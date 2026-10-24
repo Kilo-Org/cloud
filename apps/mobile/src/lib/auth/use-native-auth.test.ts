@@ -120,7 +120,7 @@ vi.mock('@/lib/auth/auth-fetch', async importOriginal => {
 
 // ── Imports (all after vi.mock hoisting) ───────────────────────────────
 
-const { defaultErrorMessage, mapError, retryableAdmissionError } =
+const { defaultErrorMessage, mapError, mapErrorKey, retryableAdmissionError } =
   await import('@/lib/auth/auth-error-messages');
 
 const { resolveAdmission } = await import('@/lib/auth/resolve-admission');
@@ -240,6 +240,10 @@ describe('use-native-auth error mapping', () => {
 
   it('returns the default error message for an undefined code', () => {
     expect(mapError(undefined)).toBe(defaultErrorMessage());
+  });
+
+  it('returns the default error message for an empty-string code', () => {
+    expect(mapError('')).toBe(defaultErrorMessage());
   });
 
   it('returns the default error message for an unknown code', () => {
@@ -422,7 +426,7 @@ describe('useNativeAuth email validation feedback', () => {
       });
 
       expect(toast.error).not.toHaveBeenCalled();
-      expect(resultRef.current?.emailError).toBe(mapError(errorCode));
+      expect(resultRef.current?.emailErrorKey).toBe(mapErrorKey(errorCode));
       expect(resultRef.current?.busy).toBeUndefined();
     }
   );
@@ -434,11 +438,33 @@ describe('useNativeAuth email validation feedback', () => {
       await act(async () => {
         expect(await resultRef.current?.requestEmailCode(address)).toBe(false);
       });
-      expect(resultRef.current?.emailError).toBe(mapError('INVALID_REQUEST'));
+      expect(resultRef.current?.emailErrorKey).toBe(mapErrorKey('INVALID_REQUEST'));
       expect(mockPostAuth).not.toHaveBeenCalled();
       expect(toast.error).not.toHaveBeenCalled();
     }
   );
+
+  it.each([255, 3508])('rejects an address of %i characters before delivery', async length => {
+    const address = `${'a'.repeat(length - 12)}@example.com`;
+    mockPostAuth.mockResolvedValue({ ok: true, data: { success: true } });
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      expect(await resultRef.current?.requestEmailCode(address)).toBe(false);
+    });
+    expect(resultRef.current?.emailErrorKey).toBe(mapErrorKey('INVALID_REQUEST'));
+    expect(mockPostAuth).not.toHaveBeenCalled();
+  });
+
+  it('allows the 254-character boundary after normalization', async () => {
+    const address = `${'a'.repeat(64)}@${'b'.repeat(63)}.${'c'.repeat(63)}.${'d'.repeat(61)}`;
+    mockPostAuth.mockResolvedValue({ ok: true, data: { success: true } });
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      expect(await resultRef.current?.requestEmailCode(` ${address.toUpperCase()} `)).toBe(true);
+    });
+    expect(mockPostAuth).toHaveBeenCalledWith('/api/auth/native/otp', { email: address });
+    expect(resultRef.current?.emailErrorKey).toBeUndefined();
+  });
 
   it('keeps an empty-email error inline without sending a request', async () => {
     const resultRef = await mountNativeAuth();
@@ -448,7 +474,7 @@ describe('useNativeAuth email validation feedback', () => {
 
     expect(toast.error).not.toHaveBeenCalled();
     expect(mockPostAuth).not.toHaveBeenCalled();
-    expect(resultRef.current?.emailError).toBe('Please enter your email address.');
+    expect(resultRef.current?.emailErrorKey).toBe('login.pleaseEnterEmail');
   });
 
   it('clears validation on edit and allows a corrected address to request a code', async () => {
@@ -459,7 +485,7 @@ describe('useNativeAuth email validation feedback', () => {
     act(() => {
       resultRef.current?.clearEmailError();
     });
-    expect(resultRef.current?.emailError).toBeUndefined();
+    expect(resultRef.current?.emailErrorKey).toBeUndefined();
 
     mockPostAuth.mockResolvedValue({ ok: true, data: { success: true } });
     await act(async () => {
@@ -468,7 +494,7 @@ describe('useNativeAuth email validation feedback', () => {
     expect(mockPostAuth).toHaveBeenCalledWith('/api/auth/native/otp', {
       email: 'user@example.com',
     });
-    expect(resultRef.current?.emailError).toBeUndefined();
+    expect(resultRef.current?.emailErrorKey).toBeUndefined();
     expect(toast.error).not.toHaveBeenCalled();
   });
 
@@ -487,7 +513,7 @@ describe('useNativeAuth email validation feedback', () => {
       void resultRef.current?.requestEmailCode('user@example.com');
     });
     expect(resultRef.current?.busy).toBe('otp-send');
-    expect(resultRef.current?.emailError).toBeUndefined();
+    expect(resultRef.current?.emailErrorKey).toBeUndefined();
     await act(async () => {
       finish?.({ ok: false, errorCode: 'EMAIL_DELIVERY_FAILED', ssoOrganizationId: undefined });
       await Promise.resolve();
@@ -646,10 +672,11 @@ describe('useNativeAuth signup step-up', () => {
       const resultRef = await mountNativeAuth();
 
       await act(async () => {
-        expect(await resultRef.current?.verifyEmailCode('user@example.com', '123456')).toBe(false);
+        const outcome = await resultRef.current?.verifyEmailCode('user@example.com', '123456');
+        expect(outcome).toEqual({ ok: false, message: i18n.t(key) });
       });
 
-      expect(toast.error).toHaveBeenCalledWith(i18n.t(key));
+      expect(toast.error).not.toHaveBeenCalled();
       expect(authMock.signIn).not.toHaveBeenCalled();
     }
   );

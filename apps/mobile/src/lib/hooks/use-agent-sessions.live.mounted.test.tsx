@@ -81,8 +81,10 @@ vi.mock('@/components/agents/user-web-connection-provider', () => ({
 // The app-level mount subscribes to foreground transitions; the mock exposes
 // the same subscribe/remove contract as React Native.
 vi.mock('react-native', () => ({
-  InteractionManager: { runAfterInteractions: vi.fn() },
   AppState: { currentState: 'active', addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+}));
+vi.mock('@/lib/query/schedule-cache-maintenance', () => ({
+  scheduleCacheMaintenance: vi.fn(),
 }));
 // The mount also derives the app-owned needs-input plan from the route and
 // posts through expo-notifications; both are native-backed, so the mount test
@@ -200,6 +202,27 @@ describe('live query presentation and refresh contracts', () => {
     expect(live().hasAcceptedSuccess).toBe(false);
   });
 
+  it('resumes a paused first load when the manager returns online', async () => {
+    // The offline→online edge the committed-connectivity bridge produces.
+    onlineManager.setOnline(false);
+    await render();
+    expect(live().isPaused).toBe(true);
+    const network = deferred<CachedActiveSessionsData>();
+    state.request.mockReturnValue(network.promise);
+    await act(async () => {
+      onlineManager.setOnline(true);
+      await flush();
+    });
+    expect(live().isFetching).toBe(true);
+    await act(async () => {
+      network.resolve({ sessions: [makeCached({ id: 'live-1', organizationId: null })] });
+      await flush();
+    });
+    expect(live().isPaused).toBe(false);
+    expect(live().hasAcceptedSuccess).toBe(true);
+    expect(live().activeSessions.map(row => row.id)).toEqual(['live-1']);
+  });
+
   it.each([
     ['retryable', new Error('offline')],
     ['non-retryable', Object.assign(new Error('denied'), { data: { code: 'FORBIDDEN' } })],
@@ -250,7 +273,7 @@ describe('live query presentation and refresh contracts', () => {
   it.each(['cancel', 'sign-out'])(
     'rejects a fallback result after %s without publishing late data',
     async boundary => {
-      await client.fetchQuery({ queryKey: QUERY_KEY, queryFn: () => cached });
+      await client.query({ queryKey: QUERY_KEY, queryFn: () => cached });
       await render();
       const network = deferred<CachedActiveSessionsData>();
       state.request.mockReturnValue(network.promise);

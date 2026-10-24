@@ -1,6 +1,11 @@
-import { describe, test, expect } from '@jest/globals';
+import { afterEach, describe, test, expect } from '@jest/globals';
 import { eq } from 'drizzle-orm';
-import { kilocode_users, organizations, user_auth_provider } from '@kilocode/db/schema';
+import {
+  admin_action_audit_logs,
+  kilocode_users,
+  organizations,
+  user_auth_provider,
+} from '@kilocode/db/schema';
 import {
   createDeletionInProgressBlockedReason,
   createSoftDeletedBlockedReason,
@@ -137,6 +142,95 @@ describe('admin.users.updateBlockStatus', () => {
     expect(after?.blocked_at).not.toBeNull();
     expect(after?.blocked_by_kilo_user_id).toBe(admin.id);
     expect(after?.api_token_pepper).toBe('deleted-pepper');
+  });
+});
+
+async function getAdminActionAudits(actorId: string) {
+  return db
+    .select()
+    .from(admin_action_audit_logs)
+    .where(eq(admin_action_audit_logs.actor_id, actorId));
+}
+
+describe('admin action audit logging', () => {
+  test('unblocking records who lifted the block and the block it replaced', async () => {
+    const blocker = await insertTestUser({ is_admin: true });
+    const admin = await insertTestUser({ is_admin: true });
+    const blockedAt = new Date().toISOString();
+    const user = await insertTestUser({
+      blocked_reason: 'abuse',
+      blocked_at: blockedAt,
+      blocked_by_kilo_user_id: blocker.id,
+    });
+
+    const caller = await createCallerForUser(admin.id);
+    await caller.admin.users.updateBlockStatus({ userId: user.id, blocked_reason: null });
+
+    const audits = await getAdminActionAudits(admin.id);
+    expect(audits).toHaveLength(1);
+    expect(audits[0]).toMatchObject({
+      action: 'user.unblock',
+      target_type: 'user',
+      target_id: user.id,
+      metadata: {
+        previousBlockedReason: 'abuse',
+        previousBlockedByKiloUserId: blocker.id,
+      },
+    });
+    expect(audits[0]?.metadata?.previousBlockedAt).toEqual(expect.any(String));
+  });
+
+  test('blocking and no-op unblocks do not write unblock audits', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+
+    const caller = await createCallerForUser(admin.id);
+    await caller.admin.users.updateBlockStatus({ userId: user.id, blocked_reason: null });
+    await caller.admin.users.updateBlockStatus({ userId: user.id, blocked_reason: 'abuse' });
+
+    expect(await getAdminActionAudits(admin.id)).toHaveLength(0);
+  });
+
+  test('bulk unblock records one audit row per unblocked user', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const blockedAt = '2026-01-15T12:00:00.000Z';
+    const users = await Promise.all(
+      [0, 1].map(() =>
+        insertTestUser({
+          blocked_reason: 'bulk spam wave',
+          blocked_at: blockedAt,
+          blocked_by_kilo_user_id: admin.id,
+        })
+      )
+    );
+
+    const caller = await createCallerForUser(admin.id);
+    const result = await caller.admin.bulkBlock.unblockRecentBlock({
+      blocked_reason: 'bulk spam wave',
+      date: '2026-01-15',
+      blocked_by_kilo_user_id: admin.id,
+    });
+    expect(result).toEqual({ updatedCount: 2 });
+
+    const audits = await getAdminActionAudits(admin.id);
+    expect(audits.map(audit => audit.target_id).sort()).toEqual(users.map(u => u.id).sort());
+    expect(audits.every(audit => audit.action === 'user.unblock')).toBe(true);
+  });
+
+  test('API key reset and session sign-out are recorded against the target user', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+
+    const caller = await createCallerForUser(admin.id);
+    await caller.admin.users.resetAPIKey({ userId: user.id });
+    await caller.admin.users.signOutBrowserSessions({ userId: user.id });
+
+    const audits = await getAdminActionAudits(admin.id);
+    expect(audits.map(audit => audit.action).sort()).toEqual([
+      'user.api_key.reset',
+      'user.browser_sessions.revoke',
+    ]);
+    expect(audits.every(audit => audit.target_id === user.id)).toBe(true);
   });
 });
 
@@ -443,5 +537,39 @@ describe('admin.users.releaseEmailAddress', () => {
         expectedEmail: target.google_user_email,
       })
     ).rejects.toMatchObject({ code: 'FORBIDDEN', message: 'Admin access required' });
+  });
+});
+
+describe('admin.syncProviders manual sync', () => {
+  const originalVercelEnv = process.env.VERCEL_ENV;
+
+  afterEach(() => {
+    if (originalVercelEnv === undefined) {
+      delete process.env.VERCEL_ENV;
+    } else {
+      process.env.VERCEL_ENV = originalVercelEnv;
+    }
+  });
+
+  test('is disabled in production', async () => {
+    process.env.VERCEL_ENV = 'production';
+    const admin = await insertTestUser({ is_admin: true });
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(caller.admin.syncProviders.getManualSyncEnabled()).resolves.toBe(false);
+    await expect(caller.admin.syncProviders.triggerSync()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    await expect(caller.admin.syncProviders.triggerDirectByokSync()).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+  });
+
+  test.each(['preview', 'development'])('is enabled when VERCEL_ENV is %s', async vercelEnv => {
+    process.env.VERCEL_ENV = vercelEnv;
+    const admin = await insertTestUser({ is_admin: true });
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(caller.admin.syncProviders.getManualSyncEnabled()).resolves.toBe(true);
   });
 });

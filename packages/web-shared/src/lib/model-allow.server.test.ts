@@ -1,4 +1,9 @@
-import { describe, expect, test } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, test } from '@jest/globals';
+import {
+  customLlmDefinition,
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import {
   createAllowPredicateFromProviderAllowList,
   createAllowPredicateFromRestrictions,
@@ -15,10 +20,10 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
   );
   return {
     ...actual,
-    getKiloExclusiveInferenceProviderRestriction: (modelId: string) =>
+    getKiloExclusiveInferenceProviders: (modelId: string) =>
       modelId === 'test/restricted-exclusive'
         ? new Set(['stepfun'])
-        : actual.getKiloExclusiveInferenceProviderRestriction(modelId),
+        : actual.getKiloExclusiveInferenceProviders(modelId),
   };
 });
 
@@ -128,7 +133,73 @@ describe('model access predicates', () => {
     await expect(missingFromSnapshot(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(false);
   });
 
-  test.each(['kilo-auto/balanced', 'kilo-internal/private-model', 'kimi-coding/kimi-for-coding'])(
+  describe('custom LLMs', () => {
+    const ORG_ID = '00000000-0000-4000-8000-0000000000a1';
+    const GROUP_ID = '00000000-0000-4000-8000-0000000000b1';
+    const restrictions = {
+      requireModelInCurrentSnapshot: true,
+      providerAllowList: [],
+      modelDenyList: ['acme/org-model', 'acme/group-model'],
+    };
+
+    beforeAll(async () => {
+      await insertCustomLlmForTest(
+        'acme/org-model',
+        customLlmDefinition({ organization_ids: [ORG_ID] })
+      );
+      await insertCustomLlmForTest(
+        'acme/group-model',
+        customLlmDefinition({ organization_ids: [], group_ids: [GROUP_ID] })
+      );
+    });
+
+    afterAll(async () => {
+      await deleteCustomLlmForTest('acme/org-model');
+      await deleteCustomLlmForTest('acme/group-model');
+    });
+
+    test.each([
+      ['an allowlisted organization', 'acme/org-model', { organizationId: ORG_ID, groupIds: [] }],
+      [
+        'an allowlisted group',
+        'acme/group-model',
+        { organizationId: '00000000-0000-4000-8000-0000000000a2', groupIds: [GROUP_ID] },
+      ],
+    ])('exempts a custom LLM granted to %s', async (_grant, modelId, customLlmGrantee) => {
+      const isAllowed = createAllowPredicateFromRestrictions(
+        { ...restrictions, customLlmGrantee },
+        lookup({})
+      );
+
+      await expect(isAllowed(modelId)).resolves.toBe(true);
+    });
+
+    test.each([
+      [
+        'another organization',
+        { organizationId: '00000000-0000-4000-8000-0000000000a2', groupIds: [] },
+      ],
+      ['no grantee', undefined],
+    ])('applies restrictions to a custom LLM for %s', async (_grant, customLlmGrantee) => {
+      const isAllowed = createAllowPredicateFromRestrictions(
+        { ...restrictions, customLlmGrantee },
+        lookup({})
+      );
+
+      await expect(isAllowed('acme/org-model')).resolves.toBe(false);
+    });
+
+    test('does not exempt a kilo-internal/ id without a custom LLM', async () => {
+      const isAllowed = createAllowPredicateFromRestrictions(
+        { requireModelInCurrentSnapshot: true, providerAllowList: [], modelDenyList: [] },
+        lookup({})
+      );
+
+      await expect(isAllowed('kilo-internal/missing-model')).resolves.toBe(false);
+    });
+  });
+
+  test.each(['kilo-auto/balanced', 'kimi-coding/kimi-for-coding'])(
     'keeps %s exempt from Enterprise model restrictions',
     async modelId => {
       const isAllowed = createAllowPredicateFromRestrictions(

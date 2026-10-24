@@ -30,6 +30,7 @@ import {
   type GetGitLabTokenResult,
 } from './gitlab-runtime-token-resolver.js';
 import { DEFAULT_GITLAB_INSTANCE_URL } from './gitlab-constants.js';
+import { readBoundedJsonBody } from './lib/bounded-read.js';
 import {
   GitLabSessionCapabilityCodec,
   GitLabSessionCapabilityError,
@@ -125,6 +126,15 @@ export type GetTokenForRepoFailure = {
 };
 
 export type GetTokenForRepoResult = GetTokenForRepoSuccess | GetTokenForRepoFailure;
+
+const GetTokenForIntegrationParamsSchema = z.object({
+  integrationId: z.string().uuid(),
+  userId: z.string().min(1),
+  orgId: z.string().uuid().optional(),
+});
+
+export type GetTokenForIntegrationParams = z.infer<typeof GetTokenForIntegrationParamsSchema>;
+
 export type {
   GetGitLabTokenParams,
   GetGitLabTokenSuccess,
@@ -370,7 +380,8 @@ async function resolveSecret(secret: SecretsStoreSecret | string): Promise<strin
 
 async function readBoundedInternalJsonRequest(request: Request): Promise<unknown> {
   const contentType = request.headers.get('Content-Type')?.split(';', 1)[0].trim().toLowerCase();
-  if (contentType !== 'application/json' || !request.body) throw new Error('invalid_request');
+  const stream = request.body;
+  if (contentType !== 'application/json' || !stream) throw new Error('invalid_request');
 
   const contentLength = request.headers.get('Content-Length');
   if (contentLength) {
@@ -379,37 +390,8 @@ async function readBoundedInternalJsonRequest(request: Request): Promise<unknown
     }
   }
 
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let totalBytes = 0;
   try {
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      if (!(chunk.value instanceof Uint8Array)) throw new Error('invalid_request');
-      totalBytes += chunk.value.byteLength;
-      if (totalBytes > INTERNAL_REQUEST_MAX_BYTES) {
-        try {
-          await reader.cancel();
-        } catch {
-          // The request remains rejected when cancellation itself fails.
-        }
-        throw new Error('invalid_request');
-      }
-      chunks.push(chunk.value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-
-  const body = new Uint8Array(totalBytes);
-  let offset = 0;
-  for (const chunk of chunks) {
-    body.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  try {
-    return JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(body));
+    return await readBoundedJsonBody(stream, INTERNAL_REQUEST_MAX_BYTES);
   } catch {
     throw new Error('invalid_request');
   }
@@ -1170,11 +1152,21 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     return this.githubService.getToken(installationId, appType);
   }
 
+  /**
+   * Mint a token for a stored integration on behalf of its owner. Callers pass
+   * the owning user (and org, for org-owned resources); an integration that
+   * belongs to anyone else is reported as unavailable.
+   */
   async getTokenForIntegration(
-    integrationId: string
+    params: GetTokenForIntegrationParams
   ): Promise<{ success: true; token: string } | { success: false; reason: 'unavailable' }> {
-    const association =
-      await this.installationLookupService.findActiveAssociationById(integrationId);
+    const parsed = GetTokenForIntegrationParamsSchema.safeParse(params);
+    if (!parsed.success) return { success: false, reason: 'unavailable' };
+    const { integrationId, userId, orgId } = parsed.data;
+    const association = await this.installationLookupService.findActiveAssociationById(
+      integrationId,
+      orgId === undefined ? { userId } : { userId, orgId }
+    );
     if (!association.success) return { success: false, reason: 'unavailable' };
     const token = await this.githubService.getToken(
       association.installationId,

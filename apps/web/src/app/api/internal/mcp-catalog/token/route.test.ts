@@ -143,11 +143,10 @@ describe('POST /api/internal/mcp-catalog/token', () => {
     );
   });
 
-  // Production configures a dedicated service account, so the default id in
-  // the contracts package 404s. The mint must follow the benchmark worker's
-  // configured identity instead of a hardcoded one.
+  // The mint must follow the benchmark worker's configured identity instead
+  // of a hardcoded one.
   it('mints for the configured benchmark identity, not the contracts default', async () => {
-    const userId = 'ce12ef3d-0000-0000-0000-000000000000';
+    const userId = 'bot-internal-catalog';
     const organizationId = '9d278969-0000-0000-0000-000000000000';
     mockGetBenchmarkConfig.mockResolvedValue({
       status: 200,
@@ -175,6 +174,23 @@ describe('POST /api/internal/mcp-catalog/token', () => {
       },
       { expiresIn: 60 * 60 }
     );
+  });
+
+  it('refuses a configured identity that is not an internal bot', async () => {
+    mockGetBenchmarkConfig.mockResolvedValue({
+      status: 200,
+      body: { config: { benchmarkUserId: 'human-user', benchmarkOrgId: null } },
+    });
+    mockRows.push({ id: 'human-user', api_token_pepper: 'pepper' });
+    mockMembershipRows.push({ role: 'owner' });
+
+    const res = await POST(createRequest({ authorization: 'Bearer catalog-secret' }));
+
+    expect(res.status).toBe(502);
+    await expect(res.json()).resolves.toEqual({
+      error: expect.stringContaining('is not an internal bot user'),
+    });
+    expect(mockGenerateApiToken).not.toHaveBeenCalled();
   });
 
   it('falls back to the contracts defaults when the benchmark config is null', async () => {

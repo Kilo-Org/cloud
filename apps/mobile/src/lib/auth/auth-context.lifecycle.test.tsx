@@ -8,7 +8,12 @@ import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 
 import type * as AuthContextModule from './auth-context';
 import type * as ContextScopeModule from '../context-scope';
 import type * as TokenOwnerModule from './token-owner';
-import { CHAT_BACKENDS_KEY, ORGANIZATION_PERSONAL_STORAGE_KEY } from '@/lib/storage-keys';
+import {
+  AUTH_TOKEN_KEY,
+  CHAT_BACKENDS_KEY,
+  ORGANIZATION_PERSONAL_STORAGE_KEY,
+  REFRESH_TOKEN_KEY,
+} from '@/lib/storage-keys';
 
 // The mobile-app gate runs `vitest related` over ~170 files concurrently with
 // the device stack, so every real timer in this file stretches several-fold.
@@ -334,6 +339,14 @@ vi.mock('@/lib/hooks/use-live-activity-preference', () => ({
   clearLiveActivityPreference: vi.fn(),
 }));
 
+// The tracking prompt module pulls expo-tracking-transparency -> expo, which
+// needs `__DEV__` and cannot load in the node test environment. Mock it like
+// the sibling SecureStore preference modules: this suite only asserts the
+// teardown ordering.
+vi.mock('@/lib/hooks/use-tracking-permission-prompt', () => ({
+  clearTrackingPromptDismissed: vi.fn(),
+}));
+
 vi.mock('@/lib/hooks/use-reasoning-preference', () => ({ clearReasoningPreference }));
 
 // Like use-trusted-hosts below: the real module pulls secure-store-preference
@@ -457,6 +470,7 @@ vi.mock('@/lib/storage-keys', () => ({
   ORGANIZATION_PERSONAL_STORAGE_KEY: 'selected-organization-personal',
   PENDING_DEEP_LINK_KEY: 'pending-deep-link',
   PICKER_LAUNCH_CONTEXT_KEY: 'picker-launch-context',
+  PICKER_RESTORE_RECORD_KEY: 'picker-restore-record',
   REFRESH_TOKEN_KEY: 'refresh-token',
   LIVE_SESSION_FILTERS_KEY: 'live-session-filters',
   SESSION_FILTERS_KEY: 'session-filters',
@@ -513,12 +527,12 @@ async function loadAuthModule() {
 /** Mount the AuthProvider and extract the auth context value via a
  *  consumer child. The context is captured synchronously once the
  *  component mounts inside act. */
-async function mountAndGetContext(): Promise<{
+async function mountAndGetContext(authModule?: typeof AuthContextModule): Promise<{
   ctx: AuthContextValue;
   getCtx: () => AuthContextValue;
   unmount: () => void;
 }> {
-  const mod = await loadAuthModule();
+  const mod = authModule ?? (await loadAuthModule());
 
   let capturedCtx: AuthContextValue | undefined = undefined;
   // The consumer captures ctx before any act flush.
@@ -1307,13 +1321,15 @@ describe('bootstrap and foreground race fencing', () => {
    *  runs against the caller-installed SecureStore mock queue. The queue is
    *  consumed in this order: preloadedToken, preloadedRefreshToken, the
    *  bootstrap expiry read, then the bootstrap credential re-read. */
-  async function mountProvider(): Promise<{
+  async function mountProvider(existingModule?: typeof AuthContextModule): Promise<{
     getCtx: () => AuthContextValue;
     unmount: () => void;
     mod: typeof AuthContextModule;
   }> {
-    vi.resetModules();
-    const mod = await import('./auth-context');
+    if (existingModule === undefined) {
+      vi.resetModules();
+    }
+    const mod = existingModule ?? (await import('./auth-context'));
 
     let capturedCtx: AuthContextValue | undefined = undefined;
     function Consumer(): null {
@@ -1344,6 +1360,93 @@ describe('bootstrap and foreground race fencing', () => {
       mod,
     };
   }
+
+  it('restores the signed-in session when the provider remounts after a signed-out launch', async () => {
+    const first = await mountProvider();
+    await settleBootstrap(first.getCtx);
+    expect(first.getCtx().token).toBeUndefined();
+    const token = makeToken({ kiloUserId: 'user-1' });
+    await act(async () => {
+      await first.getCtx().signIn(token, 'current-refresh', 3600);
+    });
+    hoisted.secureStore.getItemAsync.mockImplementation((key: string) => {
+      if (key === 'auth-token') {
+        return Promise.resolve(token);
+      }
+      if (key === 'refresh-token') {
+        return Promise.resolve('current-refresh');
+      }
+      return Promise.resolve(null);
+    });
+    act(first.unmount);
+    // signIn already binds the user id; only the remount may satisfy the assertion below.
+    hoisted.deepLinkLaunch.setCurrentDeepLinkUserId.mockClear();
+
+    const recovered = await mountProvider(first.mod);
+    onTestFinished(() => act(recovered.unmount));
+    await settleBootstrap(recovered.getCtx);
+
+    expect(recovered.getCtx().token).toBe(token);
+    expect(recovered.getCtx().restoreFailed).toBe(false);
+    expect(recovered.getCtx().sessionEnded).toBe(false);
+    expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).toHaveBeenLastCalledWith('user-1');
+  });
+
+  it('surfaces unreadable current credentials on remount instead of replaying an empty launch', async () => {
+    useFakeBackoffClock();
+    const first = await mountProvider();
+    await settleBootstrap(first.getCtx);
+    act(first.unmount);
+    hoisted.secureStore.getItemAsync.mockRejectedValue(new Error('keychain unavailable'));
+
+    const recovered = await mountProvider(first.mod);
+    onTestFinished(() => act(recovered.unmount));
+    await settleBootstrap(recovered.getCtx);
+
+    expect(recovered.getCtx().restoreFailed).toBe(true);
+    expect(recovered.getCtx().sessionEnded).toBe(false);
+  });
+
+  it('does not republish stored credentials when a provider mounts during sign-out teardown', async () => {
+    const first = await mountProvider();
+    await settleBootstrap(first.getCtx);
+    const storedToken = makeToken({ kiloUserId: 'user-1' });
+    await act(async () => {
+      await first.getCtx().signIn(storedToken, 'stored-refresh', 3600);
+    });
+
+    // Hold the remote cleanup open: the epoch bump that would fence a remount
+    // waits for it, so the stored credentials stay readable in the window.
+    const { promise: cleanupGate, resolve: releaseCleanup } = Promise.withResolvers<undefined>();
+    logoutCleanupMock.runLogoutCleanup.mockImplementationOnce(async () => {
+      await cleanupGate;
+    });
+    const signOutPromise = first.getCtx().signOut();
+    await vi.waitFor(() => {
+      expect(logoutCleanupMock.runLogoutCleanup).toHaveBeenCalled();
+    });
+    hoisted.secureStore.getItemAsync.mockImplementation((key: string) => {
+      if (key === 'auth-token') {
+        return Promise.resolve(storedToken);
+      }
+      if (key === 'refresh-token') {
+        return Promise.resolve('stored-refresh');
+      }
+      return Promise.resolve(null);
+    });
+
+    const mountedDuringTeardown = await mountProvider(first.mod);
+    onTestFinished(() => act(mountedDuringTeardown.unmount));
+    await settleBootstrap(mountedDuringTeardown.getCtx);
+
+    expect(mountedDuringTeardown.getCtx().token).toBeUndefined();
+
+    releaseCleanup(undefined);
+    await act(async () => {
+      await signOutPromise;
+    });
+    expect(mountedDuringTeardown.getCtx().token).toBeUndefined();
+  });
 
   it('regression: sign-out during bootstrap does not restore the preloaded token into React state or the owner', async () => {
     const { promise: readGate, resolve: releaseRead } = Promise.withResolvers<undefined>();
@@ -2877,4 +2980,115 @@ describe('startup credential read failure', () => {
 
     unmount();
   }, 30_000);
+});
+
+describe('session restoration after provider remount', () => {
+  const store = new Map<string, string>();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    store.clear();
+    hoisted.secureStore.getItemAsync.mockImplementation((key: string) =>
+      Promise.resolve(store.get(key) ?? null)
+    );
+    hoisted.secureStore.setItemAsync.mockImplementation((key: string, value: string) => {
+      store.set(key, value);
+      return Promise.resolve();
+    });
+    hoisted.secureStore.deleteItemAsync.mockImplementation((key: string) => {
+      store.delete(key);
+      return Promise.resolve();
+    });
+  });
+
+  afterEach(() => {
+    hoisted.secureStore.getItemAsync.mockResolvedValue(null);
+    hoisted.secureStore.setItemAsync.mockResolvedValue(undefined);
+    hoisted.secureStore.deleteItemAsync.mockImplementation(() => {
+      hoisted.callOrder.push('SecureStore.deleteItemAsync');
+      return Promise.resolve();
+    });
+  });
+
+  it('restores a session signed in after the initial signed-out bootstrap', async () => {
+    const mod = await loadAuthModule();
+    const first = await mountAndGetContext(mod);
+    expect(first.getCtx().token).toBeUndefined();
+
+    await act(async () => {
+      await first.getCtx().signIn('signed-in-token', 'signed-in-refresh', 3600);
+    });
+    expect(first.getCtx().token).toBe('signed-in-token');
+    await act(() => {
+      first.unmount();
+    });
+
+    const restored = await mountAndGetContext(mod);
+    onTestFinished(() => {
+      restored.unmount();
+    });
+    expect(restored.getCtx().token).toBe('signed-in-token');
+    expect(restored.getCtx().restoreFailed).toBe(false);
+  });
+
+  it('reads secure storage again on every later mount, not only the second one', async () => {
+    const mod = await loadAuthModule();
+    const first = await mountAndGetContext(mod);
+    await act(async () => {
+      await first.getCtx().signIn('first-token', 'first-refresh', 3600);
+    });
+    await act(() => {
+      first.unmount();
+    });
+
+    const second = await mountAndGetContext(mod);
+    expect(second.getCtx().token).toBe('first-token');
+    await act(() => {
+      second.unmount();
+    });
+
+    // A token written while the second mount was alive must win over every
+    // snapshot: the preload from JavaScript start and the second mount's read.
+    store.set(AUTH_TOKEN_KEY, 'second-token');
+    store.set(REFRESH_TOKEN_KEY, 'second-refresh');
+    const third = await mountAndGetContext(mod);
+    expect(third.getCtx().token).toBe('second-token');
+    await act(() => {
+      third.unmount();
+    });
+
+    // Remounting repeatedly keeps using secure storage rather than a
+    // one-time refresh snapshot from an earlier provider.
+    store.set(AUTH_TOKEN_KEY, 'third-token');
+    store.set(REFRESH_TOKEN_KEY, 'third-refresh');
+    const fourth = await mountAndGetContext(mod);
+    onTestFinished(() => {
+      fourth.unmount();
+    });
+    expect(fourth.getCtx().token).toBe('third-token');
+    expect(fourth.getCtx().restoreFailed).toBe(false);
+  });
+
+  it('does not restore an initial session after explicit sign-out', async () => {
+    store.set(AUTH_TOKEN_KEY, 'initial-token');
+    store.set(REFRESH_TOKEN_KEY, 'initial-refresh');
+    const mod = await loadAuthModule();
+    const first = await mountAndGetContext(mod);
+    expect(first.getCtx().token).toBe('initial-token');
+
+    await act(async () => {
+      await first.getCtx().signOut();
+    });
+    expect(first.getCtx().token).toBeUndefined();
+    await act(() => {
+      first.unmount();
+    });
+
+    const restored = await mountAndGetContext(mod);
+    onTestFinished(() => {
+      restored.unmount();
+    });
+    expect(restored.getCtx().token).toBeUndefined();
+    expect(restored.getCtx().restoreFailed).toBe(false);
+  });
 });

@@ -45,10 +45,6 @@ export function EditWebhookTriggerContent({
   // Build URLs based on context
   const routes = getWebhookRoutes(organizationId);
 
-  const { data: capabilities, isPending: isLoadingCapabilities } = useQuery(
-    trpc.webhookTriggers.capabilities.queryOptions({ organizationId })
-  );
-
   // Fetch trigger configuration
   const {
     data: triggerData,
@@ -60,6 +56,21 @@ export function EditWebhookTriggerContent({
       triggerId,
       organizationId: organizationId ?? undefined,
     })
+  );
+
+  const {
+    data: capabilities,
+    isPending: isLoadingCapabilities,
+    isError: hasCapabilitiesError,
+    refetch: refetchCapabilities,
+  } = useQuery(
+    trpc.webhookTriggers.capabilities.queryOptions(
+      {
+        organizationId,
+        githubRepo: triggerData?.githubRepo || undefined,
+      },
+      { enabled: triggerData !== undefined }
+    )
   );
 
   // Fetch GitHub repositories (use org-scoped query when in org context)
@@ -79,7 +90,11 @@ export function EditWebhookTriggerContent({
   );
 
   // Fetch models
-  const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(organizationId);
+  const { data: modelsData, isLoading: isLoadingModels } = useModelSelectorList(
+    organizationId,
+    true,
+    'shared_services'
+  );
 
   // Transform repositories to RepositoryOption format
   const repositories = useMemo<RepositoryOption[]>(() => {
@@ -111,6 +126,7 @@ export function EditWebhookTriggerContent({
     if (!triggerData) return undefined;
     return {
       triggerId: triggerData.triggerId,
+      executionUserId: triggerData.executionUserId,
       activationMode: triggerData.activationMode === 'scheduled' ? 'scheduled' : 'webhook',
       cronExpression: triggerData.cronExpression,
       cronTimezone: triggerData.cronTimezone,
@@ -121,6 +137,7 @@ export function EditWebhookTriggerContent({
       sandboxAllocation: triggerData.sandboxAllocation ?? undefined,
       promptTemplate: triggerData.promptTemplate,
       profileId: triggerData.profileId ?? undefined,
+      bodySchema: triggerData.bodySchema,
       autoCommit: triggerData.autoCommit ?? undefined,
       condenseOnComplete: triggerData.condenseOnComplete ?? undefined,
       isActive: triggerData.isActive,
@@ -174,6 +191,7 @@ export function EditWebhookTriggerContent({
         sandboxAllocation: formData.sandboxAllocation,
         promptTemplate: formData.promptTemplate,
         profileId: formData.profileId,
+        bodySchema: formData.bodySchema,
         autoCommit: formData.autoCommit ?? null,
         condenseOnComplete: formData.condenseOnComplete ?? null,
         isActive: formData.isActive,
@@ -415,7 +433,10 @@ export function EditWebhookTriggerContent({
           models={modelOptions}
           isLoadingModels={isLoadingModels}
           canSetSandboxAllocation={capabilities?.canSetSandboxAllocation ?? false}
+          sandboxSelection={capabilities?.sandboxSelection}
           isLoadingCapabilities={isLoadingCapabilities}
+          hasCapabilitiesError={hasCapabilitiesError}
+          onRetryCapabilities={() => void refetchCapabilities()}
           onSubmit={handleSubmit}
           onSaveAndInvoke={!isKiloclawChat && isScheduled ? handleSaveAndInvoke : undefined}
           onCancel={handleCancel}

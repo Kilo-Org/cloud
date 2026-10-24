@@ -25,10 +25,12 @@ import { kv } from './schema';
  * SecureStore. All plaintext lives only inside the encrypted database file;
  * no unencrypted store is created.
  *
- * Every statement runs through Drizzle: the table lives in `./schema.ts`, the
- * `drizzle/` migrations are generated from it, and the pragmas and probes use
- * Drizzle's `sql` template. Only the database lifecycle (open, close, delete)
- * stays on expo-sqlite, which has no Drizzle equivalent. Drizzle's expo driver
+ * Connection setup stays on the raw synchronous expo-sqlite handle: the
+ * SQLCipher probe, `PRAGMA key`, and the busy-timeout and journal-mode
+ * pragmas must all run before anything reads the schema, and Drizzle would
+ * prepare a statement that itself reads it. Once the connection is keyed, the
+ * table lives in `./schema.ts`, the `drizzle/` migrations are generated from
+ * it, and this module's queries go through Drizzle. Drizzle's expo driver
  * wraps the *synchronous* handle, so the statements themselves block the JS
  * thread; the exported API stays async because opening and keying do not.
  *
@@ -166,20 +168,43 @@ async function closeQuietly(client: SQLite.SQLiteDatabase): Promise<boolean> {
 }
 
 /**
- * Configures the single connection to wait out a lock and to use WAL. Both
+ * Configures the single connection to wait out a lock and to prefer WAL. Both
  * pragmas must run after `PRAGMA key` and before any statement reads the
  * schema, so a concurrent writer waits instead of failing immediately.
- * SQLCipher supports WAL, and `PRAGMA journal_mode = WAL` returns the mode it
- * switched to, so the switch is verified, not assumed.
+ *
+ * WAL is a preference, not a precondition. Some engines and files refuse the
+ * switch (a held lock, a read-only file, a build without WAL), and a refusal
+ * says nothing about whether the database works: the row reports the mode the
+ * connection is in after the request, and any supported mode is usable. An
+ * open that failed here would be read as a corrupt file, so the store would be
+ * deleted and recreated on every launch, losing its cache and drafts. The
+ * `sqlite_master` probe that follows is the real usability test.
  */
 function configureConnection(client: SQLite.SQLiteDatabase): void {
   client.execSync(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS}`);
-  const row = client.getFirstSync<{ journal_mode?: string }>('PRAGMA journal_mode = WAL');
-  if (row?.journal_mode?.toLowerCase() !== 'wal') {
-    throw new Error(
-      `encrypted-kv: journal_mode did not switch to WAL (got ${String(row?.journal_mode)})`
-    );
+  let journalMode = 'unknown';
+  let pragmaFailed = false;
+  try {
+    const row = client.getFirstSync<{ journal_mode?: string }>('PRAGMA journal_mode = WAL');
+    journalMode = row?.journal_mode?.toLowerCase() ?? journalMode;
+  } catch {
+    // Rejected by the engine (for example SQLITE_BUSY). The connection keeps
+    // the mode it already had; nothing about the store is decided here.
+    pragmaFailed = true;
   }
+  if (!pragmaFailed && journalMode === 'wal') {
+    return;
+  }
+  // A breadcrumb, not an event: it rides on the next captured event, so a
+  // device that never reaches WAL does not file an issue on every launch.
+  Sentry.addBreadcrumb({
+    category: 'encrypted-kv',
+    level: 'warning',
+    message: pragmaFailed
+      ? 'PRAGMA journal_mode = WAL was rejected'
+      : 'journal_mode did not switch to WAL',
+    data: { journal_mode: journalMode },
+  });
 }
 
 async function openWithKey(key: string): Promise<KVDatabase> {

@@ -57,6 +57,7 @@ export default function ModePickerScreen() {
           router.back();
         }}
         scrollable={false}
+        topInset="never"
         expired
       />
     );
@@ -109,9 +110,11 @@ export default function ModePickerScreen() {
         router.back();
       }}
       scrollable={false}
+      topInset="never"
     >
       {custom.length === 0 ? (
         <FlashList
+          nestedScrollEnabled
           style={[listStyle, { backgroundColor: colors.background }]}
           data={MODE_OPTIONS}
           keyExtractor={item => item.value}
@@ -119,7 +122,7 @@ export default function ModePickerScreen() {
           ItemSeparatorComponent={() => separator}
         />
       ) : (
-        <ScrollView className="flex-1 bg-background">
+        <ScrollView nestedScrollEnabled className="flex-1 bg-background">
           {MODE_OPTIONS.map((item, index) => (
             <View key={item.value}>
               {index > 0 ? separator : null}

@@ -1,169 +1,155 @@
-import { logger } from '../logger.js';
-import * as runtimeAuthorization from '@kilocode/worker-utils/runtime-authorization';
-import * as sessionService from '../session-service.js';
-import type { SessionMetadata } from '../persistence/session-metadata.js';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TRPCError } from '@trpc/server';
+import jwt from 'jsonwebtoken';
 
-import {
-  preflightAndQueuePromptMessage,
-  preflightRuntimeAuthorizationRecovery,
-  queueMessage,
-  type QueueMessageInput,
-} from './queue-message.js';
-import { preflightExistingPromptModel } from './model-preflight.js';
-import { QUEUED_MESSAGE_LIMIT } from '../control-plane/session/messages.js';
-import type {
-  CustomerBillingFailure,
-  SessionMessageAdmissionResult,
-  SubmittedSessionMessageRequest,
-} from '../execution/types.js';
+import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type { Env } from '../types.js';
 import type { SessionId } from '../types/ids.js';
+import type { CustomerBillingFailure, SessionMessageAdmissionResult } from '../execution/types.js';
+import { QUEUED_MESSAGE_LIMIT } from '../control-plane/session/messages.js';
 
 vi.mock('./model-preflight.js', () => ({
   preflightExistingPromptModel: vi.fn(),
-  preflightSessionRuntime: vi.fn().mockResolvedValue(undefined),
+  preflightSessionRuntime: vi.fn(),
 }));
 
-type QueueMessageEnv = Pick<Env, 'CLOUD_AGENT_SESSION' | 'SANDBOX_SESSION'>;
+const fetchSessionMetadata = vi.hoisted(() => vi.fn());
 
-function makeDoStub(result: SessionMessageAdmissionResult) {
-  const admitSubmittedMessage = vi.fn().mockResolvedValue(result);
-  const hasMessageAdmission = vi.fn().mockResolvedValue(false);
-  return {
-    stub: { admitSubmittedMessage, hasMessageAdmission },
-    admitSubmittedMessage,
-    hasMessageAdmission,
-  };
-}
+vi.mock('./metadata.js', () => ({ fetchSessionMetadata }));
 
-function makeEnv(stub: unknown): QueueMessageEnv {
+vi.mock('../auth.js', () => ({
+  resolveSecret: vi.fn(async () => 'secret'),
+}));
+
+vi.mock('@kilocode/worker-utils/runtime-authorization', () => ({
+  createRuntimeAuthorization: vi.fn(async () => ({
+    authorization: { id: 'authorization-1' },
+    token: 'runtime-token',
+  })),
+  sealRuntimeAuthorization: vi.fn(async () => 'runtime-seal'),
+}));
+
+vi.mock('../execution/attachment-prompt-parts.js', () => ({
+  buildSignedPromptAttachments: vi.fn(async () => []),
+}));
+
+import {
+  pendingQueueFullAdmissionFailure,
+  preflightAndQueuePromptMessage,
+  preflightRuntimeAuthorizationRecovery,
+  projectAdmissionToPublicAck,
+  queueMessage,
+  throwAdmissionError,
+  type QueueMessageInput,
+} from './queue-message.js';
+import { preflightExistingPromptModel, preflightSessionRuntime } from './model-preflight.js';
+
+const metadata = {
+  metadataSchemaVersion: 2,
+  identity: {
+    sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+    userId: 'user_abc',
+    createdOnPlatform: 'cloud-agent-web',
+  },
+  agent: { mode: 'code', model: 'test/model' },
+} as unknown as SessionMetadata;
+
+function makeEnv(stub: unknown): Env {
   return {
-    CLOUD_AGENT_SESSION: {
-      idFromName: vi.fn((name: string) => ({ toString: () => name })),
-      get: vi.fn(() => stub),
-    } as unknown as Env['CLOUD_AGENT_SESSION'],
     SANDBOX_SESSION: {
       idFromName: vi.fn((name: string) => ({ toString: () => name })),
       get: vi.fn(() => stub),
-    } as unknown as Env['SANDBOX_SESSION'],
-  };
+    },
+  } as unknown as Env;
 }
 
+function makeSend(result: unknown) {
+  return vi.fn().mockResolvedValue(result);
+}
+
+const promptInput: QueueMessageInput = {
+  cloudAgentSessionId: 'workspace_existing',
+  turn: { type: 'prompt', prompt: 'follow up' },
+};
+
 beforeEach(() => {
+  vi.mocked(fetchSessionMetadata).mockReset().mockResolvedValue(metadata);
   vi.mocked(preflightExistingPromptModel).mockReset().mockResolvedValue(undefined);
+  vi.mocked(preflightSessionRuntime).mockReset().mockResolvedValue(undefined);
 });
 
 describe('preflightAndQueuePromptMessage', () => {
-  it('retains legacy routing and preflight for an existing agent_ session', async () => {
-    const { stub, admitSubmittedMessage, hasMessageAdmission } = makeDoStub({
-      success: true,
-      outcome: 'queued',
-      messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
-      compatibilityDelivery: 'queued',
-    });
-    const env = makeEnv(stub) as Env;
-    const idFromName = vi.spyOn(env.CLOUD_AGENT_SESSION, 'idFromName');
-    const getSandboxSession = vi.spyOn(env.SANDBOX_SESSION, 'get');
-    const input: QueueMessageInput = {
-      cloudAgentSessionId: 'agent_existing',
-      turn: { type: 'prompt', id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn', prompt: 'follow up' },
-      agent: { model: 'kilo/anthropic/claude-sonnet-4' },
-    };
+  it('runs stored-session, runtime-authorization and model preflight before the send RPC', async () => {
+    const send = makeSend({ type: 'ok' });
+    const env = makeEnv({ send }) as Env;
 
     await expect(
-      preflightAndQueuePromptMessage(input, { env, userId: 'user_abc' }, 'send')
-    ).resolves.toMatchObject({ delivery: 'queued', messageId: input.turn.id });
+      preflightAndQueuePromptMessage(
+        {
+          ...promptInput,
+          turn: { type: 'prompt', id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn', prompt: 'follow up' },
+          agent: { model: 'kilo/anthropic/claude-sonnet-4' },
+        },
+        { env, userId: 'user_abc' },
+        'send'
+      )
+    ).resolves.toMatchObject({
+      delivery: 'queued',
+      messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+    });
 
-    expect(hasMessageAdmission).toHaveBeenCalledExactlyOnceWith(input.turn.id);
-    expect(preflightExistingPromptModel).toHaveBeenCalledExactlyOnceWith({
+    expect(preflightSessionRuntime).toHaveBeenCalledWith({
       env,
       userId: 'user_abc',
-      cloudAgentSessionId: 'agent_existing',
+      cloudAgentSessionId: 'workspace_existing',
+      procedure: 'send',
+    });
+    expect(preflightExistingPromptModel).toHaveBeenCalledWith({
+      env,
+      userId: 'user_abc',
+      cloudAgentSessionId: 'workspace_existing',
       requestedModel: 'kilo/anthropic/claude-sonnet-4',
       procedure: 'send',
     });
     expect(vi.mocked(preflightExistingPromptModel).mock.invocationCallOrder[0]).toBeLessThan(
-      admitSubmittedMessage.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+      send.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
     );
-    expect(idFromName).toHaveBeenCalledWith('user_abc:agent_existing');
-    expect(getSandboxSession).not.toHaveBeenCalled();
-  });
-
-  it('runs foreground runtime authorization recovery once before normal admission', async () => {
-    const { stub, admitSubmittedMessage } = makeDoStub({
-      success: true,
-      outcome: 'queued',
-      messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
-      compatibilityDelivery: 'queued',
-    });
-    const getRuntimeAuthorizationRecoveryState = vi.fn().mockResolvedValue({ state: 'active' });
-    Object.assign(stub, { getRuntimeAuthorizationRecoveryState });
-
-    await preflightAndQueuePromptMessage(
-      {
-        cloudAgentSessionId: 'agent_existing',
-        turn: { type: 'prompt', id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn', prompt: 'follow up' },
-      },
-      {
-        env: makeEnv(stub) as Env,
-        userId: 'user_abc',
-        authToken: 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJraWxvIn0.signature',
-      },
-      'send'
-    );
-
-    expect(getRuntimeAuthorizationRecoveryState).toHaveBeenCalledOnce();
-    expect(admitSubmittedMessage).toHaveBeenCalledOnce();
+    expect(send).toHaveBeenCalledOnce();
   });
 });
 
 describe('queueMessage', () => {
-  it('returns the DO result mapped to an ExecutionResponse on success', async () => {
-    const { stub, admitSubmittedMessage } = makeDoStub({
-      success: true,
-      outcome: 'queued',
-      compatibilityDelivery: 'queued',
-      messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
-    });
+  it('admits through the V2 send RPC and projects a queued acknowledgment', async () => {
+    const send = makeSend({ type: 'ok' });
+    const env = makeEnv({ send }) as Env;
 
     const response = await queueMessage(
       {
-        cloudAgentSessionId: 'agent_1234' as SessionId,
+        ...promptInput,
         turn: { type: 'prompt', prompt: 'hello' },
       },
-      {
-        env: makeEnv(stub) as Env,
-        userId: 'user_abc',
-      }
+      { env, userId: 'user_abc' }
     );
 
-    expect(response.cloudAgentSessionId).toBe('agent_1234');
-    expect(response.status).toBe('started');
-    expect(response.delivery).toBe('queued');
-    expect(response.streamUrl).toBe('/stream?cloudAgentSessionId=agent_1234');
-    expect(admitSubmittedMessage).toHaveBeenCalledTimes(1);
-    const request = admitSubmittedMessage.mock.calls[0]?.[0] as
-      | SubmittedSessionMessageRequest
-      | undefined;
-    expect(request).toMatchObject({
-      userId: 'user_abc',
-      turn: { type: 'prompt', prompt: 'hello' },
+    expect(response).toMatchObject({
+      cloudAgentSessionId: 'workspace_existing',
+      status: 'started',
+      delivery: 'queued',
+      streamUrl: '/stream?cloudAgentSessionId=workspace_existing',
     });
-    expect(request?.turn.id).toMatch(/^msg_/);
+    expect(response.messageId).toMatch(/^msg_/);
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageId: response.messageId,
+        turn: { type: 'prompt', prompt: 'hello' },
+        agent: { mode: 'code', model: 'test/model' },
+      })
+    );
   });
 
   it.each(['prompt', 'command'] as const)(
-    'reuses an omitted %s ID across a lost control-plane send response',
+    'reuses an omitted %s ID across a lost send response',
     async type => {
-      const metadata = {
-        identity: { createdOnPlatform: 'cloud-agent-web' },
-        agent: { mode: 'code', model: 'test/model' },
-      } as unknown as SessionMetadata;
-      const fetchMetadata = vi
-        .spyOn(sessionService, 'fetchSessionMetadata')
-        .mockResolvedValue(metadata);
       const sent: string[] = [];
       let attempts = 0;
       const send = vi.fn(async (payload: { messageId: string }) => {
@@ -173,6 +159,7 @@ describe('queueMessage', () => {
           throw Object.assign(new Error('Response lost after admission'), { retryable: true });
         return { type: 'ok' as const };
       });
+
       const response = await queueMessage(
         {
           cloudAgentSessionId: 'workspace_existing',
@@ -187,97 +174,31 @@ describe('queueMessage', () => {
       expect(attempts).toBe(2);
       expect(new Set(sent).size).toBe(1);
       expect(sent[0]).toBe(response.messageId);
-      fetchMetadata.mockRestore();
     }
   );
 
-  it('projects an already runtime-accepted replay as sent at the public seam', async () => {
-    const { stub } = makeDoStub({
-      success: true,
-      outcome: 'queued',
-      compatibilityDelivery: 'sent',
-      messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
-    });
-
-    const response = await queueMessage(
-      {
-        cloudAgentSessionId: 'agent_y' as SessionId,
-        turn: { type: 'prompt', id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn', prompt: 'hello' },
-      },
-      { env: makeEnv(stub) as Env, userId: 'user_a' }
-    );
-
-    expect(response).toMatchObject({ status: 'started', delivery: 'sent' });
-  });
-
   it('forwards the caller messageId when provided', async () => {
-    const { stub, admitSubmittedMessage } = makeDoStub({
-      success: true,
-      outcome: 'queued',
-      compatibilityDelivery: 'queued',
-      messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
-    });
+    const send = makeSend({ type: 'ok' });
 
     await queueMessage(
       {
-        cloudAgentSessionId: 'agent_y' as SessionId,
+        ...promptInput,
         turn: { type: 'prompt', id: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn', prompt: 'hello' },
       },
-      { env: makeEnv(stub) as Env, userId: 'user_a' }
+      { env: makeEnv({ send }) as Env, userId: 'user_a' }
     );
 
-    const request = admitSubmittedMessage.mock.calls[0]?.[0] as
-      | SubmittedSessionMessageRequest
-      | undefined;
-    expect(request?.turn.id).toBe('msg_018f1e2d3c4bAbCdEfGhIjKlMn');
-  });
-
-  it('forwards canonical document attachments to the Durable Object', async () => {
-    const { stub, admitSubmittedMessage } = makeDoStub({
-      success: true,
-      outcome: 'queued',
-      compatibilityDelivery: 'queued',
-      messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
-    });
-
-    await queueMessage(
-      {
-        cloudAgentSessionId: 'agent_document' as SessionId,
-        turn: {
-          type: 'prompt',
-          prompt: 'inspect the PDF',
-          attachments: {
-            path: '123e4567-e89b-12d3-a456-426614174000',
-            files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
-          },
-        },
-      },
-      { env: makeEnv(stub) as Env, userId: 'user_document' }
-    );
-
-    expect(admitSubmittedMessage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        turn: expect.objectContaining({
-          attachments: {
-            path: '123e4567-e89b-12d3-a456-426614174000',
-            files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
-          },
-        }),
-      })
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({ messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn' })
     );
   });
 
   it('forwards the composed canonical message payload to the Durable Object', async () => {
-    const { stub, admitSubmittedMessage } = makeDoStub({
-      success: true,
-      outcome: 'queued',
-      compatibilityDelivery: 'queued',
-      messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
-    });
+    const send = makeSend({ type: 'ok' });
 
     await queueMessage(
       {
-        cloudAgentSessionId: 'agent_payload' as SessionId,
+        cloudAgentSessionId: 'workspace_payload',
         turn: {
           type: 'prompt',
           prompt: 'inspect the screenshot',
@@ -289,50 +210,87 @@ describe('queueMessage', () => {
         agent: { mode: 'plan', model: 'queued-model', variant: 'thinking' },
         finalization: { autoCommit: true, condenseOnComplete: false },
       },
-      { env: makeEnv(stub) as Env, userId: 'user_payload', botId: 'bot_payload' }
+      { env: makeEnv({ send }) as Env, userId: 'user_payload', botId: 'bot_payload' }
     );
 
-    expect(admitSubmittedMessage).toHaveBeenCalledWith({
-      userId: 'user_payload',
-      botId: 'bot_payload',
+    expect(send).toHaveBeenCalledWith({
+      messageId: expect.stringMatching(/^msg_/),
       turn: {
         type: 'prompt',
-        id: expect.stringMatching(/^msg_/),
         prompt: 'inspect the screenshot',
-        attachments: {
-          path: '123e4567-e89b-12d3-a456-426614174000',
-          files: ['123e4567-e89b-12d3-a456-426614174001.png'],
-        },
       },
       agent: { mode: 'plan', model: 'queued-model', variant: 'thinking' },
       finalization: { autoCommit: true, condenseOnComplete: false },
     });
   });
 
-  it('maps NOT_FOUND to 404 TRPCError', async () => {
-    const { stub } = makeDoStub({ success: false, code: 'NOT_FOUND', error: 'gone' });
+  it('maps a V2 session-not-found send to 404', async () => {
+    const send = makeSend({ type: 'session-not-found' });
+
     await expect(
-      queueMessage(
-        {
-          cloudAgentSessionId: 'agent_x' as SessionId,
-          turn: { type: 'prompt', prompt: 'x' },
-        },
-        { env: makeEnv(stub) as Env, userId: 'u' }
-      )
-    ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'gone' });
+      queueMessage(promptInput, { env: makeEnv({ send }) as Env, userId: 'u' })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'Session not found' });
   });
 
-  it('maps BAD_REQUEST to 400 TRPCError', async () => {
-    const { stub } = makeDoStub({ success: false, code: 'BAD_REQUEST', error: 'nope' });
+  it('maps a V2 queue-full send to the retryable 429 PENDING_QUEUE_FULL', async () => {
+    const send = makeSend({ type: 'queue-full' });
+
+    const error = await queueMessage(promptInput, {
+      env: makeEnv({ send }) as Env,
+      userId: 'user_abc',
+    }).catch(error => error);
+
+    expect(error).toMatchObject({
+      code: 'TOO_MANY_REQUESTS',
+      message: `Pending message queue is full (${QUEUED_MESSAGE_LIMIT})`,
+      cause: { error: 'PENDING_QUEUE_FULL', retryable: true },
+    });
+  });
+
+  it('returns NOT_FOUND when stored metadata is missing', async () => {
+    vi.mocked(fetchSessionMetadata).mockResolvedValue(null);
+    const send = makeSend({ type: 'ok' });
+
     await expect(
-      queueMessage(
-        {
-          cloudAgentSessionId: 'agent_x' as SessionId,
-          turn: { type: 'prompt', prompt: 'x' },
-        },
-        { env: makeEnv(stub) as Env, userId: 'u' }
-      )
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'nope' });
+      queueMessage(promptInput, { env: makeEnv({ send }) as Env, userId: 'user_abc' })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'Session not found' });
+    expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe('projectAdmissionToPublicAck', () => {
+  it('projects an already runtime-accepted replay as sent at the public seam', () => {
+    expect(
+      projectAdmissionToPublicAck('workspace_y' as SessionId, {
+        success: true,
+        outcome: 'queued',
+        compatibilityDelivery: 'sent',
+        messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+      })
+    ).toMatchObject({ status: 'started', delivery: 'sent' });
+  });
+});
+
+describe('throwAdmissionError', () => {
+  function capture(result: Extract<SessionMessageAdmissionResult, { success: false }>): TRPCError {
+    try {
+      throwAdmissionError(result);
+    } catch (error) {
+      if (error instanceof TRPCError) return error;
+      throw error;
+    }
+    throw new Error('expected throwAdmissionError to throw');
+  }
+
+  it('maps NOT_FOUND and BAD_REQUEST to permanent client errors', () => {
+    expect(capture({ success: false, code: 'NOT_FOUND', error: 'gone' })).toMatchObject({
+      code: 'NOT_FOUND',
+      cause: { error: 'NOT_FOUND', retryable: false },
+    });
+    expect(capture({ success: false, code: 'BAD_REQUEST', error: 'nope' })).toMatchObject({
+      code: 'BAD_REQUEST',
+      cause: { error: 'BAD_REQUEST', retryable: false },
+    });
   });
 
   it.each([
@@ -341,7 +299,7 @@ describe('queueMessage', () => {
     ['BILLING_UNAVAILABLE', 'SERVICE_UNAVAILABLE', 'BILLING_UNAVAILABLE', true],
   ] as const)(
     'preserves %s billing failure details and retryability',
-    async (resultCode, trpcCode, billingCode, retryable) => {
+    (resultCode, trpcCode, billingCode, retryable) => {
       const billingFailure: CustomerBillingFailure = {
         code: billingCode,
         payer: { type: 'org', id: 'org_abc' },
@@ -349,224 +307,153 @@ describe('queueMessage', () => {
         remainingMicrodollars: 1,
         minimumRequiredMicrodollars: 5,
       };
-      const { stub } = makeDoStub({
-        success: false,
-        code: resultCode,
-        error: 'Compute billing rejected admission',
-        billingFailure,
-        failureBoundary: 'admission',
-      });
 
-      await expect(
-        queueMessage(
-          { cloudAgentSessionId: 'agent_existing', turn: { type: 'prompt', prompt: 'follow up' } },
-          { env: makeEnv(stub) as Env, userId: 'user_abc' }
-        )
-      ).rejects.toMatchObject({
+      expect(
+        capture({
+          success: false,
+          code: resultCode,
+          error: 'Compute billing rejected admission',
+          billingFailure,
+          failureBoundary: 'admission',
+        })
+      ).toMatchObject({
         code: trpcCode,
         cause: { error: resultCode, retryable, billingFailure },
       });
     }
   );
 
-  it('maps PENDING_QUEUE_FULL to a retryable TOO_MANY_REQUESTS error', async () => {
-    const { stub } = makeDoStub({ success: false, code: 'PENDING_QUEUE_FULL', error: 'full' });
-    const error = await queueMessage(
-      {
-        cloudAgentSessionId: 'agent_x' as SessionId,
-        turn: { type: 'prompt', prompt: 'x' },
-      },
-      { env: makeEnv(stub) as Env, userId: 'u' }
-    ).catch(error => error);
-
-    expect(error).toMatchObject({
-      code: 'TOO_MANY_REQUESTS',
-      message: 'full',
-      cause: { error: 'PENDING_QUEUE_FULL', retryable: true },
-    });
-  });
-
-  it('projects a control queue-full send as the legacy 429 PENDING_QUEUE_FULL', async () => {
-    const metadata = {
-      identity: { createdOnPlatform: 'cloud-agent-web' },
-      agent: { mode: 'code', model: 'test/model' },
-    } as unknown as SessionMetadata;
-    const fetchMetadata = vi
-      .spyOn(sessionService, 'fetchSessionMetadata')
-      .mockResolvedValue(metadata);
-    const send = vi.fn(async () => ({ type: 'queue-full' as const }));
-
-    const error = await queueMessage(
-      {
-        cloudAgentSessionId: 'workspace_full',
-        turn: { type: 'prompt', prompt: 'x' },
-      },
-      { env: makeEnv({ send }) as Env, userId: 'user_abc' }
-    ).catch(error => error);
-
-    expect(error).toMatchObject({
+  it('maps PENDING_QUEUE_FULL to a retryable TOO_MANY_REQUESTS error', () => {
+    expect(capture(pendingQueueFullAdmissionFailure())).toMatchObject({
       code: 'TOO_MANY_REQUESTS',
       message: `Pending message queue is full (${QUEUED_MESSAGE_LIMIT})`,
       cause: { error: 'PENDING_QUEUE_FULL', retryable: true },
     });
-    fetchMetadata.mockRestore();
   });
 
-  it('maps INTERNAL to an explicitly retryable 500 error', async () => {
-    const { stub } = makeDoStub({ success: false, code: 'INTERNAL', error: 'boom' });
-    const error = await queueMessage(
-      {
-        cloudAgentSessionId: 'agent_x' as SessionId,
-        turn: { type: 'prompt', prompt: 'x' },
-      },
-      { env: makeEnv(stub) as Env, userId: 'u' }
-    ).catch(error => error);
-
-    expect(error).toMatchObject({
+  it('maps INTERNAL to an explicitly retryable 500 error', () => {
+    expect(capture({ success: false, code: 'INTERNAL', error: 'boom' })).toMatchObject({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'boom',
       cause: { error: 'INTERNAL', retryable: true },
     });
   });
 
-  it.each([
-    ['NOT_FOUND', 'NOT_FOUND'],
-    ['BAD_REQUEST', 'BAD_REQUEST'],
-  ] as const)('marks permanent %s admission errors non-retryable', async (resultCode, trpcCode) => {
-    const { stub } = makeDoStub({ success: false, code: resultCode, error: 'permanent' });
-    const error = await queueMessage(
-      {
-        cloudAgentSessionId: 'agent_x' as SessionId,
-        turn: { type: 'prompt', prompt: 'x' },
-      },
-      { env: makeEnv(stub) as Env, userId: 'u' }
-    ).catch(error => error);
-
-    expect(error).toMatchObject({
-      code: trpcCode,
-      cause: { error: resultCode, retryable: false },
+  it('maps retryable SANDBOX_CONNECT_FAILED to SERVICE_UNAVAILABLE', () => {
+    expect(
+      capture({ success: false, code: 'SANDBOX_CONNECT_FAILED', error: 'transient' })
+    ).toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'transient',
+      cause: { error: 'SANDBOX_CONNECT_FAILED', retryable: true },
     });
-  });
-
-  it('maps retryable SANDBOX_CONNECT_FAILED to SERVICE_UNAVAILABLE with retryable cause', async () => {
-    const { stub } = makeDoStub({
-      success: false,
-      code: 'SANDBOX_CONNECT_FAILED',
-      error: 'transient',
-    });
-    await expect(
-      queueMessage(
-        {
-          cloudAgentSessionId: 'agent_x' as SessionId,
-          turn: { type: 'prompt', prompt: 'x' },
-        },
-        { env: makeEnv(stub) as Env, userId: 'u' }
-      )
-    ).rejects.toMatchObject({ code: 'SERVICE_UNAVAILABLE', message: 'transient' });
-
-    try {
-      await queueMessage(
-        {
-          cloudAgentSessionId: 'agent_x' as SessionId,
-          turn: { type: 'prompt', prompt: 'x' },
-        },
-        { env: makeEnv(stub) as Env, userId: 'u' }
-      );
-    } catch (err) {
-      if (err instanceof TRPCError) {
-        expect(err.cause).toMatchObject({
-          error: 'SANDBOX_CONNECT_FAILED',
-          retryable: true,
-        });
-      } else {
-        throw err;
-      }
-    }
   });
 });
 
 describe('preflightRuntimeAuthorizationRecovery', () => {
-  const currentAuthToken = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJraWxvIn0.signature';
+  const currentAuthToken = jwt.sign({ tokenPurpose: 'cloud-agent' }, 'test-secret');
+  const recoverExpiredRuntimeAuthorization = vi.fn();
 
-  it('denies an explicitly revoked modern runtime authorization before admission', async () => {
-    const admitSubmittedMessage = vi.fn();
-    const getRuntimeAuthorizationRecoveryState = vi.fn().mockResolvedValue({ state: 'revoked' });
+  function authEnv(state: unknown) {
+    const stub = {
+      getRuntimeAuthorizationStatus: vi.fn().mockResolvedValue(state),
+      recoverExpiredRuntimeAuthorization,
+    };
+    return {
+      ...makeEnv(stub),
+      HYPERDRIVE: { connectionString: 'postgres://test' },
+    } as unknown as Env;
+  }
 
-    await expect(
-      preflightRuntimeAuthorizationRecovery('agent_revoked', {
-        env: makeEnv({ admitSubmittedMessage, getRuntimeAuthorizationRecoveryState }) as Env,
-        userId: 'user_abc',
-        authToken: currentAuthToken,
-      })
-    ).rejects.toMatchObject({ code: 'FORBIDDEN', message: 'Runtime authorization denied' });
-
-    expect(getRuntimeAuthorizationRecoveryState).toHaveBeenCalledOnce();
-    expect(admitSubmittedMessage).not.toHaveBeenCalled();
+  beforeEach(() => {
+    recoverExpiredRuntimeAuthorization.mockReset().mockResolvedValue({ status: 'recovered' });
   });
 
-  it('does nothing for a legacy runtime authorization', async () => {
-    const getRuntimeAuthorizationRecoveryState = vi.fn().mockResolvedValue({ state: 'legacy' });
+  it('does nothing for an active authorization', async () => {
+    await preflightRuntimeAuthorizationRecovery('workspace_a', {
+      env: authEnv({ state: 'active', id: 'authorization-1' }),
+      userId: 'user_abc',
+      authToken: currentAuthToken,
+    });
+
+    expect(recoverExpiredRuntimeAuthorization).not.toHaveBeenCalled();
+  });
+
+  it('does nothing for the legacy credential-compatibility status', async () => {
+    const env = authEnv({ state: 'legacy' });
 
     await expect(
-      preflightRuntimeAuthorizationRecovery('agent_legacy', {
-        env: makeEnv({ getRuntimeAuthorizationRecoveryState }) as Env,
+      preflightRuntimeAuthorizationRecovery('workspace_legacy', {
+        env,
         userId: 'user_abc',
         authToken: currentAuthToken,
       })
     ).resolves.toBeUndefined();
 
-    expect(getRuntimeAuthorizationRecoveryState).toHaveBeenCalledOnce();
+    expect(recoverExpiredRuntimeAuthorization).not.toHaveBeenCalled();
   });
-});
 
-describe('preflight authorization denial diagnostics', () => {
-  afterEach(() => vi.restoreAllMocks());
-  it.each(['revoked', 'expired'] as const)(
-    'distinguishes the %s branch without credentials',
-    async state => {
-      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
-      vi.spyOn(logger, 'warn').mockImplementation(() => {});
-      vi.spyOn(sessionService, 'fetchSessionMetadata').mockResolvedValue({
-        identity: { sessionId: 'agent_diagnostic', userId: 'user_abc' },
-      } as SessionMetadata);
-      const create = vi
-        .spyOn(runtimeAuthorization, 'createRuntimeAuthorization')
-        .mockResolvedValue({
-          token: 'private-token',
-          authorization: {} as runtimeAuthorization.RuntimeAuthorization,
-          expiresAt: '',
-        });
-      vi.spyOn(runtimeAuthorization, 'sealRuntimeAuthorization').mockResolvedValue('private-seal');
-      const recover = vi.fn().mockResolvedValue({ status: 'denied' });
-      const env = {
-        ...makeEnv({
-          getRuntimeAuthorizationRecoveryState: async () => ({
-            state,
-            id: '00000000-0000-4000-8000-000000000011',
-          }),
-          recoverExpiredRuntimeAuthorization: recover,
-        }),
-        NEXTAUTH_SECRET: 'private-secret',
-        HYPERDRIVE: { connectionString: 'private-connection' },
-      } as Env;
-      await expect(
-        preflightRuntimeAuthorizationRecovery('agent_diagnostic', {
-          env,
-          userId: 'user_abc',
-          authToken: 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiJraWxvIn0.private-signature',
-        })
-      ).rejects.toMatchObject({ code: 'FORBIDDEN', message: 'Runtime authorization denied' });
-      expect(fields.mock.calls).toEqual([
-        [
-          {
-            sessionId: 'agent_diagnostic',
-            stage: 'preflight',
-            reason: state === 'revoked' ? 'stored_authorization_revoked' : 'recovery_denied',
-          },
-        ],
-      ]);
-      expect(create).toHaveBeenCalledTimes(state === 'expired' ? 1 : 0);
-      expect(recover).toHaveBeenCalledTimes(state === 'expired' ? 1 : 0);
-    }
-  );
+  it('rejects a revoked authorization with FORBIDDEN', async () => {
+    await expect(
+      preflightRuntimeAuthorizationRecovery('workspace_a', {
+        env: authEnv({ state: 'revoked' }),
+        userId: 'user_abc',
+        authToken: currentAuthToken,
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN', message: 'Runtime authorization denied' });
+  });
+
+  it('mints and commits a fresh authorization when the delegation expired', async () => {
+    await preflightRuntimeAuthorizationRecovery('workspace_a', {
+      env: authEnv({ state: 'expired', id: 'authorization-1' }),
+      userId: 'user_abc',
+      authToken: currentAuthToken,
+    });
+
+    expect(recoverExpiredRuntimeAuthorization).toHaveBeenCalledWith({
+      ownerId: 'user_abc',
+      expectedOldId: 'authorization-1',
+      runtimeAuthorizationSeal: 'runtime-seal',
+      runtimeToken: 'runtime-token',
+    });
+  });
+
+  it('maps a denied recovery to FORBIDDEN', async () => {
+    recoverExpiredRuntimeAuthorization.mockResolvedValue({ status: 'denied' });
+
+    await expect(
+      preflightRuntimeAuthorizationRecovery('workspace_a', {
+        env: authEnv({ state: 'expired', id: 'authorization-1' }),
+        userId: 'user_abc',
+        authToken: currentAuthToken,
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('maps a busy or retry recovery to CONFLICT', async () => {
+    recoverExpiredRuntimeAuthorization.mockResolvedValue({ status: 'busy' });
+
+    await expect(
+      preflightRuntimeAuthorizationRecovery('workspace_a', {
+        env: authEnv({ state: 'expired', id: 'authorization-1' }),
+        userId: 'user_abc',
+        authToken: currentAuthToken,
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+  });
+
+  it('rejects a non-workspace ID before reading runtime authorization', async () => {
+    const env = authEnv({ state: 'active' });
+    const getSession = vi.spyOn(env.SANDBOX_SESSION, 'get');
+
+    await expect(
+      preflightRuntimeAuthorizationRecovery('agent_existing', {
+        env,
+        userId: 'user_abc',
+        authToken: currentAuthToken,
+      })
+    ).rejects.toBeInstanceOf(TRPCError);
+
+    expect(getSession).not.toHaveBeenCalled();
+  });
 });

@@ -567,23 +567,56 @@ describe('GitTokenRPCEntrypoint.getTokenForIntegration', () => {
     serviceMocks.getToken.mockReset().mockResolvedValue('installation-token');
   });
 
-  it('returns a token only after resolving the active association', async () => {
+  const integrationId = '00000000-0000-4000-8000-000000000002';
+  const orgId = '00000000-0000-4000-8000-000000000003';
+
+  it('returns a token only after resolving the active association for its owner', async () => {
     serviceMocks.findActiveAssociationById.mockResolvedValue({
       success: true,
       installationId: '123',
       githubAppType: 'lite',
     });
     await expect(
-      createService().getTokenForIntegration('00000000-0000-4000-8000-000000000002')
+      createService().getTokenForIntegration({ integrationId, userId: 'user-1' })
     ).resolves.toEqual({ success: true, token: 'installation-token' });
+    expect(serviceMocks.findActiveAssociationById).toHaveBeenCalledWith(integrationId, {
+      userId: 'user-1',
+    });
     expect(serviceMocks.getToken).toHaveBeenCalledWith('123', 'lite');
+  });
+
+  it('scopes an organization owner lookup to that organization', async () => {
+    serviceMocks.findActiveAssociationById.mockResolvedValue({
+      success: true,
+      installationId: '123',
+      githubAppType: 'standard',
+    });
+    await createService().getTokenForIntegration({ integrationId, userId: 'user-1', orgId });
+    expect(serviceMocks.findActiveAssociationById).toHaveBeenCalledWith(integrationId, {
+      userId: 'user-1',
+      orgId,
+    });
   });
 
   it('does not reach the token cache for a disconnected association', async () => {
     serviceMocks.findActiveAssociationById.mockResolvedValue({ success: false });
     await expect(
-      createService().getTokenForIntegration('00000000-0000-4000-8000-000000000002')
+      createService().getTokenForIntegration({ integrationId, userId: 'user-1' })
     ).resolves.toEqual({ success: false, reason: 'unavailable' });
+    expect(serviceMocks.getToken).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a bare integration id', integrationId],
+    ['a missing owner', { integrationId }],
+    ['an empty owner', { integrationId, userId: '' }],
+    ['a malformed organization', { integrationId, userId: 'user-1', orgId: 'org-1' }],
+  ])('fails closed for %s', async (_label, params) => {
+    await expect(createService().getTokenForIntegration(params as never)).resolves.toEqual({
+      success: false,
+      reason: 'unavailable',
+    });
+    expect(serviceMocks.findActiveAssociationById).not.toHaveBeenCalled();
     expect(serviceMocks.getToken).not.toHaveBeenCalled();
   });
 });

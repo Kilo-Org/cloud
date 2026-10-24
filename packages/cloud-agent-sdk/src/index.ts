@@ -1,8 +1,9 @@
-export { isStreamError, isValidCloudAgentEvent } from './event-types';
-export type { CloudAgentEvent, StreamError, StreamErrorCode } from './event-types';
+export { isStreamError, isValidCloudAgentEvent } from './schemas';
+export type { CloudAgentEvent, StreamError, StreamErrorCode } from './schemas';
 
 export { formatError as formatSessionError } from './session-manager';
 export { createSessionManager } from './session-manager';
+export { sessionConfigFromFetchedSession } from './session-config';
 export { customerBillingFailureSchema, parseCustomerBillingFailure } from './schemas';
 export type { CustomerBillingFailure } from './schemas';
 export { CLI_MODEL_ID, cliModelLabel } from './cli-model';
@@ -177,6 +178,7 @@ export type {
   ResolvedSession,
   SessionSnapshot,
   SessionSnapshotPage,
+  CachedSessionSnapshotPage,
   SessionSnapshotPageOutcome,
   OlderMessagesError,
   Part,

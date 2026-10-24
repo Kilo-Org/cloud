@@ -1,4 +1,5 @@
 import { Pencil } from 'lucide-react';
+import { cloudAgentFileLabel } from '@kilocode/app-shared/cloud-agent';
 import type { ToolPart } from './types';
 import { ToolCardShell } from './ToolCardShell';
 import { ToolDiagnostics, ToolDiff, ToolDiffStats, ToolFilePath } from './ToolDiff';
@@ -16,6 +17,7 @@ export function EditToolCard({ toolPart }: EditToolCardProps) {
   const filePath =
     metadata.filediff?.file ??
     (typeof input.filePath === 'string' && input.filePath.trim() ? input.filePath : undefined);
+  const displayFilePath = filePath ? cloudAgentFileLabel(filePath) : undefined;
   const patch = getUnifiedPatch(metadata.filediff?.patch);
   const oldString = typeof input.oldString === 'string' ? input.oldString : undefined;
   const newString = typeof input.newString === 'string' ? input.newString : undefined;
@@ -26,7 +28,7 @@ export function EditToolCard({ toolPart }: EditToolCardProps) {
     <ToolCardShell
       icon={Pencil}
       title="Edit"
-      subtitle={filePath ? <ToolFilePath filePath={filePath} /> : undefined}
+      subtitle={displayFilePath ? <ToolFilePath filePath={displayFilePath} /> : undefined}
       badge={
         <>
           {input.replaceAll === true && (
@@ -37,14 +39,14 @@ export function EditToolCard({ toolPart }: EditToolCardProps) {
       }
       status={state.status}
     >
-      {filePath && (
-        <div className="text-muted-foreground font-mono text-xs break-all">{filePath}</div>
+      {displayFilePath && (
+        <div className="text-muted-foreground font-mono text-xs break-all">{displayFilePath}</div>
       )}
       <ToolDiff
         patch={patch}
         original={oldString}
         modified={newString}
-        filePath={filePath}
+        filePath={displayFilePath}
         textLabel="Input snippets (not the full file)"
       />
       {!hasPreview && state.status === 'completed' && state.output.trim() && (

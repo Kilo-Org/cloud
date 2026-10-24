@@ -789,7 +789,7 @@ describe('CreditNativeIapOwner', () => {
       expect(mockedIap.fetchProducts).toHaveBeenCalledTimes(2);
     });
 
-    it('shows the store-unavailable copy when the second ask also fails', async () => {
+    it('shows the connection copy when the second ask also fails', async () => {
       mockedIap.connected = true;
       mockedIap.fetchProducts.mockRejectedValue(notReady);
       const { handle } = await mountOwner();
@@ -797,9 +797,40 @@ describe('CreditNativeIapOwner', () => {
       const failure = await loadPlayCatalog(handle).catch((error: unknown) => error);
 
       expect(failure).toBeInstanceOf(StoreCreditProductsError);
-      expect(failure).toMatchObject({ key: 'credits.noMatchingProductsPlay' });
+      expect(failure).toMatchObject({ key: 'kiloPass.couldNotConnectToPlay' });
       expect(mockedIap.reconnect).toHaveBeenCalledTimes(1);
       expect(mockedIap.fetchProducts).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not ask again once the caller has given up on the store', async () => {
+      mockedIap.connected = true;
+      mockedIap.fetchProducts.mockRejectedValue(notReady);
+      const { handle } = await mountOwner();
+      const controller = new AbortController();
+      controller.abort();
+
+      await expect(
+        handle.value?.fetchStoreProducts(['credits_usd10'], { signal: controller.signal })
+      ).rejects.toBe(notReady);
+      expect(mockedIap.reconnect).not.toHaveBeenCalled();
+      expect(mockedIap.fetchProducts).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not ask again when the caller gives up during the reconnect', async () => {
+      mockedIap.connected = true;
+      mockedIap.fetchProducts.mockRejectedValue(notReady);
+      const { handle } = await mountOwner();
+      const controller = new AbortController();
+      // eslint-disable-next-line eslint/require-await -- the abort is the behavior under test; reconnect answers at once
+      mockedIap.reconnect.mockImplementation(async () => {
+        controller.abort();
+        return true;
+      });
+
+      await expect(
+        handle.value?.fetchStoreProducts(['credits_usd10'], { signal: controller.signal })
+      ).rejects.toBe(notReady);
+      expect(mockedIap.fetchProducts).toHaveBeenCalledTimes(1);
     });
 
     it('does not ask again when the reconnect fails', async () => {

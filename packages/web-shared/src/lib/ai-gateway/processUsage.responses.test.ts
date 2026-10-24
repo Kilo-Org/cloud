@@ -220,7 +220,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'fake-user-id',
       undefined,
       'openrouter',
-      200
+      200,
+      false
     );
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
@@ -237,7 +238,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'fake-user-id',
       undefined,
       'vercel',
-      200
+      200,
+      false
     );
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
@@ -269,7 +271,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'fake-user-id',
       undefined,
       'openrouter',
-      200
+      200,
+      false
     );
 
     expect(result.responseContent).toBe('Hello world');

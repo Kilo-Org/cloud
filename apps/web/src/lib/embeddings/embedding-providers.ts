@@ -1,7 +1,7 @@
 import { MISTRAL_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { Mistral } from '@mistralai/mistralai';
 
-export type EmbeddingProvider = 'mistral' | 'mistral-text';
+export type EmbeddingProvider = 'mistral';
 export const DEFAULT_EMBEDDING_PROVIDER: EmbeddingProvider = 'mistral';
 
 const mistral = new Mistral({
@@ -60,12 +60,6 @@ export const EMBEDDING_CONFIGS: Record<EmbeddingProvider, EmbeddingConfig> = {
     provider: 'mistral',
     model: 'codestral-embed-2505',
     dimensions: 256,
-    apiKey: MISTRAL_API_KEY,
-  },
-  'mistral-text': {
-    provider: 'mistral-text',
-    model: 'mistral-embed', // For text/issues (auto-triage)
-    dimensions: undefined, // Let Mistral decide
     apiKey: MISTRAL_API_KEY,
   },
 };

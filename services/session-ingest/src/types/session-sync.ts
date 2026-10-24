@@ -72,6 +72,12 @@ export const SessionItemSchema = z.discriminatedUnion('type', [
       // status and when the producer omits it; null is tolerated like the stored
       // row schema, because a missing time must never drop the item.
       scheduledAt: z.string().nullable().optional(),
+      occurredAt: z.string().datetime().optional(),
+      previousStatus: z.string().nullable().optional(),
+      transitionId: z
+        .string()
+        .regex(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/)
+        .optional(),
     }),
   }),
   z.object({

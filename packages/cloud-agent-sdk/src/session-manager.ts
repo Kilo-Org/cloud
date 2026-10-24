@@ -2037,6 +2037,12 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       const act = session.state.getActivity();
       const st = session.state.getStatus();
       const cs = session.state.getCloudStatus();
+      // Retained cloud progress must not hide a terminal status or its recovery action.
+      const indicatorCloudStatus =
+        (cs?.type === 'preparing' || cs?.type === 'finalizing') &&
+        (st.type === 'error' || st.type === 'disconnected' || st.type === 'interrupted')
+          ? null
+          : cs;
       const previousStatus = store.get(agentStatusAtom);
       store.set(activityAtom, act);
       if (!firstActivityFired && act.type !== 'connecting') {
@@ -2123,7 +2129,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         } else if (act.type === 'idle') {
           // Only replace our own retry warning; a newer error/cloud indicator stays.
           if (retryIndicator !== null && store.get(statusIndicatorAtom) === retryIndicator) {
-            const cloudInd = cs && cs.type !== 'ready' ? indicatorForCloudStatus(cs) : null;
+            const cloudInd = indicatorCloudStatus
+              ? indicatorForCloudStatus(indicatorCloudStatus)
+              : null;
             setIndicator(cloudInd ?? indicatorForStatus(st));
           }
           config.onComplete?.();
@@ -2150,11 +2158,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         // must not overwrite the progress indicator, and the caches must not
         // move: the leave path above forces reprojection.
       } else {
-        // Cloud status takes priority over agent status when active
-        const csk = csKey(cs);
-        if (cs && cs.type !== 'ready') {
+        const csk = csKey(indicatorCloudStatus);
+        if (indicatorCloudStatus && indicatorCloudStatus.type !== 'ready') {
           if (csk !== prevCsk) {
-            const cloudInd = indicatorForCloudStatus(cs);
+            const cloudInd = indicatorForCloudStatus(indicatorCloudStatus);
             if (cloudInd) {
               setIndicator(cloudInd);
               prevCloudStatusHadIndicator = true;

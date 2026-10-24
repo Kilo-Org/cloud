@@ -3,6 +3,7 @@ import {
   cliModelLabel,
   createSessionManager,
   formatError,
+  shouldOfferSessionRetry,
   INTERRUPT_ABORT_SUPPRESSION_MS,
   type SessionManagerConfig,
   type FetchedSessionData,
@@ -1788,6 +1789,53 @@ describe('createSessionManager', () => {
 
       expect(atomValue<readonly string[]>(config.store, mgr.atoms.setupLog)).toEqual([]);
     });
+
+    it.each(['preparing', 'finalizing'] as const)(
+      'keeps a terminal error and Retry visible through exhaustion during %s',
+      async phase => {
+        const serviceState = createServiceState({ rootSessionId: 'ses-1' });
+        mockSession.state.subscribe.mockImplementation(callback =>
+          serviceState.subscribe(callback)
+        );
+        mockSession.state.getActivity.mockImplementation(() => serviceState.getActivity());
+        mockSession.state.getStatus.mockImplementation(() => serviceState.getStatus());
+        mockSession.state.getCloudStatus.mockImplementation(() => serviceState.getCloudStatus());
+        mockSession.state.getSetupLog.mockImplementation(() => serviceState.getSetupLog());
+
+        const config = createMockConfig();
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+
+        serviceState.process({ type: 'connected', sessionStatus: { type: 'busy' } });
+        serviceState.process({
+          type: 'preparing',
+          step: 'setup_commands',
+          message: 'Installed dependencies',
+        });
+        serviceState.setCloudStatus({ type: phase });
+        expect(config.store.get(mgr.atoms.statusIndicator)?.type).toBe('progress');
+
+        serviceState.process({ type: 'session.error', error: 'Current failure' });
+        serviceState.process({ type: 'reconnecting' });
+        serviceState.process({ type: 'stopped', reason: 'transport-disconnected' });
+
+        const indicator = config.store.get(mgr.atoms.statusIndicator);
+        expect(indicator).toMatchObject({ type: 'error', message: 'Current failure' });
+        expect(shouldOfferSessionRetry(indicator)).toBe(true);
+        expect(config.store.get(mgr.atoms.cloudStatus)).toEqual({ type: phase });
+        expect(config.store.get(mgr.atoms.setupLog)).toEqual(['Installed dependencies']);
+
+        serviceState.process({
+          type: 'connected',
+          sessionStatus: { type: 'busy' },
+          cloudStatus: { type: phase },
+        });
+        expect(config.store.get(mgr.atoms.statusIndicator)?.type).toBe('progress');
+        serviceState.setCloudStatus({ type: 'ready' });
+        expect(config.store.get(mgr.atoms.statusIndicator)).toBeNull();
+        mgr.destroy();
+      }
+    );
 
     it('clears cloud status indicator when cloud status returns to ready', async () => {
       let subscriptionCallback = (): void => {

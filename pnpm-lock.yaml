@@ -200,6 +200,7 @@ patchedDependencies:
   '@expo/ui@58.0.17': 107fc3bb89a262de75123c9449bcefaef274d247dd3d240846ad06520aa6d3e3
   expo-background-task@58.0.10: 090a5f6453404ed7590639660ed51560f64ff7a00097bef406b988bce83fca35
   expo-dev-launcher@58.0.14: 7ba3ff7110dbe4563648e254e484f69ad1e550adc93f6ac1436f5ebf222000ac
+  expo-localization@58.0.4: f52925acd7c5b5d6b6647d9268400e08c9b3ecd7f1cfc822c6ce4c85d16603ab
   expo-modules-core@58.0.18: b9171316da59a4fe5d584c9ebb6d04297dc3de0de48c3fcef611d4dc621b37c9
   expo-notifications@58.1.4: 4bdcdf64d693d0d0ea97c121e481fececc083e86c227b019cbbf8fa1c7f8d1f5
   expo-router@58.0.19: c12b7f748c2160f038b8c9c6f1c1c6eecc92a5dab644932aaa5def33474cc1d2

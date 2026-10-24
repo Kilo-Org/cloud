@@ -75,6 +75,10 @@ export function hashRootNativeInputs(repoRoot: string): string {
     hash.update('\0');
   };
   add('pnpm-workspace.yaml', path.join(repoRoot, 'pnpm-workspace.yaml'));
+  hash.update('apps/mobile/package.json#expo.autolinking');
+  hash.update('\0');
+  hash.update(nativeAutolinkingSlice(path.join(repoRoot, 'apps', 'mobile', 'package.json')));
+  hash.update('\0');
   hash.update('pnpm-lock.yaml#apps/mobile');
   hash.update('\0');
   hash.update(mobileLockfileSlice(path.join(repoRoot, 'pnpm-lock.yaml')));
@@ -104,6 +108,29 @@ export function mobileLockfileSlice(lockPath: string): Buffer {
   }
   const block = body.match(/^ {2}apps\/mobile:\n(?:(?: {4}.*)?\n)*/m);
   return Buffer.from(block ? block[0] : body);
+}
+
+// `buildFromSource` in the app's Expo autolinking config decides whether an
+// autolinked module compiles from its patched sources or links a prebuilt AAR.
+// The fingerprint's ExpoConfigExtraSection skip drops the whole `expo` section,
+// so without this slice switching a module to build from source left the
+// native hash — and therefore the published artifact name — unchanged.
+export function nativeAutolinkingSlice(packagePath: string): Buffer {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
+  } catch (error) {
+    if (hasCode(error, 'ENOENT')) return Buffer.from('<missing>');
+    return Buffer.from('<unparsable>');
+  }
+  if (typeof parsed !== 'object' || parsed === null || !('expo' in parsed)) {
+    return Buffer.from('<absent>');
+  }
+  const { expo } = parsed;
+  if (typeof expo !== 'object' || expo === null || !('autolinking' in expo)) {
+    return Buffer.from('<absent>');
+  }
+  return Buffer.from(JSON.stringify(expo.autolinking));
 }
 
 function listFilesRecursively(root: string): string[] {

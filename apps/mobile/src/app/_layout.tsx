@@ -45,7 +45,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 
 import { useRootNavigationReady } from '@/lib/navigation-ready';
 import { useTranslation } from 'react-i18next';
-import { View, type ViewInstance } from 'react-native';
+import { I18nManager, View, type ViewInstance } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
@@ -87,7 +87,14 @@ import {
   useThemePreference,
 } from '@/lib/hooks/use-theme-preference';
 import { i18n } from '@/i18n';
-import { syncRtl } from '@/i18n/rtl';
+import {
+  clearDirectionReloadAttempt,
+  directionAttemptId,
+  readDirectionReloadAttempt,
+  resolveDirectionReload,
+  writeDirectionReloadAttempt,
+} from '@/i18n/direction-reload';
+import { isRtlLanguage, syncRtl } from '@/i18n/rtl';
 import { type LanguageReturnTarget, readLanguageReturnTarget } from '@/i18n/return-target';
 import {
   getResolvedLanguage,
@@ -96,6 +103,7 @@ import {
 } from '@/lib/hooks/use-language-preference';
 import { useTrackingPermissionPrompt } from '@/lib/hooks/use-tracking-permission-prompt';
 import { prewarmIntl } from '@/lib/intl-cache';
+import { isProtectedDataAvailable } from '@/lib/protected-data';
 import {
   captureLaunchDeepLink,
   clearPendingDeepLink,
@@ -452,15 +460,46 @@ function RootLayoutNav({
     const prepareLanguage = async () => {
       const resolved = getResolvedLanguage();
       let reloadFailed = false;
-      if (syncRtl(resolved)) {
-        try {
-          await reloadAppAsync();
-          // The native reload tears down this JS context; nothing below runs.
-          return;
-        } catch {
-          // Reload failed: keep going so the language still loads, then show
-          // the Retry/Continue screen instead of first-painting in the wrong
-          // direction.
+      const attemptId = directionAttemptId(resolved);
+      const decision = resolveDirectionReload({
+        nativeIsRtl: I18nManager.isRTL,
+        targetIsRtl: isRtlLanguage(resolved),
+        attemptId,
+        previousAttempt: await readDirectionReloadAttempt(),
+        // A locked device refuses the keychain, so an attempt recorded now
+        // would not survive the reload and the next launch would repeat it.
+        canRecordAttempt: isProtectedDataAvailable(),
+      });
+      if (decision === 'in-sync') {
+        // The persisted direction reached the native side. Drop the spent
+        // attempt so a later language change starts with a fresh one.
+        void clearDirectionReloadAttempt();
+      } else {
+        let recorded = false;
+        if (decision === 'reload') {
+          // Record the attempt before the reload: the next start reads this
+          // marker and stops instead of reloading the same mismatch again.
+          recorded = await writeDirectionReloadAttempt(attemptId);
+        }
+        // 'give-up', or a write the keychain refused: the previous start
+        // already spent its reload on this exact language and direction and
+        // the native side still disagrees (or the attempt cannot be recorded),
+        // so another reload would repeat the same launch. Keep the forced
+        // write (it is what the next start reads) and settle on the error
+        // surface.
+        syncRtl(resolved);
+        if (recorded) {
+          try {
+            await reloadAppAsync();
+            // The native reload tears down this JS context; nothing below runs.
+            return;
+          } catch {
+            // Reload failed: keep going so the language still loads, then show
+            // the Retry/Continue screen instead of first-painting in the wrong
+            // direction.
+            reloadFailed = true;
+          }
+        } else {
           reloadFailed = true;
         }
       }
@@ -1222,6 +1261,10 @@ function RootLayoutNav({
       <LanguageReloadErrorScreen
         onRetry={() => {
           void (async () => {
+            // Retry spends a fresh direction attempt: without clearing the
+            // marker, the relaunch would read the same spent attempt and go
+            // straight back to this screen.
+            await clearDirectionReloadAttempt();
             try {
               await reloadAppAsync();
             } catch {

@@ -1,0 +1,26 @@
+diff --git a/android/src/main/java/expo/modules/localization/LocalizationModule.kt b/android/src/main/java/expo/modules/localization/LocalizationModule.kt
+--- a/android/src/main/java/expo/modules/localization/LocalizationModule.kt
++++ b/android/src/main/java/expo/modules/localization/LocalizationModule.kt
+@@ -55,11 +55,20 @@
+     val supportsRTL =
+       context.getString(R.string.ExpoLocalization_supportsRTL).toBooleanStrictOrNull() ?: true
+     val forcesRTL =
+-      context.getString(R.string.ExpoLocalization_forcesRTL).toBooleanStrictOrNull() ?: false
++      context.getString(R.string.ExpoLocalization_forcesRTL).toBooleanStrictOrNull()
+ 
+     // We call these methods before React loads to ensure it gets rendered correctly the first time the app is opened.
+     I18nUtil.instance.allowRTL(context, supportsRTL)
+-    I18nUtil.instance.forceRTL(context, forcesRTL)
++    // An "unset" resource means the build declares no direction of its own, so
++    // this module must not write one: the stored preference belongs to the app,
++    // which forces the direction at runtime when the user picks an RTL language.
++    // Writing `false` here ran on every module create (process start and every
++    // React instance reload) and erased that preference before the next
++    // `I18nManager.isRTL` read, so the forced direction never took effect and
++    // every launch forced and reloaded again.
++    if (forcesRTL != null) {
++      I18nUtil.instance.forceRTL(context, forcesRTL)
++    }
+   }
+ 
+   private fun getMeasurementSystem(locale: Locale): String? {

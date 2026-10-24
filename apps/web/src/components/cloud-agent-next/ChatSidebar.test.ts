@@ -371,6 +371,7 @@ describe('ChatSidebar row rendering', () => {
       setFolderColor: jest.fn(async () => true),
       deleteFolder: jest.fn(async () => true),
       moveWorktree: jest.fn(async () => false),
+      moveSession: jest.fn(async () => false),
       reorderFolders: jest.fn(async () => true),
       refresh: jest.fn(async () => undefined),
     } satisfies NonNullable<ChatSidebarProps['workspaceFolders']>;

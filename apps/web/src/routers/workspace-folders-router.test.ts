@@ -46,6 +46,10 @@ function newWorktreeId(): CloudAgentWorktreeId {
   return `worktree_${crypto.randomUUID()}`;
 }
 
+function newWorkspaceId(): `workspace_${string}` {
+  return `workspace_${crypto.randomUUID()}`;
+}
+
 function makeSession(overrides: Partial<NewCliSessionV2> = {}): NewCliSessionV2 {
   return {
     session_id: `ses_${crypto.randomUUID().replaceAll('-', '').slice(0, 26)}`,
@@ -757,6 +761,197 @@ describe('workspaceFolders worktree membership', () => {
     expect(await readWorktree()).toEqual({ ...worktree, folder_id: null });
     expect(await readSessions()).toEqual(sessions);
     expect((await callerFor().list({ organizationId: null })).folders).toEqual([otherFolder]);
+  });
+});
+
+describe('workspaceFolders session moves', () => {
+  it('materializes workspace metadata when filing a standalone session and unfiling keeps the link', async () => {
+    const folder = await createFolder();
+    const workspaceId = newWorkspaceId();
+    const worktreeId = `worktree_${workspaceId.slice('workspace_'.length)}`;
+    const session = await insertSession({
+      cloud_agent_session_id: workspaceId,
+      cloud_agent_worktree_id: null,
+    });
+    const caller = callerFor();
+    expect(await readWorktree(worktreeId)).toBeUndefined();
+
+    await caller.moveSession({ organizationId: null, sessionId: workspaceId, folderId: folder.id });
+    const worktree = await readWorktree(worktreeId);
+    expect(worktree).toMatchObject({
+      worktree_id: worktreeId,
+      kilo_user_id: USER_ID,
+      organization_id: null,
+      folder_id: folder.id,
+      name: null,
+    });
+    expect(new Date(worktree?.created_at ?? '').toISOString()).toBe(INITIAL_TIME);
+    expect(
+      (
+        await db
+          .select({ cloudAgentWorktreeId: cli_sessions_v2.cloud_agent_worktree_id })
+          .from(cli_sessions_v2)
+          .where(eq(cli_sessions_v2.session_id, session.session_id))
+      )[0]?.cloudAgentWorktreeId
+    ).toBe(worktreeId);
+    expect((await caller.list({ organizationId: null })).folders).toEqual([
+      { ...folder, worktreeIds: [worktreeId] },
+    ]);
+
+    await caller.moveSession({ organizationId: null, sessionId: workspaceId, folderId: null });
+    expect(await readWorktree(worktreeId)).toMatchObject({ folder_id: null });
+    expect((await caller.list({ organizationId: null })).folders).toEqual([folder]);
+    expect(
+      (
+        await db
+          .select({ cloudAgentWorktreeId: cli_sessions_v2.cloud_agent_worktree_id })
+          .from(cli_sessions_v2)
+          .where(eq(cli_sessions_v2.session_id, session.session_id))
+      )[0]?.cloudAgentWorktreeId
+    ).toBe(worktreeId);
+  });
+
+  it('moves the whole workspace group when filing a grouped session by any root chat', async () => {
+    const folder = await createFolder();
+    const siblingWorkspaceId = newWorkspaceId();
+    await insertSession({
+      status: 'busy',
+      status_updated_at: LATER_TIME,
+      last_activity_at: LATER_TIME,
+    });
+    await insertSession({
+      parent_session_id: SESSION_ID,
+      cloud_agent_session_id: null,
+      cloud_agent_session_scope_id: WORKSPACE_ID,
+    });
+    await insertSession({ cloud_agent_session_id: siblingWorkspaceId });
+    await insertWorktree({
+      name: 'Workspace name',
+      runtime_locations: [{ sandboxId: 'session-move-sandbox', provider: 'cloudflare' }],
+    });
+    const sessions = await readSessions();
+    const caller = callerFor();
+
+    await caller.moveSession({
+      organizationId: null,
+      sessionId: siblingWorkspaceId,
+      folderId: folder.id,
+    });
+    expect((await caller.list({ organizationId: null })).folders).toEqual([
+      { ...folder, worktreeIds: [WORKTREE_ID] },
+    ]);
+    expect(await readSessions()).toEqual(sessions);
+    expect(await readWorktree()).toMatchObject({
+      name: 'Workspace name',
+      runtime_locations: [{ sandboxId: 'session-move-sandbox', provider: 'cloudflare' }],
+      folder_id: folder.id,
+      deletion_started_at: null,
+      deletion_completed_at: null,
+    });
+
+    await caller.moveSession({
+      organizationId: null,
+      sessionId: siblingWorkspaceId,
+      folderId: null,
+    });
+    expect((await caller.list({ organizationId: null })).folders).toEqual([folder]);
+    expect(await readWorktree()).toMatchObject({ name: 'Workspace name', folder_id: null });
+    expect(await readSessions()).toEqual(sessions);
+  });
+
+  it('rejects child sessions as missing without materializing metadata', async () => {
+    const folder = await createFolder();
+    const childWorkspaceId = newWorkspaceId();
+    await insertSession({
+      parent_session_id: SESSION_ID,
+      cloud_agent_session_id: childWorkspaceId,
+      cloud_agent_worktree_id: null,
+    });
+    for (const folderId of [folder.id, null]) {
+      await expect(
+        callerFor().moveSession({ organizationId: null, sessionId: childWorkspaceId, folderId })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    }
+    expect(
+      await readWorktree(`worktree_${childWorkspaceId.slice('workspace_'.length)}`)
+    ).toBeUndefined();
+    expect((await callerFor().list({ organizationId: null })).folders).toEqual([folder]);
+  });
+
+  it.each([
+    { sourceUserId: OTHER_USER_ID, sourceOrganizationId: null, organizationId: null },
+    {
+      sourceUserId: OTHER_USER_ID,
+      sourceOrganizationId: ORGANIZATION_ID,
+      organizationId: ORGANIZATION_ID,
+    },
+    { sourceUserId: USER_ID, sourceOrganizationId: ORGANIZATION_ID, organizationId: null },
+    { sourceUserId: USER_ID, sourceOrganizationId: null, organizationId: ORGANIZATION_ID },
+  ])(
+    'rejects cross-owner or cross-scope sessions with or without metadata: %p',
+    async ({ sourceUserId, sourceOrganizationId, organizationId }) => {
+      const folder = await createFolder(organizationId);
+      for (const hasMetadata of [false, true]) {
+        const workspaceId = newWorkspaceId();
+        const worktreeId = `worktree_${workspaceId.slice('workspace_'.length)}`;
+        await insertSession({
+          kilo_user_id: sourceUserId,
+          organization_id: sourceOrganizationId,
+          cloud_agent_session_id: workspaceId,
+          cloud_agent_worktree_id: null,
+        });
+        if (hasMetadata) {
+          await insertWorktree({
+            worktree_id: worktreeId,
+            kilo_user_id: sourceUserId,
+            organization_id: sourceOrganizationId,
+          });
+        }
+        for (const folderId of [folder.id, null]) {
+          await expect(
+            callerFor().moveSession({ organizationId, sessionId: workspaceId, folderId })
+          ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+        }
+        if (hasMetadata) {
+          expect(await readWorktree(worktreeId)).toMatchObject({
+            kilo_user_id: sourceUserId,
+            organization_id: sourceOrganizationId,
+            folder_id: null,
+          });
+        } else {
+          expect(await readWorktree(worktreeId)).toBeUndefined();
+        }
+      }
+    }
+  );
+
+  it('rejects cross-scope or foreign-member destinations before touching session metadata', async () => {
+    const crossScopeDestination = await createFolder(ORGANIZATION_ID);
+    await expect(
+      callerFor().moveSession({
+        organizationId: null,
+        sessionId: WORKSPACE_ID,
+        folderId: crossScopeDestination.id,
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(await readWorktree()).toBeUndefined();
+
+    // A destination owned by another member of the same organization must be
+    // rejected for ownership, not because the caller is in the wrong scope.
+    const otherMemberDestination = await createFolder(ORGANIZATION_ID, 'Private', otherUser);
+    const organizationWorkspaceId = newWorkspaceId();
+    await insertSession({
+      organization_id: ORGANIZATION_ID,
+      cloud_agent_session_id: organizationWorkspaceId,
+      cloud_agent_worktree_id: null,
+    });
+    await expect(
+      callerFor().moveSession({
+        organizationId: ORGANIZATION_ID,
+        sessionId: organizationWorkspaceId,
+        folderId: otherMemberDestination.id,
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 });
 

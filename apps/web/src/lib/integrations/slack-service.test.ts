@@ -378,42 +378,6 @@ describe('upsertSlackInstallation', () => {
     );
   });
 
-  it('dual-writes the bot token into the encrypted credential store on a new install', async () => {
-    mockLimit.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
-
-    const installation = {
-      botToken: 'xoxb-new-token',
-      botUserId: 'U_NEW_BOT',
-      teamName: 'Kilo Team',
-    } satisfies SlackInstallation;
-
-    await upsertSlackInstallation({ owner, teamId: 'T123', installation });
-
-    expect(mockWriteSlackCredential).toHaveBeenCalledWith({
-      integrationId: 'integration-1',
-      slackTeamId: 'T123',
-      owner,
-      botToken: 'xoxb-new-token',
-      botUserId: 'U_NEW_BOT',
-    });
-  });
-
-  it('dual-writes the bot token when refreshing an existing install', async () => {
-    mockLimit.mockResolvedValue([buildSlackIntegration()]);
-
-    const installation = {
-      botToken: 'xoxb-rotated-token',
-      botUserId: 'U_NEW_BOT',
-      teamName: 'Kilo Team',
-    } satisfies SlackInstallation;
-
-    await upsertSlackInstallation({ owner, teamId: 'T123', installation });
-
-    expect(mockWriteSlackCredential).toHaveBeenCalledWith(
-      expect.objectContaining({ botToken: 'xoxb-rotated-token', slackTeamId: 'T123' })
-    );
-  });
-
   // The encrypted store is write-only until reads move onto it, so a failure there
   // must not take down Slack installs. This expectation flips in the step that
   // repoints the read paths.
@@ -469,6 +433,24 @@ describe('upsertSlackInstallation organization workspace binding', () => {
     mockWriteSlackCredential.mockResolvedValue({ id: 'credential-1' });
     mockGetDefaultAllowedModel.mockReset();
     mockGetDefaultAllowedModel.mockResolvedValue(DEFAULT_BOT_MODEL);
+  });
+
+  it('uses the supplied default model without resolving organization policy again', async () => {
+    mockLimit.mockResolvedValueOnce([organizationIntegration('T123')]).mockResolvedValueOnce([]);
+
+    await upsertSlackInstallation({
+      owner: organizationOwner,
+      teamId: 'T123',
+      installation,
+      defaultModel: 'test/default-model',
+    });
+
+    expect(mockGetDefaultAllowedModel).not.toHaveBeenCalled();
+    expect(mockUpdateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ model_slug: 'test/default-model' }),
+      })
+    );
   });
 
   it('refuses to move an organization connection without caller authorization', async () => {

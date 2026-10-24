@@ -67,8 +67,8 @@ export function shouldShowFooterWorkingIndicator({
  * indicator, then the cannot-send reason.
  *
  * Two transcript surfaces already state progress, so neither takes a progress
- * item here. An empty transcript renders its own centered indicator, and a live
- * PreparationGroup shows the current preparation attempt. Stale
+ * item here. An empty transcript centers an available status indicator, and a
+ * live PreparationGroup shows the current preparation attempt. Stale
  * completed/failed groups must not suppress the row — otherwise a recycle
  * re-prepare can leave a blank progress window until the new running attempt
  * merges. The reason states a send gate no transcript surface carries, so it
@@ -86,7 +86,7 @@ export function resolveSessionFooterRowItem({
   transcriptItemCount,
 }: SessionFooterRowInput): SessionFooterRowItem | null {
   const transcriptOwnsProgress =
-    transcriptItemCount === 0 ||
+    (transcriptItemCount === 0 && hasStatusIndicator) ||
     (cloudStatusType === 'preparing' && hasInProgressTranscriptPreparation);
   // An empty rendered transcript shows its own centered status indicator.
   const indicatorMustStayVisible =

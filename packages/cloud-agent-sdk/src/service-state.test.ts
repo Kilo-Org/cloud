@@ -635,6 +635,59 @@ describe('createServiceState', () => {
       expect(state.getActivity()).toEqual({ type: 'idle' });
     });
 
+    it.each(['disconnected', 'interrupted'] as const)(
+      'preserves a %s terminal after a statusless reconnect and another drop',
+      reason => {
+        const onError = jest.fn();
+        const state = createServiceState(makeConfig({ onError }));
+        state.process({ type: 'stopped', reason });
+        const status = state.getStatus();
+        onError.mockClear();
+
+        state.process({ type: 'connected' });
+        state.beginReplay();
+        state.process({ type: 'reconnecting' });
+        expect(state.getActivity()).toEqual({ type: 'idle' });
+        state.process({ type: 'stopped', reason: 'transport-disconnected' });
+        state.cancelReplay();
+
+        expect(state.getStatus()).toEqual(status);
+        expect(state.getActivity()).toEqual({ type: 'idle' });
+        expect(onError).not.toHaveBeenCalled();
+      }
+    );
+
+    it('idles a busy turn at exhaustion while preserving its session error and setup output', () => {
+      const onError = jest.fn();
+      const state = createServiceState(makeConfig({ onError }));
+      state.process({ type: 'connected', sessionStatus: { type: 'busy' } });
+      state.process({ type: 'preparing', step: 'setup_commands', message: 'added 42 packages' });
+      state.process({ type: 'session.error', error: 'Current failure' });
+      state.process({ type: 'reconnecting' });
+      expect(state.getActivity()).toEqual({ type: 'busy' });
+      const cloudStatus = state.getCloudStatus();
+
+      const snapshots: ReturnType<typeof state.snapshot>[] = [];
+      state.subscribe(() => snapshots.push(state.snapshot()));
+      state.process({ type: 'stopped', reason: 'transport-disconnected' });
+
+      expect(state.getActivity()).toEqual({ type: 'idle' });
+      expect(snapshots).toHaveLength(1);
+      expect(snapshots[0].activity).toEqual({ type: 'idle' });
+      expect(state.getStatus()).toEqual({ type: 'error', message: 'Current failure' });
+      expect(state.getCloudStatus()).toEqual(cloudStatus);
+      expect(state.getSetupLog()).toEqual(['added 42 packages']);
+      expect(onError).toHaveBeenCalledTimes(1);
+    });
+
+    it('ends reconnecting when the connected snapshot reports a scheduled session', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'reconnecting' });
+      state.process({ type: 'connected', sessionStatus: { type: 'scheduled' } });
+      expect(state.getActivity()).toEqual({ type: 'idle' });
+      expect(state.getStatus()).toEqual({ type: 'scheduled' });
+    });
+
     it('preserves a wrapper disconnect through reconnecting and a transport stop', () => {
       const onError = jest.fn();
       const state = createServiceState(makeConfig({ onError }));

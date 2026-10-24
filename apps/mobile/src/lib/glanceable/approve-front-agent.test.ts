@@ -478,6 +478,13 @@ describe('isManagerStillWaitingForApproval', () => {
     expect(isManagerStillWaitingForApproval(fake.handle)).toBe(true);
   });
 
+  it('keeps waiting while reconnecting before the permission replay arrives', () => {
+    const fake = atomHandle();
+    fake.store.set(fake.activity, { type: 'reconnecting' });
+
+    expect(isManagerStillWaitingForApproval(fake.handle)).toBe(true);
+  });
+
   it('stops waiting once an attached session reports no ask', () => {
     const fake = atomHandle();
     fake.store.set(fake.agentStatus, { type: 'idle' });

@@ -301,7 +301,10 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
 
   function hasAuthoritativeTerminal(): boolean {
     return (
-      (terminated || status.type === 'error') &&
+      (terminated ||
+        status.type === 'error' ||
+        status.type === 'interrupted' ||
+        status.type === 'disconnected') &&
       disconnectedSource !== 'transport' &&
       (replay === null || replay.terminalAtStart)
     );
@@ -331,11 +334,13 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
   }
 
   function processStopped(event: Extract<ServiceEvent, { type: 'stopped' }>): void {
-    // A synthetic transport stop must not replace a wrapper `disconnected`, an
-    // `error`, or an `interrupted`, and must not clear cloud status or the
-    // setup log on the way. Other reasons still run the existing function,
-    // including the activity and cloud-status clears.
+    // A synthetic transport stop keeps authoritative terminal details, cloud
+    // status, and setup output. It still ends any activity left by the turn.
     if (event.reason === 'transport-disconnected' && hasAuthoritativeTerminal()) {
+      if (activity.type !== 'idle') {
+        activity = { type: 'idle' };
+        notify();
+      }
       return;
     }
 

@@ -317,6 +317,7 @@ export function SessionDetailContent({
   const isStreaming = useAtomValue(manager.atoms.isStreaming);
   const statusIndicator = useAtomValue(manager.atoms.statusIndicator);
   const agentStatus = useAtomValue(manager.atoms.agentStatus);
+  const agentActivity = useAtomValue(manager.atoms.activity);
   const cloudStatus = useAtomValue(manager.atoms.cloudStatus);
   const preparationAttempts = useAtomValue(manager.atoms.preparationAttempts);
   const canSend = useAtomValue(manager.atoms.canSend);
@@ -1680,6 +1681,7 @@ export function SessionDetailContent({
   const connectionState = resolveSessionConnectionState({
     activeSessionType,
     agentStatusType: agentStatus.type,
+    agentActivityType: agentActivity.type,
     userWebConnected,
     reconnectExhausted,
   });
@@ -1800,10 +1802,17 @@ export function SessionDetailContent({
   const hasFooterStatusIndicator =
     (!cachedMetadataRefresh && footerStatusIndicator !== null) ||
     (cloudStatus !== null && cloudStatus.type !== 'ready');
-  const shouldShowFooterWorking = shouldShowFooterWorkingIndicator({
-    isAgentWorking: shouldShowWorkingIndicator,
-    hasStatusIndicator: hasFooterStatusIndicator,
+  const terminalError = resolveSessionTerminalError({
+    error,
+    statusIndicator,
+    messageCount: messages.length,
   });
+  const shouldShowFooterWorking =
+    terminalError === null &&
+    shouldShowFooterWorkingIndicator({
+      isAgentWorking: shouldShowWorkingIndicator,
+      hasStatusIndicator: hasFooterStatusIndicator,
+    });
   // Only a live PreparationGroup duplicates footer progress. Completed groups
   // stay in the transcript after cold starts and must not suppress a later
   // recycle re-prepare footer (Setting up environment…).
@@ -1848,7 +1857,8 @@ export function SessionDetailContent({
     cloudStatusType: cloudStatus?.type,
     hasInProgressTranscriptPreparation,
     shouldShowFooterWorking,
-    hasStatusIndicator: !cachedMetadataRefresh && footerStatusIndicator !== null,
+    hasStatusIndicator:
+      terminalError === null && !cachedMetadataRefresh && footerStatusIndicator !== null,
     hasSendReason: sendDisabledReason !== null && !isReadOnlyTranscript,
     statusIndicatorCode: footerStatusIndicator?.code,
     statusIndicatorType: footerStatusIndicator?.type,
@@ -2697,11 +2707,6 @@ export function SessionDetailContent({
   }
 
   function renderContent() {
-    const terminalError = resolveSessionTerminalError({
-      error,
-      statusIndicator,
-      messageCount: messages.length,
-    });
     if (terminalError) {
       const copyText = buildTerminalErrorCopyText({
         sessionId,

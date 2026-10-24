@@ -188,14 +188,17 @@ describe('resolveSessionFooterRowItem', () => {
     ).toBeNull();
   });
 
-  it('suppresses progress items on an empty transcript, where the body states its own', () => {
+  it('keeps the working spinner on an empty transcript without a centered status', () => {
     expect(
       resolveSessionFooterRowItem({
         ...base,
         transcriptItemCount: 0,
         shouldShowFooterWorking: true,
       })
-    ).toBeNull();
+    ).toBe('working');
+  });
+
+  it('suppresses the footer status on an empty transcript, where the body states its own', () => {
     expect(
       resolveSessionFooterRowItem({ ...base, transcriptItemCount: 0, hasStatusIndicator: true })
     ).toBeNull();

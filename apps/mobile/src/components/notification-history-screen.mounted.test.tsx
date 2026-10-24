@@ -65,16 +65,16 @@ vi.mock('@shopify/flash-list', () => ({
     data,
     renderItem,
     onEndReached,
-    refreshControl,
+    onRefresh,
     ListFooterComponent,
   }: {
     data: Row[];
     renderItem: (info: { item: Row }) => ReactElement;
     onEndReached?: () => void;
-    refreshControl?: { props: { onRefresh?: () => void } };
+    onRefresh?: () => void;
     ListFooterComponent?: ReactElement;
   }) => {
-    state.listProps = { onEndReached, onRefresh: refreshControl?.props.onRefresh };
+    state.listProps = { onEndReached, onRefresh };
     return createElement(
       'FlashList',
       null,

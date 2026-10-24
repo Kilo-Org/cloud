@@ -2,6 +2,7 @@
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // login-screen.test.ts — narrow contract tests plus mounted globe tests.
 // The refresh boundary contract is verified through the useDeviceAuth hook's
@@ -44,6 +45,9 @@ const authState = vi.hoisted(() => ({
   sessionEnded: false,
   token: undefined as string | undefined,
 }));
+// The measured layout re-reads the window on rotation, so a test changes these
+// and re-renders instead of re-mocking the module.
+const windowSize = vi.hoisted(() => ({ width: 390, height: 844 }));
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
@@ -54,8 +58,10 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
+  PixelRatio: { roundToNearestPixel: (value: number) => Math.round(value) },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
+  useWindowDimensions: () => windowSize,
   View: 'View',
 }));
 vi.mock('react-native-safe-area-context', () => ({
@@ -339,6 +345,145 @@ describe('login-screen language globe', () => {
     authState.token = undefined;
     push.mockClear();
     setLanguagePickerBridge.mockClear();
+  });
+
+  it('reanchors growing sign-in content below the safe area and recenters when it fits again', async () => {
+    vi.mocked(useSafeAreaInsets).mockReturnValue({ top: 24, bottom: 0, left: 0, right: 0 });
+    const renderer = await mountLoginScreen();
+    const scroll = renderer.root.findByType('ScrollView');
+    const content = renderer.root.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        typeof node.props.onLayout === 'function'
+    );
+    const measureContent = content.props.onLayout as (event: {
+      nativeEvent: { layout: { height: number } };
+    }) => void;
+    const attachScroll = scroll.props.ref as (node: {
+      getNativeScrollRef: () => {
+        measureInWindow: (onMeasure: (...bounds: [number, number, number, number]) => void) => void;
+      };
+    }) => void;
+
+    try {
+      act(() => {
+        attachScroll({
+          getNativeScrollRef: () => ({
+            measureInWindow: onMeasure => {
+              onMeasure(0, 0, 844, 400);
+            },
+          }),
+        });
+        measureContent({ nativeEvent: { layout: { height: 200 } } });
+      });
+      expect(scroll.props.contentContainerStyle).toMatchObject({
+        paddingTop: 100,
+        paddingBottom: 100,
+      });
+
+      act(() => {
+        measureContent({ nativeEvent: { layout: { height: 600 } } });
+      });
+      expect(scroll.props.contentContainerStyle).toMatchObject({
+        paddingTop: 40,
+        paddingBottom: 16,
+      });
+
+      act(() => {
+        measureContent({ nativeEvent: { layout: { height: 200 } } });
+      });
+      expect(scroll.props.contentContainerStyle).toMatchObject({
+        paddingTop: 100,
+        paddingBottom: 100,
+      });
+    } finally {
+      renderer.unmount();
+      vi.mocked(useSafeAreaInsets).mockReturnValue({ top: 0, bottom: 0, left: 0, right: 0 });
+    }
+  });
+
+  it('re-measures the viewport when the window size changes', async () => {
+    const renderer = await mountLoginScreen();
+    const scroll = renderer.root.findByType('ScrollView');
+    const content = renderer.root.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        typeof node.props.onLayout === 'function'
+    );
+    const measureContent = content.props.onLayout as (event: {
+      nativeEvent: { layout: { height: number } };
+    }) => void;
+    const attachScroll = scroll.props.ref as (node: {
+      getNativeScrollRef: () => {
+        measureInWindow: (onMeasure: (...bounds: [number, number, number, number]) => void) => void;
+      };
+    }) => void;
+    const viewport = { width: 390, height: 700 };
+
+    try {
+      act(() => {
+        attachScroll({
+          getNativeScrollRef: () => ({
+            measureInWindow: onMeasure => {
+              onMeasure(0, 0, viewport.width, viewport.height);
+            },
+          }),
+        });
+        measureContent({ nativeEvent: { layout: { height: 200 } } });
+      });
+      expect(scroll.props.contentContainerStyle).toMatchObject({
+        paddingTop: 250,
+        paddingBottom: 250,
+      });
+
+      // A phone held sideways reports a shorter window: the layout has to read
+      // the viewport again, or the form keeps the landscape frame's padding.
+      act(() => {
+        viewport.width = 844;
+        viewport.height = 300;
+        windowSize.width = 844;
+        windowSize.height = 390;
+        renderer.update(createElement(LoginScreen));
+      });
+      expect(scroll.props.contentContainerStyle).toMatchObject({
+        paddingTop: 50,
+        paddingBottom: 50,
+      });
+    } finally {
+      renderer.unmount();
+      windowSize.width = 390;
+      windowSize.height = 844;
+    }
+  });
+
+  it('drops the welcome block only in a window that is too short for the full stack', async () => {
+    const welcomeBlockCount = async (width: number, height: number) => {
+      windowSize.width = width;
+      windowSize.height = height;
+      const renderer = await mountLoginScreen();
+      try {
+        // The greeting and the logo are one block: the logo's presence is the
+        // block's presence.
+        return findByType(renderer.root, 'Image').length;
+      } finally {
+        renderer.unmount();
+      }
+    };
+
+    try {
+      // A phone held sideways at a large text size cannot fit the welcome block
+      // above the form: the form alone keeps the primary action on screen.
+      expect(await welcomeBlockCount(844, 390)).toBe(0);
+      // The same window with a tall short edge is a tablet, which has room.
+      expect(await welcomeBlockCount(1024, 600)).toBe(1);
+      // Portrait keeps the full stack at every text size.
+      expect(await welcomeBlockCount(390, 844)).toBe(1);
+    } finally {
+      windowSize.width = 390;
+      windowSize.height = 844;
+    }
   });
 
   it('renders the globe and names it Language', async () => {

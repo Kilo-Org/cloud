@@ -23,6 +23,9 @@ import { NETWORK_BODY_CONTEXT, scrubEvent } from '@/lib/telemetry/sentry-scrub';
 let events: TelemetryEvent[] = [];
 let breadcrumbs: TelemetryBreadcrumb[] = [];
 
+// Assembled from parts so the fixture reads as a plain URL value.
+const USERINFO = ['user', 'abcdefghijklmnopqrst'].join(':');
+
 beforeEach(() => {
   events = [];
   breadcrumbs = [];
@@ -86,6 +89,18 @@ describe('stripQueryString', () => {
       'https://example.com/api/trpc/a.b'
     );
   });
+
+  it('keeps origin and path for a fragment suffix', () => {
+    expect(stripQueryString('https://example.com/oauth/callback#abcdefghijklmnopqrst')).toBe(
+      'https://example.com/oauth/callback'
+    );
+  });
+
+  it('keeps origin and path when the authority carries userinfo', () => {
+    expect(stripQueryString(`https://${USERINFO}@example.com/api/trpc/a.b`)).toBe(
+      'https://example.com/api/trpc/a.b'
+    );
+  });
 });
 
 describe('normalizeUrlPath', () => {
@@ -99,6 +114,12 @@ describe('normalizeUrlPath', () => {
 
   it('keeps a path-only URL unchanged', () => {
     expect(normalizeUrlPath('/api/trpc/a.b')).toBe('/api/trpc/a.b');
+  });
+
+  it('keeps the path of a URL whose only suffix is a fragment', () => {
+    expect(normalizeUrlPath('https://api.example.com/api/trpc/session.list#section')).toBe(
+      '/api/trpc/session.list'
+    );
   });
 
   it('returns / for an absolute URL with no path and empty for a non-string', () => {
@@ -446,6 +467,21 @@ describe('createNetworkErrorFetch', () => {
     // The message drops the scheme, host, and port so it is stable across
     // environments and worktrees.
     expect(errorMessageOf(event)).toBe('POST /api/trpc/a.b -> 412');
+  });
+
+  it('(d3) keeps the network path as origin and path', async () => {
+    const response = new Response('stale', { status: 412 });
+    const wrapped = createNetworkErrorFetch(resolvingFetch(response));
+
+    await wrapped('https://example.com/api/trpc/a.b#abcdefghijklmnopqrst', {
+      method: 'POST',
+    });
+
+    const event = reportedEvent();
+    expect(event?.contexts?.network).toMatchObject({ url: 'https://example.com/api/trpc/a.b' });
+    expect(errorMessageOf(event)).toBe('POST /api/trpc/a.b -> 412');
+    expect(JSON.stringify(event)).not.toContain('abcdefghijklmnopqrst');
+    expect(JSON.stringify(event?.fingerprint)).not.toContain('access_token');
   });
 
   it('(e) does not report a 200 response', async () => {
@@ -1007,6 +1043,59 @@ describe('reportNetworkError', () => {
       procedure: 'user.me',
       trpcCode: 'UNAUTHORIZED',
     });
+  });
+
+  it('uses one origin-and-path form for the context, title and fingerprint', () => {
+    reportNetworkError({
+      source: 'fetch',
+      url: 'https://example.com/oauth/callback/abcdefghijklmnopqrst',
+      method: 'POST',
+      status: 500,
+      durationMs: 7,
+    });
+
+    const event = reportedEvent();
+
+    // The context, the title, and the fingerprint key all name the endpoint in
+    // the same form.
+    expect(event?.contexts?.network).toMatchObject({
+      url: 'https://example.com/oauth/callback/[redacted]',
+    });
+    expect(errorMessageOf(event)).toBe('POST /oauth/callback/[redacted] -> 500');
+    expect(event?.fingerprint).toEqual([
+      'network-error',
+      'fetch',
+      '/oauth/callback/[redacted]',
+      'http.500',
+    ]);
+    expect(JSON.stringify(event)).not.toContain('abcdefghijklmnopqrst');
+  });
+
+  it('uses the origin-and-path form in a transport-failure breadcrumb', async () => {
+    const wrapped = createNetworkErrorFetch(rejectingFetch(new Error('socket closed')));
+
+    await expect(
+      wrapped('https://example.com/oauth/callback/abcdefghijklmnopqrst')
+    ).rejects.toThrow('socket closed');
+
+    expect(breadcrumbs).toHaveLength(1);
+    expect(breadcrumbs[0]).toMatchObject({
+      message: 'GET /oauth/callback/[redacted] failed',
+      data: { path: '/oauth/callback/[redacted]' },
+    });
+    expect(JSON.stringify(breadcrumbs)).not.toContain('abcdefghijklmnopqrst');
+  });
+
+  it('uses the origin-and-path form in an expected-response breadcrumb', async () => {
+    const wrapped = createNetworkErrorFetch(resolvingFetch(new Response('gone', { status: 404 })));
+
+    await wrapped('https://example.com/oauth/callback/abcdefghijklmnopqrst');
+
+    expect(breadcrumbs).toHaveLength(1);
+    expect(breadcrumbs[0]).toMatchObject({
+      message: 'GET /oauth/callback/[redacted] -> 404',
+    });
+    expect(JSON.stringify(breadcrumbs)).not.toContain('abcdefghijklmnopqrst');
   });
 });
 

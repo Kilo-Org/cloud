@@ -53,6 +53,7 @@
     "connected": "Imqabbad",
     "couldNotLoadModels": "Ma stajniex ngħabbu l-mudelli.",
     "couldNotLoadRepositories": "Ma stajniex ngħabbu r-repożitorji.",
+    "noRepositoriesFound": "L-ebda repożitorju misjub",
     "critical": "Kritiku",
     "delete": "Ħassar",
     "deleted": "Imħassar",
@@ -87,6 +88,7 @@
     "connect": "Qabbad",
     "connectBitbucket": "Qabbad Bitbucket",
     "connectGitlab": "Qabbad GitLab",
+    "connectProvider": "Ikkonnettja fornitur",
     "contentTruncated": "Il-kontenut tqassar",
     "copyLink": "Ikkopja l-ħolqa",
     "couldNotLoadOrganizations": "Ma stajniex ngħabbu l-organizzazzjonijiet.",
@@ -145,7 +147,8 @@
     "agent": "Aġent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Bidliet"
+    "changes": "Bidliet",
+    "organizationTrialEnded": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Sid l-organizzazzjoni jista' jaġġorna l-fatturazzjoni fuq kilo.ai, imbagħad jerġa' jipprova."
   },
   "language": {
     "restarting": "L-app qed terġa' tibda biex tapplika l-lingwa",
@@ -1473,7 +1476,6 @@
       "gitlabNoRepositoriesDescription": "Jista' jkollok bżonn tagħti aċċess għal aktar gruppi jew proġetti fuq GitLab.",
       "installGithubApp": "Installa l-app ta' GitHub fuq ir-repożitorji",
       "installGithubAppDescription": "Agħti lill-app ta' Kilo fuq GitHub aċċess għar-repożitorji li trid jiġu riveduti.",
-      "noRepositoriesFound": "L-ebda repożitorju misjub",
       "repositoryAccess": "aċċess għar-repożitorju"
     },
     "style": {
@@ -1555,7 +1557,6 @@
       "invalidUrl": "Daħħal URL validu għal PR.",
       "couldNotCheckProviderStatus": "Ma setax jiġi ċċekkjat l-istat tal-fornitur.",
       "couldNotLoadProviders": "Ma stajniex ngħabbu l-fornituri konnessi tiegħek. Jekk jogħġbok erġa' pprova.",
-      "connectProvider": "Ikkonnettja fornitur",
       "connectProviderDescription": "Ikkonnettja GitHub biex tibda reviżjoni manwali ta' PR.",
       "pullRequestUrl": "URL tal-PR",
       "instructions": "Struzzjonijiet (mhux obbligatorji)",
@@ -3300,7 +3301,9 @@
       "sendInvite": "Ibgħat stedina",
       "title": "Stieden membru",
       "alreadyInvited": "Din il-persuna diġà hija mistiedna jew diġà membru.",
-      "sendError": "L-istedina ma setgħetx tintbagħat."
+      "sendError": "L-istedina ma setgħetx tintbagħat.",
+      "pendingInvitation": "Dan l-indirizz tal-posta elettronika diġà għandu stedina pendenti.",
+      "alreadyMember": "Din il-persuna diġà hija membru ta' din l-organizzazzjoni."
     },
     "invoices": {
       "downloadA11y": "Niżżel l-fattura {{number}}",
@@ -3370,7 +3373,12 @@
       "pendingInvitations": "Stediniet pendenti",
       "resendInvite": "Erġa' ibgħat l-istedina",
       "shareInviteLink": "Aqsam ir-rabta tal-istedina",
-      "resendInviteError": "L-istedina ma setgħetx tintbagħat mill-ġdid."
+      "resendInviteError": "L-istedina ma setgħetx tintbagħat mill-ġdid.",
+      "inviteNotResendable": "Din l-istedina ma tistax terġa' tintbagħat.",
+      "ownerAuthority": "Biss min huwa sid tal-organizzazzjoni jista' jamministra lis-sidien.",
+      "ownRoleChange": "Ma tistax tibdel ir-rwol tiegħek.",
+      "inviteExpired": "Din l-istedina skadiet.",
+      "inviteAccepted": "Din l-istedina diġà ġiet aċċettata."
     },
     "usageStats": {
       "inputTokens": "Unitajiet tat-test tad-dħul",

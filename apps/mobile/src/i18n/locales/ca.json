@@ -53,6 +53,7 @@
     "connected": "Connectat",
     "couldNotLoadModels": "No s'han pogut carregar els models.",
     "couldNotLoadRepositories": "No s'han pogut carregar els repositoris.",
+    "noRepositoriesFound": "No s'han trobat repositoris",
     "critical": "Crític",
     "delete": "Elimina",
     "deleted": "Eliminat",
@@ -87,6 +88,7 @@
     "connect": "Connecta",
     "connectBitbucket": "Connecta Bitbucket",
     "connectGitlab": "Connecta GitLab",
+    "connectProvider": "Connecta un proveïdor",
     "contentTruncated": "Contingut truncat",
     "copyLink": "Copia l'enllaç",
     "couldNotLoadOrganizations": "No s'han pogut carregar les organitzacions.",
@@ -145,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Canvis"
+    "changes": "Canvis",
+    "organizationTrialEnded": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. El propietari de l'organització pot actualitzar la facturació a kilo.ai i tornar-ho a provar."
   },
   "language": {
     "restarting": "S'està reiniciant per aplicar l'idioma",
@@ -1429,7 +1432,6 @@
       "gitlabNoRepositoriesDescription": "Pot ser que hagis de concedir accés a més grups o projectes a GitLab.",
       "installGithubApp": "Instal·la l'aplicació de GitHub als repositoris",
       "installGithubAppDescription": "Concedeix a l'aplicació de GitHub de Kilo accés als repositoris que vols revisar.",
-      "noRepositoriesFound": "No s'han trobat repositoris",
       "repositoryAccess": "accés als repositoris"
     },
     "style": {
@@ -1511,7 +1513,6 @@
       "invalidUrl": "Introdueix una URL vàlida d'una sol·licitud d'integració.",
       "couldNotCheckProviderStatus": "No s'ha pogut comprovar l'estat del proveïdor.",
       "couldNotLoadProviders": "No hem pogut carregar els teus proveïdors connectats. Torna-ho a provar.",
-      "connectProvider": "Connecta un proveïdor",
       "connectProviderDescription": "Connecta GitHub per iniciar una revisió manual d'una sol·licitud d'integració.",
       "pullRequestUrl": "URL de la sol·licitud d'integració",
       "instructions": "Instruccions (opcionals)",
@@ -3212,7 +3213,9 @@
       "sendInvite": "Envia la invitació",
       "title": "Convida un membre",
       "alreadyInvited": "Ja té una invitació pendent o ja és membre.",
-      "sendError": "No s'ha pogut enviar la invitació."
+      "sendError": "No s'ha pogut enviar la invitació.",
+      "pendingInvitation": "Aquest correu electrònic ja té una invitació pendent.",
+      "alreadyMember": "Aquesta persona ja és membre d'aquesta organització."
     },
     "invoices": {
       "downloadA11y": "Baixa la factura {{number}}",
@@ -3282,7 +3285,12 @@
       "pendingInvitations": "Invitacions pendents",
       "resendInvite": "Torna a enviar la invitació",
       "shareInviteLink": "Comparteix l'enllaç d'invitació",
-      "resendInviteError": "No s'ha pogut tornar a enviar la invitació."
+      "resendInviteError": "No s'ha pogut tornar a enviar la invitació.",
+      "inviteNotResendable": "Aquesta invitació ja no es pot tornar a enviar.",
+      "ownerAuthority": "Només un propietari de l'organització pot gestionar propietaris.",
+      "ownRoleChange": "No pots canviar el teu propi rol.",
+      "inviteExpired": "Aquesta invitació ha caducat.",
+      "inviteAccepted": "Aquesta invitació ja s'ha acceptat."
     },
     "usageStats": {
       "inputTokens": "Tòkens d'entrada",

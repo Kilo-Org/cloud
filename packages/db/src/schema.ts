@@ -4987,7 +4987,7 @@ export const cloud_agent_webhook_triggers = pgTable(
     is_active: boolean('is_active').notNull().default(true),
     // Profile reference - resolved at runtime in the worker via Hyperdrive
     // ON DELETE RESTRICT prevents deletion of profiles referenced by triggers
-    // Nullable — only required when target_type = 'cloud_agent'
+    // Optional. Runtime resolves repository and default profiles when omitted.
     profile_id: uuid('profile_id').references(() => agent_environment_profiles.id, {
       onDelete: 'restrict',
     }),
@@ -5020,12 +5020,12 @@ export const cloud_agent_webhook_triggers = pgTable(
         (${table.user_id} IS NULL AND ${table.organization_id} IS NOT NULL)
       )`
     ),
-    // Cloud Agent triggers require github_repo and profile_id
+    // Cloud Agent triggers require github_repo
     check(
       'CHK_cloud_agent_webhook_triggers_cloud_agent_fields',
       sql`(
         ${table.target_type} != 'cloud_agent' OR
-        (${table.github_repo} IS NOT NULL AND ${table.profile_id} IS NOT NULL)
+        ${table.github_repo} IS NOT NULL
       )`
     ),
     // KiloClaw Chat triggers require kiloclaw_instance_id

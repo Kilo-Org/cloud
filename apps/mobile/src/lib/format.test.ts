@@ -136,3 +136,38 @@ describe('parseLocalizedNumber', () => {
     expect(parseLocalizedNumber(',5', 'de-DE')).toBe(0.5);
   });
 });
+
+describe('parseLocalizedNumber with the device keypad separator', () => {
+  it('reads the decimal the device keypad writes when the language cannot', () => {
+    // German app language on a device whose number keyboard writes `.`.
+    expect(parseLocalizedNumber('2.5', 'de-DE', '.')).toBe(2.5);
+    expect(parseLocalizedNumber('0.05', 'de-DE', '.')).toBe(0.05);
+    expect(parseLocalizedNumber('2.', 'de-DE', '.')).toBe(2);
+    expect(parseLocalizedNumber('.5', 'de-DE', '.')).toBe(0.5);
+    // The mirror case: English app language on a comma keypad.
+    expect(parseLocalizedNumber('2,5', 'en-US', ',')).toBe(2.5);
+  });
+
+  it('keeps the language reading when the language grammar can read the input', () => {
+    expect(parseLocalizedNumber('1.234,5', 'de-DE', '.')).toBe(1234.5);
+    expect(parseLocalizedNumber('1.234.567', 'de-DE', '.')).toBe(1_234_567);
+    expect(parseLocalizedNumber('1,234.5', 'en-US', ',')).toBe(1234.5);
+    // A space-sized group and the device separator sit together.
+    expect(parseLocalizedNumber('1.5', 'ru', '.')).toBe(1.5);
+    expect(parseLocalizedNumber('1 234,5', 'ru', '.')).toBe(1234.5);
+  });
+
+  it('rejects input the two readings disagree on', () => {
+    // A thousand in German, or 1.234 from a dot keypad: the text does not say.
+    expect(parseLocalizedNumber('1.234', 'de-DE', '.')).toBeNull();
+    expect(parseLocalizedNumber('12.345', 'de-DE', '.')).toBeNull();
+    expect(parseLocalizedNumber('1,234', 'en-US', ',')).toBeNull();
+  });
+
+  it('changes nothing when the device writes the language separator', () => {
+    expect(parseLocalizedNumber('2.5', 'en-US', '.')).toBe(2.5);
+    expect(parseLocalizedNumber('2,5', 'de-DE', ',')).toBe(2.5);
+    expect(parseLocalizedNumber('1,5', 'en-US', '.')).toBeNull();
+    expect(parseLocalizedNumber('1.5', 'de-DE', ',')).toBeNull();
+  });
+});

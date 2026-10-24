@@ -2954,7 +2954,6 @@
   },
   "voiceInput": {
     "listening": "Kulalelwa...",
-    "staysOff": "Ukufaka ngezwi kuzohlala kuvaliwe kuze kube uvumela ukuguqulwa kwezwi libe umbhalo nge-inthanethi.",
     "onlineTitle": "Izwi licutshungulwa nge-inthanethi",
     "onlineMessage": "Le divayisi ayikwazi ukuguqula izwi libe umbhalo ngaphandle kwe-inthanethi. Okurekhodile kuthunyelwa ku-{{provider}} ukuze kuguqulwe kube umbhalo. I-Kilo ayiwugcini umsindo.",
     "allow": "Vumela",

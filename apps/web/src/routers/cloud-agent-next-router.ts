@@ -14,6 +14,7 @@ import { assertSessionWorktree } from '@/lib/cloud-agent-next/worktree-review-ac
 import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
 import type { User } from '@kilocode/db/schema';
 import { fetchGitHubRepositoriesForUser } from '@/lib/cloud-agent/github-integration-helpers';
+import { resolveGitHubIntegrationIdForRepository } from '@/lib/cloud-agent/github-integration-resolution';
 import {
   getGitLabInstanceUrlForUser,
   buildGitLabCloneUrl,
@@ -209,7 +210,15 @@ export const cloudAgentNextRouter = createTRPCRouter({
       });
       const client = createCloudAgentNextClientForModel(authToken, eligibility);
 
-      const { gitlabProject, githubRepo, publicRepoUrl, attachments, images, ...restInput } = input;
+      const {
+        gitlabProject,
+        githubRepo,
+        githubIntegrationId,
+        publicRepoUrl,
+        attachments,
+        images,
+        ...restInput
+      } = input;
 
       // Tokens are resolved inside cloud-agent-next via GIT_TOKEN_SERVICE.
       // Profile resolution (repo binding + default + explicit override) also
@@ -217,6 +226,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
       // envVars/setupCommands/mcpServers overrides.
       let gitParams: {
         githubRepo?: string;
+        githubIntegrationId?: string;
         gitUrl?: string;
         platform?: 'github' | 'gitlab';
       };
@@ -234,7 +244,24 @@ export const cloudAgentNextRouter = createTRPCRouter({
         }
         gitParams = { gitUrl: publicRepoUrl };
       } else {
-        gitParams = { githubRepo, platform: PLATFORM.GITHUB };
+        // The runtime's repository preflight runs only when the request names
+        // the integration that owns the repository, so resolve it for the
+        // caller here. An explicitly supplied id wins, and an unresolvable
+        // repository stays unqualified (the previous behaviour) rather than
+        // refusing a request the runtime can still serve.
+        const resolvedIntegrationId =
+          githubIntegrationId ??
+          (githubRepo === undefined
+            ? null
+            : await resolveGitHubIntegrationIdForRepository(
+                { type: 'user', id: ctx.user.id },
+                githubRepo
+              ));
+        gitParams = {
+          githubRepo,
+          githubIntegrationId: resolvedIntegrationId ?? undefined,
+          platform: PLATFORM.GITHUB,
+        };
       }
 
       try {

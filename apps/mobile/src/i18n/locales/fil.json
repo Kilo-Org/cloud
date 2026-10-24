@@ -2954,7 +2954,6 @@
   },
   "voiceInput": {
     "listening": "Nakikinig...",
-    "staysOff": "Hindi magagamit ang pagdikta hangga't hindi mo pinapayagan ang online na pagsasalin ng boses sa teksto.",
     "onlineTitle": "Pinoproseso online ang boses",
     "onlineMessage": "Hindi kayang isalin ng device na ito ang boses sa teksto nang walang internet. Ipinapadala ang iyong rekording sa {{provider}} para gawing teksto. Hindi iniimbak ng Kilo ang audio.",
     "allow": "Payagan",

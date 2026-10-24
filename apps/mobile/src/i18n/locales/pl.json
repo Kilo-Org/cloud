@@ -353,6 +353,16 @@
       "spendAlertsSubtitle": "przekroczenia progów i skoki godzinowe",
       "spendAlertsToggle": "Kategoria alertów o wydatkach"
     },
+    "history": {
+      "title": "Historia powiadomień",
+      "subtitle": "Powiadomienia otrzymane przez to konto",
+      "bannerBody": "Powiadomienia push są wyłączone dla tego urządzenia, więc nowe nie będą tu przychodzić.",
+      "bannerAction": "Ustawienia powiadomień",
+      "emptyTitle": "Nie ma jeszcze powiadomień",
+      "emptyBody": "Powiadomienia otrzymywane przez to konto pojawiają się tutaj. Są przechowywane przez {{days}} dni.",
+      "loadError": "Nie udało się wczytać historii powiadomień.",
+      "openFailed": "Tego powiadomienia nie można już nigdzie otworzyć."
+    },
     "action": {
       "openSession": "Otwórz sesję"
     },

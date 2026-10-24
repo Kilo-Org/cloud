@@ -877,6 +877,16 @@
       "spendAlertsSubtitle": "atalaseen gainditzeak eta orduko gorakadak",
       "spendAlertsToggle": "Gastu-alerten kategoria"
     },
+    "history": {
+      "title": "Jakinarazpenen historia",
+      "subtitle": "Kontu honek jasotako jakinarazpenak",
+      "bannerBody": "Push jakinarazpenak desgaituta daude gailu honetan, beraz, berriak ez dira hona iritsiko.",
+      "bannerAction": "Jakinarazpenen ezarpenak",
+      "emptyTitle": "Oraindik ez dago jakinarazpenik",
+      "emptyBody": "Kontu honek jasotzen dituen jakinarazpenak hemen agertzen dira. {{days}} egunez gordetzen dira.",
+      "loadError": "Ezin izan da jakinarazpenen historia kargatu.",
+      "openFailed": "Jakinarazpen hau jada ez da inon irekitzen."
+    },
     "action": {
       "openSession": "Ireki saioa"
     },

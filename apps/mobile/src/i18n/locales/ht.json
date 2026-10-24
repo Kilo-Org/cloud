@@ -877,6 +877,16 @@
       "spendAlertsSubtitle": "depasman papòt ak ogmantasyon chak èdtan",
       "spendAlertsToggle": "Kategori alèt depans"
     },
+    "history": {
+      "title": "Istwa notifikasyon",
+      "subtitle": "Notifikasyon kont sa a te resevwa",
+      "bannerBody": "Notifikasyon push dezaktive pou aparèy sa a, donk nouvo yo p ap rive isit la.",
+      "bannerAction": "Paramèt notifikasyon",
+      "emptyTitle": "Poko gen notifikasyon",
+      "emptyBody": "Notifikasyon kont sa a resevwa yo parèt isit la. Yo kenbe yo pandan {{days}} jou.",
+      "loadError": "Nou pa t ka chaje istwa notifikasyon yo.",
+      "openFailed": "Notifikasyon sa a pa ouvri okenn kote ankò."
+    },
     "action": {
       "openSession": "Louvri sesyon an"
     },

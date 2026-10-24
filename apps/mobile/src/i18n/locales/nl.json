@@ -326,6 +326,16 @@
       "spendAlertsSubtitle": "drempeloverschrijdingen en uurlijkse pieken",
       "spendAlertsToggle": "Categorie bestedingswaarschuwingen"
     },
+    "history": {
+      "title": "Meldingsgeschiedenis",
+      "subtitle": "Meldingen die dit account heeft ontvangen",
+      "bannerBody": "Pushmeldingen staan uit voor dit apparaat, dus nieuwe meldingen komen hier niet binnen.",
+      "bannerAction": "Meldingsinstellingen",
+      "emptyTitle": "Nog geen meldingen",
+      "emptyBody": "Meldingen die dit account ontvangt, verschijnen hier. Ze worden {{days}} dagen bewaard.",
+      "loadError": "Meldingsgeschiedenis kon niet worden geladen.",
+      "openFailed": "Deze melding opent nergens meer."
+    },
     "liveActivities": "Liveactiviteiten",
     "liveActivitySubtitle": "Actieve agents op het toegangsscherm tonen",
     "liveUpdates": "Live-updates",

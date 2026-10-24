@@ -877,6 +877,16 @@
       "spendAlertsSubtitle": "àwọn ìkọjá ààlà àti ìgbésókè lójú wákàtí",
       "spendAlertsToggle": "Ẹ̀ka àwọn ìkìlọ̀ ìnáwó"
     },
+    "history": {
+      "title": "Ìtàn àwọn ìfitónilétí",
+      "subtitle": "Àwọn ìfitónilétí tí àkáńtì yìí gbà",
+      "bannerBody": "Àwọn ìfitónilétí títì ti wà ní pípa fún ẹ̀rọ yìí, nítorí náà àwọn tuntun kò ní dé síbí.",
+      "bannerAction": "Àwọn ètò ìfitónilétí",
+      "emptyTitle": "Kò tíì sí ìfitónilétí",
+      "emptyBody": "Àwọn ìfitónilétí tí àkáńtì yìí ń gbà máa ń farahàn síbí. A máa ń tọ́jú wọn fún {{days}} ọjọ́.",
+      "loadError": "A kò lè gbé ìtàn àwọn ìfitónilétí wọ.",
+      "openFailed": "Ìfitónilétí yìí kò tún ṣí níbikíbi mọ́."
+    },
     "action": {
       "openSession": "Ṣí ìgbà iṣẹ́"
     },

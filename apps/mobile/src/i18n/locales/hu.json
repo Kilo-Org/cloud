@@ -877,6 +877,16 @@
       "spendAlertsSubtitle": "küszöbátlépések és óránkénti kiugrások",
       "spendAlertsToggle": "Költésfigyelmeztetések kategóriája"
     },
+    "history": {
+      "title": "Értesítési előzmények",
+      "subtitle": "Az ehhez a fiókhoz beérkezett értesítések",
+      "bannerBody": "A push értesítések ki vannak kapcsolva ezen az eszközön, ezért az új értesítések nem érkeznek meg ide.",
+      "bannerAction": "Értesítési beállítások",
+      "emptyTitle": "Még nincsenek értesítések",
+      "emptyBody": "Az ehhez a fiókhoz beérkező értesítések itt jelennek meg. {{days}} napig maradnak meg.",
+      "loadError": "Nem sikerült betölteni az értesítési előzményeket.",
+      "openFailed": "Ez az értesítés már sehol nem nyitható meg."
+    },
     "action": {
       "openSession": "Munkamenet megnyitása"
     },

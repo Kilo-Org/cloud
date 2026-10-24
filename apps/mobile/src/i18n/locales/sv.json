@@ -877,6 +877,16 @@
       "spendAlertsSubtitle": "gränsöverskridanden och toppar per timme",
       "spendAlertsToggle": "Kategorin utgiftsvarningar"
     },
+    "history": {
+      "title": "Aviseringshistorik",
+      "subtitle": "Aviseringar som det här kontot har tagit emot",
+      "bannerBody": "Push-aviseringar är avstängda för den här enheten, så nya aviseringar kommer inte fram hit.",
+      "bannerAction": "Aviseringsinställningar",
+      "emptyTitle": "Inga aviseringar än",
+      "emptyBody": "Aviseringar som det här kontot tar emot visas här. De sparas i {{days}} dagar.",
+      "loadError": "Kunde inte läsa in aviseringshistoriken.",
+      "openFailed": "Den här aviseringen öppnas inte längre någonstans."
+    },
     "action": {
       "openSession": "Öppna session"
     },

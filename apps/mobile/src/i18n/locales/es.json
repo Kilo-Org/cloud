@@ -326,6 +326,16 @@
       "spendAlertsSubtitle": "superaciones de umbrales y picos por hora",
       "spendAlertsToggle": "Categoría de alertas de gasto"
     },
+    "history": {
+      "title": "Historial de notificaciones",
+      "subtitle": "Notificaciones que recibió esta cuenta",
+      "bannerBody": "Las notificaciones push están desactivadas en este dispositivo, por lo que las nuevas no llegarán aquí.",
+      "bannerAction": "Configuración de notificaciones",
+      "emptyTitle": "Aún no hay notificaciones",
+      "emptyBody": "Las notificaciones que recibe esta cuenta aparecen aquí. Se conservan durante {{days}} días.",
+      "loadError": "No se pudo cargar el historial de notificaciones.",
+      "openFailed": "Esta notificación ya no se puede abrir en ningún sitio."
+    },
     "liveActivities": "Actividades en directo",
     "liveActivitySubtitle": "Mostrar los agentes activos en la pantalla de bloqueo",
     "liveUpdates": "Actualizaciones en tiempo real",

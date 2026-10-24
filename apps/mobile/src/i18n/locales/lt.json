@@ -915,6 +915,16 @@
       "spendAlertsSubtitle": "slenksčių viršijimai ir valandiniai šuoliai",
       "spendAlertsToggle": "Išlaidų įspėjimų kategorija"
     },
+    "history": {
+      "title": "Pranešimų istorija",
+      "subtitle": "Pranešimai, kuriuos gavo ši paskyra",
+      "bannerBody": "Šiame įrenginyje stumiamieji pranešimai išjungti, todėl nauji pranešimai čia neatkeliaus.",
+      "bannerAction": "Pranešimų nustatymai",
+      "emptyTitle": "Kol kas pranešimų nėra",
+      "emptyBody": "Pranešimai, kuriuos gauna ši paskyra, rodomi čia. Jie saugomi {{days}} dienų.",
+      "loadError": "Nepavyko įkelti pranešimų istorijos.",
+      "openFailed": "Šio pranešimo nebegalima atidaryti niekur."
+    },
     "action": {
       "openSession": "Atidaryti sesiją"
     },

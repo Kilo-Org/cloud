@@ -294,6 +294,16 @@
       "spendAlertsSubtitle": "superamenti di soglia e picchi orari",
       "spendAlertsToggle": "Categoria avvisi di spesa"
     },
+    "history": {
+      "title": "Cronologia notifiche",
+      "subtitle": "Notifiche ricevute da questo account",
+      "bannerBody": "Le notifiche push sono disattivate per questo dispositivo, quindi le nuove non arriveranno qui.",
+      "bannerAction": "Impostazioni notifiche",
+      "emptyTitle": "Nessuna notifica per ora",
+      "emptyBody": "Le notifiche ricevute da questo account compaiono qui. Vengono conservate per {{days}} giorni.",
+      "loadError": "Impossibile caricare la cronologia delle notifiche.",
+      "openFailed": "Questa notifica non si apre più da nessuna parte."
+    },
     "liveActivities": "Attività in tempo reale",
     "liveActivitySubtitle": "Mostra gli agenti attivi nella schermata di blocco",
     "liveUpdates": "Aggiornamenti in tempo reale",

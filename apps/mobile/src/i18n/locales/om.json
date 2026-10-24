@@ -877,6 +877,16 @@
       "spendAlertsSubtitle": "daarbii daangaa fi olka'iinsa sa'aatii",
       "spendAlertsToggle": "Ramaddii akeekkachiisa baasii"
     },
+    "history": {
+      "title": "Seenaa beeksisaa",
+      "subtitle": "Beeksisoota herregni kun argate",
+      "bannerBody": "Beeksisoonni push meeshaa kanaaf cufamaniiru, kanaaf haaraan asitti hin dhufan.",
+      "bannerAction": "Qindaa'ina beeksisaa",
+      "emptyTitle": "Ammatti beeksisoonni hin jiran",
+      "emptyBody": "Beeksisoonni herregni kun fudhatu asitti mul'atu. Guyyaa {{days}}f ni eegamu.",
+      "loadError": "Seenaa beeksisaa fiduu hin dandeenye.",
+      "openFailed": "Beeksisni kun amma bakka tokkollee hin banamu."
+    },
     "action": {
       "openSession": "Turtii bani"
     },

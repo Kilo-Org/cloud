@@ -294,6 +294,16 @@
       "spendAlertsSubtitle": "franchissements de seuils et pics horaires",
       "spendAlertsToggle": "Catégorie « Alertes de dépenses »"
     },
+    "history": {
+      "title": "Historique des notifications",
+      "subtitle": "Notifications reçues par ce compte",
+      "bannerBody": "Les notifications push sont désactivées pour cet appareil, les nouvelles n'arriveront donc pas ici.",
+      "bannerAction": "Paramètres des notifications",
+      "emptyTitle": "Aucune notification pour l'instant",
+      "emptyBody": "Les notifications reçues par ce compte apparaissent ici. Elles sont conservées pendant {{days}} jours.",
+      "loadError": "Impossible de charger l'historique des notifications.",
+      "openFailed": "Cette notification ne s'ouvre plus nulle part."
+    },
     "liveActivities": "Activités en direct",
     "liveActivitySubtitle": "Afficher les agents actifs sur l’écran verrouillé",
     "liveUpdates": "Mises à jour en direct",

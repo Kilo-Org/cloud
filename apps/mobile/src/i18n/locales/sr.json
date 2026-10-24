@@ -896,6 +896,16 @@
       "spendAlertsSubtitle": "prekoračenja pragova i skokovi po satu",
       "spendAlertsToggle": "Kategorija obaveštenja o potrošnji"
     },
+    "history": {
+      "title": "Istorija obaveštenja",
+      "subtitle": "Obaveštenja koja je ovaj nalog primio",
+      "bannerBody": "Push obaveštenja su isključena za ovaj uređaj, pa nova neće stizati ovde.",
+      "bannerAction": "Podešavanja obaveštenja",
+      "emptyTitle": "Još nema obaveštenja",
+      "emptyBody": "Obaveštenja koja ovaj nalog prima prikazuju se ovde. Čuvaju se {{days}} dana.",
+      "loadError": "Učitavanje istorije obaveštenja nije uspelo.",
+      "openFailed": "Ovo obaveštenje se više ne otvara nigde."
+    },
     "action": {
       "openSession": "Otvori sesiju"
     },

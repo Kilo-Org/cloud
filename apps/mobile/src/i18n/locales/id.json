@@ -353,6 +353,16 @@
       "spendAlertsSubtitle": "melewati ambang batas dan lonjakan per jam",
       "spendAlertsToggle": "Kategori peringatan pengeluaran"
     },
+    "history": {
+      "title": "Riwayat notifikasi",
+      "subtitle": "Notifikasi yang diterima akun ini",
+      "bannerBody": "Notifikasi push nonaktif untuk perangkat ini, jadi notifikasi baru tidak akan masuk di sini.",
+      "bannerAction": "Pengaturan notifikasi",
+      "emptyTitle": "Belum ada notifikasi",
+      "emptyBody": "Notifikasi yang diterima akun ini akan muncul di sini. Notifikasi disimpan selama {{days}} hari.",
+      "loadError": "Tidak dapat memuat riwayat notifikasi.",
+      "openFailed": "Notifikasi ini tidak lagi dapat dibuka di mana pun."
+    },
     "action": {
       "openSession": "Buka sesi"
     },

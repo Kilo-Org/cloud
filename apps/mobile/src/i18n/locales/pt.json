@@ -896,6 +896,16 @@
       "spendAlertsSubtitle": "ultrapassagens de limites e picos horários",
       "spendAlertsToggle": "Categoria de alertas de gastos"
     },
+    "history": {
+      "title": "Histórico de notificações",
+      "subtitle": "Notificações que esta conta recebeu",
+      "bannerBody": "As notificações push estão desativadas neste dispositivo, por isso as novas não chegarão aqui.",
+      "bannerAction": "Definições de notificações",
+      "emptyTitle": "Ainda não há notificações",
+      "emptyBody": "As notificações que esta conta recebe aparecem aqui. São guardadas durante {{days}} dias.",
+      "loadError": "Não foi possível carregar o histórico de notificações.",
+      "openFailed": "Esta notificação já não abre em lado nenhum."
+    },
     "action": {
       "openSession": "Abrir sessão"
     },

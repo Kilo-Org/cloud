@@ -877,6 +877,16 @@
       "spendAlertsSubtitle": "mga paglampas sa hangganan at pagtaas bawat oras",
       "spendAlertsToggle": "Kategorya ng mga babala sa gastos"
     },
+    "history": {
+      "title": "Kasaysayan ng notipikasyon",
+      "subtitle": "Mga notipikasyong natanggap ng account na ito",
+      "bannerBody": "Naka-off ang mga push notification para sa device na ito, kaya wala nang bagong darating dito.",
+      "bannerAction": "Mga setting ng notipikasyon",
+      "emptyTitle": "Wala pang mga notipikasyon",
+      "emptyBody": "Lumalabas dito ang mga notipikasyong natatanggap ng account na ito. Itinatago ang mga ito sa loob ng {{days}} araw.",
+      "loadError": "Hindi ma-load ang kasaysayan ng notipikasyon.",
+      "openFailed": "Hindi na mabubuksan kahit saan ang notipikasyong ito."
+    },
     "action": {
       "openSession": "Buksan ang sesyon"
     },

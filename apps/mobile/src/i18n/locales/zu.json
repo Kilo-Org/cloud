@@ -877,6 +877,16 @@
       "spendAlertsSubtitle": "ukweqa imingcele nokukhuphuka ngehora",
       "spendAlertsToggle": "Isigaba sezexwayiso zokusebenzisa imali"
     },
+    "history": {
+      "title": "Umlando wezaziso",
+      "subtitle": "Izaziso ezitholwe yile akhawunti",
+      "bannerBody": "Izaziso zokupush zivaliwe kule divayisi, ngakho ezintsha ngeke zifike lapha.",
+      "bannerAction": "Izilungiselelo zezaziso",
+      "emptyTitle": "Akukho izaziso okwamanje",
+      "emptyBody": "Izaziso ezitholwa yile akhawunti zibonakala lapha. Zigcinwa izinsuku ezingama-{{days}}.",
+      "loadError": "Asikwazanga ukulayisha umlando wezaziso.",
+      "openFailed": "Lesi saziso asisavuleki ndawo."
+    },
     "action": {
       "openSession": "Vula iseshini"
     },

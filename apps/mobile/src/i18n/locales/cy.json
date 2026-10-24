@@ -953,6 +953,16 @@
       "spendAlertsSubtitle": "croesi trothwyon a sbigau bob awr",
       "spendAlertsToggle": "Categori rhybuddion gwariant"
     },
+    "history": {
+      "title": "Hanes hysbysiadau",
+      "subtitle": "Hysbysiadau a dderbyniodd y cyfrif hwn",
+      "bannerBody": "Mae hysbysiadau gwthio wedi'u diffodd ar gyfer y ddyfais hon, felly ni fydd rhai newydd yn cyrraedd yma.",
+      "bannerAction": "Gosodiadau hysbysiadau",
+      "emptyTitle": "Dim hysbysiadau eto",
+      "emptyBody": "Bydd hysbysiadau a ddaw i'r cyfrif hwn yn ymddangos yma. Cânt eu cadw am {{days}} diwrnod.",
+      "loadError": "Methu llwytho hanes hysbysiadau.",
+      "openFailed": "Nid yw'r hysbysiad hwn yn agor yn unman mwyach."
+    },
     "action": {
       "openSession": "Agor y sesiwn"
     },

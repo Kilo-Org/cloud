@@ -23,8 +23,9 @@ function failure(
  *
  * 1. point `origin` at this route's credential;
  * 2. fetch, pruning refs the remote dropped, and refresh the remote default;
- * 3. detach at the remote default branch, so a new branch starts from its tip;
- * 4. drop every local branch. The captured session's branch, or this session's own
+ * 3. discard inherited edits and untracked files, keeping ignored setup caches;
+ * 4. detach at the remote default branch, so a new branch starts from its tip;
+ * 5. drop every local branch. The captured session's branch, or this session's own
  *    from an earlier capture, would otherwise shadow a newer `origin/<branch>`.
  *
  * Any failure throws and the caller falls back to a clone.
@@ -39,6 +40,8 @@ export async function refreshAdoptedRepository(input: {
     { args: ['remote', 'set-url', 'origin', remoteUrl] },
     { args: ['fetch', '--prune', 'origin'], network: true },
     { args: ['remote', 'set-head', 'origin', '--auto'], network: true },
+    { args: ['reset', '--hard'] },
+    { args: ['clean', '-ffd'] },
     { args: ['checkout', '--detach', 'origin/HEAD'] },
   ];
   for (const step of steps) {

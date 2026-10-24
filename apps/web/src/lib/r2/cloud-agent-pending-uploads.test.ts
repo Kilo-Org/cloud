@@ -656,57 +656,79 @@ describe('cloud-agent pending-upload ledger', () => {
     );
   }, 30_000);
 
-  it('purgeUserPendingUploads retries a failed delete with a final pass over the account', async () => {
+  it('purgeUserPendingUploads completes the retry sweep', async () => {
     const kiloUserId = `ca-user-${crypto.randomUUID()}`;
     const messageUuid = crypto.randomUUID();
     const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-
-    // A full batch plus one row whose delete fails once, then succeeds on the
-    // next pass behind the cursor.
-    const failingAttachment = crypto.randomUUID();
-    const trailingAttachment = crypto.randomUUID();
-    await db.insert(cloud_agent_pending_uploads).values([
-      {
+    const attachments = Array.from({ length: CLOUD_AGENT_PENDING_UPLOAD_PURGE_BATCH + 3 }, () =>
+      crypto.randomUUID()
+    );
+    const keys = attachments.map(id => buildObjectKey(kiloUserId, messageUuid, id));
+    await db.insert(cloud_agent_pending_uploads).values(
+      attachments.map((attachmentId, index) => ({
         id: crypto.randomUUID(),
         kilo_user_id: kiloUserId,
-        object_key: buildObjectKey(kiloUserId, messageUuid, failingAttachment),
+        object_key: keys[index],
         message_uuid: messageUuid,
-        attachment_id: failingAttachment,
+        attachment_id: attachmentId,
         byte_size: 42,
-        status: 'pending',
+        status: 'linked' as const,
         expires_at: future,
-      },
-      {
-        id: crypto.randomUUID(),
-        kilo_user_id: kiloUserId,
-        object_key: buildObjectKey(kiloUserId, messageUuid, trailingAttachment),
-        message_uuid: messageUuid,
-        attachment_id: trailingAttachment,
-        byte_size: 42,
-        status: 'linked',
-        expires_at: future,
-      },
-    ]);
+      }))
+    );
+    const attempts = new Map<string, number>();
+    mockSend.mockImplementation(async command => {
+      const key = command.input.Key;
+      const attempt = (attempts.get(key) ?? 0) + 1;
+      attempts.set(key, attempt);
+      if (attempt === 1) throw new Error('R2 unavailable');
+      return {};
+    });
 
-    mockSend.mockRejectedValueOnce(new Error('R2 unavailable'));
     await purgeUserPendingUploads(kiloUserId);
 
-    // Whichever row sorts first in id order takes the failed delete: its
-    // object is attempted twice (the retry pass claims the row restored to
-    // 'pending'), and the other row is reached in the same sweep. Both rows
-    // end claimed.
-    const attemptedKeys = mockSend.mock.calls.map(call => call[0].input.Key);
-    expect(attemptedKeys).toHaveLength(3);
-    const firstAttemptedKey = attemptedKeys[0];
-    expect(attemptedKeys.filter(key => key === firstAttemptedKey)).toHaveLength(2);
-    expect(attemptedKeys[1]).not.toBe(firstAttemptedKey);
-    expect(attemptedKeys[2]).toBe(firstAttemptedKey);
-
+    expect(keys.map(key => attempts.get(key))).toEqual(keys.map(() => 2));
     const remaining = await db
       .select({ status: cloud_agent_pending_uploads.status })
       .from(cloud_agent_pending_uploads)
       .where(eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId));
-    expect(remaining.map(row => row.status).sort()).toEqual(['reaped', 'reaped']);
+    expect(remaining.map(row => row.status)).toEqual(keys.map(() => 'reaped'));
+  }, 30_000);
+
+  it('purgeUserPendingUploads retains actionable cleanup records', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const attachmentId = crypto.randomUUID();
+    const objectKey = buildObjectKey(kiloUserId, messageUuid, attachmentId);
+    const rowId = await insertPendingRow({
+      kiloUserId,
+      messageUuid,
+      attachmentId,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      status: 'linked',
+    });
+    mockSend.mockRejectedValue(new Error('R2 unavailable'));
+
+    await expect(purgeUserPendingUploads(kiloUserId)).rejects.toThrow(
+      'Cloud Agent attachment cleanup incomplete'
+    );
+
+    expect(mockSend.mock.calls.map(call => call[0].input.Key)).toEqual([objectKey, objectKey]);
+    expect(
+      await db
+        .select({ id: cloud_agent_pending_uploads.id, status: cloud_agent_pending_uploads.status })
+        .from(cloud_agent_pending_uploads)
+        .where(eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId))
+    ).toEqual([{ id: rowId, status: 'pending' }]);
+
+    mockSend.mockResolvedValue({});
+    await purgeUserPendingUploads(kiloUserId);
+    expect(
+      await db
+        .select({ status: cloud_agent_pending_uploads.status })
+        .from(cloud_agent_pending_uploads)
+        .where(eq(cloud_agent_pending_uploads.id, rowId))
+    ).toEqual([{ status: 'reaped' }]);
   });
 
   it('releasePendingUploads deletes only the caller pending object and leaves linked and other-user rows', async () => {

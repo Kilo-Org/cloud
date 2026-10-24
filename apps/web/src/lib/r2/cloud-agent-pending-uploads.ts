@@ -273,47 +273,46 @@ export async function releasePendingUploads(
 }
 
 /**
- * Delete the private objects behind every live upload row this user admitted,
- * one bounded batch at a time in id order, so account deletion removes the
- * objects together with their ledger rows.
+ * Purge live upload objects in two id-ordered, bounded-batch sweeps.
+ * Account deletion requires a completed purge; incomplete cleanup throws and
+ * retains pending records for a later attempt.
  */
 export async function purgeUserPendingUploads(kiloUserId: string): Promise<void> {
-  let cursor = '';
+  for (let pass = 0; pass < 2; pass++) {
+    let cursor = '';
 
-  for (;;) {
-    const batch = await db
-      .select({ id: cloud_agent_pending_uploads.id })
-      .from(cloud_agent_pending_uploads)
-      .where(
+    for (;;) {
+      const batch = await db
+        .select({ id: cloud_agent_pending_uploads.id })
+        .from(cloud_agent_pending_uploads)
+        .where(
+          and(
+            eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
+            inArray(cloud_agent_pending_uploads.status, ['pending', 'linked']),
+            gt(cloud_agent_pending_uploads.id, cursor)
+          )
+        )
+        .orderBy(asc(cloud_agent_pending_uploads.id))
+        .limit(CLOUD_AGENT_PENDING_UPLOAD_PURGE_BATCH);
+
+      if (batch.length === 0) break;
+
+      cursor = batch[batch.length - 1].id;
+
+      await claimAndDeleteUploadObjects(
         and(
           eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
           inArray(cloud_agent_pending_uploads.status, ['pending', 'linked']),
-          gt(cloud_agent_pending_uploads.id, cursor)
+          inArray(
+            cloud_agent_pending_uploads.id,
+            batch.map(row => row.id)
+          )
         )
-      )
-      .orderBy(asc(cloud_agent_pending_uploads.id))
-      .limit(CLOUD_AGENT_PENDING_UPLOAD_PURGE_BATCH);
-
-    if (batch.length === 0) break;
-
-    cursor = batch[batch.length - 1].id;
-
-    await claimAndDeleteUploadObjects(
-      and(
-        eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
-        inArray(cloud_agent_pending_uploads.status, ['pending', 'linked']),
-        inArray(
-          cloud_agent_pending_uploads.id,
-          batch.map(row => row.id)
-        )
-      )
-    );
+      );
+    }
   }
 
-  // One more pass over the whole account: a delete that failed above put its
-  // row back to 'pending', and the cursor has moved past it, so this retries
-  // every such row once before account deletion drops the ledger rows.
-  const restoredBatch = await db
+  const remaining = await db
     .select({ id: cloud_agent_pending_uploads.id })
     .from(cloud_agent_pending_uploads)
     .where(
@@ -322,18 +321,10 @@ export async function purgeUserPendingUploads(kiloUserId: string): Promise<void>
         inArray(cloud_agent_pending_uploads.status, ['pending', 'linked'])
       )
     )
-    .limit(CLOUD_AGENT_PENDING_UPLOAD_PURGE_BATCH);
+    .limit(1);
 
-  if (restoredBatch.length > 0) {
-    await claimAndDeleteUploadObjects(
-      and(
-        eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
-        inArray(
-          cloud_agent_pending_uploads.id,
-          restoredBatch.map(row => row.id)
-        )
-      )
-    );
+  if (remaining.length > 0) {
+    throw new Error('Cloud Agent attachment cleanup incomplete');
   }
 }
 

@@ -133,12 +133,3 @@ When addressing a Kilobot review remark:
 2. If valid, fix it and commit the change. Prefer small commits in general.
 3. Reply in the review thread, then resolve the thread.
 4. Push the commits.
-
-## PR Mergeability
-
-When GitHub reports conflicts after a base sync:
-
-1. Fetch the current base branch before comparing SHAs. The PR API's recorded base SHA can lag the branch tip; use the fetched tip when checking ancestry and merging.
-2. Check the local merge with `git merge-tree --write-tree <fetched-base> <head>`. If it is clean but `refs/pull/<number>/merge` still names earlier SHAs, treat the status as potentially stale and wait one PR-loop cycle (10–15 minutes) while doing other task work.
-3. If the status remains dirty, fetch the latest base and merge it into the branch with a normal merge commit. Never rebase or force-push; avoid empty commits and unrelated changes.
-4. Recheck the PR head, base, merge tree, and GitHub mergeability after the push. Do not close and reopen a PR to refresh its state.

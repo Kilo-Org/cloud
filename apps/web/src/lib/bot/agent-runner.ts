@@ -7,7 +7,7 @@ import {
   updateBotRequest,
 } from '@/lib/bot/request-logging';
 import { getNextBotCallbackStep, getRemainingBotIterations } from '@/lib/bot/step-budget';
-import { resolveBotModelSlug } from '@/lib/bot/model';
+import { resolveBotModelSettings } from '@/lib/bot/model';
 import spawnCloudAgentSession, {
   spawnCloudAgentInputSchema,
 } from '@/lib/bot/tools/spawn-cloud-agent-session';
@@ -213,7 +213,7 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
     headers,
   });
 
-  const modelSlug = resolveBotModelSlug(params.platformIntegration);
+  const { modelSlug, thinkingEffort } = resolveBotModelSettings(params.platformIntegration);
   const owner = ownerFromIntegration(params.platformIntegration);
   const chatPlatform = params.thread.adapter.name;
   const botPlatform = botPlatforms.requireByAdapter(params.thread.adapter);
@@ -309,6 +309,7 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
               chatPlatform,
               currentStep,
               attachments: params.attachments,
+              ...(thinkingEffort ? { variant: thinkingEffort } : {}),
             }
           );
 

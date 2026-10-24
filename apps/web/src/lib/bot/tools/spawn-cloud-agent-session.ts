@@ -96,6 +96,7 @@ export default async function spawnCloudAgentSession(
     chatPlatform?: string;
     currentStep?: number;
     attachments?: CloudAgentAttachments;
+    variant?: string | null;
   }
 ): Promise<SpawnCloudAgentResult> {
   console.log('[KiloBot] spawnCloudAgentSession called with args:', JSON.stringify(args, null, 2));
@@ -115,6 +116,7 @@ export default async function spawnCloudAgentSession(
   let prepareInput: PrepareSessionInput;
   const mode: AgentMode = args.mode;
   const chatPlatform = options?.chatPlatform ?? 'slack';
+  const variant = options?.variant?.trim() ? options.variant.trim() : undefined;
   const callbackTarget = {
     url: buildBotCallbackUrl(botRequestId, options?.currentStep),
     headers: { 'X-Bot-Callback-Token': deriveBotCallbackToken(botRequestId) },
@@ -172,6 +174,7 @@ export default async function spawnCloudAgentSession(
       prompt,
       mode,
       model,
+      ...(variant ? { variant } : {}),
       gitUrl,
       gitToken: gitlabToken,
       platform: 'gitlab',
@@ -215,6 +218,7 @@ export default async function spawnCloudAgentSession(
       prompt,
       mode,
       model,
+      ...(variant ? { variant } : {}),
       githubIntegrationId: repository.githubIntegrationId,
       githubAccessPurpose,
       kilocodeOrganizationId,

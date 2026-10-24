@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,6 +22,16 @@ import {
 } from '@/components/ui/table';
 import { InlineDeleteConfirmation } from '@/components/ui/inline-delete-confirmation';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   useCustomLlms,
   useCopyCustomLlm,
   useUpsertCustomLlm,
@@ -36,7 +46,8 @@ import type { CustomLlmCredentials, CustomLlmDefinition } from '@kilocode/db/sch
 import { deepStrict } from '@/lib/zod/deep-strict';
 import { formatZodError } from '@/lib/zod/format-zod-error';
 import { toast } from 'sonner';
-import { ChevronRight, Copy as CopyIcon, Plus, Pencil } from 'lucide-react';
+import { ChevronRight, Copy as CopyIcon, Globe, Lock, Plus, Pencil } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import Editor, { type EditorProps } from '@monaco-editor/react';
 
 const StrictCustomLlmDefinitionSchema = deepStrict(CustomLlmDefinitionSchema);
@@ -111,6 +122,7 @@ type EditorState = {
   open: boolean;
   mode: 'create' | 'edit';
   publicId: string;
+  wasPublic: boolean;
   credentialsJson: string;
   definitionJson: string;
   validationError: string | null;
@@ -118,6 +130,7 @@ type EditorState = {
 
 type CopyState = {
   sourcePublicId: string;
+  sourceIsPublic: boolean;
   publicId: string;
   displayName: string;
   internalId: string;
@@ -142,10 +155,33 @@ const INITIAL_CREDENTIALS: CustomLlmCredentials = {
   api_key: '',
 };
 
+type UpsertInput = {
+  public_id: string;
+  definition: CustomLlmDefinition;
+  credentials: CustomLlmCredentials | undefined;
+};
+
+type CopyInput = {
+  source_public_id: string;
+  public_id: string;
+  display_name: string;
+  internal_id: string | undefined;
+};
+
+/** A save that needs confirmation because it affects users beyond the editor. */
+type PendingChange = (
+  | { kind: 'upsert'; input: UpsertInput }
+  | { kind: 'copy'; input: CopyInput }
+) & {
+  makesPublic: boolean;
+  replacesKiloExclusiveModel: boolean;
+};
+
 const initialEditorState: EditorState = {
   open: false,
   mode: 'create',
   publicId: '',
+  wasPublic: false,
   credentialsJson: JSON.stringify(INITIAL_CREDENTIALS, null, 2),
   definitionJson: JSON.stringify(INITIAL_DEFINITION, null, 2),
   validationError: null,
@@ -158,12 +194,18 @@ export function CustomLlmsContent() {
   const deleteMutation = useDeleteCustomLlm();
   const [editor, setEditor] = useState<EditorState>(initialEditorState);
   const [copy, setCopy] = useState<CopyState | null>(null);
+  const [pendingChange, setPendingChange] = useState<PendingChange | null>(null);
+  const kiloExclusiveModelIds = useMemo(
+    () => new Set(data?.kiloExclusiveModelIds),
+    [data?.kiloExclusiveModelIds]
+  );
 
   const openCreate = useCallback(() => {
     setEditor({
       open: true,
       mode: 'create',
       publicId: '',
+      wasPublic: false,
       credentialsJson: JSON.stringify(INITIAL_CREDENTIALS, null, 2),
       definitionJson: JSON.stringify(INITIAL_DEFINITION, null, 2),
       validationError: null,
@@ -175,6 +217,7 @@ export function CustomLlmsContent() {
       open: true,
       mode: 'edit',
       publicId,
+      wasPublic: definition.public !== undefined,
       credentialsJson: '',
       definitionJson: JSON.stringify(definition, null, 2),
       validationError: null,
@@ -185,22 +228,53 @@ export function CustomLlmsContent() {
     setEditor(initialEditorState);
   }, []);
 
-  const openCopy = useCallback(
-    (sourcePublicId: string, sourceDisplayName: string, sourceInternalId: string | undefined) => {
-      setCopy({
-        sourcePublicId,
-        publicId: sourcePublicId,
-        displayName: sourceDisplayName,
-        internalId: sourceInternalId ?? '',
-        validationError: null,
-      });
-    },
-    []
-  );
+  const openCopy = useCallback((sourcePublicId: string, source: CustomLlmDefinition) => {
+    setCopy({
+      sourcePublicId,
+      sourceIsPublic: source.public !== undefined,
+      publicId: sourcePublicId,
+      displayName: source.display_name,
+      internalId: source.internal_id ?? '',
+      validationError: null,
+    });
+  }, []);
 
   const closeCopy = useCallback(() => {
     setCopy(null);
   }, []);
+
+  const submitCopy = useCallback(
+    async (input: CopyInput) => {
+      try {
+        await copyMutation.mutateAsync(input);
+        toast.success('Custom LLM copied');
+        closeCopy();
+      } catch (error) {
+        setCopy(prev =>
+          prev
+            ? {
+                ...prev,
+                validationError: { field: null, message: formatZodError(error) },
+              }
+            : prev
+        );
+      }
+    },
+    [copyMutation, closeCopy]
+  );
+
+  const submitUpsert = useCallback(
+    async (input: UpsertInput) => {
+      try {
+        await upsertMutation.mutateAsync(input);
+        toast.success(editor.mode === 'create' ? 'Custom LLM created' : 'Custom LLM updated');
+        closeEditor();
+      } catch (error) {
+        toast.error(formatZodError(error));
+      }
+    },
+    [editor.mode, upsertMutation, closeEditor]
+  );
 
   const handleCopy = useCallback(async () => {
     if (!copy) return;
@@ -246,26 +320,20 @@ export function CustomLlmsContent() {
       return;
     }
 
-    try {
-      await copyMutation.mutateAsync({
-        source_public_id: copy.sourcePublicId,
-        public_id: publicId,
-        display_name: displayName,
-        internal_id: internalId || undefined,
-      });
-      toast.success('Custom LLM copied');
-      closeCopy();
-    } catch (error) {
-      setCopy(prev =>
-        prev
-          ? {
-              ...prev,
-              validationError: { field: null, message: formatZodError(error) },
-            }
-          : prev
-      );
+    const input: CopyInput = {
+      source_public_id: copy.sourcePublicId,
+      public_id: publicId,
+      display_name: displayName,
+      internal_id: internalId || undefined,
+    };
+    const makesPublic = copy.sourceIsPublic;
+    const replacesKiloExclusiveModel = kiloExclusiveModelIds.has(publicId);
+    if (makesPublic || replacesKiloExclusiveModel) {
+      setPendingChange({ kind: 'copy', input, makesPublic, replacesKiloExclusiveModel });
+      return;
     }
-  }, [copy, copyMutation, closeCopy]);
+    await submitCopy(input);
+  }, [copy, submitCopy, kiloExclusiveModelIds]);
 
   const handleSave = useCallback(async () => {
     const trimmedPublicId = editor.publicId.trim();
@@ -313,7 +381,11 @@ export function CustomLlmsContent() {
       return;
     }
 
-    const defResult = StrictCustomLlmDefinitionSchema.safeParse(parsedDefinition);
+    // The strict copy rejects unknown keys but drops cross-field rules, so check both.
+    const strictDefResult = StrictCustomLlmDefinitionSchema.safeParse(parsedDefinition);
+    const defResult = strictDefResult.success
+      ? CustomLlmDefinitionSchema.safeParse(parsedDefinition)
+      : strictDefResult;
     if (!defResult.success) {
       setEditor(prev => ({ ...prev, validationError: formatZodError(defResult.error) }));
       return;
@@ -327,18 +399,27 @@ export function CustomLlmsContent() {
       return;
     }
 
-    try {
-      await upsertMutation.mutateAsync({
-        public_id: trimmedPublicId,
-        definition: defResult.data,
-        credentials: parsedCredentials,
-      });
-      toast.success(editor.mode === 'create' ? 'Custom LLM created' : 'Custom LLM updated');
-      closeEditor();
-    } catch (error) {
-      toast.error(formatZodError(error));
+    const input: UpsertInput = {
+      public_id: trimmedPublicId,
+      definition: defResult.data,
+      credentials: parsedCredentials,
+    };
+    const makesPublic = input.definition.public !== undefined && !editor.wasPublic;
+    const replacesKiloExclusiveModel =
+      editor.mode === 'create' && kiloExclusiveModelIds.has(trimmedPublicId);
+    if (makesPublic || replacesKiloExclusiveModel) {
+      setPendingChange({ kind: 'upsert', input, makesPublic, replacesKiloExclusiveModel });
+      return;
     }
-  }, [editor, upsertMutation, closeEditor]);
+    await submitUpsert(input);
+  }, [editor, submitUpsert, kiloExclusiveModelIds]);
+
+  const confirmPendingChange = useCallback(async () => {
+    const change = pendingChange;
+    setPendingChange(null);
+    if (change?.kind === 'upsert') await submitUpsert(change.input);
+    if (change?.kind === 'copy') await submitCopy(change.input);
+  }, [pendingChange, submitUpsert, submitCopy]);
 
   const handleDelete = useCallback(
     async (publicId: string) => {
@@ -377,6 +458,7 @@ export function CustomLlmsContent() {
             <TableRow>
               <TableHead>Public ID</TableHead>
               <TableHead>Display Name</TableHead>
+              <TableHead>Access</TableHead>
               <TableHead>Internal ID</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -384,7 +466,7 @@ export function CustomLlmsContent() {
           <TableBody>
             {data?.items.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="text-muted-foreground text-center">
+                <TableCell colSpan={5} className="text-muted-foreground text-center">
                   No custom LLMs defined yet.
                 </TableCell>
               </TableRow>
@@ -393,6 +475,24 @@ export function CustomLlmsContent() {
               <TableRow key={item.public_id}>
                 <TableCell className="font-mono text-sm">{item.public_id}</TableCell>
                 <TableCell>{item.definition.display_name}</TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {item.definition.public ? (
+                      <Badge variant="new">
+                        <Globe />
+                        Public
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary">
+                        <Lock />
+                        Private
+                      </Badge>
+                    )}
+                    {kiloExclusiveModelIds.has(item.public_id) && (
+                      <Badge variant="beta">Replaces Kilo-exclusive</Badge>
+                    )}
+                  </div>
+                </TableCell>
                 <TableCell className="font-mono text-sm">
                   {item.definition.internal_id ?? 'Not set'}
                 </TableCell>
@@ -410,13 +510,7 @@ export function CustomLlmsContent() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() =>
-                        openCopy(
-                          item.public_id,
-                          item.definition.display_name,
-                          item.definition.internal_id
-                        )
-                      }
+                      onClick={() => openCopy(item.public_id, item.definition)}
                       aria-label={`Copy ${item.public_id}`}
                       title="Copy custom LLM"
                     >
@@ -540,9 +634,22 @@ export function CustomLlmsContent() {
               </p>
               <p className="text-muted-foreground mt-1 text-xs">
                 Public ID may only contain lowercase letters, digits, and <code>. / -</code>. It
-                must not start with <code>kilo/</code>, <code>kilo-auto/</code>,{' '}
-                <code>kilocode/</code>, or a direct BYOK provider prefix, and must not be an
-                OpenRouter or Kilo-exclusive model.
+                must not start with <code>kilo/</code>, <code>kilo-auto/</code>, or{' '}
+                <code>kilocode/</code>, be an OpenRouter model, or use a direct BYOK provider
+                prefix. It may reuse a Kilo-exclusive model ID, which the custom LLM then replaces.
+              </p>
+              <p className="text-muted-foreground mt-1 text-xs">
+                Custom LLMs are always free for users. To make the model available to every user,
+                replace <code>organization_ids</code> and <code>group_ids</code> with{' '}
+                <code>
+                  &quot;public&quot;: {'{'} &quot;inference_providers&quot;: [&quot;acme&quot;],
+                  &quot;description&quot;: &quot;…&quot; {'}'}
+                </code>
+                . Organization provider allow lists apply to these providers. Unknown providers
+                appear in the provider list after the next provider sync. Without{' '}
+                <code>public</code>, <code>organization_ids</code>, or <code>group_ids</code>, the
+                model is stored but nobody can use it. Saved changes reach every server within a
+                minute.
               </p>
             </div>
 
@@ -563,6 +670,51 @@ export function CustomLlmsContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={pendingChange !== null}
+        onOpenChange={open => {
+          if (!open) setPendingChange(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingChange?.makesPublic
+                ? 'Make this custom LLM public?'
+                : 'Replace a Kilo-exclusive model?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="flex flex-col gap-2">
+                {pendingChange?.makesPublic && (
+                  <p>
+                    Every Kilo user, including signed-out users, will be able to use{' '}
+                    <code className="font-mono">{pendingChange.input.public_id}</code> for free.
+                    Kilo pays for all usage.
+                  </p>
+                )}
+                {pendingChange?.replacesKiloExclusiveModel && (
+                  <p>
+                    <code className="font-mono">{pendingChange.input.public_id}</code> is a
+                    Kilo-exclusive model. This custom LLM replaces it for every user: anyone it is
+                    not available to gets a model-not-found error instead.
+                  </p>
+                )}
+                <p>
+                  Test this definition with a local web app before saving it. A broken definition
+                  fails requests for everyone who can use it.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmPendingChange}>
+              {pendingChange?.makesPublic ? 'Make public' : 'Replace model'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog
         open={copy !== null}

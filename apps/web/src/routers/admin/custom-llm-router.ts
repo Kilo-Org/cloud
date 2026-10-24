@@ -14,7 +14,10 @@ import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encrypti
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { DirectUserByokInferenceProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import {
+  isKiloExclusiveModel,
+  kiloExclusiveModels,
+} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 
 const publicIdSchema = z.string().trim().min(1, 'public_id is required');
 
@@ -24,8 +27,9 @@ function badRequest(message: string): never {
 
 /**
  * Routing resolves custom LLMs before any other upstream, so a new id must not
- * hide an OpenRouter, Kilo-exclusive or direct BYOK model. Existing rows keep
- * their id, so this only runs when an id is claimed.
+ * hide an OpenRouter or direct BYOK model. Reusing a Kilo-exclusive id is
+ * allowed on purpose: the custom LLM then replaces that model. Existing rows
+ * keep their id, so this only runs when an id is claimed.
  */
 async function assertPublicIdIsClaimable(publicId: string) {
   const parsedPublicId = CustomLlmPublicIdSchema.safeParse(publicId);
@@ -39,10 +43,10 @@ async function assertPublicIdIsClaimable(publicId: string) {
   if (directByokProvider) {
     badRequest(`public_id must not use the direct BYOK prefix "${directByokProvider}/"`);
   }
-  if (isKiloExclusiveModel(modelId)) {
-    badRequest(`public_id "${modelId}" is a Kilo-exclusive model`);
-  }
-  if (Object.hasOwn(await getOpenRouterModelsMetadataFromDatabase(), modelId)) {
+  if (
+    !isKiloExclusiveModel(modelId) &&
+    Object.hasOwn(await getOpenRouterModelsMetadataFromDatabase(), modelId)
+  ) {
     badRequest(`public_id "${modelId}" already exists in the OpenRouter model list`);
   }
   // Custom LLM lookups ignore case, so a case variant would shadow the other row.
@@ -86,7 +90,11 @@ export const adminCustomLlmRouter = createTRPCRouter({
       })
       .from(custom_llm2)
       .orderBy(asc(custom_llm2.public_id));
-    return { items: rows };
+    // The editor warns before a new custom LLM replaces one of these models.
+    return {
+      items: rows,
+      kiloExclusiveModelIds: kiloExclusiveModels.map(model => model.public_id),
+    };
   }),
 
   upsert: adminProcedure.input(UpsertCustomLlmSchema).mutation(async ({ input }) => {

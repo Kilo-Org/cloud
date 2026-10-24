@@ -7,7 +7,14 @@ import {
   glyph_cluster_stealth_free_model,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
-import { getConfiguredAutoFreeModels } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
+import {
+  AUTO_FREE_FALLBACK_MODEL,
+  getConfiguredAutoFreeModels,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
+import {
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import type * as AutoFreeConfigModule from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
 import type * as ExclusiveModelsModule from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
@@ -105,6 +112,19 @@ describe('getAutoFreeCandidates', () => {
     configure(['test/present:free', 'test/paid', 'anthropic/claude-free:free', 'kilo-auto/free']);
 
     expect(await getAutoFreeCandidates('chat_completions')).toEqual(['test/present:free']);
+  });
+
+  it('skips a configured Kilo-exclusive model that a custom LLM now replaces', async () => {
+    await insertCustomLlmForTest(glyph_cluster_stealth_free_model.public_id);
+    try {
+      configure([glyph_cluster_stealth_free_model.public_id]);
+
+      expect(await getAutoFreeCandidates('chat_completions')).toEqual([
+        AUTO_FREE_FALLBACK_MODEL.model,
+      ]);
+    } finally {
+      await deleteCustomLlmForTest(glyph_cluster_stealth_free_model.public_id);
+    }
   });
 
   it('falls back to openrouter/free when nothing is configured or the config is invalid', async () => {

@@ -1,5 +1,6 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect, jest, afterEach } from '@jest/globals';
 import {
+  GRANT_MSG_UNEXPECTED_FAILURE,
   grantCreditForCategory,
   grantCreditForCategoryConfig,
   redeemSelfServicePromoCode,
@@ -15,6 +16,10 @@ import { assertNoError } from '@kilocode/web-shared/lib/maybe-result';
 
 describe('grantCreditForCategory', () => {
   const mockUser: User = defineTestUser({});
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it('should refuse user redemption while the kill switch is off', async () => {
     const result = await redeemSelfServicePromoCode(mockUser, 'pull_request');
@@ -60,6 +65,49 @@ describe('grantCreditForCategory', () => {
 
     expect(result.success).toBe(true);
     expect(result.message).toContain('Successfully added');
+  });
+
+  it('returns a fixed message when the grant throws', async () => {
+    const thrown = new Error('sensitive-internal-detail');
+    jest.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(() => {
+      throw thrown;
+    });
+    const captureException = jest.fn();
+    jest.doMock('@sentry/nextjs', () => ({
+      captureException,
+      captureMessage: jest.fn(),
+    }));
+
+    const config: PromoCreditCategoryConfig = {
+      credit_category: 'unexpected-failure',
+      amount_usd: 10,
+    };
+
+    await jest.isolateModulesAsync(async () => {
+      const { grantCreditForCategoryConfig: isolatedGrant } =
+        await import('@kilocode/web-shared/lib/promotionalCredits');
+
+      const result = await isolatedGrant(
+        { organization: null, user: mockUser },
+        { credit_category: 'unexpected-failure', counts_as_selfservice: false },
+        config
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe(GRANT_MSG_UNEXPECTED_FAILURE);
+      expect(result.message).not.toContain('sensitive-internal-detail');
+    });
+
+    expect(captureException).toHaveBeenCalledWith(thrown, {
+      tags: { source: 'promotional_credits_grant' },
+      extra: {
+        credit_category: 'unexpected-failure',
+        kilo_user_id: mockUser.id,
+        organization_id: null,
+      },
+    });
+
+    jest.dontMock('@sentry/nextjs');
   });
 
   it('stores an explicitly provided creator and leaves omitted creators null', async () => {

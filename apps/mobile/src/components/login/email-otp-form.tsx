@@ -7,6 +7,7 @@ import { formFieldA11y } from '@/components/ui/form-field-a11y';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { type BusyAction } from '@/lib/auth/use-native-auth';
+import { foldDecimalDigits } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { canSubmitEmailCode } from './email-otp-state';
 
@@ -97,8 +98,12 @@ export function EmailOtpForm({
         textContentType="oneTimeCode"
         maxLength={6}
         onChangeText={value => {
-          codeRef.current = value;
-          setHasCompleteCode(/^\d{6}$/.test(value));
+          // The field keeps what was typed, but validation and the code sent to
+          // the server work on ASCII: the sign-in code is issued in ASCII, and a
+          // keyboard in another script types the same code in its own digits.
+          const digits = foldDecimalDigits(value);
+          codeRef.current = digits;
+          setHasCompleteCode(/^\d{6}$/.test(digits));
           onCodeChange?.();
         }}
         accessibilityLabel={formFieldA11y({ label: t('login.signInCodeField'), required: true })}

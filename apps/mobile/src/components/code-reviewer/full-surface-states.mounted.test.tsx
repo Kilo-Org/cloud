@@ -64,13 +64,19 @@ const state = vi.hoisted(() => ({
   mintInstallState: vi.fn(),
   openExternalUrl: vi.fn(),
   toastError: vi.fn(),
+  resync: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: state.push }),
+  useNavigation: () => ({ isFocused: () => true }),
 }));
-vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable' }));
+vi.mock('react-native', () => ({
+  AppState: { addEventListener: () => ({ remove: vi.fn() }) },
+  Pressable: 'Pressable',
+  View: 'View',
+}));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({
     top: 0,
@@ -90,6 +96,7 @@ vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: 'ScrollView',
   useTabBarBottomPadding: () => 0,
@@ -106,7 +113,30 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.test' }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: state.openExternalUrl }));
+vi.mock('@/lib/pr-review/connect-gate-platform', () => ({
+  openAuthorizationAndWaitForReturn: (url: string) => state.openExternalUrl(url),
+}));
 vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({
+    personalReviewAgent: {
+      listGitHubRepositories: {
+        queryOptions: (input: unknown) => ({ queryKey: ['personal-github', input] }),
+      },
+      listGitLabRepositories: {
+        queryOptions: (input: unknown) => ({ queryKey: ['personal-gitlab', input] }),
+      },
+    },
+    organizations: {
+      reviewAgent: {
+        listGitHubRepositories: {
+          queryOptions: (input: unknown) => ({ queryKey: ['org-github', input] }),
+        },
+        listGitLabRepositories: {
+          queryOptions: (input: unknown) => ({ queryKey: ['org-gitlab', input] }),
+        },
+      },
+    },
+  }),
   trpcClient: {
     githubApps: {
       mintInstallState: { mutate: state.mintInstallState },
@@ -114,6 +144,7 @@ vi.mock('@/lib/trpc', () => ({
   },
 }));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
+  isPersonal: (scope: string) => scope === 'personal',
   PERSONAL_SCOPE: 'personal',
   useGitHubStatus: () => ({ data: { connected: state.connected } }),
   useGitLabStatus: () => ({ data: { connected: false } }),
@@ -127,6 +158,9 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
 }));
 vi.mock('@/lib/hooks/use-code-reviewer-repo-selection', () => ({
   useRepoSelectionToggle: () => vi.fn(),
+}));
+vi.mock('@/lib/hooks/use-code-reviewer-repo-sync', () => ({
+  useReviewerRepositoriesResync: () => ({ resync: state.resync, resyncing: false }),
 }));
 vi.mock('@/lib/hooks/use-code-reviews', () => ({ useReviewList: () => state.reviews }));
 vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({ useRouteForegroundRefresh: vi.fn() }));
@@ -151,6 +185,7 @@ beforeEach(() => {
   state.openExternalUrl.mockReset();
   state.openExternalUrl.mockResolvedValue(undefined);
   state.toastError.mockReset();
+  state.resync.mockClear();
   vi.clearAllMocks();
 });
 
@@ -216,8 +251,7 @@ describe('Reviewer repository bodies', () => {
     pressManageAccess(renderer);
     await vi.waitFor(() => {
       expect(state.openExternalUrl).toHaveBeenCalledWith(
-        'https://example.test/github-app?installState=token-1&fromApp=1',
-        { label: 'repository access' }
+        'https://example.test/github-app?installState=token-1&fromApp=1'
       );
     });
     expect(state.toastError).not.toHaveBeenCalled();
@@ -236,8 +270,7 @@ describe('Reviewer repository bodies', () => {
     pressManageAccess(renderer);
     await vi.waitFor(() => {
       expect(state.openExternalUrl).toHaveBeenCalledWith(
-        'https://example.test/github-app?organizationId=org-1',
-        { label: 'repository access' }
+        'https://example.test/github-app?organizationId=org-1'
       );
     });
     expect(state.toastError).not.toHaveBeenCalled();

@@ -1,5 +1,5 @@
 {
-  "id": "3909cdec-c00d-4120-8cf1-933f9d2130ac",
+  "id": "ff5b8190-a865-47ea-9c73-8120c8d9963a",
   "prevId": "c4c9111e-08c7-4dc3-9b6c-d9859f50241b",
   "version": "7",
   "dialect": "postgresql",
@@ -4107,13 +4107,6 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
-        },
-        "is_fork": {
-          "name": "is_fork",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         },
         "parent_session_id": {
           "name": "parent_session_id",
@@ -10653,6 +10646,13 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
+        },
+        "credits_window_granted_microdollars": {
+          "name": "credits_window_granted_microdollars",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         },
         "linked_kilo_user_id": {
           "name": "linked_kilo_user_id",
@@ -31731,13 +31731,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "pending_copy_ids": {
-          "name": "pending_copy_ids",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -31766,21 +31759,6 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_shared_cli_sessions_kilo_user_id": {
-          "name": "IDX_shared_cli_sessions_kilo_user_id",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },

@@ -1,4 +1,5 @@
 import { BOT_USER_AGENT, BOT_VERSION, MAX_ITERATIONS, SUMMARY_MODEL } from '@/lib/bot/constants';
+import { getGitHubRepositoryFullNameFromThread } from '@/lib/bot/github-thread';
 import { botPlatforms, type BotPlatform } from '@/lib/bot/platforms';
 import { buildPrSignature } from '@/lib/bot/pr-signature';
 import {
@@ -61,6 +62,11 @@ type RunBotAgentParams = {
   attachments?: CloudAgentAttachments;
   completedStepCount?: number;
   initialSteps?: BotRequestStep[];
+  /**
+   * GitHub login of the account that triggered this run. Absent for
+   * continuations that carry no verified account identity.
+   */
+  actorLogin?: string;
   onSessionReady?: (params: {
     kiloSessionId: string;
     cloudAgentSessionId: string;
@@ -324,6 +330,8 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
               chatPlatform,
               currentStep,
               attachments: params.attachments,
+              actorLogin: params.actorLogin,
+              threadRepository: getGitHubRepositoryFullNameFromThread(params.thread.id),
             }
           );
 

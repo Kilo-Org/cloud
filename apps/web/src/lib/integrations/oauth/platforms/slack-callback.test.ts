@@ -3,7 +3,7 @@ process.env.NEXTAUTH_SECRET ||= 'test-nextauth-secret';
 const mockEnsureOrganizationAccess = jest.fn();
 const mockConsumeProviderOAuthAttempt = jest.fn();
 const mockUpsertSlackInstallation = jest.fn();
-const mockHandleOAuthCallback = jest.fn();
+const mockExchangeSlackOAuthCode = jest.fn();
 const mockCaptureException = jest.fn();
 const mockCaptureMessage = jest.fn();
 
@@ -22,9 +22,14 @@ jest.mock('@/lib/bot', () => ({
   bot: {
     initialize: jest.fn(async () => {}),
     getAdapter: () => ({
-      handleOAuthCallback: (...args: unknown[]) => mockHandleOAuthCallback(...args),
+      getInstallation: jest.fn(async () => null),
+      setInstallation: jest.fn(async () => {}),
+      deleteInstallation: jest.fn(async () => {}),
     }),
   },
+}));
+jest.mock('@/lib/slack-bot/model-allow-list', () => ({
+  getDefaultAllowedModel: jest.fn(async () => 'test/default-model'),
 }));
 jest.mock('@/lib/integrations/provider-oauth-attempts', () => ({
   beginProviderOAuthAttempt: jest.fn(),
@@ -40,6 +45,8 @@ jest.mock('@/lib/integrations/slack-service', () => {
   }
   return {
     SlackWorkspaceAlreadyConnectedError,
+    exchangeSlackOAuthCode: (...args: unknown[]) => mockExchangeSlackOAuthCode(...args),
+    getConflictingSlackInstallation: jest.fn(async () => null),
     upsertSlackInstallation: (...args: unknown[]) => mockUpsertSlackInstallation(...args),
   };
 });
@@ -84,7 +91,7 @@ describe('handleSlackOAuthCallback organization authority', () => {
     mockEnsureOrganizationAccess.mockResolvedValue('owner');
     mockConsumeProviderOAuthAttempt.mockResolvedValue(true);
     mockUpsertSlackInstallation.mockResolvedValue({ id: 'integration-1' });
-    mockHandleOAuthCallback.mockResolvedValue({ teamId: 'T123', installation });
+    mockExchangeSlackOAuthCode.mockResolvedValue({ installationId: 'T123', installation });
   });
 
   it('refuses an organization completion by a plain member', async () => {
@@ -102,7 +109,7 @@ describe('handleSlackOAuthCallback organization authority', () => {
       ORGANIZATION_MANAGE_ROLES
     );
     expect(mockUpsertSlackInstallation).not.toHaveBeenCalled();
-    expect(mockHandleOAuthCallback).not.toHaveBeenCalled();
+    expect(mockExchangeSlackOAuthCode).not.toHaveBeenCalled();
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
@@ -118,37 +125,16 @@ describe('handleSlackOAuthCallback organization authority', () => {
       'permission_required'
     );
     expect(mockUpsertSlackInstallation).not.toHaveBeenCalled();
-    expect(mockHandleOAuthCallback).not.toHaveBeenCalled();
+    expect(mockExchangeSlackOAuthCode).not.toHaveBeenCalled();
   });
 
-  it('completes an organization install for an admin and authorizes a workspace change', async () => {
-    mockEnsureOrganizationAccess.mockResolvedValue('admin');
-
-    const { response } = await callCallback(`org_${ORGANIZATION_ID}`);
-
-    expect(response.status).toBe(307);
-    expect(new URL(response.headers.get('location') ?? '').pathname).toBe(
-      '/organizations/' + ORGANIZATION_ID + '/integrations/slack'
-    );
-    expect(mockUpsertSlackInstallation).toHaveBeenCalledWith({
-      owner: { type: 'org', id: ORGANIZATION_ID },
-      teamId: 'T123',
-      installation,
-      allowWorkspaceRebind: true,
-    });
-  });
-
-  it('keeps a same-workspace re-install working for an organization admin', async () => {
+  it('completes an organization installation', async () => {
     mockEnsureOrganizationAccess.mockResolvedValue('owner');
-    mockHandleOAuthCallback.mockResolvedValue({ teamId: 'T123', installation });
 
     const { response } = await callCallback(`org_${ORGANIZATION_ID}`);
 
     expect(new URL(response.headers.get('location') ?? '').searchParams.get('success')).toBe(
       'installed'
-    );
-    expect(mockUpsertSlackInstallation).toHaveBeenCalledWith(
-      expect.objectContaining({ teamId: 'T123', allowWorkspaceRebind: true })
     );
   });
 
@@ -156,12 +142,9 @@ describe('handleSlackOAuthCallback organization authority', () => {
     const { response } = await callCallback(`user_${USER_ID}`);
 
     expect(new URL(response.headers.get('location') ?? '').pathname).toBe('/integrations/slack');
+    expect(new URL(response.headers.get('location') ?? '').searchParams.get('success')).toBe(
+      'installed'
+    );
     expect(mockEnsureOrganizationAccess).not.toHaveBeenCalled();
-    expect(mockUpsertSlackInstallation).toHaveBeenCalledWith({
-      owner: { type: 'user', id: USER_ID },
-      teamId: 'T123',
-      installation,
-      allowWorkspaceRebind: false,
-    });
   });
 });

@@ -4,7 +4,8 @@ import { setImmediate } from 'node:timers/promises';
 import { and, eq, sql } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { platform_integrations, type User } from '@kilocode/db/schema';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { organizations, platform_integrations, type User } from '@kilocode/db/schema';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { createOAuthState } from '@/lib/integrations/oauth-state';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
@@ -33,6 +34,9 @@ const mockConsumeProviderOAuthAttempt = jest.fn(async (_input: unknown) => true)
 jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
   ensureOrganizationAccess: jest.fn(),
+}));
+jest.mock('@/lib/slack-bot/model-allow-list', () => ({
+  getDefaultAllowedModel: jest.fn(async () => 'test/default-model'),
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
@@ -327,6 +331,49 @@ describe('Slack install callback against the real integration row', () => {
       integration_status: INTEGRATION_STATUS.ACTIVE,
       metadata: expect.objectContaining({ bot_user_id: 'U0BOT' }),
     });
+  });
+
+  test('completes an authorized organization workspace update', async () => {
+    const organization = await createTestOrganization('Callback Workspace', otherOwner.id, 0);
+    try {
+      const [existing] = await db
+        .insert(platform_integrations)
+        .values({
+          owned_by_organization_id: organization.id,
+          platform: PLATFORM.SLACK,
+          integration_type: 'oauth',
+          platform_installation_id: 'T0PREVIOUS',
+          platform_account_id: 'T0PREVIOUS',
+          platform_account_login: 'Previous Workspace',
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          metadata: { model_slug: 'test/selected-model' },
+        })
+        .returning();
+      const state = createOAuthState(
+        `org_${organization.id}`,
+        otherOwner.id,
+        undefined,
+        'provider_install'
+      );
+      const response = await callCallback('slack', `?code=abc&state=${state}`);
+
+      expect(redirectPath(response)).toBe(
+        `/organizations/${organization.id}/integrations/slack?success=installed`
+      );
+      const [stored] = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, existing.id));
+      expect(stored).toMatchObject({
+        owned_by_organization_id: organization.id,
+        platform_installation_id: 'T0TEAM',
+        integration_status: INTEGRATION_STATUS.ACTIVE,
+        metadata: expect.objectContaining({ model_slug: 'test/selected-model' }),
+      });
+      expect(mockInstallations.get('T0TEAM')).toMatchObject({ botUserId: 'U0BOT' });
+    } finally {
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
   });
 });
 

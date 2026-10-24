@@ -3,24 +3,33 @@ import { createTestHarness, unstable_readConfig } from 'wrangler';
 import { expect, it, vi } from 'vitest';
 import { usage } from './usage.test-fixture';
 
-it('keeps production direct and routes the existing staging consumer through the private relay', () => {
+it('keeps production direct and routes the single staging EU consumer through the private relay', () => {
   const config = new URL('../wrangler.jsonc', import.meta.url).pathname;
   const production = unstable_readConfig({ config });
   const staging = unstable_readConfig({ config, env: 'staging' });
   expect(production.services).toEqual([]);
+  expect(production.queues.producers).toEqual([
+    { binding: 'USAGE_INGEST_QUEUE', queue: 'usage-ingest-processing' },
+    { binding: 'USAGE_INGEST_DLQ', queue: 'usage-ingest-processing-dlq' },
+  ]);
+  expect(staging.queues.producers).toEqual([
+    { binding: 'USAGE_INGEST_QUEUE', queue: 'usage-ingest-processing-staging-eu' },
+    { binding: 'USAGE_INGEST_DLQ', queue: 'usage-ingest-processing-dlq-staging-eu' },
+  ]);
   expect(staging.services).toMatchObject([
     { binding: 'USAGE_WRITER_RELAY', service: 'usage-writer-relay-staging' },
   ]);
   expect(staging.name).toBe('usage-ingest-staging');
+  expect(staging.queues.consumers).toHaveLength(1);
   expect(staging.queues.consumers).toMatchObject([
     {
-      queue: 'usage-ingest-processing-staging',
+      queue: 'usage-ingest-processing-staging-eu',
       max_batch_size: 1,
       max_batch_timeout: 0,
       max_retries: 3,
       retry_delay: 60,
       max_concurrency: 200,
-      dead_letter_queue: 'usage-ingest-processing-dlq-staging',
+      dead_letter_queue: 'usage-ingest-processing-dlq-staging-eu',
     },
   ]);
   const relay = unstable_readConfig({

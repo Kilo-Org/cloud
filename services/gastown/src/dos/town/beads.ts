@@ -43,6 +43,8 @@ import {
 } from '../../db/tables/convoy-metadata.table';
 import { town_events } from '../../db/tables/town-events.table';
 import { query } from '../../util/query.util';
+import { generateId } from '../../util/id.util';
+import { now } from '../../util/time.util';
 import type {
   CreateBeadInput,
   BeadFilter,
@@ -53,14 +55,6 @@ import type {
 } from '../../types';
 import type { BeadEventType } from '../../db/tables/bead-events.table';
 import type { FailureReason } from './types';
-
-function generateId(): string {
-  return crypto.randomUUID();
-}
-
-function now(): string {
-  return new Date().toISOString();
-}
 
 export function initBeadTables(sql: SqlStorage): void {
   // Create all tables first (IF NOT EXISTS — safe for existing DOs)

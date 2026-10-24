@@ -62,6 +62,8 @@ import {
   getIndexesAgentNudges,
 } from '../db/tables/agent-nudges.table';
 import { query } from '../util/query.util';
+import { generateId } from '../util/id.util';
+import { now } from '../util/time.util';
 import { getAgentDOStub } from './Agent.do';
 import { getTownContainerDoId, getTownContainerStub } from './TownContainer.do';
 
@@ -146,14 +148,6 @@ const IDLE_ALARM_INTERVAL_MS = 5 * 60_000;
 const STALE_ESCALATION_THRESHOLD_MS = 4 * 60 * 60 * 1000;
 const MAX_RE_ESCALATIONS = 3;
 const SEVERITY_ORDER = ['low', 'medium', 'high', 'critical'] as const;
-
-function generateId(): string {
-  return crypto.randomUUID();
-}
-
-function now(): string {
-  return new Date().toISOString();
-}
 
 type RigConfig = {
   townId: string;

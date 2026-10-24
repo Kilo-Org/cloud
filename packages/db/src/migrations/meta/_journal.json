@@ -2098,8 +2098,15 @@
     {
       "idx": 299,
       "version": "7",
-      "when": 1792834439275,
-      "tag": "0299_cli_session_copy_limits",
+      "when": 1792862877322,
+      "tag": "0299_lame_mojo",
+      "breakpoints": true
+    },
+    {
+      "idx": 300,
+      "version": "7",
+      "when": 1792869214713,
+      "tag": "0300_natural_kate_bishop",
       "breakpoints": true
     }
   ]

@@ -183,7 +183,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       request.workspace.workspacePath,
     ]);
     expect(gitCalls.some(args => args.join(' ') === 'checkout --progress -b main')).toBe(true);
-    expect(setupCalls).toEqual([['sh', '-lc', 'pnpm install']]);
+    expect(setupCalls).toEqual([['bash', '-e', '-o', 'pipefail', '-c', 'pnpm install']]);
     expect(restoreCalls[0]).toMatchObject({
       kiloSessionId: 'kilo_sess_1',
       workspacePath: request.workspace.workspacePath,
@@ -1535,7 +1535,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
 
     expect(setupOptions?.inactivityTimeoutMs).toBe(240_000);
     expect(setupOptions?.hardTimeoutMs).toBe(300_000);
-    expect(setupInvocation).toEqual(['sh', '-lc', 'pnpm install']);
+    expect(setupInvocation).toEqual(['bash', '-e', '-o', 'pipefail', '-c', 'pnpm install']);
     expect(markerExistedDuringSetup).toBe(false);
     expect(
       fs.existsSync(path.join(request.workspace.workspacePath, '.git', 'kilo-bootstrap-complete'))
@@ -2428,7 +2428,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       workspacePath: request.workspace.workspacePath,
     });
     expect(restoreCalls[0].filePath).toContain('/tmp/kilo-empty-session-kilo_sess_1.json');
-    expect(setupCalls).toEqual([['sh', '-lc', 'pnpm install']]);
+    expect(setupCalls).toEqual([['bash', '-e', '-o', 'pipefail', '-c', 'pnpm install']]);
   });
 
   it('leaves a cold Bitbucket review origin credential-free before restoring Kilo', async () => {

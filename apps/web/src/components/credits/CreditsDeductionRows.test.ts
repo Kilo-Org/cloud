@@ -26,6 +26,10 @@ const pairedGroup: DeductionGroup = {
 };
 
 describe('CreditsDeductionRows', () => {
+  function cellClasses(rowHtml: string): string[] {
+    return Array.from(rowHtml.matchAll(/<td[^>]*class="([^"]*)"/g), match => match[1]);
+  }
+
   it('renders the grant as the main row and the expiry beneath it', () => {
     const rows = render([pairedGroup]).split('</tr>');
 
@@ -40,6 +44,21 @@ describe('CreditsDeductionRows', () => {
     // Only the group start draws a divider between groups.
     expect(rows[0]).toContain('border-t');
     expect(rows[1]).not.toContain('border-t');
+  });
+
+  it('aligns the date and amount figures and lets the description wrap', () => {
+    const rows = render([pairedGroup]).split('</tr>');
+    const main = cellClasses(rows[0]);
+    const child = cellClasses(rows[1]);
+
+    // Date and amount are tabular; the description wraps instead of clipping.
+    expect(main[0]).toContain('tabular-nums');
+    expect(main[3]).toContain('tabular-nums');
+    expect(main[3]).toContain('text-right');
+    expect(main[1]).toContain('whitespace-normal');
+    expect(main[1]).not.toContain('whitespace-nowrap');
+    expect(child[1]).toContain('whitespace-normal');
+    expect(child[1]).not.toContain('whitespace-nowrap');
   });
 
   it('renders an unlinked deduction as a single row with its own type and amount', () => {

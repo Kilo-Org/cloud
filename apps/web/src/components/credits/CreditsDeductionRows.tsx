@@ -23,8 +23,8 @@ export function CreditsDeductionRows({ groups }: Readonly<{ groups: DeductionGro
       {groups.map((group, index) => (
         <tbody key={group.key} className={index % 2 === 1 ? 'bg-muted' : undefined}>
           <tr className="border-border border-t">
-            <TableCell>{formatIsoDateString_UsaDateOnlyFormat(group.main.date)}</TableCell>
-            <TableCell className="whitespace-normal">{group.main.description}</TableCell>
+            <TableCell numeric>{formatIsoDateString_UsaDateOnlyFormat(group.main.date)}</TableCell>
+            <TableCell wrap>{group.main.description}</TableCell>
             <TableCell>{group.main.type}</TableCell>
             <TableCell numeric align="right">
               {formatSignedAmount(group.main.amount_mUsd)}
@@ -33,7 +33,7 @@ export function CreditsDeductionRows({ groups }: Readonly<{ groups: DeductionGro
           {group.child && (
             <tr>
               <TableCell>{''}</TableCell>
-              <TableCell className="whitespace-normal">
+              <TableCell wrap>
                 <span aria-hidden="true" className="text-muted-foreground mr-1.5">
                   └
                 </span>

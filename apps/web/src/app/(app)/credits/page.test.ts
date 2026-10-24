@@ -138,12 +138,28 @@ describe('CreditsPage', () => {
     expect(html).toContain('Purchased credits');
     expect(html).toContain('Expire one year after purchase');
     // The grant leads the pair, the expiry follows as its second line.
-    expect(html).toContain('Promotional credits');
-    expect(html).toContain('Credit grant');
-    expect(html).toContain('+$50.00');
-    expect(html).toContain('└');
-    expect(html).toContain('Expired: Promotional credits');
-    expect(html).toContain('-$50.00');
+    const grantAt = html.indexOf('Promotional credits');
+    const expiryAt = html.indexOf('Expired: Promotional credits');
+    expect(grantAt).toBeGreaterThan(-1);
+    expect(expiryAt).toBeGreaterThan(grantAt);
+    expect(html.slice(grantAt, expiryAt)).toContain('Credit grant');
+    expect(html.slice(grantAt, expiryAt)).toContain('+$50.00');
+    // The marker and the expiry amount sit in the expiry's own row.
+    const expiryRow = html.slice(
+      html.lastIndexOf('<tr', expiryAt),
+      html.indexOf('</tr>', expiryAt)
+    );
+    expect(expiryRow).toContain('└');
+    expect(expiryRow).toContain('Expired: Promotional credits');
+    expect(expiryRow).toContain('-$50.00');
+    // Both lines live in one group, so one zebra stripe and one divider.
+    const group = html.slice(
+      html.lastIndexOf('<tbody', expiryAt),
+      html.indexOf('</tbody>', expiryAt)
+    );
+    expect(group).toContain('Promotional credits');
+    expect(group).toContain('Expired: Promotional credits');
+    expect(group).not.toContain('Usage charge');
     // An unpaired charge keeps its own row.
     expect(html).toContain('Usage charge');
     expect(html).toContain('-$3.00');

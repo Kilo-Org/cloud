@@ -145,7 +145,7 @@ function codeSpanAt(value: string, start: number, limit: number) {
   }
   // Runs of any other length are skipped whole, so the walk visits each run of
   // the inline run at most once.
-  for (let at = value.indexOf('`', start + length); at !== -1 && at < limit; ) {
+  for (let at = value.indexOf('`', start + length); at !== -1 && at < limit;) {
     let run = 1;
     while (value[at + run] === '`') {
       run += 1;

@@ -2954,7 +2954,6 @@
   },
   "voiceInput": {
     "listening": "Ap koute...",
-    "staysOff": "Dikte a ap rete dezaktive jiskaske ou pèmèt transkripsyon sou entènèt.",
     "onlineTitle": "Tretman vwa a fèt sou entènèt",
     "onlineMessage": "Aparèy sa a pa ka transkri san koneksyon entènèt. Yo voye anrejistreman ou a bay {{provider}} pou konvèti li an tèks. Kilo pa konsève odyo a.",
     "allow": "Pèmèt",

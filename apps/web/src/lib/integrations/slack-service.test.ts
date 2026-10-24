@@ -562,8 +562,7 @@ describe('upsertSlackInstallation', () => {
     );
   });
 
-  // The store is the system of record: a failed write fails the install so the
-  // caller can retry.
+  // A failed credential write fails the install.
   it('fails the install when the credential store write fails', async () => {
     mockLimit.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     mockWriteSlackCredential.mockRejectedValue(new Error('encryption not configured'));

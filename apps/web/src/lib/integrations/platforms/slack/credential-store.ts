@@ -17,9 +17,7 @@ import {
 /**
  * System of record for Slack bot credentials.
  *
- * Install writes go through here and every server read path decrypts from here.
- * `src/scripts/d2026-08-07_backfill-slack-oauth-credentials.ts` brings integrations
- * that predate this store onto it.
+ * Install writes and every server read path of the bot credential go through here.
  */
 
 export type WriteSlackCredentialInput = {
@@ -78,11 +76,9 @@ export async function writeSlackCredential(
 /**
  * Creates the credential row only when the integration does not have one yet.
  *
- * For callers whose token comes from a snapshot rather than from a live Slack
- * response — the backfill script reads `platform_integrations.metadata` up front — a
- * reinstall part-way through the run writes a fresh credential that a blind replace
- * would overwrite with the by-then-revoked snapshot token. Existence is therefore
- * re-checked inside the same locked transaction as the write.
+ * A caller whose token comes from a snapshot rather than from a live Slack response
+ * needs the current row to win: existence is re-checked inside the same locked
+ * transaction as the write, so a credential written after the snapshot is kept.
  */
 export async function createSlackCredentialIfAbsent(
   input: WriteSlackCredentialInput

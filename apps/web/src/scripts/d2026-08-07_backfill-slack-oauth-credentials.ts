@@ -1,20 +1,17 @@
 /**
- * Moves Slack bot credentials for existing integrations into the encrypted
- * `slack_oauth_credentials` store and normalizes `platform_integrations.metadata`
- * to non-secret workspace fields.
+ * Brings existing Slack integrations onto the encrypted `slack_oauth_credentials`
+ * store.
  *
- * The copy pass is idempotent: integrations that already have a credential row are
- * skipped rather than re-encrypted, so re-running does not churn `credential_version`
- * (each bump invalidates the previous ciphertext, since the version is inside the
- * AAD). The skip is enforced by the write itself, so a reinstall that lands mid-run
- * keeps its fresh credential instead of being overwritten by this run's earlier
- * snapshot.
+ * Pass one writes a credential row for integrations that have none. It is idempotent:
+ * integrations that already have a credential row are skipped rather than
+ * re-encrypted, so re-running does not churn `credential_version` (each bump
+ * invalidates the previous ciphertext, since the version is inside the AAD). The skip
+ * is enforced by the write itself, so a credential written mid-run is kept.
  *
- * The normalization pass (on by default with --execute; opt out with --no-normalize)
- * removes the credential field from metadata for every Slack integration whose
- * stored credential is current: either this run wrote it, or the stored credential
- * decrypts to the same value. Every other integration keeps its metadata unchanged
- * and is reported, so the operation is safe to re-run after the reported rows are
+ * Pass two runs by default with --execute (opt out with --no-normalize) and applies
+ * only to integrations whose stored credential is current: either this run wrote it,
+ * or it decrypts to the value the integration records. Anything else is reported and
+ * left unchanged, so the operation is safe to re-run after the reported rows are
  * resolved. Run this only after the release whose read paths use the credential
  * store.
  *
@@ -146,9 +143,9 @@ async function main(): Promise<void> {
     for (const integration of batch) {
       if (alreadyMigrated.has(integration.id)) {
         skipped.already_migrated += 1;
-        // The stored credential must be current before the metadata field is
-        // removed. The comparison below admits the row for normalization only on an
-        // exact match; any other result keeps it unchanged.
+        // Only rows whose stored credential is current qualify for the second pass.
+        // The comparison below admits the row on an exact match; any other result
+        // keeps it unchanged.
         if (execute && normalize && readMetadataCredential(integration.metadata)) {
           const fresh = await storedCredentialMatches(integration.id, integration);
           if (fresh === true) {
@@ -216,13 +213,12 @@ async function main(): Promise<void> {
     }
   }
 
-  // Normalization pass: remove the credential field from metadata for every eligible
-  // integration.
+  // Pass two: finalize the integration row for every eligible integration.
   // - A row is eligible only when its stored credential is current: this run wrote it,
   //   or the stored credential decrypts to the same value. Every other row is reported
   //   and left unchanged so the script can be repeated after it is resolved.
-  // The metadata update removes only that key (`jsonb -`), so concurrent writes
-  // to other metadata fields between the snapshot above and this update survive.
+  // The update changes only that key (`jsonb -`), so concurrent writes to other
+  // metadata fields between the snapshot above and this update survive.
   if (execute && normalize) {
     for (const integration of integrations) {
       if (!normalizationCandidateIds.has(integration.id)) continue;

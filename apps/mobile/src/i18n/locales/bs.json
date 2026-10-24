@@ -2997,7 +2997,6 @@
   },
   "voiceInput": {
     "listening": "Slušam...",
-    "staysOff": "Glasovni unos ostaje isključen dok ne dozvoliš pretvaranje govora u tekst putem interneta.",
     "onlineTitle": "Govor se obrađuje putem interneta",
     "onlineMessage": "Ovaj uređaj ne može pretvarati govor u tekst bez interneta. Tvoj snimak se šalje servisu {{provider}} radi pretvaranja u tekst. Kilo ne čuva zvučni snimak.",
     "allow": "Dozvoli",

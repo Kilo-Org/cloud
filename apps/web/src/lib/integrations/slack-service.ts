@@ -211,9 +211,8 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
  * Load the bot token for an integration from the encrypted credential store.
  *
  * Returns null when no credential row exists, the row is revoked, or the row cannot
- * be read (decryption failure or an owner that does not match the encryption AAD).
- * Failures are reported to Sentry without token material; callers treat null as "no
- * access token" and surface their own user-facing error.
+ * be read. Failures are reported to the error tracker with the integration id only;
+ * callers treat null as "no access token" and surface their own user-facing error.
  */
 export async function getSlackBotToken(integration: PlatformIntegration): Promise<string | null> {
   const owner = getOwnerFromInstallation(integration);
@@ -301,9 +300,6 @@ export async function upsertSlackInstallation({
       ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
       : DEFAULT_BOT_MODEL;
 
-  // Workspace identifiers and model policy only: credential material lives in the
-  // encrypted `slack_oauth_credentials` row that is written alongside this one, and
-  // metadata stays free of it.
   const existingModelSlug =
     existing?.metadata &&
     typeof existing.metadata === 'object' &&
@@ -335,6 +331,8 @@ export async function upsertSlackInstallation({
             platform_account_login: teamName,
             scopes: SLACK_SCOPES,
             integration_status: INTEGRATION_STATUS.ACTIVE,
+            suspended_at: null,
+            suspended_by: null,
             metadata,
             updated_at: new Date().toISOString(),
           })

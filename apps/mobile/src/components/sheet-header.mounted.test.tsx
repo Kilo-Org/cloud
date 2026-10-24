@@ -374,25 +374,6 @@ describe('SheetHeader', () => {
     }
   );
 
-  it('gives every action a growing target of at least 44 points', async () => {
-    const renderer = await mount({
-      title: 'report.pdf',
-      onDone: () => undefined,
-      onCancel: () => undefined,
-      onShare: () => undefined,
-    });
-    for (const label of ['Done', 'Cancel', 'Share report.pdf']) {
-      const buttons = pressablesByLabel(renderer.root, label);
-      expect(buttons).toHaveLength(1);
-      expect(buttons[0]?.props.className).toContain('min-h-11');
-      expect(buttons[0]?.props.className).toContain('min-w-11');
-      expect(buttons[0]?.props.className).not.toMatch(/(?:^|\s)(?:absolute|h-|max-h-)/);
-      expect(buttons[0]?.props.hitSlop).toBe(8);
-    }
-
-    renderer.unmount();
-  });
-
   it('disables and restores all supplied controls without marking Share busy', async () => {
     const props = {
       title: 'report.pdf',

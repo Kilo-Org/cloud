@@ -34,7 +34,7 @@ export function RemoteSessionExitFailure({
       <AccessibleStatus message={message} tone="error" className="text-center text-sm" />
       <Button
         variant="outline"
-        size="sm"
+        size="action"
         loading={isRetrying}
         accessibilityLabel={t('common.tryAgain')}
         onPress={onRetry}

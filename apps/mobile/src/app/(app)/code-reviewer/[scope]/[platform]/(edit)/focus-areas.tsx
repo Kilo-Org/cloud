@@ -1,7 +1,8 @@
-import { useLocalSearchParams } from 'expo-router';
+import { type Href } from 'expo-router';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { InvalidRouteState } from '@/components/invalid-route-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
 import { ChoiceRow } from '@/components/ui/choice-row';
@@ -12,9 +13,20 @@ import {
   useReviewConfigCacheReader,
   useSaveReviewConfig,
 } from '@/lib/hooks/use-code-reviewer';
+import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 
 export default function FocusAreasRoute() {
-  const { scope, platform } = useLocalSearchParams<{ scope: string; platform: ReviewerPlatform }>();
+  const params = useReviewerRouteParams();
+  if (!params) {
+    return <InvalidRouteState backTo={'/(app)/code-reviewer' as Href} />;
+  }
+  return <FocusAreasScreen scope={params.scope} platform={params.platform} />;
+}
+
+function FocusAreasScreen({
+  scope,
+  platform,
+}: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const { data } = useReviewConfig(scope, platform);
   const save = useSaveReviewConfig(scope, platform);
   const readConfig = useReviewConfigCacheReader(scope, platform);

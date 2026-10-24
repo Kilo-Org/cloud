@@ -4,7 +4,7 @@ import {
   CUSTOM_ROUTER_ERROR_HTTP_STATUS,
   CreateCustomRouterRequestSchema,
   CustomRouterClientEntryIdSchema,
-  CustomRouterScopeSchema,
+  OwnerTypeSchema,
   CustomRouterSlugSchema,
   MAX_CUSTOM_ROUTERS_PER_OWNER,
   MAX_CUSTOM_ROUTER_ENTRIES,
@@ -19,7 +19,7 @@ import {
   type CustomRouterErrorCode,
   type CustomRouterErrorResponse,
   type CustomRouterListEntry,
-  type CustomRouterScope,
+  type OwnerType,
   type CustomRouterSummary,
   type CustomRouterVariantStatus,
 } from '@kilocode/auto-routing-contracts';
@@ -156,10 +156,7 @@ async function readJsonBody(request: NextRequest): Promise<unknown> {
 
 type ScopedOwner = { owner: CustomRouterOwner; canEdit: boolean };
 
-function resolveScopedOwner(
-  context: CustomRouterRequestContext,
-  scope: CustomRouterScope
-): ScopedOwner {
+function resolveScopedOwner(context: CustomRouterRequestContext, scope: OwnerType): ScopedOwner {
   if (scope === 'user') return { owner: { type: 'user', id: context.user.id }, canEdit: true };
   if (!context.organization) throw routerNotFound();
   return {
@@ -170,7 +167,7 @@ function resolveScopedOwner(
 
 async function resolveEditableOwner(
   context: CustomRouterRequestContext,
-  scope: CustomRouterScope
+  scope: OwnerType
 ): Promise<CustomRouterOwner> {
   const { owner, canEdit } = resolveScopedOwner(context, scope);
   if (!canEdit) {
@@ -191,10 +188,10 @@ async function resolveEditableOwner(
 }
 
 export function parseRouterParams(params: { scope: string; slug: string }): {
-  scope: CustomRouterScope;
+  scope: OwnerType;
   slug: string;
 } {
-  const scope = CustomRouterScopeSchema.safeParse(params.scope);
+  const scope = OwnerTypeSchema.safeParse(params.scope);
   const slug = CustomRouterSlugSchema.safeParse(params.slug);
   if (!scope.success || !slug.success) throw routerNotFound();
   return { scope: scope.data, slug: slug.data };

@@ -295,6 +295,9 @@ export async function applyVercelSettings(
       Object.keys(retainedByokProviders).length > 0 ? retainedByokProviders : allByokProviders;
 
     // Pass request-scoped credentials and restrict routing to the corresponding providers.
+    // Unlike Vercel's documented behavior, Vercel special-cases Kilo to never fall back to
+    // system credentials when BYOK credentials fail, so BYOK requests are never billed to Kilo.
+    // https://anaconda.slack.com/archives/C0BQLEKUCV9/p1792652138592319
     // Request-level data handling preferences travel with the request on every routing path,
     // so upstream providers receive the caller's retention and training choices consistently.
     requestToMutate.body.providerOptions = {

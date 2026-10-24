@@ -81,6 +81,10 @@ export function IdleAuth({
     `${t('login.termsPrefix')}${t('login.terms')}${t('login.termsConnector')}` +
     `${t('common.privacyPolicy')}${t('login.termsSuffix')}`;
   const [view, setView] = useState<'main' | 'otp'>('main');
+  const [verifyError, setVerifyError] = useState<string | undefined>(undefined);
+  // Bumps on every user step that retires a refusal (edit, resend, back), so a
+  // slow refusal from an earlier attempt cannot re-appear after the user moved on.
+  const verifyAttemptRef = useRef(0);
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [browserAuthStarting, setBrowserAuthStarting] = useState(false);
   const emailRef = useRef(initialEmail);
@@ -148,6 +152,8 @@ export function IdleAuth({
     // reports a rejected address (`INVALID_REQUEST` / `INVALID_EMAIL`).
     const ok = await requestEmailCode(emailRef.current);
     if (ok) {
+      verifyAttemptRef.current += 1;
+      setVerifyError(undefined);
       setView('otp');
     }
   };
@@ -201,10 +207,28 @@ export function IdleAuth({
       <EmailOtpForm
         email={emailRef.current.trim().toLowerCase()}
         busy={busy}
+        error={verifyError}
         onVerify={code => {
-          void verifyEmailCode(emailRef.current, code);
+          const attempt = verifyAttemptRef.current;
+          void (async () => {
+            const outcome = await verifyEmailCode(emailRef.current, code);
+            // A refusal may settle after the user has moved on — edited the
+            // code (clearing the message), requested a resend, or gone back.
+            // Only the attempt this refusal belongs to may write its message.
+            if (!outcome.ok && attempt === verifyAttemptRef.current) {
+              setVerifyError(outcome.message);
+            }
+          })();
+        }}
+        onCodeChange={() => {
+          // Editing the code retires the refusal message above the field and
+          // disowns any verify attempt still in flight for the old code.
+          verifyAttemptRef.current += 1;
+          setVerifyError(undefined);
         }}
         onResend={() => {
+          verifyAttemptRef.current += 1;
+          setVerifyError(undefined);
           void (async () => {
             const ok = await requestEmailCode(emailRef.current);
             if (ok) {
@@ -213,6 +237,8 @@ export function IdleAuth({
           })();
         }}
         onBack={() => {
+          verifyAttemptRef.current += 1;
+          setVerifyError(undefined);
           setView('main');
         }}
       />

@@ -1,9 +1,11 @@
+/* eslint-disable max-lines -- the agent form keeps its validation, dirty check, and every field group in one sheet, so Save and the fields it saves stay together */
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
+import { agentErrorText, slugFieldError } from '@/components/profiles/agent-form-errors';
 import { AgentVariantPicker } from '@/components/profiles/agent-variant-picker';
 import {
   AGENT_VISIBILITY_OPTIONS,
@@ -21,16 +23,19 @@ import { FormField } from '@/components/ui/form-field';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
+import { selectableRowA11y } from '@/lib/a11y/selectable-row';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 import { cn } from '@/lib/utils';
 
-/** Catalog key for each refused field, so the message lands under the input at fault. */
-const ERROR_KEYS = {
-  'slug-required': 'profiles.agents.slugRequired',
-  'slug-invalid': 'profiles.agents.slugInvalid',
-  'slug-conflict': 'profiles.agents.slugConflict',
-  'name-required': 'profiles.agents.nameRequired',
-} satisfies Record<AgentFormError, string>;
+const ERROR_FIELDS = {
+  'slug-required': 'slug',
+  'slug-invalid': 'slug',
+  'slug-conflict': 'slug',
+  'name-required': 'name',
+  'name-too-long': 'name',
+  'description-too-long': 'description',
+} as const satisfies Record<AgentFormError, string>;
 
 type AgentFormSheetProps = Readonly<{
   agent: AgentSource | null;
@@ -50,7 +55,9 @@ type AgentFormSheetProps = Readonly<{
  * app's iOS text-input rule; visibility and the tool toggles are state.
  *
  * Save validates through `validateAgentForm`; a refused input shows the
- * matching `profiles.agents.*` message under the field at fault. Every tool is
+ * matching `profiles.agents.*` message — or, for an over-long name or
+ * description, the `profiles.tooLong` bound — under the field at fault, and the
+ * typed values stay in the sheet. Every tool is
  * allowed unless its switch is off, which writes `deny` for that tool only.
  *
  * Sampling (max steps, temperature, top_p) mirrors the web editor. The effort
@@ -86,6 +93,9 @@ export function AgentFormSheet({
   const [disabledTools, setDisabledTools] = useState<readonly string[]>(initial.disabledTools);
   const [error, setError] = useState<AgentFormError | null>(null);
   const { models } = useAvailableModels(organizationId);
+  const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<
+    'slug' | 'name' | 'description'
+  >();
 
   const variantsFor = (model: string): readonly string[] =>
     models.find(option => option.id === model.trim())?.variants ?? [];
@@ -126,6 +136,7 @@ export function AgentFormSheet({
     const problem = validateAgentForm(state, existingSlugs);
     if (problem !== null) {
       setError(problem);
+      scrollToField(ERROR_FIELDS[problem]);
       return;
     }
     setError(null);
@@ -143,6 +154,7 @@ export function AgentFormSheet({
         topInset="ios-page-sheet"
       />
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
         contentContainerClassName="gap-4 px-6 pt-4 pb-8"
         keyboardShouldPersistTaps="handled"
@@ -152,31 +164,32 @@ export function AgentFormSheet({
         <FormField
           label={t('profiles.agents.slug')}
           defaultValue={initial.slug}
-          error={
-            error === 'slug-required' ||
-            error === 'slug-invalid' ||
-            error === 'slug-conflict' ||
-            (slugConflictFromServer && error === null)
-              ? t(ERROR_KEYS[error ?? 'slug-conflict'])
-              : undefined
-          }
+          error={slugFieldError(t, error, slugConflictFromServer)}
           disabled={isSaving}
           required
           autoCapitalize="none"
           autoCorrect={false}
           placeholder={t('profiles.agents.slugPlaceholder')}
+          containerOnLayout={fieldLayout('slug')}
           onChangeText={value => {
-            slugRef.current = value.toLowerCase().replaceAll(/[^a-z0-9-]/g, '');
+            // Kept exactly as typed: a silent rewrite would save a slug the
+            // reader never entered, and an invalid one is refused with the rule.
+            slugRef.current = value;
             setError(null);
           }}
         />
         <FormField
           label={t('profiles.agents.name')}
           defaultValue={initial.name}
-          error={error === 'name-required' ? t(ERROR_KEYS[error]) : undefined}
+          error={
+            error === 'name-required' || error === 'name-too-long'
+              ? agentErrorText(t, error)
+              : undefined
+          }
           disabled={isSaving}
           required
           placeholder={t('profiles.agents.namePlaceholder')}
+          containerOnLayout={fieldLayout('name')}
           onChangeText={value => {
             nameRef.current = value;
             setError(null);
@@ -185,10 +198,13 @@ export function AgentFormSheet({
         <FormField
           label={t('profiles.agents.description')}
           defaultValue={initial.description}
+          error={error === 'description-too-long' ? agentErrorText(t, error) : undefined}
           disabled={isSaving}
           placeholder={t('profiles.descriptionPlaceholder')}
+          containerOnLayout={fieldLayout('description')}
           onChangeText={value => {
             descriptionRef.current = value;
+            setError(null);
           }}
         />
         <FormField
@@ -197,7 +213,7 @@ export function AgentFormSheet({
           disabled={isSaving}
           multiline
           textAlignVertical="top"
-          className="min-h-28 leading-5"
+          className="min-h-28 max-h-52 leading-[1.25rem]"
           autoCapitalize="none"
           autoCorrect={false}
           placeholder={t('profiles.agents.promptPlaceholder')}
@@ -275,8 +291,7 @@ export function AgentFormSheet({
                     'min-h-11 flex-row items-center rounded-md px-3 active:opacity-70',
                     selected && 'bg-secondary'
                   )}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: selected }}
+                  {...selectableRowA11y({ multi: false, selected })}
                   accessibilityLabel={t(option.labelKey)}
                   onPress={() => {
                     setVisibility(option.value);

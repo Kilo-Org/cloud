@@ -11,6 +11,7 @@ import {
   pressDelete,
   pressSave,
   rerenderScreen,
+  resetOverviewState,
   testProfile,
   type TestProfileDetail,
 } from '@/components/profiles/profile-overview-screen.test-helpers';
@@ -40,6 +41,10 @@ const h = vi.hoisted(() => ({
   },
 }));
 
+vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
+  useCanManageOrganizationProfiles: () => true,
+}));
+
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfile: () => h.query,
   useAgentProfileMutations: () => h.mutations,
@@ -52,6 +57,7 @@ vi.mock('sonner-native', () => ({ toast: { success: h.success, error: h.error } 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: h.back, push: h.push, replace: h.replace }),
 }));
+vi.mock('@/lib/navigation/pop-when-focused', () => ({ usePopWhenFocused: () => h.back }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     agentProfiles: {
@@ -117,14 +123,7 @@ describe('ProfileOverviewScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     h.connectivity = 'online';
-    Object.assign(h.query, {
-      data: undefined,
-      isError: false,
-      isPending: true,
-      isRefetching: false,
-    });
-    Object.assign(h.mutations.update, { isPending: false });
-    Object.assign(h.mutations.deleteProfile, { isPending: false });
+    resetOverviewState(h);
   });
 
   it('loading: renders skeleton rows and no content rows', async () => {
@@ -164,9 +163,7 @@ describe('ProfileOverviewScreen', () => {
 
     const queryError = findOne(renderer.root, 'QueryError');
     expect(queryError.props.title).toBe("Couldn't load profiles");
-    act(() => {
-      (queryError.props as { onRetry: () => void }).onRetry();
-    });
+    act(queryError.props.onRetry as () => void);
     expect(h.query.refetch).toHaveBeenCalledTimes(1);
   });
 
@@ -319,9 +316,8 @@ describe('ProfileOverviewScreen', () => {
     expect(h.mutations.deleteProfile.mutateAsync.mock.calls[0]?.[0]).toEqual({
       profileId: 'profile-1',
     });
-    await waitFor(() => h.success.mock.calls.length > 0);
-    expect(h.success).toHaveBeenCalledWith('Profile "Backend debugging" deleted');
     await waitFor(() => h.back.mock.calls.length > 0);
+    expect(h.back).toHaveBeenCalledTimes(1);
   });
 
   it('non-retryable: a PRECONDITION_FAILED delete shows deleteBlocked and stays', async () => {

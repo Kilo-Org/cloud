@@ -1,4 +1,5 @@
 import { type Href, Stack } from 'expo-router';
+import { appSceneLayout } from '@/components/app-screen-layout';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import {
@@ -25,7 +26,7 @@ export default function CodeReviewerPlatformLayout() {
 
   return (
     <ReviewerRouteParamsProvider params={params}>
-      <Stack screenOptions={{ headerShown: false }} />
+      <Stack screenLayout={appSceneLayout} screenOptions={{ headerShown: false }} />
     </ReviewerRouteParamsProvider>
   );
 }

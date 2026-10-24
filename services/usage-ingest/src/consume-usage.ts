@@ -25,12 +25,17 @@ async function processQueue(batch: MessageBatch<unknown>, env: Env): Promise<voi
       outcome = { kind: 'unavailable', reason: 'invalid_event' };
     } else {
       const writerStartedAt = performance.now();
-      outcome = await recordUsage(parsed.data, {
-        url: env.USAGE_WRITER_URL,
-        secret: env.USAGE_WRITER_SECRET,
-        protectionBypass: env.USAGE_WRITER_PROTECTION_BYPASS,
-        source: 'queue',
-      });
+      const relay = env.USAGE_WRITER_RELAY;
+      outcome = await recordUsage(
+        parsed.data,
+        {
+          url: env.USAGE_WRITER_URL,
+          secret: env.USAGE_WRITER_SECRET,
+          protectionBypass: env.USAGE_WRITER_PROTECTION_BYPASS,
+          source: 'queue',
+        },
+        relay ? relay.fetch.bind(relay) : undefined
+      );
       if (outcome.kind !== 'unavailable' || outcome.reason !== 'missing_config') {
         writerDurationMs = Math.round(performance.now() - writerStartedAt);
       }

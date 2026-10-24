@@ -70,7 +70,7 @@ describe('briefing model pricing', () => {
           stream: false,
         },
         2_000_000,
-        'openrouter'
+        { id: 'openrouter', userFunded: false }
       )
     ).resolves.toMatchObject({ refusal: null });
     await expect(briefingPriceBound(aion.id, 'Overnight activity', 1)).rejects.toThrow(
@@ -108,7 +108,7 @@ describe('briefing model pricing', () => {
           stream: false,
         },
         2_000_000,
-        'openrouter'
+        { id: 'openrouter', userFunded: false }
       )
     ).resolves.toMatchObject({ refusal: null });
   });
@@ -212,6 +212,45 @@ describe('briefing model pricing', () => {
 
     expect(quote.inputRate).toBe(0.0000001);
     expect(quote.outputRate).toBe(0.0000004);
+  });
+  it('keeps a missing alias target unavailable in both the quote and gateway admission', async () => {
+    const alias = catalogModel('~vendor/model-latest', {
+      prompt: '0.0000001',
+      completion: '0.0000002',
+    });
+    const targetId = 'vendor/model';
+    jest
+      .mocked(getRawOpenRouterModels)
+      .mockResolvedValue({ data: [alias] } satisfies OpenRouterModelsResponse);
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
+      [alias.id]: {
+        id: alias.id,
+        name: alias.name,
+        alias_target: { slug: targetId },
+        endpoints: [],
+      } satisfies StoredModel,
+    });
+
+    await expect(briefingPriceBound(alias.id, 'Overnight activity', 2_000_000)).rejects.toThrow(
+      'model_pricing_unavailable'
+    );
+    await expect(
+      enforceRequestCostLimit(
+        '2000000',
+        alias.id,
+        {
+          model: alias.id,
+          messages: [{ role: 'user', content: 'Overnight activity' }],
+          max_tokens: 64,
+          stream: false,
+        },
+        2_000_000,
+        { id: 'openrouter', userFunded: false }
+      )
+    ).resolves.toMatchObject({
+      refusal: expect.stringMatching(/pricing/),
+      providerConfig: null,
+    });
   });
 });
 it('redacts credentials and retains outcome evidence and source links within the input limit', () => {

@@ -148,6 +148,8 @@ pnpm dev:env
 
 The setup covers: `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `POSTGRES_URL`, `CALLBACK_TOKEN_SECRET`, `BYOK_ENCRYPTION_KEY`, `INTERNAL_API_SECRET`, `STRIPE_SECRET_KEY`, and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`.
 
+It also provisions the credential-envelope keypairs that the code-review providers need. The GitHub user-token and Bitbucket/GitLab platform-credential envelopes each keep a public half in the web app and a private half in `git-token-service`, so setup generates a local 4096-bit RSA keypair for each one that is unconfigured and writes the key ID plus both halves into `.env.local`; `pnpm dev:env` copies the private halves into the Worker's `.dev.vars`. Values that already exist are kept, read from `.env.local` first and from the Worker's `.dev.vars` second, so re-running setup neither rotates a keypair the Worker already stored credentials under nor drops a half that lives only in the Worker file. Without a complete pair the web app still reports a connected provider, but every review read answers 503 from the Worker.
+
 These changes will allow you to do local testing with a fake account.
 
 #### c. Add or rotate shared web environment variables
@@ -160,9 +162,9 @@ pnpm web:env set EXAMPLE_API_TOKEN
 
 Prerequisites:
 
-- Sign in with `vercel login` and have access to the projects in the `kilocode` scope.
+- Sign in with `pnpm exec vercel login` and have access to the projects in the `kilocode` scope.
 - Install the 1Password CLI and have write access to the `Kilo Web ENV Production` vault. If needed, the CLI prompts you to sign in with Touch ID.
-- Have `pnpm` available; the command runs the pinned Vercel CLI with `pnpm dlx`.
+- Run `pnpm install --frozen-lockfile` in the checkout first. The command uses the workspace Vercel CLI via `pnpm exec vercel`; verify access with `pnpm exec vercel whoami --scope kilocode --format=json`.
 
 The command asks whether the variable is sensitive, defaulting to yes. Sensitive Production and Staging values use Vercel's sensitive type, while Development remains encrypted but exportable through `vercel env pull`. The Production and Staging values are also stored in one concealed, exact-name item in `Kilo Web ENV Production`: Production uses the built-in `password` field and Staging uses `password (staging)`. Either field can be created before the other. The item's notes identify the local user and computer that last updated it.
 
@@ -222,6 +224,7 @@ pnpm dev:start
 ```
 
 This generates the local environment files and launches a tmux dashboard with the Next.js app and local infrastructure. It does not run database migrations.
+It also starts `git-token-service`, because every code-review read and write resolves the caller's GitHub, GitLab or Bitbucket credential through that Worker; without it the web app reports a connected provider while the review inbox and overview fail as a service outage.
 Port offset selection is automatic by default, keeping secondary worktrees from colliding with the root checkout. This setup order assumes no port conflicts; if startup selects a different offset, run `pnpm test:db` again in another terminal in the same worktree.
 When the Stripe CLI is installed, the command also starts the Stripe webhook forwarder. Run `pnpm dev:status` to get the web app's port.
 
@@ -523,6 +526,13 @@ Infrastructure containers (`postgres` on 5432, `redis` on 6379, `redis-http` on 
 
 The Next.js dev script reads `REDIS_URL` and `UPSTASH_REDIS_REST_URL` from the shell, then from the env files, and falls back to `redis://localhost:6379` and `http://localhost:8079`. It also exports `UPSTASH_REDIS_REST_TOKEN=example_token` for the shared `@upstash/redis` REST helper; `REDIS_URL` serves Chat SDK state because `@chat-adapter/state-redis` uses the Redis TCP protocol.
 
+## Admin webhook inspection
+
+Webhook request records and request logs use the session-viewer permission contract
+(`is_admin` and `can_view_sessions`). Local admin fixtures used to inspect these
+records must have both flags enabled. This applies to personal and organization
+triggers.
+
 ## First credit-pack purchase email
 
 The backend schedules one marketing email after the first production credit-pack purchase, across Apple and Google combined.
@@ -593,7 +603,7 @@ The backend owns scheduling, report revisions, optional paid summaries, and noti
 AI summaries and briefing notifications require separate opt-ins.
 Summary settings include a model override and finite generation time and spend limits.
 Summary estimates and gateway spend admission use the model picker’s configured preferred-provider price, falling back to catalog pricing when no matching route exists.
-Bounded OpenRouter requests enforce `provider.max_price` for prompt/completion rates (USD per million tokens) and per-request fees, preserving provider allow-lists, exclusions, and stricter caller price caps.
+Bounded OpenRouter requests enforce `provider.max_price` for prompt/completion rates (USD per million tokens) and per-request fees, preserving provider allow-lists, exclusions, and stricter caller price caps. Bounded requests routed through providers that cannot enforce that ceiling are refused before upstream generation.
 Tiered custom and Kilo-exclusive pricing uses the highest tier reachable from the request’s bounded input length.
 The default summary model is `~deepseek/deepseek-flash-latest`.
 Pricing estimates and gateway spend checks resolve latest-model aliases through the stored catalog target.
@@ -604,6 +614,15 @@ The structured report remains available when generation fails or reaches a limit
 Apply database migrations before deploying the session-ingest, notification, gateway, and web changes.
 The CLI status producer must send occurrence timestamps and transition identities for reliable historical blocker counts.
 Legacy activity remains readable with partial coverage; unknown values must not appear as confirmed zeroes.
+
+Report display contracts allow 64 sessions, 256 sources, and 32 sources per session.
+Titles use 160 characters, URLs 2048, and excerpts 600. Scheduled collection selects
+the latest 2048 activity events and 2048 usage records, with up to 256 session ancestry lookups.
+Session selection favors recent activity and sampled evidence carries partial coverage.
+Scorecards describe the collected evidence. Scheduled refresh replaces facts using current collection.
+One-off period sampling and the summary model's 16-source/24-session selection remain independent.
+History pages allow up to 100 reports within a 3 MB JSON response budget.
+Stored reports must satisfy the shared contract; unreadable records are skipped during pagination.
 
 The protected cron routes are `/api/cron/agent-briefing` and `/api/cron/agent-briefing-summaries`.
 They use the existing cron authorization, database, gateway, and notification configuration.

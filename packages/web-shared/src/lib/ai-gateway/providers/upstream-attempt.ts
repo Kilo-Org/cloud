@@ -90,7 +90,10 @@ export async function sendUpstreamAttempt({
       requestedModel,
       request.body,
       costLimit.availableBalanceMicrodollars,
-      providerContext.provider.id
+      {
+        id: providerContext.provider.id,
+        userFunded: providerContext.userByok !== null,
+      }
     );
     if (decision.refusal)
       return {

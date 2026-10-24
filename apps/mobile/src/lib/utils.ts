@@ -10,8 +10,6 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-const EMAIL_PATTERN = /.+@.+\..+/;
-
 // Ordered largest-first so the first unit whose bucket fits wins; the values
 // mirror the original minute/hour/day/month/year buckets.
 const RELATIVE_TIME_UNITS: readonly { unit: Intl.RelativeTimeFormatUnit; seconds: number }[] = [
@@ -76,4 +74,4 @@ function capitalize(value: string): string {
   return first.toLocaleUpperCase(i18n.language) + value.slice(first.length);
 }
 
-export { asyncNoop, capitalize, cn, EMAIL_PATTERN, firstNonEmpty, parseTimestamp, pick, timeAgo };
+export { asyncNoop, capitalize, cn, firstNonEmpty, parseTimestamp, pick, timeAgo };

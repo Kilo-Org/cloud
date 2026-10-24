@@ -58,7 +58,7 @@ import { StateSurface } from '@/components/centered-state-surface';
 import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
 import { RuntimeErrorScreen } from '@/components/runtime-error-screen';
 import { splashContentScale } from '@/components/splash-reveal';
-import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
+import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { MotionProvider } from '@/lib/a11y/motion';
 import { useAuth } from '@/lib/auth/auth-context';
 import { resolveBootstrapDecision, shouldShowBootstrapLoading } from '@/lib/bootstrap-decision';
@@ -68,7 +68,7 @@ import { subscribeToConsentChanges } from '@/lib/consent';
 import { shouldStartAnalytics } from '@/lib/analytics-consent';
 import { isPostHogReady, subscribeToPostHogReady } from '@/lib/analytics/posthog';
 import { drainStartupTimings } from '@/lib/startup-drain';
-import { markStartup, markStartupComplete } from '@/lib/startup-timing';
+import { isStartupComplete, markStartup, markStartupComplete } from '@/lib/startup-timing';
 import { prefetchCurrentUser } from '@/lib/startup-prefetch';
 import { useAnalyticsConsentGate } from '@/lib/hooks/use-analytics-consent-gate';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
@@ -130,6 +130,7 @@ import {
   consumeLastRouteForRepair,
   getLastRouteHydrationVersion,
   isLastRouteHydrated,
+  prepareLastRouteRepair,
   subscribeLastRoute,
 } from '@/lib/last-route';
 import { shouldRepairRestoredRoute } from '@/lib/last-route-repair';
@@ -283,9 +284,8 @@ function RootLayoutNav({
   const [optionalConsent, setOptionalConsentState] = useState(false);
   const [consentCheckError, setConsentCheckError] = useState<unknown>(null);
   const [consentCheckRetryKey, setConsentCheckRetryKey] = useState(0);
-  // Flipped by every splash-hide site below, so the app_startup drain can
-  // depend on "startup finished" as an ordinary dependency.
-  const [startupFinished, setStartupFinished] = useState(false);
+  // A recreated activity has no splash once this runtime completed startup.
+  const [startupFinished, setStartupFinished] = useState(isStartupComplete);
   // Reactive snapshot so the drain effect re-triggers when the PostHog
   // client becomes ready after async init.
   const postHogReady = useSyncExternalStore(subscribeToPostHogReady, isPostHogReady);
@@ -1119,11 +1119,11 @@ function RootLayoutNav({
   // Hidden root-route entry contract (D17): while `hidden`, the wrapper leaves
   // both accessibility trees. On the hidden → visible transition,
   // `announceForA11y` is the deterministic entry context for screen-reader
-  // users, and the wrapper focus is best-effort (`moveA11yFocus` returns false
-  // when the platform declines — no retry), deferred to the next frame so the
-  // revealed tree is measurable. Per-screen heading/first-control focus is
-  // owned by the screens themselves; the gate cannot know the active screen's
-  // heading.
+  // users, and the wrapper focus is best-effort (`requestA11yFocus` returns false
+  // only when the wrapper has no node yet or the native call throws — no retry),
+  // deferred to the next frame so the revealed tree is measurable. Per-screen
+  // heading/first-control focus is owned by the screens themselves; the gate
+  // cannot know the active screen's heading.
   //
   // The transition is skipped while a bootstrap error is shown: the wrapper
   // is unmounted then (the error screen replaces it), so "Content ready"
@@ -1141,7 +1141,7 @@ function RootLayoutNav({
     }
     announceForA11y(i18n.t('bootstrap.contentReady'));
     const frame = requestAnimationFrame(() => {
-      moveA11yFocus(wrapperRef);
+      requestA11yFocus(wrapperRef);
     });
     return () => {
       cancelAnimationFrame(frame);
@@ -1385,7 +1385,14 @@ function RootLayout() {
 }
 
 function RootErrorBoundary({ retry }: ErrorBoundaryProps) {
-  return <RuntimeErrorScreen onRetry={() => void retry()} />;
+  return (
+    <RuntimeErrorScreen
+      onRetry={() => {
+        prepareLastRouteRepair();
+        void retry();
+      }}
+    />
+  );
 }
 
 export const ErrorBoundary = Sentry.wrapExpoRouterErrorBoundary(RootErrorBoundary);

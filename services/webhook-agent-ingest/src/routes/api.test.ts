@@ -639,3 +639,66 @@ describe('request routes for paused triggers', () => {
     expect(deleteTrigger).not.toHaveBeenCalled();
   });
 });
+
+describe('optional profile and body schema configuration', () => {
+  const input = {
+    githubRepo: 'owner/repo',
+    mode: 'code',
+    model: 'model',
+    promptTemplate: '{{body}}',
+  };
+  const bodySchema = {
+    type: 'object',
+    properties: { name: { type: 'string', const: 'accepted' } },
+  };
+  it('accepts no profile and explicit profile clearing', () => {
+    expect(TriggerConfigInput.safeParse(input).success).toBe(true);
+    expect(TriggerConfigInput.safeParse({ ...input, profileId: null }).success).toBe(true);
+    expect(TriggerConfigUpdateInput.parse({ profileId: null })).toEqual({ profileId: null });
+  });
+  it('accepts supported schemas and explicit null clearing', () => {
+    expect(TriggerConfigInput.parse({ ...input, bodySchema }).bodySchema).toEqual(bodySchema);
+    expect(TriggerConfigUpdateInput.parse({ bodySchema: null })).toEqual({ bodySchema: null });
+  });
+  it.each([{ pattern: '[' }, { $ref: 'https://example.com/schema' }, { format: 'email' }])(
+    'rejects malformed schemas: %j',
+    bodySchema => {
+      expect(TriggerConfigInput.safeParse({ ...input, bodySchema }).success).toBe(false);
+      expect(TriggerConfigUpdateInput.safeParse({ bodySchema }).success).toBe(false);
+    }
+  );
+  it('rejects schemas for scheduled and KiloClaw targets', () => {
+    expect(
+      TriggerConfigInput.safeParse({
+        ...input,
+        activationMode: 'scheduled',
+        cronExpression: '* * * * *',
+        bodySchema,
+      }).success
+    ).toBe(false);
+    expect(
+      TriggerConfigInput.safeParse({
+        ...input,
+        targetType: 'kiloclaw_chat',
+        kiloclawInstanceId: '5d08c60b-7755-4dd3-b3fc-7ae96bf50e22',
+        bodySchema,
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('standard pattern configuration', () => {
+  it('accepts grouped and unanchored patterns on create and update', () => {
+    const bodySchema = { type: 'string', pattern: 'issue\\.(opened|closed)' };
+    expect(
+      TriggerConfigInput.safeParse({
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'model',
+        promptTemplate: '{{body}}',
+        bodySchema,
+      }).success
+    ).toBe(true);
+    expect(TriggerConfigUpdateInput.parse({ bodySchema })).toEqual({ bodySchema });
+  });
+});

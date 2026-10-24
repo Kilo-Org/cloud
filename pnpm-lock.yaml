@@ -2176,6 +2176,9 @@ importers:
 
   packages/worker-utils:
     dependencies:
+      '@cfworker/json-schema':
+        specifier: 'catalog:'
+        version: 4.1.1
       '@kilocode/app-shared':
         specifier: workspace:*
         version: link:../app-shared

@@ -53,6 +53,7 @@
     "connected": "Tilknyttet",
     "couldNotLoadModels": "Modellerne kunne ikke indlæses.",
     "couldNotLoadRepositories": "Kodelagrene kunne ikke indlæses.",
+    "noRepositoriesFound": "Ingen kodelagre fundet",
     "critical": "Kritisk",
     "delete": "Slet",
     "deleted": "Slettet",
@@ -87,6 +88,7 @@
     "connect": "Tilknyt",
     "connectBitbucket": "Tilknyt Bitbucket",
     "connectGitlab": "Tilknyt GitLab",
+    "connectProvider": "Tilslut en udbyder",
     "contentTruncated": "Indhold afkortet",
     "copyLink": "Kopiér link",
     "couldNotLoadOrganizations": "Organisationerne kunne ikke indlæses.",
@@ -145,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Ændringer"
+    "changes": "Ændringer",
+    "organizationTrialEnded": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. En ejer af organisationen kan opdatere betalingen på kilo.ai og derefter prøve igen."
   },
   "language": {
     "restarting": "Genstarter for at skifte sprog",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Du skal muligvis give adgang til flere grupper eller projekter på GitLab.",
       "installGithubApp": "Installér GitHub-appen på kodelagre",
       "installGithubAppDescription": "Giv Kilos GitHub-app adgang til de kodelagre, du vil have gennemgået.",
-      "noRepositoriesFound": "Ingen kodelagre fundet",
       "repositoryAccess": "adgang til kodelagre"
     },
     "style": {
@@ -1489,7 +1491,6 @@
       "invalidUrl": "Indtast en gyldig URL til en pull request.",
       "couldNotCheckProviderStatus": "Udbyderens status kunne ikke kontrolleres.",
       "couldNotLoadProviders": "Dine tilsluttede udbydere kunne ikke indlæses. Prøv igen.",
-      "connectProvider": "Tilslut en udbyder",
       "connectProviderDescription": "Tilslut GitHub for at starte en manuel gennemgang af en pull request.",
       "pullRequestUrl": "URL til pull request",
       "instructions": "Instruktioner (valgfrie)",
@@ -3168,7 +3169,9 @@
       "sendInvite": "Send invitation",
       "title": "Invitér medlem",
       "alreadyInvited": "Personen er allerede inviteret eller allerede medlem.",
-      "sendError": "Invitationen kunne ikke sendes."
+      "sendError": "Invitationen kunne ikke sendes.",
+      "pendingInvitation": "Denne e-mailadresse har allerede en afventende invitation.",
+      "alreadyMember": "Denne person er allerede medlem af denne organisation."
     },
     "invoices": {
       "downloadA11y": "Download faktura {{number}}",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "Ubesvarede invitationer",
       "resendInvite": "Send invitation igen",
       "shareInviteLink": "Del invitationslink",
-      "resendInviteError": "Invitationen kunne ikke sendes igen."
+      "resendInviteError": "Invitationen kunne ikke sendes igen.",
+      "inviteNotResendable": "Denne invitation kan ikke længere sendes igen.",
+      "ownerAuthority": "Kun en organisationsejer kan administrere ejere.",
+      "ownRoleChange": "Du kan ikke ændre din egen rolle.",
+      "inviteExpired": "Denne invitation er udløbet.",
+      "inviteAccepted": "Denne invitation er allerede blevet accepteret."
     },
     "usageStats": {
       "inputTokens": "Tokens i inddata",

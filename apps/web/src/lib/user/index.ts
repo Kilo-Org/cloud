@@ -1305,6 +1305,20 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(cloud_agent_webhook_triggers)
     .where(eq(cloud_agent_webhook_triggers.user_id, userId));
+  // Organization triggers can retain a creator's personal profile reference.
+  // Keep those triggers while releasing the profile FK before profile deletion.
+  await tx
+    .update(cloud_agent_webhook_triggers)
+    .set({ profile_id: null })
+    .where(
+      inArray(
+        cloud_agent_webhook_triggers.profile_id,
+        tx
+          .select({ id: agent_environment_profiles.id })
+          .from(agent_environment_profiles)
+          .where(eq(agent_environment_profiles.owned_by_user_id, userId))
+      )
+    );
   await tx
     .delete(agent_environment_profiles)
     .where(eq(agent_environment_profiles.owned_by_user_id, userId));

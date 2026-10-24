@@ -53,6 +53,7 @@
     "connected": "Pripojené",
     "couldNotLoadModels": "Nepodarilo sa načítať modely.",
     "couldNotLoadRepositories": "Nepodarilo sa načítať repozitáre.",
+    "noRepositoriesFound": "Nenašli sa žiadne repozitáre",
     "critical": "Kritická",
     "delete": "Odstrániť",
     "deleted": "Odstránené",
@@ -87,6 +88,7 @@
     "connect": "Pripojiť",
     "connectBitbucket": "Pripojiť Bitbucket",
     "connectGitlab": "Pripojiť GitLab",
+    "connectProvider": "Pripojte poskytovateľa",
     "contentTruncated": "Obsah skrátený",
     "copyLink": "Kopírovať odkaz",
     "couldNotLoadOrganizations": "Nepodarilo sa načítať organizácie.",
@@ -145,7 +147,8 @@
     "agent": "agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Zmeny"
+    "changes": "Zmeny",
+    "organizationTrialEnded": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Vlastník organizácie môže aktualizovať fakturáciu na kilo.ai a potom to skúsiť znova."
   },
   "language": {
     "restarting": "Aplikácia sa reštartuje na zmenu jazyka",
@@ -1451,7 +1454,6 @@
       "gitlabNoRepositoriesDescription": "Možno bude potrebné udeliť prístup k ďalším skupinám alebo projektom na platforme GitLab.",
       "installGithubApp": "Inštalácia aplikácie GitHub pre repozitáre",
       "installGithubAppDescription": "Udeľte aplikácii Kilo na platforme GitHub prístup k repozitárom, ktoré chcete kontrolovať.",
-      "noRepositoriesFound": "Nenašli sa žiadne repozitáre",
       "repositoryAccess": "prístup k repozitárom"
     },
     "style": {
@@ -1533,7 +1535,6 @@
       "invalidUrl": "Zadajte platnú URL adresu PR.",
       "couldNotCheckProviderStatus": "Stav poskytovateľa sa nepodarilo overiť.",
       "couldNotLoadProviders": "Pripojených poskytovateľov sa nepodarilo načítať. Skúste to znova.",
-      "connectProvider": "Pripojte poskytovateľa",
       "connectProviderDescription": "Pripojte GitHub, aby ste mohli spustiť manuálnu kontrolu PR.",
       "pullRequestUrl": "URL adresa PR",
       "instructions": "Pokyny (voliteľné)",
@@ -3256,7 +3257,9 @@
       "sendInvite": "Odoslať pozvánku",
       "title": "Pozvať člena",
       "alreadyInvited": "Táto osoba už bola pozvaná alebo už je členom.",
-      "sendError": "Pozvánku sa nepodarilo odoslať."
+      "sendError": "Pozvánku sa nepodarilo odoslať.",
+      "pendingInvitation": "Táto e-mailová adresa už má čakajúcu pozvánku.",
+      "alreadyMember": "Táto osoba je už členom tejto organizácie."
     },
     "invoices": {
       "downloadA11y": "Stiahnuť faktúru {{number}}",
@@ -3326,7 +3329,12 @@
       "pendingInvitations": "Čakajúce pozvánky",
       "resendInvite": "Znova odoslať pozvánku",
       "shareInviteLink": "Zdieľať odkaz na pozvánku",
-      "resendInviteError": "Pozvánku sa nepodarilo odoslať znova."
+      "resendInviteError": "Pozvánku sa nepodarilo odoslať znova.",
+      "inviteNotResendable": "Túto pozvánku už nemožno znova odoslať.",
+      "ownerAuthority": "Iba vlastník organizácie môže spravovať vlastníkov.",
+      "ownRoleChange": "Nemôžete si zmeniť vlastnú rolu.",
+      "inviteExpired": "Tejto pozvánke vypršila platnosť.",
+      "inviteAccepted": "Táto pozvánka už bola prijatá."
     },
     "usageStats": {
       "inputTokens": "Vstupné tokeny",

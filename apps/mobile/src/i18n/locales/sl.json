@@ -53,6 +53,7 @@
     "connected": "Povezano",
     "couldNotLoadModels": "Modelov ni bilo mogoče naložiti.",
     "couldNotLoadRepositories": "Repozitorijev ni bilo mogoče naložiti.",
+    "noRepositoriesFound": "Ni najdenih skladišč",
     "critical": "Kritično",
     "delete": "Izbriši",
     "deleted": "Izbrisano",
@@ -87,6 +88,7 @@
     "connect": "Poveži",
     "connectBitbucket": "Poveži Bitbucket",
     "connectGitlab": "Poveži GitLab",
+    "connectProvider": "Poveži ponudnika",
     "contentTruncated": "Vsebina skrajšana",
     "copyLink": "Kopiraj povezavo",
     "couldNotLoadOrganizations": "Organizacij ni bilo mogoče naložiti.",
@@ -145,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Spremembe"
+    "changes": "Spremembe",
+    "organizationTrialEnded": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Lastnik organizacije lahko posodobi obračun na kilo.ai, nato poskusi znova."
   },
   "language": {
     "restarting": "Ponovni zagon za spremembo jezika",
@@ -510,7 +513,7 @@
       "unresolveThread": "Prekliči razrešitev niti",
       "resolved": "Razrešeno",
       "outdated": "Zastarelo",
-      "comment_one": "1 komentar",
+      "comment_one": "{{displayCount}} komentar",
       "comment": "{{displayCount}} komentarjev",
       "comment_other": "{{displayCount}} komentarjev",
       "startedRelative": " · začeto {{relative}}",
@@ -1451,7 +1454,6 @@
       "gitlabNoRepositoriesDescription": "Morda moraš odobriti dostop do več skupin ali projektov na platformi GitLab.",
       "installGithubApp": "Namestitev aplikacije GitHub v skladišča",
       "installGithubAppDescription": "Aplikaciji Kilo za GitHub odobri dostop do skladišč, ki jih želiš pregledati.",
-      "noRepositoriesFound": "Ni najdenih skladišč",
       "repositoryAccess": "dostop do skladišč"
     },
     "style": {
@@ -1533,7 +1535,6 @@
       "invalidUrl": "Vnesi veljaven URL zahteve za združitev.",
       "couldNotCheckProviderStatus": "Stanja ponudnika ni bilo mogoče preveriti.",
       "couldNotLoadProviders": "Povezanih ponudnikov ni bilo mogoče naložiti. Poskusi znova.",
-      "connectProvider": "Poveži ponudnika",
       "connectProviderDescription": "Poveži GitHub, da začneš ročni pregled zahteve za združitev.",
       "pullRequestUrl": "URL zahteve za združitev",
       "instructions": "Navodila (neobvezno)",
@@ -3256,7 +3257,9 @@
       "sendInvite": "Pošlji povabilo",
       "title": "Povabi člana",
       "alreadyInvited": "Ta oseba je že povabljena ali že član organizacije.",
-      "sendError": "Povabila ni bilo mogoče poslati."
+      "sendError": "Povabila ni bilo mogoče poslati.",
+      "pendingInvitation": "Ta e-poštni naslov že ima čakajoče povabilo.",
+      "alreadyMember": "Ta oseba je že član te organizacije."
     },
     "invoices": {
       "downloadA11y": "Prenesi račun {{number}}",
@@ -3326,7 +3329,12 @@
       "pendingInvitations": "Čakajoča povabila",
       "resendInvite": "Ponovno pošlji povabilo",
       "shareInviteLink": "Deli povezavo do povabila",
-      "resendInviteError": "Povabila ni bilo mogoče ponovno poslati."
+      "resendInviteError": "Povabila ni bilo mogoče ponovno poslati.",
+      "inviteNotResendable": "Tega povabila ni več mogoče ponovno poslati.",
+      "ownerAuthority": "Samo lastnik organizacije lahko upravlja z lastniki.",
+      "ownRoleChange": "Svoje vloge ne morete spremeniti.",
+      "inviteExpired": "To povabilo je poteklo.",
+      "inviteAccepted": "To povabilo je bilo že sprejeto."
     },
     "usageStats": {
       "inputTokens": "Vhodni žetoni",

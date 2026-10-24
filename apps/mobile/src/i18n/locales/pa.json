@@ -53,6 +53,7 @@
     "connected": "ਜੁੜਿਆ ਹੋਇਆ",
     "couldNotLoadModels": "ਮਾਡਲ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
     "couldNotLoadRepositories": "ਰਿਪੋਜ਼ਿਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
+    "noRepositoriesFound": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਨਹੀਂ ਮਿਲੀ",
     "critical": "ਅਤਿ ਗੰਭੀਰ",
     "delete": "ਮਿਟਾਓ",
     "deleted": "ਮਿਟਾਈ ਗਈ",
@@ -87,6 +88,7 @@
     "connect": "ਜੋੜੋ",
     "connectBitbucket": "Bitbucket ਨਾਲ ਜੋੜੋ",
     "connectGitlab": "GitLab ਨਾਲ ਜੋੜੋ",
+    "connectProvider": "ਇੱਕ ਪ੍ਰਦਾਤਾ ਕਨੈਕਟ ਕਰੋ",
     "contentTruncated": "ਸਮੱਗਰੀ ਦਾ ਕੁਝ ਹਿੱਸਾ ਕੱਟਿਆ ਗਿਆ",
     "copyLink": "ਲਿੰਕ ਕਾਪੀ ਕਰੋ",
     "couldNotLoadOrganizations": "ਸੰਸਥਾਵਾਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
@@ -145,7 +147,8 @@
     "agent": "ਏਜੰਟ",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "ਤਬਦੀਲੀਆਂ"
+    "changes": "ਤਬਦੀਲੀਆਂ",
+    "organizationTrialEnded": "ਸੰਸਥਾ ਦਾ ਟ੍ਰਾਇਲ ਖਤਮ ਹੋ ਗਿਆ ਹੈ ਅਤੇ ਇਸਦੀ ਕੋਈ ਸਰਗਰਮ ਯੋਜਨਾ ਨਹੀਂ ਹੈ। ਸੰਸਥਾ ਦਾ ਮਾਲਕ kilo.ai 'ਤੇ ਬਿਲਿੰਗ ਅੱਪਡੇਟ ਕਰ ਸਕਦਾ ਹੈ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
   },
   "language": {
     "restarting": "ਭਾਸ਼ਾ ਲਾਗੂ ਕਰਨ ਲਈ ਮੁੜ ਚਾਲੂ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "ਤੁਹਾਨੂੰ GitLab 'ਤੇ ਹੋਰ ਸਮੂਹਾਂ ਜਾਂ ਪ੍ਰੋਜੈਕਟਾਂ ਤੱਕ ਪਹੁੰਚ ਦੇਣ ਦੀ ਲੋੜ ਹੋ ਸਕਦੀ ਹੈ।",
       "installGithubApp": "ਰਿਪੋਜ਼ਟਰੀਆਂ 'ਤੇ GitHub ਐਪ ਸਥਾਪਤ ਕਰੋ",
       "installGithubAppDescription": "Kilo GitHub ਐਪ ਨੂੰ ਉਨ੍ਹਾਂ ਰਿਪੋਜ਼ਟਰੀਆਂ ਤੱਕ ਪਹੁੰਚ ਦਿਓ ਜਿਨ੍ਹਾਂ ਦੀ ਤੁਸੀਂ ਸਮੀਖਿਆ ਕਰਵਾਉਣੀ ਚਾਹੁੰਦੇ ਹੋ।",
-      "noRepositoriesFound": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਨਹੀਂ ਮਿਲੀ",
       "repositoryAccess": "ਰਿਪੋਜ਼ਟਰੀ ਤੱਕ ਪਹੁੰਚ"
     },
     "style": {
@@ -1489,7 +1491,6 @@
       "invalidUrl": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਦਾ ਵੈਧ URL ਦਰਜ ਕਰੋ।",
       "couldNotCheckProviderStatus": "ਪ੍ਰਦਾਤਾ ਦੀ ਸਥਿਤੀ ਦੀ ਜਾਂਚ ਨਹੀਂ ਹੋ ਸਕੀ।",
       "couldNotLoadProviders": "ਅਸੀਂ ਤੁਹਾਡੇ ਕਨੈਕਟ ਕੀਤੇ ਪ੍ਰਦਾਤਾਵਾਂ ਨੂੰ ਲੋਡ ਨਹੀਂ ਕਰ ਸਕੇ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-      "connectProvider": "ਇੱਕ ਪ੍ਰਦਾਤਾ ਕਨੈਕਟ ਕਰੋ",
       "connectProviderDescription": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਦੀ ਦਸਤੀ ਸਮੀਖਿਆ ਸ਼ੁਰੂ ਕਰਨ ਲਈ GitHub ਕਨੈਕਟ ਕਰੋ।",
       "pullRequestUrl": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਦਾ URL",
       "instructions": "ਹਦਾਇਤਾਂ (ਵਿਕਲਪਿਕ)",
@@ -3168,7 +3169,9 @@
       "sendInvite": "ਸੱਦਾ ਭੇਜੋ",
       "title": "ਮੈਂਬਰ ਨੂੰ ਸੱਦਾ ਦਿਓ",
       "alreadyInvited": "ਉਹ ਪਹਿਲਾਂ ਹੀ ਸੱਦਿਆ ਹੋਇਆ ਹੈ ਜਾਂ ਪਹਿਲਾਂ ਹੀ ਮੈਂਬਰ ਹੈ।",
-      "sendError": "ਸੱਦਾ ਭੇਜਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।"
+      "sendError": "ਸੱਦਾ ਭੇਜਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
+      "pendingInvitation": "ਇਸ ਈਮੇਲ ਲਈ ਪਹਿਲਾਂ ਹੀ ਇੱਕ ਸੱਦਾ ਬਕਾਇਆ ਹੈ।",
+      "alreadyMember": "ਇਹ ਵਿਅਕਤੀ ਪਹਿਲਾਂ ਹੀ ਇਸ ਸੰਸਥਾ ਦਾ ਮੈਂਬਰ ਹੈ।"
     },
     "invoices": {
       "downloadA11y": "ਇਨਵੌਇਸ {{number}} ਡਾਊਨਲੋਡ ਕਰੋ",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "ਜਵਾਬ ਦੀ ਉਡੀਕ ਵਾਲੇ ਸੱਦੇ",
       "resendInvite": "ਸੱਦਾ ਦੁਬਾਰਾ ਭੇਜੋ",
       "shareInviteLink": "ਸੱਦੇ ਦਾ ਲਿੰਕ ਸਾਂਝਾ ਕਰੋ",
-      "resendInviteError": "ਸੱਦਾ ਦੁਬਾਰਾ ਭੇਜਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।"
+      "resendInviteError": "ਸੱਦਾ ਦੁਬਾਰਾ ਭੇਜਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
+      "inviteNotResendable": "ਇਹ ਸੱਦਾ ਹੁਣ ਦੁਬਾਰਾ ਨਹੀਂ ਭੇਜਿਆ ਜਾ ਸਕਦਾ।",
+      "ownerAuthority": "ਸਿਰਫ਼ ਸੰਗਠਨ ਦਾ ਮਾਲਕ ਹੀ ਮਾਲਕਾਂ ਦਾ ਪ੍ਰਬੰਧਨ ਕਰ ਸਕਦਾ ਹੈ।",
+      "ownRoleChange": "ਤੁਸੀਂ ਆਪਣੀ ਭੂਮਿਕਾ ਨਹੀਂ ਬਦਲ ਸਕਦੇ।",
+      "inviteExpired": "ਇਹ ਸੱਦਾ ਮਿਆਦ ਪੁੱਗ ਗਿਆ ਹੈ।",
+      "inviteAccepted": "ਇਹ ਸੱਦਾ ਪਹਿਲਾਂ ਹੀ ਸਵੀਕਾਰ ਕੀਤਾ ਜਾ ਚੁੱਕਾ ਹੈ।"
     },
     "usageStats": {
       "inputTokens": "ਇਨਪੁੱਟ ਟੋਕਨ",

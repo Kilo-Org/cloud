@@ -53,6 +53,7 @@
     "connected": "Connecté",
     "couldNotLoadModels": "Impossible de charger les modèles.",
     "couldNotLoadRepositories": "Impossible de charger les dépôts.",
+    "noRepositoriesFound": "Aucun dépôt trouvé",
     "critical": "Critique",
     "delete": "Supprimer",
     "deleted": "Supprimé",
@@ -87,6 +88,7 @@
     "connect": "Connecter",
     "connectBitbucket": "Connecter Bitbucket",
     "connectGitlab": "Connecter GitLab",
+    "connectProvider": "Connecter un fournisseur",
     "contentTruncated": "Contenu tronqué",
     "copyLink": "Copier le lien",
     "couldNotLoadOrganizations": "Impossible de charger les organisations.",
@@ -145,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Modifications"
+    "changes": "Modifications",
+    "organizationTrialEnded": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Le propriétaire de l'organisation peut mettre à jour la facturation sur kilo.ai, puis réessayer."
   },
   "language": {
     "restarting": "Redémarrage pour changer de langue",
@@ -854,7 +857,6 @@
       "gitlabNoRepositoriesDescription": "Vous devrez peut-être accorder l'accès à d'autres groupes ou projets sur GitLab.",
       "installGithubApp": "Installer l'application GitHub sur les dépôts",
       "installGithubAppDescription": "Accordez à l'application GitHub de Kilo l'accès aux dépôts dont vous souhaitez faire examiner le code.",
-      "noRepositoriesFound": "Aucun dépôt trouvé",
       "repositoryAccess": "accès au dépôt"
     },
     "style": {
@@ -878,7 +880,6 @@
     "followReviewMd": "Suivre les consignes de REVIEW.md",
     "followReviewMdSubtitle": "Respecter les fichiers d'instructions REVIEW.md de chaque dépôt",
     "manualReview": {
-      "connectProvider": "Connecter un fournisseur",
       "connectProviderDescription": "Connectez GitHub pour lancer une revue manuelle d'une demande de fusion.",
       "couldNotCheckProviderStatus": "Impossible de vérifier l'état du fournisseur.",
       "couldNotLoadProviders": "Impossible de charger les fournisseurs connectés à votre compte. Réessayez.",
@@ -3211,7 +3212,9 @@
       "sendInvite": "Envoyer l'invitation",
       "title": "Inviter un membre",
       "alreadyInvited": "Cette adresse a déjà reçu une invitation ou appartient déjà à un membre.",
-      "sendError": "Impossible d'envoyer l'invitation."
+      "sendError": "Impossible d'envoyer l'invitation.",
+      "pendingInvitation": "Cette adresse e-mail a déjà une invitation en attente.",
+      "alreadyMember": "Cette personne est déjà membre de cette organisation."
     },
     "invoices": {
       "downloadA11y": "Télécharger la facture {{number}}",
@@ -3281,7 +3284,12 @@
       "pendingInvitations": "Invitations en attente",
       "resendInvite": "Renvoyer l'invitation",
       "shareInviteLink": "Partager le lien d'invitation",
-      "resendInviteError": "Impossible de renvoyer l'invitation."
+      "resendInviteError": "Impossible de renvoyer l'invitation.",
+      "inviteNotResendable": "Cette invitation ne peut plus être renvoyée.",
+      "ownerAuthority": "Seul un propriétaire de l'organisation peut gérer les propriétaires.",
+      "ownRoleChange": "Vous ne pouvez pas changer votre propre rôle.",
+      "inviteExpired": "Cette invitation a expiré.",
+      "inviteAccepted": "Cette invitation a déjà été acceptée."
     },
     "usageStats": {
       "inputTokens": "Jetons d'entrée",

@@ -6,6 +6,19 @@ import { captureException } from '@sentry/nextjs';
 import { client } from '@kilocode/web-shared/lib/stripe-client';
 import Stripe from 'stripe';
 
+const SIGNATURE_FAILURE_REPORT_INTERVAL_MS = 60_000;
+
+let lastSignatureFailureReportedAt = 0;
+
+function reportSignatureFailure(error: Stripe.errors.StripeSignatureVerificationError): void {
+  const now = Date.now();
+  if (now - lastSignatureFailureReportedAt < SIGNATURE_FAILURE_REPORT_INTERVAL_MS) {
+    return;
+  }
+  lastSignatureFailureReportedAt = now;
+  captureException(error, { tags: { source: 'stripe_webhook_signature' } });
+}
+
 export async function POST(req: Request): Promise<NextResponse<unknown>> {
   const body = await req.text();
   const signature = (await headers()).get('stripe-signature');
@@ -31,6 +44,7 @@ export async function POST(req: Request): Promise<NextResponse<unknown>> {
       );
     } catch (err: unknown) {
       if (err instanceof Stripe.errors.StripeSignatureVerificationError) {
+        reportSignatureFailure(err);
         return new NextResponse('Webhook Error', { status: 400 });
       }
       throw err;

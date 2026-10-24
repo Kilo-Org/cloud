@@ -48,8 +48,12 @@ async function deliver(
 }
 
 describe('Stripe webhook responses', () => {
+  let now = Date.UTC(2026, 0, 1);
+
   beforeEach(() => {
     jest.clearAllMocks();
+    now += 60_000;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
     jest.mocked(processStripePaymentEventHook).mockResolvedValue(undefined);
     jest
       .mocked(getEnvVariable)
@@ -62,21 +66,46 @@ describe('Stripe webhook responses', () => {
     jest.restoreAllMocks();
   });
 
-  test.each([
-    null,
-    'fixture',
-    client.webhooks.generateTestHeaderString({ payload: body, secret: 'whsec_other_fixture' }),
-    client.webhooks.generateTestHeaderString({
-      payload: body,
-      secret,
-      timestamp: Math.floor(Date.now() / 1000) - 3600,
-    }),
-  ])('applies the request response contract %#', async signature => {
-    const response = await deliver(body, signature);
+  test('refuses a request without a signature header', async () => {
+    const response = await deliver(body, null);
     expect(response.status).toBe(400);
     expect(await response.text()).toBe('Webhook Error');
     expect(processStripePaymentEventHook).not.toHaveBeenCalled();
     expect(captureException).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    () => 'fixture',
+    () =>
+      client.webhooks.generateTestHeaderString({ payload: body, secret: 'whsec_other_fixture' }),
+    () =>
+      client.webhooks.generateTestHeaderString({
+        payload: body,
+        secret,
+        timestamp: Math.floor(Date.now() / 1000) - 3600,
+      }),
+  ])('refuses and reports a failed signature verification %#', async buildSignature => {
+    const response = await deliver(body, buildSignature());
+    expect(response.status).toBe(400);
+    expect(await response.text()).toBe('Webhook Error');
+    expect(processStripePaymentEventHook).not.toHaveBeenCalled();
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Stripe.errors.StripeSignatureVerificationError),
+      { tags: { source: 'stripe_webhook_signature' } }
+    );
+  });
+
+  test('limits repeated signature verification reports', async () => {
+    await deliver(body, 'fixture');
+    await deliver(body, 'another fixture');
+
+    expect(captureException).toHaveBeenCalledTimes(1);
+
+    now += 60_000;
+    await deliver(body, 'a third fixture');
+
+    expect(captureException).toHaveBeenCalledTimes(2);
   });
 
   test('refuses delivery when the signing secret is not configured', async () => {

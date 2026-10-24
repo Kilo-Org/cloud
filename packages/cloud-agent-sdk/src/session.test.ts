@@ -521,7 +521,7 @@ describe('remote session create and retry commands', () => {
       onReconnectExhaustionChange: jest.fn(() => jest.fn()),
       retryConnection: jest.fn(),
       subscribeToCliSession: jest.fn(() => jest.fn()),
-      sendCommand: jest.fn<Promise<unknown>, [string, string, unknown, string?]>(() =>
+      sendCommand: jest.fn<Promise<unknown>, [string, string, unknown, string?, string?]>(() =>
         Promise.resolve({
           all: [],
           default: {},
@@ -582,8 +582,7 @@ describe('remote session create and retry commands', () => {
       kiloId('ses-remote'),
       'create_session',
       { protocolVersion: 1 },
-      'owner',
-      expect.any(String) as string
+      'owner'
     );
     expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
     session.destroy();
@@ -617,8 +616,7 @@ describe('remote session create and retry commands', () => {
         model: { providerID: 'kilo', modelID: 'kilo-auto' },
         orgId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
       },
-      'owner',
-      expect.any(String) as string
+      'owner'
     );
     session.destroy();
   });
@@ -648,6 +646,44 @@ describe('remote session create and retry commands', () => {
       })
     );
     expect(userWebConnection.sendCommandToConnection).not.toHaveBeenCalled();
+    session.destroy();
+  });
+
+  it('replays the stored create result when the caller retries the intent', async () => {
+    const { userWebConnection, session, systemListener } = createRemoteSessionFixture();
+
+    session.connect();
+    await Promise.resolve();
+    emitOwner(systemListener(), kiloId('ses-remote'));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Relay-shaped durable dedupe: one stored terminal result per mutation id,
+    // and the first reply never reaches the client.
+    const stored = new Map<string, unknown>();
+    const provisioned: string[] = [];
+    jest.mocked(userWebConnection.sendCommand).mockClear();
+    jest
+      .mocked(userWebConnection.sendCommand)
+      .mockImplementation(async (_sessionId, command, _data, _owner, mutationId) => {
+        if (command !== 'create_session') return { ok: true };
+        const key = mutationId ?? '<none>';
+        const existing = stored.get(key);
+        if (existing !== undefined) return existing;
+        const result = { protocolVersion: 1, sessionID: REMOTE_CREATED_SESSION_ID };
+        stored.set(key, result);
+        provisioned.push(key);
+        throw new Error('Command timed out');
+      });
+
+    await expect(session.createRemoteSession({ mutationId: 'intent-7' })).rejects.toThrow(
+      'Command timed out'
+    );
+    await expect(session.createRemoteSession({ mutationId: 'intent-7' })).resolves.toBe(
+      REMOTE_CREATED_SESSION_ID
+    );
+
+    expect(provisioned).toEqual(['intent-7:ext']);
     session.destroy();
   });
 

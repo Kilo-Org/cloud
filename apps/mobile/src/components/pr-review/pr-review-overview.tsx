@@ -247,7 +247,10 @@ export function PrReviewOverview({
     >
       <View className="gap-3">
         <PrStateChip descriptor={chip} />
-        <Text className="text-[22px] font-semibold leading-7 text-foreground" numberOfLines={3}>
+        <Text
+          className="text-[22px] font-semibold leading-[1.75rem] text-foreground"
+          numberOfLines={3}
+        >
           {data.title}
         </Text>
         <PrAuthorRow author={data.author} />

@@ -87,6 +87,7 @@ import {
   user_push_tokens,
   user_activity_tokens,
   user_notification_preferences,
+  user_notification_history,
   spend_alert_settings,
   spend_alert_hourly,
   spend_alert_deliveries,
@@ -1304,6 +1305,20 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(cloud_agent_webhook_triggers)
     .where(eq(cloud_agent_webhook_triggers.user_id, userId));
+  // Organization triggers can retain a creator's personal profile reference.
+  // Keep those triggers while releasing the profile FK before profile deletion.
+  await tx
+    .update(cloud_agent_webhook_triggers)
+    .set({ profile_id: null })
+    .where(
+      inArray(
+        cloud_agent_webhook_triggers.profile_id,
+        tx
+          .select({ id: agent_environment_profiles.id })
+          .from(agent_environment_profiles)
+          .where(eq(agent_environment_profiles.owned_by_user_id, userId))
+      )
+    );
   await tx
     .delete(agent_environment_profiles)
     .where(eq(agent_environment_profiles.owned_by_user_id, userId));
@@ -1579,6 +1594,9 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(user_notification_preferences)
     .where(eq(user_notification_preferences.user_id, userId));
+  // Recorded pushes hold the content that was sent to this account's devices
+  // (titles, bodies, i18n params, payloads), so they go with the account.
+  await tx.delete(user_notification_history).where(eq(user_notification_history.user_id, userId));
   await tx.delete(agent_briefing_reports).where(eq(agent_briefing_reports.kilo_user_id, userId));
   await tx.delete(agent_briefing_events).where(eq(agent_briefing_events.kilo_user_id, userId));
   await tx

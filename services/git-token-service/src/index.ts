@@ -549,10 +549,10 @@ function validateGitHubCapabilityUpstream(
         : { failure: 'invalid_upstream_request' };
     }
     if (path === '/graphql') {
-      // gh resolves pull-request views and mutations through GraphQL, which is not
-      // addressed by repository path, so the capability's own credential answers it:
-      // the recorded user's token for a user source, the repository-scoped
-      // installation token for an installation source.
+      // gh resolves pull-request views and mutations through GraphQL. The endpoint is
+      // not addressed by repository path, so the capability's own credential answers it:
+      // the recorded user's token for a user source, the repository-scoped installation
+      // token for an installation source.
       return method === 'POST'
         ? { failure: null, credential: 'pinned' }
         : { failure: 'invalid_upstream_request' };

@@ -2098,8 +2098,8 @@
     {
       "idx": 299,
       "version": "7",
-      "when": 1792834494499,
-      "tag": "0299_device_auth_client_details",
+      "when": 1792862877322,
+      "tag": "0299_lame_mojo",
       "breakpoints": true
     }
   ]

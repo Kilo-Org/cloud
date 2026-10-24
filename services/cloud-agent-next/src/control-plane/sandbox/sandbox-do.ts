@@ -4926,7 +4926,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (current && now - (attachment.billingCheckedAt ?? 0) >= WRAPPER_BILLING_CHECK_MS) {
       const blocked = await withTimeout(
         this.readWrapperBillingBlock(currentState),
-        this.sandboxTimers().providerStopAttemptMs,
+        this.billingReadTimeoutMs(),
         'Sandbox billing state read timed out'
       ).catch(() => false);
       if (blocked) {
@@ -5509,6 +5509,27 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private sandboxTimers(): SandboxTimers {
     return resolveControlPlaneTimers(this.env as unknown as Record<string, string | undefined>)
       .sandbox;
+  }
+
+  /**
+   * Bounds the stored-policy read inside the wrapper's heartbeat
+   * acknowledgement deadline. The read runs on the serial queue, so a read that
+   * outlived the deadline would hold back the acknowledgement the wrapper
+   * watchdog waits for and reconnect a healthy socket. Half the deadline leaves
+   * room for the queued acknowledgement itself; a timed-out read stays
+   * non-enforcing and is retried on the next cadence.
+   */
+  private billingReadTimeoutMs(): number {
+    const timers = resolveControlPlaneTimers(
+      this.env as unknown as Record<string, string | undefined>
+    );
+    return Math.max(
+      1,
+      Math.min(
+        timers.sandbox.providerStopAttemptMs,
+        Math.floor(timers.wrapper.heartbeatAckTimeoutMs / 2)
+      )
+    );
   }
 
   /**

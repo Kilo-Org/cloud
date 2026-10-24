@@ -12,6 +12,7 @@
 
 import { timingSafeEqual } from '@kilocode/encryption';
 import production from './index.js';
+import { extractProcedureNames } from './balance-validation.js';
 import { e2eSurfaceApp } from './e2e-surface/app.js';
 import type { Env } from './types.js';
 
@@ -28,6 +29,7 @@ export {
 export { SandboxControlV2 as SandboxControl } from './control-plane/sandbox/sandbox-do.js';
 export { SandboxSessionV2 as SandboxSession } from './control-plane/session/session-do.js';
 export { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
+export { CloudAgentSession } from './persistence/CloudAgentSession.js';
 export { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
 export { E2eCallbackSink } from './persistence/E2eCallbackSink.js';
 
@@ -53,16 +55,18 @@ function isE2eSurfacePath(pathname: string): boolean {
 }
 
 /**
- * A tRPC mutation path carries one procedure, or a comma-separated batch of
- * them; any session-start member of the batch makes the request a session
- * start. Only POST can invoke a mutation, so GET queries stay outside the gate.
+ * A tRPC mutation path carries one procedure, or a batch of them when
+ * `?batch=1`. The gate classifies the request through the same parser the
+ * router uses — the percent-decoded path, split on commas only for a batch — so
+ * the procedure it inspects is the one tRPC dispatches. A path the parser cannot
+ * decode counts as a session start, so the gate fails closed. Only POST can
+ * invoke a mutation, so GET queries stay outside the gate.
  */
-export function isSessionStartRequest(method: string, pathname: string): boolean {
-  if (method !== 'POST' || !pathname.startsWith('/trpc/')) return false;
-  return pathname
-    .slice('/trpc/'.length)
-    .split(',')
-    .some(procedure => SESSION_START_PROCEDURES[procedure] === true);
+export function isSessionStartRequest(method: string, url: URL): boolean {
+  if (method !== 'POST') return false;
+  const procedures = extractProcedureNames(url.pathname, url.searchParams.get('batch') === '1');
+  if (procedures === null) return true;
+  return procedures.some(procedure => SESSION_START_PROCEDURES[procedure] === true);
 }
 
 /**
@@ -93,7 +97,7 @@ export default {
     if (isE2eSurfacePath(url.pathname)) {
       return e2eSurfaceApp.fetch(request, env, ctx);
     }
-    if (isSessionStartRequest(request.method, url.pathname)) {
+    if (isSessionStartRequest(request.method, url)) {
       const denial = admitSessionStart(request, env);
       if (denial) return denial;
     }

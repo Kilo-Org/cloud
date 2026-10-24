@@ -257,14 +257,34 @@ function admissionEnv(
 }
 
 describe('session-start admission', () => {
-  it('classifies both session-start procedures, and any batch member, as session starts', () => {
+  function parse(path: string): URL {
+    return new URL(`https://worker.test${path}`);
+  }
+
+  it('classifies every session-start procedure, and any batch member, as a session start', () => {
     for (const path of SESSION_START_ROUTES) {
-      expect(isSessionStartRequest('POST', path), path).toBe(true);
+      expect(isSessionStartRequest('POST', parse(path)), path).toBe(true);
     }
-    expect(isSessionStartRequest('POST', '/trpc/getSession,start')).toBe(true);
-    expect(isSessionStartRequest('POST', '/trpc/getSession')).toBe(false);
-    expect(isSessionStartRequest('POST', '/trpc/startSomethingElse')).toBe(false);
-    expect(isSessionStartRequest('GET', '/trpc/start')).toBe(false);
+    expect(isSessionStartRequest('POST', parse('/trpc/getSession,start?batch=1'))).toBe(true);
+    expect(isSessionStartRequest('POST', parse('/trpc/start,send?batch=1'))).toBe(true);
+    expect(isSessionStartRequest('POST', parse('/trpc/getSession,start'))).toBe(false);
+    expect(isSessionStartRequest('POST', parse('/trpc/getSession'))).toBe(false);
+    expect(isSessionStartRequest('POST', parse('/trpc/startSomethingElse'))).toBe(false);
+    expect(isSessionStartRequest('GET', parse('/trpc/start'))).toBe(false);
+  });
+
+  it('classifies the path with the parser the router uses, and fails closed on an undecodable one', () => {
+    for (const path of [
+      '/trpc/%73tart',
+      '/trpc/star%74',
+      '/trpc/%73end?batch=1',
+      '/trpc/getSession,%73tart?batch=1',
+      '/trpc/getSession%2Cstart?batch=1',
+    ]) {
+      expect(isSessionStartRequest('POST', parse(path)), path).toBe(true);
+    }
+    expect(isSessionStartRequest('POST', parse('/trpc/get%53ession?batch=1'))).toBe(false);
+    expect(isSessionStartRequest('POST', parse('/trpc/start%ZZ'))).toBe(true);
   });
 
   it('rejects both procedures without the key before the token is read', async () => {
@@ -291,6 +311,25 @@ describe('session-start admission', () => {
       );
       expect(response.status, path).toBe(401);
       await expect(response.text()).resolves.toBe('Unauthorized');
+    }
+  });
+
+  it('requires the key for every path the parser recognizes as a session start', async () => {
+    for (const path of ['/trpc/%73tart', '/trpc/getSession,%73tart?batch=1']) {
+      const denied = await e2eWorker.fetch(
+        sessionStartRequest(path, { token: tokenFor(ALLOWED_USER) }),
+        admissionEnv(),
+        createExecutionContext()
+      );
+      expect(denied.status, path).toBe(401);
+      await expect(denied.text()).resolves.toBe('Unauthorized');
+
+      const admitted = await e2eWorker.fetch(
+        sessionStartRequest(path, { token: tokenFor(ALLOWED_USER), secret: internalApiSecret }),
+        admissionEnv(),
+        createExecutionContext()
+      );
+      expect(admitted.status, path).toBe(400);
     }
   });
 

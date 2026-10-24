@@ -96,7 +96,10 @@ The commands below run from `services/cloud-agent-next` (or use the full path fr
    `x-internal-api-key` are rejected with `401` by `src/e2e-entry.ts` before the
    token is verified or the database is touched; every other route is unchanged.
    Those five are the user-token procedures that create a session or enqueue the
-   work whose flusher starts its container. The key is the Worker's
+   work whose flusher starts its container. The gate classifies each request
+   through the same procedure parser the router uses — the percent-decoded path,
+   with a batch split on `?batch=1` — and treats a path it cannot decode as a
+   session start. The key is the Worker's
    `INTERNAL_API_SECRET`, the same value the surface and the internal procedures
    use, and the driver presents it on every call.
 

@@ -549,8 +549,8 @@ async function reconcileLockedBriefingCharge(
       (generation.id === row.generation_id ? row.generation_deadline_at : null);
     const deadlineMs = deadline === null ? null : Date.parse(deadline);
     if (generation.delivery === 'queued') {
-      // Receipts write the delivery time; a missing one falls back to the request
-      // deadline, which is never later than the queue acceptance it bounds.
+      // Receipts write the delivery time; a record without one falls back to the
+      // request deadline, which is inside the same request lifetime.
       const anchorMs =
         generation.deliveryAt === undefined ? deadlineMs : Date.parse(generation.deliveryAt);
       if (anchorMs === null) return 'waiting' as const;

@@ -355,7 +355,7 @@ patchedDependencies:
   '@expo/react-native-action-sheet@4.1.1': patches/@expo+react-native-action-sheet@4.1.1.patch
   # Android: a hugged markdown node re-measures its height at the width its view
   # actually receives, so a line that the display view wraps is inside the box.
-  react-native-enriched-markdown@1.1.1: patches/react-native-enriched-markdown.patch
+  react-native-enriched-markdown@1.1.1: patches/react-native-enriched-markdown@1.1.1.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

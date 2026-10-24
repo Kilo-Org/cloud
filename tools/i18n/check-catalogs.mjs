@@ -547,6 +547,58 @@ function pluralParts(key) {
   return { base: key.slice(0, -match[0].length), category: match[1] };
 }
 
+/**
+ * Every `{{token}}` an English plural family uses, across the base key and all
+ * of its categories. A language may need one of those tokens in a category
+ * where English spells the number out: English's `_one` only ever renders at 1,
+ * but Serbian, Croatian, Bosnian, Russian, Ukrainian, Belarusian, Macedonian,
+ * Lithuanian, Latvian, Icelandic, Filipino and Slovene also select their
+ * singular form for 21, 101 and the like, so their `_one` value has to
+ * interpolate the count. A category may therefore add a token its English
+ * family already uses; it may never drop one English requires in that category.
+ */
+function familyPlaceholders(english, base) {
+  const tokens = new Set();
+  for (const [key, value] of english) {
+    if (key !== base && pluralBaseKey(key) !== base) {
+      continue;
+    }
+    for (const token of placeholders(value).split(',').filter(Boolean)) {
+      tokens.add(token);
+    }
+  }
+  return tokens;
+}
+
+/**
+ * Whether a plural category's placeholder set is English's plus tokens from its
+ * own family. Returns false for a non-plural key, for a dropped required token,
+ * and for a token no value of the family uses.
+ */
+function addsFamilyPlaceholderOnly(english, key, actual, expected) {
+  const parts = pluralParts(key);
+  if (!parts) {
+    return false;
+  }
+  const required = new Set(expected.split(',').filter(Boolean));
+  const used = new Set(actual.split(',').filter(Boolean));
+  if (used.size <= required.size) {
+    return false;
+  }
+  for (const token of required) {
+    if (!used.has(token)) {
+      return false;
+    }
+  }
+  const family = familyPlaceholders(english, parts.base);
+  for (const token of used) {
+    if (!family.has(token)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 const tags = supportedLanguages();
 
 for (const catalog of CATALOGS) {
@@ -783,7 +835,11 @@ for (const catalog of CATALOGS) {
         .filter(name => !actualSet.includes(name))
         .every(name => name === 'displayCount' || name === 'itemCount');
       const addedPlaceholder = actualSet.some(name => !expectedSet.includes(name));
-      if (actual !== expected && !(wordedForm && droppedVisibleCount && !addedPlaceholder)) {
+      if (
+        actual !== expected &&
+        !addsFamilyPlaceholderOnly(english, key, actual, expected) &&
+        !(wordedForm && droppedVisibleCount && !addedPlaceholder)
+      ) {
         fail(`${label}: "${key}" placeholders differ from English (${expected || 'none'})`);
       }
       const expectedRefs = nestingRefs(englishValue).join(',');

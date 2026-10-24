@@ -17,6 +17,7 @@ import type {
   WorktreeFileQuery,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { z } from 'zod';
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import type {
   personalPrepareSessionNextSchema,
   SandboxStatusSnapshot,
@@ -1223,6 +1224,28 @@ describe('cloudAgentNextRouter.prepareSession', () => {
     model: 'kilo/test-model',
     githubRepo: 'acme/repo',
   };
+
+  it('rejects an initialPayload prompt over the shared cap before constructing a Cloud Agent client', async () => {
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'Inspect the repository',
+        mode: 'code',
+        model: 'kilo/test-model',
+        githubRepo: 'acme/repo',
+        autoInitiate: true,
+        initialPayload: {
+          type: 'prompt',
+          prompt: 'x'.repeat(CLOUD_AGENT_PROMPT_MAX_LENGTH + 1),
+          mode: 'code',
+          model: 'kilo/test-model',
+        },
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+    expect(mockPrepareSession).not.toHaveBeenCalled();
+  });
 
   it.each(SELECTABLE_SANDBOX_ALLOCATIONS)(
     'forwards the normalized legacy personal sandbox preset %s',

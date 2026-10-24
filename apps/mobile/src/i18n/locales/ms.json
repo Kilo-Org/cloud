@@ -53,6 +53,7 @@
     "connected": "Disambungkan",
     "couldNotLoadModels": "Tidak dapat memuatkan model.",
     "couldNotLoadRepositories": "Tidak dapat memuatkan repositori.",
+    "noRepositoriesFound": "Tiada repositori ditemui",
     "critical": "Kritikal",
     "delete": "Padam",
     "deleted": "Dipadam",
@@ -87,6 +88,7 @@
     "connect": "Sambungkan",
     "connectBitbucket": "Sambungkan Bitbucket",
     "connectGitlab": "Sambungkan GitLab",
+    "connectProvider": "Sambungkan penyedia",
     "contentTruncated": "Kandungan dipotong",
     "copyLink": "Salin pautan",
     "couldNotLoadOrganizations": "Tidak dapat memuatkan organisasi.",
@@ -145,7 +147,8 @@
     "agent": "ejen",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Perubahan"
+    "changes": "Perubahan",
+    "organizationTrialEnded": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Pemilik organisasi boleh mengemas kini bil di kilo.ai, kemudian cuba lagi."
   },
   "language": {
     "restarting": "Memulakan semula apl untuk menukar bahasa",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Anda mungkin perlu memberikan akses kepada lebih banyak kumpulan atau projek di GitLab.",
       "installGithubApp": "Pasang apl GitHub pada repositori",
       "installGithubAppDescription": "Benarkan apl GitHub Kilo mengakses repositori yang anda mahu disemak.",
-      "noRepositoriesFound": "Tiada repositori ditemui",
       "repositoryAccess": "akses repositori"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "Tunjukkan lebih banyak",
       "created": "Dicipta",
       "started": "Dimulakan",
+      "reviewEnded": "Tamat",
+      "severityNitpick": "Kecil",
       "tokens": "Token",
       "tokensInOut": "{{input}} masuk / {{output}} keluar",
       "council": "Panel penyemak",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "Masukkan URL permintaan penarikan yang sah.",
       "couldNotCheckProviderStatus": "Tidak dapat menyemak status penyedia.",
       "couldNotLoadProviders": "Kami tidak dapat memuatkan penyedia yang telah anda sambungkan. Sila cuba lagi.",
-      "connectProvider": "Sambungkan penyedia",
       "connectProviderDescription": "Sambungkan GitHub untuk memulakan semakan manual bagi permintaan penarikan.",
       "pullRequestUrl": "URL permintaan penarikan",
       "instructions": "Arahan (pilihan)",
@@ -1913,11 +1916,17 @@
       "actorSystem": "Sistem Kilo",
       "couldNotLoad": "Tidak dapat memuatkan laporan audit.",
       "events": "Peristiwa",
+      "eventConfidence": "Keyakinan: {{confidence}}",
+      "eventReason": "Sebab: {{reason}}",
+      "eventsCount_one": "{{displayCount}} peristiwa",
+      "eventsCount_other": "{{displayCount}} peristiwa",
       "generated": "Laporan dijana pada {{generatedAt}}.",
       "noActivity": "Tiada aktiviti direkodkan",
       "noActivityDescription": "Kilo tidak mempunyai aktiviti penemuan keselamatan yang boleh dilaporkan dari {{start}} hingga {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repositori tidak direkodkan",
+      "reasonUnknown": "Sebab tidak dikenali",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Ringkasan laporan",
       "title": "Laporan audit",
       "unavailable": "Laporan audit tidak tersedia",
@@ -1972,6 +1981,7 @@
       "reauthorizeButton": "Berikan semula kebenaran kepada apl GitHub",
       "reauthorizeDescription": "Ejen Keselamatan memerlukan kebenaran untuk membaca amaran Dependabot. Berikan semula kebenaran kepada apl GitHub untuk memberikan kebenaran ini.",
       "reauthorizeTitle": "Kebenaran tambahan diperlukan",
+      "retryFailed": "Masih tidak dapat memuatkan Ejen Keselamatan. Sila semak sambungan anda dan cuba lagi.",
       "setupFailed": "Tidak dapat memulakan persediaan GitHub. Sila cuba lagi."
     },
     "queuedActionUntracked": "Tindakan dalam baris gilir tidak lagi dapat dijejaki. Muat semula untuk melihat status terkini.",
@@ -2565,7 +2575,10 @@
       "allowOnceAccessibility": "Benarkan sekali",
       "alwaysAllow": "Sentiasa benarkan",
       "alwaysAllowAccessibility": "Sentiasa benarkan",
-      "retrying": "Mencuba semula…"
+      "retrying": "Mencuba semula…",
+      "retryDeny": "Cuba tolak semula",
+      "retryAllowOnce": "Cuba benarkan sekali semula",
+      "retryAlwaysAllow": "Cuba sentiasa benarkan semula"
     },
     "questionCard": {
       "title": "Ejen memerlukan maklumat",
@@ -3156,7 +3169,9 @@
       "sendInvite": "Hantar jemputan",
       "title": "Jemput ahli",
       "alreadyInvited": "E-mel itu sudah dijemput atau sudah menjadi ahli.",
-      "sendError": "Tidak dapat menghantar jemputan."
+      "sendError": "Tidak dapat menghantar jemputan.",
+      "pendingInvitation": "E-mel ini sudah mempunyai jemputan yang belum selesai.",
+      "alreadyMember": "Orang ini sudah menjadi ahli organisasi ini."
     },
     "invoices": {
       "downloadA11y": "Muat turun invois {{number}}",
@@ -3226,7 +3241,12 @@
       "pendingInvitations": "Jemputan menunggu jawapan",
       "resendInvite": "Hantar semula jemputan",
       "shareInviteLink": "Kongsi pautan jemputan",
-      "resendInviteError": "Tidak dapat menghantar semula jemputan."
+      "resendInviteError": "Tidak dapat menghantar semula jemputan.",
+      "inviteNotResendable": "Jemputan ini tidak boleh dihantar semula lagi.",
+      "ownerAuthority": "Hanya pemilik organisasi boleh mengurus pemilik.",
+      "ownRoleChange": "Anda tidak boleh menukar peranan anda sendiri.",
+      "inviteExpired": "Jemputan ini telah tamat tempoh.",
+      "inviteAccepted": "Jemputan ini telah pun diterima."
     },
     "usageStats": {
       "inputTokens": "Token masukan",

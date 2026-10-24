@@ -53,6 +53,7 @@
     "connected": "დაკავშირებულია",
     "couldNotLoadModels": "მოდელების ჩატვირთვა ვერ მოხერხდა.",
     "couldNotLoadRepositories": "რეპოზიტორიების ჩატვირთვა ვერ მოხერხდა.",
+    "noRepositoriesFound": "რეპოზიტორები ვერ მოიძებნა",
     "critical": "კრიტიკული",
     "delete": "წაშლა",
     "deleted": "წაშლილია",
@@ -87,6 +88,7 @@
     "connect": "დაკავშირება",
     "connectBitbucket": "Bitbucket-თან დაკავშირება",
     "connectGitlab": "GitLab-თან დაკავშირება",
+    "connectProvider": "პროვაიდერის დაკავშირება",
     "contentTruncated": "შიგთავსი შეკვეცილია",
     "copyLink": "ბმულის კოპირება",
     "couldNotLoadOrganizations": "ორგანიზაციების ჩატვირთვა ვერ მოხერხდა.",
@@ -145,7 +147,8 @@
     "agent": "აგენტი",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "ცვლილებები"
+    "changes": "ცვლილებები",
+    "organizationTrialEnded": "ორგანიზაციის საცდელი პერიოდი დასრულდა და მას აქტიური გეგმა არ აქვს. ორგანიზაციის მფლობელს შეუძლია განაახლოს ბილინგი kilo.ai-ზე, შემდეგ კი ხელახლა სცადოს."
   },
   "language": {
     "restarting": "ენის შესაცვლელად აპი ხელახლა იტვირთება",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "შესაძლოა საჭირო იყოს GitLab-ზე დამატებით ჯგუფებსა და პროექტებზე წვდომის მინიჭება.",
       "installGithubApp": "GitHub აპის დაყენება რეპოზიტორებზე",
       "installGithubAppDescription": "მიანიჭე Kilo-ს GitHub აპს წვდომა იმ რეპოზიტორებზე, რომელთა შემოწმებაც გსურს.",
-      "noRepositoriesFound": "რეპოზიტორები ვერ მოიძებნა",
       "repositoryAccess": "რეპოზიტორზე წვდომა"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "მეტის ჩვენება",
       "created": "შექმნის თარიღი",
       "started": "დაწყების თარიღი",
+      "reviewEnded": "დასრულების თარიღი",
+      "severityNitpick": "წვრილმანი",
       "tokens": "ტოკენი",
       "tokensInOut": "{{input}} შემავალი / {{output}} გამომავალი",
       "council": "საბჭო",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "შეიყვანე PR-ის სწორი URL.",
       "couldNotCheckProviderStatus": "პროვაიდერის სტატუსის შემოწმება ვერ მოხერხდა.",
       "couldNotLoadProviders": "დაკავშირებული პროვაიდერების ჩატვირთვა ვერ მოხერხდა. სცადე ხელახლა.",
-      "connectProvider": "პროვაიდერის დაკავშირება",
       "connectProviderDescription": "PR-ის ხელით შემოწმების დასაწყებად დააკავშირე GitHub.",
       "pullRequestUrl": "PR-ის URL",
       "instructions": "ინსტრუქციები (არასავალდებულო)",
@@ -1913,11 +1916,17 @@
       "actorSystem": "Kilo სისტემა",
       "couldNotLoad": "აუდიტის ანგარიშის ჩატვირთვა ვერ მოხერხდა.",
       "events": "მოვლენები",
+      "eventConfidence": "სანდოობა: {{confidence}}",
+      "eventReason": "მიზეზი: {{reason}}",
+      "eventsCount_one": "{{displayCount}} მოვლენა",
+      "eventsCount_other": "{{displayCount}} მოვლენა",
       "generated": "შექმნის დრო: {{generatedAt}}.",
       "noActivity": "აქტივობა არ დაფიქსირებულა",
       "noActivityDescription": "{{start}}-დან {{end}}-მდე Kilo-ში უსაფრთხოების მიგნებებთან დაკავშირებული აქტივობა არ დაფიქსირებულა, რომელიც ანგარიშში აისახებოდა.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "რეპოზიტორი არ არის ჩაწერილი",
+      "reasonUnknown": "ამოუცნობი მიზეზი",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "ანგარიშის შეჯამება",
       "title": "აუდიტის ანგარიში",
       "unavailable": "აუდიტის ანგარიში მიუწვდომელია",
@@ -1972,6 +1981,7 @@
       "reauthorizeButton": "GitHub აპის ხელახალი ავტორიზაცია",
       "reauthorizeDescription": "უსაფრთხოების აგენტს Dependabot-ის გაფრთხილებების წაკითხვის ნებართვა სჭირდება. ამ ნებართვის მისანიჭებლად ხელახლა გაიარე GitHub აპის ავტორიზაცია.",
       "reauthorizeTitle": "საჭიროა დამატებითი ნებართვები",
+      "retryFailed": "უსაფრთხოების აგენტის ჩატვირთვა კვლავ ვერ მოხერხდა. შეამოწმე კავშირი და სცადე ხელახლა.",
       "setupFailed": "GitHub-ის გამართვის დაწყება ვერ მოხერხდა. სცადე ხელახლა."
     },
     "queuedActionUntracked": "რიგში დამატებული მოქმედების სტატუსის კონტროლი ვეღარ ხერხდება. მიმდინარე მდგომარეობის სანახავად განაახლე მონაცემები.",
@@ -2565,7 +2575,10 @@
       "allowOnceAccessibility": "ერთჯერადი დაშვება",
       "alwaysAllow": "ყოველთვის დაშვება",
       "alwaysAllowAccessibility": "ყოველთვის დაშვება",
-      "retrying": "ხელახლა ცდა…"
+      "retrying": "ხელახლა ცდა…",
+      "retryDeny": "უარყოფის ხელახლა ცდა",
+      "retryAllowOnce": "ერთჯერადი დაშვების ხელახლა ცდა",
+      "retryAlwaysAllow": "ყოველთვის დაშვების ხელახლა ცდა"
     },
     "questionCard": {
       "title": "აგენტი პასუხს ელოდება",
@@ -3156,7 +3169,9 @@
       "sendInvite": "მოწვევის გაგზავნა",
       "title": "წევრის მოწვევა",
       "alreadyInvited": "ის უკვე მოწვეულია ან უკვე არის წევრი.",
-      "sendError": "მოწვევის გაგზავნა ვერ მოხერხდა."
+      "sendError": "მოწვევის გაგზავნა ვერ მოხერხდა.",
+      "pendingInvitation": "ამ ელფოსტაზე უკვე არის მოლოდინში მყოფი მოწვევა.",
+      "alreadyMember": "ეს პირი უკვე ამ ორგანიზაციის წევრია."
     },
     "invoices": {
       "downloadA11y": "ინვოისის ჩამოტვირთვა: {{number}}",
@@ -3226,7 +3241,12 @@
       "pendingInvitations": "დაუდასტურებელი მოწვევები",
       "resendInvite": "მოწვევის ხელახლა გაგზავნა",
       "shareInviteLink": "მოწვევის ბმულის გაზიარება",
-      "resendInviteError": "მოწვევის ხელახლა გაგზავნა ვერ მოხერხდა."
+      "resendInviteError": "მოწვევის ხელახლა გაგზავნა ვერ მოხერხდა.",
+      "inviteNotResendable": "ეს მოწვევა ვეღარ გაიგზავნება ხელახლა.",
+      "ownerAuthority": "მხოლოდ ორგანიზაციის მფლობელს შეუძლია მფლობელების მართვა.",
+      "ownRoleChange": "თქვენ არ შეგიძლიათ საკუთარი როლის შეცვლა.",
+      "inviteExpired": "ეს მოწვევა ვადაგასულია.",
+      "inviteAccepted": "ეს მოწვევა უკვე დადასტურებულია."
     },
     "usageStats": {
       "inputTokens": "შემავალი ტოკენები",

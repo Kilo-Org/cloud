@@ -1,6 +1,6 @@
 {
-  "id": "577481af-5dcb-4db2-9933-4f78f8871e6d",
-  "prevId": "b575ebaa-8bfb-4016-b5ce-af54b1df482d",
+  "id": "42feeec7-3e3c-45cf-9095-29b1b578f1a9",
+  "prevId": "f3abc364-273c-444a-824b-7db65a082252",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -6910,7 +6910,7 @@
         },
         "CHK_cloud_agent_webhook_triggers_cloud_agent_fields": {
           "name": "CHK_cloud_agent_webhook_triggers_cloud_agent_fields",
-          "value": "(\n        \"cloud_agent_webhook_triggers\".\"target_type\" != 'cloud_agent' OR\n        (\"cloud_agent_webhook_triggers\".\"github_repo\" IS NOT NULL AND \"cloud_agent_webhook_triggers\".\"profile_id\" IS NOT NULL)\n      )"
+          "value": "(\n        \"cloud_agent_webhook_triggers\".\"target_type\" != 'cloud_agent' OR\n        \"cloud_agent_webhook_triggers\".\"github_repo\" IS NOT NULL\n      )"
         },
         "CHK_cloud_agent_webhook_triggers_kiloclaw_fields": {
           "name": "CHK_cloud_agent_webhook_triggers_kiloclaw_fields",

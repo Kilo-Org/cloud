@@ -53,6 +53,7 @@
     "connected": "منسلک",
     "couldNotLoadModels": "ماڈلز لوڈ نہیں ہو سکے۔",
     "couldNotLoadRepositories": "ریپوزٹریز لوڈ نہیں ہو سکیں۔",
+    "noRepositoriesFound": "کوئی ریپوزٹری نہیں ملی",
     "critical": "سنگین",
     "delete": "حذف کریں",
     "deleted": "حذف شدہ",
@@ -87,6 +88,7 @@
     "connect": "منسلک کریں",
     "connectBitbucket": "Bitbucket کو منسلک کریں",
     "connectGitlab": "GitLab کو منسلک کریں",
+    "connectProvider": "فراہم کنندہ منسلک کریں",
     "contentTruncated": "مواد مکمل نہیں دکھایا گیا",
     "copyLink": "لنک کاپی کریں",
     "couldNotLoadOrganizations": "تنظیمیں لوڈ نہیں ہو سکیں۔",
@@ -145,7 +147,8 @@
     "agent": "ایجنٹ",
     "durationMinuteShort": "منٹ",
     "durationHourShort": "گھنٹہ",
-    "changes": "تبدیلیاں"
+    "changes": "تبدیلیاں",
+    "organizationTrialEnded": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ تنظیم کا مالک kilo.ai پر بلنگ اپ ڈیٹ کر سکتا ہے، پھر دوبارہ کوشش کریں۔"
   },
   "language": {
     "restarting": "منتخب زبان لاگو کرنے کے لیے ایپ دوبارہ شروع ہو رہی ہے",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "آپ کو GitLab پر مزید گروپس یا پروجیکٹس تک رسائی دینے کی ضرورت پڑ سکتی ہے۔",
       "installGithubApp": "ریپوزٹریز پر GitHub ایپ انسٹال کریں",
       "installGithubAppDescription": "Kilo کی GitHub ایپ کو ان ریپوزٹریز تک رسائی دیں جن کا آپ جائزہ کروانا چاہتے ہیں۔",
-      "noRepositoriesFound": "کوئی ریپوزٹری نہیں ملی",
       "repositoryAccess": "ریپوزٹری تک رسائی"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "مزید دکھائیں",
       "created": "تخلیق شدہ",
       "started": "شروع ہوا",
+      "reviewEnded": "اختتام پذیر",
+      "severityNitpick": "معمولی تنقیح",
       "tokens": "ٹوکن",
       "tokensInOut": "{{input}} ان پٹ / {{output}} آؤٹ پٹ",
       "council": "جائزہ کمیٹی",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "پل ریکویسٹ کا درست URL درج کریں۔",
       "couldNotCheckProviderStatus": "فراہم کنندہ کی حالت کی جانچ نہیں ہو سکی۔",
       "couldNotLoadProviders": "آپ کے منسلک فراہم کنندگان لوڈ نہیں ہو سکے۔ براہ کرم دوبارہ کوشش کریں۔",
-      "connectProvider": "فراہم کنندہ منسلک کریں",
       "connectProviderDescription": "پل ریکویسٹ کا دستی جائزہ شروع کرنے کے لیے GitHub منسلک کریں۔",
       "pullRequestUrl": "پل ریکویسٹ کا URL",
       "instructions": "ہدایات (اختیاری)",
@@ -1913,11 +1916,17 @@
       "actorSystem": "Kilo سسٹم",
       "couldNotLoad": "آڈٹ رپورٹ لوڈ نہیں ہو سکی۔",
       "events": "واقعات",
+      "eventConfidence": "اعتماد: {{confidence}}",
+      "eventReason": "وجہ: {{reason}}",
+      "eventsCount_one": "{{displayCount}} واقعہ",
+      "eventsCount_other": "{{displayCount}} واقعات",
       "generated": "رپورٹ {{generatedAt}} کو تیار کی گئی۔",
       "noActivity": "کوئی درج شدہ سرگرمی نہیں",
       "noActivityDescription": "Kilo میں {{start}} سے {{end}} تک سکیورٹی مسائل سے متعلق کوئی قابلِ رپورٹ سرگرمی نہیں ہے۔",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "ریپوزٹری درج نہیں",
+      "reasonUnknown": "ناقابلِ شناخت وجہ",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "رپورٹ کا خلاصہ",
       "title": "آڈٹ رپورٹ",
       "unavailable": "آڈٹ رپورٹ دستیاب نہیں",
@@ -1972,6 +1981,7 @@
       "reauthorizeButton": "GitHub ایپ کو دوبارہ اجازت دیں",
       "reauthorizeDescription": "سکیورٹی ایجنٹ کو Dependabot کی اطلاعات پڑھنے کے لیے اجازت درکار ہے۔ یہ اجازت دینے کے لیے GitHub ایپ کو دوبارہ مجاز بنائیں۔",
       "reauthorizeTitle": "اضافی اجازتیں درکار ہیں",
+      "retryFailed": "سکیورٹی ایجنٹ اب بھی لوڈ نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
       "setupFailed": "GitHub سیٹ اپ شروع نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔"
     },
     "queuedActionUntracked": "قطار میں شامل ایک کارروائی کی حالت معلوم نہیں ہو سکی۔ تازہ ترین حالت دیکھنے کے لیے صفحہ تازہ کریں۔",
@@ -2565,7 +2575,10 @@
       "allowOnceAccessibility": "ایک بار اجازت دیں",
       "alwaysAllow": "ہمیشہ اجازت دیں",
       "alwaysAllowAccessibility": "ہمیشہ اجازت دیں",
-      "retrying": "دوبارہ کوشش ہو رہی ہے…"
+      "retrying": "دوبارہ کوشش ہو رہی ہے…",
+      "retryDeny": "اجازت نہ دینے کی دوبارہ کوشش کریں",
+      "retryAllowOnce": "ایک بار اجازت دینے کی دوبارہ کوشش کریں",
+      "retryAlwaysAllow": "ہمیشہ اجازت دینے کی دوبارہ کوشش کریں"
     },
     "questionCard": {
       "title": "ایجنٹ کو جواب درکار ہے",
@@ -3156,7 +3169,9 @@
       "sendInvite": "دعوت بھیجیں",
       "title": "رکن کو دعوت دیں",
       "alreadyInvited": "انہیں پہلے ہی دعوت دے دی گئی ہے یا وہ پہلے سے ہی رکن ہیں۔",
-      "sendError": "دعوت نہیں بھیجی جا سکی۔"
+      "sendError": "دعوت نہیں بھیجی جا سکی۔",
+      "pendingInvitation": "اس ای میل کے لیے پہلے ہی ایک زیرِ التوا دعوت موجود ہے۔",
+      "alreadyMember": "یہ شخص پہلے ہی اس تنظیم کا رکن ہے۔"
     },
     "invoices": {
       "downloadA11y": "انوائس {{number}} ڈاؤن لوڈ کریں",
@@ -3226,7 +3241,12 @@
       "pendingInvitations": "زیر التواء دعوتیں",
       "resendInvite": "دعوت دوبارہ بھیجیں",
       "shareInviteLink": "دعوت کا لنک شیئر کریں",
-      "resendInviteError": "دعوت دوبارہ نہیں بھیجی جا سکی۔"
+      "resendInviteError": "دعوت دوبارہ نہیں بھیجی جا سکی۔",
+      "inviteNotResendable": "یہ دعوت اب دوبارہ نہیں بھیجی جا سکتی۔",
+      "ownerAuthority": "صرف تنظیم کا مالک ہی مالکان کا انتظام کر سکتا ہے۔",
+      "ownRoleChange": "آپ اپنا کردار تبدیل نہیں کر سکتے۔",
+      "inviteExpired": "یہ دعوت کی میعاد ختم ہو گئی ہے۔",
+      "inviteAccepted": "یہ دعوت پہلے ہی قبول کی جا چکی ہے۔"
     },
     "usageStats": {
       "inputTokens": "ان پٹ ٹوکن",

@@ -1,5 +1,5 @@
 {
-  "id": "b575ebaa-8bfb-4016-b5ce-af54b1df482d",
+  "id": "f3abc364-273c-444a-824b-7db65a082252",
   "prevId": "2d61ccea-6389-4ab3-a6fd-492cc75f6550",
   "version": "7",
   "dialect": "postgresql",
@@ -4108,13 +4108,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "is_fork": {
-          "name": "is_fork",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
         "parent_session_id": {
           "name": "parent_session_id",
           "type": "uuid",
@@ -6910,7 +6903,7 @@
         },
         "CHK_cloud_agent_webhook_triggers_cloud_agent_fields": {
           "name": "CHK_cloud_agent_webhook_triggers_cloud_agent_fields",
-          "value": "(\n        \"cloud_agent_webhook_triggers\".\"target_type\" != 'cloud_agent' OR\n        (\"cloud_agent_webhook_triggers\".\"github_repo\" IS NOT NULL AND \"cloud_agent_webhook_triggers\".\"profile_id\" IS NOT NULL)\n      )"
+          "value": "(\n        \"cloud_agent_webhook_triggers\".\"target_type\" != 'cloud_agent' OR\n        \"cloud_agent_webhook_triggers\".\"github_repo\" IS NOT NULL\n      )"
         },
         "CHK_cloud_agent_webhook_triggers_kiloclaw_fields": {
           "name": "CHK_cloud_agent_webhook_triggers_kiloclaw_fields",
@@ -31313,21 +31306,6 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_shared_cli_sessions_kilo_user_id": {
-          "name": "IDX_shared_cli_sessions_kilo_user_id",
-          "columns": [
-            {
-              "expression": "kilo_user_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },

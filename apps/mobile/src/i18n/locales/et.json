@@ -53,6 +53,7 @@
     "connected": "Ühendatud",
     "couldNotLoadModels": "Mudeleid ei õnnestunud laadida.",
     "couldNotLoadRepositories": "Hoidlaid ei õnnestunud laadida.",
+    "noRepositoriesFound": "Hoidlaid ei leitud",
     "critical": "Kriitiline",
     "delete": "Kustuta",
     "deleted": "Kustutatud",
@@ -87,6 +88,7 @@
     "connect": "Ühenda",
     "connectBitbucket": "Ühenda Bitbucket",
     "connectGitlab": "Ühenda GitLab",
+    "connectProvider": "Teenusepakkuja ühendamine",
     "contentTruncated": "Sisu kärbitud",
     "copyLink": "Kopeeri link",
     "couldNotLoadOrganizations": "Organisatsioone ei õnnestunud laadida.",
@@ -145,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Muudatused"
+    "changes": "Muudatused",
+    "organizationTrialEnded": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Organisatsiooni omanik saab arveldust kilo.ai keskkonnas uuendada ja seejärel uuesti proovida."
   },
   "language": {
     "restarting": "Keele vahetamiseks taaskäivitatakse rakendus",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Võimalik, et pead GitLabis andma juurdepääsu veel mõnele rühmale või projektile.",
       "installGithubApp": "GitHubi rakenduse paigaldamine hoidlatele",
       "installGithubAppDescription": "Anna Kilo GitHubi rakendusele juurdepääs hoidlatele, mille koodi soovid üle vaadata.",
-      "noRepositoriesFound": "Hoidlaid ei leitud",
       "repositoryAccess": "juurdepääs hoidlatele"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "Kuva rohkem",
       "created": "Loodud",
       "started": "Alustatud",
+      "reviewEnded": "Lõppenud",
+      "severityNitpick": "Pisiasi",
       "tokens": "Tokenid",
       "tokensInOut": "{{input}} sisendis / {{output}} väljundis",
       "council": "Nõukogu",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "Sisesta kehtiv tõmbetaotluse URL.",
       "couldNotCheckProviderStatus": "Teenusepakkuja olekut ei õnnestunud kontrollida.",
       "couldNotLoadProviders": "Ühendatud teenusepakkujaid ei õnnestunud laadida. Proovi uuesti.",
-      "connectProvider": "Teenusepakkuja ühendamine",
       "connectProviderDescription": "Ühenda GitHub, et käivitada tõmbetaotluse ülevaatus käsitsi.",
       "pullRequestUrl": "Tõmbetaotluse URL",
       "instructions": "Juhised (valikulised)",
@@ -1913,11 +1916,17 @@
       "actorSystem": "Kilo süsteem",
       "couldNotLoad": "Auditiaruannet ei õnnestunud laadida.",
       "events": "Sündmused",
+      "eventConfidence": "Usaldus: {{confidence}}",
+      "eventReason": "Põhjus: {{reason}}",
+      "eventsCount_one": "{{displayCount}} sündmust",
+      "eventsCount_other": "{{displayCount}} sündmust",
       "generated": "Aruanne on loodud {{generatedAt}}.",
       "noActivity": "Salvestatud tegevust pole",
       "noActivityDescription": "Kilol pole ajavahemikust {{start}} kuni {{end}} aruandesse lisatavaid turvaleidudega seotud toiminguid.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Hoidlat pole salvestatud",
+      "reasonUnknown": "Tuvastamata põhjus",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Aruande kokkuvõte",
       "title": "Auditiaruanne",
       "unavailable": "Auditiaruanne pole saadaval",
@@ -1972,6 +1981,7 @@
       "reauthorizeButton": "Volita GitHubi rakendus uuesti",
       "reauthorizeDescription": "Turvaagent vajab õigust Dependaboti hoiatusi lugeda. Selle õiguse andmiseks volita GitHubi rakendus uuesti.",
       "reauthorizeTitle": "Vaja on täiendavaid õigusi",
+      "retryFailed": "Turvaagenti ei õnnestunud endiselt laadida. Kontrolli ühendust ja proovi uuesti.",
       "setupFailed": "GitHubi seadistamist ei õnnestunud alustada. Proovi uuesti."
     },
     "queuedActionUntracked": "Järjekorras olevat toimingut ei õnnestunud enam jälgida. Värskenda, et näha uusimat olekut.",
@@ -2565,7 +2575,10 @@
       "allowOnceAccessibility": "Luba üks kord",
       "alwaysAllow": "Luba alati",
       "alwaysAllowAccessibility": "Luba alati",
-      "retrying": "Uuesti proovimine…"
+      "retrying": "Uuesti proovimine…",
+      "retryDeny": "Proovi keelamist uuesti",
+      "retryAllowOnce": "Proovi lubamist üks kord uuesti",
+      "retryAlwaysAllow": "Proovi lubamist alati uuesti"
     },
     "questionCard": {
       "title": "Agent vajab vastust",
@@ -3156,7 +3169,9 @@
       "sendInvite": "Saada kutse",
       "title": "Kutsu liige",
       "alreadyInvited": "Ta on juba kutsutud või juba liige.",
-      "sendError": "Kutset ei õnnestunud saata."
+      "sendError": "Kutset ei õnnestunud saata.",
+      "pendingInvitation": "Sellele e-posti aadressile on juba saadetud kutse, mis on ootel.",
+      "alreadyMember": "See isik on juba selle organisatsiooni liige."
     },
     "invoices": {
       "downloadA11y": "Laadi alla arve {{number}}",
@@ -3226,7 +3241,12 @@
       "pendingInvitations": "Ootel kutsed",
       "resendInvite": "Saada kutse uuesti",
       "shareInviteLink": "Jaga kutselinki",
-      "resendInviteError": "Kutset ei õnnestunud uuesti saata."
+      "resendInviteError": "Kutset ei õnnestunud uuesti saata.",
+      "inviteNotResendable": "Seda kutset ei saa enam uuesti saata.",
+      "ownerAuthority": "Ainult organisatsiooni omanik saab omanikke hallata.",
+      "ownRoleChange": "Sa ei saa oma rolli muuta.",
+      "inviteExpired": "See kutse on aegunud.",
+      "inviteAccepted": "See kutse on juba vastu võetud."
     },
     "usageStats": {
       "inputTokens": "Sisendtokenid",

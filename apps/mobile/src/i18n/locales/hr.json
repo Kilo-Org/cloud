@@ -53,6 +53,7 @@
     "connected": "Povezano",
     "couldNotLoadModels": "Nije moguće učitati modele.",
     "couldNotLoadRepositories": "Nije moguće učitati repozitorije.",
+    "noRepositoriesFound": "Nisu pronađeni repozitoriji",
     "critical": "Kritično",
     "delete": "Obriši",
     "deleted": "Obrisano",
@@ -87,6 +88,7 @@
     "connect": "Poveži",
     "connectBitbucket": "Poveži Bitbucket",
     "connectGitlab": "Poveži GitLab",
+    "connectProvider": "Poveži pružatelja",
     "contentTruncated": "Sadržaj skraćen",
     "copyLink": "Kopiraj poveznicu",
     "couldNotLoadOrganizations": "Nije moguće učitati organizacije.",
@@ -145,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Izmjene"
+    "changes": "Izmjene",
+    "organizationTrialEnded": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan. Vlasnik organizacije može ažurirati naplatu na kilo.ai i zatim pokušati ponovno."
   },
   "language": {
     "restarting": "Ponovno pokretanje radi promjene jezika",
@@ -502,7 +505,7 @@
       "unresolveThread": "Označi nit kao neriješenu",
       "resolved": "Riješeno",
       "outdated": "Zastarjelo",
-      "comment_one": "1 komentar",
+      "comment_one": "{{displayCount}} komentar",
       "comment": "{{displayCount}} komentara",
       "comment_other": "{{displayCount}} komentara",
       "startedRelative": " · započeto {{relative}}",
@@ -1429,7 +1432,6 @@
       "gitlabNoRepositoriesDescription": "Možda trebaš odobriti pristup dodatnim grupama ili projektima na GitLabu.",
       "installGithubApp": "Instaliraj aplikaciju GitHub za repozitorije",
       "installGithubAppDescription": "Odobri aplikaciji Kilo za GitHub pristup repozitorijima koje želiš pregledati.",
-      "noRepositoriesFound": "Nisu pronađeni repozitoriji",
       "repositoryAccess": "pristup repozitoriju"
     },
     "style": {
@@ -1459,6 +1461,8 @@
       "showMore": "Prikaži više",
       "created": "Stvoreno",
       "started": "Pokrenuto",
+      "reviewEnded": "Završeno",
+      "severityNitpick": "Sitnica",
       "tokens": "Tokeni",
       "tokensInOut": "Ulazni: {{input}} / izlazni: {{output}}",
       "council": "Vijeće",
@@ -1509,7 +1513,6 @@
       "invalidUrl": "Unesi valjan URL zahtjeva za spajanje.",
       "couldNotCheckProviderStatus": "Nije moguće provjeriti status pružatelja.",
       "couldNotLoadProviders": "Nije moguće učitati povezane pružatelje. Pokušaj ponovno.",
-      "connectProvider": "Poveži pružatelja",
       "connectProviderDescription": "Poveži GitHub za pokretanje ručnog pregleda zahtjeva za spajanje.",
       "pullRequestUrl": "URL zahtjeva za spajanje",
       "instructions": "Upute (neobavezno)",
@@ -1939,11 +1942,18 @@
       "actorSystem": "Kilo sustav",
       "couldNotLoad": "Nije moguće učitati izvješće o reviziji.",
       "events": "Događaji",
+      "eventConfidence": "Pouzdanost: {{confidence}}",
+      "eventReason": "Razlog: {{reason}}",
+      "eventsCount_one": "{{displayCount}} događaj",
+      "eventsCount_few": "{{displayCount}} događaja",
+      "eventsCount_other": "{{displayCount}} događaja",
       "generated": "Izvješće je izrađeno {{generatedAt}}.",
       "noActivity": "Nema zabilježene aktivnosti",
       "noActivityDescription": "Kilo nema aktivnosti povezanih sa sigurnosnim nalazima koje bi uključio u izvješće za razdoblje od {{start}} do {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repozitorij nije zabilježen",
+      "reasonUnknown": "Neprepoznat razlog",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Sažetak izvješća",
       "title": "Izvješće o reviziji",
       "unavailable": "Izvješće o reviziji nedostupno",
@@ -1998,6 +2008,7 @@
       "reauthorizeButton": "Ponovno autoriziraj aplikaciju GitHub",
       "reauthorizeDescription": "Sigurnosni agent treba dopuštenje za čitanje upozorenja iz Dependabota. Ponovno autoriziraj aplikaciju GitHub da joj dodijeliš to dopuštenje.",
       "reauthorizeTitle": "Potrebna dodatna dopuštenja",
+      "retryFailed": "I dalje nije moguće učitati sigurnosnog agenta. Provjeri vezu i pokušaj ponovno.",
       "setupFailed": "Nije moguće pokrenuti postavljanje za GitHub. Pokušaj ponovno."
     },
     "queuedActionUntracked": "Radnju u redu čekanja više nije moguće pratiti. Osvježi prikaz za najnovije stanje.",
@@ -2600,7 +2611,10 @@
       "allowOnceAccessibility": "Dopusti jednom",
       "alwaysAllow": "Uvijek dopusti",
       "alwaysAllowAccessibility": "Uvijek dopusti",
-      "retrying": "Ponovni pokušaj…"
+      "retrying": "Ponovni pokušaj…",
+      "retryDeny": "Pokušaj ponovno odbiti",
+      "retryAllowOnce": "Pokušaj ponovno dopustiti jednom",
+      "retryAlwaysAllow": "Pokušaj ponovno uvijek dopustiti"
     },
     "questionCard": {
       "title": "Agent treba odgovor",
@@ -3199,7 +3213,9 @@
       "sendInvite": "Pošalji pozivnicu",
       "title": "Pozovi člana",
       "alreadyInvited": "Taj je korisnik već pozvan ili je već član.",
-      "sendError": "Nije moguće poslati pozivnicu."
+      "sendError": "Nije moguće poslati pozivnicu.",
+      "pendingInvitation": "Ova adresa e-pošte već ima pozivnicu na čekanju.",
+      "alreadyMember": "Ova osoba je već član ove organizacije."
     },
     "invoices": {
       "downloadA11y": "Preuzmi račun {{number}}",
@@ -3269,7 +3285,12 @@
       "pendingInvitations": "Pozivnice na čekanju",
       "resendInvite": "Ponovno pošalji pozivnicu",
       "shareInviteLink": "Podijeli poveznicu pozivnice",
-      "resendInviteError": "Nije moguće ponovno poslati pozivnicu."
+      "resendInviteError": "Nije moguće ponovno poslati pozivnicu.",
+      "inviteNotResendable": "Ova pozivnica se više ne može ponovno poslati.",
+      "ownerAuthority": "Samo vlasnik organizacije može upravljati vlasnicima.",
+      "ownRoleChange": "Ne možete promijeniti vlastitu ulogu.",
+      "inviteExpired": "Ova pozivnica je istekla.",
+      "inviteAccepted": "Ova pozivnica je već prihvaćena."
     },
     "usageStats": {
       "inputTokens": "Ulazni tokeni",

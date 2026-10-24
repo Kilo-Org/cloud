@@ -294,6 +294,10 @@ jest.mock('@/lib/r2/cloud-agent-pending-uploads', () => ({
   releasePendingUploads: jest.fn(),
 }));
 
+jest.mock('@/lib/cloud-agent-next/release-unadmitted-send', () => ({
+  releaseUnadmittedSend: jest.fn(async () => {}),
+}));
+
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => {
   const trpcInit = jest.requireActual<typeof TrpcInitModule>('@kilocode/web-shared/lib/trpc/init');
   const zod = jest.requireActual<typeof ZodModule>('zod');
@@ -1031,6 +1035,38 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
     expect(linkAttachmentsForDispatch.mock.invocationCallOrder[0]).toBeLessThan(
       mockSendMessage.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
     );
+  });
+
+  it('asks the Worker whether a failed send was admitted before keeping the rows', async () => {
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+    const attachments = {
+      path: '12345678-1234-4234-9234-123456789abc',
+      files: ['87654321-4321-4321-8321-cba987654321.md'],
+    };
+    const releaseUnadmittedSend = jest.mocked(
+      jest.requireMock<{ releaseUnadmittedSend: (input: unknown) => Promise<void> }>(
+        '@/lib/cloud-agent-next/release-unadmitted-send'
+      ).releaseUnadmittedSend
+    );
+    mockSendMessage.mockRejectedValueOnce(new TRPCClientError('worker unavailable'));
+
+    await expect(
+      caller.sendMessage({
+        organizationId: ORGANIZATION_ID,
+        cloudAgentSessionId: 'agent_123',
+        messageId: SEND_MESSAGE_ID,
+        payload: { type: 'prompt', prompt: 'Read notes', mode: 'code', model: 'test' },
+        attachments,
+      })
+    ).rejects.toThrow('worker unavailable');
+
+    expect(releaseUnadmittedSend).toHaveBeenCalledWith({
+      attachments,
+      client: expect.anything(),
+      cloudAgentSessionId: 'agent_123',
+      kiloUserId: 'user-1',
+      messageId: SEND_MESSAGE_ID,
+    });
   });
 
   it('normalizes legacy image requests to canonical Worker attachments', async () => {

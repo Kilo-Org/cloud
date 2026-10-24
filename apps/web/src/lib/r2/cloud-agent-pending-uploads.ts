@@ -166,6 +166,17 @@ export type LinkPendingUploadsResult = {
   unlinkedObjectKeys: string[];
 };
 
+/** The attachments of one message, as the send and prepare inputs carry them. */
+export type DispatchAttachments = { path: string; files: string[] };
+
+/** Object keys of one message's attachments, as the presign helper admitted them. */
+export function attachmentObjectKeys(
+  kiloUserId: string,
+  attachments: DispatchAttachments
+): string[] {
+  return attachments.files.map(file => `${kiloUserId}/cloud-agent/${attachments.path}/${file}`);
+}
+
 /**
  * Flip pending ledger rows to 'linked' for a user's message, and report the
  * requested keys the message does not end up holding. The guarded update links
@@ -243,7 +254,7 @@ export const CLOUD_AGENT_ATTACHMENT_EXPIRED_MESSAGE =
  */
 export async function linkAttachmentsForDispatch(
   kiloUserId: string,
-  attachments: { path: string; files: string[] } | undefined
+  attachments: DispatchAttachments | undefined
 ): Promise<void> {
   if (!attachments || attachments.files.length === 0) return;
 
@@ -254,7 +265,7 @@ export async function linkAttachmentsForDispatch(
       tx,
       kiloUserId,
       attachments.path,
-      attachments.files.map(file => `${kiloUserId}/cloud-agent/${attachments.path}/${file}`)
+      attachmentObjectKeys(kiloUserId, attachments)
     );
     if (unlinkedObjectKeys.length > 0) {
       throw new TRPCError({
@@ -263,6 +274,39 @@ export async function linkAttachmentsForDispatch(
       });
     }
   });
+}
+
+/**
+ * Hand one message's attachment rows back to the abandoned-upload lifecycle
+ * after the worker stated it never admitted the turn. Only the rows this message
+ * still holds are moved back, so a row another message holds or the reaper
+ * already took keeps its state. The rows keep their original lease, so the
+ * reaper claims them on its next run once that lease lapses. Returns the number
+ * of rows handed back.
+ */
+export async function releaseUnadmittedUploads(
+  kiloUserId: string,
+  attachments: DispatchAttachments
+): Promise<number> {
+  if (attachments.files.length === 0) return 0;
+
+  const released = await db
+    .update(cloud_agent_pending_uploads)
+    .set({ status: 'pending' })
+    .where(
+      and(
+        eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
+        eq(cloud_agent_pending_uploads.message_uuid, attachments.path),
+        eq(cloud_agent_pending_uploads.status, 'linked'),
+        inArray(
+          cloud_agent_pending_uploads.object_key,
+          attachmentObjectKeys(kiloUserId, attachments)
+        )
+      )
+    )
+    .returning({ id: cloud_agent_pending_uploads.id });
+
+  return released.length;
 }
 
 export type ReapAbandonedUploadsSummary = {

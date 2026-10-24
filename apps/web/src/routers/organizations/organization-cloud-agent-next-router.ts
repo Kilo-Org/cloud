@@ -8,6 +8,7 @@ import {
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
 import { isPublicRepoUrlEnabled } from '@/lib/cloud-agent-next/public-repo-url';
+import { releaseUnadmittedSend } from '@/lib/cloud-agent-next/release-unadmitted-send';
 import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
 import { createWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import { assertSessionWorktree } from '@/lib/cloud-agent-next/worktree-review-access';
@@ -522,6 +523,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       // Tokens are refreshed inside cloud-agent-next (GitHub App installation
       // for GitHub, GIT_TOKEN_SERVICE for managed GitLab). organizationId is
       // consumed by the membership middleware; it is not forwarded.
+      const attachments = input.attachments;
       try {
         // Link the attachment rows before the worker can accept the turn: the
         // link is what keeps their objects out of the abandoned-upload reaper,
@@ -529,17 +531,30 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         // could report an accepted send as failed. Only ATTACHMENT rows are
         // admitted (images are never admitted; only
         // generateCloudAgentAttachmentUploadUrl admits).
-        const attachments = input.attachments;
         await linkAttachmentsForDispatch(ctx.user.id, attachments);
+      } catch (error) {
+        rethrowCloudAgentError(error);
+      }
 
+      try {
         return await client.sendMessage({
           cloudAgentSessionId: input.cloudAgentSessionId,
           payload: input.payload,
           autoCommit: input.autoCommit,
           messageId: input.messageId,
-          attachments: input.attachments ?? input.images,
+          attachments: attachments ?? input.images,
         });
       } catch (error) {
+        // A send can fail after the worker accepted the turn, so the rows are
+        // only returned to the reaper when the worker states that it never
+        // admitted this message.
+        await releaseUnadmittedSend({
+          attachments,
+          client,
+          cloudAgentSessionId: input.cloudAgentSessionId,
+          kiloUserId: ctx.user.id,
+          messageId: input.messageId,
+        });
         rethrowCloudAgentError(error);
       }
     }),

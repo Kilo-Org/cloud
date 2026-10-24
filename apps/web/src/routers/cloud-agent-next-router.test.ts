@@ -41,6 +41,7 @@ import { TRPCError } from '@trpc/server';
 import { getHTTPStatusCodeFromError } from '@trpc/server/http';
 import type { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import type * as StreamTicketModule from '@/lib/cloud-agent/stream-ticket';
+import type { releaseUnadmittedSend } from '@/lib/cloud-agent-next/release-unadmitted-send';
 
 type AttachmentReference = { path: string; files: string[] };
 
@@ -157,6 +158,7 @@ const mockIsFeatureFlagEnabledOrDevelopment =
   jest.fn<(flagName: string, distinctId: string) => Promise<boolean>>();
 const mockVerifyUserOwnsSessionV2ByCloudAgentId =
   jest.fn<typeof verifyUserOwnsSessionV2ByCloudAgentId>();
+const mockReleaseUnadmittedSend = jest.fn<typeof releaseUnadmittedSend>(async () => {});
 const mockSignPreviewTicket = jest.fn<typeof StreamTicketModule.signPreviewTicket>();
 const mockGetBalanceForUser = jest.fn<(user: User) => Promise<{ balance: number }>>();
 const mockFetchGitHubRepositoriesForUser = jest.fn<
@@ -208,6 +210,10 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
 
 jest.mock('@/lib/cloud-agent-next/worktree-chat', () => ({
   createWorktreeChat: mockCreateWorktreeChat,
+}));
+
+jest.mock('@/lib/cloud-agent-next/release-unadmitted-send', () => ({
+  releaseUnadmittedSend: mockReleaseUnadmittedSend,
 }));
 
 jest.mock('@kilocode/web-shared/lib/trpc/min-version', () => ({
@@ -883,6 +889,8 @@ describe('cloudAgentNextRouter send attachment ledger', () => {
     });
 
     expect(mockSendMessage).not.toHaveBeenCalled();
+    // The refusal rolls the link back, so there is nothing to hand back.
+    expect(mockReleaseUnadmittedSend).not.toHaveBeenCalled();
   });
 
   it('links the attachment rows before the worker accepts the send', async () => {
@@ -899,6 +907,7 @@ describe('cloudAgentNextRouter send attachment ledger', () => {
     ).resolves.toMatchObject({ messageId: SEND_MESSAGE_ID });
 
     expect(mockSendMessage).toHaveBeenCalledWith(expect.objectContaining({ attachments }));
+    expect(mockReleaseUnadmittedSend).not.toHaveBeenCalled();
     expect(await readStatus()).toBe('linked');
   });
 
@@ -916,6 +925,13 @@ describe('cloudAgentNextRouter send attachment ledger', () => {
       })
     ).rejects.toThrow('worker unavailable');
 
+    expect(mockReleaseUnadmittedSend).toHaveBeenCalledWith({
+      attachments,
+      client: expect.anything(),
+      cloudAgentSessionId: 'agent_123',
+      kiloUserId: userId,
+      messageId: SEND_MESSAGE_ID,
+    });
     expect(await readStatus()).toBe('linked');
   });
 

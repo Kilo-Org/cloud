@@ -6,6 +6,7 @@ import type {
   purgeUserPendingUploads as PurgeUserPendingUploads,
   reapAbandonedUploads as ReapAbandonedUploads,
   releasePendingUploads as ReleasePendingUploads,
+  releaseUnadmittedUploads as ReleaseUnadmittedUploads,
 } from './cloud-agent-pending-uploads';
 
 const mockSend = jest.fn<(command: { input: { Key: string }; name: string }) => Promise<unknown>>();
@@ -22,7 +23,7 @@ jest.mock('@aws-sdk/client-s3', () => ({
   DeleteObjectCommand: mockDeleteObjectCommand,
 }));
 
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import {
   CLOUD_AGENT_ATTACHMENT_MAX_COUNT,
   CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES,
@@ -38,6 +39,7 @@ let linkPendingUploads: typeof LinkPendingUploads;
 let purgeUserPendingUploads: typeof PurgeUserPendingUploads;
 let reapAbandonedUploads: typeof ReapAbandonedUploads;
 let releasePendingUploads: typeof ReleasePendingUploads;
+let releaseUnadmittedUploads: typeof ReleaseUnadmittedUploads;
 
 function buildObjectKey(kiloUserId: string, messageUuid: string, attachmentId: string): string {
   return `${kiloUserId}/cloud-agent/${messageUuid}/${attachmentId}.bin`;
@@ -83,6 +85,7 @@ describe('cloud-agent pending-upload ledger', () => {
     purgeUserPendingUploads = pendingUploadsModule.purgeUserPendingUploads;
     reapAbandonedUploads = pendingUploadsModule.reapAbandonedUploads;
     releasePendingUploads = pendingUploadsModule.releasePendingUploads;
+    releaseUnadmittedUploads = pendingUploadsModule.releaseUnadmittedUploads;
   });
 
   afterEach(async () => {
@@ -917,6 +920,73 @@ describe('cloud-agent pending-upload ledger', () => {
       .from(cloud_agent_pending_uploads)
       .where(eq(cloud_agent_pending_uploads.id, row));
     expect(after?.status).toBe('linked');
+  });
+
+  it('returns only the unadmitted message rows to pending and leaves another message linked', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const unadmittedMessage = crypto.randomUUID();
+    const otherMessage = crypto.randomUUID();
+    const unadmittedAttachment = crypto.randomUUID();
+    const otherAttachment = crypto.randomUUID();
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    const unadmittedRow = await insertPendingRow({
+      kiloUserId,
+      messageUuid: unadmittedMessage,
+      attachmentId: unadmittedAttachment,
+      expiresAt: future,
+      status: 'linked',
+    });
+    const otherRow = await insertPendingRow({
+      kiloUserId,
+      messageUuid: otherMessage,
+      attachmentId: otherAttachment,
+      expiresAt: future,
+      status: 'linked',
+    });
+
+    const released = await releaseUnadmittedUploads(kiloUserId, {
+      path: unadmittedMessage,
+      files: [`${unadmittedAttachment}.bin`],
+    });
+
+    expect(released).toBe(1);
+    const rows = await db
+      .select({ id: cloud_agent_pending_uploads.id, status: cloud_agent_pending_uploads.status })
+      .from(cloud_agent_pending_uploads)
+      .where(inArray(cloud_agent_pending_uploads.id, [unadmittedRow, otherRow]));
+    const statusById = new Map(rows.map(row => [row.id, row.status]));
+    expect(statusById.get(unadmittedRow)).toBe('pending');
+    expect(statusById.get(otherRow)).toBe('linked');
+  });
+
+  it('lets the reaper reclaim a returned row once its lease lapses', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const attachment = crypto.randomUUID();
+    const past = new Date(Date.now() - 60_000).toISOString();
+    mockSend.mockResolvedValue({});
+
+    const row = await insertPendingRow({
+      kiloUserId,
+      messageUuid,
+      attachmentId: attachment,
+      expiresAt: past,
+      status: 'linked',
+    });
+
+    await releaseUnadmittedUploads(kiloUserId, {
+      path: messageUuid,
+      files: [`${attachment}.bin`],
+    });
+    const summary = await reapAbandonedUploads();
+
+    expect(summary.reaped).toBe(1);
+    const [after] = await db
+      .select({ status: cloud_agent_pending_uploads.status })
+      .from(cloud_agent_pending_uploads)
+      .where(eq(cloud_agent_pending_uploads.id, row));
+    expect(after?.status).toBe('reaped');
   });
 
   it('reports the attachment row a reaper claim took first and does not link it', async () => {

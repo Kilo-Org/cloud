@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
+import { eq } from 'drizzle-orm';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { kilocode_users, platform_integrations } from '@kilocode/db/schema';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { verifyOAuthState, createOAuthState } from '@/lib/integrations/oauth-state';
 import { bot } from '@/lib/bot';
@@ -289,22 +293,40 @@ describe('GET /api/integrations/linear/callback', () => {
     expect(mockCancelProviderOAuthAttempt).not.toHaveBeenCalled();
   });
 
-  test('persists the installation and the integration row for an unclaimed workspace', async () => {
-    mockedUpsertLinearInstallation.mockResolvedValue({} as never);
-    const state = createProviderState();
-    const response = await callLinearCallback(
-      makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
+  test('persists the installation and the integration row', async () => {
+    await insertTestUser({ id: USER_ID });
+    mockedUpsertLinearInstallation.mockImplementation(
+      jest.requireActual<{ upsertLinearInstallation: typeof upsertLinearInstallation }>(
+        '@/lib/integrations/linear-service'
+      ).upsertLinearInstallation
     );
+    try {
+      const state = createProviderState();
+      const response = await callLinearCallback(
+        makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
+      );
 
-    expect(setInstallation).toHaveBeenCalledTimes(1);
-    expect(setInstallation).toHaveBeenCalledWith(ORGANIZATION_ID, {
-      accessToken: 'lin_app_tok',
-      botUserId: 'linear-bot-user',
-      expiresAt: null,
-      organizationId: ORGANIZATION_ID,
-    });
-
-    expectRedirectLocation(response, '/integrations/linear?success=installed');
+      expectRedirectLocation(response, '/integrations/linear?success=installed');
+      expect(setInstallation).toHaveBeenCalledWith(ORGANIZATION_ID, {
+        accessToken: 'lin_app_tok',
+        botUserId: 'linear-bot-user',
+        expiresAt: null,
+        organizationId: ORGANIZATION_ID,
+      });
+      const [stored] = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.owned_by_user_id, USER_ID));
+      expect(stored).toMatchObject({
+        platform: PLATFORM.LINEAR,
+        platform_installation_id: ORGANIZATION_ID,
+        platform_account_login: 'Acme Workspace',
+        metadata: expect.objectContaining({ bot_enabled: true, bot_user_id: 'linear-bot-user' }),
+      });
+    } finally {
+      mockedUpsertLinearInstallation.mockReset();
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, USER_ID));
+    }
   });
 
   test('redirects successful installs to returnTo when signed state carries one', async () => {

@@ -9,6 +9,8 @@ export async function withWorkspaceInstallationLock<T>(
   operation: (tx: DrizzleTransaction) => Promise<T>
 ): Promise<T> {
   return db.transaction(async tx => {
+    await tx.execute(sql`SET LOCAL lock_timeout = '5s'`);
+    await tx.execute(sql`SET LOCAL statement_timeout = '30s'`);
     const ownerKey = `integration-installation-owner:${platform}:${owner.type}:${owner.id}`;
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${ownerKey}, 0))`);
     const key = `integration-installation:${platform}:${installationId}`;

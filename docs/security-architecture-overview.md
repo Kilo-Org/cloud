@@ -234,7 +234,7 @@ Kilo Cloud distinguishes among several authorization contexts:
 
 Repository code includes token-version checks in shared JWT validation paths and revocation-pepper checks in selected web and Worker authorization paths. The exact lifetime, rotation cadence, and emergency-revocation process for production credentials are operational controls managed outside this overview.
 
-Slack and Linear installation callbacks serialize persistence by provider, owner, and workspace using primary-PostgreSQL transaction advisory locks, acquired in owner-then-workspace order. Ownership reads and integration-row writes share that transaction; installation-state updates and restoration complete while the locks are held. Organization model defaults are resolved before entering the transaction. Slack credential mirroring uses a transaction savepoint and retains its best-effort behavior.
+Slack and Linear installation callbacks serialize persistence by provider, owner, and workspace using primary-PostgreSQL transaction advisory locks, acquired in owner-then-workspace order. Each transaction sets a five-second lock timeout and a thirty-second SQL statement timeout. Ownership reads and integration-row writes share that transaction; installation-state updates and restoration complete while the locks are held. Organization model defaults are resolved before entering the transaction. Slack credential mirroring uses a transaction savepoint and retains its best-effort behavior.
 
 ### 5.3 Tenant and execution scoping
 

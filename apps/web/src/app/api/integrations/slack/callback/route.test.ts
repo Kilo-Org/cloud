@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
+import { eq } from 'drizzle-orm';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { kilocode_users, platform_integrations } from '@kilocode/db/schema';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { createOAuthState } from '@/lib/integrations/oauth-state';
 import { bot } from '@/lib/bot';
@@ -119,17 +123,35 @@ describe('GET /api/integrations/slack/callback', () => {
     expect(response.headers.get('location')).toContain('/users/sign_in');
   });
 
-  test('persists the exchanged installation for an unclaimed workspace', async () => {
-    mockedUpsertSlackInstallation.mockResolvedValue({} as never);
-    const state = createProviderState();
-
-    const response = await callSlackCallback(
-      makeRequest(`/api/integrations/slack/callback?code=abc&state=${state}`)
+  test('persists the installation and the integration row', async () => {
+    await insertTestUser({ id: USER_ID });
+    mockedUpsertSlackInstallation.mockImplementation(
+      jest.requireActual<{ upsertSlackInstallation: typeof upsertSlackInstallation }>(
+        '@/lib/integrations/slack-service'
+      ).upsertSlackInstallation
     );
+    try {
+      const state = createProviderState();
+      const response = await callSlackCallback(
+        makeRequest(`/api/integrations/slack/callback?code=abc&state=${state}`)
+      );
 
-    expect(setInstallation).toHaveBeenCalledTimes(1);
-    expect(setInstallation).toHaveBeenCalledWith(TEAM_ID, INSTALLATION);
-    expectRedirectLocation(response, '/integrations/slack?success=installed');
+      expectRedirectLocation(response, '/integrations/slack?success=installed');
+      expect(setInstallation).toHaveBeenCalledWith(TEAM_ID, INSTALLATION);
+      const [stored] = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.owned_by_user_id, USER_ID));
+      expect(stored).toMatchObject({
+        platform: 'slack',
+        platform_installation_id: TEAM_ID,
+        platform_account_login: 'Acme Workspace',
+        metadata: expect.objectContaining({ bot_user_id: 'U0BOT', access_token: 'xoxb-new-token' }),
+      });
+    } finally {
+      mockedUpsertSlackInstallation.mockReset();
+      await db.delete(kilocode_users).where(eq(kilocode_users.id, USER_ID));
+    }
   });
 
   test('redirects successful installs to returnTo when signed state carries one', async () => {

@@ -37,6 +37,17 @@ export const MAX_LIST_LIMIT = 100;
 export const DEFAULT_LIST_OFFSET = 0;
 
 // ============================================================================
+// Existing Inline Comments
+// ============================================================================
+
+/**
+ * Characters of each existing inline comment body kept in review state and rendered in the
+ * duplicate-detection table of the review prompt. The provider adapters and the prompt share this
+ * ceiling so the reviewer sees as much of a prior finding as the lookup keeps.
+ */
+export const MAX_INLINE_COMMENT_BODY_CHARS = 500;
+
+// ============================================================================
 // GitHub Webhook Events
 // ============================================================================
 

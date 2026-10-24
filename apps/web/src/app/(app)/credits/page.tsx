@@ -296,9 +296,9 @@ function CreditsPageContent() {
   }
 
   const currentBalance = creditData.totalBalance_mUsd;
-  const nextPromotionalExpiry = creditData.creditBlocks.reduce<string | null>(
+  const nextCreditExpiry = creditData.creditBlocks.reduce<string | null>(
     (earliestExpiry, block) => {
-      if (!block.is_free || !block.expiry_date) return earliestExpiry;
+      if (block.balance_mUsd <= 0 || !block.expiry_date) return earliestExpiry;
       if (!earliestExpiry) return block.expiry_date;
       return new Date(block.expiry_date) < new Date(earliestExpiry)
         ? block.expiry_date
@@ -333,6 +333,11 @@ function CreditsPageContent() {
                     </p>
                     <p className="type-body text-muted-foreground mt-0.5 tabular-nums">
                       Current balance: {formatMicrodollars(currentBalance)}
+                    </p>
+                    <p className="type-body text-muted-foreground mt-0.5">
+                      {confirmation.expiryDate
+                        ? `Purchased credits expire ${formatExpiryTimestamp(confirmation.expiryDate)}.`
+                        : 'These purchased credits do not expire.'}
                     </p>
                   </div>
                 </div>
@@ -433,10 +438,10 @@ function CreditsPageContent() {
               <div className="flex items-start gap-2">
                 <CalendarDays className="text-status-info-icon mt-0.5 size-4 shrink-0" />
                 <div>
-                  <p className="type-body text-muted-foreground">Next promotional expiry</p>
-                  {nextPromotionalExpiry ? (
+                  <p className="type-body text-muted-foreground">Next credit expiry</p>
+                  {nextCreditExpiry ? (
                     <p className="type-body font-medium">
-                      {formatExpiryTimestamp(nextPromotionalExpiry)}
+                      {formatExpiryTimestamp(nextCreditExpiry)}
                     </p>
                   ) : (
                     <p className="type-body font-medium">None scheduled</p>
@@ -446,7 +451,8 @@ function CreditsPageContent() {
             </div>
 
             <div className="type-label text-muted-foreground border-border border-t pt-4">
-              Promotional credits may have their own expiration timestamp.
+              Credits with the earliest expiration are used first. Non-expiring credits are used
+              last. Existing credits keep their current terms.
             </div>
           </CardContent>
         </Card>
@@ -475,6 +481,7 @@ function CreditsPageContent() {
                     <Th>Purchase Date</Th>
                     <Th>Type</Th>
                     <Th>Credits Added</Th>
+                    <Th>Expires</Th>
                     <Th>Invoice</Th>
                   </tr>
                 </thead>
@@ -493,6 +500,9 @@ function CreditsPageContent() {
                       <Td>
                         <Skeleton className="h-4 w-20" />
                       </Td>
+                      <Td>
+                        <Skeleton className="h-4 w-20" />
+                      </Td>
                     </tr>
                   )}
                   {purchaseHistoryData?.entries.map(entry => {
@@ -504,6 +514,11 @@ function CreditsPageContent() {
                         <Td>{formatIsoDateString_UsaDateOnlyFormat(entry.date)}</Td>
                         <Td>{entry.description}</Td>
                         <Td numeric>{formatMicrodollars(entry.amount_mUsd)}</Td>
+                        <Td>
+                          {entry.expiryDate
+                            ? formatExpiryTimestamp(entry.expiryDate)
+                            : 'Does not expire'}
+                        </Td>
                         <Td>
                           <Button
                             variant="link"

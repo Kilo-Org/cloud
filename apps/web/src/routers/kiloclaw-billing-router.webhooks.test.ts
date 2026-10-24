@@ -23,7 +23,7 @@ import {
   credit_transactions,
   user_affiliate_events,
 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { sandboxIdFromUserId } from '@kilocode/worker-utils/sandbox-id';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import type Stripe from 'stripe';
@@ -1857,6 +1857,36 @@ describe('handleKiloClawInvoicePaid affiliate events', () => {
       status: 'active',
       instance_id: newInstance.id,
       kiloclaw_price_version: CURRENT_KILOCLAW_PRICE_VERSION,
+    });
+    const [settlement] = await db
+      .select()
+      .from(credit_transactions)
+      .where(
+        and(
+          eq(credit_transactions.kilo_user_id, user.id),
+          eq(credit_transactions.description, 'KiloClaw standard settlement')
+        )
+      );
+    expect(settlement).toMatchObject({
+      paid_credit_policy: 'settlement',
+      credit_source: 'settlement',
+      expiry_date: null,
+      amount_microdollars: 9_000_000,
+    });
+    const [deduction] = await db
+      .select()
+      .from(credit_transactions)
+      .where(
+        and(
+          eq(credit_transactions.kilo_user_id, user.id),
+          eq(credit_transactions.description, 'KiloClaw standard period deduction')
+        )
+      );
+    expect(deduction).toMatchObject({
+      paid_credit_policy: 'settlement',
+      credit_source: 'settlement',
+      expiry_date: null,
+      amount_microdollars: -9_000_000,
     });
   });
 

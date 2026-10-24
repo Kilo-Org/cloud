@@ -16,6 +16,11 @@ const makeTransaction = (
   credit_category: opts.credit_category ?? null,
   original_transaction_id: opts.original_transaction_id ?? null,
   created_at: opts.created_at ?? '2024-01-01',
+  consumed_microdollars: opts.consumed_microdollars ?? 0,
+  retired_microdollars: opts.retired_microdollars ?? 0,
+  paid_credit_policy: opts.paid_credit_policy ?? null,
+  credit_source: opts.credit_source ?? null,
+  source_transaction_id: opts.source_transaction_id ?? null,
 });
 
 const ENTITY_ID = 'user-1';
@@ -156,24 +161,20 @@ describe('getCreditBlocks', () => {
     expect(result.creditBlocks).toHaveLength(3);
     expect(result.totalBalance_mUsd).toBe(1600); // 1800 - 200
 
-    // Expiring block first (t1), then non-expiring ordered by created_at (oldest first)
-    // t1: 1000 original, 200 used, 800 remaining
+    // Equal-date and nonexpiring lots use deterministic ID order.
     expect(result.creditBlocks[0].id).toBe('t1');
     expect(result.creditBlocks[0].balance_mUsd).toBe(800);
     expect(result.creditBlocks[0].is_free).toBe(true);
     expect(result.creditBlocks[0].expiry_date).toBe('2024-01-10');
 
-    // Non-expiring blocks: t3 (oldest) then t2 (newer)
-    // t3: 300 original, non-expiring
-    expect(result.creditBlocks[1].id).toBe('t3');
-    expect(result.creditBlocks[1].balance_mUsd).toBe(300);
-    expect(result.creditBlocks[1].is_free).toBe(true);
+    expect(result.creditBlocks[1].id).toBe('t2');
+    expect(result.creditBlocks[1].balance_mUsd).toBe(500);
+    expect(result.creditBlocks[1].is_free).toBe(false);
     expect(result.creditBlocks[1].expiry_date).toBeNull();
 
-    // t2: 500 original, non-expiring
-    expect(result.creditBlocks[2].id).toBe('t2');
-    expect(result.creditBlocks[2].balance_mUsd).toBe(500);
-    expect(result.creditBlocks[2].is_free).toBe(false);
+    expect(result.creditBlocks[2].id).toBe('t3');
+    expect(result.creditBlocks[2].balance_mUsd).toBe(300);
+    expect(result.creditBlocks[2].is_free).toBe(true);
     expect(result.creditBlocks[2].expiry_date).toBeNull();
 
     expect(result.isFirstPurchase).toBe(false);
@@ -185,6 +186,36 @@ describe('getCreditBlocks', () => {
 
     const result = getCreditBlocks(transactions, now, entity, ENTITY_ID);
 
+    expect(result.isFirstPurchase).toBe(true);
+  });
+
+  it('presents only unconsumed and unretired principal from normalized lots', () => {
+    const transactions = [
+      makeTransaction('principal', 30, 100, {
+        expiry_date: '2027-01-01',
+        is_free: false,
+        consumed_microdollars: 30,
+        retired_microdollars: 20,
+        paid_credit_policy: 'one_year',
+        credit_source: 'stripe',
+      }),
+      makeTransaction('refund', 30, -20, { expiry_date: '2027-01-01' }),
+    ];
+    const result = getCreditBlocks(transactions, now, makeEntity(40, 80), ENTITY_ID);
+    expect(result.creditBlocks).toHaveLength(1);
+    expect(result.creditBlocks[0]).toMatchObject({ id: 'principal', balance_mUsd: 40 });
+  });
+
+  it('does not show hosting settlement deposits as remaining credits or a purchase', () => {
+    const transactions = [
+      makeTransaction('settlement', 0, 100, {
+        is_free: false,
+        paid_credit_policy: 'settlement',
+        retired_microdollars: 100,
+      }),
+    ];
+    const result = getCreditBlocks(transactions, now, makeEntity(0, 0), ENTITY_ID);
+    expect(result.creditBlocks).toHaveLength(0);
     expect(result.isFirstPurchase).toBe(true);
   });
 });

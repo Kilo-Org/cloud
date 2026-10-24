@@ -12,10 +12,17 @@ import { grantCreditForCategory } from '@kilocode/web-shared/lib/promotionalCred
 import { IS_IN_AUTOMATED_TEST } from '@kilocode/web-shared/lib/config.server';
 import { sendCreditsTopUpEmail } from '@kilocode/web-shared/lib/email';
 import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
+import {
+  resolvePaidCreditPolicy,
+  type PaidCreditGrant,
+} from '@kilocode/web-shared/lib/paidCreditPolicy';
+import { reconcileCreditExpirationsInTransaction } from '@kilocode/db/credit-expiration';
+import { recordRefundDebtRepayment } from '@kilocode/db/credit-refund-repayments';
 
 export type StripeConfig = { type: 'stripe'; stripe_payment_id: string };
 
 type ProcessTopUpOptions = {
+  paidCredit?: PaidCreditGrant;
   /** If true, this is a native auto top-up (not Orb) */
   isAutoTopUp?: boolean;
 
@@ -84,19 +91,30 @@ export async function processTopUp(
     (isAutoTopUp ? `Auto top-up via ${config.type}` : `Top-up via ${config.type}`);
   const creditAmountInMicrodollars = amountInCents * 10_000;
 
-  // Create a credit transaction in our database
   const new_credit_transaction_id = creditTransactionIdOverride ?? crypto.randomUUID();
-  const creditTransactionOptions = {
-    id: new_credit_transaction_id,
-    kilo_user_id: user.id,
-    is_free: false,
-    amount_microdollars: creditAmountInMicrodollars,
-    description: creditDescription,
-    original_baseline_microdollars_used: user.microdollars_used,
-    stripe_payment_id: config.stripe_payment_id,
-  } satisfies typeof credit_transactions.$inferInsert;
+  const policy = resolvePaidCreditPolicy(
+    options.paidCredit ?? { source: 'stripe', purchasedAt: new Date(), terms: 'legacy' }
+  );
 
   const insertCreditTransactionAndUpdateBalance = async (tx: DrizzleTransaction) => {
+    const current = await reconcileCreditExpirationsInTransaction(
+      { type: 'user', id: user.id },
+      tx
+    );
+    const baseline = Math.min(current.microdollars_used, current.total_microdollars_acquired);
+    const creditTransactionOptions = {
+      id: new_credit_transaction_id,
+      kilo_user_id: user.id,
+      is_free: false,
+      amount_microdollars: creditAmountInMicrodollars,
+      description: creditDescription,
+      original_baseline_microdollars_used: current.microdollars_used,
+      expiration_baseline_microdollars_used: baseline,
+      stripe_payment_id: config.stripe_payment_id,
+      retired_microdollars:
+        policy.paid_credit_policy === 'settlement' ? creditAmountInMicrodollars : 0,
+      ...policy,
+    } satisfies typeof credit_transactions.$inferInsert;
     const attemptToInsert = await tx
       .insert(credit_transactions)
       .values(creditTransactionOptions)
@@ -104,11 +122,23 @@ export async function processTopUp(
     const didInsertCreditTransaction = (attemptToInsert.rowCount ?? 0) > 0;
 
     if (!didInsertCreditTransaction) return false;
+    if (policy.paid_credit_policy !== 'settlement') {
+      await recordRefundDebtRepayment(tx, {
+        owner: { type: 'user', id: user.id },
+        transactionId: new_credit_transaction_id,
+        priorAcquired: current.total_microdollars_acquired,
+        priorUsed: current.microdollars_used,
+        amountMicrodollars: creditAmountInMicrodollars,
+      });
+    }
 
     const updateResult = await tx
       .update(kilocode_users)
       .set({
         total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} + ${Math.round(creditAmountInMicrodollars)}`,
+        ...(policy.expiry_date && {
+          next_credit_expiration_at: sql`LEAST(${kilocode_users.next_credit_expiration_at}, ${policy.expiry_date}::timestamptz)`,
+        }),
       })
       .where(eq(kilocode_users.id, user.id));
 
@@ -271,6 +301,19 @@ async function maybeSendTopUpConfirmationEmail(params: {
     }
 
     const receiptUrl = await resolveStripeReceiptUrl(stripeChargeOrInvoiceId);
+    const [creditTransaction] = await db
+      .select({
+        expiryDate: credit_transactions.expiry_date,
+        createdAt: credit_transactions.created_at,
+      })
+      .from(credit_transactions)
+      .where(
+        and(
+          eq(credit_transactions.kilo_user_id, user.id),
+          eq(credit_transactions.stripe_payment_id, stripeChargeOrInvoiceId)
+        )
+      )
+      .limit(1);
     const sendResult = await sendCreditsTopUpEmail({
       to: user.google_user_email,
       variant: isAutoTopUp ? 'auto' : 'manual',
@@ -278,7 +321,11 @@ async function maybeSendTopUpConfirmationEmail(params: {
       serviceFeeCents,
       grossPaidCents,
       creditsCents,
-      purchaseDate: purchaseDate ?? new Date(),
+      purchaseDate:
+        purchaseDate ?? (creditTransaction ? new Date(creditTransaction.createdAt) : new Date()),
+      creditExpiryDate: creditTransaction?.expiryDate
+        ? new Date(creditTransaction.expiryDate)
+        : null,
       receiptUrl,
     });
 

@@ -2080,6 +2080,13 @@
       "when": 1792693880283,
       "tag": "0296_orange_jack_power",
       "breakpoints": true
+    },
+    {
+      "idx": 297,
+      "version": "7",
+      "when": 1792776112006,
+      "tag": "0297_fine_moonstone",
+      "breakpoints": true
     }
   ]
 }

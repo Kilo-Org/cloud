@@ -40,7 +40,11 @@ const mockedQuery = vi.hoisted(() => ({
   completePurchase: vi.fn(),
   invalidateQueries: vi.fn(),
   serverProductsData: undefined as
-    | { appAccountToken: string; products: { appleProductId: string; googleProductId: string }[] }
+    | {
+        appAccountToken: string;
+        products: { appleProductId: string; googleProductId: string }[];
+        recoveryGoogleProductIds?: string[];
+      }
     | undefined,
 }));
 
@@ -703,6 +707,37 @@ describe('CreditNativeIapOwner', () => {
     await flushPromises();
     expect(mockedQuery.completePurchase).not.toHaveBeenCalled();
     expect(handle.value?.errorMessageKey).toBe('kiloPass.purchaseFailed');
+  });
+
+  it('recovers a legacy Play receipt after the purchasable catalog switches to expiring SKUs', async () => {
+    mockedPlatform.OS = 'android';
+    mockedIap.connected = true;
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10_1year_v2' }],
+      recoveryGoogleProductIds: ['credits_usd10', 'credits_usd10_1year_v2'],
+    };
+    const legacyPurchase = createPurchase({
+      store: 'google',
+      productId: 'credits_usd10',
+      purchaseToken: 'legacy-play-token',
+    });
+    mockedIap.getAvailablePurchases.mockResolvedValue([legacyPurchase]);
+    const { handle } = await mountOwner();
+    await flushPromises();
+
+    expect(mockedQuery.completePurchase).toHaveBeenCalledWith({
+      productId: 'credits_usd10',
+      purchaseToken: 'legacy-play-token',
+    });
+    expect(mockedIap.finishTransaction).toHaveBeenCalledWith({
+      purchase: legacyPurchase,
+      isConsumable: true,
+    });
+    expect(mockedQuery.invalidateQueries).toHaveBeenCalled();
+    // The background recovery pass is silent: it refreshes the balance but
+    // announces nothing.
+    expect(handle.value?.completedPurchaseCount).toBe(0);
   });
 
   it('does not submit a recovery pass that outlived an account change', async () => {

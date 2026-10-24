@@ -272,8 +272,14 @@ export async function handleEmbeddingsRequest(
 
   // Skip balance/org checks for anonymous users — they can only use free models
   if (!isAnonymousContext(user)) {
+    const freeRequest = await isFreeModel(requestedModelLowerCased);
     const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
-      await getBalanceAndOrgSettings(organizationId, user, readDb);
+      await getBalanceAndOrgSettings(
+        organizationId,
+        user,
+        readDb,
+        freeRequest ? undefined : 'usage'
+      );
     accountBalance = balance;
     accountPlan = plan;
     accountPayer = payer;

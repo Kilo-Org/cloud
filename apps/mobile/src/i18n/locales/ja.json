@@ -1094,8 +1094,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "利用可能なフィルターがありません",
-      "noFiltersDescription": "前の画面に戻り、検出結果の一覧からフィルターを開き直してください。",
       "title": "検出結果の絞り込み",
       "fixed": "修正済み",
       "outcome": "結果",

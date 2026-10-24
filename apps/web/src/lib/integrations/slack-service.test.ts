@@ -536,14 +536,16 @@ describe('upsertSlackInstallation', () => {
 
     await upsertSlackInstallation({ owner, teamId: 'T123', installation });
 
-    expect(mockWriteSlackCredential).toHaveBeenCalledWith({
-      integrationId: 'integration-1',
-      slackTeamId: 'T123',
-      owner,
-      botToken: 'xoxb-new-token',
-      botUserId: 'U_NEW_BOT',
-      tx: expect.objectContaining({ insert: expect.any(Function) }),
-    });
+    expect(mockWriteSlackCredential).toHaveBeenCalledWith(
+      {
+        integrationId: 'integration-1',
+        slackTeamId: 'T123',
+        owner,
+        botToken: 'xoxb-new-token',
+        botUserId: 'U_NEW_BOT',
+      },
+      expect.objectContaining({ insert: expect.any(Function) })
+    );
   });
 
   it('writes the bot token into the credential store when refreshing an existing install', async () => {
@@ -558,7 +560,8 @@ describe('upsertSlackInstallation', () => {
     await upsertSlackInstallation({ owner, teamId: 'T123', installation });
 
     expect(mockWriteSlackCredential).toHaveBeenCalledWith(
-      expect.objectContaining({ botToken: 'xoxb-rotated-token', slackTeamId: 'T123' })
+      expect.objectContaining({ botToken: 'xoxb-rotated-token', slackTeamId: 'T123' }),
+      expect.objectContaining({ update: expect.any(Function) })
     );
   });
 
@@ -611,6 +614,42 @@ describe('upsertSlackInstallation organization workspace binding', () => {
     mockWriteSlackCredential.mockResolvedValue({ id: 'credential-1' });
     mockGetDefaultAllowedModel.mockReset();
     mockGetDefaultAllowedModel.mockResolvedValue(DEFAULT_BOT_MODEL);
+  });
+
+  it('uses the supplied default model without resolving organization policy again', async () => {
+    mockLimit.mockResolvedValueOnce([organizationIntegration('T123')]).mockResolvedValueOnce([]);
+
+    await upsertSlackInstallation({
+      owner: organizationOwner,
+      teamId: 'T123',
+      installation,
+      defaultModel: 'test/default-model',
+    });
+
+    expect(mockGetDefaultAllowedModel).not.toHaveBeenCalled();
+    expect(mockUpdateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({ model_slug: 'test/default-model' }),
+      })
+    );
+  });
+
+  it('stores no model when the supplied model is null', async () => {
+    mockLimit.mockResolvedValueOnce([organizationIntegration('T123')]).mockResolvedValueOnce([]);
+
+    await upsertSlackInstallation({
+      owner: organizationOwner,
+      teamId: 'T123',
+      installation,
+      defaultModel: null,
+    });
+
+    expect(mockGetDefaultAllowedModel).not.toHaveBeenCalled();
+    expect(mockUpdateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.not.objectContaining({ model_slug: expect.anything() }),
+      })
+    );
   });
 
   it('refuses to move an organization connection without caller authorization', async () => {

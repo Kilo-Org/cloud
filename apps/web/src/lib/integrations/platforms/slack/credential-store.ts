@@ -40,12 +40,6 @@ export type WriteSlackCredentialInput = {
   accessTokenExpiresAt?: string | null;
   /** Present only once Slack token rotation is enabled. */
   refreshToken?: string | null;
-  /**
-   * Existing transaction to join instead of opening one. Callers that write the
-   * `platform_integrations` row in the same operation (the Slack install path) pass
-   * their transaction so the integration row and its credential commit together.
-   */
-  tx?: DrizzleTransaction;
 };
 
 export type SlackCredentialWriteOutcome =
@@ -62,9 +56,10 @@ export type SlackCredentialWriteOutcome =
  * interleave a read of the current version with a write of the next one.
  */
 export async function writeSlackCredential(
-  input: WriteSlackCredentialInput
+  input: WriteSlackCredentialInput,
+  database: typeof db | DrizzleTransaction = db
 ): Promise<SlackOAuthCredential> {
-  const outcome = await upsertSlackCredential(input, { onlyIfAbsent: false });
+  const outcome = await upsertSlackCredential(input, { onlyIfAbsent: false }, database);
   if (outcome.status === 'skipped_existing') {
     // Unreachable: only `onlyIfAbsent` can skip. Asserted rather than cast so a future
     // change to the skip conditions cannot silently drop a credential write.
@@ -88,9 +83,10 @@ export async function createSlackCredentialIfAbsent(
 
 async function upsertSlackCredential(
   input: WriteSlackCredentialInput,
-  { onlyIfAbsent }: { onlyIfAbsent: boolean }
+  { onlyIfAbsent }: { onlyIfAbsent: boolean },
+  database: typeof db | DrizzleTransaction = db
 ): Promise<SlackCredentialWriteOutcome> {
-  const run = async (tx: DrizzleTransaction): Promise<SlackCredentialWriteOutcome> => {
+  return database.transaction(async tx => {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${buildSlackCredentialLockKey(input.integrationId)}, 0))`
     );
@@ -158,9 +154,7 @@ async function upsertSlackCredential(
       .values({ id: credentialId, platform_integration_id: input.integrationId, ...values })
       .returning();
     return { status: 'written', credential: created };
-  };
-
-  return input.tx ? run(input.tx) : db.transaction(run);
+  });
 }
 
 export async function getSlackCredentialByIntegrationId(

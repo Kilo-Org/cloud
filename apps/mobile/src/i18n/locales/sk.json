@@ -1662,8 +1662,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Nie sú dostupné žiadne filtre",
-      "noFiltersDescription": "Vráťte sa a znova otvorte filtre zo zoznamu nálezov.",
       "title": "Filtre nálezov",
       "reset": "Obnoviť pôvodné",
       "severity": "Závažnosť",

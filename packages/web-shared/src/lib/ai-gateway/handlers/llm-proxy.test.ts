@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
-import type { User } from '@kilocode/db/schema';
+import { randomUUID } from 'crypto';
+import { eq } from 'drizzle-orm';
+import { agent_briefing_reports, type User } from '@kilocode/db/schema';
+import { BRIEFING_SETTLEMENT_HEADER } from '@kilocode/web-shared/lib/agent-briefing-usage';
+import type { UsageAccountingResult } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import jwt from 'jsonwebtoken';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
@@ -57,7 +62,7 @@ import { applyResolvedAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto
 import type * as AutoModelResolution from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { rewriteModelResponse } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
@@ -69,7 +74,7 @@ import {
   releaseDecideLease,
   type DecideResponse,
 } from '@kilocode/web-shared/lib/bouncer/client';
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { handleLlmProxyRequest } from './llm-proxy';
 
 jest.mock('next/server', () => {
@@ -98,7 +103,10 @@ jest.mock('@kilocode/web-shared/lib/creditTransactions', () => ({
     payments_total_microdollars: 0,
   })),
 }));
-jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@kilocode/web-shared/lib/drizzle'),
+  readDb: {},
+}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
   isCustomLlm: jest.fn(async () => false),
 }));
@@ -379,7 +387,7 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
       response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
     });
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
-    mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
+    mockedAccountForMicrodollarUsage.mockResolvedValue(null);
   });
 
   it('serves a free model to a client that sends the anonymous sentinel', async () => {
@@ -696,7 +704,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
     });
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
-    mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
+    mockedAccountForMicrodollarUsage.mockResolvedValue(null);
   });
 
   it('rejects providerOptions and directs clients to provider', async () => {
@@ -1741,7 +1749,7 @@ describe('kilo-auto/efficient classifier billing', () => {
       }),
     });
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
-    mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
+    mockedAccountForMicrodollarUsage.mockResolvedValue(null);
     mockedLogMicrodollarUsage.mockResolvedValue(null);
     mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
     mockedCollectDeniedAutoRoutingModelIds.mockResolvedValue([]);
@@ -2442,7 +2450,7 @@ describe('auto-routing shadow classifier', () => {
       response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
     });
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
-    mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
+    mockedAccountForMicrodollarUsage.mockResolvedValue(null);
     mockedApplyResolvedAutoModel.mockImplementation(async (opts, request) => {
       if (opts.efficientDecision) await opts.efficientDecision();
       request.body.model = 'openai/gpt-4o';
@@ -2529,7 +2537,7 @@ describe('custom routers and signed auto decisions', () => {
       response: upstreamJsonResponse({ id: 'chatcmpl-1', model: haiku, choices: [] }),
     });
     mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
-    mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
+    mockedAccountForMicrodollarUsage.mockResolvedValue(null);
     mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
     mockedDeniedAutoRoutingCandidates.mockResolvedValue([]);
     mockedFindCustomRouter.mockResolvedValue(personalRouter);
@@ -2890,5 +2898,197 @@ describe('custom routers and signed auto decisions', () => {
       expect(response.status).toBe(503);
       expect(mockedUpstreamRequest).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('briefing gateway accounting receipts', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: undefined,
+      plan: undefined,
+    });
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider,
+      userByok: null,
+      isFree: false,
+      bypassAccessCheck: false,
+    });
+    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedIsValidOpenRouterModelId.mockResolvedValue(true);
+    mockedIsFreeModelRateLimited.mockResolvedValue(false);
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'success',
+      response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
+    });
+    mockedAccountForMicrodollarUsage.mockResolvedValue(null);
+  });
+
+  async function prepare() {
+    const user = await insertTestUser();
+    mockedGetUserFromAuth.mockResolvedValue({
+      user,
+      authFailedResponse: null,
+      organizationId: undefined,
+    });
+    const generationId = `agent-briefing:${randomUUID()}`;
+    const settlementToken = randomUUID();
+    const now = new Date().toISOString();
+    const summary = {
+      status: 'failed',
+      chargeStatus: 'pending',
+      chargeAccounting: {
+        baselineCostMicrodollars: 0,
+        generations: [{ id: generationId, settlementToken, usageId: null }],
+      },
+    };
+    const [report] = await db
+      .insert(agent_briefing_reports)
+      .values({
+        kilo_user_id: user.id,
+        context_key: 'personal',
+        kind: 'one_off',
+        night_start_at: now,
+        cutoff_at: now,
+        morning_end_at: now,
+        evidence_hash: 'gateway-receipt-test',
+        facts: {},
+        summary,
+        generation_id: generationId,
+      })
+      .returning();
+    if (!report) throw new Error('Report fixture was not inserted');
+    return {
+      report,
+      headers: {
+        [BRIEFING_SETTLEMENT_HEADER]: settlementToken,
+        'x-kilocode-taskid': generationId,
+        'x-kilo-request': generationId,
+      },
+      usage: {
+        status: 'queued',
+        usageId: randomUUID(),
+        createdAt: now,
+      } satisfies UsageAccountingResult,
+    };
+  }
+
+  async function persistedSummary(reportId: string) {
+    const [report] = await db
+      .select({ summary: agent_briefing_reports.summary })
+      .from(agent_briefing_reports)
+      .where(eq(agent_briefing_reports.id, reportId));
+    if (!report) throw new Error('Report fixture was not found');
+    return report.summary;
+  }
+
+  async function finishAfterTasks() {
+    await Promise.all(
+      jest.mocked(after).mock.calls.map(([task]) => (typeof task === 'function' ? undefined : task))
+    );
+  }
+
+  it('stores completion after accounting without changing the response', async () => {
+    const prepared = await prepare();
+    const completion = Promise.withResolvers<UsageAccountingResult | null>();
+    mockedAccountForMicrodollarUsage.mockReturnValueOnce(completion.promise);
+    const response = await handleLlmProxyRequest(makeRequest(makeBody(), prepared.headers));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      id: 'chatcmpl-1',
+      model: 'openai/gpt-4o',
+      choices: [],
+    });
+    expect(await persistedSummary(prepared.report.id)).toEqual(prepared.report.summary);
+    completion.resolve(prepared.usage);
+    await finishAfterTasks();
+    expect(await persistedSummary(prepared.report.id)).toMatchObject({
+      chargeAccounting: {
+        generations: [expect.objectContaining({ usageId: prepared.usage.usageId })],
+      },
+    });
+  });
+
+  it('stores accounting completion after response handling fails', async () => {
+    const prepared = await prepare();
+    const completion = Promise.withResolvers<UsageAccountingResult | null>();
+    mockedAccountForMicrodollarUsage.mockReturnValueOnce(completion.promise);
+    mockedRewriteModelResponse.mockRejectedValueOnce(new Error('Response unavailable'));
+    await expect(handleLlmProxyRequest(makeRequest(makeBody(), prepared.headers))).rejects.toThrow(
+      'Response unavailable'
+    );
+    expect(await persistedSummary(prepared.report.id)).toEqual(prepared.report.summary);
+    completion.resolve(prepared.usage);
+    await finishAfterTasks();
+    expect(await persistedSummary(prepared.report.id)).toMatchObject({
+      chargeAccounting: {
+        generations: [expect.objectContaining({ usageId: prepared.usage.usageId })],
+      },
+    });
+  });
+
+  it('leaves completion pending when accounting is unavailable', async () => {
+    const prepared = await prepare();
+    mockedAccountForMicrodollarUsage.mockRejectedValueOnce(new Error('Accounting unavailable'));
+    const response = await handleLlmProxyRequest(makeRequest(makeBody(), prepared.headers));
+    expect(response.status).toBe(200);
+    await finishAfterTasks();
+    expect(await persistedSummary(prepared.report.id)).toEqual(prepared.report.summary);
+  });
+
+  it.each([
+    'without capability',
+    'different request',
+    'different session',
+    'streaming',
+    'anonymous',
+    'auto routing',
+  ])('leaves accounting pending for requests %s', async variant => {
+    const prepared = await prepare();
+    const headers = new Headers(prepared.headers);
+    const body = makeBody();
+    if (variant === 'without capability') headers.delete(BRIEFING_SETTLEMENT_HEADER);
+    if (variant === 'different request') headers.set('x-kilo-request', randomUUID());
+    if (variant === 'different session') {
+      headers.set('x-kilocode-taskid', 'another-session');
+      headers.set('x-kilo-request', 'another-session');
+    }
+    if (variant === 'anonymous') {
+      headers.set('authorization', 'Bearer anonymous');
+      body.model = 'test/free-model:free';
+      mockedGetUserFromAuth.mockResolvedValueOnce({
+        user: null,
+        authFailedResponse: NextResponse.json(failureResult('Unauthorized'), { status: 401 }),
+        organizationId: undefined,
+      });
+      mockedGetProvider.mockResolvedValueOnce({
+        kind: 'provider',
+        provider,
+        userByok: null,
+        isFree: true,
+        bypassAccessCheck: false,
+      });
+    }
+    if (variant === 'auto routing') {
+      body.model = 'kilo-auto/efficient';
+      mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
+      mockedCollectDeniedAutoRoutingModelIds.mockResolvedValue([]);
+      mockedCollectDataCollectionRequiredAutoRoutingModelIds.mockResolvedValue([]);
+      mockedApplyResolvedAutoModel.mockImplementationOnce(async (_options, request) => {
+        request.body.model = 'openai/gpt-4o';
+        return { kind: 'ok', resolved: { model: 'openai/gpt-4o' } };
+      });
+    }
+    mockedAccountForMicrodollarUsage.mockResolvedValueOnce(prepared.usage);
+    const request = makeRequest(
+      { ...body, stream: variant === 'streaming' },
+      Object.fromEntries(headers)
+    );
+    const response = await handleLlmProxyRequest(request);
+    expect(response.status).toBe(200);
+    await finishAfterTasks();
+    expect(await persistedSummary(prepared.report.id)).toEqual(prepared.report.summary);
   });
 });

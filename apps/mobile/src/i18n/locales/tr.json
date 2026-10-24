@@ -1094,8 +1094,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Kullanılabilir filtre yok",
-      "noFiltersDescription": "Geri dön ve filtreleri bulgu listesinden yeniden aç.",
       "title": "Bulgu filtreleri",
       "fixed": "Düzeltildi",
       "outcome": "Sonuç",

@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Ez dago iragazki erabilgarririk",
-      "noFiltersDescription": "Itzuli eta ireki berriro iragazkiak aurkikuntzen zerrendatik.",
       "title": "Aurkikuntzen iragazkia",
       "reset": "Berrezarri",
       "severity": "Larritasuna",

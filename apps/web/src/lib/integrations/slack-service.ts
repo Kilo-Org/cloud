@@ -1,5 +1,5 @@
 import 'server-only';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type { PlatformIntegration, SlackOAuthCredential } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
@@ -7,7 +7,7 @@ import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
-import { SLACK_CLIENT_ID } from '@kilocode/web-shared/lib/config.server';
+import { SLACK_CLIENT_ID, SLACK_CLIENT_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { WebClient } from '@slack/web-api';
 import type { SlackInstallation } from '@chat-adapter/slack';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
@@ -102,6 +102,59 @@ export function getSlackOAuthUrl(state: string): string {
   return `https://slack.com/oauth/v2/authorize?${params.toString()}`;
 }
 
+export type SlackOAuthExchangeResult = {
+  installationId: string;
+  enterpriseId: string | undefined;
+  isEnterpriseInstall: boolean;
+  installation: SlackInstallation;
+};
+
+/**
+ * Exchange a Slack OAuth V2 authorization code for a workspace installation.
+ *
+ * Produces the same installation record `slackAdapter.handleOAuthCallback`
+ * persists, but without writing it, so the callback can resolve which workspace
+ * is being connected and check its ownership first. Enterprise Grid org-wide
+ * installs are keyed on the enterprise ID, matching the adapter.
+ */
+export async function exchangeSlackOAuthCode(code: string): Promise<SlackOAuthExchangeResult> {
+  if (!SLACK_CLIENT_ID || !SLACK_CLIENT_SECRET) {
+    throw new Error('SLACK_CLIENT_ID / SLACK_CLIENT_SECRET are not configured');
+  }
+
+  const result = await new WebClient().oauth.v2.access({
+    client_id: SLACK_CLIENT_ID,
+    client_secret: SLACK_CLIENT_SECRET,
+    code,
+    redirect_uri: SLACK_REDIRECT_URI,
+  });
+
+  const isEnterpriseInstall = Boolean(result.is_enterprise_install);
+  const enterpriseId = result.enterprise?.id;
+  const installationId = isEnterpriseInstall ? enterpriseId : result.team?.id;
+
+  if (!result.ok || !result.access_token || !installationId) {
+    throw new Error(
+      isEnterpriseInstall
+        ? 'Slack OAuth failed: missing access_token or enterprise id'
+        : 'Slack OAuth failed: missing access_token or team id'
+    );
+  }
+
+  return {
+    installationId,
+    enterpriseId,
+    isEnterpriseInstall,
+    installation: {
+      botToken: result.access_token,
+      botUserId: result.bot_user_id,
+      teamName: result.team?.name ?? result.enterprise?.name,
+      ...(enterpriseId ? { enterpriseId } : {}),
+      ...(isEnterpriseInstall ? { isEnterpriseInstall } : {}),
+    },
+  };
+}
+
 /**
  * Revoke Slack access token
  */
@@ -122,8 +175,11 @@ export async function revokeSlackToken(accessToken: string): Promise<boolean> {
  * For user-owned integrations, we explicitly check that owned_by_organization_id is null
  * to avoid returning organization-owned integrations
  */
-export async function getInstallation(owner: Owner): Promise<PlatformIntegration | null> {
-  const [integration] = await db
+export async function getInstallation(
+  owner: Owner,
+  database: typeof db | DrizzleTransaction = db
+): Promise<PlatformIntegration | null> {
+  const [integration] = await database
     .select()
     .from(platform_integrations)
     .where(
@@ -159,11 +215,18 @@ function isOwnedBy(integration: PlatformIntegration, owner: Owner): boolean {
     : integration.owned_by_organization_id === owner.id && integration.owned_by_user_id === null;
 }
 
-async function getConflictingSlackInstallation(
+/**
+ * Find a Slack `platform_integrations` row for `teamId` that belongs to a
+ * different Kilo owner. Callers use this before persisting a workspace
+ * installation so a workspace owned elsewhere is rejected without writing to
+ * the shared Chat SDK installation state.
+ */
+export async function getConflictingSlackInstallation(
   owner: Owner,
-  teamId: string
+  teamId: string,
+  database: typeof db | DrizzleTransaction = db
 ): Promise<PlatformIntegration | null> {
-  const integrations = await db
+  const integrations = await database
     .select()
     .from(platform_integrations)
     .where(
@@ -260,23 +323,32 @@ export async function getSlackBotToken(integration: PlatformIntegration): Promis
  * it to another Slack workspace is refused unless the caller passes
  * `allowWorkspaceRebind` after verifying organization-management authority.
  */
-export async function upsertSlackInstallation({
-  owner,
-  teamId,
-  installation,
-  allowWorkspaceRebind = false,
-}: {
-  owner: Owner;
-  teamId: string;
-  installation: SlackInstallation;
-  allowWorkspaceRebind?: boolean;
-}): Promise<PlatformIntegration> {
-  const existing = await getInstallation(owner);
+export async function upsertSlackInstallation(
+  {
+    owner,
+    teamId,
+    installation,
+    allowWorkspaceRebind = false,
+    defaultModel: suppliedDefaultModel,
+  }: {
+    owner: Owner;
+    teamId: string;
+    installation: SlackInstallation;
+    allowWorkspaceRebind?: boolean;
+    /**
+     * Model resolved by the caller before the install transaction. `null` means
+     * the owner's policy allows no candidate model; `undefined` resolves it here.
+     */
+    defaultModel?: string | null;
+  },
+  database: typeof db | DrizzleTransaction = db
+): Promise<PlatformIntegration> {
+  const existing = await getInstallation(owner, database);
   const teamName = installation.teamName || 'Unknown Team';
   // Legacy rows can carry the workspace id only in `platform_account_id`.
   const boundTeamId = existing?.platform_installation_id ?? existing?.platform_account_id ?? null;
 
-  const conflicting = await getConflictingSlackInstallation(owner, teamId);
+  const conflicting = await getConflictingSlackInstallation(owner, teamId, database);
   if (conflicting) {
     throw new SlackWorkspaceAlreadyConnectedError(teamName);
   }
@@ -296,9 +368,11 @@ export async function upsertSlackInstallation({
   // stores no `model_slug` and the UI keeps its "Select a model" state.
   // For user integrations, use the shared bot default model.
   const defaultModel =
-    owner.type === 'org'
-      ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
-      : DEFAULT_BOT_MODEL;
+    suppliedDefaultModel !== undefined
+      ? suppliedDefaultModel
+      : owner.type === 'org'
+        ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
+        : DEFAULT_BOT_MODEL;
 
   const existingModelSlug =
     existing?.metadata &&
@@ -322,7 +396,7 @@ export async function upsertSlackInstallation({
 
   if (existing) {
     try {
-      return await db.transaction(async tx => {
+      return await database.transaction(async tx => {
         const [updated] = await tx
           .update(platform_integrations)
           .set({
@@ -341,14 +415,16 @@ export async function upsertSlackInstallation({
 
         // Both writes commit together: the integration row and its credential row
         // form one unit, and each is incomplete without the other.
-        await writeSlackCredential({
-          integrationId: updated.id,
-          slackTeamId: teamId,
-          owner,
-          botToken: installation.botToken,
-          botUserId: installation.botUserId ?? null,
-          tx,
-        });
+        await writeSlackCredential(
+          {
+            integrationId: updated.id,
+            slackTeamId: teamId,
+            owner,
+            botToken: installation.botToken,
+            botUserId: installation.botUserId ?? null,
+          },
+          tx
+        );
 
         return updated;
       });
@@ -361,7 +437,7 @@ export async function upsertSlackInstallation({
   }
 
   try {
-    return await db.transaction(async tx => {
+    return await database.transaction(async tx => {
       const [created] = await tx
         .insert(platform_integrations)
         .values({
@@ -379,14 +455,16 @@ export async function upsertSlackInstallation({
         })
         .returning();
 
-      await writeSlackCredential({
-        integrationId: created.id,
-        slackTeamId: teamId,
-        owner,
-        botToken: installation.botToken,
-        botUserId: installation.botUserId ?? null,
-        tx,
-      });
+      await writeSlackCredential(
+        {
+          integrationId: created.id,
+          slackTeamId: teamId,
+          owner,
+          botToken: installation.botToken,
+          botUserId: installation.botUserId ?? null,
+        },
+        tx
+      );
 
       return created;
     });

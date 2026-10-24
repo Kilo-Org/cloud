@@ -1094,8 +1094,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "沒有可用的篩選條件",
-      "noFiltersDescription": "請返回資安問題清單，再重新開啟篩選設定。",
       "title": "篩選資安問題",
       "fixed": "已修復",
       "outcome": "結果",
@@ -2444,7 +2442,7 @@
     "busy": "語音輸入忙碌中。請再試一次。",
     "stopped": "語音輸入已停止。點按麥克風圖示再試一次。",
     "unavailableDevice": "此裝置上無法使用語音輸入。",
-    "unavailableLanguage": "語音輸入不支援此裝置目前使用的語言。",
+    "unavailableLanguage": "語音輸入不支援此裝置目前使用的語言。請安裝該語言的離線語音檔案，或改用應用程式語言。",
     "languageNotInstalledTitle": "{{language}} 的語音輸入尚未就緒",
     "languageNotInstalledMessage": "此手機尚未安裝 {{language}} 的離線語音檔案。請下載這些檔案，然後再試一次語音輸入。",
     "downloadOfflineModel": "下載",
@@ -3331,7 +3329,7 @@
     "title": "信任的主機",
     "subtitle": "已信任的主機，開啟連結時不再詢問",
     "emptyTitle": "沒有信任的主機",
-    "emptyDescription": "信任連結的主機後，開啟該主機的連結時就不會再詢問。",
+    "emptyDescription": "信任連結的主機或圖片主機後，開啟時就不會再詢問。",
     "imagesSectionTitle": "信任的圖片主機",
     "imagesSectionDescription": "來自這些主機的圖片將不再詢問即可載入。",
     "imagesSectionEmpty": "沒有信任的圖片主機",
@@ -3707,9 +3705,9 @@
   "spendAlerts": {
     "subtitle": "當此範圍的支出超過限額或高於其平時每小時速率時，透過電子郵件或推播向帳單聯絡人發送提醒。",
     "thresholdTitle": "門檻突破",
-    "thresholdSubtitle": "累計支出超過你的限額",
+    "thresholdSubtitle": "此範圍在所選時間視窗內的滾動支出超過你的限額",
     "anomalyTitle": "每小時激增",
-    "anomalySubtitle": "某一小時的支出遠高於此範圍的平時速率",
+    "anomalySubtitle": "此範圍的每小時支出遠高於其自身的 p95 基準",
     "limitLabel": "限額 (USD)",
     "windowLabel": "時間視窗",
     "window24h": "24 小時",

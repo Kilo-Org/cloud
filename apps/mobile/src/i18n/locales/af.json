@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Geen filters beskikbaar",
-      "noFiltersDescription": "Gaan terug en maak die filters weer vanuit die bevindingslys oop.",
       "title": "Filtreer bevindings",
       "reset": "Stel terug",
       "severity": "Ernsgraad",

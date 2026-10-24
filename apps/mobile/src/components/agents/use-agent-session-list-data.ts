@@ -73,18 +73,16 @@ export function useAgentSessionListData(options: {
     enabled: ready,
   });
   const contentIsError = isSearching ? search.isError : storedIsError;
-  const handleRetry = useCallback(() => {
+  const handleRetry = useCallback(async () => {
     if (!isSearching) {
-      void refetch();
+      await refetch();
       return;
     }
     if (activeIsError) {
-      void (async () => {
-        await Promise.all([search.refetch(), refetch()]);
-      })();
+      await Promise.all([search.refetch(), refetch()]);
       return;
     }
-    void search.refetch();
+    await search.refetch();
   }, [activeIsError, isSearching, refetch, search]);
   const handleRefetch = useCallback(async () => {
     if (isSearching) {

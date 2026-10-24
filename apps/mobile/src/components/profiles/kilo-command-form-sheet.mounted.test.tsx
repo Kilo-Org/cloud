@@ -1,4 +1,4 @@
-import { createElement } from 'react';
+import { createElement, type ReactNode, type Ref } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -9,14 +9,31 @@ import { renderWithProviders } from '@/test/render-with-providers';
 const h = vi.hoisted(() => ({
   onClose: vi.fn(),
   confirm: vi.fn(),
+  scrollTo: vi.fn(),
 }));
 
-vi.mock('react-native', () => ({
-  Platform: { OS: 'ios' },
-  View: 'View',
-  ScrollView: 'ScrollView',
-  Switch: 'Switch',
-}));
+// A mock factory is hoisted above this file's imports, so React comes in through a
+// dynamic import there (the pattern this suite's harness already relies on). The
+// stub exposes `scrollTo`, which a refused Save drives, so tests can observe it.
+vi.mock('react-native', async () => {
+  const {
+    createElement: createMockElement,
+    forwardRef,
+    useImperativeHandle,
+  } = await import('react');
+  return {
+    Platform: { OS: 'ios' },
+    View: 'View',
+    Switch: 'Switch',
+    ScrollView: forwardRef(function ScrollViewStub(
+      props: { children?: ReactNode },
+      ref: Ref<{ scrollTo: typeof h.scrollTo }>
+    ) {
+      useImperativeHandle(ref, () => ({ scrollTo: h.scrollTo }));
+      return createMockElement('ScrollView', props, props.children);
+    }),
+  };
+});
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
@@ -73,6 +90,22 @@ function callHandler(node: ReactTestInstance, name: string): void {
   const handler = voidHandler(node.props[name]);
   act(() => {
     handler();
+  });
+}
+
+/** A host stub's layout prop, read from the renderer's untyped props. */
+type ContainerLayout = (event: { nativeEvent: { layout: { y: number } } }) => void;
+
+/** Register a field block's offset the way the scroll view reports it after layout. */
+function layoutField(root: ReactTestInstance, label: string, y: number): void {
+  const handler: unknown = findField(root, label).props.containerOnLayout;
+  if (typeof handler !== 'function') {
+    throw new TypeError(`field ${label} has no layout handler`);
+  }
+  // Checked to be a function above; the stub props carry no call signature.
+  const onLayout = handler as ContainerLayout;
+  act(() => {
+    onLayout({ nativeEvent: { layout: { y } } });
   });
 }
 
@@ -177,6 +210,39 @@ describe('KiloCommandFormSheet dismissal', () => {
       confirmRequest(1)?.onConfirm();
     });
     expect(h.onClose).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+});
+
+describe('KiloCommandFormSheet refused save', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('scrolls to the name field when it is missing', async () => {
+    const { renderer, unmount } = await mountSheet();
+    layoutField(renderer.root, 'Command name', 200);
+
+    callHandler(findOne(renderer.root, 'SheetHeader'), 'onDone');
+
+    expect(h.scrollTo).toHaveBeenCalledWith({ y: 188, animated: true });
+
+    unmount();
+  });
+
+  it('scrolls to a named command with no template to the template field', async () => {
+    const { renderer, unmount } = await mountSheet();
+    act(() => {
+      (findField(renderer.root, 'Command name').props.onChangeText as (v: string) => void)(
+        'release-notes'
+      );
+    });
+    layoutField(renderer.root, 'Template', 640);
+
+    callHandler(findOne(renderer.root, 'SheetHeader'), 'onDone');
+
+    expect(h.scrollTo).toHaveBeenCalledWith({ y: 628, animated: true });
 
     unmount();
   });

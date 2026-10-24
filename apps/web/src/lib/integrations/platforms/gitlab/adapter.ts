@@ -24,6 +24,17 @@ const DEFAULT_GITLAB_URL = DEFAULT_GITLAB_INSTANCE_URL;
 const MAX_GITLAB_REDIRECTS = 5;
 const MAX_GITLAB_RESPONSE_BYTES = 10 * 1024 * 1024;
 const GITLAB_REQUEST_TIMEOUT_MS = 30_000;
+const MAX_PROVIDER_ERROR_EXCERPT_CHARS = 200;
+
+/** Collapses a provider error body to one bounded line for the log. */
+function providerErrorExcerpt(body: string): string {
+  const singleLine = body.replace(/\s+/g, ' ').trim();
+  if (singleLine.length <= MAX_PROVIDER_ERROR_EXCERPT_CHARS) {
+    return singleLine;
+  }
+  return `${singleLine.slice(0, MAX_PROVIDER_ERROR_EXCERPT_CHARS - 1)}…`;
+}
+
 const MAX_GITLAB_PAGINATION_PAGES = 100;
 const MAX_GITLAB_PAGINATION_ITEMS = 10_000;
 
@@ -423,8 +434,11 @@ export async function exchangeGitLabOAuthCode(
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    logExceptInTest('GitLab OAuth token exchange failed:', { status: response.status, error });
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
+    logExceptInTest('GitLab OAuth token exchange failed:', {
+      status: response.status,
+      bodyExcerpt,
+    });
     throw new Error(`GitLab OAuth token exchange failed: ${response.status}`);
   }
 
@@ -451,8 +465,8 @@ export async function fetchGitLabUser(
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    logExceptInTest('GitLab user fetch failed:', { status: response.status, error });
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
+    logExceptInTest('GitLab user fetch failed:', { status: response.status, bodyExcerpt });
     throw new Error(`GitLab user fetch failed: ${response.status}`);
   }
 
@@ -483,8 +497,8 @@ export async function fetchGitLabProjects(
     );
 
     if (!response.ok) {
-      const error = await response.text();
-      logExceptInTest('GitLab projects fetch failed:', { status: response.status, error });
+      const bodyExcerpt = providerErrorExcerpt(await response.text());
+      logExceptInTest('GitLab projects fetch failed:', { status: response.status, bodyExcerpt });
       throw new Error(`GitLab projects fetch failed: ${response.status}`);
     }
 
@@ -555,8 +569,8 @@ export async function fetchGitLabBranches(
     );
 
     if (!response.ok) {
-      const error = await response.text();
-      logExceptInTest('GitLab branches fetch failed:', { status: response.status, error });
+      const bodyExcerpt = providerErrorExcerpt(await response.text());
+      logExceptInTest('GitLab branches fetch failed:', { status: response.status, bodyExcerpt });
       throw new GitLabBranchesFetchError(
         response.status,
         `GitLab branches fetch failed: ${response.status}`
@@ -750,10 +764,10 @@ export async function listProjectWebhooks(
   );
 
   if (!response.ok) {
-    const error = await response.text();
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
     logExceptInTest('GitLab list webhooks failed:', {
       status: response.status,
-      error,
+      bodyExcerpt,
       projectId,
     });
 
@@ -813,10 +827,10 @@ export async function createProjectWebhook(
   );
 
   if (!response.ok) {
-    const error = await response.text();
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
     logExceptInTest('GitLab create webhook failed:', {
       status: response.status,
-      error,
+      bodyExcerpt,
       projectId,
     });
 
@@ -836,7 +850,7 @@ export async function createProjectWebhook(
       );
     }
 
-    throw new Error(`GitLab create webhook failed: ${response.status} - ${error}`);
+    throw new Error(`GitLab create webhook failed: ${response.status}`);
   }
 
   const webhook = (await response.json()) as GitLabWebhook;
@@ -886,10 +900,10 @@ export async function updateProjectWebhook(
   );
 
   if (!response.ok) {
-    const error = await response.text();
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
     logExceptInTest('GitLab update webhook failed:', {
       status: response.status,
-      error,
+      bodyExcerpt,
       projectId,
       hookId,
     });
@@ -910,7 +924,7 @@ export async function updateProjectWebhook(
       );
     }
 
-    throw new Error(`GitLab update webhook failed: ${response.status} - ${error}`);
+    throw new Error(`GitLab update webhook failed: ${response.status}`);
   }
 
   const webhook = (await response.json()) as GitLabWebhook;
@@ -953,14 +967,14 @@ export async function deleteProjectWebhook(
 
   // 404 means webhook already deleted, which is fine
   if (!response.ok && response.status !== 404) {
-    const error = await response.text();
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
     logExceptInTest('GitLab delete webhook failed:', {
       status: response.status,
-      error,
+      bodyExcerpt,
       projectId,
       hookId,
     });
-    throw new Error(`GitLab delete webhook failed: ${response.status} - ${error}`);
+    throw new Error(`GitLab delete webhook failed: ${response.status}`);
   }
 
   logExceptInTest('[deleteProjectWebhook] Deleted webhook', {
@@ -1151,8 +1165,8 @@ export async function fetchGitLabMergeRequest(params: {
   );
 
   if (!response.ok) {
-    const error = await response.text();
-    logExceptInTest('GitLab MR fetch failed:', { status: response.status, error });
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
+    logExceptInTest('GitLab MR fetch failed:', { status: response.status, bodyExcerpt });
     throw new Error(`GitLab MR fetch failed: ${response.status}`);
   }
 
@@ -1190,8 +1204,8 @@ export async function findKiloReviewNote(
     );
 
     if (!response.ok) {
-      const error = await response.text();
-      logExceptInTest('GitLab MR notes fetch failed:', { status: response.status, error });
+      const bodyExcerpt = providerErrorExcerpt(await response.text());
+      logExceptInTest('GitLab MR notes fetch failed:', { status: response.status, bodyExcerpt });
       throw new Error(`GitLab MR notes fetch failed: ${response.status}`);
     }
 
@@ -1264,8 +1278,15 @@ export async function updateKiloReviewNote(
   );
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`GitLab MR note update failed: ${response.status} ${error}`);
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
+    logExceptInTest('GitLab MR note update failed:', {
+      status: response.status,
+      bodyExcerpt,
+      projectId,
+      mrIid,
+      noteId,
+    });
+    throw new Error(`GitLab MR note update failed: ${response.status}`);
   }
 
   logExceptInTest('[updateKiloReviewNote] Updated note', {
@@ -1301,8 +1322,14 @@ export async function createMRNote(
   );
 
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`GitLab MR note creation failed: ${response.status} ${error}`);
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
+    logExceptInTest('GitLab MR note creation failed:', {
+      status: response.status,
+      bodyExcerpt,
+      projectId,
+      mrIid,
+    });
+    throw new Error(`GitLab MR note creation failed: ${response.status}`);
   }
 
   logExceptInTest('[createMRNote] Created note', { projectId, mrIid });
@@ -1340,8 +1367,15 @@ export async function hasMRNoteWithMarker(
     );
 
     if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`GitLab MR notes fetch failed: ${response.status} ${error}`);
+      const bodyExcerpt = providerErrorExcerpt(await response.text());
+      logExceptInTest('GitLab MR notes fetch failed:', {
+        status: response.status,
+        bodyExcerpt,
+        projectId,
+        mrIid,
+        page,
+      });
+      throw new Error(`GitLab MR notes fetch failed: ${response.status}`);
     }
 
     const notes = (await response.json()) as Array<{ body: string }>;
@@ -1404,8 +1438,11 @@ export async function fetchMRInlineComments(
     );
 
     if (!response.ok) {
-      const error = await response.text();
-      logExceptInTest('GitLab MR discussions fetch failed:', { status: response.status, error });
+      const bodyExcerpt = providerErrorExcerpt(await response.text());
+      logExceptInTest('GitLab MR discussions fetch failed:', {
+        status: response.status,
+        bodyExcerpt,
+      });
       throw new Error(`GitLab MR discussions fetch failed: ${response.status}`);
     }
 
@@ -1565,8 +1602,8 @@ export async function addReactionToMR(
       return;
     }
 
-    const error = await response.text();
-    logExceptInTest('GitLab add reaction failed:', { status: response.status, error });
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
+    logExceptInTest('GitLab add reaction failed:', { status: response.status, bodyExcerpt });
     throw new Error(`GitLab add reaction failed: ${response.status}`);
   }
 
@@ -1594,8 +1631,8 @@ export async function getGitLabProject(
   );
 
   if (!response.ok) {
-    const error = await response.text();
-    logExceptInTest('GitLab project fetch failed:', { status: response.status, error });
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
+    logExceptInTest('GitLab project fetch failed:', { status: response.status, bodyExcerpt });
     throw new Error(`GitLab project fetch failed: ${response.status}`);
   }
 
@@ -1619,10 +1656,10 @@ export async function fetchGitLabRepositorySize(
   );
 
   if (!response.ok) {
-    const error = await response.text();
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
     logExceptInTest('GitLab project repository size fetch failed:', {
       status: response.status,
-      error,
+      bodyExcerpt,
     });
     throw new Error(`GitLab project repository size fetch failed: ${response.status}`);
   }
@@ -1892,10 +1929,10 @@ export async function createProjectAccessToken(
   );
 
   if (!response.ok) {
-    const error = await response.text();
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
     logExceptInTest('[createProjectAccessToken] Failed:', {
       status: response.status,
-      error,
+      bodyExcerpt,
       projectId,
     });
 
@@ -1922,7 +1959,7 @@ export async function createProjectAccessToken(
       );
     }
 
-    throw new Error(`GitLab create Project Access Token failed: ${response.status} - ${error}`);
+    throw new Error(`GitLab create Project Access Token failed: ${response.status}`);
   }
 
   const token = (await response.json()) as GitLabProjectAccessToken;
@@ -1968,10 +2005,10 @@ export async function listProjectAccessTokens(
   );
 
   if (!response.ok) {
-    const error = await response.text();
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
     logExceptInTest('[listProjectAccessTokens] Failed:', {
       status: response.status,
-      error,
+      bodyExcerpt,
       projectId,
     });
 
@@ -2041,10 +2078,10 @@ export async function getProjectAccessToken(
       return null;
     }
 
-    const error = await response.text();
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
     logExceptInTest('[getProjectAccessToken] Failed:', {
       status: response.status,
-      error,
+      bodyExcerpt,
       projectId,
       tokenId,
     });
@@ -2099,10 +2136,10 @@ export async function rotateProjectAccessToken(
   );
 
   if (!response.ok) {
-    const error = await response.text();
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
     logExceptInTest('[rotateProjectAccessToken] Failed:', {
       status: response.status,
-      error,
+      bodyExcerpt,
       projectId,
       tokenId,
     });
@@ -2127,7 +2164,7 @@ export async function rotateProjectAccessToken(
       throw new Error(`Project Access Token ${tokenId} not found in project ${projectId}.`);
     }
 
-    throw new Error(`GitLab rotate Project Access Token failed: ${response.status} - ${error}`);
+    throw new Error(`GitLab rotate Project Access Token failed: ${response.status}`);
   }
 
   const token = (await response.json()) as GitLabProjectAccessToken;
@@ -2176,10 +2213,10 @@ export async function revokeProjectAccessToken(
 
   // 404 means token already deleted, which is fine
   if (!response.ok && response.status !== 404) {
-    const error = await response.text();
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
     logExceptInTest('[revokeProjectAccessToken] Failed:', {
       status: response.status,
-      error,
+      bodyExcerpt,
       projectId,
       tokenId,
     });
@@ -2203,7 +2240,7 @@ export async function revokeProjectAccessToken(
     throw new GitLabProjectAccessTokenRevocationError(
       projectId,
       response.status,
-      `GitLab revoke Project Access Token failed: ${response.status} - ${error}`
+      `GitLab revoke Project Access Token failed: ${response.status}`
     );
   }
 
@@ -2419,10 +2456,10 @@ export async function validatePersonalAccessToken(
       };
     }
 
-    const errorText = await tokenInfoResponse.text();
+    const bodyExcerpt = providerErrorExcerpt(await tokenInfoResponse.text());
     logExceptInTest('[validatePersonalAccessToken] Token info fetch failed', {
       status: tokenInfoResponse.status,
-      error: errorText,
+      bodyExcerpt,
     });
     return {
       valid: false,
@@ -2503,10 +2540,10 @@ export async function validatePersonalAccessToken(
   }
 
   if (!userResponse.ok) {
-    const errorText = await userResponse.text();
+    const bodyExcerpt = providerErrorExcerpt(await userResponse.text());
     logExceptInTest('[validatePersonalAccessToken] User fetch failed', {
       status: userResponse.status,
-      error: errorText,
+      bodyExcerpt,
     });
     return {
       valid: false,
@@ -2587,15 +2624,15 @@ export async function setCommitStatus(
   );
 
   if (!response.ok) {
-    const error = await response.text();
+    const bodyExcerpt = providerErrorExcerpt(await response.text());
     logExceptInTest('[setCommitStatus] Failed to set commit status', {
       status: response.status,
-      error,
+      bodyExcerpt,
       projectId,
       sha: sha.substring(0, 8),
       state,
     });
-    throw new Error(`GitLab set commit status failed: ${response.status} - ${error}`);
+    throw new Error(`GitLab set commit status failed: ${response.status}`);
   }
 
   logExceptInTest('[setCommitStatus] Set commit status', {

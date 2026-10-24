@@ -10,6 +10,7 @@ import {
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { safeCallbackContext } from '@/lib/integrations/oauth/callback-safety';
 import {
   appendIntegrationOAuthRedirectQuery,
   buildIntegrationOAuthRedirectPath,
@@ -35,11 +36,14 @@ export async function handleDoltHubOAuthCallback(request: NextRequest) {
     const state = searchParams.get('state');
     const error = searchParams.get('error');
 
+    // Callback diagnostics use the shared callback context.
+    const callbackContext = safeCallbackContext(searchParams);
+
     if (error) {
       captureMessage('DoltHub OAuth error', {
         level: 'warning',
         tags: { endpoint: 'dolthub/callback', source: 'dolthub_oauth' },
-        extra: { error, state },
+        extra: { error, ...callbackContext },
       });
 
       return NextResponse.redirect(
@@ -54,18 +58,11 @@ export async function handleDoltHubOAuthCallback(request: NextRequest) {
       );
     }
 
-    // Build a redacted copy of the callback query params so we never write
-    // the raw `code` (a short-lived credential) into Sentry/logs even if a
-    // future change adds another logging path here.
-    const redactedParams = Object.fromEntries(
-      Array.from(searchParams.entries()).map(([k, v]) => [k, k === 'code' ? '***' : v])
-    );
-
     if (!code) {
       captureMessage('DoltHub callback missing code', {
         level: 'warning',
         tags: { endpoint: 'dolthub/callback', source: 'dolthub_oauth' },
-        extra: { state, allParams: redactedParams },
+        extra: callbackContext,
       });
 
       return NextResponse.redirect(
@@ -81,7 +78,7 @@ export async function handleDoltHubOAuthCallback(request: NextRequest) {
       captureMessage('DoltHub callback invalid or tampered state signature', {
         level: 'warning',
         tags: { endpoint: 'dolthub/callback', source: 'dolthub_oauth' },
-        extra: { code: '***', state, allParams: redactedParams },
+        extra: callbackContext,
       });
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
@@ -93,6 +90,15 @@ export async function handleDoltHubOAuthCallback(request: NextRequest) {
         extra: { stateUserId: verified.userId, sessionUserId: user.id },
       });
       return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
+    }
+
+    if (verified.provider !== PLATFORM.DOLTHUB) {
+      captureMessage('DoltHub callback state minted for another flow', {
+        level: 'warning',
+        tags: { endpoint: 'dolthub/callback', source: 'dolthub_oauth' },
+        extra: { ...callbackContext, mintedProvider: verified.provider },
+      });
+      return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
 
     const ownerStr = verified.owner;
@@ -135,10 +141,7 @@ export async function handleDoltHubOAuthCallback(request: NextRequest) {
         endpoint: 'dolthub/callback',
         source: 'dolthub_oauth',
       },
-      extra: {
-        state,
-        hasCode: !!searchParams.get('code'),
-      },
+      extra: safeCallbackContext(searchParams),
     });
 
     return NextResponse.redirect(

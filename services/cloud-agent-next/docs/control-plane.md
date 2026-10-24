@@ -2,8 +2,8 @@
 
 This is the single design and acceptance spec for the `workspace_*` control plane: the Session DO
 (`SandboxSession`), the Sandbox DO (`SandboxControl`), the in-container supervisor and the control
-wrapper. Product rules stay in `.specs/cloud-agent-session.md`. The legacy `agent_*` plane
-(`CloudAgentSession`, legacy wrapper `wrapper/src/main.ts`) is out of scope.
+wrapper. Product rules stay in `.specs/cloud-agent-session.md`. The retired `agent_*` plane is
+out of scope; old session IDs are rejected.
 
 ## 1. Principles
 
@@ -182,6 +182,8 @@ public stream has no reconnecting status today, so `reconnecting` changes no cli
 - Wrapper events are appended to the event log and broadcast on `/stream` with the current schema.
   The Session DO emits `cloud.message.*` events on message changes and `preparing` events from route
   progress.
+- Session event error fields use the shared public failure projection before event storage and delivery.
+  Public execution-stop notices retain their bounded reason and recovery guidance.
 - Pending questions and permissions are projected from events. Answers go to the wrapper through the
   Sandbox DO. If the turn already settled, for example because the sandbox stopped, the answer is
   sent as a new message.
@@ -410,6 +412,13 @@ These keep their current owners and evidence; the rewrite ports them, it does no
 
 - Compute billing follows the physical container lifecycle (`metered-billing-lifecycle.ts`), not
   the routing state.
+- The Sandbox DO reconciles the current wrapper's stored compute policy on a 30-second cadence.
+  A confirmed `billing_blocked` result enters the allocation's existing stop ladder and closes
+  the wrapper socket with code `4402`. Allocation state fences forwarding and activity renewal.
+  Unavailable policy reads remain non-enforcing; message admission retains its own checks. The
+  read shares the serial queue with frame handling, so it is bounded by half of
+  `wrapper.heartbeatAckTimeoutMs`: a slower read is abandoned as unavailable rather than holding
+  back the acknowledgement the wrapper watchdog waits for.
 - The Sandbox DO mints the wrapper launch credential and owns one canonical Git/Kilo grant per
   compatible credential scope in DO SQLite. Route rows reference that owner rather than storing
   writable grant copies. Compatibility requires the same user, organization, worktree/directory,
@@ -956,8 +965,31 @@ Worker forwards an admitted report to the Sandbox DO as `startup-failed`.
 Modern runtime authorization uses the existing Worker facade for model, backend and native
 ingest/export requests on every supported provider. Each outbound request resolves the current
 Session-owned token through its renewing authorization path. No modern backing token reaches the
-wrapper, and no capability or direct-token fallback can redeem the registration snapshot. Legacy
-non-policy-bearing tokens retain their existing credential paths and access limits.
+wrapper, and no capability or direct-token fallback can redeem the registration snapshot.
+
+Kilo execution requires modern runtime authorization, whether credential containment is enabled
+or disabled. The wrapper receives only a session-bound runtime credential proxy handle. The
+legacy Kilo broker capability and direct-token execution paths are retired. Git credential
+containment and managed SCM direct-token paths keep their existing behavior.
+
+Managed SCM request-body inspection uses a growable buffer capped by each caller's byte limit
+and a 30-second total read deadline. GitHub git replay is capped at 1 MiB; bootstrap JSON
+inspection is capped at 16,000 bytes. An unavailable replay body keeps the single-forward path.
+The reader inspects a clone and preserves the original request body for forwarding.
+
+### Compatibility and rollout
+
+Persisted sessions and credential grants without modern runtime authorization remain readable
+for viewing, Stop, deletion, and cleanup. Their next start, restore, resume, or warm message
+delivery fails with `credential_upgrade_required` and asks the user to start a new session.
+Messages and callbacks receive the same failure guidance. There is no production data migration
+or automatic termination of an existing sandbox.
+
+New session producers must issue modern control tokens. Web and workflow issuance requires
+both `SHARED_RESOURCE_TOKENS_ENABLED=true` and `CLOUD_AGENT_RESOURCE_TOKENS_ENABLED=true`.
+Worker-local producers use their existing modern issuance settings. Local development must
+also enable modern issuance and configure a reachable Worker runtime proxy endpoint; enabling
+containment alone does not enable legacy Kilo execution.
 
 Handles are per worktree scope, including in a shared checkout: one handle serves every member of
 the scope. A handle is bound to the user, organization, authorization, worktree scope, current
@@ -1405,4 +1437,4 @@ provider stop reliability, billing or hosted timing; those are checked on a depl
   the desired environment after the next restart. This predates the directory-key flip for legacy
   shared directories.
 - Out of scope: Kilo and model-provider retry policy, workspace file recovery after sandbox loss,
-  the legacy plane.
+  the retired legacy plane.

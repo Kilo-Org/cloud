@@ -223,7 +223,6 @@ function rootAssistantMessage(): StoredMessage {
   };
 }
 
-/** The task input the `real-session-excerpt` event stream carried. */
 function taskInput(): Record<string, unknown> {
   return {
     description: 'Read memory bank files',
@@ -382,7 +381,6 @@ async function createTaskManager(
       variant: null,
       repository: null,
       isInitiated: true,
-      needsLegacyPrepare: false,
       isPreparingAsync: false,
       prompt: null,
       initialMessageId: null,

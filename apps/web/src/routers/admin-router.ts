@@ -32,8 +32,6 @@ import { sortSessionMessagesForDisplay } from '@/lib/cloud-agent-next/message-or
 import { postTestStaleSyncAlert } from '@/lib/providers/openrouter/sync-providers-stale-alert';
 import { syncAndStoreProviders } from '@/lib/providers/openrouter/sync-providers';
 import { syncAndStoreDirectByokProviders } from '@/lib/providers/direct-byok/sync-direct-byok';
-import { adminAppBuilderRouter } from '@/routers/admin-app-builder-router';
-import { adminDeploymentsRouter } from '@/routers/admin-deployments-router';
 import { adminKiloclawInstancesRouter } from '@/routers/admin-kiloclaw-instances-router';
 import { adminKiloclawVersionsRouter } from '@/routers/admin-kiloclaw-versions-router';
 import { adminKiloclawRegionsRouter } from '@/routers/admin-kiloclaw-regions-router';
@@ -62,6 +60,7 @@ import { adminGatewayConfigRouter } from '@/routers/admin/gateway-config-router'
 import { adminAutoFreeConfigRouter } from '@/routers/admin/auto-free-config-router';
 import { adminGatewayModelListsRouter } from '@/routers/admin/gateway-model-lists-router';
 import { adminVercelModelIdOverridesRouter } from '@/routers/admin/vercel-model-id-overrides-router';
+import { adminPreferredProviderOrderRouter } from '@/routers/admin/preferred-provider-order-router';
 import { adminBlacklistDomainsRouter } from '@/routers/admin/blacklist-domains-router';
 import { adminRequestLoggingOptInsRouter } from '@/routers/admin/request-logging-opt-ins-router';
 import { adminBulkBlockRouter } from '@/routers/admin/bulk-block-router';
@@ -2471,8 +2470,6 @@ export const adminRouter = createTRPCRouter({
     }),
   }),
 
-  deployments: adminDeploymentsRouter,
-
   alerting: adminAlertingRouter,
 
   featureInterest: adminFeatureInterestRouter,
@@ -2734,7 +2731,6 @@ export const adminRouter = createTRPCRouter({
         }
       }),
   }),
-  appBuilder: adminAppBuilderRouter,
   kiloclawInstances: adminKiloclawInstancesRouter,
   kiloclawVersions: adminKiloclawVersionsRouter,
   kiloclawRegions: adminKiloclawRegionsRouter,
@@ -2756,6 +2752,7 @@ export const adminRouter = createTRPCRouter({
   autoFreeConfig: adminAutoFreeConfigRouter,
   gatewayModelLists: adminGatewayModelListsRouter,
   vercelModelIdOverrides: adminVercelModelIdOverridesRouter,
+  preferredProviderOrder: adminPreferredProviderOrderRouter,
   blacklistDomains: adminBlacklistDomainsRouter,
   requestLoggingOptIns: adminRequestLoggingOptInsRouter,
   bulkBlock: adminBulkBlockRouter,

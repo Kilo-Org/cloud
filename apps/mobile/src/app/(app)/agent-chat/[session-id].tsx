@@ -24,8 +24,7 @@ import { useIdentityConfirmation } from '@/components/agents/user-web-connection
 import { buildTerminalErrorCopyText } from '@/components/agents/session-terminal-error';
 import { performCopy } from '@/components/agents/use-message-copy';
 import { InvalidRouteState } from '@/components/invalid-route-state';
-import { NewSessionModelProvider } from '@/components/agents/new-session-model-provider';
-import { NewSessionScreenBody } from '@/components/agents/new-session-screen-body';
+import { NewSessionRoute } from '@/components/agents/new-session-route';
 import { CenteredState } from '@/components/centered-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -254,12 +253,9 @@ export default function SessionDetailScreen() {
     // here would land on the permanent "Not found" screen. Such an id renders
     // the New-session screen instead — the composer the user asked for — with
     // the route's organization context carried through, exactly as
-    // `agent-chat/new` renders it.
-    return (
-      <NewSessionModelProvider organizationId={routeOrganizationId}>
-        <NewSessionScreenBody />
-      </NewSessionModelProvider>
-    );
+    // `agent-chat/new` renders it: the same component, so the composer waits
+    // for the account scope there too.
+    return <NewSessionRoute />;
   }
 
   if (

@@ -573,13 +573,12 @@ const PrepareSessionSharedFields = {
     .uuid()
     .optional()
     .describe('Profile ID to resolve (repo binding + default still apply on top)'),
-
   ...AttachmentFieldsSchema,
   createdOnPlatform: z
     .string()
     .max(100)
     .optional()
-    .describe('Platform that created this session (e.g. slack, app-builder)'),
+    .describe('Platform that created this session (e.g. slack, code-review)'),
   clientProvenance: z.enum(['browser', 'mobile']).optional(),
   shallow: z
     .boolean()

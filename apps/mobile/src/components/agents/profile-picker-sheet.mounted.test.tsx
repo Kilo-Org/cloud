@@ -7,6 +7,7 @@ import { ProfilePickerSheet, type ProfilePickerSheetProps } from './profile-pick
 import { type SessionProfilePickerProfile } from './session-profile-picker-model';
 
 vi.mock('react-native', () => ({
+  Platform: { OS: 'android' },
   Pressable: 'Pressable',
   View: 'View',
 }));
@@ -56,11 +57,21 @@ function profile(
     mcpServerCount: 0,
     skillCount: 0,
     kiloCommandCount: 0,
+    commandCount: 0,
+    agentCount: 0,
     ...overrides,
   };
 }
 
-const BACKEND = profile({ id: 'backend', name: 'Backend', varCount: 3, mcpServerCount: 1 });
+const BACKEND = profile({
+  id: 'backend',
+  name: 'Backend',
+  varCount: 3,
+  mcpServerCount: 1,
+  kiloCommandCount: 1,
+  commandCount: 2,
+  agentCount: 1,
+});
 const FRONTEND = profile({ id: 'frontend', name: 'Frontend', skillCount: 2 });
 
 function defaults(overrides: Partial<ProfilePickerSheetProps> = {}): ProfilePickerSheetProps {
@@ -134,7 +145,7 @@ describe('ProfilePickerSheet', () => {
       'Backend',
       'Frontend',
     ]);
-    expect(texts(renderer)).toContain('3 vars · 1 MCP');
+    expect(texts(renderer)).toContain('3 vars · 1 MCP · 1 cmd · 2 setup cmds · 1 agent');
     expect(checkedStates(renderer)).toEqual([true, false, false]);
   });
 

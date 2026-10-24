@@ -21,8 +21,9 @@ import {
 } from '@/lib/security-agent-ledger';
 import { buildLocalizedMetrics, DashboardScreen } from './dashboard-screen';
 
-// The ledger module imports the operation-key helpers, whose expo-crypto root
-// import loads a native binding this node project does not have.
+// The security mutation hooks hoist an operation key through
+// `@/lib/operation-key`, whose expo-crypto root import loads a native binding
+// this node project does not have.
 vi.mock('expo-crypto', () => ({ randomUUID: () => '00000000-0000-4000-8000-000000000000' }));
 
 const PERSISTENCE_FAILED_MESSAGE = vi.hoisted(
@@ -50,8 +51,9 @@ const config = vi.hoisted(() => ({
 }));
 const dashboardStats = vi.hoisted(() => ({
   isLoading: false,
+  isPending: false,
   isError: false,
-  data: { sla: { overall: { total: 0 } } },
+  data: undefined as Record<string, unknown> | undefined,
   refetch: vi.fn(),
 }));
 const lastSync = vi.hoisted(() => ({
@@ -205,7 +207,7 @@ vi.mock('@/components/security-agent/audit-report-button', () => ({
 vi.mock('@/components/security-agent/dashboard-sections', () => ({
   DashboardSections: () => null,
 }));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/spinning-icon', () => ({ SpinningIcon: () => null }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({
@@ -293,6 +295,7 @@ describe('DashboardScreen sync control terminal states', () => {
     triggerSync.error = null;
     config.data = { slaEnabled: true };
     dashboardStats.isLoading = false;
+    dashboardStats.isPending = false;
     dashboardStats.isError = false;
     dashboardStats.data = { sla: { overall: { total: 0 } } };
     lastSync.data = undefined;
@@ -692,5 +695,61 @@ describe('DashboardScreen reconcile card states', () => {
     });
 
     expect(outbox.refresh).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('DashboardScreen pending stats', () => {
+  const resolvedData = {
+    analysis: {
+      total: 3,
+      exploitable: 0,
+      needsReview: 1,
+      triageComplete: 0,
+      analyzing: 0,
+      notAnalyzed: 0,
+      failed: 0,
+    },
+    severity: { critical: 1, high: 1 },
+    sla: {
+      overall: { total: 0, withinSla: 0, overdue: 0 },
+      bySeverity: { critical: { overdue: 0 }, high: { overdue: 0 } },
+      dueSoon: { total: 0, exploitable: 0 },
+      untrackedCount: 0,
+    },
+  };
+
+  it('paints the metric skeleton while a paused stats read is still pending', () => {
+    // A NetInfo-paused read is pending without fetching, so `isLoading` is
+    // false. The body must still show its loading state instead of an empty
+    // metrics row.
+    dashboardStats.isPending = true;
+    dashboardStats.isLoading = false;
+    dashboardStats.data = undefined;
+    sharedMetrics.build.mockReturnValue([dashboardMetric('openFindings')]);
+
+    const root = renderScreen();
+
+    expect(
+      root.root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Skeleton')
+    ).toHaveLength(4);
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.dashboardMetrics.openFindings')
+    );
+  });
+
+  it('replaces the skeleton with the metric once the read resolves', () => {
+    dashboardStats.isPending = false;
+    dashboardStats.isLoading = false;
+    dashboardStats.data = resolvedData;
+    sharedMetrics.build.mockReturnValue([dashboardMetric('openFindings')]);
+
+    const root = renderScreen();
+
+    expect(
+      root.root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Skeleton')
+    ).toHaveLength(0);
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.dashboardMetrics.openFindings')
+    );
   });
 });

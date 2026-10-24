@@ -1,3 +1,4 @@
+import { FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN } from './helpers/fake-credentials.js';
 import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
@@ -16,7 +17,7 @@ import { waitFor } from './wait-for.js';
 type SessionNamespace = DurableObjectNamespace<SandboxSessionV2>;
 const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDBOX_SESSION;
 
-const NATIVE_KILO_TOKEN = 'native-kilo-token-user';
+const NATIVE_KILO_TOKEN = FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN;
 const QUEUED_BACKSTOP_MS = CONTROL_PLANE_TIMERS.session.queuedBackstopMs;
 
 let sequence = 0;

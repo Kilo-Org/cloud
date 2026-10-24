@@ -1,7 +1,10 @@
 import {
   activeSessionSchema,
+  autocommitCompletedDataSchema,
   cloudAgentEventSchema,
   cloudWorktreeChangesReadyDataSchema,
+  isStreamError,
+  isValidCloudAgentEvent,
   parseCustomerBillingFailure,
   remoteCommandCatalogV1Schema,
   sessionEventPayloadSchema,
@@ -9,6 +12,11 @@ import {
   sessionStatusDataSchema,
   sessionStatusUpdatedPayloadSchema,
 } from './schemas';
+
+function omitKey(record: Record<string, unknown>, key: string): Record<string, unknown> {
+  const { [key]: _omitted, ...rest } = record;
+  return rest;
+}
 
 describe('cloudWorktreeChangesReadyDataSchema', () => {
   it.each([1, 42, Number.MAX_SAFE_INTEGER])('accepts positive safe revision %p', revision => {
@@ -55,6 +63,63 @@ describe('cloudWorktreeChangesReadyDataSchema', () => {
         streamEventType: 'future.event',
       }).success
     ).toBe(true);
+  });
+});
+
+describe('isValidCloudAgentEvent', () => {
+  const envelope = {
+    eventId: 7,
+    sessionId: 'agent-1',
+    streamEventType: 'message.part.updated',
+    timestamp: '2026-10-22T00:00:00.000Z',
+    data: { type: 'message.part.updated' },
+  };
+
+  it.each([
+    ['without executionId', envelope],
+    ['with a string executionId', { ...envelope, executionId: 'exec-1' }],
+    ['with a null executionId', { ...envelope, executionId: null }],
+    ['with an unknown stream event type', { ...envelope, streamEventType: 'future.event' }],
+    ['with an extra field', { ...envelope, extra: true }],
+  ])('accepts a frame %s', (_case, frame) => {
+    expect(isValidCloudAgentEvent(frame)).toBe(true);
+  });
+
+  it.each([
+    ['a frame without data', omitKey(envelope, 'data')],
+    ['a frame without eventId', omitKey(envelope, 'eventId')],
+    ['a frame without sessionId', omitKey(envelope, 'sessionId')],
+    ['a frame without streamEventType', omitKey(envelope, 'streamEventType')],
+    ['a frame without timestamp', omitKey(envelope, 'timestamp')],
+    ['a numeric executionId', { ...envelope, executionId: 42 }],
+    ['a numeric timestamp', { ...envelope, timestamp: 1 }],
+    ['an array', [envelope]],
+    ['null', null],
+    ['a stream error', { type: 'error', code: 'WS_AUTH_ERROR', message: 'bad' }],
+  ])('rejects %s', (_case, frame) => {
+    expect(isValidCloudAgentEvent(frame)).toBe(false);
+  });
+});
+
+describe('isStreamError', () => {
+  it.each([
+    'WS_PROTOCOL_ERROR',
+    'WS_AUTH_ERROR',
+    'WS_SESSION_NOT_FOUND',
+    'WS_EXECUTION_NOT_FOUND',
+    'WS_DUPLICATE_CONNECTION',
+    'WS_INTERNAL_ERROR',
+  ])('accepts the %s code', code => {
+    expect(isStreamError({ type: 'error', code, message: 'bad' })).toBe(true);
+  });
+
+  it.each([
+    ['an unknown code', { type: 'error', code: 'INVALID', message: 'bad' }],
+    ['a missing message', { type: 'error', code: 'WS_AUTH_ERROR' }],
+    ['a cloud agent event', { eventId: 1, data: {} }],
+    ['null', null],
+  ])('rejects %s', (_case, frame) => {
+    expect(isStreamError(frame)).toBe(false);
   });
 });
 
@@ -313,6 +378,49 @@ describe('activeSessionSchema scheduledAt', () => {
 
     expect(parsed.scheduledAt).toBeUndefined();
   });
+});
+
+describe('autocommitCompletedDataSchema commit fields', () => {
+  const record = {
+    messageId: 'msg-1',
+    success: true,
+    commitHash: 'a'.repeat(40),
+    commitMessage: 'feat: add feature',
+    userMessageId: 'user-msg-1',
+    committedAt: '2026-09-01T12:00:00+02:00',
+    pushStatus: 'pushed',
+    commitMessageTruncated: true,
+  };
+
+  it('keeps every field of a storable commit record', () => {
+    expect(autocommitCompletedDataSchema.parse(record)).toEqual(record);
+  });
+
+  it.each([
+    ['commitHash', 'abc123'],
+    ['commitHash', 'A'.repeat(40)],
+    ['commitMessage', 'x'.repeat(16 * 1024 + 1)],
+    ['userMessageId', ''],
+    ['userMessageId', 'x'.repeat(257)],
+    ['committedAt', '2026-09-01'],
+    ['pushStatus', 'pushing'],
+    ['commitMessageTruncated', false],
+  ])('drops an unstorable %s instead of failing the completion', (field, value) => {
+    const parsed = autocommitCompletedDataSchema.parse({ ...record, [field]: value });
+
+    expect((parsed as unknown as Record<string, unknown>)[field]).toBeUndefined();
+    expect(parsed.success).toBe(true);
+    expect(parsed.messageId).toBe('msg-1');
+  });
+
+  it.each([{ messageId: '' }, { messageId: 'x'.repeat(257) }, { messageId: undefined }])(
+    'rejects a completion whose message id cannot name a message: %p',
+    overrides => {
+      expect(autocommitCompletedDataSchema.safeParse({ ...record, ...overrides }).success).toBe(
+        false
+      );
+    }
+  );
 });
 
 describe('live session status values', () => {

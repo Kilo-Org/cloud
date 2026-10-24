@@ -286,6 +286,30 @@ describe('buildChecksResult', () => {
       result.rollup.success + result.rollup.failure + result.rollup.pending + result.rollup.skipped
     ).toBe(result.rollup.total);
   });
+
+  it('carries the partial flag only when the caller read less than the ref has', () => {
+    const args = {
+      checkRuns: [{ name: 'ci', status: 'completed', conclusion: 'success' }],
+      commitStatuses: [],
+    };
+
+    // A complete listing keeps the shape it has always had: no key at all.
+    expect(buildChecksResult(args)).toEqual({
+      checkRuns: [
+        {
+          name: 'ci',
+          status: 'completed',
+          conclusion: 'success',
+          detailsUrl: null,
+          appName: null,
+        },
+      ],
+      rollup: { total: 1, success: 1, failure: 0, pending: 0, skipped: 0 },
+    });
+    expect(Object.hasOwn(buildChecksResult(args), 'truncated')).toBe(false);
+    expect(buildChecksResult({ ...args, truncated: false })).not.toHaveProperty('truncated');
+    expect(buildChecksResult({ ...args, truncated: true }).truncated).toBe(true);
+  });
 });
 
 describe('buildFilesPage', () => {

@@ -1,3 +1,4 @@
+import { webhookBodySchema } from '@kilocode/worker-utils/webhook-body-validation';
 /**
  * API Routes (internal API key auth required)
  *
@@ -15,8 +16,13 @@ import { withDORetry } from '../util/do-retry';
 import { internalApiMiddleware } from '../util/auth';
 import { clampRequestLimit } from '../util/constants';
 import { decodeUserIdFromPath, encodeUserIdForPath } from '@kilocode/worker-utils/user-id-encoding';
+import { sandboxAllocationSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import { validateCronExpression, enforcesMinimumInterval, isValidTimezone } from '../util/cron';
-import type { ScheduledInvocationResult } from '../dos/TriggerDO';
+import type {
+  ScheduledInvocationResult,
+  TriggerConfigResponse,
+  TriggerConfig,
+} from '../dos/TriggerDO';
 
 const api = new Hono<HonoContext>();
 
@@ -179,6 +185,7 @@ type RouteContext = Context<HonoContext>;
 export const TriggerConfigInput = z
   .object({
     targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).default('cloud_agent'),
+    executionUserId: z.string().min(1).optional(),
     kiloclawInstanceId: z.string().uuid().optional(),
     githubRepo: z.string().trim().min(1, 'githubRepo is required').optional(),
     mode: z.string().trim().min(1, 'mode is required').optional(),
@@ -188,9 +195,10 @@ export const TriggerConfigInput = z
       .max(50)
       .regex(/^[a-zA-Z]+$/)
       .optional(),
-    sandboxAllocation: z.literal('isolated-standard').optional(),
+    sandboxAllocation: sandboxAllocationSchema.optional(),
     promptTemplate: z.string().trim().min(1, 'promptTemplate is required'),
-    profileId: z.string().uuid().optional(),
+    profileId: z.string().uuid().nullable().optional(),
+    bodySchema: webhookBodySchema.nullable().optional(),
     autoCommit: z.boolean().optional(),
     condenseOnComplete: z.boolean().optional(),
     webhookAuth: z
@@ -204,6 +212,32 @@ export const TriggerConfigInput = z
     cronTimezone: z.string().max(50).optional().default('UTC'),
   })
   .superRefine((data, ctx) => {
+    if (
+      data.bodySchema != null &&
+      (data.targetType !== 'cloud_agent' || data.activationMode !== 'webhook')
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Body validation is only available for Cloud Agent webhooks',
+        path: ['bodySchema'],
+      });
+    }
+    if (data.executionUserId !== undefined) {
+      if (data.targetType !== 'cloud_agent') {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'executionUserId is only supported for Cloud Agent triggers',
+          path: ['executionUserId'],
+        });
+      }
+      if (data.activationMode !== 'scheduled' && !data.webhookAuth) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Webhook auth is required for creator execution',
+          path: ['webhookAuth'],
+        });
+      }
+    }
     if (data.activationMode === 'scheduled') {
       if (!data.cronExpression) {
         ctx.addIssue({
@@ -261,12 +295,6 @@ export const TriggerConfigInput = z
           message: 'model is required for cloud_agent triggers',
           path: ['model'],
         });
-      if (!data.profileId)
-        ctx.addIssue({
-          code: 'custom',
-          message: 'profileId is required for cloud_agent triggers',
-          path: ['profileId'],
-        });
     }
     if (data.targetType === 'kiloclaw_chat') {
       if (!data.kiloclawInstanceId)
@@ -291,6 +319,7 @@ export const TriggerConfigInput = z
 // immutable after creation. To change target type or instance, delete and recreate.
 export const TriggerConfigUpdateInput = z
   .object({
+    executionUserId: z.never().optional(),
     mode: z.string().trim().min(1).optional(),
     model: z.string().trim().min(1).optional(),
     variant: z
@@ -299,10 +328,11 @@ export const TriggerConfigUpdateInput = z
       .regex(/^[a-zA-Z]+$/)
       .nullable()
       .optional(),
-    sandboxAllocation: z.literal('isolated-standard').nullable().optional(),
+    sandboxAllocation: sandboxAllocationSchema.nullable().optional(),
     promptTemplate: z.string().trim().min(1).optional(),
     isActive: z.boolean().optional(),
-    profileId: z.string().uuid().optional(),
+    profileId: z.string().uuid().nullable().optional(),
+    bodySchema: webhookBodySchema.nullable().optional(),
     autoCommit: z.boolean().nullable().optional(),
     condenseOnComplete: z.boolean().nullable().optional(),
     webhookAuth: z
@@ -361,6 +391,9 @@ async function handleCreateTrigger(
   }
 
   const config = parsedConfig.data;
+  if (config.executionUserId !== undefined && !namespace.startsWith('org/')) {
+    return c.json(resError('executionUserId is only supported for organization triggers'), 400);
+  }
 
   try {
     const result = await withDORetry(
@@ -393,8 +426,11 @@ async function handleCreateTrigger(
       201
     );
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith('Webhook auth')) {
-      logger.warn('Failed to create trigger due to invalid webhook auth', {
+    if (
+      error instanceof Error &&
+      (error.message.startsWith('Webhook auth') || error.message.startsWith('Execution user'))
+    ) {
+      logger.warn('Failed to create trigger due to invalid configuration', {
         namespace,
         triggerId,
         error: error.message,
@@ -416,7 +452,7 @@ async function handleGetTrigger(c: RouteContext, namespace: string, triggerId: s
   try {
     const config = await withDORetry(
       () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
-      stub => stub.getConfigForResponse(),
+      async (stub): Promise<TriggerConfigResponse | null> => await stub.getConfigForResponse(),
       'getConfigForResponse'
     );
 
@@ -442,7 +478,7 @@ async function handleInvokeScheduled(c: RouteContext, namespace: string, trigger
       () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
       async stub => {
         const result = await stub.invokeScheduled();
-        return result as ScheduledInvocationResult;
+        return result;
       },
       'invokeScheduled',
       { maxAttempts: 1, baseBackoffMs: 0, maxBackoffMs: 0 }
@@ -494,12 +530,19 @@ async function handleUpdateTrigger(c: RouteContext, namespace: string, triggerId
     // First check if trigger exists
     const existingConfig = await withDORetry(
       () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
-      stub => stub.getConfig(),
+      async (stub): Promise<TriggerConfig | null> => await stub.getConfig(),
       'getConfig'
     );
 
     if (!existingConfig) {
       return c.json(resError('Trigger not found'), 404);
+    }
+
+    if (
+      updates.bodySchema != null &&
+      (existingConfig.targetType !== 'cloud_agent' || existingConfig.activationMode !== 'webhook')
+    ) {
+      return c.json(resError('Body validation is only available for Cloud Agent webhooks'), 400);
     }
 
     if (existingConfig.targetType === 'kiloclaw_chat' && updates.sandboxAllocation !== undefined) {
@@ -527,7 +570,7 @@ async function handleUpdateTrigger(c: RouteContext, namespace: string, triggerId
     // Return updated config (without encryptedSecrets)
     const updatedConfig = await withDORetry(
       () => c.env.TRIGGER_DO.get(c.env.TRIGGER_DO.idFromName(doKey)),
-      stub => stub.getConfigForResponse(),
+      async (stub): Promise<TriggerConfigResponse | null> => await stub.getConfigForResponse(),
       'getConfigForResponse'
     );
 

@@ -17,6 +17,8 @@ import {
 import { formatIsoDateString_UsaDateOnlyFormat } from '@/lib/utils';
 import { formatMicrodollars } from '@/lib/admin-utils';
 import { buildDeductionGroups } from '@/lib/credits/deductionGroups';
+import { purchasedCreditTermsText } from '@/lib/credits/purchasedCreditTerms';
+import { CreditsDeductionRows } from '@/components/credits/CreditsDeductionRows';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -86,11 +88,6 @@ function formatExpiryTimestamp(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Unknown';
   return EXPIRY_TIMESTAMP_FORMATTER.format(date);
-}
-
-function formatSignedAmount(amount_mUsd: number): string {
-  const amount = formatMicrodollars(Math.abs(amount_mUsd));
-  return amount_mUsd < 0 ? `-${amount}` : `+${amount}`;
 }
 
 function CreditsPageContent() {
@@ -308,13 +305,7 @@ function CreditsPageContent() {
     transactionIdIsValid && isPurchaseConfirmationError && !confirmation;
   // New paid credits follow the live policy; a claim shown before the policy
   // loads, or after it fails, would repeat the old non-expiration promise.
-  const purchasedCreditTerms = isPaidCreditPolicyError
-    ? 'Terms unavailable'
-    : paidCreditPolicy === undefined
-      ? 'Loading terms...'
-      : paidCreditPolicy.creditExpiryPolicy === 'one_year'
-        ? 'Expire one year after purchase'
-        : 'Do not expire';
+  const purchasedCreditTerms = purchasedCreditTermsText(paidCreditPolicy, isPaidCreditPolicyError);
   const deductionGroups = buildDeductionGroups(creditData.deductions);
 
   return (
@@ -619,33 +610,7 @@ function CreditsPageContent() {
                     <Th align="right">Amount</Th>
                   </tr>
                 </thead>
-                {deductionGroups.map((group, index) => (
-                  <tbody key={group.key} className={index % 2 === 1 ? 'bg-muted' : undefined}>
-                    <tr className="border-border border-t">
-                      <Td>{formatIsoDateString_UsaDateOnlyFormat(group.main.date)}</Td>
-                      <Td className="whitespace-normal">{group.main.description}</Td>
-                      <Td>{group.main.type}</Td>
-                      <Td numeric align="right">
-                        {formatSignedAmount(group.main.amount_mUsd)}
-                      </Td>
-                    </tr>
-                    {group.child && (
-                      <tr>
-                        <Td>{''}</Td>
-                        <Td className="whitespace-normal">
-                          <span aria-hidden="true" className="text-muted-foreground mr-1.5">
-                            └
-                          </span>
-                          {group.child.description}
-                        </Td>
-                        <Td>{group.child.type}</Td>
-                        <Td numeric align="right">
-                          {formatSignedAmount(group.child.amount_mUsd)}
-                        </Td>
-                      </tr>
-                    )}
-                  </tbody>
-                ))}
+                <CreditsDeductionRows groups={deductionGroups} />
               </table>
             </div>
             {creditData.deductions.length === 0 && (

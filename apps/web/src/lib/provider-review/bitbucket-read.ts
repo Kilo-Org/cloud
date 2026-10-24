@@ -11,9 +11,9 @@
  */
 import 'server-only';
 
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import {
-  providerPrRefKey,
   type ProviderPrChecksResult,
   type ProviderPrFile,
   type ProviderPrFilesPage,
@@ -54,6 +54,14 @@ const MAX_BUILD_PAGES = 3;
 const INBOX_REPOSITORY_CONCURRENCY = 8;
 /** The maximum repository count served by the inbox on one load. */
 const MAX_INBOX_REPOSITORIES = 300;
+/**
+ * The receiving wire limit of an inbox cursor: the `pageCursor` bound the
+ * provider-review router accepts, so a cursor this layer issues always fits
+ * the next request. The per-repository page state is two bytes each — 300
+ * repositories stay far below the limit — and a test pins the maximum-size
+ * cursor to it.
+ */
+export const INBOX_CURSOR_MAX_CHARS = 2048;
 /** How long a server-issued inbox cursor stays usable. */
 const INBOX_CURSOR_TTL_SECONDS = 60 * 60;
 /**
@@ -980,11 +988,22 @@ export async function listInbox(
 ): Promise<ProviderPrInboxPage> {
   try {
     const access = await authorizeWorkspace(owner);
+    const repositories = [...access.repositories]
+      .sort((left, right) =>
+        left.fullName.toLowerCase() < right.fullName.toLowerCase()
+          ? -1
+          : left.fullName.toLowerCase() > right.fullName.toLowerCase()
+            ? 1
+            : 0
+      )
+      .slice(0, MAX_INBOX_REPOSITORIES);
+    const repositoryFingerprint = createHash('sha256')
+      .update(repositories.map(repository => repository.fullName.toLowerCase()).join('\0'))
+      .digest('base64url');
     const identity =
       owner.type === 'organization'
-        ? `bitbucket-inbox:${access.workspace.slug}:${owner.organizationId}:${owner.userId}`
-        : `bitbucket-inbox:${access.workspace.slug}:user:${owner.userId}`;
-    const repositories = access.repositories.slice(0, MAX_INBOX_REPOSITORIES);
+        ? `bitbucket-inbox:${access.workspace.slug}:${owner.organizationId}:${owner.userId}:${repositoryFingerprint}`
+        : `bitbucket-inbox:${access.workspace.slug}:user:${owner.userId}:${repositoryFingerprint}`;
     const repositoryNames = new Set(
       repositories.map(repository => repository.fullName.toLowerCase())
     );
@@ -1021,9 +1040,7 @@ export async function listInbox(
         }
         if (parsedPage.data.next) repositoryPageFull = true;
         const pageItems = inboxItemsFrom(parsedPage.data.values, position, repositoryNames);
-        const merged = [...window, ...pageItems].sort(
-          (left, right) => inboxUpdatedMs(right) - inboxUpdatedMs(left)
-        );
+        const merged = [...window, ...pageItems].sort(compareInboxItems);
         if (merged.length > BITBUCKET_PAGE_SIZE) beyondWindow = true;
         window = merged.slice(0, BITBUCKET_PAGE_SIZE);
         if (
@@ -1049,13 +1066,24 @@ export async function listInbox(
       boundary !== null && position?.boundary === boundary
         ? position.providerPages
         : new Map<string, number>();
-    const servedRefs =
-      boundary === null ? [] : window.filter(item => inboxBoundaryValue(item) === boundary);
+    let lastBoundaryItem: ProviderPrInboxItem | undefined;
+    for (let index = window.length - 1; index >= 0; index -= 1) {
+      if (inboxBoundaryValue(window[index]) === boundary) {
+        lastBoundaryItem = window[index];
+        break;
+      }
+    }
+    const lastRef =
+      lastBoundaryItem?.ref.platform === 'bitbucket'
+        ? ([lastBoundaryItem.ref.repoSlug, lastBoundaryItem.ref.prId] as const)
+        : boundary === position?.boundary
+          ? position.lastRef
+          : null;
     return {
       items: window,
       nextCursor:
         hasMore && boundary !== null
-          ? encodeInboxCursor(identity, boundary, servedRefs, providerPages, repositories)
+          ? encodeInboxCursor(identity, boundary, lastRef, providerPages, repositories)
           : null,
     };
   } catch (error) {
@@ -1080,7 +1108,7 @@ function inboxBoundaryValue(item: ProviderPrInboxItem): string | null {
   if (Number.isNaN(Date.parse(item.updatedAt))) return null;
   return item.updatedAt;
 }
-/** The inbox rows of one provider page, minus the rows an earlier page served. */
+/** Rows in one provider page after applying the stable inbox continuation. */
 function inboxItemsFrom(
   values: unknown[],
   position: InboxCursorPosition | null,
@@ -1091,8 +1119,14 @@ function inboxItemsFrom(
     const parsed = BitbucketInboxPullRequestSchema.safeParse(value);
     if (!parsed.success) continue;
     const ref = inboxRefFrom(parsed.data, allowedFullNames);
-    if (!ref) continue;
-    if (position?.servedRefs.has(providerPrRefKey(ref))) continue;
+    if (ref?.platform !== 'bitbucket') continue;
+    if (
+      position?.lastRef &&
+      parsed.data.updated_on === position.boundary &&
+      compareInboxTie(ref.repoSlug, ref.prId, position.lastRef[0], position.lastRef[1]) <= 0
+    ) {
+      continue;
+    }
     items.push({
       ref,
       title: parsed.data.title,
@@ -1105,41 +1139,50 @@ function inboxItemsFrom(
   return items;
 }
 
+function compareInboxTie(
+  leftRepo: string,
+  leftId: number,
+  rightRepo: string,
+  rightId: number
+): number {
+  const leftKey = leftRepo.toLowerCase();
+  const rightKey = rightRepo.toLowerCase();
+  if (leftKey !== rightKey) return leftKey < rightKey ? -1 : 1;
+  return leftId - rightId;
+}
+
+function compareInboxItems(left: ProviderPrInboxItem, right: ProviderPrInboxItem): number {
+  const timestampOrder = inboxUpdatedMs(right) - inboxUpdatedMs(left);
+  if (timestampOrder !== 0) return timestampOrder;
+  if (left.ref.platform !== 'bitbucket' || right.ref.platform !== 'bitbucket') return 0;
+  return compareInboxTie(left.ref.repoSlug, left.ref.prId, right.ref.repoSlug, right.ref.prId);
+}
+
 const INBOX_CURSOR_KIND = 'bitbucket-inbox-cursor';
 const inboxCursorPayloadSchema = z.object({
   kind: z.literal(INBOX_CURSOR_KIND),
   identity: z.string().min(1),
   boundary: z.string().min(1),
-  served: z.string().max(400),
+  lastRef: z.tuple([z.string().min(1).max(512), z.number().int().positive()]).nullable(),
   pages: z.string().max(800),
 });
 
 type InboxCursorPosition = {
   boundary: string;
-  servedRefs: ReadonlySet<string>;
+  lastRef: readonly [string, number] | null;
   providerPages: Map<string, number>;
 };
 
 function encodeInboxCursor(
   identity: string,
   boundary: string,
-  servedRefs: ProviderPrInboxItem[],
+  lastRef: readonly [string, number] | null,
   providerPages: ReadonlyMap<string, number>,
   repositories: BitbucketWorkspaceRepositoryAccess['repositories']
 ): string {
   const repositoryIndexes = new Map(
     repositories.map((repository, index) => [repository.fullName.toLowerCase(), index])
   );
-  const served = Buffer.alloc(servedRefs.length * 6);
-  let servedOffset = 0;
-  for (const item of servedRefs) {
-    if (item.ref.platform !== 'bitbucket') continue;
-    const index = repositoryIndexes.get(`${item.ref.workspace}/${item.ref.repoSlug}`.toLowerCase());
-    if (index === undefined || item.ref.prId > 0xffff_ffff) continue;
-    served.writeUInt16BE(index, servedOffset);
-    served.writeUInt32BE(item.ref.prId, servedOffset + 2);
-    servedOffset += 6;
-  }
   const pages = Buffer.alloc(repositories.length * 2);
   for (const [fullName, page] of providerPages) {
     const index = repositoryIndexes.get(fullName);
@@ -1149,7 +1192,7 @@ function encodeInboxCursor(
     kind: INBOX_CURSOR_KIND,
     identity,
     boundary,
-    served: served.subarray(0, servedOffset).toString('base64url'),
+    lastRef,
     pages: pages.toString('base64url'),
   });
 }
@@ -1165,36 +1208,20 @@ function decodeInboxCursor(
     parse: value => {
       const parsed = inboxCursorPayloadSchema.safeParse(value);
       if (!parsed.success || parsed.data.identity !== identity) return null;
-      const servedBytes = Buffer.from(parsed.data.served, 'base64url');
       const pageBytes = Buffer.from(parsed.data.pages, 'base64url');
-      if (servedBytes.length % 6 !== 0 || pageBytes.length !== repositories.length * 2) {
-        return null;
-      }
-      const servedRefs = new Set<string>();
-      for (let offset = 0; offset < servedBytes.length; offset += 6) {
-        const repository = repositories[servedBytes.readUInt16BE(offset)];
-        if (!repository) return null;
-        servedRefs.add(
-          providerPrRefKey({
-            platform: 'bitbucket',
-            workspace: repository.fullName.split('/')[0] ?? '',
-            repoSlug: repository.slug,
-            prId: servedBytes.readUInt32BE(offset + 2),
-          })
-        );
-      }
+      if (pageBytes.length !== repositories.length * 2) return null;
       const providerPages = new Map<string, number>();
       for (let index = 0; index < repositories.length; index += 1) {
         const page = pageBytes.readUInt16BE(index * 2);
         if (page > 1) providerPages.set(repositories[index].fullName.toLowerCase(), page);
       }
-      return { boundary: parsed.data.boundary, servedRefs, providerPages };
+      return { boundary: parsed.data.boundary, lastRef: parsed.data.lastRef, providerPages };
     },
   });
   if (payload === null) return null;
   return {
     boundary: payload.boundary,
-    servedRefs: payload.servedRefs,
+    lastRef: payload.lastRef,
     providerPages: payload.providerPages,
   };
 }

@@ -11,6 +11,7 @@ import {
   listChecks,
   listDiscussions,
   listInbox,
+  INBOX_CURSOR_MAX_CHARS,
 } from './bitbucket-read';
 import { BitbucketReviewError } from './bitbucket-authorization';
 import { FILE_LINES_MAX } from '@/lib/github-pr-review/dtos';
@@ -1150,6 +1151,41 @@ describe('listInbox', () => {
     expect(third.nextCursor).toBeNull();
     expect(requests.map(request => request.page)).toEqual(['1', '1', '2']);
   });
+  it('keeps equal-time rows in a stable order across inbox pages', async () => {
+    const requests: InboxRequest[] = [];
+    const tiedAt = '2026-09-02T00:00:00.000000+00:00';
+    serveInbox(
+      {
+        'repo-a': Array.from({ length: 40 }, (_, index) =>
+          inboxPr(1000 + index, tiedAt, 'acme/repo-a')
+        ),
+        'repo-b': Array.from({ length: 40 }, (_, index) =>
+          inboxPr(2000 + index, tiedAt, 'acme/repo-b')
+        ),
+        'repo-c': Array.from({ length: 40 }, (_, index) =>
+          inboxPr(3000 + index, tiedAt, 'acme/repo-c')
+        ),
+      },
+      requests
+    );
+
+    const first = await listInbox(ORG_OWNER);
+    const second = await listInbox(ORG_OWNER, first.nextCursor!);
+    const third = await listInbox(ORG_OWNER, second.nextCursor!);
+    const ids = [...first.items, ...second.items, ...third.items].map(item =>
+      item.ref && 'prId' in item.ref ? item.ref.prId : null
+    );
+
+    expect(ids).toHaveLength(120);
+    expect(new Set(ids).size).toBe(120);
+    expect(ids).toEqual([
+      ...Array.from({ length: 40 }, (_, index) => 1000 + index),
+      ...Array.from({ length: 40 }, (_, index) => 2000 + index),
+      ...Array.from({ length: 40 }, (_, index) => 3000 + index),
+    ]);
+    expect(requests.every(request => request.page === '1')).toBe(true);
+    expect(third.nextCursor).toBeNull();
+  });
 
   it('continues several repositories across pages', async () => {
     // repo-a's rows are all older than repo-b's, so the first load serves
@@ -1209,22 +1245,62 @@ describe('listInbox', () => {
     expect(requests.filter(request => request.query === 'state="OPEN"')).toHaveLength(12);
   });
 
-  it('reads one provider page per enumerated repository', async () => {
-    // The enumeration cap is 300 repositories; a load reads at most one page
-    // from each of them.
+  it('caps the workspace fan-out at the enumerated repository set', async () => {
+    const slugs = Array.from({ length: 301 }, (_, repo) => `repo-${repo}`);
     const rowsBySlug: Record<string, InboxRow[]> = {};
-    for (let repo = 0; repo < 300; repo += 1) {
-      rowsBySlug[`repo-${repo}`] = [
-        inboxPr(repo, `2026-09-02T00:${String(repo % 60).padStart(2, '0')}:00+00:00`),
-      ];
+    for (const slug of slugs) {
+      rowsBySlug[slug] = [inboxPr(slugs.indexOf(slug) + 1, '2026-09-02T00:00:00+00:00')];
     }
     const requests: InboxRequest[] = [];
     serveInbox(rowsBySlug, requests);
 
     const page = await listInbox(ORG_OWNER);
-    expect(requests).toHaveLength(300);
+    const expected = [...slugs].sort().slice(0, 300);
+    expect(requests.map(request => request.slug).sort()).toEqual(expected);
     expect(page.items).toHaveLength(50);
     expect(page.nextCursor).toBeTruthy();
+  });
+
+  it('keeps a maximum-size continuation within the receiving wire limit', async () => {
+    const slugs = Array.from(
+      { length: 300 },
+      (_, index) => `repo-${String(index).padStart(3, '0')}`
+    );
+    const tiedAt = '2026-09-02T00:00:00.000000+00:00';
+    const rowsBySlug: Record<string, InboxRow[]> = {};
+    for (const slug of slugs) {
+      rowsBySlug[slug] = Array.from({ length: 60 }, (_, index) =>
+        inboxPr(index + 1, tiedAt, `acme/${slug}`)
+      );
+    }
+    const requests: InboxRequest[] = [];
+    serveInbox(rowsBySlug, requests);
+
+    const fingerprint = crypto
+      .createHash('sha256')
+      .update(
+        [...slugs]
+          .sort()
+          .map(slug => `acme/${slug}`)
+          .join('\0')
+      )
+      .digest('base64url');
+    const pages = Buffer.alloc(slugs.length * 2);
+    for (let index = 0; index < slugs.length; index += 1) pages.writeUInt16BE(2, index * 2);
+    const cursor = createSignedToken({
+      kind: 'bitbucket-inbox-cursor',
+      identity: `bitbucket-inbox:acme:${ORG_OWNER.organizationId}:${ORG_OWNER.userId}:${fingerprint}`,
+      boundary: tiedAt,
+      lastRef: null,
+      pages: pages.toString('base64url'),
+    });
+    expect(cursor.length).toBeLessThanOrEqual(INBOX_CURSOR_MAX_CHARS);
+
+    const page = await listInbox(ORG_OWNER, cursor);
+
+    expect(requests).toHaveLength(300);
+    expect(requests.every(request => request.page === '2')).toBe(true);
+    expect(page.nextCursor?.length).toBeLessThanOrEqual(INBOX_CURSOR_MAX_CHARS);
   });
 
   it('starts again at the first page when continuation state is not valid', async () => {

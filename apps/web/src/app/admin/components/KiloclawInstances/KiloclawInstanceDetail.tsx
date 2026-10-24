@@ -1394,8 +1394,12 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
 
   const { mutateAsync: destroyInstance, isPending: isDestroying } = useMutation(
     trpc.admin.kiloclawInstances.destroy.mutationOptions({
-      onSuccess: () => {
-        toast.success('Instance destroyed successfully');
+      onSuccess: result => {
+        if (result.pending) {
+          toast.info('Destruction requested; provider cleanup is still pending');
+        } else {
+          toast.success('Instance destroyed successfully');
+        }
         void queryClient.invalidateQueries({
           queryKey: trpc.admin.kiloclawInstances.get.queryKey(),
         });

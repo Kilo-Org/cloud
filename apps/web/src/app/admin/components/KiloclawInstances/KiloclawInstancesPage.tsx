@@ -38,6 +38,7 @@ import { ChevronLeft, ChevronRight, Info, X, Bomb } from 'lucide-react';
 import Link from 'next/link';
 import { format, parseISO } from 'date-fns';
 import { BulkChangeVersionDialog } from './BulkChangeVersionDialog';
+import { BulkDestroyDialog } from './BulkDestroyDialog';
 import {
   ComposedChart,
   Bar,
@@ -432,6 +433,7 @@ export function KiloclawInstancesPage() {
   const [searchInput, setSearchInput] = useState(queryStringState.search);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const [bulkDestroyDialogOpen, setBulkDestroyDialogOpen] = useState(false);
 
   const offset = (queryStringState.page - 1) * queryStringState.limit;
 
@@ -700,7 +702,10 @@ export function KiloclawInstancesPage() {
       {selectedIds.size === 0 ? (
         <div className="text-muted-foreground border-border/60 flex items-center gap-2 rounded-md border border-dashed px-3 py-2 text-xs">
           <Info className="h-3 w-3 opacity-60" />
-          <span>Use the checkboxes to select rows for bulk version changes.</span>
+          <span>
+            Use the checkboxes to select instances for bulk version changes or permanent
+            destruction.
+          </span>
         </div>
       ) : (
         <div className="bg-muted/30 flex items-center gap-3 rounded-md border px-3 py-2">
@@ -715,6 +720,24 @@ export function KiloclawInstancesPage() {
           <Button size="sm" onClick={() => setBulkDialogOpen(true)}>
             Change version…
           </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => setBulkDestroyDialogOpen(true)}
+            disabled={selectedIds.size > 25}
+            title={
+              selectedIds.size > 25
+                ? 'Select at most 25 instances to destroy in one batch'
+                : undefined
+            }
+          >
+            Destroy and cancel hosting ({selectedIds.size})
+          </Button>
+          {selectedIds.size > 25 && (
+            <span className="text-destructive text-xs">
+              Destruction batches are limited to 25 instances.
+            </span>
+          )}
           <Button size="sm" variant="ghost" onClick={clearSelection}>
             Clear
           </Button>
@@ -972,6 +995,11 @@ export function KiloclawInstancesPage() {
         onApplied={() => {
           clearSelection();
         }}
+      />
+      <BulkDestroyDialog
+        open={bulkDestroyDialogOpen}
+        onOpenChange={setBulkDestroyDialogOpen}
+        selectedIds={Array.from(selectedIds)}
       />
     </div>
   );

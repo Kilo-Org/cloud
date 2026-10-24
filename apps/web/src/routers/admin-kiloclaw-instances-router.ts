@@ -9,6 +9,7 @@ import {
   insertKiloClawSubscriptionChangeLog,
   orphanVolumeSubscriptionContextKey,
 } from '@kilocode/db';
+import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
 import { createHash } from 'crypto';
 import {
   kiloclaw_instances,
@@ -30,6 +31,7 @@ import {
   getInboundEmailAddressForInstance,
 } from '@/lib/kiloclaw/inbound-email-alias';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
+import { destroyBulkTarget } from '@/lib/kiloclaw/admin-bulk-destroy';
 import { kiloclawFilePathSchema } from '@/lib/kiloclaw/file-path-schema';
 import { KiloClawUserClient } from '@/lib/kiloclaw/kiloclaw-user-client';
 import { pushPinToWorker } from '@/lib/kiloclaw/pin-sync';
@@ -47,6 +49,12 @@ import {
 } from '@/lib/kiloclaw/admin-audit-log';
 import { cancelCliRun, createCliRun, getCliRunStatus } from '@/lib/kiloclaw/cli-runs';
 import { clearTrialInactivityStopAfterStart } from '@/lib/kiloclaw/instance-lifecycle';
+import {
+  cancelStripeHostingImmediately,
+  cancelKiloClawHostingImmediately,
+  decideImmediateKiloClawCancellation,
+  type BulkHostingCancellationOutcome,
+} from '@/lib/kiloclaw/immediate-cancellation';
 import {
   classifyOrphanVolume,
   ORPHAN_VOLUME_GRACE_PERIOD_MS,
@@ -164,6 +172,142 @@ const DestroyInstanceSchema = z.object({
   id: z.string().uuid(),
 });
 
+const BulkDestroySchema = z.object({
+  instanceIds: z.array(z.string().uuid()).min(1).max(25),
+  confirmation: z.literal('DESTROY'),
+});
+
+const BULK_HOSTING_CANCELLATION_STRIPE_OPTIONS = {
+  timeout: 10_000,
+  maxNetworkRetries: 0,
+} as const;
+
+function isInactiveStripeScheduleError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes('not active') ||
+    message.includes('released') ||
+    message.includes('canceled') ||
+    message.includes('completed')
+  );
+}
+
+async function cancelHostingForBulkDestroy(params: {
+  instanceId: string;
+  actorUserId: string;
+}): Promise<BulkHostingCancellationOutcome> {
+  return cancelKiloClawHostingImmediately({
+    prepare: () =>
+      db.transaction(async tx => {
+        const [current] = await tx
+          .select()
+          .from(kiloclaw_subscriptions)
+          .where(eq(kiloclaw_subscriptions.instance_id, params.instanceId))
+          .for('update')
+          .limit(1);
+        if (!current || current.transferred_to_subscription_id || !current.pending_conversion) {
+          return { subscription: current ?? null, clearedPendingConversion: false };
+        }
+        const [after] = await tx
+          .update(kiloclaw_subscriptions)
+          .set({ pending_conversion: false })
+          .where(eq(kiloclaw_subscriptions.id, current.id))
+          .returning();
+        if (!after) throw new Error('Failed to clear pending hosting conversion.');
+        await insertKiloClawSubscriptionChangeLog(tx, {
+          subscriptionId: current.id,
+          actor: { actorType: 'user', actorId: params.actorUserId },
+          action: 'status_changed',
+          reason: 'admin_bulk_destroy_clear_pending_conversion',
+          before: current,
+          after,
+        });
+        return { subscription: after, clearedPendingConversion: true };
+      }),
+    cancelStripe: (stripeSubscriptionId, storedScheduleId) =>
+      cancelStripeHostingImmediately({
+        stripeSubscriptionId,
+        storedScheduleId,
+        retrieve: subscriptionId =>
+          stripeClient.subscriptions.retrieve(
+            subscriptionId,
+            BULK_HOSTING_CANCELLATION_STRIPE_OPTIONS
+          ),
+        releaseSchedule: scheduleId =>
+          stripeClient.subscriptionSchedules.release(
+            scheduleId,
+            BULK_HOSTING_CANCELLATION_STRIPE_OPTIONS
+          ),
+        cancel: (subscriptionId, options) =>
+          stripeClient.subscriptions.cancel(
+            subscriptionId,
+            options,
+            BULK_HOSTING_CANCELLATION_STRIPE_OPTIONS
+          ),
+        isInactiveScheduleError: isInactiveStripeScheduleError,
+      }),
+    reconcile: subscription =>
+      db.transaction(async tx => {
+        const [current] = await tx
+          .select()
+          .from(kiloclaw_subscriptions)
+          .where(eq(kiloclaw_subscriptions.id, subscription.id))
+          .for('update')
+          .limit(1);
+
+        if (
+          !current ||
+          current.instance_id !== params.instanceId ||
+          current.transferred_to_subscription_id ||
+          current.stripe_subscription_id !== subscription.stripe_subscription_id
+        ) {
+          throw new Error('Subscription changed before cancellation reconciliation.');
+        }
+
+        if (
+          decideImmediateKiloClawCancellation({
+            status: current.status,
+            transferredToSubscriptionId: current.transferred_to_subscription_id,
+            pendingConversion: current.pending_conversion,
+          }) === 'not_needed'
+        ) {
+          return false;
+        }
+
+        const now = new Date().toISOString();
+        const [after] = await tx
+          .update(kiloclaw_subscriptions)
+          .set({
+            status: 'canceled',
+            cancel_at_period_end: false,
+            pending_conversion: false,
+            stripe_schedule_id: null,
+            scheduled_plan: null,
+            scheduled_by: null,
+            current_period_end: now,
+            credit_renewal_at: now,
+            ...(current.status === 'trialing' ? { trial_ends_at: now } : {}),
+          })
+          .where(eq(kiloclaw_subscriptions.id, current.id))
+          .returning();
+
+        if (!after) {
+          throw new Error('Failed to reconcile canceled hosting subscription.');
+        }
+
+        await insertKiloClawSubscriptionChangeLog(tx, {
+          subscriptionId: current.id,
+          actor: { actorType: 'user', actorId: params.actorUserId },
+          action: 'canceled',
+          reason: 'admin_bulk_destroy_immediate_cancel',
+          before: current,
+          after,
+        });
+        return true;
+      }),
+  });
+}
+
 const SetInboundEmailEnabledSchema = z.object({
   id: z.string().uuid(),
   enabled: z.boolean(),
@@ -262,6 +406,14 @@ function getKiloclawApiErrorPayload(
   return { message: err.responseBody.trim() || fallbackMessage };
 }
 
+function isFinalizedInstanceGoneError(error: unknown): boolean {
+  return (
+    error instanceof KiloClawApiError &&
+    error.statusCode === 404 &&
+    getKiloclawApiErrorPayload(error, '').message === 'Instance not provisioned'
+  );
+}
+
 function throwKiloclawAdminError(
   err: unknown,
   fallbackMessage: string,
@@ -354,6 +506,53 @@ async function clearAdminInstanceDestructionDeadlineWithChangeLog(params: {
   } catch (error) {
     console.error('[admin-kiloclaw] Failed to write subscription change log:', error);
   }
+}
+
+async function cleanupAdminDestroyedInstance(params: {
+  actorUserId: string;
+  userId: string;
+  instanceId: string;
+  sandboxId: string;
+}): Promise<void> {
+  await clearAdminInstanceDestructionDeadlineWithChangeLog({
+    actorUserId: params.actorUserId,
+    userId: params.userId,
+    instanceId: params.instanceId,
+    reason: 'admin_destroy_clear_lifecycle_state',
+  });
+
+  await db
+    .delete(kiloclaw_email_log)
+    .where(
+      and(
+        eq(kiloclaw_email_log.user_id, params.userId),
+        eq(kiloclaw_email_log.instance_id, params.instanceId),
+        inArray(kiloclaw_email_log.email_type, [
+          'claw_suspended_trial',
+          'claw_suspended_subscription',
+          'claw_suspended_payment',
+          'claw_destruction_warning',
+          'claw_instance_destroyed',
+        ])
+      )
+    );
+  await db
+    .delete(kiloclaw_email_log)
+    .where(
+      and(
+        eq(kiloclaw_email_log.user_id, params.userId),
+        or(
+          and(
+            eq(kiloclaw_email_log.instance_id, params.instanceId),
+            eq(kiloclaw_email_log.email_type, 'claw_instance_ready')
+          ),
+          and(
+            isNull(kiloclaw_email_log.instance_id),
+            eq(kiloclaw_email_log.email_type, `claw_instance_ready:${params.sandboxId}`)
+          )
+        )
+      )
+    );
 }
 
 /**
@@ -1823,6 +2022,118 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       console.error('Failed to stop machine for user:', input.userId, err);
       throwKiloclawAdminError(err, fallbackMessage);
     }
+  }),
+
+  bulkDestroy: adminProcedure.input(BulkDestroySchema).mutation(async ({ input, ctx }) => {
+    const instanceIds = Array.from(new Set(input.instanceIds));
+    const instances = await db
+      .select({
+        id: kiloclaw_instances.id,
+        user_id: kiloclaw_instances.user_id,
+        sandbox_id: kiloclaw_instances.sandbox_id,
+        destroyed_at: kiloclaw_instances.destroyed_at,
+      })
+      .from(kiloclaw_instances)
+      .where(inArray(kiloclaw_instances.id, instanceIds));
+
+    const destroyed: string[] = [];
+    const pending: string[] = [];
+    const skipped: Array<{ instanceId: string; reason: 'already_destroyed' }> = [];
+    const failed: Array<{ instanceId: string; error: string }> = [];
+    const billing = {
+      canceled: [] as Array<{ instanceId: string; subscriptionIds: string[] }>,
+      notNeeded: [] as string[],
+      failed: [] as Array<{ instanceId: string; error: string }>,
+    };
+    const instanceById = new Map(instances.map(instance => [instance.id, instance]));
+    const outcomes = new Map<
+      string,
+      Awaited<ReturnType<typeof destroyBulkTarget>> | { missing: true }
+    >();
+    for (let index = 0; index < instanceIds.length; index += 3) {
+      await Promise.all(
+        instanceIds.slice(index, index + 3).map(async instanceId => {
+          const instance = instanceById.get(instanceId);
+          if (!instance) {
+            outcomes.set(instanceId, { missing: true });
+            return;
+          }
+          outcomes.set(
+            instanceId,
+            await destroyBulkTarget({
+              target: {
+                id: instance.id,
+                userId: instance.user_id,
+                workerInstanceId: workerInstanceId(instance),
+                destroyedAt: instance.destroyed_at,
+              },
+              cancelHosting: () =>
+                cancelHostingForBulkDestroy({ instanceId, actorUserId: ctx.user.id }),
+              markDestroyed: async () =>
+                (await markActiveInstanceDestroyed(instance.user_id, instance.id)) !== null,
+              restoreDestroyed: () => restoreDestroyedInstance(instance.id),
+              destroyWorker: () =>
+                new KiloClawInternalClient().destroy(instance.user_id, workerInstanceId(instance), {
+                  reason: 'admin_request',
+                }),
+              isAlreadyGone: isFinalizedInstanceGoneError,
+              cleanup: () =>
+                cleanupAdminDestroyedInstance({
+                  actorUserId: ctx.user.id,
+                  userId: instance.user_id,
+                  instanceId: instance.id,
+                  sandboxId: instance.sandbox_id,
+                }),
+            })
+          );
+        })
+      );
+    }
+
+    for (const instanceId of instanceIds) {
+      const outcome = outcomes.get(instanceId);
+      if (!outcome || 'missing' in outcome) {
+        failed.push({ instanceId, error: 'not_found' });
+        billing.failed.push({ instanceId, error: 'not_found' });
+        continue;
+      }
+      if (outcome.billing.status === 'canceled') {
+        billing.canceled.push({ instanceId, subscriptionIds: outcome.billing.subscriptionIds });
+      } else if (outcome.billing.status === 'not_needed') {
+        billing.notNeeded.push(instanceId);
+      } else {
+        billing.failed.push({ instanceId, error: outcome.billing.error });
+      }
+      if (outcome.result.status === 'destroyed') destroyed.push(instanceId);
+      if (outcome.result.status === 'pending') pending.push(instanceId);
+      if (outcome.result.status === 'skipped')
+        skipped.push({ instanceId, reason: outcome.result.reason });
+      if (outcome.result.status === 'failed')
+        failed.push({ instanceId, error: outcome.result.error });
+    }
+
+    try {
+      await createKiloClawAdminAuditLog({
+        action: 'kiloclaw.instance.destroy',
+        actor_id: ctx.user.id,
+        actor_email: ctx.user.google_user_email,
+        actor_name: ctx.user.google_user_name,
+        target_user_id: ctx.user.id,
+        message: `Bulk instance destroy: requested=${instanceIds.length} destroyed=${destroyed.length} pending=${pending.length} skipped=${skipped.length} failed=${failed.length} billing_canceled=${billing.canceled.length} billing_not_needed=${billing.notNeeded.length} billing_failed=${billing.failed.length}`,
+        metadata: {
+          requestedInstanceIds: instanceIds,
+          destroyedInstanceIds: destroyed,
+          pendingInstanceIds: pending,
+          skipped,
+          failed,
+          billing,
+        },
+      });
+    } catch (auditError) {
+      console.error('Failed to write audit log for bulkDestroy:', auditError);
+    }
+
+    return { destroyed, pending, skipped, failed, billing };
   }),
 
   restartMachine: adminProcedure
@@ -3368,69 +3679,34 @@ export const adminKiloclawInstancesRouter = createTRPCRouter({
       `[admin-kiloclaw] Destroy triggered by admin ${ctx.user.id} (${ctx.user.google_user_email}) for instance ${instance.id} (user: ${instance.user_id})`
     );
 
-    const destroyedRow = await markActiveInstanceDestroyed(instance.user_id, instance.id);
-    const client = new KiloClawInternalClient();
-    try {
-      await client.destroy(instance.user_id, workerInstanceId(instance), {
-        reason: 'admin_request',
-      });
-    } catch (error) {
-      if (destroyedRow) {
-        await restoreDestroyedInstance(destroyedRow.id);
-      }
-      throw error;
-    }
-
-    // Post-destroy cleanup: best-effort DB tidying that must not report
-    // failure after a successful destroy.
-    try {
-      await clearAdminInstanceDestructionDeadlineWithChangeLog({
-        actorUserId: ctx.user.id,
+    const outcome = await destroyBulkTarget({
+      target: {
+        id: instance.id,
         userId: instance.user_id,
-        instanceId: instance.id,
-        reason: 'admin_destroy_clear_lifecycle_state',
-      });
-
-      // Clear lifecycle emails so they can fire again if the user re-provisions.
-      const resettableEmailTypes = [
-        'claw_suspended_trial',
-        'claw_suspended_subscription',
-        'claw_suspended_payment',
-        'claw_destruction_warning',
-        'claw_instance_destroyed',
-      ];
-      await db
-        .delete(kiloclaw_email_log)
-        .where(
-          and(
-            eq(kiloclaw_email_log.user_id, instance.user_id),
-            eq(kiloclaw_email_log.instance_id, instance.id),
-            inArray(kiloclaw_email_log.email_type, resettableEmailTypes)
-          )
-        );
-      // Clear per-instance ready emails so a future re-provision triggers the notification.
-      await db
-        .delete(kiloclaw_email_log)
-        .where(
-          and(
-            eq(kiloclaw_email_log.user_id, instance.user_id),
-            or(
-              and(
-                eq(kiloclaw_email_log.instance_id, instance.id),
-                eq(kiloclaw_email_log.email_type, 'claw_instance_ready')
-              ),
-              and(
-                isNull(kiloclaw_email_log.instance_id),
-                eq(kiloclaw_email_log.email_type, `claw_instance_ready:${instance.sandbox_id}`)
-              )
-            )
-          )
-        );
-    } catch (cleanupError) {
-      console.error('[admin-kiloclaw] Post-destroy cleanup failed:', cleanupError);
+        workerInstanceId: workerInstanceId(instance),
+        destroyedAt: null,
+      },
+      cancelHosting: async () => ({ status: 'not_needed' }),
+      markDestroyed: async () =>
+        (await markActiveInstanceDestroyed(instance.user_id, instance.id)) !== null,
+      restoreDestroyed: () => restoreDestroyedInstance(instance.id),
+      destroyWorker: () =>
+        new KiloClawInternalClient().destroy(instance.user_id, workerInstanceId(instance), {
+          reason: 'admin_request',
+        }),
+      isAlreadyGone: isFinalizedInstanceGoneError,
+      cleanup: () =>
+        cleanupAdminDestroyedInstance({
+          actorUserId: ctx.user.id,
+          userId: instance.user_id,
+          instanceId: instance.id,
+          sandboxId: instance.sandbox_id,
+        }),
+    });
+    if (outcome.result.status === 'failed') {
+      throw new Error(outcome.result.error);
     }
-
-    return { success: true };
+    return { success: true, pending: outcome.result.status === 'pending' };
   }),
 
   adminAuditLogs: adminProcedure

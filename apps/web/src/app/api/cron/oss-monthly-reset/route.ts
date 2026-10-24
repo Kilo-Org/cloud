@@ -5,7 +5,7 @@ import { and, eq, isNull, lt, or, sql } from 'drizzle-orm';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { organizations, organization_memberships, kilocode_users } from '@kilocode/db/schema';
-import type { Organization, User } from '@kilocode/db/schema';
+import type { User } from '@kilocode/db/schema';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-base-types';
 import { grantEntityCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
 
@@ -49,6 +49,39 @@ async function getOrganizationOwner(
     .limit(1);
 
   return result[0]?.user ?? null;
+}
+
+/**
+ * Whether an organization is due for a top-up in the current window. Evaluated
+ * both for candidate discovery and again under the row lock, so a run that lost
+ * the window to a concurrent run sees the committed reset timestamp.
+ */
+function isDueForReset(settings: OrganizationSettings | null | undefined, cutoff: Date): boolean {
+  if (!settings) return false;
+  if (settings.oss_sponsorship_tier == null) return false;
+  const monthlyAmountMicrodollars = settings.oss_monthly_credit_amount_microdollars ?? 0;
+  if (!(monthlyAmountMicrodollars > 0)) return false;
+
+  const lastResetAt = settings.oss_credits_last_reset_at;
+  if (!lastResetAt) return true;
+  return new Date(lastResetAt).getTime() < cutoff.getTime();
+}
+
+/**
+ * Records the reset window without touching any other settings key: the merge
+ * happens in Postgres against the row's current value.
+ */
+async function markResetTimestamp(
+  tx: DrizzleTransaction,
+  organizationId: string,
+  resetAt: string
+): Promise<void> {
+  await tx
+    .update(organizations)
+    .set({
+      settings: sql`jsonb_set(coalesce(${organizations.settings}, '{}'::jsonb), '{oss_credits_last_reset_at}', to_jsonb(${resetAt}::text))`,
+    })
+    .where(eq(organizations.id, organizationId));
 }
 
 /**
@@ -116,8 +149,6 @@ export async function GET(request: Request) {
       ...rawOrg,
       currentBalance: rawOrg.total_microdollars_acquired - rawOrg.microdollars_used,
     };
-    const monthlyAmountMicrodollars = org.settings.oss_monthly_credit_amount_microdollars ?? 0;
-
     const result: ResetResult = {
       organizationId: org.id,
       organizationName: org.name,
@@ -129,69 +160,78 @@ export async function GET(request: Request) {
 
     try {
       await db.transaction(async (tx: DrizzleTransaction) => {
-        // Calculate how much to top up (only if below monthly allocation)
-        const creditDeltaMicrodollars = monthlyAmountMicrodollars - org.currentBalance;
+        // The row lock is the first statement of the transaction, so the settings,
+        // the balances and the due predicate are read after the organization's
+        // reset window belongs to this run. A run that acquires the lock later
+        // reads the committed timestamp and leaves the organization alone.
+        const [lockedOrg] = await tx
+          .select()
+          .from(organizations)
+          .where(eq(organizations.id, org.id))
+          .for('update');
 
-        // Always update the reset timestamp in settings
-        const updatedSettings: OrganizationSettings = {
-          ...org.settings,
-          oss_credits_last_reset_at: now,
-        };
+        if (!lockedOrg) {
+          result.skippedReason = 'not_due_anymore';
+          result.success = true;
+          return;
+        }
+
+        const currentBalance = lockedOrg.total_microdollars_acquired - lockedOrg.microdollars_used;
+        result.previousBalance = currentBalance;
+        result.newBalance = currentBalance;
+
+        const settings: OrganizationSettings = lockedOrg.settings ?? {};
+        if (lockedOrg.deleted_at !== null || !isDueForReset(settings, thirtyDaysAgo)) {
+          result.skippedReason = 'not_due_anymore';
+          result.success = true;
+          console.log(
+            `[oss-monthly-reset] Skipped org ${lockedOrg.name} (${lockedOrg.id}): not due for a reset`
+          );
+          return;
+        }
+
+        const monthlyAmountMicrodollars = settings.oss_monthly_credit_amount_microdollars ?? 0;
+
+        // Calculate how much to top up (only if below monthly allocation)
+        const creditDeltaMicrodollars = monthlyAmountMicrodollars - currentBalance;
 
         // If balance is already at or above monthly allocation, just update timestamp
         if (creditDeltaMicrodollars <= 0) {
-          await tx
-            .update(organizations)
-            .set({ settings: updatedSettings })
-            .where(eq(organizations.id, org.id));
+          await markResetTimestamp(tx, lockedOrg.id, now);
 
           result.skippedReason = 'balance_already_sufficient';
           result.success = true;
           console.log(
-            `[oss-monthly-reset] Skipped org ${org.name} (${org.id}): balance ${org.currentBalance} >= monthly ${monthlyAmountMicrodollars}`
+            `[oss-monthly-reset] Skipped org ${lockedOrg.name} (${lockedOrg.id}): balance ${currentBalance} >= monthly ${monthlyAmountMicrodollars}`
           );
           return;
         }
 
         // Get the organization owner for the credit grant
-        const owner = await getOrganizationOwner(tx, org.id);
+        const owner = await getOrganizationOwner(tx, lockedOrg.id);
 
         if (!owner) {
           // No owner yet (invite not accepted) - skip this org for now
           // We still update the timestamp so we don't keep retrying
-          await tx
-            .update(organizations)
-            .set({ settings: updatedSettings })
-            .where(eq(organizations.id, org.id));
+          await markResetTimestamp(tx, lockedOrg.id, now);
 
           result.skippedReason = 'no_owner_found';
           result.success = true;
           console.log(
-            `[oss-monthly-reset] Skipped org ${org.name} (${org.id}): no owner found (invite not accepted?)`
+            `[oss-monthly-reset] Skipped org ${lockedOrg.name} (${lockedOrg.id}): no owner found (invite not accepted?)`
           );
           return;
-        }
-
-        // Fetch the full organization record for the credit grant
-        const [orgRecord] = await tx
-          .select()
-          .from(organizations)
-          .where(eq(organizations.id, org.id))
-          .limit(1);
-
-        if (!orgRecord) {
-          throw new Error(`Organization ${org.id} not found`);
         }
 
         // Grant credits using the standard function
         const creditDeltaUsd = creditDeltaMicrodollars / 1_000_000;
         const creditResult = await grantEntityCreditForCategory(
-          { user: owner, organization: orgRecord as Organization },
+          { user: owner, organization: lockedOrg },
           {
             credit_category: 'oss-monthly-reset',
             counts_as_selfservice: false,
             amount_usd: creditDeltaUsd,
-            description: `OSS sponsorship monthly top-up (tier ${org.settings.oss_sponsorship_tier ?? 'unknown'})`,
+            description: `OSS sponsorship monthly top-up (tier ${settings.oss_sponsorship_tier ?? 'unknown'})`,
             dbOrTx: tx,
           }
         );
@@ -200,17 +240,13 @@ export async function GET(request: Request) {
           throw new Error(`Failed to grant credits: ${creditResult.message}`);
         }
 
-        // Update the reset timestamp in settings
-        await tx
-          .update(organizations)
-          .set({ settings: updatedSettings })
-          .where(eq(organizations.id, org.id));
+        await markResetTimestamp(tx, lockedOrg.id, now);
 
         result.newBalance = monthlyAmountMicrodollars;
         result.creditsGranted = creditDeltaMicrodollars;
         result.success = true;
         console.log(
-          `[oss-monthly-reset] Topped up org ${org.name} (${org.id}): ${org.currentBalance} -> ${monthlyAmountMicrodollars} (added ${creditDeltaMicrodollars})`
+          `[oss-monthly-reset] Topped up org ${lockedOrg.name} (${lockedOrg.id}): ${currentBalance} -> ${monthlyAmountMicrodollars} (added ${creditDeltaMicrodollars})`
         );
       });
     } catch (error) {

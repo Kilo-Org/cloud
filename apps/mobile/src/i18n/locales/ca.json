@@ -53,6 +53,7 @@
     "connected": "Connectat",
     "couldNotLoadModels": "No s'han pogut carregar els models.",
     "couldNotLoadRepositories": "No s'han pogut carregar els repositoris.",
+    "noRepositoriesFound": "No s'han trobat repositoris",
     "critical": "Crític",
     "delete": "Elimina",
     "deleted": "Eliminat",
@@ -87,6 +88,7 @@
     "connect": "Connecta",
     "connectBitbucket": "Connecta Bitbucket",
     "connectGitlab": "Connecta GitLab",
+    "connectProvider": "Connecta un proveïdor",
     "contentTruncated": "Contingut truncat",
     "copyLink": "Copia l'enllaç",
     "couldNotLoadOrganizations": "No s'han pogut carregar les organitzacions.",
@@ -145,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Canvis"
+    "changes": "Canvis",
+    "organizationTrialEnded": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. El propietari de l'organització pot actualitzar la facturació a kilo.ai i tornar-ho a provar."
   },
   "language": {
     "restarting": "S'està reiniciant per aplicar l'idioma",
@@ -182,7 +185,7 @@
     "codeArrivalHint": "Si aquesta adreça compleix els requisits, rebràs el codi en menys d'un minut.",
     "verifyCode": "Verifica el codi",
     "resendCode": "Torna a enviar el codi",
-    "termsPrefix": "En continuar, acceptes les nostres",
+    "termsPrefix": "En continuar, acceptes les nostres ",
     "terms": "Condicions d'ús",
     "termsConnector": " i ",
     "termsSuffix": ".",
@@ -293,7 +296,8 @@
     "condenseToolCallsSubtitle": "Agrupa les crides d'eines consecutives en una fila que puguis obrir.",
     "toolSummaryTranslation": "Tradueix els resums d'eines",
     "toolSummaryTranslationSubtitle": "Envia cada resum d'eina a un model perquè el tradueixi a la llengua de la teva aplicació. Es mostra l'original si la traducció falla.",
-    "toolSummaryTranslationModelUnavailableNotice": "Aquest model ja no s'ofereix. Toca $t(common.model) per triar-ne un altre."
+    "toolSummaryTranslationModelUnavailableNotice": "Aquest model ja no s'ofereix. Toca $t(common.model) per triar-ne un altre.",
+    "autoExpandThinkingInactiveSubtitle": "No té cap efecte mentre els detalls del raonament estan amagats."
   },
   "prReview": {
     "pullRequestUnavailable": "Sol·licitud d'integració no disponible",
@@ -633,9 +637,18 @@
       "viewOnGitHub": "Mostra la PR a GitHub",
       "noChecksReported": "No s'ha informat de cap comprovació",
       "passed": "{{displayCount}} superades",
+      "passed_one": "{{displayCount}} superades",
+      "passed_other": "{{displayCount}} superades",
+      "passed_many": "{{displayCount}} superades",
       "failed": "{{displayCount}} fallides",
+      "failed_one": "{{displayCount}} fallides",
+      "failed_other": "{{displayCount}} fallides",
+      "failed_many": "{{displayCount}} fallides",
       "pending": "{{displayCount}} pendents",
       "skipped": "{{displayCount}} omeses",
+      "skipped_one": "{{displayCount}} omeses",
+      "skipped_other": "{{displayCount}} omeses",
+      "skipped_many": "{{displayCount}} omeses",
       "checksCount": "{{displayCount}} comprovacions",
       "checksCount_one": "{{displayCount}} comprovació",
       "checksCount_many": "{{displayCount}} comprovacions",
@@ -681,7 +694,8 @@
       "gitlabDescription": "Connecta el teu compte de GitLab per revisar sol·licituds de fusió des del mòbil.",
       "bitbucketDescription": "Connecta Bitbucket a aquesta organització per revisar sol·licituds d'integració des del mòbil.",
       "bitbucketOrgOnlyDescription": "Canvia el compte de dalt a una organització per revisar-ne les sol·licituds d'integració a Bitbucket.",
-      "contextLine": "Per a {{organization}}"
+      "contextLine": "Per a {{organization}}",
+      "contextLinePersonal": "Per a ús personal"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1418,7 +1432,6 @@
       "gitlabNoRepositoriesDescription": "Pot ser que hagis de concedir accés a més grups o projectes a GitLab.",
       "installGithubApp": "Instal·la l'aplicació de GitHub als repositoris",
       "installGithubAppDescription": "Concedeix a l'aplicació de GitHub de Kilo accés als repositoris que vols revisar.",
-      "noRepositoriesFound": "No s'han trobat repositoris",
       "repositoryAccess": "accés als repositoris"
     },
     "style": {
@@ -1448,6 +1461,8 @@
       "showMore": "Mostra'n més",
       "created": "Data de creació",
       "started": "Data d'inici",
+      "reviewEnded": "Data de finalització",
+      "severityNitpick": "Mínim",
       "tokens": "Unitats de text",
       "tokensInOut": "{{input}} d'entrada / {{output}} de sortida",
       "council": "Consell",
@@ -1471,7 +1486,13 @@
       "sessionError": "S'ha produït un error a la sessió: {{error}}.",
       "statusWithValue": "Estat: {{status}}",
       "toolName": "Eina: {{name}}",
-      "toolNameError": "S'ha produït un error a l'eina {{name}}."
+      "toolNameError": "S'ha produït un error a l'eina {{name}}.",
+      "cancelReasonSuperseded": "S'ha enviat un commit més recent, per la qual cosa aquesta revisió ha estat substituïda.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} està desconnectat, per la qual cosa aquesta revisió s'ha cancel·lat. Torna a connectar-lo i, a continuació, torna a executar la revisió.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer s'ha desactivat per a Bitbucket, per la qual cosa aquesta revisió s'ha cancel·lat. Activa'l de nou i, a continuació, torna a executar la revisió.",
+      "cancelReasonBitbucketPullRequestChanged": "La sol·licitud d'extracció de Bitbucket ha canviat, per la qual cosa aquesta revisió ha estat substituïda.",
+      "cancelReasonCancelled": "Aquesta revisió s'ha cancel·lat.",
+      "cancelReasonInterrupted": "Aquesta revisió s'ha interromput."
     },
     "reviewMemory": {
       "title": "Memòria de revisió",
@@ -1492,13 +1513,20 @@
       "invalidUrl": "Introdueix una URL vàlida d'una sol·licitud d'integració.",
       "couldNotCheckProviderStatus": "No s'ha pogut comprovar l'estat del proveïdor.",
       "couldNotLoadProviders": "No hem pogut carregar els teus proveïdors connectats. Torna-ho a provar.",
-      "connectProvider": "Connecta un proveïdor",
       "connectProviderDescription": "Connecta GitHub per iniciar una revisió manual d'una sol·licitud d'integració.",
       "pullRequestUrl": "URL de la sol·licitud d'integració",
       "instructions": "Instruccions (opcionals)",
       "instructionsPlaceholder": "Aspectes concrets en què s'ha de centrar el revisor…",
       "starting": "S'està iniciant la revisió…",
-      "start": "Inicia la revisió"
+      "start": "Inicia la revisió",
+      "startNotFound": "No s'ha pogut llegir aquesta {{requestNoun}} de {{provider}}. Comprova la URL i que el repositori sigui accessible.",
+      "startRateLimited": "{{provider}} està limitant les sol·licituds ara mateix. Torna-ho a provar d'aquí a uns minuts.",
+      "startNotAllowed": "No tens permisos per iniciar una revisió d'aquesta {{requestNoun}}. Comprova els teus permisos i el pla de la teva organització.",
+      "startProviderNeedsAttention": "Les revisions manuals necessiten la connexió estàndard de {{provider}}. Connecta-la i torna-ho a provar.",
+      "startAlreadyRunning": "Ja hi ha una revisió en curs per a {{requestNoun}}.",
+      "startRejected": "No es pot revisar {{requestNoun}}. Comprova que l'estat sigui obert, que no sigui un esborrany i que la URL sigui correcta.",
+      "startProviderUnavailable": "No s'ha pogut contactar amb {{provider}} per llegir {{requestNoun}}. Torna-ho a provar.",
+      "startFailed": "No s'ha pogut iniciar la revisió. Comprova la teva connexió i torna-ho a provar."
     },
     "notConnectedReadOnly": "{{platform}} no està connectat. Només els propietaris i els administradors de l'organització poden connectar-lo.",
     "gitlab": {
@@ -1753,7 +1781,7 @@
       "deadlinePassed": "Termini vençut",
       "deadlinePassedDetail": "{{critical}} de nivell crític, {{high}} de nivell alt",
       "dueThisWeek": "Vencen aquesta setmana",
-      "dueThisWeekDetail": "{{exploitable}} confirmades com a explotables",
+      "dueThisWeekDetail": "{{exploitable}} d'aquestes confirmades com a explotables",
       "noDeadline": "Sense termini",
       "reviewSlaAssignment": "Revisa l'assignació de l'SLA",
       "allOpenFindingsTracked": "Es fa el seguiment de totes les incidències obertes"
@@ -1914,11 +1942,18 @@
       "actorSystem": "Sistema Kilo",
       "couldNotLoad": "No s'ha pogut carregar l'informe d'auditoria.",
       "events": "Esdeveniments",
+      "eventConfidence": "Confiança: {{confidence}}",
+      "eventReason": "Motiu: {{reason}}",
+      "eventsCount_one": "{{displayCount}} esdeveniment",
+      "eventsCount_many": "{{displayCount}} esdeveniments",
+      "eventsCount_other": "{{displayCount}} esdeveniments",
       "generated": "L'informe s'ha generat el {{generatedAt}}.",
       "noActivity": "Cap activitat registrada",
       "noActivityDescription": "Kilo no té activitat d'incidències de seguretat per incloure a l'informe del període de {{start}} a {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repositori no registrat",
+      "reasonUnknown": "Motiu no reconegut",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Resum de l'informe",
       "title": "Informe d'auditoria",
       "unavailable": "Informe d'auditoria no disponible",
@@ -1971,8 +2006,9 @@
       "couldNotLoad": "No s'ha pogut carregar l'agent de seguretat.",
       "installApp": "Instal·la l'aplicació de GitHub",
       "reauthorizeButton": "Torna a autoritzar l'aplicació de GitHub",
-      "reauthorizeDescription": "L'agent de seguretat necessita el permís vulnerability_alerts per accedir a les alertes de Dependabot. Torna a autoritzar l'aplicació de GitHub per concedir aquest permís.",
+      "reauthorizeDescription": "L'agent de seguretat necessita permís per llegir les alertes de Dependabot. Torna a autoritzar l'aplicació de GitHub per concedir aquest permís.",
       "reauthorizeTitle": "Calen permisos addicionals",
+      "retryFailed": "No s'ha pogut carregar l'agent de seguretat. Comprova la connexió i torna-ho a provar.",
       "setupFailed": "No s'ha pogut iniciar la configuració de GitHub. Torna-ho a provar."
     },
     "queuedActionUntracked": "No s'ha pogut continuar el seguiment d'una acció en cua. Actualitza les dades per veure'n l'estat més recent.",
@@ -2139,7 +2175,8 @@
       "dollar_many": "dòlars",
       "costSpoken": "import de {{cost}}",
       "costSpokenWithTime": "cost de {{cost}}, {{time}}",
-      "pullRequest": "sol·licitud d'integració {{number}}"
+      "pullRequest": "sol·licitud d'integració {{number}}",
+      "spokenJoiner": "i"
     },
     "githubInstall": {
       "couldNotOpenTitle": "No s'ha pogut obrir GitHub",
@@ -2276,7 +2313,6 @@
       "couldNotLoadEnvironment": "No s'ha pogut carregar el teu entorn.",
       "retryLoadingEnvironment": "Torna a provar de carregar l'entorn",
       "defaultEnvironment": "Entorn predeterminat",
-      "environmentSummary": "{{commands}} ordres · {{mcp}} MCP · {{skills}} habilitats · {{agents}} agents",
       "leaveChanges": "Deixa els canvis",
       "commitAndPush": "Consigna i envia",
       "startSession": "Inicia la sessió",
@@ -2499,7 +2535,71 @@
       "preparationComplete": "Preparació completada",
       "preparationFailed": "La preparació ha fallat",
       "setupCommand": "Ordre de configuració {{index}}",
-      "setupCommandOf": "Ordre de configuració {{index}} de {{displayCount}}"
+      "setupCommandOf": "Ordre de configuració {{index}} de {{displayCount}}",
+      "stepWorkspaceSetup": "Configuració de l'espai de treball",
+      "stepDiskCheck": "Comprovació del disc",
+      "stepCloning": "Clonant el dipòsit",
+      "stepBranch": "Configurant la branca",
+      "stepDevcontainerSetup": "Configuració del contenidor de desenvolupament",
+      "stepWorkspaceRestore": "Restaurant l'espai de treball",
+      "stepWorkspaceBackup": "Desant l'espai de treball",
+      "stepSandboxProvision": "Provisionament de l'entorn aïllat",
+      "stepSandboxBoot": "Iniciant l'entorn aïllat",
+      "stepSnapshotFallback": "Es torna a provar sense instantània",
+      "stepKiloServer": "Iniciant Kilo",
+      "stepKiloSession": "Preparant la sessió",
+      "stepRestoreIncomplete": "Restauració de la sessió incompleta",
+      "stepReady": "Entorn llest",
+      "stepFailed": "Ha fallat la configuració de l'entorn",
+      "stepUnknown": "Configuració de l'entorn",
+      "detailCreatingSandbox": "Creant l'entorn aïllat",
+      "detailUpdatingRepository": "Actualitzant el dipòsit",
+      "detailCheckingOutBranch": "Comprovant la branca",
+      "detailRunningSetupCommands": "Executant les ordres de configuració",
+      "detailSavingRepository": "Desant el dipòsit per a inicis més ràpids",
+      "detailStartingKiloRuntime": "Iniciant el temps d'execució de Kilo",
+      "detailPreparingKiloSession": "Preparant la sessió de Kilo",
+      "detailWaitingForPreviousSandbox": "Esperant que s'aturi l'entorn aïllat anterior",
+      "detailRetryingSandboxCreation": "Es torna a provar la creació de l'entorn aïllat",
+      "detailPreviousSnapshotFailed": "L'inici amb la instantània anterior ha fallat. Es torna a provar sense instantània.",
+      "detailSnapshotStartupFailed": "L'inici amb la instantània ha fallat. Es torna a provar sense instantània.",
+      "detailStartingSandboxWithoutSnapshot": "Iniciant l'entorn aïllat sense instantània",
+      "detailSettingUpWorkspace": "Configurant l'espai de treball",
+      "detailRestoringSession": "Restaurant la sessió",
+      "detailWarmWorkspaceReused": "Espai de treball en calent reutilitzat",
+      "detailRetryingClone": "Es torna a provar la clonació (intent {{attempt}} de {{total}})",
+      "detailSetupCommandFailed": "L'ordre de configuració {{index}} ha fallat",
+      "detailSetupCommandTimedOut": "L'ordre de configuració {{index}} ha excedit el temps",
+      "detailColdRestore": "Restauració en fred, instantània aplicada, {{applied}} de {{total}} fitxers restaurats",
+      "detailProgressPercent": "{{percent}}% completat",
+      "detailRestoreIncompleteReport": "Restauració de la sessió incompleta: no s'han restaurat {{skipped}} de {{total}} fitxers ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Falten: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} i {{omitted}} més",
+      "detailReasonPatchFailed": "el pedaç no s'ha pogut aplicar",
+      "detailReasonOutsideWorkspace": "el camí és fora de l'espai de treball",
+      "detailReasonMissingContent": "la instantània no contenia cap contingut per al fitxer",
+      "detailReasonIndexResetFailed": "no s'ha pogut restablir l'índex després d'una aplicació fallida",
+      "detailReasonUnlinkFailed": "no s'ha pogut eliminar el fitxer",
+      "detailReasonWriteFailed": "no s'ha pogut escriure el fitxer",
+      "detailReasonUnknown": "un motiu desconegut",
+      "detailUnknown": "Encara s'està preparant",
+      "errorPreparationTimeout": "La preparació de l'entorn ha excedit el temps",
+      "errorWorkspaceSetupFailed": "Ha fallat la configuració de l'espai de treball",
+      "errorCredentialUpgradeRequired": "Aquesta sessió no té una actualització de credencials necessària. Inicieu una sessió nova per continuar.",
+      "errorAgentUnavailable": "L'agent ha deixat d'estar disponible",
+      "errorBillingBlocked": "La facturació de l'entorn aïllat requereix crèdits addicionals",
+      "errorBillingUnavailable": "La verificació de facturació o capacitat de l'entorn aïllat no està disponible. Proveu-ho de nou d'aquí poc.",
+      "errorContainerLimitReached": "S'ha arribat al límit de contenidors. Atureu un contenidor existent abans d'iniciar-ne un altre.",
+      "errorInvalidConfiguration": "La configuració de l'entorn aïllat no és vàlida o no és compatible",
+      "errorRuntimeArtifactUnauthorized": "La baixada del temps d'execució no ha estat autoritzada",
+      "errorRuntimeArtifactInvalid": "Ha fallat la verificació de l'artefacte del temps d'execució",
+      "errorRuntimeCliProbeFailed": "Ha fallat la validació de la CLI del temps d'execució",
+      "errorRuntimeSupervisorMissing": "Falta el supervisor del temps d'execució",
+      "errorConnectionLost": "S'ha perdut la connexió amb l'entorn aïllat",
+      "errorSandboxLost": "S'ha perdut l'entorn aïllat",
+      "errorAgentRestarted": "L'agent s'ha reiniciat",
+      "errorSandboxOutOfMemory": "L'entorn aïllat s'ha quedat sense memòria",
+      "errorPreparationDidNotComplete": "La preparació no s'ha completat"
     },
     "permissionCard": {
       "title": "Permís necessari",
@@ -2511,7 +2611,10 @@
       "allowOnceAccessibility": "Permet-ho una vegada",
       "alwaysAllow": "Permet-ho sempre",
       "alwaysAllowAccessibility": "Permet-ho sempre",
-      "retrying": "Tornant-ho a provar…"
+      "retrying": "Tornant-ho a provar…",
+      "retryDeny": "Torna a provar de denegar",
+      "retryAllowOnce": "Torna a provar de permetre-ho una vegada",
+      "retryAlwaysAllow": "Torna a provar de permetre-ho sempre"
     },
     "questionCard": {
       "title": "L'agent necessita una resposta",
@@ -3071,22 +3174,16 @@
     "boundary": {
       "backToProfile": "Torna al perfil",
       "loadErrorMessage": "Comprova la connexió i torna-ho a provar.",
-
       "chooseAccount": "Selecciona un compte",
       "loadErrorTitle": "No s'han pogut carregar les teves organitzacions.",
       "membershipLostNotice": "Ja no tens accés a aquesta organització. Canviat a {{target}}.",
       "noOrganization": "Sense organització",
-
       "noOrganizationDescription": "Aquest compte no forma part de cap organització. Crea'n una o uneix-te'n a una al web per utilitzar funcions d'organització com les invitacions de membres i les alertes de saldo baix.",
-
       "openWebOrganizations": "Obre les organitzacions al web",
-
       "organizationUnavailable": "L'organització no està disponible.",
       "selectDescriptionWithOrganizations": "Pertanys a una o més organitzacions. Tria el compte que ha d'utilitzar aquesta pantalla.",
-
       "selectOrganization": "Selecciona una organització",
       "unavailableDescription": "Aquesta organització ja no està disponible. Tria'n una des del teu perfil per continuar.",
-
       "unavailableSessionsDescription": "Aquesta organització ja no està disponible. No es poden carregar les seves sessions.",
       "accessDeniedDescription": "No tens accés a aquesta organització."
     },
@@ -3114,7 +3211,11 @@
       "permissionDenied": "No tens permís per convidar membres.",
       "roleMember": "El rol és de membre.",
       "sendInvite": "Envia la invitació",
-      "title": "Convida un membre"
+      "title": "Convida un membre",
+      "alreadyInvited": "Ja té una invitació pendent o ja és membre.",
+      "sendError": "No s'ha pogut enviar la invitació.",
+      "pendingInvitation": "Aquest correu electrònic ja té una invitació pendent.",
+      "alreadyMember": "Aquesta persona ja és membre d'aquesta organització."
     },
     "invoices": {
       "downloadA11y": "Baixa la factura {{number}}",
@@ -3183,7 +3284,13 @@
       "inviteCreated": "Invitació creada",
       "pendingInvitations": "Invitacions pendents",
       "resendInvite": "Torna a enviar la invitació",
-      "shareInviteLink": "Comparteix l'enllaç d'invitació"
+      "shareInviteLink": "Comparteix l'enllaç d'invitació",
+      "resendInviteError": "No s'ha pogut tornar a enviar la invitació.",
+      "inviteNotResendable": "Aquesta invitació ja no es pot tornar a enviar.",
+      "ownerAuthority": "Només un propietari de l'organització pot gestionar propietaris.",
+      "ownRoleChange": "No pots canviar el teu propi rol.",
+      "inviteExpired": "Aquesta invitació ha caducat.",
+      "inviteAccepted": "Aquesta invitació ja s'ha acceptat."
     },
     "usageStats": {
       "inputTokens": "Tòkens d'entrada",
@@ -3332,7 +3439,8 @@
     "noneChosen": "Cap seleccionat",
     "emptyTitle": "Cap model de transcripció",
     "emptyDescription": "Kilo Gateway no ofereix cap model de transcripció ara mateix.",
-    "loadFailed": "No s'han pogut carregar els models de transcripció."
+    "loadFailed": "No s'han pogut carregar els models de transcripció.",
+    "choose": "Tria un model"
   },
   "voiceLanguage": {
     "title": "Idioma del dictat",
@@ -3548,6 +3656,7 @@
       "fromHuggingFace": "De Hugging Face",
       "loading": "S'estan carregant els models",
       "noResults": "No s'ha trobat cap model",
+      "noResultsForQuery": "No s'han trobat models per a \"{{query}}\"",
       "noFits": "Cap model no cap en aquest dispositiu",
       "noFitsDescription": "Els models més grans són a la pestanya $t(common.all).",
       "fit": {
@@ -3578,8 +3687,6 @@
       "quantizations": "Quantitzacions",
       "quantizationsHelp": "Els fitxers més petits fan servir menys memòria i espai. Els més grans solen donar millors respostes.",
       "quantDetail": "Descàrrega de {{size}} · uns {{memory}} de memòria",
-      "downloadQuant": "Descarrega {{quant}}",
-      "downloadModelA11y": "Descarrega {{name}}",
       "detailsA11y": "Detalls: {{name}}",
       "loadingModel": "S'estan carregant els detalls del model",
       "couldNotLoadModel": "No s'ha pogut carregar aquest model",
@@ -3624,13 +3731,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "Aquest model admet l'esforç de raonament"
-    }
+    },
+    "creditsRequired": "No hi ha prou crèdits per enviar aquest missatge. Afegeix crèdits i torna-ho a provar."
   },
   "settingsTools": {
     "confirmTitle": "Confirmar aquest canvi?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "el teu repositori més recent",
+      "confirmMessage": "Repositori: {{repository}}. Sol·licitud: {{prompt}}",
+      "confirmTitle": "Iniciar aquest agent?",
       "promptRequired": "Per iniciar un agent cal un missatge. Afegeix un missatge i torna-ho a executar.",
       "repositoryRequired": "Per iniciar un agent cal un repositori. Obre Kilo i tria'n-neu un, i torna-ho a executar.",
       "repositoryUnknown": "Kilo no reconeix {{repository}} com a repositori de GitHub o GitLab. Tria un altre repositori a Kilo.",
@@ -3660,7 +3771,9 @@
     "spend24h": "Despesa de les últimes 24 hores",
     "multiplierError": "Introdueix un multiplicador d'1 o més",
     "permissionDenied": "No tens permís per gestionar les alertes de despesa.",
-    "pushOffByCategory": "Desactivat a Notificacions"
+    "pushOffByCategory": "Desactivat a Notificacions",
+    "multiplierMaxError": "Introdueix un multiplicador de {{max}} o menys",
+    "thresholdMaxError": "Introdueix un import de {{max}} o menys."
   },
   "profiles": {
     "title": "Perfils",
@@ -3670,19 +3783,22 @@
     "emptyDescription": "Creeu un perfil per reutilitzar variables d'entorn, ordres de configuració i habilitats entre sessions.",
     "loadFailed": "No s'han pogut carregar els perfils",
     "counts": {
-      "vars_many": "{{count}} variables",
       "vars_one": "{{count}} variable",
+      "vars_many": "{{count}} variables",
       "vars_other": "{{count}} variables",
       "mcp": "{{count}} MCP",
-      "skills_many": "{{count}} habilitats",
       "skills_one": "{{count}} habilitat",
+      "skills_many": "{{count}} habilitats",
       "skills_other": "{{count}} habilitats",
-      "commands_many": "{{count}} ordres",
       "commands_one": "{{count}} ordre",
+      "commands_many": "{{count}} ordres",
       "commands_other": "{{count}} ordres",
-      "varsShort": "{{count}}v",
-      "skillsShort": "{{count}}h",
-      "commandsShort": "{{count}}o"
+      "setupCommands_one": "{{count}} ordre de configuració",
+      "setupCommands_many": "{{count}} ordres de configuració",
+      "setupCommands_other": "{{count}} ordres de configuració",
+      "agents_one": "{{count}} agent",
+      "agents_many": "{{count}} agents",
+      "agents_other": "{{count}} agents"
     },
     "nameLabel": "Nom del perfil",
     "namePlaceholder": "p. ex. Depuració del backend",
@@ -3710,6 +3826,8 @@
     "keyTooLong": "La clau ha de tenir 256 caràcters o menys",
     "keyDuplicate": "Aquesta clau ja existeix al perfil",
     "valueLabel": "Valor",
+    "valueRequired": "Introduïu un valor",
+    "tooLong": "Utilitzeu com a màxim {{max}} caràcters",
     "secrets": {
       "markSecret": "Marca com a secret",
       "masked": "Valor ocult",
@@ -3760,7 +3878,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Introduïu un nom de servidor",
-      "nameInvalid": "El nom només pot utilitzar lletres, números, guions baixos i guions",
+      "nameInvalid": "El nom només pot utilitzar lletres ASCII, números, guions baixos i guions, fins a 100 caràcters",
       "commandRequired": "Introduïu una ordre",
       "commandTooLong": "Utilitzeu com a màxim 50 arguments de 500 caràcters cadascun",
       "urlRequired": "Introduïu un URL",
@@ -3788,16 +3906,16 @@
       "stepsPlaceholder": "p. ex. 50",
       "temperature": "Temperatura",
       "temperaturePlaceholder": "p. ex. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "p. ex. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "El meu agent",
       "promptPlaceholder": "Ets un...",
       "tools": "Eines",
       "visibility": "Visibilitat",
-      "visibilityPrimary": "Principal: es mostra al selector",
-      "visibilitySubagent": "Subagent: només es pot trucar des d'altres",
-      "visibilityAll": "Tots, tots dos",
+      "visibilityPrimary": "Principal — es mostra al selector",
+      "visibilitySubagent": "Subagent — només es pot trucar des d'altres",
+      "visibilityAll": "Tots — tots dos",
       "modePrimary": "Només principal",
       "modeSubagent": "Només subagent",
       "modeAll": "Tots",
@@ -3805,7 +3923,7 @@
       "deleteFailed": "No s'ha pogut suprimir l'agent",
       "nameRequired": "Introduïu un nom d'agent",
       "slugRequired": "Introduïu un llimac d'agent",
-      "slugInvalid": "Slug ha de començar amb una lletra i utilitzar només lletres minúscules, dígits i guions",
+      "slugInvalid": "Slug ha de començar amb una lletra ASCII minúscula i utilitzar només lletres ASCII minúscules, dígits i guions, fins a 50 caràcters",
       "slugConflict": "Aquest slug ja l'utilitza un agent integrat o un altre agent d'aquest perfil",
       "edit": "Edita l'agent"
     },
@@ -3850,7 +3968,9 @@
       "pinFailed": "No s'ha pogut fixar el repo",
       "unboundToast": "Repo no lligat",
       "unbindFailed": "No s'ha pogut desenllaçar el repo"
-    }
+    },
+    "variablesDeleteFailed": "No s'ha pogut suprimir la variable",
+    "deleteCommand": "Elimina l'ordre {{position}}"
   },
   "credits": {
     "title": "Compra crèdits",
@@ -3888,7 +4008,8 @@
       "archive": "Arxiva",
       "unarchive": "Desarxiva",
       "deleteTitle": "Vols eliminar {{name}}?",
-      "deleteMessage": "També s'eliminen les seves tasques. Les sessions es mantenen."
+      "deleteMessage": "També s'eliminen les seves tasques. Les sessions es mantenen.",
+      "createFailed": "No s'ha pogut crear la llista"
     },
     "listSettings": {
       "title": "Configuració de la llista",
@@ -3958,20 +4079,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Resum del matí",
+    "title": "Resum de l'agent",
     "atLeast": "≥{{value}}",
     "coverageHint": "Pot faltar part de l'activitat històrica. ≥ vol dir com a mínim aquesta quantitat; desconegut no és zero.",
     "available": "Resums disponibles",
     "history": "Historial de resums",
-    "historyHint": "Els informes es conserven 30 dies, inclosos els descartats.",
+    "historyHint": "Els resums es conserven 30 dies, inclosos els descartats.",
     "settings": "Configuració del resum",
-    "empty": "Cap activitat durant la nit",
-    "emptyHint": "Les teves sessions de programació al núvol i a la CLI apareixeran aquí després d'una nit activa.",
+    "empty": "Cap activitat en aquesta finestra del resum",
+    "emptyHint": "Les teves sessions de programació al núvol i a la CLI apareixen aquí quan un resum programat té activitat.",
     "loadError": "No s'han pogut carregar els resums",
-    "sessions": "Actives durant la nit",
+    "sessions": "Actives a la finestra",
     "pullRequests": "PRs obertes",
     "blockers": "Nous bloquejos",
-    "spend": "Despesa nocturna",
+    "spend": "Despesa a la finestra",
     "view": "Llegeix el resum",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -3993,13 +4114,13 @@
     "sources": "Proves i artefactes",
     "timezone": "Zona horària del resum",
     "deviceTimezone": "Usa la zona horària del dispositiu",
-    "timezoneHint": "Zona horària IANA, per exemple Europe/Berlin. Els canvis d'horari s'apliquen a les nits futures.",
-    "nightStart": "Inici de la nit",
-    "morningStart": "Fi de la nit / inici del matí",
-    "morningEnd": "Fi del matí",
-    "timeHint": "La targeta d'Inici torna a l'estat en directe quan acaba el matí, fins i tot sense connexió.",
-    "invalidSchedule": "Tria una zona horària vàlida i períodes de nit i matí no buits i que no se solapin.",
-    "notificationsHint": "Una notificació genèrica cada matí quan el primer informe estigui llest. Independent dels resums d'AI de pagament.",
+    "timezoneHint": "Zona horària IANA, per exemple Europe/Berlin. Els canvis d'horari s'apliquen als resums futurs.",
+    "nightStart": "Inici de la finestra del resum",
+    "morningStart": "Resum a punt a les",
+    "morningEnd": "Resum disponible fins a les",
+    "timeHint": "La targeta d'Inici torna a l'estat en directe quan acaba la finestra del resum, fins i tot sense connexió.",
+    "invalidSchedule": "Tria una zona horària vàlida i una finestra del resum no buida.",
+    "notificationsHint": "Una notificació genèrica per cada resum programat. Independent dels resums d'AI de pagament.",
     "notificationPermission": "Activa les notificacions del dispositiu a $t(common.notifications) per rebre el resum.",
     "aiOptIn": "Resums d'AI de pagament",
     "aiHint": "Opcional només per a aquest context. S'envien al teu model fragments seleccionats i anonimitzats i dades estructurades en l'idioma de l'app. Els càrrecs usen el saldo d'aquest context.",
@@ -4017,7 +4138,7 @@
     "contextSettings": "Configuració d'AI · {{context}}",
     "allContexts": "Els resums personals i d'organització es mantenen separats.",
     "create": "Crea un resum",
-    "oneOff": "Puntual",
+    "oneOff": "Sota demanda",
     "createdAt": "Creat {{time}}",
     "chooseContext": "Tria un context",
     "period": "Període del resum",
@@ -4039,13 +4160,16 @@
     "emptyPeriod": "No s'ha trobat activitat en aquest període. No es generarà cap resum d'AI ni s'aplicarà cap càrrec.",
     "emptyHistory": "No hi ha resums desats",
     "historicalStateHint": "L'estat de la sessió reflecteix el final del període seleccionat, no l'estat actual en temps real.",
-    "oneOffHint": "L'AI rep proves seleccionades amb les dades sensibles ocultes en l'idioma de l'aplicació. Aquest informe puntual no modifica la programació del matí ni les preferències d'AI.",
+    "oneOffHint": "L'AI rep proves seleccionades amb les dades sensibles ocultes en l'idioma de l'aplicació. Aquest resum sota demanda no modifica el resum programat ni les preferències d'AI.",
     "createOffline": "Connecta't a internet per revisar o crear un resum. Les sol·licituds de pagament no es posen mai en cua sense connexió.",
     "estimateInputTooLarge": "Aquest període conté massa proves per al model seleccionat.",
     "estimatePermissionUnavailable": "No tens permís per utilitzar el saldo d'aquest context.",
+    "createFailed": "No s'ha pogut crear aquest resum.",
+    "reviewFailed": "No s'ha pogut revisar aquest resum.",
     "estimatePricingUnavailable": "El preu d'aquest model no està disponible.",
     "estimateBalanceUnavailable": "No hi ha prou saldo per a un resum de pagament.",
     "estimateModelNotAllowed": "Aquest model no està permès aquí.",
-    "estimateSpendLimitTooLow": "Augmenta la salvaguarda de despesa per permetre aquest resum."
+    "estimateSpendLimitTooLow": "Augmenta la salvaguarda de despesa per permetre aquest resum.",
+    "saved": "S'ha desat la configuració del resum"
   }
 }

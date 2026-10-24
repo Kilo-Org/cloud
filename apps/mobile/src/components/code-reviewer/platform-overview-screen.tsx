@@ -1,12 +1,13 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Switch, View } from 'react-native';
+import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
 import { CenteredState } from '@/components/centered-state';
 import { openModelPicker } from '@/components/agents/model-selector';
+import { ActionRequiredBanner } from '@/components/code-reviewer/action-required-banner';
 import { BitbucketOverview } from '@/components/code-reviewer/bitbucket-overview';
 import { connectNoticeKey } from '@/components/code-reviewer/connect-notice-key';
 import {
@@ -20,6 +21,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
@@ -36,7 +38,6 @@ import {
 import { useReviewerModels } from '@/lib/hooks/use-reviewer-models';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
-import { ACTION_REQUIRED_KEYS } from '@/components/code-reviewer/action-required-keys';
 
 export function PlatformOverviewScreen({
   scope,
@@ -174,6 +175,20 @@ export function PlatformOverviewScreen({
   const hasRepoSelection =
     data != null &&
     (data.repositorySelectionMode === 'all' || data.selectedRepositoryIds.length > 0);
+  const openReviewerModelPicker = () => {
+    if (data == null) {
+      return;
+    }
+    openModelPicker(router, {
+      options: models,
+      value: data.modelSlug,
+      variant: data.thinkingEffort ?? '',
+      onSelect: (modelSlug, variant) => {
+        save.mutate({ modelSlug, thinkingEffort: variant || null });
+      },
+    });
+  };
+
   const rows =
     data == null
       ? null
@@ -182,16 +197,7 @@ export function PlatformOverviewScreen({
           capabilities,
           models,
           modelsLoading,
-          onOpenModelPicker: () => {
-            openModelPicker(router, {
-              options: models,
-              value: data.modelSlug,
-              variant: data.thinkingEffort ?? '',
-              onSelect: (modelSlug, variant) => {
-                save.mutate({ modelSlug, thinkingEffort: variant || null });
-              },
-            });
-          },
+          onOpenModelPicker: openReviewerModelPicker,
           onOpenReviewMemory:
             platform === 'github'
               ? () => {
@@ -199,9 +205,6 @@ export function PlatformOverviewScreen({
                 }
               : undefined,
         });
-
-  const actionRequiredKeys =
-    data?.actionRequired != null ? ACTION_REQUIRED_KEYS[data.actionRequired.reason] : null;
 
   return (
     <View className="flex-1 bg-background">
@@ -240,16 +243,16 @@ export function PlatformOverviewScreen({
                 </View>
               )}
 
-              {actionRequiredKeys != null && (
-                <View className="rounded-lg bg-warn-tile-bg p-4">
-                  <Text className="text-sm font-medium">{t(actionRequiredKeys.title)}</Text>
-                  <Text variant="muted" className="text-xs">
-                    {t(actionRequiredKeys.description)}
-                  </Text>
-                  <Text className="mt-1 text-xs font-medium">
-                    {t(actionRequiredKeys.recoveryLabel)}
-                  </Text>
-                </View>
+              {data?.actionRequired != null && (
+                <ActionRequiredBanner
+                  scope={scope}
+                  reason={data.actionRequired.reason}
+                  canEdit={canEdit}
+                  onRefreshConfig={() => {
+                    void config.refetch();
+                  }}
+                  onOpenModelPicker={openReviewerModelPicker}
+                />
               )}
 
               <View className="rounded-lg bg-secondary p-4">

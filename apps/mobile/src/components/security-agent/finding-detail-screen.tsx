@@ -13,6 +13,7 @@ import { FindingRemediationPanel } from '@/components/security-agent/finding-rem
 import { PanelErrorBoundary } from '@/components/security-agent/panel-error-boundary';
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
+import { IconButton } from '@/components/ui/icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -134,10 +135,26 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   const errorCode = findingQuery.error?.data?.code;
   const notFound = findingQuery.isError && (errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN');
 
+  // React Query resets a failed query to pending when its retry starts, so a
+  // condition on `isError` alone tears the failure surface down — and the
+  // progress of the retry the user just asked for — for as long as the request
+  // runs. Hold the surface for the retry of the same finding; another finding's
+  // id never matches, so opening it starts clean. A not-found or forbidden
+  // answer keeps its own state instead of retrying into a generic failure.
+  const loadFailed = findingQuery.isError && !findingQuery.data && !notFound;
+  const [failedFindingId, setFailedFindingId] = useState<string | null>(null);
+  useEffect(() => {
+    if (loadFailed) {
+      setFailedFindingId(findingId);
+    }
+  }, [loadFailed, findingId]);
+  const showLoadFailure = !findingQuery.data && (loadFailed || failedFindingId === findingId);
+
   if (notFound) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
+          className="px-6"
           title={t('securityAgent.findingDetail.title')}
           showBackButton
           onBack={handleBack}
@@ -151,10 +168,11 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
     );
   }
 
-  if (findingQuery.isError && !findingQuery.data) {
+  if (showLoadFailure) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
+          className="px-6"
           title={t('securityAgent.findingDetail.title')}
           showBackButton
           onBack={handleBack}
@@ -162,6 +180,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
         <QueryError
           message={t('securityAgent.dismiss.couldNotLoad')}
           onRetry={() => void findingQuery.refetch()}
+          isRetrying={findingQuery.isFetching}
         />
       </View>
     );
@@ -171,6 +190,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
+          className="px-6"
           title={t('securityAgent.findingDetail.title')}
           showBackButton
           onBack={handleBack}
@@ -196,22 +216,21 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        className="px-6"
         title={t('securityAgent.findingDetail.title')}
         eyebrow={finding.repo_full_name}
         showBackButton
         onBack={handleBack}
         headerRight={
           canDismiss ? (
-            <Pressable
+            <IconButton
               onPress={() => {
                 router.push(getSecurityAgentPath(scope, `dismiss/${findingId}`));
               }}
-              accessibilityRole="button"
               accessibilityLabel={t('securityAgent.dismiss.title')}
-              className="size-11 items-center justify-center active:opacity-70"
             >
               <Ban size={20} color={colors.mutedForeground} />
-            </Pressable>
+            </IconButton>
           ) : undefined
         }
       />

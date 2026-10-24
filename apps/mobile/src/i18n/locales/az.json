@@ -4005,7 +4005,8 @@
       "startNewSession": "Yeni sessiya başlat",
       "startNewSessionHint": "Yeni sessiya başlatmaq üçün uzun bas.",
       "linkSession": "Sessiyanı əlaqələndir",
-      "linkFailed": "Sessiyanı tapşırıqla əlaqələndirmək mümkün olmadı"
+      "linkFailed": "Sessiyanı tapşırıqla əlaqələndirmək mümkün olmadı",
+      "moveToAnotherTodo": "Başqa tapşırığa köçür"
     },
     "linkSession": {
       "title": "Sessiya əlaqələndir",
@@ -4014,6 +4015,7 @@
     },
     "upNext": "Sıradakı",
     "sessionTodo": "Tapşırıq: {{title}}",
+    "openTodoHint": "Tapşırığı açır.",
     "linkToTodo": "Tapşırığa əlaqələndir",
     "candidates": {
       "empty": "Açıq tapşırıq yoxdur"

@@ -4060,7 +4060,8 @@
       "startNewSession": "Avvia nuova sessione",
       "startNewSessionHint": "Tieni premuto per avviare una nuova sessione.",
       "linkSession": "Collega sessione",
-      "linkFailed": "Impossibile collegare la sessione all'attività"
+      "linkFailed": "Impossibile collegare la sessione all'attività",
+      "moveToAnotherTodo": "Sposta in un'altra attività"
     },
     "linkSession": {
       "title": "Collega una sessione",
@@ -4069,6 +4070,7 @@
     },
     "upNext": "Prossimo",
     "sessionTodo": "Attività: {{title}}",
+    "openTodoHint": "Apre l'attività.",
     "linkToTodo": "Collega all'attività",
     "candidates": {
       "empty": "Nessuna attività aperta"

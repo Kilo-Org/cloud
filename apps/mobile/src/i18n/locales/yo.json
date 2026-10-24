@@ -4005,7 +4005,8 @@
       "startNewSession": "Bẹ̀rẹ̀ ìpàdé tuntun",
       "startNewSessionHint": "Tẹ̀ pẹ́ láti bẹ̀rẹ̀ ìpàdé tuntun.",
       "linkSession": "So ìgbà iṣẹ́ pọ̀",
-      "linkFailed": "A kò lè so ìgbà iṣẹ́ pọ̀ mọ́ iṣẹ́ náà"
+      "linkFailed": "A kò lè so ìgbà iṣẹ́ pọ̀ mọ́ iṣẹ́ náà",
+      "moveToAnotherTodo": "Gbe lọ sí iṣẹ́ míràn"
     },
     "linkSession": {
       "title": "So ìgbà iṣẹ́ kan pọ̀",
@@ -4014,6 +4015,7 @@
     },
     "upNext": "Tó ń bọ̀",
     "sessionTodo": "Iṣẹ́: {{title}}",
+    "openTodoHint": "Ó ń ṣí iṣẹ́.",
     "linkToTodo": "So pọ̀ mọ́ iṣẹ́",
     "candidates": {
       "empty": "Kò sí iṣẹ́ tí ó ṣí"

@@ -4005,7 +4005,8 @@
       "startNewSession": "Hasi saio berria",
       "startNewSessionHint": "Eduki sakatuta saio berri bat hasteko.",
       "linkSession": "Lotu saioa",
-      "linkFailed": "Ezin izan da saioa zereginarekin lotu"
+      "linkFailed": "Ezin izan da saioa zereginarekin lotu",
+      "moveToAnotherTodo": "Eraman beste zeregin batera"
     },
     "linkSession": {
       "title": "Lotu saio bat",
@@ -4014,6 +4015,7 @@
     },
     "upNext": "Hurrengoa",
     "sessionTodo": "Zeregina: {{title}}",
+    "openTodoHint": "Zeregina irekitzen du.",
     "linkToTodo": "Lotu zereginarekin",
     "candidates": {
       "empty": "Ez dago zeregin irekirik"

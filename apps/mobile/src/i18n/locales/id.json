@@ -4005,7 +4005,8 @@
       "startNewSession": "Mulai sesi baru",
       "startNewSessionHint": "Tekan lama untuk memulai sesi baru.",
       "linkSession": "Tautkan sesi",
-      "linkFailed": "Tidak dapat menautkan sesi ke tugas"
+      "linkFailed": "Tidak dapat menautkan sesi ke tugas",
+      "moveToAnotherTodo": "Pindahkan ke tugas lain"
     },
     "linkSession": {
       "title": "Tautkan sebuah sesi",
@@ -4014,6 +4015,7 @@
     },
     "upNext": "Berikutnya",
     "sessionTodo": "Tugas: {{title}}",
+    "openTodoHint": "Membuka tugas.",
     "linkToTodo": "Tautkan ke tugas",
     "candidates": {
       "empty": "Tidak ada tugas terbuka"

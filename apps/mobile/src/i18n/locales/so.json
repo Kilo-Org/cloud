@@ -4005,7 +4005,8 @@
       "startNewSession": "Bilow fadhi cusub",
       "startNewSessionHint": "Riix muddo dheer si aad u bilowdo fadhi cusub.",
       "linkSession": "Ku xidh kalfadhi",
-      "linkFailed": "Lama xidhi karin kalfadhiga hawsha"
+      "linkFailed": "Lama xidhi karin kalfadhiga hawsha",
+      "moveToAnotherTodo": "U guuri hawl kale"
     },
     "linkSession": {
       "title": "Ku xidh kalfadhi",
@@ -4014,6 +4015,7 @@
     },
     "upNext": "Xiga",
     "sessionTodo": "Hawl: {{title}}",
+    "openTodoHint": "Wuxuu furaa hawsha.",
     "linkToTodo": "Ku xidh hawl",
     "candidates": {
       "empty": "Ma jiraan hawlo furan"

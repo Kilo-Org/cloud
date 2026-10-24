@@ -4005,7 +4005,8 @@
       "startNewSession": "نوی سیشن پیل کړئ",
       "startNewSessionHint": "د نوي سیشن پیل لپاره اوږد کېک کړئ.",
       "linkSession": "ناسته ونښلوئ",
-      "linkFailed": "ناسته له دندې سره ونښلول نه شوه"
+      "linkFailed": "ناسته له دندې سره ونښلول نه شوه",
+      "moveToAnotherTodo": "بلې دندې ته ولیږدوئ"
     },
     "linkSession": {
       "title": "یوه ناسته ونښلوئ",
@@ -4014,6 +4015,7 @@
     },
     "upNext": "بل",
     "sessionTodo": "دنده: {{title}}",
+    "openTodoHint": "دنده پرانیزي.",
     "linkToTodo": "له دندې سره ونښلوئ",
     "candidates": {
       "empty": "هېڅ پرانیستې دنده نشته"

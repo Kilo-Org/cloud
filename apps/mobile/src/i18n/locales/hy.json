@@ -4005,7 +4005,8 @@
       "startNewSession": "Սկսել նոր նստաշրջան",
       "startNewSessionHint": "Երկար սեղմիր՝ նոր նստաշրջան սկսելու համար։",
       "linkSession": "Կապել նիստ",
-      "linkFailed": "Չհաջողվեց նիստը կապել անելիքի հետ"
+      "linkFailed": "Չհաջողվեց նիստը կապել անելիքի հետ",
+      "moveToAnotherTodo": "Տեղափոխել մեկ այլ անելիք"
     },
     "linkSession": {
       "title": "Նիստի կապում",
@@ -4014,6 +4015,7 @@
     },
     "upNext": "Հաջորդը",
     "sessionTodo": "Անելիք՝ {{title}}",
+    "openTodoHint": "Բացում է անելիքը։",
     "linkToTodo": "Կապել անելիքի հետ",
     "candidates": {
       "empty": "Բաց անելիքներ չկան"

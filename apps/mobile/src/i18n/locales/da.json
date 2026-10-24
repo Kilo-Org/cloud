@@ -4005,7 +4005,8 @@
       "startNewSession": "Start ny session",
       "startNewSessionHint": "Langt tryk for at starte en ny session.",
       "linkSession": "Tilknyt session",
-      "linkFailed": "Kunne ikke tilknytte sessionen til opgaven"
+      "linkFailed": "Kunne ikke tilknytte sessionen til opgaven",
+      "moveToAnotherTodo": "Flyt til en anden opgave"
     },
     "linkSession": {
       "title": "Tilknyt en session",
@@ -4014,6 +4015,7 @@
     },
     "upNext": "Næste",
     "sessionTodo": "Opgave: {{title}}",
+    "openTodoHint": "Åbner opgaven.",
     "linkToTodo": "Tilknyt til opgave",
     "candidates": {
       "empty": "Ingen åbne opgaver"

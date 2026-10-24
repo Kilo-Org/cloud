@@ -4005,7 +4005,8 @@
       "startNewSession": "Fara sabon zama",
       "startNewSessionHint": "Riƙe dogon lokaci don fara sabon zama.",
       "linkSession": "Haɗa zama",
-      "linkFailed": "An kasa haɗa zaman da aikin"
+      "linkFailed": "An kasa haɗa zaman da aikin",
+      "moveToAnotherTodo": "Kai zuwa wani aiki"
     },
     "linkSession": {
       "title": "Haɗa wani zama",
@@ -4014,6 +4015,7 @@
     },
     "upNext": "Na gaba",
     "sessionTodo": "Aiki: {{title}}",
+    "openTodoHint": "Yana buɗe aiki.",
     "linkToTodo": "Haɗa da aiki",
     "candidates": {
       "empty": "Babu buɗaɗɗen ayyuka"

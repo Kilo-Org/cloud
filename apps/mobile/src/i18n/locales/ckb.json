@@ -4005,7 +4005,8 @@
       "startNewSession": "دەستپێکردنی دانیشتنی نوێ",
       "startNewSessionHint": "بۆ دەستپێکردنی دانیشتنی نوێ بە درێژی دایگرە.",
       "linkSession": "سێشن ببەستە",
-      "linkFailed": "نەتوانرا سێشن بە ئەرکەکە ببەسترێت"
+      "linkFailed": "نەتوانرا سێشن بە ئەرکەکە ببەسترێت",
+      "moveToAnotherTodo": "گواستنەوە بۆ ئەرکێکی تر"
     },
     "linkSession": {
       "title": "سێشنێک ببەستە",
@@ -4014,6 +4015,7 @@
     },
     "upNext": "دواتر",
     "sessionTodo": "ئەرک: {{title}}",
+    "openTodoHint": "ئەرکەکە دەکاتەوە.",
     "linkToTodo": "بەستن بە ئەرک",
     "candidates": {
       "empty": "هیچ ئەرکێکی کراوە نییە"

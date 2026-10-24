@@ -4060,7 +4060,8 @@
       "startNewSession": "Începe o sesiune nouă",
       "startNewSessionHint": "Ține apăsat pentru a începe o sesiune nouă.",
       "linkSession": "Asociază sesiunea",
-      "linkFailed": "Nu s-a putut asocia sesiunea cu sarcina"
+      "linkFailed": "Nu s-a putut asocia sesiunea cu sarcina",
+      "moveToAnotherTodo": "Mută la o altă sarcină"
     },
     "linkSession": {
       "title": "Asociază o sesiune",
@@ -4069,6 +4070,7 @@
     },
     "upNext": "Urmează",
     "sessionTodo": "Sarcină: {{title}}",
+    "openTodoHint": "Deschide sarcina.",
     "linkToTodo": "Asociază cu sarcina",
     "candidates": {
       "empty": "Nicio sarcină deschisă"

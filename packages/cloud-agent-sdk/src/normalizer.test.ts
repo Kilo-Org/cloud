@@ -95,10 +95,56 @@ describe('normalize', () => {
         id: 'msg-1',
         sessionID: 'ses-1',
         role: 'assistant',
-        parts: [],
+        time: { created: 1 },
       };
       const result = normalize(createRaw('message.updated', { info }));
       expect(result).toEqual({ type: 'message.updated', info });
+    });
+
+    it('returns null when info carries no role', () => {
+      expect(
+        normalize(createRaw('message.updated', { info: { id: 'msg-1', sessionID: 'ses-1' } }))
+      ).toBeNull();
+    });
+
+    it.each(['', 42, null])('returns null when info.role is %p', role => {
+      const info = { id: 'msg-1', sessionID: 'ses-1', role };
+      expect(normalize(createRaw('message.updated', { info }))).toBeNull();
+    });
+
+    it.each([undefined, null, 'today', {}, { created: '1' }])(
+      'returns null when info.time is %p',
+      time => {
+        const info = { id: 'msg-1', sessionID: 'ses-1', role: 'assistant', time };
+        expect(normalize(createRaw('message.updated', { info }))).toBeNull();
+      }
+    );
+
+    it('returns null when info.time.completed is not a number', () => {
+      const info = {
+        id: 'msg-1',
+        sessionID: 'ses-1',
+        role: 'assistant',
+        time: { created: 1, completed: 'soon' },
+      };
+      expect(normalize(createRaw('message.updated', { info }))).toBeNull();
+    });
+
+    it('keeps a user message that carries its created time', () => {
+      const info = { id: 'msg-1', sessionID: 'ses-1', role: 'user', time: { created: 2 } };
+      expect(normalize(createRaw('message.updated', { info }))).toEqual({
+        type: 'message.updated',
+        info,
+      });
+    });
+
+    it('keeps a role this SDK does not know yet when the time is readable', () => {
+      // The role set can grow on the wire; only the assistant branch is read.
+      const info = { id: 'msg-1', sessionID: 'ses-1', role: 'system', time: { created: 3 } };
+      expect(normalize(createRaw('message.updated', { info }))).toEqual({
+        type: 'message.updated',
+        info,
+      });
     });
 
     it('returns null when info is missing', () => {
@@ -1201,17 +1247,34 @@ describe('normalize', () => {
       });
     });
 
-    it('normalizes permission.asked with minimal fields', () => {
-      const data = { id: 'perm-2', permission: 'write' };
-      const result = normalize(createRaw('permission.asked', data));
-      expect(result).toEqual({
-        type: 'permission.asked',
-        requestId: 'perm-2',
+    it('skips permission.asked whose scope fields are not the declared shapes', () => {
+      const malformed: Array<Record<string, unknown>> = [
+        { patterns: 'src/**' },
+        { patterns: [1] },
+        { metadata: ['command'] },
+        { metadata: null },
+        { always: 'bash' },
+      ];
+
+      for (const scope of malformed) {
+        const data = { id: 'perm-2', permission: 'write', ...scope };
+        expect(normalize(createRaw('permission.asked', data))).toBeNull();
+      }
+    });
+
+    it('skips permission.asked that omits a scope field', () => {
+      const complete: Record<string, unknown> = {
+        id: 'perm-2',
         permission: 'write',
-        patterns: [],
+        patterns: ['**/*'],
         metadata: {},
         always: [],
-      });
+      };
+
+      for (const field of ['patterns', 'metadata', 'always']) {
+        const { [field]: _omitted, ...data } = complete;
+        expect(normalize(createRaw('permission.asked', data))).toBeNull();
+      }
     });
 
     it('skips permission.asked without id', () => {
@@ -2505,6 +2568,11 @@ describe('normalizeCliEvent', () => {
         type: 'message.updated',
         info,
       });
+    });
+
+    it('returns null for a CLI message.updated whose assistant time is unreadable', () => {
+      const info = { id: 'msg-1', sessionID: 'ses-1', role: 'assistant' };
+      expect(normalizeCliEvent('message.updated', { info })).toBeNull();
     });
 
     it('normalizes message.part.updated without envelope', () => {

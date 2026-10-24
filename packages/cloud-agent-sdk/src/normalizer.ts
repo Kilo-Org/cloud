@@ -468,6 +468,8 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
 
     case 'permission.asked': {
       const r = permissionAskedDataSchema.safeParse(data);
+      // A request whose scope does not parse is malformed: forwarding an empty
+      // scope would offer an approval for settings the app never read.
       if (!r.success) return null;
       return {
         type: 'permission.asked',

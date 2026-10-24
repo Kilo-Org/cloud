@@ -61,6 +61,7 @@ import type {
   FilePart,
   TextPart,
   UserMessage,
+  AssistantMessage,
   OlderMessagesError,
   PreparationAttempt,
   SessionCommit,
@@ -746,9 +747,24 @@ function formatError(err: unknown): string {
   return formatErrorDetail(err).message;
 }
 
+/**
+ * Whether an assistant message's `time` still says the turn is running.
+ *
+ * The generated `AssistantMessage` declares `time`, but a replayed or stored
+ * row is not parsed by the per-event schema, so the field can be absent or of
+ * the wrong shape even though the type says otherwise. An unreadable `time` is
+ * not evidence of an unfinished turn: it returns false and the parts below are
+ * the only remaining signal.
+ */
+function assistantTurnIncomplete(info: AssistantMessage): boolean {
+  const time: unknown = info.time;
+  if (typeof time !== 'object' || time === null) return false;
+  return !('completed' in time);
+}
+
 function isMessageStreaming(msg: StoredMessage): boolean {
   if (msg.info.role === 'assistant' && msg.info.error) return false;
-  if (msg.info.role === 'assistant' && !msg.info.time.completed) return true;
+  if (msg.info.role === 'assistant' && assistantTurnIncomplete(msg.info)) return true;
   return msg.parts.some(part => {
     if (part.type === 'text' || part.type === 'reasoning')
       return part.time !== undefined && part.time.end === undefined;

@@ -73,11 +73,13 @@ type AgentSessionListContentProps = {
   nonPullRefreshes: number;
   hasActiveQuery: boolean;
   isSearching: boolean;
+  /** True while the driving query fetches — the error body's retry in flight. */
+  isRetrying: boolean;
   /** Committed (debounced) search query — scroll-to-top fires when this value changes. */
   searchQuery: string;
   onClearQuery: () => void;
-  /** Optional no-op accepted for the history screen's call-site compatibility. */
-  onCreateSession?: () => void;
+  /** The no-history body's next step: open the new-session composer. */
+  onCreateSession: () => void;
 };
 
 export function AgentSessionListContent({
@@ -96,8 +98,10 @@ export function AgentSessionListContent({
   nonPullRefreshes,
   hasActiveQuery,
   isSearching,
+  isRetrying,
   searchQuery,
   onClearQuery,
+  onCreateSession,
 }: Readonly<AgentSessionListContentProps>) {
   const listRef = useRef<FlashListRef<SessionListRow>>(null);
   useScrollToTop(listRef);
@@ -126,13 +130,20 @@ export function AgentSessionListContent({
   // The stored refetch resolves void: a pull failure surfaces through the
   // query error state (showInlineError below), so a settlement is always
   // "accepted" here. Only the feedback budget can fail a history pull.
+  const pullStartedFromHistoryError = useRef(false);
   const pull = usePullRefresh(async () => {
     await refetch();
     return true;
   });
   const { markSettled } = pull;
   const pullBusy = pull.refreshing || pull.busy;
+  // Preserve the full-screen error during a pull only when the pull began there;
+  // an empty-history pull must keep its empty state while the refresh is pending.
+  const errorPullBusy = pullStartedFromHistoryError.current && pullBusy;
+  const errorPullFailed = pullStartedFromHistoryError.current && pull.failed;
   const handleRefresh = () => {
+    pullStartedFromHistoryError.current =
+      (isError || errorPullFailed) && !hasActiveQuery && !hasFreshHistory;
     pull.startPull();
   };
   const handlePullRetry = () => {
@@ -171,7 +182,8 @@ export function AgentSessionListContent({
 
   const surface = selectSessionListContentSurface({
     isLoading,
-    isError,
+    isError: isError || errorPullFailed,
+    isRetrying: isRetrying || errorPullBusy,
     hasAnySessions,
     hasHistoryContent: sections.length > 0,
     hasActiveQuery,
@@ -185,6 +197,15 @@ export function AgentSessionListContent({
       </Button>
     ),
     [isSearching, onClearQuery, t]
+  );
+
+  // The no-history body's next step. It opens the same composer the Agents
+  // tab's "New session" action does, so an empty history never dead-ends at a
+  // message.
+  const createSessionAction = (
+    <Button onPress={onCreateSession}>
+      <Text>{t('common.newSession')}</Text>
+    </Button>
   );
 
   // The tabs navigator uses `freezeOnBlur`, so while the session detail screen
@@ -352,16 +373,16 @@ export function AgentSessionListContent({
         <QueryError
           message={t('common.couldNotLoadSessions')}
           onRetry={onRetry}
+          isRetrying={isRetrying || errorPullBusy}
           refreshControl={refreshControl}
         />
       </Animated.View>
     );
   }
 
-  // No stored rows and no active query: render the history-empty body ("No
-  // past sessions" with no create CTA) full-screen, skipping the list.
-  // Gated on !isLoading (via surface) so a cold open with an empty cache does
-  // not flash this while queries run.
+  // No stored rows and no active query: render the history-empty body with its
+  // new-session action full-screen. The surface selector gates this on !isLoading
+  // so a cold open with an empty cache does not flash before queries settle.
   if (surface.kind === 'history-empty') {
     return (
       <Animated.View entering={FadeIn.duration(200)} className="flex-1">
@@ -370,6 +391,7 @@ export function AgentSessionListContent({
           kind="no-past-sessions"
           isSearching={isSearching}
           clearQueryAction={clearQueryAction}
+          createSessionAction={createSessionAction}
           onRetry={onRetry}
           refreshControl={refreshControl}
         />
@@ -392,6 +414,7 @@ export function AgentSessionListContent({
             bodyModel.kind === 'query-error-empty' ? bodyModel.secondaryAction : undefined
           }
           clearQueryAction={clearQueryAction}
+          isRetrying={isRetrying}
           onRetry={onRetry}
           refreshControl={refreshControl}
         />

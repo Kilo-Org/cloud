@@ -269,7 +269,6 @@
     "voiceInput": "Raddinntak",
     "autoExpandThinking": "Opna hugsunarferlið sjálfkrafa",
     "autoExpandThinkingSubtitle": "Sýna allt hugsunarferli fulltrúans þegar því er lokið.",
-    "autoExpandThinkingInactiveSubtitle": "Hefur engin áhrif á meðan upplýsingar um hugsun eru faldar.",
     "hideThinking": "Fela upplýsingar um hugsun",
     "hideThinkingSubtitle": "Ekki sýna hugsun fulltrúans á lotusíðunni.",
     "keepScreenOn": "Halda skjánum kveiktum á lotusíðunni",
@@ -294,7 +293,8 @@
     "condenseToolCallsSubtitle": "Flokkaðu samfelld tólaköll í eina röð sem þú getur opnað.",
     "toolSummaryTranslation": "Þýða samantektir tóla",
     "toolSummaryTranslationSubtitle": "Sendu hverja samantekt tóls til líkans til að þýða hana á tungumál appsins þíns. Upprunalega textinn birtist ef þýðing mistekst.",
-    "toolSummaryTranslationModelUnavailableNotice": "Þetta líkan er ekki lengur í boði. Ýttu á $t(common.model) til að velja annað."
+    "toolSummaryTranslationModelUnavailableNotice": "Þetta líkan er ekki lengur í boði. Ýttu á $t(common.model) til að velja annað.",
+    "autoExpandThinkingInactiveSubtitle": "Hefur engin áhrif á meðan upplýsingar um hugsun eru faldar."
   },
   "prReview": {
     "pullRequestUnavailable": "Sameiningarbeiðni ekki tiltæk",
@@ -494,7 +494,7 @@
       "unresolveThread": "Merkja þráð sem óleystan",
       "resolved": "Leyst",
       "outdated": "Úrelt",
-      "comment_one": "1 athugasemd",
+      "comment_one": "{{displayCount}} athugasemd",
       "comment": "{{displayCount}} athugasemdir",
       "comment_other": "{{displayCount}} athugasemdir",
       "startedRelative": " · hófst {{relative}}",
@@ -1434,15 +1434,11 @@
       "findingsUnavailable": "Niðurstöður eru ekki tiltækar þar sem þessi yfirferð mistókst.",
       "serviceUnavailable": "Ekki náðist samband við kóðayfirferðarþjónustuna. Reyndu yfirferðina aftur þegar þjónustan er tiltæk.",
       "reviewFailed": "Yfirferðin mistókst. Vinsamlegast reyndu aftur.",
-      "cancelReasonSuperseded": "Nýrra framlagi var ýtt inn, svo þessari yfirferð var skipt út.",
-      "cancelReasonIntegrationDisconnected": "{{platform}} er aftengt, svo þessari yfirferð var hætt. Tengstu aftur og keyrðu yfirferðina aftur.",
-      "cancelReasonBitbucketReviewerDisabled": "Slökkt var á Code Reviewer fyrir Bitbucket, svo þessari yfirferð var hætt. Kveiktu á Code Reviewer aftur og keyrðu yfirferðina aftur.",
-      "cancelReasonBitbucketPullRequestChanged": "Dráttarbeiðnin í Bitbucket breyttist, svo þessari yfirferð var skipt út.",
-      "cancelReasonCancelled": "Þessari yfirferð var hætt.",
-      "cancelReasonInterrupted": "Þessi yfirferð var trufluð.",
       "showMore": "Sýna meira",
       "created": "Búin til",
       "started": "Hófst",
+      "reviewEnded": "Lauk",
+      "severityNitpick": "Atriði",
       "tokens": "Tókar",
       "tokensInOut": "{{input}} inn / {{output}} út",
       "council": "Yfirferðarráð",
@@ -1466,7 +1462,13 @@
       "sessionError": "Villa í lotu: {{error}}.",
       "statusWithValue": "Staða: {{status}}",
       "toolName": "Tól: {{name}}",
-      "toolNameError": "Villa kom upp í tólinu {{name}}."
+      "toolNameError": "Villa kom upp í tólinu {{name}}.",
+      "cancelReasonSuperseded": "Nýrra framlagi var ýtt inn, svo þessari yfirferð var skipt út.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} er aftengt, svo þessari yfirferð var hætt. Tengstu aftur og keyrðu yfirferðina aftur.",
+      "cancelReasonBitbucketReviewerDisabled": "Slökkt var á Code Reviewer fyrir Bitbucket, svo þessari yfirferð var hætt. Kveiktu á Code Reviewer aftur og keyrðu yfirferðina aftur.",
+      "cancelReasonBitbucketPullRequestChanged": "Dráttarbeiðnin í Bitbucket breyttist, svo þessari yfirferð var skipt út.",
+      "cancelReasonCancelled": "Þessari yfirferð var hætt.",
+      "cancelReasonInterrupted": "Þessi yfirferð var trufluð."
     },
     "reviewMemory": {
       "title": "Rýniminni",
@@ -1913,11 +1915,17 @@
       "actorSystem": "Kilo-kerfi",
       "couldNotLoad": "Ekki tókst að sækja endurskoðunarskýrsluna.",
       "events": "Atburðir",
+      "eventConfidence": "Vissu: {{confidence}}",
+      "eventReason": "Ástæða: {{reason}}",
+      "eventsCount_one": "{{displayCount}} atburður",
+      "eventsCount_other": "{{displayCount}} atburðir",
       "generated": "Skýrslan var búin til {{generatedAt}}.",
       "noActivity": "Engin skráð virkni",
       "noActivityDescription": "Kilo hefur enga skýrsluskylda virkni tengda öryggisfrávikum frá {{start}} til {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Geymsla ekki skráð",
+      "reasonUnknown": "Óþekkt ástæða",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Samantekt skýrslu",
       "title": "Endurskoðunarskýrsla",
       "unavailable": "Endurskoðunarskýrsla ekki tiltæk",
@@ -1972,6 +1980,7 @@
       "reauthorizeButton": "Endurnýja heimildir GitHub-forritsins",
       "reauthorizeDescription": "Öryggisvakinn þarf heimild til að lesa Dependabot-viðvaranir. Endurnýjaðu heimildir GitHub-forritsins til að veita þessa heimild.",
       "reauthorizeTitle": "Viðbótarheimildir nauðsynlegar",
+      "retryFailed": "Ekki tókst enn að hlaða öryggisvakanum. Athugaðu nettenginguna þína og reyndu aftur.",
       "setupFailed": "Ekki tókst að hefja uppsetningu GitHub. Reyndu aftur."
     },
     "queuedActionUntracked": "Ekki var lengur hægt að fylgjast með aðgerð í biðröð. Endurnýjaðu til að sjá nýjustu stöðu.",
@@ -2134,8 +2143,8 @@
       "dollar_other": "dalir",
       "costSpoken": "kostnaður {{cost}}",
       "costSpokenWithTime": "kostnaður {{cost}}, {{time}}",
-      "spokenJoiner": "og",
-      "pullRequest": "sameiningarbeiðni {{number}}"
+      "pullRequest": "sameiningarbeiðni {{number}}",
+      "spokenJoiner": "og"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Ekki tókst að opna GitHub",
@@ -2565,7 +2574,10 @@
       "allowOnceAccessibility": "Leyfa einu sinni",
       "alwaysAllow": "Leyfa alltaf",
       "alwaysAllowAccessibility": "Leyfa alltaf",
-      "retrying": "Reynir aftur…"
+      "retrying": "Reynir aftur…",
+      "retryDeny": "Reyna að hafna aftur",
+      "retryAllowOnce": "Reyna að leyfa einu sinni aftur",
+      "retryAlwaysAllow": "Reyna að leyfa alltaf aftur"
     },
     "questionCard": {
       "title": "Fulltrúinn þarf svar",
@@ -3117,22 +3129,16 @@
     "boundary": {
       "backToProfile": "Til baka í prófíl",
       "loadErrorMessage": "Athugaðu tenginguna og reyndu aftur.",
-
       "chooseAccount": "Veldu reikning",
       "loadErrorTitle": "Ekki tókst að hlaða félögunum þínum.",
       "membershipLostNotice": "Þú hefur ekki lengur aðgang að þessu félagi. Skipt yfir í {{target}}.",
       "noOrganization": "Ekkert félag",
-
       "noOrganizationDescription": "Þessi reikningur er ekki hluti af félagi. Búðu til eða gakktu til liðs við félag á vefnum til að nota eiginleika félagsins eins og boð til meðlima og viðvaranir um lága stöðu.",
-
       "openWebOrganizations": "Opna félög á vefnum",
-
       "organizationUnavailable": "Félagið er ekki tiltækt.",
       "selectDescriptionWithOrganizations": "Þú tilheyrir einu eða fleiri félögum. Veldu reikninginn sem þessi skjár á að nota.",
-
       "selectOrganization": "Val á félagi",
       "unavailableDescription": "Þetta félag er ekki lengur tiltækt. Veldu eitt úr prófílnum þínum til að halda áfram.",
-
       "unavailableSessionsDescription": "Þetta félag er ekki lengur tiltækt. Ekki er hægt að hlaða setum þess.",
       "accessDeniedDescription": "Þú hefur ekki aðgang að þessu félagi."
     },
@@ -3155,14 +3161,14 @@
       "truncated": "Hægt er að skoða eldri inneignarfærslur."
     },
     "inviteMember": {
-      "alreadyInvited": "Tölvupóstfangið er þegar boðið eða meðlimurinn er þegar í félaginu.",
       "emailError": "Sláðu inn gilt tölvupóstfang.",
       "emailPlaceholder": "nafn@fyrirtaeki.is",
       "permissionDenied": "Þú hefur ekki heimild til að bjóða nýjum meðlimum að ganga í félagið.",
       "roleMember": "Hlutverkið er meðlimur.",
-      "sendError": "Ekki tókst að senda boðið.",
       "sendInvite": "Senda boð",
-      "title": "Bjóða meðlim að taka þátt"
+      "title": "Bjóða meðlim að taka þátt",
+      "alreadyInvited": "Tölvupóstfangið er þegar boðið eða meðlimurinn er þegar í félaginu.",
+      "sendError": "Ekki tókst að senda boðið."
     },
     "invoices": {
       "downloadA11y": "Sækja reikning {{number}}",
@@ -3231,8 +3237,8 @@
       "inviteCreated": "Boð búið til",
       "pendingInvitations": "Boð í bið",
       "resendInvite": "Senda boð aftur",
-      "resendInviteError": "Ekki tókst að senda boðið aftur.",
-      "shareInviteLink": "Deila boðstengli"
+      "shareInviteLink": "Deila boðstengli",
+      "resendInviteError": "Ekki tókst að senda boðið aftur."
     },
     "usageStats": {
       "inputTokens": "Inntakstókar",
@@ -3377,11 +3383,11 @@
   },
   "transcriptionModel": {
     "title": "Umritunarlíkan",
-    "choose": "Veldu líkan",
     "noneChosen": "Ekkert valið",
     "emptyTitle": "Engin umritunarlíkan",
     "emptyDescription": "Kilo Gateway býður ekki upp á umritunarlíkan um þessar mundir.",
-    "loadFailed": "Ekki tókst að sækja umritunarlíkin."
+    "loadFailed": "Ekki tókst að sækja umritunarlíkin.",
+    "choose": "Veldu líkan"
   },
   "voiceLanguage": {
     "title": "Tungumál raddinnsláttar",
@@ -3403,7 +3409,6 @@
   },
   "modelChat": {
     "offlineFailure": "Þetta líkan þarf nettengingu. Tengstu og reyndu aftur, eða skiptu yfir í líkan á þessu tæki.",
-    "creditsRequired": "Ekki nógu mikil inneign til að senda þetta skilaboð. Bættu við inneign og reyndu aftur.",
     "empty": {
       "title": "Byrjaðu spjall",
       "description": "Sendu skilaboð til að tala við líkan."
@@ -3597,6 +3602,7 @@
       "fromHuggingFace": "Frá Hugging Face",
       "loading": "Hleður líkönum",
       "noResults": "Engin líkön fundust",
+      "noResultsForQuery": "Engin líkön fundust fyrir \"{{query}}\"",
       "noFits": "Engin líkön passa í þetta tæki",
       "noFitsDescription": "Stærri líkön eru á flipanum $t(common.all).",
       "fit": {
@@ -3671,7 +3677,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "Þetta líkan styður dýpt rökhugsunar"
-    }
+    },
+    "creditsRequired": "Ekki nógu mikil inneign til að senda þetta skilaboð. Bættu við inneign og reyndu aftur."
   },
   "settingsTools": {
     "confirmTitle": "Staðfesta þessa breytingu?"
@@ -3709,10 +3716,10 @@
     "noSpend": "Engin útgjöld skráð ennþá",
     "spend24h": "Útgjöld síðustu 24 klukkustundir",
     "multiplierError": "Sláðu inn margfaldara sem er 1 eða meira",
-    "multiplierMaxError": "Sláðu inn margfaldara sem er {{max}} eða minna",
-    "thresholdMaxError": "Sláðu inn upphæð sem er {{max}} eða lægri.",
     "permissionDenied": "Þú hefur ekki heimild til að stjórna útgjaldaviðvörunum.",
-    "pushOffByCategory": "Af í Tilkynningum"
+    "pushOffByCategory": "Af í Tilkynningum",
+    "multiplierMaxError": "Sláðu inn margfaldara sem er {{max}} eða minna",
+    "thresholdMaxError": "Sláðu inn upphæð sem er {{max}} eða lægri."
   },
   "profiles": {
     "title": "Snið",
@@ -3771,7 +3778,6 @@
     },
     "variablesEmpty": "Engar breytur ennþá",
     "variablesSaveFailed": "Ekki tókst að vista breytu",
-    "variablesDeleteFailed": "Ekki tókst að eyða breytunni",
     "commandsTitle": "Uppsetningarskipanir",
     "addCommand": "Bæta við skipun",
     "commandLabel": "Skipun",
@@ -3782,7 +3788,6 @@
     "moveDown": "Færðu þig niður",
     "moveCommandUp": "Færa skipun {{position}} upp",
     "moveCommandDown": "Færa skipun {{position}} niður",
-    "deleteCommand": "Eyða skipun {{position}}",
     "skillsTitle": "Færni",
     "addSkill": "Bættu við færni",
     "skillNameLabel": "Nafn kunnáttu",
@@ -3904,7 +3909,9 @@
       "pinFailed": "Ekki tókst að festa geymslu",
       "unboundToast": "Geymsla óbundin",
       "unbindFailed": "Ekki tókst að aftengja geymslu"
-    }
+    },
+    "variablesDeleteFailed": "Ekki tókst að eyða breytunni",
+    "deleteCommand": "Eyða skipun {{position}}"
   },
   "credits": {
     "title": "Kaupa inneign",
@@ -3931,7 +3938,6 @@
       "newList": "Nýr listi",
       "empty": "Engir listar enn",
       "couldNotLoad": "Ekki tókst að sækja lista",
-      "createFailed": "Ekki tókst að búa til lista",
       "noRepository": "Ekkert kóðasafn",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} opið",
@@ -3941,7 +3947,8 @@
       "archive": "Geyma",
       "unarchive": "Taka úr geymslu",
       "deleteTitle": "Eyða {{name}}?",
-      "deleteMessage": "Verkefnum þess er líka eytt. Loturnar þeirra haldast."
+      "deleteMessage": "Verkefnum þess er líka eytt. Loturnar þeirra haldast.",
+      "createFailed": "Ekki tókst að búa til lista"
     },
     "listSettings": {
       "title": "Stillingar lista",
@@ -4009,21 +4016,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Morgunyfirlit",
+    "title": "Agent-yfirlit",
     "atLeast": "≥{{value}}",
     "coverageHint": "Einhverja eldri virkni gæti vantað. ≥ þýðir að minnsta kosti þetta mikið; óþekkt er ekki núll.",
     "available": "Tiltæk yfirlit",
     "history": "Yfirlitssaga",
-    "historyHint": "Skýrslur eru geymdar í 30 daga, þar á meðal hunsaðar skýrslur.",
+    "historyHint": "Yfirlit eru geymd í 30 daga, þar á meðal hunsuð yfirlit.",
     "settings": "Stillingar yfirlits",
-    "saved": "Stillingar yfirlits vistaðar",
-    "empty": "Engin virkni í nótt",
-    "emptyHint": "Forritunarlotur þínar í skýinu og CLI birtast hér eftir virka nótt.",
+    "empty": "Engin virkni í þessum yfirlitsglugga",
+    "emptyHint": "Forritunarlotur þínar í skýinu og CLI birtast hér þegar áætlað yfirlit hefur virkni.",
     "loadError": "Ekki tókst að hlaða yfirlitum",
-    "sessions": "Virkt í nótt",
+    "sessions": "Virkt í yfirlitsglugga",
     "pullRequests": "PRs opnuð",
     "blockers": "Nýjar hindranir",
-    "spend": "Kostnaður í nótt",
+    "spend": "Kostnaður í yfirlitsglugga",
     "view": "Lesa yfirlit",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4045,13 +4051,13 @@
     "sources": "Gögn og afurðir",
     "timezone": "Tímabelti yfirlits",
     "deviceTimezone": "Nota tímabelti tækis",
-    "timezoneHint": "IANA tímabelti, til dæmis Europe/Berlin. Breytingar á tímaáætlun gilda fyrir komandi nætur.",
-    "nightStart": "Nótt hefst",
-    "morningStart": "Nótt lýkur / morgunn hefst",
-    "morningEnd": "Morgni lýkur",
-    "timeHint": "Heimaspjaldið sýnir aftur rauntímastöðu þegar morgni lýkur, jafnvel án tengingar.",
-    "invalidSchedule": "Veldu gilt tímabelti og nætur- og morguntímabil sem skarast ekki og eru ekki tóm.",
-    "notificationsHint": "Ein almenn tilkynning á morgni þegar fyrsta skýrslan er tilbúin. Óháð greiddum AI samantektum.",
+    "timezoneHint": "IANA tímabelti, til dæmis Europe/Berlin. Breytingar á tímaáætlun gilda fyrir komandi yfirlit.",
+    "nightStart": "Yfirlitsgluggi hefst",
+    "morningStart": "Yfirlit tilbúið klukkan",
+    "morningEnd": "Yfirlit tiltækt til",
+    "timeHint": "Heimaspjaldið sýnir aftur rauntímastöðu þegar yfirlitsglugganum lýkur, jafnvel án tengingar.",
+    "invalidSchedule": "Veldu gilt tímabelti og yfirlitsglugga sem er ekki tómur.",
+    "notificationsHint": "Ein almenn tilkynning fyrir hvert áætlað yfirlit. Óháð greiddum AI samantektum.",
     "notificationPermission": "Virkjaðu tilkynningar tækis í $t(common.notifications) til að fá yfirlitið.",
     "aiOptIn": "Greiddar AI samantektir",
     "aiHint": "Valfrjálst eingöngu fyrir þetta samhengi. Valdir, ritskoðaðir útdrættir og skipulagðar staðreyndir eru sendar til líkansins á tungumáli appsins. Kostnaður dregst af inneign þessa samhengis.",
@@ -4069,7 +4075,7 @@
     "contextSettings": "AI stillingar · {{context}}",
     "allContexts": "Yfirlit einstaklinga og fyrirtækja eru aðskilin.",
     "create": "Búa til yfirlit",
-    "oneOff": "Einskiptis",
+    "oneOff": "Eftir beiðni",
     "createdAt": "Búið til {{time}}",
     "chooseContext": "Veldu eitt samhengi",
     "period": "Tímabil yfirlits",
@@ -4091,13 +4097,16 @@
     "emptyPeriod": "Engin virkni fannst á þessu tímabili. Engin AI samantekt verður gerð og ekkert gjald tekið.",
     "emptyHistory": "Engin vistuð yfirlit",
     "historicalStateHint": "Staða lotunnar endurspeglar lok valins tímabils, ekki núverandi stöðu í rauntíma.",
-    "oneOffHint": "AI fær valin gögn á tungumáli appsins eftir að viðkvæmar upplýsingar hafa verið afmáðar. Þessi einskiptisskýrsla breytir hvorki morgunáætluninni þinni né AI stillingunum þínum.",
+    "oneOffHint": "AI fær valin gögn á tungumáli appsins eftir að viðkvæmar upplýsingar hafa verið afmáðar. Þetta yfirlit eftir beiðni breytir hvorki áætlaða yfirlitinu þínu né AI stillingunum þínum.",
     "createOffline": "Tengstu netinu til að fara yfir eða búa til yfirlit. Greiddar beiðnir eru aldrei settar í biðröð án nettengingar.",
     "estimateInputTooLarge": "Of mikið er af gögnum á þessu tímabili fyrir valið líkan.",
     "estimatePermissionUnavailable": "Þú hefur ekki heimild til að nota inneign þessa samhengis.",
+    "createFailed": "Ekki tókst að búa til þetta yfirlit.",
+    "reviewFailed": "Ekki tókst að fara yfir þetta yfirlit.",
     "estimatePricingUnavailable": "Verð fyrir þetta líkan er ekki tiltækt.",
     "estimateBalanceUnavailable": "Ekki nóg innistæða fyrir greidda samantekt.",
     "estimateModelNotAllowed": "Þetta líkan er ekki heimilað hér.",
-    "estimateSpendLimitTooLow": "Hækkaðu útgjaldaörugleikann til að heimila þessa samantekt."
+    "estimateSpendLimitTooLow": "Hækkaðu útgjaldaörugleikann til að heimila þessa samantekt.",
+    "saved": "Stillingar yfirlits vistaðar"
   }
 }

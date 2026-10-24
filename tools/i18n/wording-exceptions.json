@@ -152,6 +152,7 @@
     "completed ({{count}})",
     "critical",
     "no changes needed",
+    "none",
     "open",
     "open pull request",
     "pr opened",

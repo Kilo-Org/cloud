@@ -24,6 +24,26 @@ const DEFAULT_GITLAB_URL = DEFAULT_GITLAB_INSTANCE_URL;
 const MAX_GITLAB_REDIRECTS = 5;
 const MAX_GITLAB_RESPONSE_BYTES = 10 * 1024 * 1024;
 const GITLAB_REQUEST_TIMEOUT_MS = 30_000;
+const MAX_GITLAB_PAGINATION_PAGES = 100;
+const MAX_GITLAB_PAGINATION_ITEMS = 10_000;
+
+/**
+ * Enforces the server-side pagination bounds for every paginating helper in this
+ * adapter: pagination continues only within MAX_GITLAB_PAGINATION_PAGES pages and
+ * MAX_GITLAB_PAGINATION_ITEMS items, and exceeding either bound fails with an error.
+ */
+function checkGitLabPaginationBounds(page: number, itemCount: number, context: string): void {
+  if (page > MAX_GITLAB_PAGINATION_PAGES) {
+    throw new Error(
+      `GitLab pagination limit exceeded: ${context} returned more than ${MAX_GITLAB_PAGINATION_PAGES} pages`
+    );
+  }
+  if (itemCount > MAX_GITLAB_PAGINATION_ITEMS) {
+    throw new Error(
+      `GitLab pagination limit exceeded: ${context} returned more than ${MAX_GITLAB_PAGINATION_ITEMS} items`
+    );
+  }
+}
 
 async function fetchGitLab(url: string, init?: RequestInit, redirectCount = 0): Promise<Response> {
   const response = await fetchGitLabOnce(url, init);
@@ -51,10 +71,57 @@ async function fetchGitLab(url: string, init?: RequestInit, redirectCount = 0): 
 async function fetchGitLabOnce(url: string, init?: RequestInit): Promise<Response> {
   const resolvedUrl = await resolveGitLabUrlSafely(url);
   if (!resolvedUrl.address) {
-    return fetch(url, { ...init, redirect: 'manual' });
+    return fetchBounded(url, init);
   }
 
   return fetchGitLabBoundToAddress({ ...resolvedUrl, address: resolvedUrl.address }, init);
+}
+
+async function fetchBounded(url: string, init?: RequestInit): Promise<Response> {
+  const signal = init?.signal ?? AbortSignal.timeout(GITLAB_REQUEST_TIMEOUT_MS);
+  const response = await fetch(url, {
+    ...init,
+    signal,
+    redirect: 'manual',
+  });
+
+  const rawHeaders = response.headers;
+  const contentLength =
+    rawHeaders && typeof rawHeaders.get === 'function' ? rawHeaders.get('content-length') : null;
+  if (contentLength && Number(contentLength) > MAX_GITLAB_RESPONSE_BYTES) {
+    const error = new Error('GitLab response exceeded size limit');
+    await response.body?.cancel();
+    throw error;
+  }
+
+  if (!response.body || typeof response.body.getReader !== 'function') {
+    return response;
+  }
+
+  const chunks: Buffer[] = [];
+  let responseBytes = 0;
+  const reader = response.body.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    const buffer = Buffer.isBuffer(value) ? value : Buffer.from(value);
+    responseBytes += buffer.byteLength;
+    if (responseBytes > MAX_GITLAB_RESPONSE_BYTES) {
+      const error = new Error('GitLab response exceeded size limit');
+      await reader.cancel(error);
+      throw error;
+    }
+    chunks.push(buffer);
+  }
+
+  const body = responseStatusForbidsBody(response.status) ? null : Buffer.concat(chunks);
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
 }
 
 function isGitLabRedirect(status: number): boolean {
@@ -434,12 +501,13 @@ export async function fetchGitLabProjects(
 
     const nextPage = Number.parseInt(response.headers.get('x-next-page') || '', 10);
     if (Number.isInteger(nextPage) && nextPage > page) {
+      checkGitLabPaginationBounds(nextPage, projects.length, 'project listing');
       page = nextPage;
       continue;
     }
 
-    if (data.length < perPage) break;
-    page++;
+    checkGitLabPaginationBounds(page, projects.length, 'project listing');
+    break;
   }
 
   logExceptInTest('GitLab projects fetched', { count: projects.length });
@@ -498,7 +566,9 @@ export async function fetchGitLabBranches(
     const data = (await response.json()) as GitLabBranch[];
     branches.push(...data);
 
-    const totalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    const totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
+    checkGitLabPaginationBounds(totalPages, branches.length, 'branch listing');
     if (page >= totalPages) break;
     page++;
   }
@@ -1128,7 +1198,9 @@ export async function findKiloReviewNote(
     const data = (await response.json()) as GitLabNote[];
     notes.push(...data);
 
-    const totalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    const totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
+    checkGitLabPaginationBounds(totalPages, notes.length, 'MR note listing');
     if (page >= totalPages) break;
     page++;
   }
@@ -1277,7 +1349,9 @@ export async function hasMRNoteWithMarker(
       return true;
     }
 
-    const totalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    const totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
+    checkGitLabPaginationBounds(totalPages, page * perPage, 'MR note marker search');
     if (page >= totalPages) break;
     page++;
   }
@@ -1287,6 +1361,9 @@ export async function hasMRNoteWithMarker(
 
 /**
  * Used to detect duplicates and track outdated inline comments.
+ *
+ * `authoredByKilo` reports whether the user behind the access token that reads the MR wrote
+ * the note (the Project Access Token bot user).
  */
 export async function fetchMRInlineComments(
   accessToken: string,
@@ -1301,6 +1378,7 @@ export async function fetchMRInlineComments(
     line: number | null;
     body: string;
     isOutdated: boolean;
+    authoredByKilo: boolean;
     user: { username: string };
   }>
 > {
@@ -1334,39 +1412,66 @@ export async function fetchMRInlineComments(
     const data = (await response.json()) as GitLabDiscussion[];
     discussions.push(...data);
 
-    const totalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    const parsedTotalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
+    const totalPages = Number.isFinite(parsedTotalPages) ? parsedTotalPages : 1;
+    checkGitLabPaginationBounds(totalPages, discussions.length, 'MR discussion listing');
     if (page >= totalPages) break;
     page++;
   }
 
-  const inlineComments: Array<{
+  const positionedNotes: Array<{
     id: number;
     discussionId: string;
     path: string;
     line: number | null;
     body: string;
     isOutdated: boolean;
-    user: { username: string };
+    authorId: number;
+    authorUsername: string;
   }> = [];
 
   for (const discussion of discussions) {
     if (discussion.individual_note) continue;
 
     for (const note of discussion.notes) {
-      if (note.position) {
-        inlineComments.push({
-          id: note.id,
-          discussionId: discussion.id,
-          path: note.position.new_path || note.position.old_path,
-          line: note.position.new_line ?? note.position.old_line,
-          body: note.body,
-          // In GitLab, resolved discussions are considered "outdated" for our purposes
-          isOutdated: note.resolved === true,
-          user: { username: note.author.username },
-        });
-      }
+      if (!note.position) continue;
+
+      positionedNotes.push({
+        id: note.id,
+        discussionId: discussion.id,
+        path: note.position.new_path || note.position.old_path,
+        line: note.position.new_line ?? note.position.old_line,
+        body: note.body,
+        // In GitLab, resolved discussions are considered "outdated" for our purposes
+        isOutdated: note.resolved === true,
+        authorId: note.author.id,
+        authorUsername: note.author.username,
+      });
     }
   }
+
+  // Attribution is best-effort: a failed lookup leaves the comments unattributed for this
+  // run so the surrounding review state (summary, incremental mode, diff refs) is preserved.
+  let kiloUserId: number | null = null;
+  if (positionedNotes.length > 0) {
+    try {
+      kiloUserId = (await fetchGitLabUser(accessToken, instanceUrl)).id;
+    } catch (error) {
+      logExceptInTest(
+        '[fetchMRInlineComments] Token user lookup failed; comments stay unattributed',
+        {
+          projectId,
+          mrIid,
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
+    }
+  }
+  const inlineComments = positionedNotes.map(({ authorId, authorUsername, ...comment }) => ({
+    ...comment,
+    authoredByKilo: kiloUserId !== null && authorId === kiloUserId,
+    user: { username: authorUsername },
+  }));
 
   logExceptInTest('[fetchMRInlineComments] Fetched inline comments', {
     projectId,

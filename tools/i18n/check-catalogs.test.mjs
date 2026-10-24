@@ -311,6 +311,77 @@ test('rejects unknown placeholders in a locale-specific plural category', contex
   );
 });
 
+const SINGULAR_COUNTED = {
+  agents: {
+    title: 'Agents',
+    liveCount_one: '1 live session',
+    liveCount_other: '{{count}} live sessions',
+  },
+};
+
+test('accepts a category that interpolates the count its English family uses', context => {
+  const result = runChecker(context, {
+    english: SINGULAR_COUNTED,
+    translated: {
+      agents: {
+        title: 'Localized agents',
+        liveCount_one: '{{count}} localized session',
+        liveCount_few: '{{count}} localized sessions (few)',
+        liveCount_many: '{{count}} localized sessions (many)',
+        liveCount_other: '{{count}} localized sessions',
+      },
+    },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stderr, '');
+});
+
+test('still rejects a token no value of the family uses', context => {
+  const result = runChecker(context, {
+    english: SINGULAR_COUNTED,
+    translated: {
+      agents: {
+        title: 'Localized agents',
+        liveCount_one: '{{count}} localized session out of {{total}}',
+        liveCount_few: '{{count}} localized sessions (few)',
+        liveCount_many: '{{count}} localized sessions (many)',
+        liveCount_other: '{{count}} localized sessions',
+      },
+    },
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ru: "agents\.liveCount_one" placeholders differ from English \(none\)/
+  );
+});
+
+test('still rejects a category that drops a placeholder English requires', context => {
+  const result = runChecker(context, {
+    english: {
+      agents: {
+        title: 'Agents',
+        liveCount_one: '{{total}} live session',
+        liveCount_other: '{{count}} of {{total}} live sessions',
+      },
+    },
+    translated: {
+      agents: {
+        title: 'Localized agents',
+        liveCount_one: '{{count}} localized session',
+        liveCount_few: '{{count}} localized sessions (few)',
+        liveCount_many: '{{count}} localized sessions (many)',
+        liveCount_other: '{{count}} localized sessions',
+      },
+    },
+  });
+  assert.equal(result.status, 1, result.stderr);
+  assert.match(
+    result.stderr,
+    /mobile\/ru: "agents\.liveCount_other" placeholders differ from English \(count,total\)/
+  );
+});
+
 /**
  * A counted form may say its number in a word instead of the placeholder, but
  * only where the allowlist names that key, category and locale: Arabic names

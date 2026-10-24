@@ -269,7 +269,6 @@
     "voiceInput": "वॉइस इनपुट",
     "autoExpandThinking": "विचार प्रक्रिया अपने आप खोलें",
     "autoExpandThinkingSubtitle": "एजेंट की विचार प्रक्रिया पूरी होने पर उसका पूरा विवरण दिखाएँ।",
-    "autoExpandThinkingInactiveSubtitle": "विचार प्रक्रिया का विवरण छिपाने पर कोई प्रभाव नहीं होगा।",
     "hideThinking": "विचार प्रक्रिया का विवरण छिपाएँ",
     "hideThinkingSubtitle": "सत्र पेज पर एजेंट की विचार प्रक्रिया न दिखाएँ।",
     "keepScreenOn": "सत्र पेज पर स्क्रीन चालू रखें",
@@ -294,7 +293,8 @@
     "condenseToolCallsSubtitle": "लगातार टूल कॉल को एक पंक्ति में समूहित करें जिसे आप खोल सकते हैं।",
     "toolSummaryTranslation": "टूल सारांश का अनुवाद करें",
     "toolSummaryTranslationSubtitle": "हर टूल सारांश को मॉडल पर भेजें ताकि उसका अनुवाद आपके ऐप की भाषा में हो सके। अनुवाद विफल होने पर मूल दिखाया जाता है।",
-    "toolSummaryTranslationModelUnavailableNotice": "यह मॉडल अब पेश नहीं किया जाता। दूसरा चुनने के लिए $t(common.model) पर टैप करें।"
+    "toolSummaryTranslationModelUnavailableNotice": "यह मॉडल अब पेश नहीं किया जाता। दूसरा चुनने के लिए $t(common.model) पर टैप करें।",
+    "autoExpandThinkingInactiveSubtitle": "विचार प्रक्रिया का विवरण छिपाने पर कोई प्रभाव नहीं होगा।"
   },
   "notifications": {
     "liveActivities": "लाइव गतिविधियाँ",
@@ -916,6 +916,8 @@
       "invalidUrl": "पुल रिक्वेस्ट का मान्य URL दर्ज करें।",
       "pullRequestUrl": "पुल रिक्वेस्ट का URL",
       "start": "समीक्षा शुरू करें",
+      "starting": "समीक्षा शुरू हो रही है…",
+      "title": "मैन्युअल समीक्षा",
       "startNotFound": "उस {{requestNoun}} को {{provider}} से पढ़ा नहीं जा सका। कृपया URL जाँचें और यह भी देखें कि रिपॉज़िटरी सुलभ है।",
       "startRateLimited": "{{provider}} अभी अनुरोधों को सीमित कर रहा है। कुछ मिनटों में फिर से कोशिश करें।",
       "startNotAllowed": "आपके पास उस {{requestNoun}} के लिए समीक्षा शुरू करने का एक्सेस नहीं है। कृपया अपनी अनुमतियाँ और अपने संगठन की योजना जाँचें।",
@@ -923,9 +925,7 @@
       "startAlreadyRunning": "उस {{requestNoun}} की समीक्षा पहले से चल रही है।",
       "startRejected": "उस {{requestNoun}} की समीक्षा नहीं की जा सकती। सुनिश्चित करें कि वह खुला है, ड्राफ़्ट नहीं है, और URL सही है।",
       "startProviderUnavailable": "उस {{requestNoun}} को पढ़ने के लिए {{provider}} तक नहीं पहुँचा जा सका। फिर से कोशिश करें।",
-      "startFailed": "समीक्षा शुरू नहीं हो सकी। अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
-      "starting": "समीक्षा शुरू हो रही है…",
-      "title": "मैन्युअल समीक्षा"
+      "startFailed": "समीक्षा शुरू नहीं हो सकी। अपना कनेक्शन जाँचें और फिर से कोशिश करें।"
     },
     "notConnectedReadOnly": "{{platform}} कनेक्ट नहीं है। केवल संगठन के मालिक और एडमिन ही इसे कनेक्ट कर सकते हैं।",
     "gitlab": {
@@ -963,12 +963,6 @@
       "findingsUnavailable": "यह समीक्षा विफल होने के कारण परिणाम उपलब्ध नहीं हैं।",
       "serviceUnavailable": "कोड समीक्षा सेवा से संपर्क नहीं हो सका। सेवा उपलब्ध होने पर समीक्षा फिर से करें।",
       "reviewFailed": "समीक्षा विफल हो गई। कृपया फिर से कोशिश करें।",
-      "cancelReasonSuperseded": "एक नया कमिट पुश किया गया था, इसलिए यह समीक्षा बदल दी गई।",
-      "cancelReasonIntegrationDisconnected": "{{platform}} डिस्कनेक्ट हो गया है, इसलिए यह समीक्षा रद्द हो गई। इसे फिर से जोड़ें, फिर समीक्षा दोबारा करें।",
-      "cancelReasonBitbucketReviewerDisabled": "Bitbucket के लिए Code Reviewer बंद कर दिया गया था, इसलिए यह समीक्षा रद्द हो गई। इसे फिर से चालू करें, फिर समीक्षा दोबारा करें।",
-      "cancelReasonBitbucketPullRequestChanged": "Bitbucket पुल रिक्वेस्ट बदल गई, इसलिए यह समीक्षा बदल दी गई।",
-      "cancelReasonCancelled": "यह समीक्षा रद्द हो गई।",
-      "cancelReasonInterrupted": "यह समीक्षा बाधित हो गई।",
       "retryMessage": "इससे कोड की समीक्षा फिर से होगी।",
       "retryReview": "समीक्षा फिर से करें",
       "retryNeedsSettings": "कोड समीक्षक बंद है या इसकी सेटिंग पर ध्यान देने की ज़रूरत है। सेटिंग ठीक करें, फिर यह समीक्षा दोबारा करें।",
@@ -976,6 +970,8 @@
       "retryTitle": "समीक्षा फिर से करें?",
       "showMore": "और दिखाएँ",
       "started": "शुरू हुआ",
+      "reviewEnded": "समाप्त हुआ",
+      "severityNitpick": "मामूली टिप्पणी",
       "threshold": "सीमा",
       "title": "समीक्षा",
       "tokens": "टोकन",
@@ -994,7 +990,13 @@
       "sessionError": "सत्र में त्रुटि हुई: {{error}}।",
       "statusWithValue": "स्थिति: {{status}}",
       "toolName": "उपकरण: {{name}}",
-      "toolNameError": "उपकरण {{name}} में त्रुटि हुई।"
+      "toolNameError": "उपकरण {{name}} में त्रुटि हुई।",
+      "cancelReasonSuperseded": "एक नया कमिट पुश किया गया था, इसलिए यह समीक्षा बदल दी गई।",
+      "cancelReasonIntegrationDisconnected": "{{platform}} डिस्कनेक्ट हो गया है, इसलिए यह समीक्षा रद्द हो गई। इसे फिर से जोड़ें, फिर समीक्षा दोबारा करें।",
+      "cancelReasonBitbucketReviewerDisabled": "Bitbucket के लिए Code Reviewer बंद कर दिया गया था, इसलिए यह समीक्षा रद्द हो गई। इसे फिर से चालू करें, फिर समीक्षा दोबारा करें।",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket पुल रिक्वेस्ट बदल गई, इसलिए यह समीक्षा बदल दी गई।",
+      "cancelReasonCancelled": "यह समीक्षा रद्द हो गई।",
+      "cancelReasonInterrupted": "यह समीक्षा बाधित हो गई।"
     },
     "reviewList": {
       "configureProvider": "प्रदाता कॉन्फ़िगर करें",
@@ -1158,12 +1160,18 @@
       "actorSystem": "Kilo सिस्टम",
       "couldNotLoad": "ऑडिट रिपोर्ट लोड नहीं हो सकी।",
       "events": "घटनाएँ",
+      "eventConfidence": "विश्वास: {{confidence}}",
+      "eventReason": "कारण: {{reason}}",
+      "eventsCount_one": "{{displayCount}} घटना",
+      "eventsCount_other": "{{displayCount}} घटनाएँ",
       "generated": "रिपोर्ट तैयार हुई: {{generatedAt}}।",
       "noActivity": "कोई गतिविधि दर्ज नहीं",
       "noActivityDescription": "{{start}} से {{end}} तक Kilo में सुरक्षा समस्याओं से जुड़ी कोई गतिविधि नहीं है जिसे रिपोर्ट में शामिल किया जा सके।",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "रिपोर्ट क्वेरी पूरी नहीं हुई। फिर से कोशिश करें।",
       "repositoryNotRecorded": "रिपॉज़िटरी दर्ज नहीं",
+      "reasonUnknown": "अपरिचित कारण",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "रिपोर्ट का सारांश",
       "title": "ऑडिट रिपोर्ट",
       "unavailable": "ऑडिट रिपोर्ट अनुपलब्ध",
@@ -1405,6 +1413,7 @@
       "reauthorizeButton": "GitHub ऐप को फिर से अधिकृत करें",
       "reauthorizeDescription": "Dependabot अलर्ट पढ़ने के लिए सुरक्षा एजेंट को अनुमति चाहिए। यह अनुमति देने के लिए GitHub ऐप को फिर से अधिकृत करें।",
       "reauthorizeTitle": "अतिरिक्त अनुमतियाँ आवश्यक",
+      "retryFailed": "सुरक्षा एजेंट अब भी लोड नहीं हो सका। कृपया अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
       "setupFailed": "GitHub सेटअप शुरू नहीं हो सका। कृपया फिर से कोशिश करें।"
     },
     "settingsOverview": {
@@ -1610,8 +1619,8 @@
       "dollar_other": "डॉलर",
       "costSpoken": "लागत {{cost}}",
       "costSpokenWithTime": "लागत {{cost}}, {{time}}",
-      "spokenJoiner": ", और",
-      "pullRequest": "पुल रिक्वेस्ट {{number}}"
+      "pullRequest": "पुल रिक्वेस्ट {{number}}",
+      "spokenJoiner": ", और"
     },
     "githubInstall": {
       "couldNotOpenMessage": "हम GitHub ऐप का सेटअप शुरू नहीं कर सके। कृपया फिर से कोशिश करें।",
@@ -2014,7 +2023,10 @@
       "allowOnceAccessibility": "एक बार अनुमति दें",
       "alwaysAllow": "हमेशा अनुमति दें",
       "alwaysAllowAccessibility": "हमेशा अनुमति दें",
-      "retrying": "फिर से कोशिश हो रही है…"
+      "retrying": "फिर से कोशिश हो रही है…",
+      "retryDeny": "अस्वीकार करने की फिर से कोशिश करें",
+      "retryAllowOnce": "एक बार अनुमति देने की फिर से कोशिश करें",
+      "retryAlwaysAllow": "हमेशा अनुमति देने की फिर से कोशिश करें"
     },
     "questionCard": {
       "title": "एजेंट को आपका उत्तर चाहिए",
@@ -3109,22 +3121,16 @@
     "boundary": {
       "backToProfile": "प्रोफ़ाइल पर वापस जाएँ",
       "loadErrorMessage": "अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
-
       "chooseAccount": "एक खाता चुनें",
       "loadErrorTitle": "आपके संगठन लोड नहीं हो सके।",
       "membershipLostNotice": "आपको इस संगठन का ऐक्सेस अब नहीं है। {{target}} पर स्विच किया गया।",
       "noOrganization": "कोई संगठन नहीं",
-
       "noOrganizationDescription": "यह खाता किसी संगठन का हिस्सा नहीं है। सदस्य आमंत्रण और कम बैलेंस अलर्ट जैसी संगठन सुविधाओं का उपयोग करने के लिए वेब पर एक संगठन बनाएँ या उसमें शामिल हों।",
-
       "openWebOrganizations": "वेब पर संगठन खोलें",
-
       "organizationUnavailable": "संगठन उपलब्ध नहीं है।",
       "selectDescriptionWithOrganizations": "आप एक या अधिक संगठनों से जुड़े हैं। वह खाता चुनें जिसका इस स्क्रीन को उपयोग करना चाहिए।",
-
       "selectOrganization": "एक संगठन चुनें",
       "unavailableDescription": "यह संगठन अब उपलब्ध नहीं है। जारी रखने के लिए अपनी प्रोफ़ाइल से दूसरा संगठन चुनें।",
-
       "unavailableSessionsDescription": "यह संगठन अब उपलब्ध नहीं है। इसके सत्र लोड नहीं किए जा सकते।",
       "accessDeniedDescription": "आपको इस संगठन का ऐक्सेस नहीं है।"
     },
@@ -3154,14 +3160,14 @@
       "renameTitle": "संगठन का नाम बदलें"
     },
     "inviteMember": {
-      "alreadyInvited": "वे पहले से आमंत्रित हैं या पहले से ही सदस्य हैं।",
       "emailError": "मान्य ईमेल पता दर्ज करें।",
       "emailPlaceholder": "आपका ईमेल पता",
       "permissionDenied": "आपको सदस्यों को आमंत्रित करने की अनुमति नहीं है।",
       "roleMember": "भूमिका: सदस्य",
-      "sendError": "आमंत्रण नहीं भेजा जा सका।",
       "sendInvite": "आमंत्रण भेजें",
-      "title": "सदस्य को आमंत्रित करें"
+      "title": "सदस्य को आमंत्रित करें",
+      "alreadyInvited": "वे पहले से आमंत्रित हैं या पहले से ही सदस्य हैं।",
+      "sendError": "आमंत्रण नहीं भेजा जा सका।"
     },
     "invoices": {
       "downloadA11y": "इनवॉइस {{number}} डाउनलोड करें",
@@ -3230,8 +3236,8 @@
       "inviteCreated": "आमंत्रण बनाया गया",
       "pendingInvitations": "लंबित आमंत्रण",
       "resendInvite": "आमंत्रण फिर से भेजें",
-      "resendInviteError": "आमंत्रण फिर से नहीं भेजा जा सका।",
-      "shareInviteLink": "आमंत्रण का लिंक साझा करें"
+      "shareInviteLink": "आमंत्रण का लिंक साझा करें",
+      "resendInviteError": "आमंत्रण फिर से नहीं भेजा जा सका।"
     },
     "usageStats": {
       "inputTokens": "इनपुट टोकन",
@@ -3377,11 +3383,11 @@
   },
   "transcriptionModel": {
     "title": "आवाज़ को टेक्स्ट में बदलने का मॉडल",
-    "choose": "मॉडल चुनें",
     "noneChosen": "कोई नहीं चुना गया",
     "emptyTitle": "आवाज़ को टेक्स्ट में बदलने का कोई मॉडल नहीं",
     "emptyDescription": "Kilo Gateway फिलहाल आवाज़ को टेक्स्ट में बदलने के लिए कोई मॉडल नहीं दे रहा।",
-    "loadFailed": "आवाज़ को टेक्स्ट में बदलने वाले मॉडल लोड नहीं हो सके।"
+    "loadFailed": "आवाज़ को टेक्स्ट में बदलने वाले मॉडल लोड नहीं हो सके।",
+    "choose": "मॉडल चुनें"
   },
   "voiceLanguage": {
     "title": "वॉइस इनपुट की भाषा",
@@ -3403,7 +3409,6 @@
   },
   "modelChat": {
     "offlineFailure": "इस मॉडल के लिए इंटरनेट कनेक्शन आवश्यक है। कनेक्ट करें और फिर से कोशिश करें, या इस डिवाइस पर मौजूद किसी मॉडल पर स्विच करें।",
-    "creditsRequired": "यह संदेश भेजने के लिए पर्याप्त क्रेडिट नहीं है। क्रेडिट जोड़ें और फिर से कोशिश करें।",
     "empty": {
       "title": "चैट शुरू करें",
       "description": "किसी मॉडल से बात करने के लिए संदेश भेजें।"
@@ -3597,6 +3602,7 @@
       "fromHuggingFace": "Hugging Face से",
       "loading": "मॉडल लोड हो रहे हैं",
       "noResults": "कोई मॉडल नहीं मिला",
+      "noResultsForQuery": "\"{{query}}\" के लिए कोई मॉडल नहीं मिला",
       "noFits": "कोई भी मॉडल इस डिवाइस के अनुकूल नहीं है",
       "noFitsDescription": "बड़े मॉडल $t(common.all) टैब में हैं।",
       "fit": {
@@ -3671,7 +3677,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "यह मॉडल सोचने के स्तर का समर्थन करता है"
-    }
+    },
+    "creditsRequired": "यह संदेश भेजने के लिए पर्याप्त क्रेडिट नहीं है। क्रेडिट जोड़ें और फिर से कोशिश करें।"
   },
   "settingsTools": {
     "confirmTitle": "यह बदलाव पुष्टि करें?"
@@ -3709,10 +3716,10 @@
     "noSpend": "अभी तक कोई खर्च दर्ज नहीं हुआ",
     "spend24h": "पिछले 24 घंटों का खर्च",
     "multiplierError": "1 या उससे अधिक का गुणक दर्ज करें",
-    "multiplierMaxError": "{{max}} या उससे कम का गुणक दर्ज करें",
-    "thresholdMaxError": "{{max}} या उससे कम की राशि दर्ज करें।",
     "permissionDenied": "आपको खर्च की चेतावनियाँ प्रबंधित करने की अनुमति नहीं है।",
-    "pushOffByCategory": "सूचनाओं में बंद"
+    "pushOffByCategory": "सूचनाओं में बंद",
+    "multiplierMaxError": "{{max}} या उससे कम का गुणक दर्ज करें",
+    "thresholdMaxError": "{{max}} या उससे कम की राशि दर्ज करें।"
   },
   "profiles": {
     "title": "प्रोफ़ाइल",
@@ -3771,7 +3778,6 @@
     },
     "variablesEmpty": "अभी तक कोई चर नहीं",
     "variablesSaveFailed": "वेरिएबल सहेजा नहीं जा सका",
-    "variablesDeleteFailed": "वेरिएबल हटाया नहीं जा सका",
     "commandsTitle": "सेटअप आदेश",
     "addCommand": "आदेश जोड़ें",
     "commandLabel": "आज्ञा",
@@ -3782,7 +3788,6 @@
     "moveDown": "नीचे की ओर",
     "moveCommandUp": "आदेश {{position}} को ऊपर ले जाएँ",
     "moveCommandDown": "आदेश {{position}} को नीचे ले जाएँ",
-    "deleteCommand": "आदेश {{position}} हटाएँ",
     "skillsTitle": "कौशल",
     "addSkill": "कौशल जोड़ें",
     "skillNameLabel": "कौशल का नाम",
@@ -3904,7 +3909,9 @@
       "pinFailed": "रेपो पिन नहीं किया जा सका",
       "unboundToast": "रेपो अनबाउंड",
       "unbindFailed": "रेपो को अनबाइंड नहीं किया जा सका"
-    }
+    },
+    "variablesDeleteFailed": "वेरिएबल हटाया नहीं जा सका",
+    "deleteCommand": "आदेश {{position}} हटाएँ"
   },
   "credits": {
     "title": "क्रेडिट खरीदें",
@@ -3931,7 +3938,6 @@
       "newList": "नई सूची",
       "empty": "अभी कोई सूची नहीं",
       "couldNotLoad": "सूचियाँ लोड नहीं हो सकीं",
-      "createFailed": "सूची नहीं बन सकी",
       "noRepository": "कोई रिपॉज़िटरी नहीं",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} खुले",
@@ -3941,7 +3947,8 @@
       "archive": "संग्रहित करें",
       "unarchive": "संग्रह से बाहर करें",
       "deleteTitle": "{{name}} हटाएँ?",
-      "deleteMessage": "इसके कार्य भी हट जाएँगे। इसके सत्र बने रहेंगे।"
+      "deleteMessage": "इसके कार्य भी हट जाएँगे। इसके सत्र बने रहेंगे।",
+      "createFailed": "सूची नहीं बन सकी"
     },
     "listSettings": {
       "title": "सूची सेटिंग",
@@ -4009,21 +4016,20 @@
     }
   },
   "agentBriefing": {
-    "title": "सुबह की ब्रीफ़िंग",
+    "title": "एजेंट ब्रीफ़िंग",
     "atLeast": "≥{{value}}",
     "coverageHint": "कुछ पुरानी गतिविधि छूट सकती है। ≥ का मतलब कम से कम इतना है; अज्ञात का मतलब शून्य नहीं है।",
     "available": "उपलब्ध ब्रीफ़िंग",
     "history": "ब्रीफ़िंग इतिहास",
-    "historyHint": "रिपोर्ट 30 दिनों तक रखी जाती हैं, खारिज की गई रिपोर्ट भी।",
+    "historyHint": "ब्रीफ़िंग 30 दिनों तक रखी जाती हैं, खारिज की गई ब्रीफ़िंग भी शामिल हैं।",
     "settings": "ब्रीफ़िंग सेटिंग्स",
-    "saved": "ब्रीफ़िंग सेटिंग्स सहेज दी गईं",
-    "empty": "रात में कोई गतिविधि नहीं",
-    "emptyHint": "सक्रिय रात के बाद आपके क्लाउड और CLI कोडिंग सेशन यहाँ दिखेंगे।",
+    "empty": "इस ब्रीफ़िंग विंडो में कोई गतिविधि नहीं",
+    "emptyHint": "जब किसी निर्धारित ब्रीफ़िंग में गतिविधि होती है, तो आपके क्लाउड और CLI कोडिंग सेशन यहाँ दिखाई देते हैं।",
     "loadError": "ब्रीफ़िंग लोड नहीं हो सकीं",
-    "sessions": "रात में सक्रिय",
+    "sessions": "विंडो में सक्रिय",
     "pullRequests": "खोले गए PRs",
     "blockers": "नई रुकावटें",
-    "spend": "रात का खर्च",
+    "spend": "विंडो में खर्च",
     "view": "ब्रीफ़िंग पढ़ें",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4045,14 +4051,14 @@
     "sources": "साक्ष्य और आर्टिफ़ैक्ट",
     "timezone": "ब्रीफ़िंग समय क्षेत्र",
     "deviceTimezone": "डिवाइस का समय क्षेत्र इस्तेमाल करें",
-    "timezoneHint": "IANA समय क्षेत्र, जैसे Europe/Berlin। शेड्यूल बदलाव आने वाली रातों पर लागू होंगे।",
-    "nightStart": "रात शुरू",
-    "morningStart": "रात खत्म / सुबह शुरू",
-    "morningEnd": "सुबह खत्म",
-    "timeHint": "सुबह खत्म होने पर Home कार्ड लाइव स्थिति पर लौट आता है, ऑफ़लाइन भी।",
-    "invalidSchedule": "मान्य समय क्षेत्र और बिना ओवरलैप वाली, खाली न हों ऐसी रात और सुबह की अवधि चुनें।",
-    "notificationsHint": "पहली रिपोर्ट तैयार होने पर हर सुबह एक सामान्य सूचना। सशुल्क AI सारांशों से स्वतंत्र।",
-    "notificationPermission": "ब्रीफ़िंग पाने के लिए $t(common.notifications) में डिवाइस सूचनाएँ चालू करें।",
+    "timezoneHint": "IANA समय क्षेत्र, जैसे Europe/Berlin। शेड्यूल बदलाव आने वाली ब्रीफ़िंग पर लागू होंगे।",
+    "nightStart": "ब्रीफ़िंग विंडो शुरू",
+    "morningStart": "ब्रीफ़िंग तैयार होने का समय",
+    "morningEnd": "ब्रीफ़िंग उपलब्ध रहने तक",
+    "timeHint": "ब्रीफ़िंग विंडो खत्म होने पर Home कार्ड लाइव स्थिति पर लौट आता है, ऑफ़लाइन भी।",
+    "invalidSchedule": "मान्य समय क्षेत्र और खाली न होने वाली ब्रीफ़िंग विंडो चुनें।",
+    "notificationsHint": "प्रत्येक निर्धारित ब्रीफ़िंग के लिए एक सामान्य सूचना। सशुल्क AI सारांशों से स्वतंत्र।",
+    "notificationPermission": "अपनी ब्रीफ़िंग पाने के लिए $t(common.notifications) में डिवाइस सूचनाएँ चालू करें।",
     "aiOptIn": "सशुल्क AI सारांश",
     "aiHint": "केवल इस संदर्भ के लिए वैकल्पिक। चुने गए, संपादित अंश और संरचित तथ्य आपकी ऐप भाषा में आपके मॉडल को भेजे जाते हैं। शुल्क इस संदर्भ के बैलेंस से लिया जाता है।",
     "defaultModel": "Kilo का डिफ़ॉल्ट मॉडल इस्तेमाल करें",
@@ -4069,7 +4075,7 @@
     "contextSettings": "AI सेटिंग्स · {{context}}",
     "allContexts": "व्यक्तिगत और संगठन ब्रीफ़िंग अलग-अलग रहती हैं।",
     "create": "ब्रीफ़िंग बनाएँ",
-    "oneOff": "केवल एक बार",
+    "oneOff": "मांग पर",
     "createdAt": "बनाने का समय: {{time}}",
     "chooseContext": "एक संदर्भ चुनें",
     "period": "ब्रीफ़िंग की अवधि",
@@ -4091,13 +4097,16 @@
     "emptyPeriod": "इस अवधि में कोई गतिविधि नहीं मिली। न AI सारांश बनेगा, न शुल्क लगेगा।",
     "emptyHistory": "कोई सहेजी गई ब्रीफ़िंग नहीं",
     "historicalStateHint": "सत्र की स्थिति चुनी गई अवधि के अंत की स्थिति दर्शाती है, न कि वर्तमान लाइव स्थिति।",
-    "oneOffHint": "AI को आपके ऐप की भाषा में चुना गया साक्ष्य मिलता है, जिसमें से संवेदनशील जानकारी हटा दी गई है। केवल एक बार बनने वाली यह रिपोर्ट आपकी सुबह की समय-सारणी या AI प्राथमिकताएँ नहीं बदलती।",
+    "oneOffHint": "AI को आपके ऐप की भाषा में चुना गया साक्ष्य मिलता है, जिसमें से संवेदनशील जानकारी हटा दी गई है। मांग पर बनने वाली यह ब्रीफ़िंग आपकी निर्धारित ब्रीफ़िंग या AI प्राथमिकताएँ नहीं बदलती।",
     "createOffline": "ब्रीफ़िंग की समीक्षा करने या उसे बनाने के लिए इंटरनेट से जुड़ें। सशुल्क अनुरोध ऑफ़लाइन होने पर कभी कतार में नहीं रखे जाते।",
     "estimateInputTooLarge": "इस अवधि में चुने गए मॉडल के लिए बहुत अधिक साक्ष्य है।",
     "estimatePermissionUnavailable": "आपको इस संदर्भ की शेष राशि का उपयोग करने की अनुमति नहीं है।",
+    "createFailed": "यह ब्रीफ़िंग नहीं बनाई जा सकी।",
+    "reviewFailed": "इस ब्रीफ़िंग की समीक्षा नहीं की जा सकी।",
     "estimatePricingUnavailable": "इस मॉडल की कीमत उपलब्ध नहीं है।",
     "estimateBalanceUnavailable": "सशुल्क सारांश के लिए पर्याप्त बैलेंस नहीं है।",
     "estimateModelNotAllowed": "यह मॉडल यहाँ अनुमत नहीं है।",
-    "estimateSpendLimitTooLow": "इस सारांश की अनुमति देने के लिए खर्च सुरक्षा सीमा बढ़ाएँ।"
+    "estimateSpendLimitTooLow": "इस सारांश की अनुमति देने के लिए खर्च सुरक्षा सीमा बढ़ाएँ।",
+    "saved": "ब्रीफ़िंग सेटिंग्स सहेज दी गईं"
   }
 }

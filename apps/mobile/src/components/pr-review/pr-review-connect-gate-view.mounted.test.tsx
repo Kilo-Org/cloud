@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- one gate harness runs the provider × platform matrix; the header Back test shares its mount and router mocks. */
 import * as React from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import type * as ReactI18next from 'react-i18next';
 import * as WebBrowser from 'expo-web-browser';
 import { toast } from 'sonner-native';
@@ -19,7 +19,22 @@ const appState = vi.hoisted(() => ({
   addEventListener: vi.fn(),
 }));
 const providers: ProviderPrPlatform[] = ['github', 'gitlab', 'bitbucket'];
-let queryResult = {
+type MockStatusData = {
+  connected: boolean;
+  revoked?: boolean;
+  reconnectRequired?: boolean;
+};
+
+type MockQueryResult = {
+  data: MockStatusData;
+  isPending: boolean;
+  isLoading: boolean;
+  isError: boolean;
+  isFetching: boolean;
+  refetch: Mock;
+};
+
+let queryResult: MockQueryResult = {
   data: { connected: false, revoked: false },
   isPending: false,
   isLoading: false,
@@ -345,6 +360,58 @@ describe.each(['ios', 'android'])('PR-review connect gate on %s', os => {
     expect(renderer.root.findByType('EmptyState').props.description).toBeTruthy();
     expect(renderer.root.findAllByType('Button')).toHaveLength(0);
     expect(WebBrowser.openAuthSessionAsync).not.toHaveBeenCalled();
+  });
+
+  it.each(['github', 'gitlab'] as const)(
+    '%s asks to re-authorize an existing connection instead of a first-time connect',
+    provider => {
+      queryResult.data =
+        provider === 'github'
+          ? { connected: false, revoked: true }
+          : { connected: false, reconnectRequired: true };
+      const expectedTitle =
+        provider === 'github' ? 'Reconnect GitHub' : 'GitLab connection expired';
+      // The GitHub arm labels its recovery action with the same reconnect
+      // copy; the provider gate's action is the integration-page CTA, so it
+      // keeps that provider's Connect label.
+      const expectedAction = provider === 'github' ? 'Reconnect GitHub' : 'Connect GitLab';
+      const renderer = mount(provider, null);
+      const emptyState = renderer.root.findByType('EmptyState');
+      expect(emptyState.props.title).toBe(expectedTitle);
+      // The recovery action is the same integration-page CTA as Connect, so
+      // its label is the provider's Connect label rather than the expired-state
+      // title above it.
+      const labels = renderer.root
+        .findAllByType('Text')
+        .map(node => node.children.find(child => typeof child === 'string'));
+      expect(labels).toContain(expectedAction);
+    }
+  );
+
+  it.each(['gitlab', 'bitbucket'] as const)(
+    '%s keeps the first-time Connect copy when the status carries no reconnect marker',
+    provider => {
+      queryResult.data = { connected: false };
+      const noun = provider === 'gitlab' ? 'GitLab' : 'Bitbucket';
+      const renderer = mount(provider, provider === 'bitbucket' ? 'org-1' : null);
+      const emptyState = renderer.root.findByType('EmptyState');
+      expect(emptyState.props.title).toBe(`Connect ${noun}`);
+    }
+  );
+
+  it('a personal GitLab reconnect CTA opens the personal integration page', async () => {
+    platform.OS = 'android';
+    queryResult.data = { connected: false, reconnectRequired: true };
+    const pending = beginPendingLaunch();
+    const renderer = mount('gitlab', null);
+    await pressConnect(renderer);
+    expect(WebBrowser.openBrowserAsync).toHaveBeenCalledExactlyOnceWith(
+      'https://web.example/integrations/gitlab'
+    );
+    expect(queryResult.refetch).not.toHaveBeenCalled();
+
+    await settleLaunch(pending);
+    expect(queryResult.refetch).toHaveBeenCalledOnce();
   });
 
   it('shows the GitHub icon in the Connect GitHub action', () => {

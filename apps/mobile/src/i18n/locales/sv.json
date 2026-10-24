@@ -269,7 +269,6 @@
     "voiceInput": "Röstinmatning",
     "autoExpandThinking": "Visa resonemang automatiskt",
     "autoExpandThinkingSubtitle": "Visa agentens resonemang i sin helhet när det är klart.",
-    "autoExpandThinkingInactiveSubtitle": "Ingen effekt när information om resonemang är dold.",
     "hideThinking": "Dölj information om resonemang",
     "hideThinkingSubtitle": "Visa inte agentens resonemang på sessionssidan.",
     "keepScreenOn": "Håll skärmen tänd på sessionssidan",
@@ -294,7 +293,8 @@
     "condenseToolCallsSubtitle": "Gruppera på varandra följande verktygsanrop i en rad som du kan öppna.",
     "toolSummaryTranslation": "Översätt verktygssammanfattningar",
     "toolSummaryTranslationSubtitle": "Skicka varje verktygssammanfattning till en modell för att översätta den till appens språk. Originalet visas om översättningen misslyckas.",
-    "toolSummaryTranslationModelUnavailableNotice": "Den här modellen erbjuds inte längre. Tryck på $t(common.model) för att välja en annan."
+    "toolSummaryTranslationModelUnavailableNotice": "Den här modellen erbjuds inte längre. Tryck på $t(common.model) för att välja en annan.",
+    "autoExpandThinkingInactiveSubtitle": "Ingen effekt när information om resonemang är dold."
   },
   "prReview": {
     "pullRequestUnavailable": "PR:en är inte tillgänglig",
@@ -1434,15 +1434,11 @@
       "findingsUnavailable": "Resultaten är inte tillgängliga eftersom den här granskningen misslyckades.",
       "serviceUnavailable": "Kunde inte ansluta till tjänsten för kodgranskning. Gör om granskningen när tjänsten är tillgänglig.",
       "reviewFailed": "Granskningen misslyckades. Försök igen.",
-      "cancelReasonSuperseded": "En nyare commit pushades, så denna granskning ersattes.",
-      "cancelReasonIntegrationDisconnected": "{{platform}} är frånkopplad, så denna granskning avbröts. Anslut den igen och kör sedan om granskningen.",
-      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer stängdes av för Bitbucket, så denna granskning avbröts. Aktivera den igen och kör sedan om granskningen.",
-      "cancelReasonBitbucketPullRequestChanged": "Bitbucket-pull requesten ändrades, så denna granskning ersattes.",
-      "cancelReasonCancelled": "Denna granskning avbröts.",
-      "cancelReasonInterrupted": "Denna granskning avbröts.",
       "showMore": "Visa mer",
       "created": "Skapad",
       "started": "Startad",
+      "reviewEnded": "Avslutad",
+      "severityNitpick": "Anmärkning",
       "tokens": "Token",
       "tokensInOut": "{{input}} in / {{output}} ut",
       "council": "Granskningsråd",
@@ -1466,7 +1462,13 @@
       "sessionError": "Ett sessionsfel uppstod: {{error}}",
       "statusWithValue": "Aktuell status: {{status}}",
       "toolName": "Verktyg: {{name}}",
-      "toolNameError": "Ett fel uppstod i verktyget {{name}}."
+      "toolNameError": "Ett fel uppstod i verktyget {{name}}.",
+      "cancelReasonSuperseded": "En nyare commit pushades, så denna granskning ersattes.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} är frånkopplad, så denna granskning avbröts. Anslut den igen och kör sedan om granskningen.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer stängdes av för Bitbucket, så denna granskning avbröts. Aktivera den igen och kör sedan om granskningen.",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket-pull requesten ändrades, så denna granskning ersattes.",
+      "cancelReasonCancelled": "Denna granskning avbröts.",
+      "cancelReasonInterrupted": "Denna granskning avbröts."
     },
     "reviewMemory": {
       "title": "Granskningsminne",
@@ -1913,11 +1915,17 @@
       "actorSystem": "Kilo-system",
       "couldNotLoad": "Kunde inte läsa in revisionsrapporten",
       "events": "Händelser",
+      "eventConfidence": "Konfidens: {{confidence}}",
+      "eventReason": "Orsak: {{reason}}",
+      "eventsCount_one": "{{displayCount}} händelse",
+      "eventsCount_other": "{{displayCount}} händelser",
       "generated": "Rapporten skapades {{generatedAt}}",
       "noActivity": "Ingen registrerad aktivitet",
       "noActivityDescription": "Kilo har ingen aktivitet att rapportera för säkerhetsfynd från {{start}} till {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Kodarkiv inte registrerat",
+      "reasonUnknown": "Okänd orsak",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Rapportsammanfattning",
       "title": "Revisionsrapport",
       "unavailable": "Revisionsrapporten är inte tillgänglig",
@@ -1972,6 +1980,7 @@
       "reauthorizeButton": "Godkänn GitHub-appen på nytt",
       "reauthorizeDescription": "Security Agent behöver behörighet att läsa Dependabot-varningar. Godkänn GitHub-appen på nytt för att ge den behörigheten.",
       "reauthorizeTitle": "Ytterligare behörigheter krävs",
+      "retryFailed": "Kunde fortfarande inte läsa in Security Agent. Kontrollera din anslutning och försök igen.",
       "setupFailed": "Kunde inte starta GitHub-konfigurationen. Försök igen."
     },
     "queuedActionUntracked": "En köad åtgärd kunde inte längre spåras. Uppdatera för att se det senaste läget.",
@@ -2134,8 +2143,8 @@
       "dollar_other": "dollar",
       "costSpoken": "kostnad {{cost}}",
       "costSpokenWithTime": "kostnad {{cost}}, {{time}}",
-      "spokenJoiner": "och",
-      "pullRequest": "PR {{number}}"
+      "pullRequest": "PR {{number}}",
+      "spokenJoiner": "och"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kunde inte öppna GitHub",
@@ -2565,7 +2574,10 @@
       "allowOnceAccessibility": "Tillåt en gång",
       "alwaysAllow": "Tillåt alltid",
       "alwaysAllowAccessibility": "Tillåt alltid",
-      "retrying": "Försöker igen…"
+      "retrying": "Försöker igen…",
+      "retryDeny": "Försök neka igen",
+      "retryAllowOnce": "Försök tillåta en gång igen",
+      "retryAlwaysAllow": "Försök tillåta alltid igen"
     },
     "questionCard": {
       "title": "Agenten behöver inmatning",
@@ -3117,21 +3129,16 @@
     "boundary": {
       "backToProfile": "Tillbaka till profilen",
       "loadErrorMessage": "Kontrollera anslutningen och försök igen.",
-
       "chooseAccount": "Välj ett konto",
       "loadErrorTitle": "Det gick inte att läsa in dina organisationer.",
       "membershipLostNotice": "Du har inte längre åtkomst till den här organisationen. Växlade till {{target}}.",
       "noOrganization": "Ingen organisation",
-
       "noOrganizationDescription": "Det här kontot tillhör ingen organisation. Skapa eller gå med i en organisation på webben för att använda organisationsfunktioner som medlemsinbjudningar och varningar om lågt saldo.",
-
       "openWebOrganizations": "Öppna organisationer på webben",
-
       "organizationUnavailable": "Organisationen är inte tillgänglig.",
       "selectDescriptionWithOrganizations": "Du tillhör en eller flera organisationer. Välj det konto som den här skärmen ska använda.",
       "selectOrganization": "Välj en organisation",
       "unavailableDescription": "Den här organisationen är inte längre tillgänglig. Välj en annan i din profil för att fortsätta.",
-
       "unavailableSessionsDescription": "Den här organisationen är inte längre tillgänglig. Det går inte att läsa in sessioner för den.",
       "accessDeniedDescription": "Du har inte åtkomst till den här organisationen."
     },
@@ -3154,14 +3161,14 @@
       "truncated": "Det finns äldre kreditaktivitet att visa."
     },
     "inviteMember": {
-      "alreadyInvited": "Personen är redan inbjuden eller redan medlem.",
       "emailError": "Ange en giltig e-postadress",
       "emailPlaceholder": "namn@foretag.se",
       "permissionDenied": "Du har inte behörighet att bjuda in medlemmar.",
       "roleMember": "Roll: Medlem",
-      "sendError": "Inbjudan kunde inte skickas.",
       "sendInvite": "Skicka inbjudan",
-      "title": "Bjud in medlem"
+      "title": "Bjud in medlem",
+      "alreadyInvited": "Personen är redan inbjuden eller redan medlem.",
+      "sendError": "Inbjudan kunde inte skickas."
     },
     "invoices": {
       "downloadA11y": "Ladda ner faktura {{number}}",
@@ -3230,8 +3237,8 @@
       "inviteCreated": "Inbjudan skapad",
       "pendingInvitations": "Väntande inbjudningar",
       "resendInvite": "Skicka inbjudan igen",
-      "resendInviteError": "Inbjudan kunde inte skickas igen.",
-      "shareInviteLink": "Dela inbjudningslänk"
+      "shareInviteLink": "Dela inbjudningslänk",
+      "resendInviteError": "Inbjudan kunde inte skickas igen."
     },
     "usageStats": {
       "inputTokens": "Inmatade token",
@@ -3376,11 +3383,11 @@
   },
   "transcriptionModel": {
     "title": "Transkriberingsmodell",
-    "choose": "Välj en modell",
     "noneChosen": "Ingen vald",
     "emptyTitle": "Inga transkriberingsmodeller",
     "emptyDescription": "Kilo Gateway erbjuder inga transkriberingsmodeller just nu.",
-    "loadFailed": "Det gick inte att läsa in transkriberingsmodellerna."
+    "loadFailed": "Det gick inte att läsa in transkriberingsmodellerna.",
+    "choose": "Välj en modell"
   },
   "voiceLanguage": {
     "title": "Röstinmatningsspråk",
@@ -3402,7 +3409,6 @@
   },
   "modelChat": {
     "offlineFailure": "Den här modellen kräver en internetanslutning. Anslut och försök igen, eller byt till en modell på den här enheten.",
-    "creditsRequired": "Det räcker inte med krediter för att skicka det här meddelandet. Fyll på krediter och försök igen.",
     "empty": {
       "title": "Starta en chatt",
       "description": "Skicka ett meddelande för att prata med en modell."
@@ -3596,6 +3602,7 @@
       "fromHuggingFace": "Från Hugging Face",
       "loading": "Läser in modeller",
       "noResults": "Inga modeller hittades",
+      "noResultsForQuery": "Inga modeller hittades för \"{{query}}\"",
       "noFits": "Inga modeller passar den här enheten",
       "noFitsDescription": "Större modeller finns på fliken $t(common.all).",
       "fit": {
@@ -3670,7 +3677,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "Den här modellen stöder resonemangsnivå"
-    }
+    },
+    "creditsRequired": "Det räcker inte med krediter för att skicka det här meddelandet. Fyll på krediter och försök igen."
   },
   "settingsTools": {
     "confirmTitle": "Bekräfta denna ändring?"
@@ -3708,10 +3716,10 @@
     "noSpend": "Ingen utgift registrerad ännu",
     "spend24h": "Utgifter de senaste 24 timmarna",
     "multiplierError": "Ange en multiplikator på 1 eller mer",
-    "multiplierMaxError": "Ange en multiplikator på {{max}} eller mindre",
-    "thresholdMaxError": "Ange ett belopp på {{max}} eller mindre.",
     "permissionDenied": "Du har inte behörighet att hantera utgiftsvarningar.",
-    "pushOffByCategory": "Av i Aviseringar"
+    "pushOffByCategory": "Av i Aviseringar",
+    "multiplierMaxError": "Ange en multiplikator på {{max}} eller mindre",
+    "thresholdMaxError": "Ange ett belopp på {{max}} eller mindre."
   },
   "profiles": {
     "title": "Profiler",
@@ -3770,7 +3778,6 @@
     },
     "variablesEmpty": "Inga variabler ännu",
     "variablesSaveFailed": "Det gick inte att spara variabeln",
-    "variablesDeleteFailed": "Det gick inte att ta bort variabeln",
     "commandsTitle": "Installationskommandon",
     "addCommand": "Lägg till kommando",
     "commandLabel": "Kommando",
@@ -3781,7 +3788,6 @@
     "moveDown": "Flytta ner",
     "moveCommandUp": "Flytta kommando {{position}} uppåt",
     "moveCommandDown": "Flytta kommando {{position}} nedåt",
-    "deleteCommand": "Ta bort kommando {{position}}",
     "skillsTitle": "Färdigheter",
     "addSkill": "Lägg till färdighet",
     "skillNameLabel": "Färdighetsnamn",
@@ -3903,7 +3909,9 @@
       "pinFailed": "Det gick inte att fästa kodarkivet",
       "unboundToast": "Kodarkivet har kopplats från",
       "unbindFailed": "Det gick inte att koppla från kodarkivet"
-    }
+    },
+    "variablesDeleteFailed": "Det gick inte att ta bort variabeln",
+    "deleteCommand": "Ta bort kommando {{position}}"
   },
   "credits": {
     "title": "Köp krediter",
@@ -3930,7 +3938,6 @@
       "newList": "Ny lista",
       "empty": "Inga listor ännu",
       "couldNotLoad": "Kunde inte läsa in listorna",
-      "createFailed": "Kunde inte skapa listan",
       "noRepository": "Inget kodarkiv",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} öppen",
@@ -3940,7 +3947,8 @@
       "archive": "Arkivera",
       "unarchive": "Återställ från arkivet",
       "deleteTitle": "Ta bort {{name}}?",
-      "deleteMessage": "Dess uppgifter tas bort också. Sessionerna finns kvar."
+      "deleteMessage": "Dess uppgifter tas bort också. Sessionerna finns kvar.",
+      "createFailed": "Kunde inte skapa listan"
     },
     "listSettings": {
       "title": "Listinställningar",
@@ -4008,21 +4016,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Morgonsammanfattning",
+    "title": "Agentsammanfattning",
     "atLeast": "≥{{value}}",
     "coverageHint": "Viss historisk aktivitet kan saknas. ≥ betyder minst så mycket; okänt är inte noll.",
     "available": "Tillgängliga sammanfattningar",
     "history": "Sammanfattningshistorik",
-    "historyHint": "Rapporter sparas i 30 dagar, även avfärdade rapporter.",
+    "historyHint": "Sammanfattningar sparas i 30 dagar, även avfärdade.",
     "settings": "Inställningar för sammanfattning",
-    "saved": "Inställningar för sammanfattning sparade.",
-    "empty": "Ingen aktivitet under natten",
-    "emptyHint": "Dina kodningssessioner i molnet och CLI visas här efter en aktiv natt.",
+    "empty": "Ingen aktivitet i det här sammanfattningsfönstret",
+    "emptyHint": "Dina kodningssessioner i molnet och CLI visas här när en schemalagd sammanfattning har aktivitet.",
     "loadError": "Det gick inte att läsa in sammanfattningar",
-    "sessions": "Aktiva under natten",
+    "sessions": "Aktiva i tidsfönstret",
     "pullRequests": "Öppnade PRs",
     "blockers": "Nya hinder",
-    "spend": "Kostnad under natten",
+    "spend": "Kostnad i tidsfönstret",
     "view": "Läs sammanfattning",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4044,13 +4051,13 @@
     "sources": "Underlag och artefakter",
     "timezone": "Tidszon för sammanfattning",
     "deviceTimezone": "Använd enhetens tidszon",
-    "timezoneHint": "IANA-tidszon, till exempel Europe/Berlin. Schemaändringar gäller kommande nätter.",
-    "nightStart": "Natten börjar",
-    "morningStart": "Natten slutar / morgonen börjar",
-    "morningEnd": "Morgonen slutar",
-    "timeHint": "Hem-kortet återgår till livestatus när morgonen slutar, även offline.",
-    "invalidSchedule": "Välj en giltig tidszon och natt- och morgonperioder som inte är tomma eller överlappar.",
-    "notificationsHint": "En allmän avisering per morgon när din första rapport är klar. Oberoende av betalda AI-sammanfattningar.",
+    "timezoneHint": "IANA-tidszon, till exempel Europe/Berlin. Schemaändringar gäller kommande sammanfattningar.",
+    "nightStart": "Sammanfattningsfönstret börjar",
+    "morningStart": "Sammanfattning klar",
+    "morningEnd": "Sammanfattning tillgänglig till",
+    "timeHint": "Hem-kortet återgår till livestatus när sammanfattningsfönstret slutar, även offline.",
+    "invalidSchedule": "Välj en giltig tidszon och ett sammanfattningsfönster som inte är tomt.",
+    "notificationsHint": "En allmän avisering per schemalagd sammanfattning. Oberoende av betalda AI-sammanfattningar.",
     "notificationPermission": "Aktivera enhetsaviseringar i $t(common.notifications) för att få din sammanfattning.",
     "aiOptIn": "Betalda AI-sammanfattningar",
     "aiHint": "Valfritt, endast för detta sammanhang. Utvalda, maskerade utdrag och strukturerade fakta skickas till din modell på appens språk. Avgifter dras från detta sammanhangs saldo.",
@@ -4068,7 +4075,7 @@
     "contextSettings": "AI-inställningar · {{context}}",
     "allContexts": "Personliga sammanfattningar och organisationssammanfattningar hålls åtskilda.",
     "create": "Skapa sammanfattning",
-    "oneOff": "Engångsrapport",
+    "oneOff": "På begäran",
     "createdAt": "Skapad {{time}}",
     "chooseContext": "Välj en kontext",
     "period": "Sammanfattningsperiod",
@@ -4090,13 +4097,16 @@
     "emptyPeriod": "Ingen aktivitet hittades under den här perioden. Ingen AI-sammanfattning skapas och ingen avgift tas ut.",
     "emptyHistory": "Inga sparade sammanfattningar",
     "historicalStateHint": "Sessionens tillstånd återspeglar slutet av den valda perioden, inte aktuell status i realtid.",
-    "oneOffHint": "AI får utvalt underlag med känsliga uppgifter maskerade, på appens språk. Den här engångsrapporten ändrar inte ditt morgonschema eller dina AI-inställningar.",
-    "createOffline": "Anslut till internet för att granska eller skapa en sammanfattning. Betalda förfrågningar köas aldrig utan internetanslutning.",
+    "oneOffHint": "AI får utvalt underlag med känsliga uppgifter maskerade, på appens språk. Den här sammanfattningen på begäran ändrar inte din schemalagda sammanfattning eller dina AI-inställningar.",
+    "createOffline": "Anslut till internet för att granska eller skapa en sammanfattning. Betalda förfrågningar köas aldrig offline.",
     "estimateInputTooLarge": "Den här perioden innehåller för mycket underlag för den valda modellen.",
     "estimatePermissionUnavailable": "Du har inte behörighet att använda saldot för den här kontexten.",
+    "createFailed": "Det gick inte att skapa den här sammanfattningen.",
+    "reviewFailed": "Det gick inte att granska den här sammanfattningen.",
     "estimatePricingUnavailable": "Prissättning för denna modell är inte tillgänglig.",
     "estimateBalanceUnavailable": "Inte tillräcklig saldo för en betald sammanfattning.",
     "estimateModelNotAllowed": "Denna modell är inte tillåten här.",
-    "estimateSpendLimitTooLow": "Höj utgiftsskyddet för att tillåta denna sammanfattning."
+    "estimateSpendLimitTooLow": "Höj utgiftsskyddet för att tillåta denna sammanfattning.",
+    "saved": "Inställningar för sammanfattning sparade."
   }
 }

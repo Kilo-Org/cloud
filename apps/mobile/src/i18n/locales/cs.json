@@ -269,7 +269,6 @@
     "voiceInput": "Hlasový vstup",
     "autoExpandThinking": "Automaticky rozbalovat uvažování",
     "autoExpandThinkingSubtitle": "Po dokončení uvažování agenta zobrazí jeho obsah rozbalený.",
-    "autoExpandThinkingInactiveSubtitle": "Nemá žádný účinek, dokud jsou podrobnosti uvažování skryté.",
     "hideThinking": "Skrýt podrobnosti uvažování",
     "hideThinkingSubtitle": "Nezobrazovat uvažování agenta na stránce relace.",
     "keepScreenOn": "Nezhasínat obrazovku v relaci",
@@ -294,7 +293,8 @@
     "condenseToolCallsSubtitle": "Seskupte po sobě jdoucí volání nástrojů do jednoho řádku, který můžete otevřít.",
     "toolSummaryTranslation": "Přeložit souhrny nástrojů",
     "toolSummaryTranslationSubtitle": "Pošli každý souhrn nástroje modelu, aby jej přeložil do jazyka tvé aplikace. Pokud překlad selže, zobrazí se originál.",
-    "toolSummaryTranslationModelUnavailableNotice": "Tento model se již nenabízí. Klepnutím na $t(common.model) vyberte jiný."
+    "toolSummaryTranslationModelUnavailableNotice": "Tento model se již nenabízí. Klepnutím na $t(common.model) vyberte jiný.",
+    "autoExpandThinkingInactiveSubtitle": "Nemá žádný účinek, dokud jsou podrobnosti uvažování skryté."
   },
   "prReview": {
     "pullRequestUnavailable": "PR není dostupný",
@@ -1478,15 +1478,11 @@
       "findingsUnavailable": "Výsledky nejsou k dispozici, protože tato kontrola selhala.",
       "serviceUnavailable": "Nepodařilo se připojit ke službě kontroly kódu. Zopakujte kontrolu, až bude služba dostupná.",
       "reviewFailed": "Kontrola selhala. Zkuste to prosím znovu.",
-      "cancelReasonSuperseded": "Byl odeslán novější commit, takže tato kontrola byla nahrazena.",
-      "cancelReasonIntegrationDisconnected": "{{platform}} je odpojen, takže tato kontrola byla zrušena. Znovu jej připojte a kontrolu zopakujte.",
-      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer byl pro Bitbucket vypnut, takže tato kontrola byla zrušena. Znovu jej zapněte a kontrolu zopakujte.",
-      "cancelReasonBitbucketPullRequestChanged": "Pull request v Bitbucketu se změnil, takže tato kontrola byla nahrazena.",
-      "cancelReasonCancelled": "Tato kontrola byla zrušena.",
-      "cancelReasonInterrupted": "Tato kontrola byla přerušena.",
       "showMore": "Zobrazit více",
       "created": "Vytvořeno",
       "started": "Zahájeno",
+      "reviewEnded": "Ukončeno",
+      "severityNitpick": "Drobnost",
       "tokens": "Tokeny",
       "tokensInOut": "Vstup: {{input}} / výstup: {{output}}",
       "council": "Rada modelů",
@@ -1510,7 +1506,13 @@
       "sessionError": "V relaci došlo k chybě: {{error}}.",
       "statusWithValue": "Stav: {{status}}",
       "toolName": "Nástroj: {{name}}",
-      "toolNameError": "V nástroji {{name}} došlo k chybě."
+      "toolNameError": "V nástroji {{name}} došlo k chybě.",
+      "cancelReasonSuperseded": "Byl odeslán novější commit, takže tato kontrola byla nahrazena.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} je odpojen, takže tato kontrola byla zrušena. Znovu jej připojte a kontrolu zopakujte.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer byl pro Bitbucket vypnut, takže tato kontrola byla zrušena. Znovu jej zapněte a kontrolu zopakujte.",
+      "cancelReasonBitbucketPullRequestChanged": "Pull request v Bitbucketu se změnil, takže tato kontrola byla nahrazena.",
+      "cancelReasonCancelled": "Tato kontrola byla zrušena.",
+      "cancelReasonInterrupted": "Tato kontrola byla přerušena."
     },
     "reviewMemory": {
       "title": "Paměť kontrol",
@@ -1965,11 +1967,19 @@
       "actorSystem": "Systém Kilo",
       "couldNotLoad": "Zprávu o auditu se nepodařilo načíst.",
       "events": "Události",
+      "eventConfidence": "Spolehlivost: {{confidence}}",
+      "eventReason": "Důvod: {{reason}}",
+      "eventsCount_one": "{{displayCount}} událost",
+      "eventsCount_few": "{{displayCount}} události",
+      "eventsCount_many": "{{displayCount}} události",
+      "eventsCount_other": "{{displayCount}} událostí",
       "generated": "Zpráva byla vygenerována {{generatedAt}}.",
       "noActivity": "Žádná zaznamenaná aktivita",
       "noActivityDescription": "Kilo za období od {{start}} do {{end}} neeviduje žádnou aktivitu u bezpečnostních nálezů, kterou by bylo možné uvést ve zprávě.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repozitář nezaznamenán",
+      "reasonUnknown": "Nerozpoznaný důvod",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Souhrn zprávy",
       "title": "Zpráva o auditu",
       "unavailable": "Zpráva o auditu není k dispozici",
@@ -2024,6 +2034,7 @@
       "reauthorizeButton": "Znovu autorizovat aplikaci GitHub",
       "reauthorizeDescription": "Bezpečnostní agent potřebuje oprávnění k čtení upozornění Dependabot. Udělte ho opětovnou autorizací aplikace GitHub.",
       "reauthorizeTitle": "Jsou vyžadována další oprávnění",
+      "retryFailed": "Bezpečnostního agenta se stále nepodařilo načíst. Zkontrolujte připojení a zkuste to znovu.",
       "setupFailed": "Nastavení GitHubu se nepodařilo spustit. Zkuste to znovu."
     },
     "queuedActionUntracked": "Akci zařazenou do fronty již nelze sledovat. Obnovte zobrazení, abyste viděli aktuální stav.",
@@ -2194,8 +2205,8 @@
       "dollar_many": "dolaru",
       "costSpoken": "náklady {{cost}}",
       "costSpokenWithTime": "náklady {{cost}}, {{time}}",
-      "spokenJoiner": "a",
-      "pullRequest": "pR {{number}}"
+      "pullRequest": "pR {{number}}",
+      "spokenJoiner": "a"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub se nepodařilo otevřít",
@@ -2635,7 +2646,10 @@
       "allowOnceAccessibility": "Povolit jen tentokrát",
       "alwaysAllow": "Vždy povolit",
       "alwaysAllowAccessibility": "Vždy povolit",
-      "retrying": "Opakování…"
+      "retrying": "Opakování…",
+      "retryDeny": "Zamítnout znovu",
+      "retryAllowOnce": "Povolit jen tentokrát znovu",
+      "retryAlwaysAllow": "Vždy povolit znovu"
     },
     "questionCard": {
       "title": "Agent potřebuje odpověď",
@@ -3203,22 +3217,16 @@
     "boundary": {
       "backToProfile": "Zpět na profil",
       "loadErrorMessage": "Zkontroluj připojení a zkus to znovu.",
-
       "chooseAccount": "Vyberte účet",
       "loadErrorTitle": "Vaše organizace se nepodařilo načíst.",
       "membershipLostNotice": "Už nemáte přístup do této organizace. Přepnuto na {{target}}.",
       "noOrganization": "Žádná organizace",
-
       "noOrganizationDescription": "Tento účet není součástí organizace. Vytvořte organizaci nebo se k některé připojte na webu, abyste mohli využívat funkce organizace, jako jsou pozvánky pro členy a upozornění na nízký zůstatek.",
-
       "openWebOrganizations": "Otevřít organizace na webu",
-
       "organizationUnavailable": "Organizace není k dispozici.",
       "selectDescriptionWithOrganizations": "Patříte k jedné nebo více organizacím. Vyberte účet, který má tato obrazovka používat.",
-
       "selectOrganization": "Vyberte organizaci",
       "unavailableDescription": "Tato organizace už není dostupná. Vyberte ve svém profilu jinou organizaci a pokračujte.",
-
       "unavailableSessionsDescription": "Tato organizace už není dostupná. Její relace nelze načíst.",
       "accessDeniedDescription": "Nemáte přístup do této organizace."
     },
@@ -3241,14 +3249,14 @@
       "truncated": "K dispozici jsou i starší pohyby kreditů."
     },
     "inviteMember": {
-      "alreadyInvited": "Tento uživatel už byl pozván nebo už je členem.",
       "emailError": "Zadejte platnou e-mailovou adresu.",
       "emailPlaceholder": "jmeno@firma.cz",
       "permissionDenied": "Nemáte oprávnění zvát členy.",
       "roleMember": "Role: člen",
-      "sendError": "Pozvánku se nepodařilo odeslat.",
       "sendInvite": "Odeslat pozvánku",
-      "title": "Pozvat člena"
+      "title": "Pozvat člena",
+      "alreadyInvited": "Tento uživatel už byl pozván nebo už je členem.",
+      "sendError": "Pozvánku se nepodařilo odeslat."
     },
     "invoices": {
       "downloadA11y": "Stáhnout fakturu {{number}}",
@@ -3317,8 +3325,8 @@
       "inviteCreated": "Pozvánka vytvořena",
       "pendingInvitations": "Čekající pozvánky",
       "resendInvite": "Poslat pozvánku znovu",
-      "resendInviteError": "Pozvánku se nepodařilo odeslat znovu.",
-      "shareInviteLink": "Sdílet odkaz na pozvánku"
+      "shareInviteLink": "Sdílet odkaz na pozvánku",
+      "resendInviteError": "Pozvánku se nepodařilo odeslat znovu."
     },
     "usageStats": {
       "inputTokens": "Vstupní tokeny",
@@ -3465,11 +3473,11 @@
   },
   "transcriptionModel": {
     "title": "Model přepisu",
-    "choose": "Vybrat model",
     "noneChosen": "Není vybrán žádný",
     "emptyTitle": "Žádné modely přepisu",
     "emptyDescription": "Kilo Gateway nyní nenabízí žádné modely přepisu.",
-    "loadFailed": "Modely přepisu se nepodařilo načíst."
+    "loadFailed": "Modely přepisu se nepodařilo načíst.",
+    "choose": "Vybrat model"
   },
   "voiceLanguage": {
     "title": "Jazyk diktování",
@@ -3491,7 +3499,6 @@
   },
   "modelChat": {
     "offlineFailure": "Tento model vyžaduje připojení k internetu. Připojte se a zkuste to znovu, nebo přepněte na model v tomto zařízení.",
-    "creditsRequired": "Nedostatek kreditů k odeslání této zprávy. Dobijte kredity a zkuste to znovu.",
     "empty": {
       "title": "Začněte chatovat",
       "description": "Pošlete zprávu, abyste si popovídali s modelem."
@@ -3687,6 +3694,7 @@
       "fromHuggingFace": "Z Hugging Face",
       "loading": "Načítání modelů",
       "noResults": "Nebyly nalezeny žádné modely",
+      "noResultsForQuery": "Nebyly nalezeny žádné modely pro \"{{query}}\"",
       "noFits": "Pro toto zařízení není vhodný žádný model",
       "noFitsDescription": "Větší modely najdete na kartě $t(common.all).",
       "fit": {
@@ -3761,7 +3769,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "Tento model podporuje úroveň uvažování"
-    }
+    },
+    "creditsRequired": "Nedostatek kreditů k odeslání této zprávy. Dobijte kredity a zkuste to znovu."
   },
   "settingsTools": {
     "confirmTitle": "Potvrdit tuto změnu?"
@@ -3799,10 +3808,10 @@
     "noSpend": "Zatím není zaznamenána žádná útrata",
     "spend24h": "Útrata za posledních 24 hodin",
     "multiplierError": "Zadej násobitel 1 nebo větší",
-    "multiplierMaxError": "Zadej násobitel {{max}} nebo menší",
-    "thresholdMaxError": "Zadejte částku {{max}} nebo menší.",
     "permissionDenied": "Nemáš oprávnění spravovat upozornění na útratu.",
-    "pushOffByCategory": "Vypnuto v Oznámeních"
+    "pushOffByCategory": "Vypnuto v Oznámeních",
+    "multiplierMaxError": "Zadej násobitel {{max}} nebo menší",
+    "thresholdMaxError": "Zadejte částku {{max}} nebo menší."
   },
   "profiles": {
     "title": "Profily",
@@ -3871,7 +3880,6 @@
     },
     "variablesEmpty": "Zatím žádné proměnné",
     "variablesSaveFailed": "Proměnnou se nepodařilo uložit",
-    "variablesDeleteFailed": "Proměnnou se nepodařilo smazat",
     "commandsTitle": "Nastavení příkazů",
     "addCommand": "Přidat příkaz",
     "commandLabel": "Příkaz",
@@ -3882,7 +3890,6 @@
     "moveDown": "Posuňte se dolů",
     "moveCommandUp": "Přesunout příkaz {{position}} nahoru",
     "moveCommandDown": "Přesunout příkaz {{position}} dolů",
-    "deleteCommand": "Smazat příkaz {{position}}",
     "skillsTitle": "Dovednosti",
     "addSkill": "Přidejte dovednost",
     "skillNameLabel": "Název dovednosti",
@@ -4004,7 +4011,9 @@
       "pinFailed": "Repo se nepodařilo připnout",
       "unboundToast": "Repo odpojeno",
       "unbindFailed": "Repo se nepodařilo zrušit"
-    }
+    },
+    "variablesDeleteFailed": "Proměnnou se nepodařilo smazat",
+    "deleteCommand": "Smazat příkaz {{position}}"
   },
   "credits": {
     "title": "Koupit kredity",
@@ -4031,7 +4040,6 @@
       "newList": "Nový seznam",
       "empty": "Zatím žádné seznamy",
       "couldNotLoad": "Seznamy se nepodařilo načíst",
-      "createFailed": "Seznam se nepodařilo vytvořit",
       "noRepository": "Žádný repozitář",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} otevřeno",
@@ -4045,7 +4053,8 @@
       "archive": "Archivovat",
       "unarchive": "Zrušit archivaci",
       "deleteTitle": "Smazat {{name}}?",
-      "deleteMessage": "Smažou se i jeho úkoly. Jejich relace zůstanou."
+      "deleteMessage": "Smažou se i jeho úkoly. Jejich relace zůstanou.",
+      "createFailed": "Seznam se nepodařilo vytvořit"
     },
     "listSettings": {
       "title": "Nastavení seznamu",
@@ -4117,21 +4126,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Ranní přehled",
+    "title": "Přehled agenta",
     "atLeast": "≥{{value}}",
     "coverageHint": "Část historické aktivity může chybět. ≥ znamená alespoň tolik; neznámá hodnota neznamená nulu.",
     "available": "Dostupné přehledy",
     "history": "Historie přehledů",
-    "historyHint": "Reporty se uchovávají 30 dní, včetně zavřených.",
+    "historyHint": "Přehledy se uchovávají 30 dní, včetně zamítnutých.",
     "settings": "Nastavení přehledu",
-    "saved": "Nastavení přehledu bylo uloženo.",
-    "empty": "Žádná noční aktivita",
-    "emptyHint": "Vaše cloudové a CLI relace programování se zde zobrazí po aktivní noci.",
+    "empty": "Žádná aktivita v tomto období přehledu",
+    "emptyHint": "Vaše cloudové a CLI relace programování se zde zobrazí, když naplánovaný přehled zaznamená aktivitu.",
     "loadError": "Přehledy se nepodařilo načíst",
-    "sessions": "Aktivní přes noc",
+    "sessions": "Aktivní v období",
     "pullRequests": "Otevřené PRs",
     "blockers": "Nové blokery",
-    "spend": "Noční útrata",
+    "spend": "Útrata v období",
     "view": "Číst přehled",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4153,13 +4161,13 @@
     "sources": "Důkazy a artefakty",
     "timezone": "Časové pásmo přehledu",
     "deviceTimezone": "Použít časové pásmo zařízení",
-    "timezoneHint": "Časové pásmo IANA, například Europe/Berlin. Změny plánu platí pro další noci.",
-    "nightStart": "Začátek noci",
-    "morningStart": "Konec noci / začátek rána",
-    "morningEnd": "Konec rána",
-    "timeHint": "Karta na domovské obrazovce po skončení rána obnoví živý stav, i offline.",
-    "invalidSchedule": "Zvolte platné časové pásmo a nepřekrývající se, neprázdné noční a ranní období.",
-    "notificationsHint": "Jedno obecné oznámení každé ráno, až bude první report hotový. Nezávisí na placených AI shrnutích.",
+    "timezoneHint": "Časové pásmo IANA, například Europe/Berlin. Změny plánu platí pro další přehledy.",
+    "nightStart": "Začátek období přehledu",
+    "morningStart": "Přehled připraven v",
+    "morningEnd": "Přehled dostupný do",
+    "timeHint": "Karta na domovské obrazovce obnoví živý stav po skončení období přehledu, i offline.",
+    "invalidSchedule": "Zvolte platné časové pásmo a neprázdné období přehledu.",
+    "notificationsHint": "Jedno obecné oznámení na každý naplánovaný přehled. Nezávisí na placených AI shrnutích.",
     "notificationPermission": "Pro příjem přehledu povolte oznámení zařízení v sekci $t(common.notifications).",
     "aiOptIn": "Placená AI shrnutí",
     "aiHint": "Volitelné pouze pro tento kontext. Vybrané anonymizované úryvky a strukturovaná fakta se odesílají vašemu modelu v jazyce aplikace. Poplatky se strhávají z kreditu tohoto kontextu.",
@@ -4177,7 +4185,7 @@
     "contextSettings": "Nastavení AI · {{context}}",
     "allContexts": "Osobní a organizační přehledy zůstávají oddělené.",
     "create": "Vytvořit přehled",
-    "oneOff": "Jednorázový",
+    "oneOff": "Na vyžádání",
     "createdAt": "Vytvořeno {{time}}",
     "chooseContext": "Vyberte jeden kontext",
     "period": "Období přehledu",
@@ -4199,13 +4207,16 @@
     "emptyPeriod": "V tomto období nebyla nalezena žádná aktivita. Bez AI shrnutí a bez poplatku.",
     "emptyHistory": "Žádné uložené přehledy",
     "historicalStateHint": "Stav relace odpovídá konci vybraného období, nikoli aktuálnímu živému stavu.",
-    "oneOffHint": "AI obdrží vybrané podklady s odstraněnými citlivými údaji v jazyce vaší aplikace. Tento jednorázový přehled nemění váš ranní rozvrh ani předvolby AI.",
+    "oneOffHint": "AI obdrží vybrané podklady s odstraněnými citlivými údaji v jazyce vaší aplikace. Tento přehled na vyžádání nemění váš naplánovaný přehled ani předvolby AI.",
     "createOffline": "Pro kontrolu nebo vytvoření přehledu se připojte k internetu. Placené požadavky se v režimu offline nikdy nezařazují do fronty.",
     "estimateInputTooLarge": "Toto období obsahuje příliš mnoho podkladů pro vybraný model.",
     "estimatePermissionUnavailable": "Nemáte oprávnění používat zůstatek tohoto kontextu.",
+    "createFailed": "Tento přehled se nepodařilo vytvořit.",
+    "reviewFailed": "Tento přehled se nepodařilo zkontrolovat.",
     "estimatePricingUnavailable": "Ceny pro tento model nejsou dostupné.",
     "estimateBalanceUnavailable": "Nedostatečný zůstatek pro placené shrnutí.",
     "estimateModelNotAllowed": "Tento model zde není povolen.",
-    "estimateSpendLimitTooLow": "Zvyšte limit výdajů, aby toto shrnutí bylo povoleno."
+    "estimateSpendLimitTooLow": "Zvyšte limit výdajů, aby toto shrnutí bylo povoleno.",
+    "saved": "Nastavení přehledu bylo uloženo."
   }
 }

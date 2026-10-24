@@ -18,10 +18,25 @@ const FAILURE_MESSAGE_KEY_BY_RESULT_CODE = {
 const QUEUE_ADMISSION_FAILED_KEY = 'securityAgent.commandFailure.queueAdmissionFailed';
 const GENERIC_FAILURE_KEY = 'securityAgent.commandFailure.generic';
 
+// Rows failed before the backend preserved the underlying attempt error carry
+// this placeholder in lastErrorRedacted; keep showing the translated copy for
+// them. Matches LEGACY_RETRIES_EXHAUSTED_PLACEHOLDER in packages/app-shared.
+const LEGACY_RETRIES_EXHAUSTED_PLACEHOLDER = 'Queue command failed after maximum delivery attempts';
+
 // Mirrors getSecurityCommandFailureMessage in packages/app-shared: a known
-// result code translates to catalog copy; QUEUE_ADMISSION_FAILED and unknown
-// codes keep lastErrorRedacted when present, else the translated fallback.
+// result code translates to catalog copy; QUEUE_RETRIES_EXHAUSTED,
+// QUEUE_ADMISSION_FAILED and unknown codes keep lastErrorRedacted when present,
+// else the translated fallback.
 export function getSecurityCommandFailureMessage(command: SecurityCommand): string {
+  if (command.resultCode === 'QUEUE_RETRIES_EXHAUSTED') {
+    if (
+      command.lastErrorRedacted &&
+      command.lastErrorRedacted !== LEGACY_RETRIES_EXHAUSTED_PLACEHOLDER
+    ) {
+      return command.lastErrorRedacted;
+    }
+    return i18n.t(FAILURE_MESSAGE_KEY_BY_RESULT_CODE.QUEUE_RETRIES_EXHAUSTED);
+  }
   const knownKey =
     command.resultCode && command.resultCode in FAILURE_MESSAGE_KEY_BY_RESULT_CODE
       ? FAILURE_MESSAGE_KEY_BY_RESULT_CODE[

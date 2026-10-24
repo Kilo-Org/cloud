@@ -17,6 +17,7 @@ import {
 import { kilocode_users, security_agent_commands } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { getSecurityAgentCommandStatus } from './security-commands';
 
 describe('Security Agent command ledger', () => {
   afterEach(async () => {
@@ -124,6 +125,63 @@ describe('Security Agent command ledger', () => {
     await expect(markSecurityAgentCommandRetriesExhausted(db, terminal.id)).resolves.toMatchObject({
       transitioned: false,
       command: { status: 'no_op', result_code: 'ALREADY_IGNORED' },
+    });
+  });
+
+  it('preserves the last attempt error on exhausted retries and exposes it via command status', async () => {
+    const owner = await insertTestUser();
+    const command = await createSecurityAgentCommand(db, {
+      commandType: 'dismiss_finding',
+      origin: 'manual',
+      owner: { type: 'user', id: owner.id },
+    });
+    await transitionSecurityAgentCommand(db, {
+      commandId: command.id,
+      fromStatuses: ['accepted'],
+      status: 'running',
+    });
+
+    const outcome = await markSecurityAgentCommandRetriesExhausted(
+      db,
+      command.id,
+      new Error('GitHub integration unavailable for finding\nAuthorization: bearer ghp_secret123')
+    );
+
+    expect(outcome).toMatchObject({
+      transitioned: true,
+      command: {
+        status: 'failed',
+        result_code: 'QUEUE_RETRIES_EXHAUSTED',
+        last_error_redacted:
+          'GitHub integration unavailable for finding Authorization: bearer [redacted]',
+      },
+    });
+
+    await expect(
+      getSecurityAgentCommandStatus({ userId: owner.id }, command.id)
+    ).resolves.toMatchObject({
+      resultCode: 'QUEUE_RETRIES_EXHAUSTED',
+      lastErrorRedacted:
+        'GitHub integration unavailable for finding Authorization: bearer [redacted]',
+    });
+  });
+
+  it('keeps the generic placeholder when exhaustion has no attempt error', async () => {
+    const owner = await insertTestUser();
+    const command = await createSecurityAgentCommand(db, {
+      commandType: 'sync',
+      origin: 'manual',
+      owner: { type: 'user', id: owner.id },
+    });
+
+    await expect(
+      markSecurityAgentCommandRetriesExhausted(db, command.id, new Error('   '))
+    ).resolves.toMatchObject({
+      transitioned: true,
+      command: {
+        result_code: 'QUEUE_RETRIES_EXHAUSTED',
+        last_error_redacted: 'Queue command failed after maximum delivery attempts',
+      },
     });
   });
 

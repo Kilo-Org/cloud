@@ -1370,15 +1370,24 @@ export function parseEmbeddingUsageFromResponse(
   };
 }
 
+/**
+ * OpenRouter transcriptions report only `usage.cost`, without `is_byok` or
+ * `cost_details`, so a BYOK-served transcription reports just the 5% BYOK fee.
+ * The generation id from the `x-generation-id` response header lets
+ * `processTokenData` look up the generation, which reports `is_byok` and the
+ * upstream inference cost.
+ */
 export function parseTranscriptionUsageFromResponse(
   responseText: string,
   statusCode: number,
   requestedModel: string,
-  provider: ProviderId
+  provider: ProviderId,
+  generationId: string | null
 ): MicrodollarUsageStats {
   const json = JSON.parse(responseText) as TranscriptionResponse;
+  const messageId = json.id ?? generationId;
   const base = {
-    messageId: json.id ?? null,
+    messageId,
     model: json.model ?? requestedModel,
     responseContent: json.text ?? '',
     hasError: statusCode >= 400 || typeof json.text !== 'string',
@@ -1396,7 +1405,7 @@ export function parseTranscriptionUsageFromResponse(
     json.usage ?? {},
     base,
     'transcription_usage_processing',
-    providerReportsIsByok(provider)
+    messageId === null && providerReportsIsByok(provider)
   );
 
   return {
@@ -1482,7 +1491,8 @@ export function countAndStoreTranscriptionUsage(
             text,
             statusCode,
             usageContext.requested_model,
-            usageContext.provider
+            usageContext.provider,
+            clonedResponse.headers.get('x-generation-id')
           )
         )
         .catch(() => null);

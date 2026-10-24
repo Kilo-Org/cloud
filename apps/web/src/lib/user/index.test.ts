@@ -2150,7 +2150,9 @@ describe('User', () => {
         },
       ]);
 
-      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+      const { deletedOpenAiChatGptOwners } = await db.transaction(tx =>
+        anonymizeCloudUserData(tx, user.id)
+      );
 
       expect(
         await db
@@ -2158,6 +2160,13 @@ describe('User', () => {
           .from(openai_chatgpt_connections)
           .where(eq(openai_chatgpt_connections.kilo_user_id, user.id))
       ).toHaveLength(0);
+      expect(deletedOpenAiChatGptOwners).toEqual(
+        expect.arrayContaining([
+          { kiloUserId: user.id, organizationId: null },
+          { kiloUserId: user.id, organizationId: organization.id },
+        ])
+      );
+      expect(deletedOpenAiChatGptOwners).toHaveLength(2);
     });
 
     it("keeps the organization's shared-services row when the connector is deleted", async () => {
@@ -2179,7 +2188,10 @@ describe('User', () => {
         created_by: connector.id,
       });
 
-      await db.transaction(tx => anonymizeCloudUserData(tx, connector.id));
+      const { deletedOpenAiChatGptOwners } = await db.transaction(tx =>
+        anonymizeCloudUserData(tx, connector.id)
+      );
+      expect(deletedOpenAiChatGptOwners).toEqual([]);
 
       // The organization's connection belongs to the organization, so the
       // deletion keeps it: only the reference to the deleted connector is

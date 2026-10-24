@@ -4,6 +4,16 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   OPENAI_CLIENT_SECRET: 'test-client-secret',
 }));
 
+// The Upstash client sends commands through global fetch, which this suite
+// replaces to intercept the token exchange.
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
+  redisClient: {
+    get: jest.fn(async () => null),
+    set: jest.fn(async () => 'OK'),
+    del: jest.fn(async () => 1),
+  },
+}));
+
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -34,6 +44,12 @@ function connection(overrides: Partial<OpenAiChatGptConnection> = {}): OpenAiCha
     status: 'connected',
     ...overrides,
   };
+}
+
+async function resolveFromStoredConnection(owner: OpenAiChatGptOwner) {
+  const stored = await getOpenAiChatGptStoredConnection(owner);
+  if (!stored) throw new Error('expected a stored connection');
+  return resolveOpenAiChatGptAccessToken(owner, stored);
 }
 
 const TERMINAL_REFRESH_RESPONSE = {
@@ -68,7 +84,7 @@ describe('terminal refresh failure against a real database', () => {
     await saveOpenAiChatGptConnection(owner, connection(), owner.kiloUserId as string);
     fetchMock.mockResolvedValue(TERMINAL_REFRESH_RESPONSE);
 
-    await expect(resolveOpenAiChatGptAccessToken(owner)).resolves.toEqual({ kind: 'terminal' });
+    await expect(resolveFromStoredConnection(owner)).resolves.toEqual({ kind: 'terminal' });
 
     const request = fetchMock.mock.calls[0][1] as RequestInit;
     const body = request.body;
@@ -97,7 +113,7 @@ describe('terminal refresh failure against a real database', () => {
       return TERMINAL_REFRESH_RESPONSE;
     });
 
-    const refresh = resolveOpenAiChatGptAccessToken(owner);
+    const refresh = resolveFromStoredConnection(owner);
     await fetchCalled.promise;
 
     let reconnected = false;

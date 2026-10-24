@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { openai_chatgpt_connections } from '@kilocode/db/schema';
-import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import {
   OPENAI_CLIENT_ID,
@@ -20,6 +20,7 @@ import {
   readOpenAiChatGptConnectionRow,
   type OpenAiChatGptDatabase,
   type OpenAiChatGptOwner,
+  type OpenAiChatGptStoredConnection,
 } from './store';
 import type { OpenAiChatGptConnection } from './types';
 
@@ -355,7 +356,8 @@ async function resolveInsideLock(
 }
 
 async function resolveOpenAiChatGptAccessTokenUncached(
-  owner: OpenAiChatGptOwner
+  owner: OpenAiChatGptOwner,
+  stored: OpenAiChatGptStoredConnection
 ): Promise<OpenAiChatGptAccessTokenOutcome> {
   try {
     if (!OPENAI_CLIENT_ID || !OPENAI_CLIENT_SECRET) {
@@ -368,13 +370,11 @@ async function resolveOpenAiChatGptAccessTokenUncached(
 
     // Fast path: no lock, no network call while the stored token can still
     // serve a request. A disabled row is skipped so it can never serve one.
-    // The replica is enough here: a lagging row still holds an unexpired token,
-    // and the refresh below re-reads the row on the primary under the lock.
-    const row = await readOpenAiChatGptConnectionRow(readDb, owner);
-    const current =
-      row?.is_enabled === true ? decryptOpenAiChatGptConnection(row.encrypted_connection) : null;
-    if (current && isUsableWithoutRefresh(current, nowSeconds())) {
-      return { kind: 'access_token', accessToken: current.access_token };
+    // The caller's replica read is enough here: a lagging row still holds an
+    // unexpired token, and the refresh below re-reads the row on the primary
+    // under the lock.
+    if (stored.isEnabled && isUsableWithoutRefresh(stored.connection, nowSeconds())) {
+      return { kind: 'access_token', accessToken: stored.connection.access_token };
     }
 
     for (let attempt = 1; attempt <= OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS; attempt++) {
@@ -406,18 +406,22 @@ async function resolveOpenAiChatGptAccessTokenUncached(
 
 /**
  * Resolves the delegated credential for the owner's ChatGPT connection.
- * Concurrent calls within one process share one refresh. `terminal` means the
- * stored credential can never work again: the connection has been cleared and
- * disabled, and the caller must not fall back to another billing path.
+ * `stored` is the connection the caller already read through
+ * `getOpenAiChatGptStoredConnection`, so the fast path does not read the row
+ * again. Concurrent calls within one process share one refresh. `terminal`
+ * means the stored credential can never work again: the connection has been
+ * cleared and disabled, and the caller must not fall back to another billing
+ * path.
  */
 export function resolveOpenAiChatGptAccessToken(
-  owner: OpenAiChatGptOwner
+  owner: OpenAiChatGptOwner,
+  stored: OpenAiChatGptStoredConnection
 ): Promise<OpenAiChatGptAccessTokenOutcome> {
   const key = openAiChatGptOwnerKey(owner);
   const existing = inFlightRefreshes.get(key);
   if (existing) return existing;
 
-  const pending = resolveOpenAiChatGptAccessTokenUncached(owner).finally(() => {
+  const pending = resolveOpenAiChatGptAccessTokenUncached(owner, stored).finally(() => {
     inFlightRefreshes.delete(key);
   });
   inFlightRefreshes.set(key, pending);

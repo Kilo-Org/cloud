@@ -2248,6 +2248,11 @@ export async function validateProjectAccessToken(
     logExceptInTest('[validateProjectAccessToken] Token validation request failed', {
       error: error instanceof Error ? error.message : String(error),
     });
+    // A rejected URL is stored configuration and stays rejected; temporary name
+    // resolution failures and transport errors can clear on their own.
+    if (error instanceof GitLabInstanceUrlError && !error.transient) {
+      return { status: 'unverified', reason: 'instance-url' };
+    }
     return { status: 'unverified', reason: 'transport' };
   }
 

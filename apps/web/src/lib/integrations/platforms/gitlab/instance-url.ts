@@ -4,9 +4,16 @@ import { isIP } from 'net';
 export const DEFAULT_GITLAB_INSTANCE_URL = 'https://gitlab.com';
 
 export class GitLabInstanceUrlError extends Error {
-  constructor(message: string) {
+  /**
+   * True when the same URL may resolve on a later attempt because name
+   * resolution failed, rather than the URL violating a policy.
+   */
+  readonly transient: boolean;
+
+  constructor(message: string, options: { transient?: boolean } = {}) {
     super(message);
     this.name = 'GitLabInstanceUrlError';
+    this.transient = options.transient ?? false;
   }
 }
 
@@ -193,11 +200,15 @@ async function resolveHostnameSafely(
   try {
     addresses = await lookup(hostname, { all: true, verbatim: true });
   } catch {
-    throw new GitLabInstanceUrlError('GitLab instance URL host could not be resolved.');
+    throw new GitLabInstanceUrlError('GitLab instance URL host could not be resolved.', {
+      transient: true,
+    });
   }
 
   if (addresses.length === 0) {
-    throw new GitLabInstanceUrlError('GitLab instance URL host could not be resolved.');
+    throw new GitLabInstanceUrlError('GitLab instance URL host could not be resolved.', {
+      transient: true,
+    });
   }
 
   for (const { address } of addresses) {

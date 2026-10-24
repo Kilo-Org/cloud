@@ -1064,6 +1064,29 @@ describe('validateProjectAccessToken', () => {
     expect(result).toEqual({ status: 'unverified', reason: 'instance-url' });
     expect(mockFetch).not.toHaveBeenCalled();
   });
+
+  it('reports a blocked resolution target as an instance URL problem', async () => {
+    mockLookup.mockResolvedValue([{ address: '10.0.0.5', family: 4 }]);
+
+    const result = await validateProjectAccessToken(
+      'glpat-project-token',
+      'https://gitlab.example.com'
+    );
+
+    expect(result).toEqual({ status: 'unverified', reason: 'instance-url' });
+    expect(mockHttpsRequest).not.toHaveBeenCalled();
+  });
+
+  it('keeps a temporary resolution failure retryable', async () => {
+    mockLookup.mockRejectedValue(new Error('EAI_AGAIN'));
+
+    const result = await validateProjectAccessToken(
+      'glpat-project-token',
+      'https://gitlab.example.com'
+    );
+
+    expect(result).toEqual({ status: 'unverified', reason: 'transport' });
+  });
 });
 
 describe('fetchMRInlineComments authorship', () => {

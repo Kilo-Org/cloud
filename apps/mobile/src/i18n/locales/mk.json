@@ -53,6 +53,7 @@
     "connected": "Поврзано",
     "couldNotLoadModels": "Моделите не се вчитаа.",
     "couldNotLoadRepositories": "Репозиториумите не се вчитаа.",
+    "noRepositoriesFound": "Не се пронајдени складишта",
     "critical": "Критично",
     "delete": "Избриши",
     "deleted": "Избришано",
@@ -87,6 +88,7 @@
     "connect": "Поврзи",
     "connectBitbucket": "Поврзи Bitbucket",
     "connectGitlab": "Поврзи GitLab",
+    "connectProvider": "Поврзи платформа",
     "contentTruncated": "Содржината е скратена",
     "copyLink": "Копирај врска",
     "couldNotLoadOrganizations": "Организациите не се вчитаа.",
@@ -145,7 +147,8 @@
     "agent": "Агент",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Промени"
+    "changes": "Промени",
+    "organizationTrialEnded": "Пробниот период на организацијата заврши и таа нема активен план. Сопственик на организација може да го ажурира наплатувањето на kilo.ai, а потоа да се обиде повторно."
   },
   "language": {
     "restarting": "Се рестартира за да се примени јазикот",
@@ -494,7 +497,7 @@
       "unresolveThread": "Означи ја нишката како нерешена",
       "resolved": "Решено",
       "outdated": "Застарено",
-      "comment_one": "1 коментар",
+      "comment_one": "{{displayCount}} коментар",
       "comment": "{{displayCount}} коментари",
       "comment_other": "{{displayCount}} коментари",
       "startedRelative": " · започната {{relative}}",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Можеби треба да дадеш пристап до повеќе групи или проекти на GitLab.",
       "installGithubApp": "Инсталирај ја апликацијата на GitHub за складиштата",
       "installGithubAppDescription": "Дозволи ѝ на апликацијата Kilo за GitHub да пристапи до складиштата што сакаш да се прегледуваат.",
-      "noRepositoriesFound": "Не се пронајдени складишта",
       "repositoryAccess": "пристап до складиштето"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "Прикажи повеќе",
       "created": "Создадено",
       "started": "Започнато",
+      "reviewEnded": "Окончено",
+      "severityNitpick": "Ситница",
       "tokens": "Токени",
       "tokensInOut": "{{input}} влез / {{output}} излез",
       "council": "Совет",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "Внеси валидна URL-адреса на барање за спојување.",
       "couldNotCheckProviderStatus": "Не успеа проверката на статусот на платформата.",
       "couldNotLoadProviders": "Не успеа вчитувањето на твоите поврзани платформи. Обиди се повторно.",
-      "connectProvider": "Поврзи платформа",
       "connectProviderDescription": "Поврзи го GitHub за да започнеш рачен преглед на барање за спојување.",
       "pullRequestUrl": "URL-адреса на барањето за спојување",
       "instructions": "Упатства (незадолжително)",
@@ -1913,11 +1916,17 @@
       "actorSystem": "Систем Kilo",
       "couldNotLoad": "Не успеа вчитувањето на извештајот за ревизија.",
       "events": "Настани",
+      "eventConfidence": "Доверба: {{confidence}}",
+      "eventReason": "Причина: {{reason}}",
+      "eventsCount_one": "{{displayCount}} настан",
+      "eventsCount_other": "{{displayCount}} настани",
       "generated": "Извештајот е генериран {{generatedAt}}.",
       "noActivity": "Нема запишана активност",
       "noActivityDescription": "Kilo нема активност поврзана со безбедносни наоди што може да ја вклучи во извештајот за периодот од {{start}} до {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Складиштето не е запишано",
+      "reasonUnknown": "Непрепознаена причина",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Резиме на извештајот",
       "title": "Извештај за ревизија",
       "unavailable": "Извештајот за ревизија е недостапен",
@@ -1972,6 +1981,7 @@
       "reauthorizeButton": "Повторно овласти ја апликацијата на GitHub",
       "reauthorizeDescription": "На безбедносниот агент му треба дозвола да ги чита предупредувањата од Dependabot. Повторно овласти ја апликацијата на GitHub за да ја доделиш оваа дозвола.",
       "reauthorizeTitle": "Потребни се дополнителни дозволи",
+      "retryFailed": "Сè уште не успеа вчитувањето на безбедносниот агент. Провери ја врската и обиди се повторно.",
       "setupFailed": "Не можеше да се започне поставувањето на GitHub. Обиди се повторно."
     },
     "queuedActionUntracked": "Дејството во редицата повеќе не може да се следи. Освежи за да ја видиш најновата состојба.",
@@ -2565,7 +2575,10 @@
       "allowOnceAccessibility": "Дозволи еднаш",
       "alwaysAllow": "Секогаш дозволи",
       "alwaysAllowAccessibility": "Секогаш дозволи",
-      "retrying": "Повторен обид…"
+      "retrying": "Повторен обид…",
+      "retryDeny": "Повтори го одбивањето",
+      "retryAllowOnce": "Повтори го дозволувањето еднаш",
+      "retryAlwaysAllow": "Повтори го дозволувањето секогаш"
     },
     "questionCard": {
       "title": "Агентот чека одговор",
@@ -3156,7 +3169,9 @@
       "sendInvite": "Испрати покана",
       "title": "Покани член",
       "alreadyInvited": "Оваа адреса веќе е поканета или веќе припаѓа на член.",
-      "sendError": "Не успеа испраќањето на поканата."
+      "sendError": "Не успеа испраќањето на поканата.",
+      "pendingInvitation": "Оваа е-пошта веќе има покана на чекање.",
+      "alreadyMember": "Ова лице веќе е член на оваа организација."
     },
     "invoices": {
       "downloadA11y": "Преземи фактура {{number}}",
@@ -3226,7 +3241,12 @@
       "pendingInvitations": "Покани на чекање",
       "resendInvite": "Испрати ја повторно поканата",
       "shareInviteLink": "Сподели линк за покана",
-      "resendInviteError": "Не успеа повторното испраќање на поканата."
+      "resendInviteError": "Не успеа повторното испраќање на поканата.",
+      "inviteNotResendable": "Оваа покана веќе не може да се испрати повторно.",
+      "ownerAuthority": "Само сопственик на организација може да управува со сопственици.",
+      "ownRoleChange": "Не можеш да ја промениш сопствената улога.",
+      "inviteExpired": "Оваа покана истече.",
+      "inviteAccepted": "Оваа покана е веќе прифатена."
     },
     "usageStats": {
       "inputTokens": "Влезни токени",

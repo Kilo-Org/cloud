@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { i18n } from '@/i18n';
+import { knownServerErrorMessage } from '@/lib/server-error-copy';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /**
@@ -28,11 +29,16 @@ export type InviteErrorCopy = Readonly<{
  * A rejected invite is never shown as the server wrote it: a schema rejection
  * carries a JSON array of zod issues (internal code, raw pattern, untranslated
  * message), not a sentence. The email field's own rule covers a malformed
- * address, so a validation rejection belongs on that field; a taken address
- * belongs next to the form; every other failure — transport, permission, an
- * SSO-only join rule — gets the generic line.
+ * address, so a validation rejection belongs on that field; a rejection the app
+ * can name — a taken address, an outstanding invitation, a lapsed plan — gets
+ * its own line; every other failure — transport, permission, an SSO-only join
+ * rule — gets the generic line.
  */
 export function inviteErrorCopy(error: unknown): InviteErrorCopy {
+  const known = knownServerErrorMessage(error);
+  if (known != null) {
+    return { field: 'form', message: known };
+  }
   const code = readTrpcErrorField(error, 'code');
   if (code === 'BAD_REQUEST') {
     return { field: 'email', message: i18n.t('organization.inviteMember.emailError') };

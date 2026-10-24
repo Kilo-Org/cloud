@@ -219,6 +219,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
       fetchSnapshotPage: (id, options) => fetchWebSessionSnapshotPage(trpcClient, id, options),
       readCachedSnapshotPage: transcriptCache.read,
       writeCachedSnapshotPage: transcriptCache.write,
+      invalidateCachedSnapshotPage: transcriptCache.invalidate,
 
       userWebConnection: sharedConnection,
 

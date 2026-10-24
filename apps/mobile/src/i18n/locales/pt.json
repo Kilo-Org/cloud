@@ -53,6 +53,7 @@
     "connected": "Ligado",
     "couldNotLoadModels": "Não foi possível carregar os modelos.",
     "couldNotLoadRepositories": "Não foi possível carregar os repositórios.",
+    "noRepositoriesFound": "Nenhum repositório encontrado",
     "critical": "Crítico",
     "delete": "Eliminar",
     "deleted": "Eliminado",
@@ -87,6 +88,7 @@
     "connect": "Ligar",
     "connectBitbucket": "Ligar ao Bitbucket",
     "connectGitlab": "Ligar ao GitLab",
+    "connectProvider": "Ligar um fornecedor",
     "contentTruncated": "Conteúdo truncado",
     "copyLink": "Copiar ligação",
     "couldNotLoadOrganizations": "Não foi possível carregar as organizações.",
@@ -145,7 +147,8 @@
     "agent": "Agente",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Alterações"
+    "changes": "Alterações",
+    "organizationTrialEnded": "O período de teste da organização terminou e esta não tem um plano ativo. O proprietário da organização pode atualizar a faturação em kilo.ai e, em seguida, tentar novamente."
   },
   "language": {
     "restarting": "A reiniciar para aplicar o idioma",
@@ -1429,7 +1432,6 @@
       "gitlabNoRepositoriesDescription": "Podes precisar de conceder acesso a mais grupos ou projetos no GitLab.",
       "installGithubApp": "Instalar a aplicação do GitHub nos repositórios",
       "installGithubAppDescription": "Dá à aplicação do Kilo no GitHub acesso aos repositórios que queres rever.",
-      "noRepositoriesFound": "Nenhum repositório encontrado",
       "repositoryAccess": "acesso ao repositório"
     },
     "style": {
@@ -1459,6 +1461,8 @@
       "showMore": "Mostrar mais",
       "created": "Criada",
       "started": "Iniciada",
+      "reviewEnded": "Terminada",
+      "severityNitpick": "Detalhe",
       "tokens": "Tokens de texto",
       "tokensInOut": "{{input}} de entrada / {{output}} de saída",
       "council": "Conselho",
@@ -1509,7 +1513,6 @@
       "invalidUrl": "Introduz um URL válido de um pedido de integração.",
       "couldNotCheckProviderStatus": "Não foi possível verificar o estado do fornecedor.",
       "couldNotLoadProviders": "Não foi possível carregar os teus fornecedores ligados. Tenta novamente.",
-      "connectProvider": "Ligar um fornecedor",
       "connectProviderDescription": "Liga o GitHub para iniciar a revisão manual de um pedido de integração.",
       "pullRequestUrl": "URL do pedido de integração",
       "instructions": "Instruções (opcionais)",
@@ -1939,11 +1942,18 @@
       "actorSystem": "Sistema Kilo",
       "couldNotLoad": "Não foi possível carregar o relatório de auditoria.",
       "events": "Eventos",
+      "eventConfidence": "Confiança: {{confidence}}",
+      "eventReason": "Motivo: {{reason}}",
+      "eventsCount_one": "{{displayCount}} evento",
+      "eventsCount_many": "{{displayCount}} eventos",
+      "eventsCount_other": "{{displayCount}} eventos",
       "generated": "Relatório gerado em {{generatedAt}}.",
       "noActivity": "Nenhuma atividade registada",
       "noActivityDescription": "O Kilo não tem atividade de ocorrências de segurança para incluir no relatório de {{start}} a {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repositório não registado",
+      "reasonUnknown": "Motivo não reconhecido",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Resumo do relatório",
       "title": "Relatório de auditoria",
       "unavailable": "Relatório de auditoria indisponível",
@@ -1998,6 +2008,7 @@
       "reauthorizeButton": "Renovar autorização da aplicação do GitHub",
       "reauthorizeDescription": "O agente de segurança precisa de permissão para ler os alertas do Dependabot. Volta a autorizar a aplicação do GitHub para conceder esta permissão.",
       "reauthorizeTitle": "Permissões adicionais necessárias",
+      "retryFailed": "Ainda não foi possível carregar o agente de segurança. Verifica a tua ligação e tenta novamente.",
       "setupFailed": "Não foi possível iniciar a configuração do GitHub. Tenta novamente."
     },
     "queuedActionUntracked": "Deixou de ser possível acompanhar uma ação na fila. Atualiza para ver o estado mais recente.",
@@ -2600,7 +2611,10 @@
       "allowOnceAccessibility": "Permitir uma vez",
       "alwaysAllow": "Permitir sempre",
       "alwaysAllowAccessibility": "Permitir sempre",
-      "retrying": "A tentar novamente…"
+      "retrying": "A tentar novamente…",
+      "retryDeny": "Tentar negar novamente",
+      "retryAllowOnce": "Tentar permitir uma vez novamente",
+      "retryAlwaysAllow": "Tentar permitir sempre novamente"
     },
     "questionCard": {
       "title": "Resposta necessária",
@@ -3199,7 +3213,9 @@
       "sendInvite": "Enviar convite",
       "title": "Convidar membro",
       "alreadyInvited": "O utilizador já foi convidado ou já é membro.",
-      "sendError": "Não foi possível enviar o convite."
+      "sendError": "Não foi possível enviar o convite.",
+      "pendingInvitation": "Este email já tem um convite pendente.",
+      "alreadyMember": "Esta pessoa já é membro desta organização."
     },
     "invoices": {
       "downloadA11y": "Transferir fatura {{number}}",
@@ -3269,7 +3285,12 @@
       "pendingInvitations": "Convites pendentes",
       "resendInvite": "Reenviar convite",
       "shareInviteLink": "Partilhar ligação de convite",
-      "resendInviteError": "Não foi possível reenviar o convite."
+      "resendInviteError": "Não foi possível reenviar o convite.",
+      "inviteNotResendable": "Este convite não pode mais ser reenviado.",
+      "ownerAuthority": "Apenas um proprietário da organização pode gerenciar proprietários.",
+      "ownRoleChange": "Você não pode alterar sua própria função.",
+      "inviteExpired": "Este convite expirou.",
+      "inviteAccepted": "Este convite já foi aceito."
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",

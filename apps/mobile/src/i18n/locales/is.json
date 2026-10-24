@@ -53,6 +53,7 @@
     "connected": "Tengt",
     "couldNotLoadModels": "Tókst ekki að sækja líkön.",
     "couldNotLoadRepositories": "Tókst ekki að sækja kóðasöfn.",
+    "noRepositoriesFound": "Engar geymslur fundust",
     "critical": "Bráðalvarlegt",
     "delete": "Eyða",
     "deleted": "Eytt",
@@ -87,6 +88,7 @@
     "connect": "Tengja",
     "connectBitbucket": "Tengja Bitbucket",
     "connectGitlab": "Tengja GitLab",
+    "connectProvider": "Tengdu þjónustuveitanda",
     "contentTruncated": "Innihald stytt",
     "copyLink": "Afrita tengil",
     "couldNotLoadOrganizations": "Tókst ekki að sækja fyrirtæki.",
@@ -145,7 +147,8 @@
     "agent": "Umboðsmaður",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Breytingar"
+    "changes": "Breytingar",
+    "organizationTrialEnded": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Eigandi fyrirtækis getur uppfært greiðsluupplýsingar á kilo.ai og reynir síðan aftur."
   },
   "language": {
     "restarting": "Endurræsi til að virkja valið tungumál",
@@ -494,7 +497,7 @@
       "unresolveThread": "Merkja þráð sem óleystan",
       "resolved": "Leyst",
       "outdated": "Úrelt",
-      "comment_one": "1 athugasemd",
+      "comment_one": "{{displayCount}} athugasemd",
       "comment": "{{displayCount}} athugasemdir",
       "comment_other": "{{displayCount}} athugasemdir",
       "startedRelative": " · hófst {{relative}}",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Þú gætir þurft að veita aðgang að fleiri hópum eða verkefnum á GitLab.",
       "installGithubApp": "Settu upp GitHub-forritið á geymslum",
       "installGithubAppDescription": "Veittu GitHub-forriti Kilo aðgang að geymslunum sem þú vilt láta yfirfara.",
-      "noRepositoriesFound": "Engar geymslur fundust",
       "repositoryAccess": "aðgang að geymslum"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "Sýna meira",
       "created": "Búin til",
       "started": "Hófst",
+      "reviewEnded": "Lauk",
+      "severityNitpick": "Atriði",
       "tokens": "Tókar",
       "tokensInOut": "{{input}} inn / {{output}} út",
       "council": "Yfirferðarráð",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "Sláðu inn gilda URL-slóð á samrunabeiðni.",
       "couldNotCheckProviderStatus": "Ekki tókst að athuga stöðu þjónustuveitanda.",
       "couldNotLoadProviders": "Ekki tókst að sækja tengda þjónustuveitendur. Reyndu aftur.",
-      "connectProvider": "Tengdu þjónustuveitanda",
       "connectProviderDescription": "Tengdu GitHub til að hefja handvirka yfirferð á samrunabeiðni.",
       "pullRequestUrl": "URL-slóð samrunabeiðnar",
       "instructions": "Leiðbeiningar (valfrjálsar)",
@@ -1913,11 +1916,17 @@
       "actorSystem": "Kilo-kerfi",
       "couldNotLoad": "Ekki tókst að sækja endurskoðunarskýrsluna.",
       "events": "Atburðir",
+      "eventConfidence": "Vissu: {{confidence}}",
+      "eventReason": "Ástæða: {{reason}}",
+      "eventsCount_one": "{{displayCount}} atburður",
+      "eventsCount_other": "{{displayCount}} atburðir",
       "generated": "Skýrslan var búin til {{generatedAt}}.",
       "noActivity": "Engin skráð virkni",
       "noActivityDescription": "Kilo hefur enga skýrsluskylda virkni tengda öryggisfrávikum frá {{start}} til {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Geymsla ekki skráð",
+      "reasonUnknown": "Óþekkt ástæða",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Samantekt skýrslu",
       "title": "Endurskoðunarskýrsla",
       "unavailable": "Endurskoðunarskýrsla ekki tiltæk",
@@ -1972,6 +1981,7 @@
       "reauthorizeButton": "Endurnýja heimildir GitHub-forritsins",
       "reauthorizeDescription": "Öryggisvakinn þarf heimild til að lesa Dependabot-viðvaranir. Endurnýjaðu heimildir GitHub-forritsins til að veita þessa heimild.",
       "reauthorizeTitle": "Viðbótarheimildir nauðsynlegar",
+      "retryFailed": "Ekki tókst enn að hlaða öryggisvakanum. Athugaðu nettenginguna þína og reyndu aftur.",
       "setupFailed": "Ekki tókst að hefja uppsetningu GitHub. Reyndu aftur."
     },
     "queuedActionUntracked": "Ekki var lengur hægt að fylgjast með aðgerð í biðröð. Endurnýjaðu til að sjá nýjustu stöðu.",
@@ -2565,7 +2575,10 @@
       "allowOnceAccessibility": "Leyfa einu sinni",
       "alwaysAllow": "Leyfa alltaf",
       "alwaysAllowAccessibility": "Leyfa alltaf",
-      "retrying": "Reynir aftur…"
+      "retrying": "Reynir aftur…",
+      "retryDeny": "Reyna að hafna aftur",
+      "retryAllowOnce": "Reyna að leyfa einu sinni aftur",
+      "retryAlwaysAllow": "Reyna að leyfa alltaf aftur"
     },
     "questionCard": {
       "title": "Fulltrúinn þarf svar",
@@ -3156,7 +3169,9 @@
       "sendInvite": "Senda boð",
       "title": "Bjóða meðlim að taka þátt",
       "alreadyInvited": "Tölvupóstfangið er þegar boðið eða meðlimurinn er þegar í félaginu.",
-      "sendError": "Ekki tókst að senda boðið."
+      "sendError": "Ekki tókst að senda boðið.",
+      "pendingInvitation": "Þetta tölvupóstfang er þegar með boð í bið.",
+      "alreadyMember": "Þessi einstaklingur er þegar meðlimur í þessu fyrirtæki."
     },
     "invoices": {
       "downloadA11y": "Sækja reikning {{number}}",
@@ -3226,7 +3241,12 @@
       "pendingInvitations": "Boð í bið",
       "resendInvite": "Senda boð aftur",
       "shareInviteLink": "Deila boðstengli",
-      "resendInviteError": "Ekki tókst að senda boðið aftur."
+      "resendInviteError": "Ekki tókst að senda boðið aftur.",
+      "inviteNotResendable": "Ekki er lengur hægt að senda þetta boð aftur.",
+      "ownerAuthority": "Aðeins eigandi stofnunar getur stýrt eigendum.",
+      "ownRoleChange": "Þú getur ekki breytt þínu eigin hlutverki.",
+      "inviteExpired": "Þetta boð er útrunnið.",
+      "inviteAccepted": "Þetta boð hefur þegar verið samþykkt."
     },
     "usageStats": {
       "inputTokens": "Inntakstókar",

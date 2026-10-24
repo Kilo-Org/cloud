@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import {
   organizationTarget,
@@ -10,10 +11,9 @@ import {
   updateRepositoriesForIntegration,
 } from '@/lib/integrations/db/platform-integrations';
 import { fetchGitHubRepositories } from '@/lib/integrations/platforms/github/adapter';
-import { requireNumericPlatformRepositories } from '@/lib/integrations/core/types';
+import { type PlatformRepository } from '@/lib/integrations/core/types';
 import {
   getSecurityAgentConfigWithStatus,
-  upsertSecurityAgentConfig,
   saveSecurityAgentConfigWithRevision,
   setSecurityAgentEnabled,
 } from '@/lib/security-agent/db/security-config';
@@ -164,11 +164,60 @@ type SecurityAgentDeps<TExtra = {}> = {
   trackingExtras: (ctx: TRPCContext, input: TExtra) => { organizationId?: string };
 };
 
+/**
+ * What this router can read out of the owner's cached repository snapshot.
+ *
+ * `platform_integrations.repositories` is shared with other providers and is
+ * typed `number | string` ids, while the Security Agent matches a repository
+ * against `selected_repository_ids` by numeric id. The strict reader other
+ * modules use throws on an id it cannot match, and every procedure in this
+ * router that decorates a finding reads the snapshot, so one unreadable entry
+ * answered 500 for the whole findings surface at that owner: the list, the
+ * detail and the analysis panel. Read the snapshot once here, report what
+ * could not be matched, and let a damaged entry cost only that repository's
+ * id-scoped membership.
+ */
+type RepositorySnapshot = {
+  /** Entries this router can match against a selected repository id. */
+  repositories: PlatformRepository[];
+  /** Every full name in the snapshot, whatever its id. Reading a name never
+   * needs an id, so an unreadable id does not remove a repository here. */
+  fullNames: string[];
+  /** Entries whose id this router cannot match. */
+  unreadableCount: number;
+};
+
+function readRepositorySnapshot(owner: Owner, integration: Integration): RepositorySnapshot {
+  const snapshot = integration?.repositories ?? null;
+  if (!snapshot) {
+    return { repositories: [], fullNames: [], unreadableCount: 0 };
+  }
+  const repositories = snapshot.filter(
+    (repository): repository is PlatformRepository => typeof repository.id === 'number'
+  );
+  const unreadableCount = snapshot.length - repositories.length;
+  if (unreadableCount > 0) {
+    console.error('Security Agent could not match cached repository ids', {
+      ownerType: owner.type,
+      ownerId: owner.id,
+      unreadableCount,
+    });
+  }
+  return {
+    repositories,
+    fullNames: snapshot
+      .map(repository => repository.full_name)
+      .filter((name): name is string => !!name),
+    unreadableCount,
+  };
+}
+
 function getRepoFullNamesInScope(
+  owner: Owner,
   integration: Integration,
   config: { repository_selection_mode?: 'all' | 'selected'; selected_repository_ids?: number[] }
 ): string[] {
-  const repositories = requireNumericPlatformRepositories(integration?.repositories ?? null) ?? [];
+  const { repositories } = readRepositorySnapshot(owner, integration);
   if (config.repository_selection_mode === 'all') {
     return repositories.map(repo => repo.full_name).filter((name): name is string => !!name);
   }
@@ -356,6 +405,18 @@ function securityOwnerScopeKey(owner: SecurityReviewOwner): string {
 /** Security ledger resource identity for a manual sync (owner scope + repo). */
 function securitySyncLedgerResourceKey(owner: SecurityReviewOwner, repoFullName?: string): string {
   return `security:manual_sync:${securityOwnerScopeKey(owner)}:${repoFullName ?? '*'}`;
+}
+
+/**
+ * Stable per-config-revision key for the enable-triggered sync: one stored
+ * configuration revision admits at most one sync command. A later enable
+ * transition or new scope produces a new revision, and therefore a new key.
+ */
+function enableSyncOperationKey(owner: SecurityReviewOwner, configRevision: number): string {
+  const digest = createHash('sha256')
+    .update(`security:enable_sync:${securityOwnerScopeKey(owner)}:${configRevision}`)
+    .digest('hex');
+  return `enable_sync:${digest}`;
 }
 
 /** Trimmed, whitespace-collapsed comment, so cosmetic spacing is not a key-reuse mismatch. */
@@ -1141,14 +1202,35 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         const selectedIds =
           input.selectedRepositoryIds ?? existingConfig?.config.selected_repository_ids ?? [];
 
+        // Canonical selection and effective-repository keys, so ordering and
+        // duplicate ids never look like a scope change.
+        const requestedSelectionKey = `${selectionMode}:${[...new Set(selectedIds)]
+          .sort((a, b) => a - b)
+          .join(',')}`;
+        const storedSelectionKey = existingConfig
+          ? `${existingConfig.config.repository_selection_mode}:${[
+              ...new Set(existingConfig.config.selected_repository_ids),
+            ]
+              .sort((a, b) => a - b)
+              .join(',')}`
+          : null;
+
+        const repositoriesToSync = getRepoFullNamesInScope(owner, integration, {
+          repository_selection_mode: selectionMode,
+          selected_repository_ids: selectedIds,
+        });
+        const storedRepositories = existingConfig
+          ? getRepoFullNamesInScope(owner, integration, existingConfig.config)
+          : null;
+        const repositoriesToSyncChanged =
+          storedRepositories === null ||
+          [...new Set(storedRepositories)].sort().join('\n') !==
+            [...new Set(repositoriesToSync)].sort().join('\n');
+
         // Refuse enabling with an empty effective repo set: no repository would
         // be synced or analyzed, so an enabled state would be misleading.
         if (input.isEnabled) {
-          const effectiveRepos = getRepoFullNamesInScope(integration, {
-            repository_selection_mode: selectionMode,
-            selected_repository_ids: selectedIds,
-          });
-          if (effectiveRepos.length === 0) {
+          if (repositoriesToSync.length === 0) {
             throw new TRPCError({
               code: 'PRECONDITION_FAILED',
               message: 'Select at least one repository before enabling Security Agent.',
@@ -1156,88 +1238,65 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           }
         }
 
+        const enableTransition = input.isEnabled && !existingConfig?.isEnabled;
+        const scopeConfigChanged = storedSelectionKey !== requestedSelectionKey;
+
+        // An enable that matches the stored configuration leaves existing state
+        // untouched: no write, no command, no event.
+        if (input.isEnabled && !enableTransition && !scopeConfigChanged) {
+          return { success: true };
+        }
+
+        let initialSync:
+          | { accepted: true; commandId: string; runId?: string; messageId?: string }
+          | undefined;
+        let initialSyncAdmissionFailed = false;
+
         if (input.isEnabled) {
-          await upsertSecurityAgentConfig(
+          const { newRevision } = await saveSecurityAgentConfigWithRevision({
             owner,
-            {
+            config: {
               repository_selection_mode: selectionMode,
               selected_repository_ids: selectedIds,
             },
-            ctx.user.id
-          );
-        }
+            createdBy: ctx.user.id,
+            expectedRevision: existingConfig?.configRevision ?? null,
+          });
 
-        await setSecurityAgentEnabled(owner, input.isEnabled);
-
-        if (input.isEnabled && integration) {
-          const installationId = integration.platform_installation_id;
-          if (installationId) {
-            const allRepos = requireNumericPlatformRepositories(integration.repositories) ?? [];
-
-            let repositoriesToSync: string[];
-
-            if (selectionMode === 'all') {
-              repositoriesToSync = allRepos
-                .map(r => r.full_name)
-                .filter((name): name is string => !!name);
-            } else {
-              repositoriesToSync = allRepos
-                .filter(r => selectedIds.includes(r.id))
-                .map(r => r.full_name)
-                .filter((name): name is string => !!name);
-            }
-
-            if (repositoriesToSync.length > 0) {
-              let initialSync: Awaited<ReturnType<typeof submitManualSecuritySync>> | undefined;
-              let initialSyncAdmissionFailed = false;
-              try {
-                initialSync = await submitManualSecuritySync({
-                  owner: securityOwner,
-                  actor: {
-                    id: ctx.user.id,
-                    email: ctx.user.google_user_email,
-                    name: ctx.user.google_user_name,
-                  },
-                  origin: 'enable_initial_sync',
-                });
-              } catch (error) {
-                initialSyncAdmissionFailed = true;
-                console.error('Security Agent enabled but initial sync admission failed', error);
-              }
-
-              trackSecurityAgentEnabled({
-                distinctId: ctx.user.id,
-                userId: ctx.user.id,
-                ...deps.trackingExtras(ctx, input),
-                isEnabled: input.isEnabled,
-                repositorySelectionMode: selectionMode,
-                selectedRepoCount: repositoriesToSync.length,
-              });
-
-              logSecurityAudit({
+          if (
+            (enableTransition || repositoriesToSyncChanged) &&
+            integration?.platform_installation_id &&
+            repositoriesToSync.length > 0
+          ) {
+            const operationKey = enableSyncOperationKey(securityOwner, newRevision);
+            try {
+              const result = await runSecurityLedgerSubmit({
+                ctx,
                 owner: securityOwner,
-                actor_id: ctx.user.id,
-                actor_email: ctx.user.google_user_email,
-                actor_name: ctx.user.google_user_name,
-                action: SecurityAuditLogAction.ConfigEnabled,
-                resource_type: 'agent_config',
-                resource_id: resourceId,
-                after_state: { isEnabled: true, repositorySelectionMode: selectionMode },
+                intent: 'manual_sync',
+                operationKey,
+                resourceKey: securitySyncLedgerResourceKey(securityOwner),
+                submit: () =>
+                  submitManualSecuritySync({
+                    owner: securityOwner,
+                    actor: {
+                      id: ctx.user.id,
+                      email: ctx.user.google_user_email,
+                      name: ctx.user.google_user_name,
+                    },
+                    origin: 'enable_initial_sync',
+                    operationKey,
+                  }),
               });
-
-              return {
-                success: true,
-                initialSync,
-                initialSyncAdmissionFailed,
-              };
+              initialSync = result.kind === 'accepted' ? result.accepted : undefined;
+            } catch (error) {
+              initialSyncAdmissionFailed = true;
+              console.error('Security Agent enabled but initial sync admission failed', error);
             }
           }
+        } else {
+          await setSecurityAgentEnabled(owner, false);
         }
-
-        const effectiveRepoCount =
-          selectionMode === 'all'
-            ? (integration?.repositories || []).filter(r => !!r.full_name).length
-            : selectedIds.length;
 
         trackSecurityAgentEnabled({
           distinctId: ctx.user.id,
@@ -1245,7 +1304,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           ...deps.trackingExtras(ctx, input),
           isEnabled: input.isEnabled,
           repositorySelectionMode: selectionMode,
-          selectedRepoCount: effectiveRepoCount,
+          selectedRepoCount: integration ? repositoriesToSync.length : selectedIds.length,
         });
 
         logSecurityAudit({
@@ -1261,28 +1320,53 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           after_state: { isEnabled: input.isEnabled, repositorySelectionMode: selectionMode },
         });
 
-        return { success: true };
+        return input.isEnabled
+          ? { success: true, initialSync, initialSyncAdmissionFailed }
+          : { success: true };
       },
     },
 
     getRepositories: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
+      const owner = deps.resolveOwner(ctx, extra);
       const integration = await deps.getIntegration(ctx, extra);
 
       if (!integration || integration.integration_status !== 'active') {
         return [];
       }
 
-      let repos = requireNumericPlatformRepositories(integration.repositories) ?? [];
-      if (repos.length === 0 && integration.platform_installation_id) {
-        const appType = integration.github_app_type || 'standard';
-        const fetchedRepos = await fetchGitHubRepositories(
-          integration.platform_installation_id,
-          appType,
-          integration.id
-        );
-        await updateRepositoriesForIntegration(integration.id, fetchedRepos);
-        repos = fetchedRepos;
+      const snapshot = readRepositorySnapshot(owner, integration);
+      let repos = snapshot.repositories;
+      // A dropped entry is a snapshot this router cannot fully read, so refetch
+      // and rewrite it the same way as one it read as empty: otherwise the
+      // dropped repositories stay invisible in every repository picker.
+      if (
+        integration.platform_installation_id &&
+        (repos.length === 0 || snapshot.unreadableCount > 0)
+      ) {
+        const readableCount = repos.length;
+        try {
+          const appType = integration.github_app_type || 'standard';
+          const fetchedRepos = await fetchGitHubRepositories(
+            integration.platform_installation_id,
+            appType,
+            integration.id
+          );
+          await updateRepositoriesForIntegration(integration.id, fetchedRepos);
+          repos = fetchedRepos;
+        } catch (error) {
+          // A snapshot nothing could be read from has no answer of its own, so
+          // it keeps the provider error. A partially read one still lists the
+          // entries it could read, and the next read retries the refresh.
+          if (readableCount === 0) {
+            throw error;
+          }
+          console.error('Could not refresh the cached GitHub repositories', {
+            ownerType: owner.type,
+            ownerId: owner.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
 
       const repositoryDetails = repos.map(repo => ({
@@ -1375,7 +1459,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           findings,
           config,
           isAgentEnabled: configWithStatus?.isEnabled ?? false,
-          repoFullNamesInScope: getRepoFullNamesInScope(integration, config),
+          repoFullNamesInScope: getRepoFullNamesInScope(owner, integration, config),
         });
 
         return {
@@ -1423,7 +1507,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           finding,
           config,
           isAgentEnabled: configWithStatus?.isEnabled ?? false,
-          repoFullNamesInScope: getRepoFullNamesInScope(integration, config),
+          repoFullNamesInScope: getRepoFullNamesInScope(owner, integration, config),
         });
       },
     },
@@ -1490,7 +1574,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           });
         }
 
-        const allRepos = requireNumericPlatformRepositories(integration.repositories) ?? [];
+        const allRepos = readRepositorySnapshot(owner, integration).repositories;
 
         let syncScope:
           | { syncType: 'single_repo'; repoCount: number; repoFullName: string }
@@ -1956,7 +2040,7 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
           finding,
           config,
           isAgentEnabled: configWithStatus?.isEnabled ?? false,
-          repoFullNamesInScope: getRepoFullNamesInScope(integration, config),
+          repoFullNamesInScope: getRepoFullNamesInScope(owner, integration, config),
         });
 
         return {
@@ -2030,18 +2114,17 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
     getOrphanedRepositories: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const extra = toExtra(input);
       const securityOwner = deps.resolveSecurityOwner(ctx, extra);
+      const owner = deps.resolveOwner(ctx, extra);
 
       const integration = await deps.getIntegration(ctx, extra);
 
-      const accessibleRepoFullNames: string[] = [];
-      if (integration && integration.integration_status === 'active') {
-        const repos = requireNumericPlatformRepositories(integration.repositories) ?? [];
-        for (const repo of repos) {
-          if (repo.full_name) {
-            accessibleRepoFullNames.push(repo.full_name);
-          }
-        }
-      }
+      // Orphan detection compares names, never ids: a repository whose cached
+      // id could not be matched is still connected, and calling its findings
+      // orphaned would offer them for deletion.
+      const accessibleRepoFullNames: string[] =
+        integration && integration.integration_status === 'active'
+          ? readRepositorySnapshot(owner, integration).fullNames
+          : [];
 
       const orphanedRepos = await getOrphanedRepositoriesWithFindingCounts({
         owner: securityOwner,

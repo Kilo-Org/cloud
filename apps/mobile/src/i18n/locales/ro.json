@@ -53,6 +53,7 @@
     "connected": "Conectat",
     "couldNotLoadModels": "Nu s-au putut încărca modelele.",
     "couldNotLoadRepositories": "Nu s-au putut încărca depozitele de cod.",
+    "noRepositoriesFound": "Niciun depozit găsit",
     "critical": "Critic",
     "delete": "Șterge",
     "deleted": "Șters",
@@ -87,6 +88,7 @@
     "connect": "Conectează",
     "connectBitbucket": "Conectează Bitbucket",
     "connectGitlab": "Conectează GitLab",
+    "connectProvider": "Conectează un furnizor",
     "contentTruncated": "Conținut trunchiat",
     "copyLink": "Copiază linkul",
     "couldNotLoadOrganizations": "Nu s-au putut încărca organizațiile.",
@@ -145,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Modificări"
+    "changes": "Modificări",
+    "organizationTrialEnded": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Un proprietar al organizației poate actualiza facturarea pe kilo.ai, apoi poate încerca din nou."
   },
   "language": {
     "restarting": "Se repornește aplicația pentru a schimba limba",
@@ -1429,7 +1432,6 @@
       "gitlabNoRepositoriesDescription": "S-ar putea să fie nevoie să acorzi acces la mai multe grupuri sau proiecte pe GitLab.",
       "installGithubApp": "Instalează aplicația GitHub pe depozite",
       "installGithubAppDescription": "Acordă aplicației Kilo pentru GitHub acces la depozitele pe care vrei să le revizuiască.",
-      "noRepositoriesFound": "Niciun depozit găsit",
       "repositoryAccess": "acces la depozit"
     },
     "style": {
@@ -1459,6 +1461,8 @@
       "showMore": "Afișează mai mult",
       "created": "Creată",
       "started": "Începută",
+      "reviewEnded": "Terminată",
+      "severityNitpick": "Nuanță",
       "tokens": "Tokenuri",
       "tokensInOut": "{{input}} intrare / {{output}} ieșire",
       "council": "Consiliu",
@@ -1509,7 +1513,6 @@
       "invalidUrl": "Introdu o adresă URL validă pentru un PR.",
       "couldNotCheckProviderStatus": "Nu s-a putut verifica starea furnizorului.",
       "couldNotLoadProviders": "Nu s-au putut încărca furnizorii conectați. Încearcă din nou.",
-      "connectProvider": "Conectează un furnizor",
       "connectProviderDescription": "Conectează GitHub pentru a începe revizuirea manuală a unui PR.",
       "pullRequestUrl": "Adresa URL a PR-ului",
       "instructions": "Instrucțiuni (opțional)",
@@ -1939,11 +1942,18 @@
       "actorSystem": "Sistemul Kilo",
       "couldNotLoad": "Nu s-a putut încărca raportul de audit.",
       "events": "Evenimente",
+      "eventConfidence": "Încredere: {{confidence}}",
+      "eventReason": "Motiv: {{reason}}",
+      "eventsCount_one": "{{displayCount}} eveniment",
+      "eventsCount_few": "{{displayCount}} evenimente",
+      "eventsCount_other": "{{displayCount}} evenimente",
       "generated": "Raport generat la {{generatedAt}}.",
       "noActivity": "Nicio activitate înregistrată",
       "noActivityDescription": "Kilo nu are activități de raportat privind constatările de securitate pentru perioada {{start}} – {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Depozit neînregistrat",
+      "reasonUnknown": "Motiv necunoscut",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Rezumatul raportului",
       "title": "Raport de audit",
       "unavailable": "Raport de audit indisponibil",
@@ -1998,6 +2008,7 @@
       "reauthorizeButton": "Autorizează din nou aplicația GitHub",
       "reauthorizeDescription": "Agentul de securitate are nevoie de permisiunea de a citi alertele Dependabot. Autorizează din nou aplicația GitHub pentru a acorda această permisiune.",
       "reauthorizeTitle": "Sunt necesare permisiuni suplimentare",
+      "retryFailed": "Nu s-a putut încărca agentul de securitate. Verifică conexiunea și încearcă din nou.",
       "setupFailed": "Nu s-a putut începe configurarea GitHub. Încearcă din nou."
     },
     "queuedActionUntracked": "O acțiune din coada de așteptare nu a mai putut fi urmărită. Actualizează pentru a vedea starea curentă.",
@@ -2600,7 +2611,10 @@
       "allowOnceAccessibility": "Permite o singură dată",
       "alwaysAllow": "Permite întotdeauna",
       "alwaysAllowAccessibility": "Permite întotdeauna",
-      "retrying": "Se reîncearcă…"
+      "retrying": "Se reîncearcă…",
+      "retryDeny": "Încearcă din nou să refuzi",
+      "retryAllowOnce": "Încearcă din nou să permiți o singură dată",
+      "retryAlwaysAllow": "Încearcă din nou să permiți întotdeauna"
     },
     "questionCard": {
       "title": "Răspuns necesar pentru agent",
@@ -3199,7 +3213,9 @@
       "sendInvite": "Trimite invitația",
       "title": "Invită un membru",
       "alreadyInvited": "Această persoană este deja invitată sau este deja membru.",
-      "sendError": "Invitația nu a putut fi trimisă."
+      "sendError": "Invitația nu a putut fi trimisă.",
+      "pendingInvitation": "Acest e-mail are deja o invitație în așteptare.",
+      "alreadyMember": "Această persoană este deja membru al acestei organizații."
     },
     "invoices": {
       "downloadA11y": "Descarcă factura {{number}}",
@@ -3269,7 +3285,12 @@
       "pendingInvitations": "Invitații în așteptare",
       "resendInvite": "Retrimite invitația",
       "shareInviteLink": "Partajează linkul de invitație",
-      "resendInviteError": "Invitația nu a putut fi retrimisă."
+      "resendInviteError": "Invitația nu a putut fi retrimisă.",
+      "inviteNotResendable": "Această invitație nu mai poate fi retrimisă.",
+      "ownerAuthority": "Doar un proprietar al organizației poate gestiona proprietarii.",
+      "ownRoleChange": "Nu îți poți schimba propriul rol.",
+      "inviteExpired": "Această invitație a expirat.",
+      "inviteAccepted": "Această invitație a fost deja acceptată."
     },
     "usageStats": {
       "inputTokens": "Tokenuri de intrare",

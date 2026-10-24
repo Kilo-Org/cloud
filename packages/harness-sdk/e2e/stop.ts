@@ -30,12 +30,16 @@ interface Answer {
 const empty: Answer = { said: '', stop: undefined };
 
 const ask = (session: SessionHandle, text: string, maxTokens: number) =>
-  Stream.runFold(session.ask(text, { maxTokens }), empty, (held, event) => {
-    if (event.kind === 'delta') {
-      return { ...held, said: held.said + event.text };
+  Stream.runFold(
+    session.ask(text, { maxTokens }),
+    () => empty,
+    (held, event) => {
+      if (event.kind === 'delta') {
+        return { ...held, said: held.said + event.text };
+      }
+      return event.kind === 'done' ? { ...held, stop: event.stop } : held;
     }
-    return event.kind === 'done' ? { ...held, stop: event.stop } : held;
-  });
+  );
 
 const runShape = async (model: string, kind: ApiKind) => {
   const layers = kilo({ apiKinds: [kind] });
@@ -55,7 +59,7 @@ const runShape = async (model: string, kind: ApiKind) => {
     return { finished, cut };
   });
 
-  return Effect.runPromise(Effect.either(Effect.scoped(Effect.provide(program, layers))));
+  return Effect.runPromise(Effect.result(Effect.scoped(Effect.provide(program, layers))));
 };
 
 const kinds: readonly ApiKind[] = ['messages', 'responses', 'chat_completions'];
@@ -68,13 +72,13 @@ for (const model of models) {
 
   for (const kind of kinds) {
     const result = await runShape(model, kind);
-    if (result._tag === 'Left') {
-      console.log(`${kind.padEnd(18)}FAILED    ${JSON.stringify(result.left)}`);
+    if (result._tag === 'Failure') {
+      console.log(`${kind.padEnd(18)}FAILED    ${JSON.stringify(result.failure)}`);
       fail(`${kind}: the call failed`);
       continue;
     }
 
-    const { finished, cut } = result.right;
+    const { finished, cut } = result.success;
     console.log(
       `${kind.padEnd(18)}${String(finished.stop).padEnd(10)}${String(cut.stop).padEnd(10)}` +
         JSON.stringify(cut.said.slice(0, 30))

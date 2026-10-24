@@ -8,7 +8,7 @@ import {
   type OrganizationUserLimitType,
 } from '@kilocode/db/schema';
 import type { OrganizationRole } from '@kilocode/db/schema-types';
-import { and, eq, not, sql } from 'drizzle-orm';
+import { and, eq, isNull, not, sql } from 'drizzle-orm';
 import * as z from 'zod';
 
 // Account access rules shared by the Next.js gateway and Workers that authenticate Kilo users.
@@ -32,6 +32,8 @@ export function isApiTokenPepperCurrent(
   return !accountPepper || accountPepper === tokenPepper;
 }
 
+// A membership resolves only for a live organization: the join excludes a soft-deleted
+// organization, so the caller sees no role (and therefore no membership).
 export async function findOrganizationMemberRole(
   db: AccountDb,
   organizationId: string,
@@ -40,10 +42,12 @@ export async function findOrganizationMemberRole(
   const [membership] = await db
     .select({ role: organization_memberships.role })
     .from(organization_memberships)
+    .innerJoin(organizations, eq(organizations.id, organization_memberships.organization_id))
     .where(
       and(
         eq(organization_memberships.organization_id, organizationId),
-        eq(organization_memberships.kilo_user_id, userId)
+        eq(organization_memberships.kilo_user_id, userId),
+        isNull(organizations.deleted_at)
       )
     )
     .limit(1);
@@ -126,6 +130,7 @@ export async function findOrganizationMemberBalanceRow(
       and(
         eq(organizations.id, organizationId),
         eq(organization_memberships.kilo_user_id, userId),
+        isNull(organizations.deleted_at),
         not(eq(organization_memberships.role, 'billing_manager'))
       )
     )
@@ -188,19 +193,42 @@ export function blacklistedDomainsFromConfig(
   return domains.length > 0 ? domains : fallbackDomains;
 }
 
+// The admin config is cached for a minute, so auth checks keep re-using the same
+// array. Index it once per array reference instead of scanning it per call: a
+// list with tens of thousands of entries costs one Set build per cache refresh,
+// not one scan per sign-in.
+const blacklistIndexCache = new WeakMap<readonly string[], Set<string>>();
+
+function blacklistIndex(domains: readonly string[]): Set<string> {
+  const cached = blacklistIndexCache.get(domains);
+  if (cached) return cached;
+
+  const index = new Set(domains.map(domain => domain.toLowerCase()));
+  blacklistIndexCache.set(domains, index);
+  return index;
+}
+
 // A blocked domain also blocks its subdomains.
 export function isEmailBlacklistedByDomain(
   email: string,
   blacklistedDomains: readonly string[] | undefined
 ): boolean {
+  if (!blacklistedDomains?.length) return false;
+
+  const index = blacklistIndex(blacklistedDomains);
   const normalizedEmail = email.toLowerCase();
-  return (
-    blacklistedDomains?.some(domain => {
-      const normalizedDomain = domain.toLowerCase();
-      return (
-        normalizedEmail.endsWith(`@${normalizedDomain}`) ||
-        normalizedEmail.endsWith(`.${normalizedDomain}`)
-      );
-    }) ?? false
-  );
+  const at = normalizedEmail.lastIndexOf('@');
+  const host = at === -1 ? normalizedEmail : normalizedEmail.slice(at + 1);
+  const labels = host.split('.');
+
+  // An address without '@' can only match on a dotted suffix, because the
+  // previous implementation needed '@' for an exact-domain match.
+  const firstLabel = at === -1 ? 1 : 0;
+
+  // Every label-boundary suffix of the host. '@' cannot appear inside a label,
+  // so these are exactly the strings the previous endsWith checks matched.
+  for (let i = firstLabel; i < labels.length; i++) {
+    if (index.has(labels.slice(i).join('.'))) return true;
+  }
+  return false;
 }

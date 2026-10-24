@@ -22,13 +22,8 @@ export type ExecutionId = `exc_${string}`;
  */
 export type EventSourceId = ExecutionId;
 
-/**
- * Session identifier - supports:
- * - `sess_*` for new WebSocket sessions
- * - `agent_*` for legacy-plane sessions
- * - `workspace_*` for control-plane sessions
- */
-export type SessionId = `sess_${string}` | `agent_${string}` | `workspace_${string}`;
+/** Cloud session identity. */
+export type SessionId = `workspace_${string}`;
 
 /** Unique identifier for an execution lease */
 export type LeaseId = `lease_${string}`;
@@ -48,9 +43,8 @@ export const createLeaseId = (): LeaseId => `lease_${crypto.randomUUID()}`;
 /** Check if a string is a valid ExecutionId (exc_<ulid> format) */
 export const isExecutionId = (s: string): s is ExecutionId => s.startsWith('exc_');
 
-/** Check if a string is a valid SessionId (sess_, agent_, or workspace_ prefixes) */
-export const isSessionId = (s: string): s is SessionId =>
-  s.startsWith('sess_') || s.startsWith('agent_') || s.startsWith('workspace_');
+/** Check whether an ID uses the cloud session namespace. */
+export const isSessionId = (s: string): s is SessionId => s.startsWith('workspace_');
 
 /** Check if a string is a valid LeaseId */
 export const isLeaseId = (s: string): s is LeaseId => s.startsWith('lease_');

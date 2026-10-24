@@ -136,8 +136,15 @@ export function resetAuthTerminalReports(): void {
   reportedTerminalFailures.clear();
 }
 
-/** True when this exact terminal failure has not been reported yet. */
-export function shouldReportAuthTerminalFailure(route: string, status: number): boolean {
+/**
+ * Claim the one report this process may file for this route and status: true
+ * on the first call, false on every repeat.
+ *
+ * The call itself marks the failure as reported, so it is not a question to ask
+ * out of curiosity: a claim spends the process's single report for that
+ * failure, and a `reportAuthTerminalFailure` after it files nothing.
+ */
+export function claimAuthTerminalFailureReport(route: string, status: number): boolean {
   const key = `${route}:${status}`;
   if (reportedTerminalFailures.has(key)) {
     return false;
@@ -152,7 +159,7 @@ export function shouldReportAuthTerminalFailure(route: string, status: number): 
  * installed.
  */
 export function reportAuthTerminalFailure(route: AuthTerminalRoute, status: number): void {
-  if (!shouldReportAuthTerminalFailure(route, status)) {
+  if (!claimAuthTerminalFailureReport(route, status)) {
     return;
   }
   captureTelemetry({

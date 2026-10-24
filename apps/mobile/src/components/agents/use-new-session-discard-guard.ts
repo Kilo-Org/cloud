@@ -1,4 +1,4 @@
-import { useNavigation } from 'expo-router';
+import { useNavigation, usePreventRemove, useRouter } from 'expo-router';
 import {
   createElement,
   type ReactNode,
@@ -11,14 +11,8 @@ import { toast } from 'sonner-native';
 
 import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
 import { i18n } from '@/i18n';
-import { usePreventRemove } from '@/lib/navigation/prevent-remove';
-
-/**
- * The captured navigation action the confirm will replay. Derived from
- * `usePreventRemove`'s own callback type so this file keeps the single deep
- * import (see `prevent-remove.ts`) instead of reaching into react-navigation.
- */
-type PreventedLeaveAction = Parameters<Parameters<typeof usePreventRemove>[1]>[0]['data']['action'];
+import { isLeaveAction } from '@/lib/navigation/leave-actions';
+import { pickerRouteOnTop } from '@/lib/picker-routes';
 
 type NewSessionDiscardGuard = {
   /**
@@ -27,20 +21,6 @@ type NewSessionDiscardGuard = {
    */
   discardConfirm: ReactNode;
 };
-
-/**
- * Navigation action types that mean "the user is leaving this screen": the
- * header back button and Android hardware back (`GO_BACK`), the iOS swipe-back
- * gesture and programmatic `router.back()` (`POP`). Every other action that
- * can remove this screen — a `NAVIGATE`/`PUSH` to another route (e.g. tapping
- * Preferences from the tab bar behind this screen), a `RESET` — is forward
- * navigation: the user is going somewhere else, not abandoning the prompt.
- * The draft is durable (saved on every change), so a forward leave loses
- * nothing and must not be blocked by a discard confirm (spot check
- * e12-tap-prefs: the confirm hijacked a Preferences push and the screen never
- * opened).
- */
-const LEAVE_ACTION_TYPES: ReadonlySet<string> = new Set(['GO_BACK', 'POP', 'POP_TO', 'POP_TO_TOP']);
 
 /**
  * New-session discard confirm. Registers a predictive-Back-safe guard via
@@ -97,7 +77,6 @@ export function useNewSessionDiscardGuard({
   onSaveAsTodo?: (leave: () => void) => void;
   skipNextGuardRef: RefObject<boolean>;
 }>): NewSessionDiscardGuard {
-  const navigation = useNavigation();
   // Keep the latest onDiscard in a ref so the callback below doesn't depend on
   // it directly — onDiscard is a fresh closure every render. usePreventRemove
   // already keeps the callback itself fresh via useLatestCallback, but the ref
@@ -107,67 +86,77 @@ export function useNewSessionDiscardGuard({
 
   // The intercepted leave is held here until the in-app confirm resolves.
   const [confirmVisible, setConfirmVisible] = useState(false);
-  const pendingActionRef = useRef<PreventedLeaveAction | null>(null);
+  const [leaveAllowed, setLeaveAllowed] = useState(false);
+  const pendingLeaveRef = useRef<(() => void) | null>(null);
 
   const closeConfirm = useCallback(() => {
-    pendingActionRef.current = null;
+    pendingLeaveRef.current = null;
     setConfirmVisible(false);
   }, []);
 
-  const discardAndLeave = useCallback(
-    (action: PreventedLeaveAction) => {
-      void (async () => {
-        try {
-          await onDiscardRef.current();
-          navigation.dispatch(action);
-        } catch {
-          // The clear failed: stay on the screen so the draft is kept and the
-          // user can retry by leaving again or keep editing.
-          toast.error(i18n.t('agentChat.newSession.discardFailed'));
-        }
-      })();
-    },
-    [navigation]
-  );
+  const discardAndLeave = useCallback((leave: () => void) => {
+    void (async () => {
+      try {
+        await onDiscardRef.current();
+        leave();
+      } catch {
+        // The clear failed: stay on the screen so the draft is kept and the
+        // user can retry by leaving again or keep editing.
+        toast.error(i18n.t('agentChat.newSession.discardFailed'));
+      }
+    })();
+  }, []);
 
   const confirmDiscard = useCallback(() => {
-    const action = pendingActionRef.current;
-    if (action === null) {
+    const leave = pendingLeaveRef.current;
+    if (leave === null) {
       return;
     }
     // Close first: the choice is made, and a second press must not clear or
     // leave twice.
     closeConfirm();
-    discardAndLeave(action);
+    discardAndLeave(leave);
   }, [closeConfirm, discardAndLeave]);
 
   const saveAsTodo = useCallback(() => {
-    const action = pendingActionRef.current;
-    if (action === null || !onSaveAsTodo) {
+    const leave = pendingLeaveRef.current;
+    if (leave === null || !onSaveAsTodo) {
       return;
     }
     closeConfirm();
     onSaveAsTodo(() => {
-      discardAndLeave(action);
+      discardAndLeave(leave);
     });
   }, [closeConfirm, discardAndLeave, onSaveAsTodo]);
 
-  usePreventRemove(dirty, ({ data }) => {
+  const navigation = useNavigation();
+  const router = useRouter();
+
+  // Armed for every removal, not only while the prompt is non-empty: a Back
+  // that lands while one of this screen's pickers is still presenting arrives
+  // before this screen has re-rendered, so the picker can only be read from the
+  // live navigation state at that moment. Every other removal is replayed.
+  usePreventRemove(!leaveAllowed, ({ data, repeat }) => {
+    const leave = () => {
+      setLeaveAllowed(true);
+      repeat();
+    };
+    if (isLeaveAction(data.action.type) && pickerRouteOnTop(navigation.getState())) {
+      // Back while the picker is still presenting: pop the picker, the path
+      // its own Done control uses. This screen and its draft stay.
+      router.back();
+      return;
+    }
     if (skipNextGuardRef.current) {
       skipNextGuardRef.current = false;
-      navigation.dispatch(data.action);
+      leave();
       return;
     }
-    const action = data.action;
-    if (!LEAVE_ACTION_TYPES.has(action.type)) {
-      // Forward navigation (push/navigate/reset): replay it now. The durable
-      // draft keeps the prompt, so there is nothing to confirm away.
-      navigation.dispatch(data.action);
+    if (!dirty || !isLeaveAction(data.action.type)) {
+      leave();
       return;
     }
-    // Hold the intercepted leave and open the in-app confirm, on every
-    // platform: the confirm below is the one cross-platform implementation.
-    pendingActionRef.current = action;
+    pendingLeaveRef.current = leave;
     setConfirmVisible(true);
   });
 

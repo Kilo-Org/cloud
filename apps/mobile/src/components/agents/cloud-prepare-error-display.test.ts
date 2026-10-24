@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { cloudPrepareFailureMessage } from '@/components/agents/cloud-prepare-error-display';
+import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 
 import '@/i18n';
 
@@ -31,15 +32,18 @@ describe('cloudPrepareFailureMessage', () => {
 
   it('does not key the organization copy on the code alone', () => {
     // UNAUTHORIZED/FORBIDDEN also carry unrelated failures (trial expiry,
-    // model-catalog access, re-authentication), so only the precise denial
-    // message maps to the organization copy.
-    const trial = makeError('FORBIDDEN', 'Organization trial has expired.');
+    // model-catalog access, re-authentication), so only a precise, known
+    // sentence maps to its own copy.
     const reauth = makeError('UNAUTHORIZED', 'Invalid token');
-    expect(cloudPrepareFailureMessage(trial)).toBe(
-      'Something went wrong on our end. Please try again.'
-    );
     expect(cloudPrepareFailureMessage(reauth)).toBe(
       'Something went wrong on our end. Please try again.'
+    );
+  });
+
+  it('explains a lapsed organization plan instead of a generic server error', () => {
+    const trial = makeError('FORBIDDEN', ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
+    expect(cloudPrepareFailureMessage(trial)).toBe(
+      "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again."
     );
   });
 
@@ -56,6 +60,24 @@ describe('cloudPrepareFailureMessage', () => {
   it('maps PAYMENT_REQUIRED to the credits copy', () => {
     expect(cloudPrepareFailureMessage(makeError('PAYMENT_REQUIRED', 'add credits'))).toBe(
       'Not enough credits to run Cloud Agent. Add credits and try again.'
+    );
+  });
+
+  it('maps a missing profile record to the removed-or-unavailable copy', () => {
+    const missing = makeError('NOT_FOUND', "Profile 'profile-42' not found");
+    const message = cloudPrepareFailureMessage(missing);
+    expect(message).toBe('This item may have been removed or is no longer available.');
+    expect(message).not.toContain('profile-42');
+  });
+
+  it('maps the shaped form of a missing record too', () => {
+    const missing = {
+      shape: {
+        data: { code: 'NOT_FOUND', message: "Profile 'profile-42' not found" },
+      },
+    };
+    expect(cloudPrepareFailureMessage(missing)).toBe(
+      'This item may have been removed or is no longer available.'
     );
   });
 

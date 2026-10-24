@@ -22,10 +22,11 @@ import type { StartupFailureCode } from '../../src/sandbox-control/startup-failu
 import { RUNTIME_BASE_ABI } from '../../src/sandbox-control/runtime-release.js';
 import { downloadedStartup } from '../../src/sandbox-control/downloaded-startup.js';
 import { runtimeArtifactReleaseKey } from '../../src/sandbox-control/runtime-artifact-keys.js';
-import { FakeSessionPeer } from './helpers/fake-session-peer.js';
+import { FakeSessionPeer, createRuntimeProxyMintingPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
 import {
   createFakeCredentialBroker,
+  FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
@@ -142,7 +143,7 @@ function configureHarness(
 ) {
   installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
     NEXTAUTH_SECRET: workerSecret,
-    WORKER_URL: 'http://worker.test',
+    WORKER_URL: 'https://worker.test',
     CONTAINER_REPO_SNAPSHOT_IDS: '*',
     SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
     RUNTIME_STARTUP_MODE: 'downloaded',
@@ -154,6 +155,10 @@ function configureHarness(
       },
     },
   });
+  peer.runtimeProxyForSession = createRuntimeProxyMintingPeer(instance.env, () => ({
+    userId: 'user_123',
+    kiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
+  }));
   Object.assign(instance, {
     provider: provider.adapter,
     createProviderAdapter: () => provider.adapter,
@@ -184,7 +189,7 @@ async function prepare(h: Harness) {
     credentials: {
       userId: 'user_123',
       kiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
-      kiloToken: 'test-kilo-token',
+      kiloToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
       orgId: 'org_123',
       repository: { type: 'github', repo: 'acme/widgets' },
       scopeId: SESSION,

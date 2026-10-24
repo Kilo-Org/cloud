@@ -3,11 +3,41 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { withDeadline } from '@kilocode/event-service';
 import { listDirectoriesOnConnection } from '@kilocode/cloud-agent-sdk/list-directories';
 
+import { getLanguageSnapshot } from '@/i18n';
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
 import { cliCommandUnavailableError } from '@/lib/hooks/cli-command-unavailable-error';
+import { collator } from '@/lib/intl-cache';
 
 /** One child directory returned by `list_directories`. */
 export type DirectoryEntry = { name: string; path: string };
+
+/**
+ * Child folders in the order a person reads them. The CLI answers in its own
+ * filesystem order, which is neither alphabetical nor grouped, so the sheet
+ * would otherwise ask the user to scan every row.
+ *
+ * The app language's collation orders the rows; digits compare as numbers
+ * (`作業フォルダ-9` before `作業フォルダ-10`) and case or accent differences do
+ * not split a name group. Names that still compare equal (`Cafe`, `café`) keep
+ * a fixed relative order, so a re-listing cannot shuffle them.
+ *
+ * The spread copies first: the array comes from the React Query cache and must
+ * not be reordered in place.
+ */
+function sortDirectories(directories: readonly DirectoryEntry[], locale: string): DirectoryEntry[] {
+  const compare = collator(locale, { sensitivity: 'base', numeric: true });
+  // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; the spread already copies so the cached listing is not mutated
+  return [...directories].sort((left, right) => {
+    const collated = compare.compare(left.name, right.name);
+    if (collated !== 0) {
+      return collated;
+    }
+    if (left.name === right.name) {
+      return 0;
+    }
+    return left.name < right.name ? -1 : 1;
+  });
+}
 
 /** The folder picker's view of the current listing. */
 type ListDirectoriesState =
@@ -276,8 +306,18 @@ export function useListDirectories(connectionId: string | null): UseListDirector
     if (query.data === LISTING_UNSUPPORTED) {
       return { phase: 'unsupported', path };
     }
-    return { phase: 'ready', path, directories: query.data };
-  }, [path, query.data, query.isError, query.isPending]);
+    return {
+      phase: 'ready',
+      path,
+      directories: sortDirectories(query.data, getLanguageSnapshot()),
+    };
+    // `getLanguageSnapshot()` is a plain read of the active language, not a
+    // hook value: listing the locale keeps the collation in step with a
+    // language change while the sheet is open (the same dep `useTranslation`
+    // would give), and a re-render with an unchanged listing reuses the sorted
+    // array instead of sorting again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [path, query.data, query.isError, query.isPending, getLanguageSnapshot()]);
 
   return { state, list };
 }

@@ -7,8 +7,7 @@ import { isDefaultSessionTitle } from '@kilocode/session-ingest-contracts';
  * `packages/session-ingest-contracts/src/index.ts` owns the placeholder
  * pattern (`DEFAULT_SESSION_TITLE_PATTERN` / `isDefaultSessionTitle`). The
  * backend seeds every fresh session with `New session - ${ISO}` —
- * `services/cloud-agent-next/src/session/session-registration.ts`,
- * `services/cloud-agent-next/src/session-service.ts`, and
+ * `services/cloud-agent-next/src/session/session-registration.ts` and
  * `services/cloud-agent-next/wrapper/src/session-bootstrap.ts` — and
  * `services/session-ingest/src/ingest/metadata.ts` promotes the first user
  * message's real title over it. A session that still carries the placeholder

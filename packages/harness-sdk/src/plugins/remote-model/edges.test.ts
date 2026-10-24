@@ -43,8 +43,8 @@ it('rejects max effort for direct Chat Completions before sending a request', as
     retry
   );
   const result = await Effect.runPromise(
-    Effect.either(Stream.runDrain(client.stream({ ...sampleRequest(), effort: 'max' })))
+    Effect.result(Stream.runDrain(client.stream({ ...sampleRequest(), effort: 'max' })))
   );
-  expect(result).toMatchObject({ left: { reason: 'unsupported' } });
+  expect(result).toMatchObject({ failure: { reason: 'unsupported' } });
   expect(calls).toHaveLength(0);
 });

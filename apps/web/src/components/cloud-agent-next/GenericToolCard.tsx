@@ -11,27 +11,17 @@ type GenericToolCardProps = {
   toolPart: ToolPart;
 };
 
-const knownTools = new Map([
-  ['app-builder-images/transfer_image', 'Publish Image'],
-  ['app-builder-images/get_image', 'Analyze Image'],
-  ['app-builder-images_transfer_image', 'Publish Image'],
-  ['app-builder-images_get_image', 'Analyze Image'],
-]);
 const labelKeys = ['description', 'query', 'url', 'filePath', 'path', 'pattern', 'name'];
 const argumentsSchema = z.record(z.string(), z.unknown());
 
 function resolveDisplayName(toolPart: ToolPart): string {
-  const byTool = knownTools.get(toolPart.tool);
-  if (byTool) return byTool;
-
   const input = toolPart.state.input;
   if (
     toolPart.tool === 'mcp' &&
     typeof input.server_name === 'string' &&
     typeof input.tool_name === 'string'
   ) {
-    const key = `${input.server_name}/${input.tool_name}`;
-    return knownTools.get(key) ?? key;
+    return `${input.server_name}/${input.tool_name}`;
   }
 
   return toolPart.tool;

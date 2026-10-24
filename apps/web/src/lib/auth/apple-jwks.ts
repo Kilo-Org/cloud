@@ -16,21 +16,63 @@ type AppleJWK = {
 };
 
 let cachedKeys: { keys: AppleJWK[]; fetchedAt: number } | null = null;
+let refreshInFlight: Promise<AppleJWK[]> | null = null;
+let lastRefreshStartedAt = 0;
+let lastRefreshError: unknown = null;
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const REFRESH_COOLDOWN_MS = 30 * 1000;
+const JWKS_FETCH_TIMEOUT_MS = 10_000;
 
-async function getApplePublicKeys(): Promise<AppleJWK[]> {
-  if (cachedKeys && Date.now() - cachedKeys.fetchedAt < CACHE_TTL_MS) {
-    return cachedKeys.keys;
-  }
-
-  const response = await fetch(APPLE_JWKS_URL);
+async function fetchApplePublicKeys(): Promise<AppleJWK[]> {
+  const response = await fetch(APPLE_JWKS_URL, {
+    signal: AbortSignal.timeout(JWKS_FETCH_TIMEOUT_MS),
+  });
   if (!response.ok) {
     throw new Error(`Failed to fetch Apple JWKS: ${response.status}`);
   }
 
   const { keys } = (await response.json()) as { keys: AppleJWK[] };
-  cachedKeys = { keys, fetchedAt: Date.now() };
   return keys;
+}
+
+async function refreshAppleKeys(): Promise<AppleJWK[]> {
+  if (refreshInFlight) {
+    return refreshInFlight;
+  }
+
+  const now = Date.now();
+  if (now - lastRefreshStartedAt < REFRESH_COOLDOWN_MS) {
+    if (cachedKeys) {
+      return cachedKeys.keys;
+    }
+    throw lastRefreshError instanceof Error
+      ? lastRefreshError
+      : new Error('Apple JWKS is unavailable');
+  }
+
+  lastRefreshStartedAt = now;
+  const inFlight = (async () => {
+    try {
+      const keys = await fetchApplePublicKeys();
+      cachedKeys = { keys, fetchedAt: Date.now() };
+      lastRefreshError = null;
+      return keys;
+    } catch (error) {
+      lastRefreshError = error;
+      throw error;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+  refreshInFlight = inFlight;
+  return inFlight;
+}
+
+async function getApplePublicKeys(): Promise<AppleJWK[]> {
+  if (cachedKeys && Date.now() - cachedKeys.fetchedAt < CACHE_TTL_MS) {
+    return cachedKeys.keys;
+  }
+  return refreshAppleKeys();
 }
 
 function jwkToPem(jwk: AppleJWK): string {
@@ -39,8 +81,11 @@ function jwkToPem(jwk: AppleJWK): string {
 }
 
 /**
- * Verifies a JWT signed by Apple against Apple's JWKS, retrying once with a
- * freshly-fetched key set if the token's `kid` isn't found in the cache.
+ * Verifies a JWT signed by Apple against Apple's JWKS, with a bounded refresh:
+ * if the token's `kid` isn't in the cached key set, the module refreshes the key
+ * set at most once per cooldown through a single shared in-flight fetch, keeping
+ * the current cached keys until a refresh succeeds. Tokens whose `kid` remains
+ * absent after that refresh are rejected.
  *
  * @param token - The Apple-signed JWT to verify
  * @param audience - Expected `aud` claim (Apple client ID(s))
@@ -64,10 +109,8 @@ export async function verifyAppleJwtWithJwks(
   const keys = await getApplePublicKeys();
   let matchingKey = keys.find(k => k.kid === kid);
   if (!matchingKey) {
-    // Key not found — clear cache and retry once
-    cachedKeys = null;
-    const freshKeys = await getApplePublicKeys();
-    matchingKey = freshKeys.find(k => k.kid === kid);
+    const refreshedKeys = await refreshAppleKeys();
+    matchingKey = refreshedKeys.find(k => k.kid === kid);
     if (!matchingKey) {
       throw new AppleJwtClientError('No matching Apple public key');
     }

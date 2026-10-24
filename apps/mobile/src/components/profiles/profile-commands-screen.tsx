@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { usePreventRemove, useRouter } from 'expo-router';
 import { type ReactNode, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
@@ -25,9 +25,11 @@ import { ChevronDown, ChevronUp, Terminal, Trash2 } from '@/components/ui/icons'
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAgentProfile } from '@/lib/hooks/use-agent-profiles';
+import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useProfileCommandsSave } from '@/lib/hooks/use-profile-commands-save';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
+import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
 type CommandRow = Readonly<{ sequence: number; command: string }>;
 
@@ -59,6 +61,7 @@ export function ProfileCommandsScreen({
   const router = useRouter();
   const colors = useThemeColors();
   const profileQuery = useAgentProfile(profileId, organizationId);
+  const canManage = useCanManageOrganizationProfiles(organizationId);
 
   const profile = profileQuery.data;
   const serverRows = profile?.commands ?? NO_COMMAND_ROWS;
@@ -79,6 +82,9 @@ export function ProfileCommandsScreen({
   const commandsRef = useRef(commands);
   commandsRef.current = commands;
   const leavingRef = useRef(false);
+  // Latched once the newest list is persisted, so the replay of the blocked
+  // navigation action is not intercepted again.
+  const [leaveAllowed, setLeaveAllowed] = useState(false);
   // Remount uncontrolled fields for reorders and accepted server changes;
   // their text belongs to the position, not the input instance.
   const [generation, setGeneration] = useState(0);
@@ -129,11 +135,13 @@ export function ProfileCommandsScreen({
   };
 
   /**
-   * The screen has no save control, so the header arrow persists the focused
-   * edit before leaving. Each pass re-reads the rendered list, so an edit made
-   * during a write is saved by the same press.
+   * The screen has no save control, so every leave — the header arrow, the
+   * Android back button and the back gesture — persists the focused edit
+   * before the screen goes. Each pass re-reads the rendered list, so an edit
+   * made during a write is saved by the same attempt; the replay of the
+   * blocked navigation action then leaves. A failed save stays on the screen.
    */
-  const leave = async () => {
+  const leave = async (repeat: () => void) => {
     if (leavingRef.current) {
       return;
     }
@@ -146,14 +154,27 @@ export function ProfileCommandsScreen({
         return;
       }
       if (sameCommands(nonBlankCommands(commandsRef.current), persistedRef.current)) {
-        router.back();
+        setLeaveAllowed(true);
+        repeat();
         return;
       }
     }
   };
 
+  /**
+   * One guard covers the header arrow, the hardware back button and the back
+   * gesture, because all of them remove this route. A focused, unblurred field
+   * is already in `commands`, so a typed draft counts as unsaved work before
+   * any blur commit; a write in flight keeps the guard on so a second back
+   * waits for it instead of leaving behind an unreported failure.
+   */
+  const unsavedCommands = !sameCommands(nonBlankCommands(commands), persistedRef.current);
+  usePreventRemove(!leaveAllowed && (unsavedCommands || isSaving), ({ repeat }) => {
+    void leave(repeat);
+  });
+
   const controlClass = (disabled: boolean) =>
-    cn('h-11 w-11 items-center justify-center active:opacity-70', disabled && 'opacity-40');
+    cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70', disabled && 'opacity-40');
 
   const commandTotal = nonBlankCommands(commands).length;
   const renderCommandRow = (command: string, index: number) => {
@@ -164,6 +185,8 @@ export function ProfileCommandsScreen({
       position === null ? t('profiles.moveUp') : t('profiles.moveCommandUp', { position });
     const downLabel =
       position === null ? t('profiles.moveDown') : t('profiles.moveCommandDown', { position });
+    const deleteLabel =
+      position === null ? t('common.delete') : t('profiles.deleteCommand', { position });
     const rowHint = position === null ? undefined : commandRowA11yLabel(position - 1, commandTotal);
     return (
       <View key={`${generation}-${index}`} className="gap-3 rounded-lg bg-secondary p-3">
@@ -177,6 +200,7 @@ export function ProfileCommandsScreen({
           autoCorrect={false}
           returnKeyType="done"
           accessibilityHint={rowHint}
+          disabled={!canManage}
           onChangeText={value => {
             setCommands(current => replaceCommand(current, index, value));
           }}
@@ -187,42 +211,45 @@ export function ProfileCommandsScreen({
             commit(index);
           }}
         />
-        <View className="flex-row items-center justify-end gap-1">
-          <Pressable
-            className={controlClass(isFirst)}
-            disabled={isFirst}
-            accessibilityRole="button"
-            accessibilityLabel={upLabel}
-            accessibilityHint={rowHint}
-            onPress={() => {
-              move(index, -1);
-            }}
-          >
-            <ChevronUp size={20} color={colors.mutedForeground} />
-          </Pressable>
-          <Pressable
-            className={controlClass(isLast)}
-            disabled={isLast}
-            accessibilityRole="button"
-            accessibilityLabel={downLabel}
-            accessibilityHint={rowHint}
-            onPress={() => {
-              move(index, 1);
-            }}
-          >
-            <ChevronDown size={20} color={colors.mutedForeground} />
-          </Pressable>
-          <Pressable
-            className="h-11 w-11 items-center justify-center active:opacity-70"
-            accessibilityRole="button"
-            accessibilityLabel={t('common.delete')}
-            onPress={() => {
-              remove(index);
-            }}
-          >
-            <Trash2 size={20} color={colors.destructive} />
-          </Pressable>
-        </View>
+        {canManage ? (
+          <View className="flex-row items-center justify-end gap-1">
+            <Pressable
+              className={controlClass(isFirst)}
+              disabled={isFirst}
+              accessibilityRole="button"
+              accessibilityLabel={upLabel}
+              accessibilityHint={rowHint}
+              onPress={() => {
+                move(index, -1);
+              }}
+            >
+              <ChevronUp size={20} color={colors.mutedForeground} />
+            </Pressable>
+            <Pressable
+              className={controlClass(isLast)}
+              disabled={isLast}
+              accessibilityRole="button"
+              accessibilityLabel={downLabel}
+              accessibilityHint={rowHint}
+              onPress={() => {
+                move(index, 1);
+              }}
+            >
+              <ChevronDown size={20} color={colors.mutedForeground} />
+            </Pressable>
+            <Pressable
+              className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+              accessibilityRole="button"
+              accessibilityLabel={deleteLabel}
+              accessibilityHint={rowHint}
+              onPress={() => {
+                remove(index);
+              }}
+            >
+              <Trash2 size={20} color={colors.destructive} />
+            </Pressable>
+          </View>
+        ) : null}
       </View>
     );
   };
@@ -248,9 +275,11 @@ export function ProfileCommandsScreen({
         description={null}
         placement="top"
         action={
-          <Button onPress={add}>
-            <Text>{t('profiles.addCommand')}</Text>
-          </Button>
+          canManage ? (
+            <Button className={STATE_ACTION_CLASS} onPress={add}>
+              <Text>{t('profiles.addCommand')}</Text>
+            </Button>
+          ) : null
         }
       />
     );
@@ -258,9 +287,11 @@ export function ProfileCommandsScreen({
     content = (
       <>
         {commands.map((command, index) => renderCommandRow(command, index))}
-        <Button onPress={add} disabled={commands.length >= MAX_SETUP_COMMANDS}>
-          <Text>{t('profiles.addCommand')}</Text>
-        </Button>
+        {canManage ? (
+          <Button onPress={add} disabled={commands.length >= MAX_SETUP_COMMANDS}>
+            <Text>{t('profiles.addCommand')}</Text>
+          </Button>
+        ) : null}
       </>
     );
   }
@@ -270,7 +301,7 @@ export function ProfileCommandsScreen({
       <ScreenHeader
         title={t('profiles.commandsTitle')}
         onBack={() => {
-          void leave();
+          router.back();
         }}
       />
       <TabScreenScrollView

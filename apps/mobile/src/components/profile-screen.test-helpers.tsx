@@ -1,13 +1,14 @@
+/* eslint-disable promise/prefer-await-to-callbacks -- controls delivery of the native idle callback */
 import { createElement } from 'react';
 import { type QueryClient } from '@tanstack/react-query';
-import { vi } from 'vitest';
+import { afterEach, beforeEach, vi } from 'vitest';
 
 import '@/i18n';
+import type * as ProfileAgentNavigation from '@/lib/profile-agent-navigation';
+import type * as SecurityAgent from '@/lib/security-agent';
 import { ProfileScreen } from '@/components/profile-screen';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
-
-// ── Hoisted mocks ──────────────────────────────────────────────────────────
 
 const providersQueryFn = vi.hoisted(() => vi.fn());
 const organizationsQueryFn = vi.hoisted(() => vi.fn());
@@ -18,17 +19,21 @@ const keys = vi.hoisted(() => ({
   organizations: ['organizations', 'list'],
 }));
 const authState = vi.hoisted(() => ({ token: 'token-1' as string | null }));
-const interactionState = vi.hoisted(() => ({
+const idleState = vi.hoisted(() => ({
   storedCallback: undefined as (() => void) | undefined,
   cancel: vi.fn(),
 }));
-// eslint-disable-next-line promise/prefer-await-to-callbacks -- the mock must capture the callback so the test can flush it
-const captureInteraction = vi.hoisted(() => (cb: () => void) => {
-  interactionState.storedCallback = cb;
-  return { cancel: interactionState.cancel };
+const captureIdle = vi.hoisted(() => (cb: () => void) => {
+  idleState.storedCallback = cb;
+  return 1;
 });
 const getProfileAgentScopeMock = vi.hoisted(() => vi.fn());
 const openExternalUrlFn = vi.hoisted(() => vi.fn());
+const organizationState = vi.hoisted(() => ({
+  organizationId: 'org-1' as string | null,
+  isLoaded: true,
+}));
+const setOrganizationIdFn = vi.hoisted(() => vi.fn());
 const connectivityState = vi.hoisted(() => ({
   value: 'online' as 'online' | 'offline' | 'unknown',
 }));
@@ -37,21 +42,33 @@ export {
   authState,
   connectivityState,
   getProfileAgentScopeMock,
-  interactionState,
+  idleState,
   keys,
+  organizationState,
   organizationsQueryFn,
   providersQueryFn,
   routerPush,
+  setOrganizationIdFn,
   signOutFn,
 };
 
 vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
+  Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
+  ScrollView: 'ScrollView',
   View: 'View',
-  InteractionManager: {
-    runAfterInteractions: vi.fn(captureInteraction),
-  },
 }));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ bottom: 0 }),
+}));
+
+beforeEach(() => {
+  vi.stubGlobal('requestIdleCallback', captureIdle);
+  vi.stubGlobal('cancelIdleCallback', idleState.cancel);
+});
+afterEach(() => vi.unstubAllGlobals());
 
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
@@ -89,7 +106,11 @@ vi.mock('@/lib/auth/auth-context', () => ({
 }));
 
 vi.mock('@/lib/organization-context', () => ({
-  useOrganization: () => ({ organizationId: 'org-1', isLoaded: true }),
+  useOrganization: () => ({
+    organizationId: organizationState.organizationId,
+    isLoaded: organizationState.isLoaded,
+    setOrganizationId: setOrganizationIdFn,
+  }),
 }));
 
 vi.mock('@/components/use-delete-account', () => ({
@@ -115,7 +136,7 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 }));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#000000' }),
+  useThemeColors: () => ({ mutedForeground: '#000000', primary: '#000000', card: '#ffffff' }),
 }));
 
 vi.mock('@/lib/hooks/use-language-preference', () => ({
@@ -127,14 +148,15 @@ vi.mock('@/lib/auth/push-registration-reconciliation', () => ({
   attemptPushRegistrationReconciliation: vi.fn(),
 }));
 
-vi.mock('@/lib/profile-agent-navigation', () => ({
-  getCodeReviewerProfilePath: () => '/code-reviewer',
+// The path builders are the real ones: a test that presses a row must observe
+// the route the screen actually pushes, and these modules carry no native import.
+vi.mock('@/lib/profile-agent-navigation', async importOriginal => ({
+  ...(await importOriginal<typeof ProfileAgentNavigation>()),
   getProfileAgentScope: getProfileAgentScopeMock,
-  getPrReviewEntryPath: () => '/pr-review',
 }));
 
-vi.mock('@/lib/security-agent', () => ({
-  getSecurityAgentPath: () => '/security-agent',
+vi.mock('@/lib/security-agent', async importOriginal => ({
+  ...(await importOriginal<typeof SecurityAgent>()),
 }));
 
 vi.mock('@/lib/external-link', () => ({
@@ -156,6 +178,8 @@ vi.mock('@/components/ui/dialog', () => ({
 vi.mock('@/components/ui/icons', () => ({
   BookOpenCheck: 'BookOpenCheck',
   Building2: 'Building2',
+  Check: 'Check',
+  ChevronDown: 'ChevronDown',
   GitMerge: 'GitMerge',
   GitPullRequest: 'GitPullRequest',
   Globe: 'Globe',
@@ -171,6 +195,7 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 
 vi.mock('@/components/profile-action-tile', () => ({ ActionTile: 'ActionTile' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/profile-credits-card', () => ({ CreditsCard: 'CreditsCard' }));
 vi.mock('@/components/language-picker-sheet', () => ({
   LanguagePickerSheet: 'LanguagePickerSheet',
@@ -222,10 +247,10 @@ export async function mountProfile(queryClient?: QueryClient) {
   return result;
 }
 
-export function flushInteractions() {
-  const run = interactionState.storedCallback;
+export function flushIdle() {
+  const run = idleState.storedCallback;
   if (!run) {
-    throw new Error('runAfterInteractions callback was not captured');
+    throw new Error('Idle callback was not captured');
   }
   act(() => {
     run();

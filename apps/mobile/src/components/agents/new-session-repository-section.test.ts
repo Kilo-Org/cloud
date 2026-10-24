@@ -11,6 +11,7 @@ import {
   gitlabRow,
   group,
   mountSection,
+  partialGroup,
   renderedText,
 } from './new-session-repository-section.test-helpers';
 import {
@@ -475,6 +476,78 @@ describe('NewSessionRepositorySection connect cards after selection', () => {
 
     expect(renderedText(renderer)).toContain(
       i18n.t('agentChat.newSession.connectGitlabDescription')
+    );
+  });
+});
+
+describe('NewSessionRepositorySection unavailable provider', () => {
+  it('asks for the reconnect step instead of connecting the provider again', () => {
+    const onConnect = vi.fn(() => undefined);
+    const onRefreshRepos = vi.fn(() => undefined);
+    const renderer = mountSection({
+      groups: [group('github', 'unavailable'), group('gitlab', 'repos')],
+      onConnect,
+      onRefreshRepos,
+    });
+
+    const text = renderedText(renderer);
+    expect(text).toContain(i18n.t('agentChat.newSession.githubNeedsAttention'));
+    expect(text).toContain(i18n.t('agentChat.newSession.githubNeedsAttentionDescription'));
+    expect(text).not.toContain(i18n.t('common.connectGithub'));
+
+    const open = labelNode(renderer, i18n.t('agentChat.newSession.openGithub'));
+    expect(open).toBeDefined();
+    // The card carries exactly two actions: the provider open label and the
+    // list refresh. Both must reach the section's own callbacks.
+    const actions = renderer.root
+      .findAllByType('Button' as never)
+      .map(node => node.props.onPress as () => void);
+    expect(actions).toHaveLength(2);
+    act(() => {
+      for (const onPress of actions) {
+        onPress();
+      }
+    });
+    expect(onConnect).toHaveBeenCalledWith('github');
+    expect(onRefreshRepos).toHaveBeenCalledOnce();
+  });
+
+  it('renders no unavailable card for a provider that cannot report the state', () => {
+    const renderer = mountSection({
+      groups: [group('github', 'repos'), group('gitlab', 'unavailable')],
+    });
+
+    expect(renderedText(renderer)).not.toContain(
+      i18n.t('agentChat.newSession.githubNeedsAttention')
+    );
+  });
+});
+
+describe('NewSessionRepositorySection partial list', () => {
+  it('keeps the rows and offers a refresh when the provider answered with a subset', () => {
+    const onRefreshRepos = vi.fn(() => undefined);
+    const renderer = mountSection({
+      groups: [partialGroup('github'), group('gitlab', 'repos')],
+      onRefreshRepos,
+    });
+
+    expect(renderedText(renderer)).toContain(i18n.t('agentChat.newSession.partialRepositories'));
+    const refresh = renderer.root.findByProps({
+      accessibilityLabel: i18n.t('agentChat.newSession.refreshRepositories'),
+    });
+    act(() => {
+      (refresh.props.onPress as () => void)();
+    });
+    expect(onRefreshRepos).toHaveBeenCalledOnce();
+  });
+
+  it('renders no partial notice for a complete provider list', () => {
+    const renderer = mountSection({
+      groups: [group('github', 'repos', [githubRow]), group('gitlab', 'repos')],
+    });
+
+    expect(renderedText(renderer)).not.toContain(
+      i18n.t('agentChat.newSession.partialRepositories')
     );
   });
 });

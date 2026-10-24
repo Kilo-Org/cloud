@@ -90,6 +90,7 @@ import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gat
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import {
   computeOpenRouterCostFields,
+  providerReportsIsByok,
   drainSseStream,
   extractVercelGenerationTime,
   extractVercelIsByok,
@@ -1072,6 +1073,11 @@ export function countAndStoreUsage(
   openrouterRequestSpan: Span | undefined
 ) {
   let usageStatsPromise: Promise<MicrodollarUsageStats | null> = Promise.resolve(null);
+  // An interrupted non-streaming body (gateway duration budget, upstream disconnect)
+  // never delivers its usage object, so there is nothing to record and no reason to
+  // report the missing usage as suspicious. A client disconnect does not interrupt it
+  // in production; see "Vercel request cancellation" in apps/ai-gateway/AGENTS.md.
+  let responseInterrupted = false;
 
   const parseResponseText = async (
     parse: (content: string) => MicrodollarUsageStats
@@ -1079,7 +1085,10 @@ export function countAndStoreUsage(
     try {
       return parse(await clonedReponse.text());
     } catch (error) {
-      if (isResponseInterruptedError(error)) return null;
+      if (isResponseInterruptedError(error)) {
+        responseInterrupted = true;
+        return null;
+      }
       throw error;
     }
   };
@@ -1099,7 +1108,11 @@ export function countAndStoreUsage(
             usesUserCredentials
           )
         : parseResponseText(content =>
-            parseResponsesMicrodollarUsageFromString(content, clonedReponse.status)
+            parseResponsesMicrodollarUsageFromString(
+              content,
+              clonedReponse.status,
+              usageContext.provider
+            )
           );
     }
     if (usageContext.api_kind === 'chat_completions') {
@@ -1113,7 +1126,12 @@ export function countAndStoreUsage(
             usesUserCredentials
           )
         : parseResponseText(content =>
-            parseMicrodollarUsageFromString(content, usageContext.kiloUserId, clonedReponse.status)
+            parseMicrodollarUsageFromString(
+              content,
+              usageContext.kiloUserId,
+              clonedReponse.status,
+              usageContext.provider
+            )
           );
     }
     if (usageContext.api_kind === 'messages') {
@@ -1127,24 +1145,32 @@ export function countAndStoreUsage(
             usesUserCredentials
           )
         : parseResponseText(content =>
-            parseMessagesMicrodollarUsageFromString(content, clonedReponse.status)
+            parseMessagesMicrodollarUsageFromString(
+              content,
+              clonedReponse.status,
+              usageContext.provider
+            )
           );
     }
   }
 
-  return usageStatsPromise.then(usageStats => processTokenData(usageStats, usageContext));
+  return usageStatsPromise.then(usageStats =>
+    responseInterrupted ? null : processTokenData(usageStats, usageContext)
+  );
 }
 
 export function processOpenRouterUsage(
   usage: OpenRouterUsage | null | undefined,
   coreProps: NotYetCostedUsageStats,
+  provider: ProviderId,
   vercelProviderMetadata?: VercelProviderMetaData | null
 ): JustTheCostsUsageStats {
   // usage may be null when there's no response (e.g. error), so default to empty object
   const { cost_mUsd, is_byok } = computeOpenRouterCostFields(
     usage ?? {},
     coreProps,
-    'sse_processing'
+    'sse_processing',
+    providerReportsIsByok(provider)
   );
 
   return {
@@ -1288,7 +1314,7 @@ export async function parseMicrodollarUsageFromStream(
     status_code: effectiveStatusCode,
   };
 
-  const costs = processOpenRouterUsage(usage, coreProps, vercelProviderMetadata);
+  const costs = processOpenRouterUsage(usage, coreProps, provider, vercelProviderMetadata);
 
   return { ...coreProps, ...costs };
 }
@@ -1296,7 +1322,8 @@ export async function parseMicrodollarUsageFromStream(
 export function parseMicrodollarUsageFromString(
   fullResponse: string,
   kiloUserId: string,
-  statusCode: number
+  statusCode: number,
+  provider: ProviderId
 ): MicrodollarUsageStats {
   const responseJson = JSON.parse(fullResponse) as
     | (OpenAI.Chat.Completions.ChatCompletion &
@@ -1304,7 +1331,11 @@ export function parseMicrodollarUsageFromString(
         MaybeHasVercelProviderMetaData)
     | null;
 
-  if (responseJson?.usage?.is_byok == null && responseJson?.usage?.cost) {
+  if (
+    providerReportsIsByok(provider) &&
+    responseJson?.usage?.is_byok == null &&
+    responseJson?.usage?.cost
+  ) {
     captureException(new Error('SUSPICIOUS: is_byok is null'), {
       tags: { source: 'string_processing' },
       extra: { responseJson },
@@ -1331,7 +1362,12 @@ export function parseMicrodollarUsageFromString(
     status_code: statusCode,
   };
 
-  const costs = processOpenRouterUsage(responseJson?.usage, coreProps, vercelProviderMetadata);
+  const costs = processOpenRouterUsage(
+    responseJson?.usage,
+    coreProps,
+    provider,
+    vercelProviderMetadata
+  );
 
   return { ...coreProps, ...costs };
 }

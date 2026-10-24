@@ -362,7 +362,8 @@ export async function handleLlmProxyRequest(
     // The request signal is forwarded to the upstream fetch and to the response
     // stream reader, so this disconnect also aborts them. Any abort/cancellation
     // logged for this request after this line is a consequence of the client
-    // going away, not an upstream provider failure.
+    // going away, not an upstream provider failure. On Vercel the signal never
+    // fires because request cancellation is off; see apps/ai-gateway/AGENTS.md.
     console.log(
       'AI gateway client disconnected (aborting in-flight upstream work for this request), requested model: %s',
       requestedModelLowerCased,

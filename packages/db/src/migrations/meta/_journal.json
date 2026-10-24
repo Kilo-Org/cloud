@@ -2094,6 +2094,13 @@
       "when": 1792829491526,
       "tag": "0298_youthful_vin_gonzales",
       "breakpoints": true
+    },
+    {
+      "idx": 299,
+      "version": "7",
+      "when": 1792834494499,
+      "tag": "0299_device_auth_client_details",
+      "breakpoints": true
     }
   ]
 }

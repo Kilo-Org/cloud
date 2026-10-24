@@ -1126,12 +1126,10 @@ export async function listInbox(
       !hasMore && inboxRepositoryWindow(cachedRepositories, nextWindow).length > 0;
     let nextCursor: string | null = null;
     if (hasMore) {
-      // Every row of this window that can be ordered carries a timestamp, so a
-      // ceiling exists whenever the window still has rows to serve.
-      nextCursor =
-        ceiling === null
-          ? null
-          : encodeInboxCursor(identity, windowIndex, ceiling, pages, repositories);
+      // A page whose rows all lack a timestamp leaves no ceiling yet; the
+      // continuation then carries none and the next load reads on unfiltered,
+      // so the rest of the window is still walked instead of ending here.
+      nextCursor = encodeInboxCursor(identity, windowIndex, ceiling, pages, repositories);
     } else if (carriesNextWindow) {
       // This window is served in full: the walk moves to the next slice of the
       // cached repositories, so a workspace larger than one window is still

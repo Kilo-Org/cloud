@@ -1666,6 +1666,55 @@ describe('listInbox', () => {
     expect(requests.at(-1)).toMatchObject({ slug: 'repo-300', query: 'state="OPEN"' });
   });
 
+  it('continues a window whose pages carry no orderable row', async () => {
+    // Pages one and two answer rows without a timestamp and promise another
+    // page; page three holds the first orderable row. The walk must continue
+    // without a ceiling instead of ending at the first unorderable page.
+    mockReadCachedRepositories.mockResolvedValue({
+      status: 'available',
+      repositories: [
+        {
+          id: '87654321-4321-4321-4321-000000000000',
+          workspaceUuid: WORKSPACE.uuid,
+          name: 'repo',
+          fullName: 'acme/repo',
+          private: true,
+          defaultBranch: 'main',
+        },
+      ],
+      syncedAt: '2026-09-06T00:00:00.000Z',
+    });
+    const requests: InboxRequest[] = [];
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      const parsed = new URL(full);
+      const page = Number(parsed.searchParams.get('page') ?? '1');
+      requests.push({ slug: 'repo', query: parsed.searchParams.get('q'), page: String(page) });
+      if (page < 3) {
+        return jsonResponse({
+          pagelen: 1,
+          values: [{ ...inboxPr(900 + page, ''), updated_on: null }],
+          next: `https://api.bitbucket.org/2.0/repositories/acme/repo/pullrequests?page=${page + 1}`,
+        });
+      }
+      return jsonResponse({ pagelen: 1, values: [inboxPr(999, '2026-09-02T00:00:00+00:00')] });
+    });
+
+    const first = await listInbox(ORG_OWNER);
+    expect(first.items).toEqual([]);
+    expect(first.nextCursor).toBeTruthy();
+
+    const second = await listInbox(ORG_OWNER, first.nextCursor!);
+    expect(second.items.map(item => item.ref)).toEqual([
+      { platform: 'bitbucket', workspace: 'acme', repoSlug: 'repo', prId: 999 },
+    ]);
+    expect(second.nextCursor).toBeNull();
+    expect(requests.at(-1)).toMatchObject({ slug: 'repo', query: 'state="OPEN"', page: '3' });
+  });
+
   it('reads one provider page per repository that still has rows', async () => {
     // 12 repositories × 5 open PRs: the first load reads one page per
     // repository, and the continuation reads only the two with rows left.

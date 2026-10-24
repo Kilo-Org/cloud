@@ -1264,7 +1264,7 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     expect(clearUnbilledCase).toHaveBeenCalledTimes(1);
   });
 
-  it('preserves retry cost and generation from a container callback through grading', async () => {
+  it('preserves retry cost, tokens, and generation from a container callback through grading', async () => {
     const execution = {
       runId,
       model,
@@ -1275,13 +1275,19 @@ describe('processJob — scheduler waits and paid-call safety', () => {
       attemptStartedAt: 1_729_411_200_001,
       retried: true,
       priorCostUsd: 0.01,
+      priorUsage: {
+        inputTokens: 100,
+        cachedInputTokens: null,
+        outputTokens: 20,
+        reasoningTokens: 5,
+      },
     };
     const response = {
       exitCode: 0,
       durationMs: 12,
       stdoutLines: [
         '{"type":"text","part":{"text":"42","time":{"end":1}}}',
-        '{"type":"step_finish","part":{"cost":0.02}}',
+        '{"type":"step_finish","part":{"cost":0.02,"tokens":{"input":300,"output":40,"reasoning":0,"cache":{"read":50}}}}',
       ],
       stderrTail: '',
     };
@@ -1315,6 +1321,10 @@ describe('processJob — scheduler waits and paid-call safety', () => {
       env.BENCH_DB,
       expect.objectContaining({
         cost_usd: 0.03,
+        input_tokens: 400,
+        cached_input_tokens: 50,
+        output_tokens: 60,
+        reasoning_tokens: 5,
         retried: true,
         prompt_revision: 2,
       })

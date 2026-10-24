@@ -76,7 +76,7 @@ export async function resolveCustomRouterEntries(
   source: CatalogSource,
   profiles: { db: D1Database; router: AutoRouter }
 ): Promise<{ resolved: ResolvedCustomRouterEntry[]; catalog: ModelCatalog | null }> {
-  const catalog = entries.some(entry => entry.kind === 'gateway' || entry.measuredAs)
+  const catalog = entries.some(entry => entry.kind === 'gateway')
     ? await fetchBenchmarkModelCatalog(source.catalogEnv, source.fetchImpl)
     : null;
   const clientEval = new Set(clientEvalEntryKeys);
@@ -92,7 +92,7 @@ export async function resolveCustomRouterEntries(
               : [null]
             : (concrete?.variants ?? [null]);
         const measuredAs = entry.measuredAs;
-        if (!measuredAs || !catalog) return { measuredBy: 'client', entry, variants };
+        if (!measuredAs) return { measuredBy: 'client', entry, variants };
         // Same-name variants link only when the platform has measured them: the catalog lists
         // variants it has not benchmarked yet, and those stay on the owner's client eval.
         const measuredRows = await loadProfileRowsForPairs(
@@ -212,12 +212,20 @@ async function loadCustomRouterMeasurements(
   context: CustomRouterBenchmarkContext,
   source: CatalogSource
 ): Promise<CustomRouterMeasurements> {
-  const { resolved, catalog } = await resolveCustomRouterEntries(
+  const resolution = await resolveCustomRouterEntries(
     context.entries,
     context.clientEvalEntryKeys,
     source,
     { db, router: context.baseRouter }
   );
+  // Linked client entries price and age their platform rows against the catalog; plans and
+  // uploads never read it, so only tables and status pay for the fetch.
+  const catalog =
+    resolution.catalog ??
+    (context.entries.some(entry => entry.measuredAs)
+      ? await fetchBenchmarkModelCatalog(source.catalogEnv, source.fetchImpl)
+      : null);
+  const resolved = resolution.resolved;
   const [platformRows, clientRows] = await Promise.all([
     loadProfileRowsForPairs(db, context.baseRouter, platformPairs(resolved)),
     context.clientEvalEntryKeys.length > 0

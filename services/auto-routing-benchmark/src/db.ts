@@ -1186,11 +1186,14 @@ export async function copyRemeasureBaselines(
     .prepare(`
       INSERT INTO case_results (
         run_id, model, variant, case_id, route_key, score, latency_ms, cost_usd,
+        input_tokens, cached_input_tokens, output_tokens, reasoning_tokens,
         error, fallback_reason, route_hit, retried, exit_code, output_prefix,
         event_count, last_event_types, rep, timed_out, prompt_revision
       )
       SELECT r.run_id, source.model, source.variant, source.case_id, source.route_key,
-        source.score, source.latency_ms, source.cost_usd, source.error, source.fallback_reason,
+        source.score, source.latency_ms, source.cost_usd, source.input_tokens,
+        source.cached_input_tokens, source.output_tokens, source.reasoning_tokens,
+        source.error, source.fallback_reason,
         source.route_hit, source.retried, source.exit_code, source.output_prefix,
         source.event_count, source.last_event_types, source.rep, source.timed_out,
         source.prompt_revision

@@ -680,8 +680,8 @@ export async function registerClientEntryResponse(
   const { scope, slug } = parseRouterParams(params);
   const parsed = RegisterClientEntryRequestSchema.safeParse(await readJsonBody(request));
   if (!parsed.success) throw invalidRequest(parsed.error);
-  const entry = parsed.data.entry;
-  const key = customRouterEntryKey(entry);
+  const incoming = parsed.data.entry;
+  const key = customRouterEntryKey(incoming);
   const owner = await resolveEditableOwner(context, scope);
 
   const router = await db.transaction(async tx => {
@@ -694,6 +694,13 @@ export async function registerClientEntryResponse(
         `A custom router can include at most ${MAX_CUSTOM_ROUTER_ENTRIES} models`
       );
     }
+    // Re-registering refreshes capabilities and pricing; a stored link stays unless the CLI sends
+    // a new one. The web editor clears links.
+    const storedLink = index === -1 ? undefined : current.entries[index]?.measuredAs;
+    const entry =
+      incoming.measuredAs === undefined && storedLink !== undefined
+        ? { ...incoming, measuredAs: storedLink }
+        : incoming;
     const entries =
       index === -1
         ? [...current.entries, entry]

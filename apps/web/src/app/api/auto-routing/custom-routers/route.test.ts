@@ -1381,6 +1381,28 @@ describe('/api/auto-routing/custom-routers', () => {
       expect(row?.entries).toEqual([gateway(SONNET)]);
     });
 
+    test('keeps a stored link when the CLI re-registers the entry without one', async () => {
+      const linked = { ...clientEntry('qwen3:8b'), measuredAs: SONNET };
+      await create(
+        routerBody({ entries: [linked], defaultEntryKey: customRouterEntryKey(linked) })
+      );
+      mockedGetPlatformMeasurements.mockClear();
+      const { measuredAs: _link, ...unlinked } = linked;
+
+      const response = await registerClientEntry(
+        request('/user/coding/client-entries', {
+          method: 'POST',
+          body: { entry: { ...unlinked, variants: ['think'] } },
+        }),
+        params('user', 'coding')
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockedGetPlatformMeasurements).not.toHaveBeenCalled();
+      const [row] = await db.select().from(auto_routing_custom_routers);
+      expect(row?.entries).toEqual([{ ...linked, variants: ['think'] }]);
+    });
+
     test('refuses to remove the default entry and to exceed the entry cap', async () => {
       const local = clientEntry('qwen3:8b');
       const fullPool = Array.from({ length: 20 }, (_, index) => clientEntry(`model-${index}`));

@@ -89,6 +89,8 @@ import {
   filterSummariesByProvenance,
 } from './routing-table-builder';
 import {
+  addPriorAttempt,
+  type AttemptUsage,
   DECIDER_CLI_TIMEOUT_MS,
   destroyDeciderCliContainer,
   isRetryableContainerAvailabilityError,
@@ -1318,6 +1320,15 @@ const ContainerCaseResultSchema = z.object({
     attemptStartedAt: z.number().int().nonnegative().optional(),
     retried: z.boolean().optional(),
     priorCostUsd: z.number().nonnegative().nullable().optional(),
+    priorUsage: z
+      .object({
+        inputTokens: z.number().nonnegative().nullable(),
+        cachedInputTokens: z.number().nonnegative().nullable(),
+        outputTokens: z.number().nonnegative().nullable(),
+        reasoningTokens: z.number().nonnegative().nullable(),
+      })
+      .nullable()
+      .optional(),
   }),
   outcome: z.discriminatedUnion('kind', [
     z.object({
@@ -1599,10 +1610,13 @@ export async function acceptContainerCaseResult(env: Env, body: unknown): Promis
   } else {
     const result = parseContainerRunResponse(outcome.response, Date.now(), execution.model);
     if (execution.retried) {
-      result.costUsd =
-        result.costUsd === null && execution.priorCostUsd == null
-          ? null
-          : (result.costUsd ?? 0) + (execution.priorCostUsd ?? 0);
+      addPriorAttempt(result, {
+        costUsd: execution.priorCostUsd ?? null,
+        inputTokens: execution.priorUsage?.inputTokens ?? null,
+        cachedInputTokens: execution.priorUsage?.cachedInputTokens ?? null,
+        outputTokens: execution.priorUsage?.outputTokens ?? null,
+        reasoningTokens: execution.priorUsage?.reasoningTokens ?? null,
+      });
     }
     stored = await savePendingDeciderOutput(
       env.BENCH_DB,
@@ -2143,6 +2157,7 @@ async function processDeciderJob(
         attemptStartedAt = startedAt;
         let retried = false;
         let priorCostUsd: number | null = null;
+        let priorUsage: Omit<AttemptUsage, 'costUsd'> | null = null;
         console.log(
           JSON.stringify({
             event: 'benchmark_case_execution_started',
@@ -2168,7 +2183,13 @@ async function processDeciderJob(
             variant: cliVariant,
             resultCallback: {
               url: env.BENCH_RESULT_URL,
-              execution: { ...execution, attemptStartedAt: startedAt, retried, priorCostUsd },
+              execution: {
+                ...execution,
+                attemptStartedAt: startedAt,
+                retried,
+                priorCostUsd,
+                priorUsage,
+              },
             },
           }).catch(error => {
             if (isRetryableContainerAvailabilityError(error)) throw error;
@@ -2195,6 +2216,12 @@ async function processDeciderJob(
         attemptStartedAt = startedAt;
         retried = true;
         priorCostUsd = first.costUsd;
+        priorUsage = {
+          inputTokens: first.inputTokens,
+          cachedInputTokens: first.cachedInputTokens,
+          outputTokens: first.outputTokens,
+          reasoningTokens: first.reasoningTokens,
+        };
         await deletePendingDeciderOutput(env.BENCH_DB, pendingKey);
         console.log(
           JSON.stringify({
@@ -2211,10 +2238,7 @@ async function processDeciderJob(
           })
         );
         const retry = await invokeCli();
-        retry.costUsd =
-          retry.costUsd === null && first.costUsd === null
-            ? null
-            : (retry.costUsd ?? 0) + (first.costUsd ?? 0);
+        addPriorAttempt(retry, first);
         return { result: retry, retried: true, attemptStartedAt: startedAt };
       };
       try {

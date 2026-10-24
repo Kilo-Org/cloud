@@ -151,27 +151,14 @@ describe('client eval (real SQLite)', () => {
     expect(resumed.staleEntries).toEqual([]);
   });
 
-  it('omits linked variants from the plan and rejects their uploads while unmatched variants still grade', async () => {
+  it('omits linked variants from the plan and rejects their uploads without reading the catalog', async () => {
     sqlite
       .prepare(`INSERT INTO benchmark_profiles (router, model, variant, engine_identity,
       repetitions, status, run_id, requested_at, updated_at)
       VALUES ('efficient', 'vendor/platform', 'low', ?, 1, 'ready', 'platform-run', 'a', 'a')`)
       .run(ENGINE);
     const entries = [{ ...localModel, measuredAs: 'vendor/platform' }];
-    deps.source.fetchImpl = async () =>
-      Response.json({
-        data: [
-          {
-            id: 'vendor/platform',
-            opencode: {
-              variants: {
-                low: { reasoning: { effort: 'low' } },
-                high: { reasoning: { effort: 'high' } },
-              },
-            },
-          },
-        ],
-      });
+    deps.source.fetchImpl = async () => new Response('catalog unavailable', { status: 503 });
     const plan = await planClientEval(db, CONFIG, { ...context, entries }, deps.source);
     expect(new Set(plan.items.map(item => item.variant))).toEqual(new Set(['high']));
     await expect(

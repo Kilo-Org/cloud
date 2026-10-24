@@ -8,7 +8,8 @@ import { ModeSelector } from '@/components/agents/mode-selector';
 import { ModelSelector } from '@/components/agents/model-selector';
 import { RepoSelector } from '@/components/agents/repo-selector';
 import { PickerSheet } from '@/components/picker-sheet';
-import { QueryError } from '@/components/query-error';
+import { NameField } from '@/components/todos/list-settings-name-field';
+import { ListSettingsPendingSheet } from '@/components/todos/list-settings-pending-sheet';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
@@ -160,7 +161,7 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
             </View>
             <View className="min-w-0 flex-1 gap-2">
               <FieldLabel>{t('todos.listSettings.name')}</FieldLabel>
-              <Input
+              <NameField
                 defaultValue={list?.name ?? ''}
                 autoFocus={!list}
                 onChangeText={text => {
@@ -170,11 +171,9 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
                   setHasName(current => (current === next ? current : next));
                 }}
                 onSubmitEditing={save}
-                returnKeyType="done"
                 maxLength={TODO_LIST_NAME_MAX_LENGTH}
                 placeholder={t('todos.listSettings.namePlaceholder')}
                 accessibilityLabel={t('todos.listSettings.name')}
-                className="rounded-lg border border-border bg-secondary text-base text-foreground"
               />
             </View>
           </View>
@@ -259,7 +258,6 @@ export function TodoListSettingsSheet({
   afterCreate?: 'open' | 'back';
 }>) {
   const router = useRouter();
-  const { t } = useTranslation();
   const lists = useTodoLists(organizationId, listId !== null);
 
   if (listId === null) {
@@ -279,25 +277,14 @@ export function TodoListSettingsSheet({
     );
   }
   return (
-    <PickerSheet
-      title={t('todos.listSettings.title')}
+    <ListSettingsPendingSheet
+      isError={lists.isError}
+      isFetching={lists.isFetching}
+      isSuccess={lists.isSuccess}
+      onRetry={() => void lists.refetch()}
       onDone={() => {
         router.back();
       }}
-      scrollable={false}
-      expired={lists.isSuccess}
-    >
-      {lists.isError ? (
-        <QueryError
-          onRetry={() => void lists.refetch()}
-          isRetrying={lists.isFetching}
-          placement="top"
-        />
-      ) : (
-        <View className="items-center py-8">
-          <ActivityIndicator />
-        </View>
-      )}
-    </PickerSheet>
+    />
   );
 }

@@ -1,7 +1,7 @@
 import {
   AutoRoutingModeSchema,
   AutoRoutingModeResponseSchema,
-  type AutoRoutingModeOwnerType,
+  type AutoRoutingModeOwnerQuery,
 } from '@kilocode/auto-routing-contracts';
 import { TRPCError } from '@trpc/server';
 import { NextResponse, type NextRequest } from 'next/server';
@@ -39,10 +39,7 @@ function trpcErrorResponse(error: unknown): NextResponse<{ error: string }> | nu
 async function resolveOwner(
   request: NextRequest,
   roles?: Parameters<typeof ensureOrganizationAccess>[2]
-): Promise<
-  | { ownerType: AutoRoutingModeOwnerType; ownerId: string }
-  | { response: NextResponse<{ error: string }> }
-> {
+): Promise<AutoRoutingModeOwnerQuery | { response: NextResponse<{ error: string }> }> {
   const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
   if (!user || authFailedResponse) {
     return { response: NextResponse.json({ error: 'Authentication required' }, { status: 401 }) };
@@ -67,8 +64,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const owner = await resolveOwner(request);
   if ('response' in owner) return owner.response;
 
-  const result = await getAutoRoutingMode(owner);
-  return workerResultResponse(result);
+  return workerResultResponse(await getAutoRoutingMode(owner));
 }
 
 export async function PUT(request: NextRequest): Promise<NextResponse> {
@@ -92,14 +88,11 @@ export async function PUT(request: NextRequest): Promise<NextResponse> {
   }
 
   const parsed = AutoRoutingModeSchema.nullable().safeParse(
-    rawBody && typeof rawBody === 'object' && 'mode' in rawBody
-      ? (rawBody as { mode?: unknown }).mode
-      : undefined
+    rawBody && typeof rawBody === 'object' && 'mode' in rawBody ? rawBody.mode : undefined
   );
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid routing mode' }, { status: 400 });
   }
 
-  const result = await updateAutoRoutingMode({ ...owner, mode: parsed.data });
-  return workerResultResponse(result);
+  return workerResultResponse(await updateAutoRoutingMode({ ...owner, mode: parsed.data }));
 }

@@ -11,7 +11,11 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   warnExceptInTest: (...args: unknown[]) => mockedWarnExceptInTest(...args),
 }));
 
-import { EFFICIENT_DECISION_TIMEOUT_MS, fetchEfficientAutoDecision } from './auto-routing-decision';
+import {
+  EFFICIENT_DECISION_TIMEOUT_MS,
+  fetchCustomRouterDecision,
+  fetchEfficientAutoDecision,
+} from './auto-routing-decision';
 import type { EfficientDecisionParams } from './auto-routing-decision';
 import {
   detectRequiredInputModalities,
@@ -334,5 +338,139 @@ describe('fetchEfficientAutoDecision', () => {
     const expected = estimateRoutingTokens(body);
     expect(expected).toBeGreaterThan(0);
     expect(sent.constraints?.promptTokensEstimate).toBe(expected);
+  });
+});
+
+describe('fetchCustomRouterDecision', () => {
+  const customParams = () => ({
+    ...makeParams(),
+    router: 'efficient' as const,
+    customRouter: { scope: 'org' as const, slug: 'team' },
+    requestedModel: 'kilo-auto/custom/org/team',
+    deniedModelIds: ['openai/gpt-4o'],
+  });
+  const customDecision = {
+    ...validDecision,
+    entry: { kind: 'gateway' as const, model: validDecision.model },
+    stale: false,
+    fallback: false,
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    globalThis.fetch = mockedFetch;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  function errorResponse(code: string, status: number) {
+    return new Response(JSON.stringify({ error: { code, message: `${code} message` } }), {
+      status,
+    });
+  }
+
+  it('sends the router reference without client entries and returns the decision', async () => {
+    mockedFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ ...validResponse, cost: 0, decision: customDecision }), {
+        status: 200,
+      })
+    );
+
+    const result = await fetchCustomRouterDecision(customParams(), options);
+
+    const [, init] = mockedFetch.mock.calls[0];
+    const sent = JSON.parse(init?.body as string);
+    expect(sent).toMatchObject({
+      router: 'efficient',
+      customRouter: { scope: 'org', slug: 'team' },
+      input: { requestedModel: 'kilo-auto/custom/org/team' },
+      routingPolicy: { deniedModelIds: ['openai/gpt-4o'] },
+      userId: 'user-1',
+      organizationId: 'org-1',
+    });
+    expect(sent).not.toHaveProperty('clientEntries');
+    expect(result).toEqual({ kind: 'ok', decision: customDecision, costUsd: 0 });
+  });
+
+  it.each([
+    ['router_not_found', 404],
+    ['custom_router_unavailable', 422],
+  ])('passes the worker %s rejection through', async (code, status) => {
+    mockedFetch.mockResolvedValueOnce(errorResponse(code, status));
+
+    expect(await fetchCustomRouterDecision(customParams(), options)).toEqual({
+      kind: 'rejected',
+      code,
+      message: `${code} message`,
+    });
+  });
+
+  it.each([
+    ['internal_error', 500],
+    ['unauthorized', 401],
+    ['forbidden', 403],
+    ['quota_exceeded', 429],
+    ['invalid_request', 400],
+  ])(
+    'reports the worker %s error as unavailable instead of passing it to the caller',
+    async (code, status) => {
+      const onError = jest.fn();
+      mockedFetch.mockResolvedValueOnce(errorResponse(code, status));
+
+      expect(await fetchCustomRouterDecision(customParams(), { ...options, onError })).toEqual({
+        kind: 'unavailable',
+      });
+      expect(onError).toHaveBeenCalledWith('Efficient auto decision request failed', {
+        error: `status ${status}`,
+      });
+    }
+  );
+
+  it('does not log an expected router rejection as a failure', async () => {
+    const onError = jest.fn();
+    mockedFetch.mockResolvedValueOnce(errorResponse('router_not_found', 404));
+
+    await fetchCustomRouterDecision(customParams(), { ...options, onError });
+
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a non-contract error body', () => new Response('Bad Gateway', { status: 502 })],
+    ['an invalid success body', () => new Response(JSON.stringify({ unexpected: true }))],
+  ])('reports %s as unavailable', async (_name, response) => {
+    mockedFetch.mockResolvedValueOnce(response());
+
+    expect(await fetchCustomRouterDecision(customParams(), options)).toEqual({
+      kind: 'unavailable',
+    });
+  });
+
+  it('reports a timeout as unavailable', async () => {
+    mockedFetch.mockRejectedValueOnce(new DOMException('The operation timed out', 'TimeoutError'));
+
+    expect(await fetchCustomRouterDecision(customParams(), options)).toEqual({
+      kind: 'unavailable',
+    });
+  });
+
+  it('reports a missing worker configuration as unavailable', async () => {
+    expect(await fetchCustomRouterDecision(customParams(), { ...options, workerUrl: '' })).toEqual({
+      kind: 'unavailable',
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unclassifiable body as an invalid request', async () => {
+    expect(
+      await fetchCustomRouterDecision({ ...customParams(), body: { stream: true } }, options)
+    ).toEqual({
+      kind: 'rejected',
+      code: 'invalid_request',
+      message: 'Messages cannot be classified',
+    });
+    expect(mockedFetch).not.toHaveBeenCalled();
   });
 });

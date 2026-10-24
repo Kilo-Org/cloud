@@ -29,7 +29,7 @@ export function setPrReviewFooter(value: boolean) {
 
 /** The stored PR-review footer value for callers with no React tree. */
 export function getPrReviewFooter(): boolean {
-  return store.get();
+  return store.getRequested();
 }
 
 export function usePrReviewFooterPreference() {

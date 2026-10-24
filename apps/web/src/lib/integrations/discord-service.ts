@@ -162,7 +162,7 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
 }
 
 /**
- * Create or update Discord installation from OAuth response
+ * Persist the selected Discord installation while preserving owner configuration.
  */
 export async function upsertDiscordInstallation(
   owner: Owner,
@@ -195,6 +195,7 @@ export async function upsertDiscordInstallation(
     const [updated] = await db
       .update(platform_integrations)
       .set({
+        platform_installation_id: guildId,
         platform_account_id: guildId,
         platform_account_login: guildName,
         scopes,

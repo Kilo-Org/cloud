@@ -5,7 +5,11 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
 
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { createServer } from 'node:http';
-import { enqueueUsage, USAGE_ENQUEUE_TIMEOUT_MS } from './usage-publisher';
+import {
+  enqueueUsage,
+  USAGE_ENQUEUE_TIMEOUT_MS,
+  USAGE_ENQUEUE_MAX_ATTEMPTS,
+} from './usage-publisher';
 import type { UsageRecordRequest } from '@kilocode/usage-contracts';
 
 const payload: UsageRecordRequest = {
@@ -90,6 +94,7 @@ beforeEach(() => {
 
 afterEach(() => {
   jest.restoreAllMocks();
+  jest.useRealTimers();
 });
 
 function expectUnavailableWarning(reason: string) {
@@ -124,7 +129,7 @@ describe('enqueueUsage', () => {
       body: JSON.stringify(event),
       signal: expect.any(AbortSignal),
       cache: 'no-store',
-      redirect: 'error',
+      redirect: 'manual',
     });
     expect(timeout).toHaveBeenCalledWith(USAGE_ENQUEUE_TIMEOUT_MS);
     expect(read).not.toHaveBeenCalled();
@@ -225,4 +230,300 @@ describe('enqueueUsage', () => {
     expect(mockFetch).toHaveBeenCalledTimes(1);
     expectUnavailableWarning('request_failed');
   });
+});
+
+describe('enqueueUsage transient retries', () => {
+  test.each([408, 429, 500, 502, 503, 504, 'network'])(
+    'recovers from %s with the identical serialized event and fresh timeout',
+    async failure => {
+      jest.useFakeTimers();
+      jest.spyOn(Math, 'random').mockReturnValue(0);
+      const timeouts = jest.spyOn(AbortSignal, 'timeout');
+      if (typeof failure === 'number')
+        mockFetch.mockResolvedValueOnce(new Response('sensitive body', { status: failure }));
+      else mockFetch.mockRejectedValueOnce(new Error('sensitive network error'));
+      mockFetch.mockResolvedValue(new Response(null, { status: 202 }));
+      const result = enqueueUsage(payload, { retryTransientFailures: true });
+      await jest.runAllTimersAsync();
+      expect(await result).toEqual({ kind: 'accepted' });
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      for (const [url, init] of mockFetch.mock.calls) {
+        expect(url).toBe(config.USAGE_INGEST_URL);
+        expect(init?.body).toBe(JSON.stringify(payload));
+      }
+      expect(mockFetch.mock.calls[0][1]?.signal).not.toBe(mockFetch.mock.calls[1][1]?.signal);
+      expect(timeouts.mock.calls).toEqual([[USAGE_ENQUEUE_TIMEOUT_MS], [USAGE_ENQUEUE_TIMEOUT_MS]]);
+      expect(warn.mock.calls).toEqual([
+        [
+          'usage enqueue retrying',
+          {
+            usageId: payload.core.id,
+            reason: failure === 'network' ? 'request_failed' : `http_${failure}`,
+            attempt: 1,
+          },
+        ],
+      ]);
+    }
+  );
+
+  test.each([200, 204, 301, 400, 401, 403, 404, 422])(
+    'does not retry permanent or unexpected HTTP %i',
+    async status => {
+      mockFetch.mockResolvedValue(
+        new Response(status === 204 ? null : 'sensitive body', { status })
+      );
+      expect(await enqueueUsage(payload, { retryTransientFailures: true })).toEqual({
+        kind: 'unavailable',
+        reason: `http_${status}`,
+      });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expectUnavailableWarning(`http_${status}`);
+    }
+  );
+
+  test.each(['USAGE_INGEST_URL', 'USAGE_INGEST_PUBLISH_SECRET'] as const)(
+    'does not attempt or retry missing %s',
+    async key => {
+      config[key] = '';
+      expect(await enqueueUsage(payload, { retryTransientFailures: true })).toEqual({
+        kind: 'disabled',
+      });
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(warn).not.toHaveBeenCalled();
+    }
+  );
+
+  test('does not retry a malformed URL', async () => {
+    config.USAGE_INGEST_URL = 'sensitive-malformed-url';
+    expect(await enqueueUsage(payload, { retryTransientFailures: true })).toEqual({
+      kind: 'unavailable',
+      reason: 'request_failed',
+    });
+    expect(mockFetch).not.toHaveBeenCalled();
+    expectUnavailableWarning('request_failed');
+  });
+
+  test('waits for each backoff boundary before issuing the next fetch', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    mockFetch.mockResolvedValue(new Response(null, { status: 503 }));
+    const result = enqueueUsage(payload, { retryTransientFailures: true });
+    await jest.advanceTimersByTimeAsync(0);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(199);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(1);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    await jest.advanceTimersByTimeAsync(399);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    await jest.advanceTimersByTimeAsync(1);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(await result).toEqual({ kind: 'unavailable', reason: 'http_503' });
+  });
+
+  test.each(
+    [301, 302, 303, 307, 308].flatMap(status =>
+      [false, true].map(retryTransientFailures => ({ status, retryTransientFailures }))
+    )
+  )(
+    'real HTTP $status is terminal and never follows its target (retries=$retryTransientFailures)',
+    async ({ status, retryTransientFailures }) => {
+      let targetRequests = 0;
+      const received: {
+        method: string | undefined;
+        authorization: string | undefined;
+        body: string;
+      }[] = [];
+      const target = createServer((_request, response) => {
+        targetRequests++;
+        response.writeHead(202);
+        response.end();
+      });
+      let targetUrl = '';
+      const publisher = createServer((request, response) => {
+        let body = '';
+        request.on('data', chunk => {
+          body += chunk;
+        });
+        request.on('end', () => {
+          received.push({
+            method: request.method,
+            authorization: request.headers.authorization,
+            body,
+          });
+          response.writeHead(status, { Location: targetUrl });
+          response.end('sensitive-upstream-redirect-body');
+        });
+      });
+      try {
+        await new Promise<void>(resolve => target.listen(0, '127.0.0.1', resolve));
+        const targetAddress = target.address();
+        if (!targetAddress || typeof targetAddress === 'string')
+          throw new Error('Missing target port');
+        targetUrl = `http://127.0.0.1:${targetAddress.port}/sensitive-redirect-target`;
+        await new Promise<void>(resolve => publisher.listen(0, '127.0.0.1', resolve));
+        const address = publisher.address();
+        if (!address || typeof address === 'string') throw new Error('Missing publisher port');
+        config.USAGE_INGEST_URL = `http://127.0.0.1:${address.port}/usage`;
+        mockFetch.mockImplementation(nativeFetch);
+        expect(await enqueueUsage(payload, { retryTransientFailures })).toEqual({
+          kind: 'unavailable',
+          reason: `http_${status}`,
+        });
+        expect(mockFetch).toHaveBeenCalledTimes(1);
+        expect(received).toEqual([
+          {
+            method: 'POST',
+            authorization: `Bearer ${config.USAGE_INGEST_PUBLISH_SECRET}`,
+            body: JSON.stringify(payload),
+          },
+        ]);
+        expect(targetRequests).toBe(0);
+        expectUnavailableWarning(`http_${status}`);
+        expect(JSON.stringify(warn.mock.calls)).not.toContain(targetUrl);
+      } finally {
+        await Promise.all(
+          [publisher, target].map(async server => {
+            server.closeAllConnections();
+            if (server.listening)
+              await new Promise<void>((resolve, reject) =>
+                server.close(error => (error ? reject(error) : resolve()))
+              );
+          })
+        );
+      }
+    }
+  );
+
+  test('bounds retries and backoff, preserves bytes, and logs safe categorical outcomes', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    const delays = jest.spyOn(globalThis, 'setTimeout');
+    const event = { ...payload, core: { ...payload.core } };
+    const originalBody = JSON.stringify(event);
+    mockFetch.mockImplementation(async () => {
+      event.core.cost++;
+      throw new Error('synthetic-publisher-secret sensitive prompt');
+    });
+    const result = enqueueUsage(event, { retryTransientFailures: true });
+    await jest.runAllTimersAsync();
+    expect(await result).toEqual({ kind: 'unavailable', reason: 'request_failed' });
+    expect(mockFetch).toHaveBeenCalledTimes(USAGE_ENQUEUE_MAX_ATTEMPTS);
+    expect(mockFetch.mock.calls.map(([, init]) => init?.body)).toEqual(
+      Array(USAGE_ENQUEUE_MAX_ATTEMPTS).fill(originalBody)
+    );
+    expect(delays.mock.calls.map(([, delay]) => delay)).toEqual([200, 400]);
+    expect(warn.mock.calls).toEqual([
+      [
+        'usage enqueue retrying',
+        { usageId: payload.core.id, reason: 'request_failed', attempt: 1 },
+      ],
+      [
+        'usage enqueue retrying',
+        { usageId: payload.core.id, reason: 'request_failed', attempt: 2 },
+      ],
+      [
+        'usage enqueue unavailable',
+        { usageId: payload.core.id, kind: 'unavailable', reason: 'request_failed' },
+      ],
+    ]);
+    expect(JSON.stringify(warn.mock.calls)).not.toMatch(/secret|sensitive|prompt|metadata|https/);
+  });
+
+  test('stops immediately if a retry receives an authentication failure', async () => {
+    jest.useFakeTimers();
+    mockFetch.mockResolvedValueOnce(new Response(null, { status: 503 }));
+    mockFetch.mockResolvedValue(new Response(null, { status: 401 }));
+    const result = enqueueUsage(payload, { retryTransientFailures: true });
+    await jest.runAllTimersAsync();
+    expect(await result).toEqual({ kind: 'unavailable', reason: 'http_401' });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(warn).toHaveBeenLastCalledWith('usage enqueue unavailable', {
+      usageId: payload.core.id,
+      kind: 'unavailable',
+      reason: 'http_401',
+    });
+  });
+
+  test.each(['drop', 'timeout'])(
+    'retries real HTTP ambiguous acceptance (%s) with identical IDs and body',
+    async failure => {
+      const bodies: string[] = [];
+      const server = createServer((request, response) => {
+        let body = '';
+        request.on('data', chunk => {
+          body += chunk;
+        });
+        request.on('end', () => {
+          bodies.push(body);
+          if (bodies.length === 1) {
+            if (failure === 'drop') request.socket.destroy();
+          } else {
+            response.writeHead(202);
+            response.end();
+          }
+        });
+      });
+      try {
+        await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+        const address = server.address();
+        if (!address || typeof address === 'string') throw new Error('Missing fixture port');
+        config.USAGE_INGEST_URL = `http://127.0.0.1:${address.port}/usage`;
+        mockFetch.mockImplementation(nativeFetch);
+        expect(await enqueueUsage(payload, { retryTransientFailures: true })).toEqual({
+          kind: 'accepted',
+        });
+        expect(mockFetch).toHaveBeenCalledTimes(2);
+        expect(bodies).toEqual([JSON.stringify(payload), JSON.stringify(payload)]);
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn).toHaveBeenCalledWith('usage enqueue retrying', {
+          usageId: payload.core.id,
+          reason: failure === 'timeout' ? 'timeout' : 'request_failed',
+          attempt: 1,
+        });
+      } finally {
+        server.closeAllConnections();
+        await new Promise<void>((resolve, reject) =>
+          server.close(error => (error ? reject(error) : resolve()))
+        );
+      }
+    }
+  );
+
+  test('exhausts three real HTTP timeouts within the bounded attempt/backoff budget', async () => {
+    let requests = 0;
+    const server = createServer(() => {
+      requests++;
+    });
+    try {
+      await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+      const address = server.address();
+      if (!address || typeof address === 'string') throw new Error('Missing fixture port');
+      config.USAGE_INGEST_URL = `http://127.0.0.1:${address.port}/usage`;
+      mockFetch.mockImplementation(nativeFetch);
+      const start = performance.now();
+      expect(await enqueueUsage(payload, { retryTransientFailures: true })).toEqual({
+        kind: 'unavailable',
+        reason: 'timeout',
+      });
+      const elapsed = performance.now() - start;
+      expect(elapsed).toBeGreaterThanOrEqual(USAGE_ENQUEUE_TIMEOUT_MS * USAGE_ENQUEUE_MAX_ATTEMPTS);
+      expect(elapsed).toBeLessThan(USAGE_ENQUEUE_TIMEOUT_MS * USAGE_ENQUEUE_MAX_ATTEMPTS + 2_000);
+      expect(requests).toBe(USAGE_ENQUEUE_MAX_ATTEMPTS);
+      expect(mockFetch).toHaveBeenCalledTimes(USAGE_ENQUEUE_MAX_ATTEMPTS);
+      expect(
+        warn.mock.calls.filter(([message]) => message === 'usage enqueue retrying')
+      ).toHaveLength(2);
+      expect(warn).toHaveBeenLastCalledWith('usage enqueue unavailable', {
+        usageId: payload.core.id,
+        kind: 'unavailable',
+        reason: 'timeout',
+      });
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) =>
+        server.close(error => (error ? reject(error) : resolve()))
+      );
+    }
+  }, 10_000);
 });

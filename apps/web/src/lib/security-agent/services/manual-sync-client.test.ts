@@ -1,4 +1,5 @@
 import { TRPCError } from '@trpc/server';
+import { CONTROL_PLANE_UPSTREAM_BUDGET_MS } from '@/lib/bounded-service-fetch';
 import { submitManualSecuritySync } from './manual-sync-client';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
@@ -307,6 +308,41 @@ describe('submitManualSecuritySync', () => {
     expect((captured as TRPCError).code).toBe('BAD_GATEWAY');
     expect((captured as TRPCError).message).not.toContain('security-sync.test');
     expect((captured as TRPCError).message).not.toContain('test-internal-secret');
+  });
+
+  it('bounds the Worker call at the shared upstream budget when it never answers', async () => {
+    jest.useFakeTimers();
+    try {
+      // The platform errors a fetch (and its body) when the request signal
+      // aborts; emulate that so the bound behaves as in production.
+      mockFetch.mockImplementation((_url: string, init?: RequestInit) => {
+        const signal = init?.signal as AbortSignal;
+        return new Promise<Response>((_resolve, reject) =>
+          signal.addEventListener('abort', () => reject(signal.reason))
+        );
+      });
+
+      let settled = false;
+      const outcome = submitManualSecuritySync({
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actor: { id: 'user-123' },
+      }).catch((error: unknown) => {
+        settled = true;
+        return error;
+      });
+
+      await jest.advanceTimersByTimeAsync(CONTROL_PLANE_UPSTREAM_BUDGET_MS - 1);
+      expect(settled).toBe(false);
+
+      await jest.advanceTimersByTimeAsync(1);
+      const error = await outcome;
+      expect(error).toBeInstanceOf(TRPCError);
+      expect((error as TRPCError).code).toBe('BAD_GATEWAY');
+      expect((error as TRPCError).message).not.toContain('security-sync.test');
+      expect((error as TRPCError).message).not.toContain('test-internal-secret');
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });
 

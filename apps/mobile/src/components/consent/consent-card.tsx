@@ -4,14 +4,16 @@ import { LineChart, MessageSquare, Shield, Smartphone, User } from '@/components
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, Pressable, ScrollView, Switch, View } from 'react-native';
+import { Platform, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConsentRow } from '@/components/consent/consent-row';
 import { type ConsentMode, getConsentActions } from '@/components/consent/consent-mode';
+import { ConsentPolicySentence } from '@/components/consent/consent-policy-sentence';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -230,7 +232,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           </View>
 
           <Text className="mt-6 text-2xl font-bold text-foreground">
-            {t('consent.beforeWeGetStarted')}
+            {mode === 'review' ? t('consent.summaryTitle') : t('consent.beforeWeGetStarted')}
           </Text>
           <Text className="mt-3 text-base text-muted-foreground">
             {t('consent.introDescription')}
@@ -259,7 +261,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
           </View>
 
           <Text className="mt-6 text-sm font-semibold text-foreground">
-            {t('consent.optional')}
+            {mode === 'review' ? t('consent.optionalReview') : t('consent.optionalOnboarding')}
           </Text>
 
           <View className="mt-3 flex-row items-start gap-3 rounded-lg border border-border p-4">
@@ -297,6 +299,7 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
               );
             }}
             hitSlop={8}
+            accessibilityRole="button"
             accessibilityLabel={t('consent.seeFullDetails')}
             className="mt-6 flex-row items-center gap-1 active:opacity-70"
           >
@@ -318,20 +321,12 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             because at the foot of the scrolling body the footer edge cut the
             sentence in half. Its font scale is capped so the pinned height
             stays bounded (see CONSENT_DISCLOSURE_MAX_FONT_SCALE). */}
-        <Text
-          className="text-xs text-muted-foreground"
+        <ConsentPolicySentence
+          prefix={t('consent.privacyPolicyPrefix')}
+          linkLabel={t('consent.privacyPolicy')}
           maxFontSizeMultiplier={CONSENT_DISCLOSURE_MAX_FONT_SCALE}
-        >
-          {t('consent.privacyPolicyPrefix')}{' '}
-          <Text
-            className="text-xs text-primary underline"
-            maxFontSizeMultiplier={CONSENT_DISCLOSURE_MAX_FONT_SCALE}
-            onPress={handleOpenPrivacy}
-          >
-            {t('consent.privacyPolicy')}
-          </Text>
-          .
-        </Text>
+          onOpenPolicy={handleOpenPrivacy}
+        />
         <View className="min-h-5 justify-center">
           <AccessibleStatus message={error} className="text-sm" />
         </View>

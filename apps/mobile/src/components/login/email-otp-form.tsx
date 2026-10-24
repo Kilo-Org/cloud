@@ -6,17 +6,23 @@ import { Button } from '@/components/ui/button';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
-import { type useNativeAuth } from '@/lib/auth/use-native-auth';
+import { type BusyAction } from '@/lib/auth/use-native-auth';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { canSubmitEmailCode } from './email-otp-state';
 
 /**
  * Marks where the address sits inside the translated sentence. The catalog
  * message is never rewritten: the address is substituted for this slot and
- * placed on a line of its own, so a long address starts a fresh line and cannot
- * be broken mid-word (the reported `.com` orphan).
+ * placed on a line of its own, so a long address starts a fresh line instead of
+ * breaking mid-word (the reported `.com` orphan). A destination above the
+ * display bound is abbreviated in the middle.
  */
 const ADDRESS_SLOT = '\u0000';
+
+/** Above this, the destination abbreviates in the middle to keep the code controls visible. */
+const DESTINATION_MAX_CHARS = 48;
+const DESTINATION_PREFIX_CHARS = 24;
+const DESTINATION_SUFFIX_CHARS = 23;
 
 /**
  * Puts the address on its own line without assuming the translation's word
@@ -29,19 +35,29 @@ function formatCodeDestination(message: string, email: string): string {
   const [before = '', after = ''] = message.split(ADDRESS_SLOT);
   const lead = before ? `${before}\n` : '';
   const trail = after.startsWith(' ') ? `\n${after}` : after;
-  return `${lead}${email}${trail}`;
+  const destination =
+    email.length > DESTINATION_MAX_CHARS
+      ? `${email.slice(0, DESTINATION_PREFIX_CHARS)}…${email.slice(-DESTINATION_SUFFIX_CHARS)}`
+      : email;
+  return `${lead}${destination}${trail}`;
 }
 
 export function EmailOtpForm({
   email,
   busy,
+  error,
   onVerify,
+  onCodeChange,
   onResend,
   onBack,
 }: Readonly<{
   email: string;
-  busy: ReturnType<typeof useNativeAuth>['busy'];
+  busy: BusyAction;
+  /** A verify refusal in the active language, rendered above the verify button. */
+  error?: string;
   onVerify: (code: string) => void;
+  /** Fires on every code-input change so the caller can retire a stale refusal message. */
+  onCodeChange?: () => void;
   onResend: () => void;
   onBack: () => void;
 }>) {
@@ -83,9 +99,15 @@ export function EmailOtpForm({
         onChangeText={value => {
           codeRef.current = value;
           setHasCompleteCode(/^\d{6}$/.test(value));
+          onCodeChange?.();
         }}
         accessibilityLabel={formFieldA11y({ label: t('login.signInCodeField'), required: true })}
       />
+      {error ? (
+        <Text className="text-center text-sm text-destructive" accessibilityLiveRegion="polite">
+          {error}
+        </Text>
+      ) : null}
       <Button
         size="lg"
         className="flex-row gap-2"

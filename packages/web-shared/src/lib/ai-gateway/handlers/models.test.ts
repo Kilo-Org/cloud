@@ -7,6 +7,13 @@ jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
   getEnhancedOpenRouterModels: jest.fn(),
+  buildAutoModelCatalogEntry: (model: { id: string; name: string }) => ({
+    id: model.id,
+    name: model.name,
+  }),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
+  listUsableCustomRouters: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForUser: jest.fn(),
@@ -51,6 +58,9 @@ const { getCachedRoutingTable } = jest.requireMock(
 const { getAutoFreeCandidates } = jest.requireMock(
   '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution'
 );
+const { listUsableCustomRouters } = jest.requireMock(
+  '@kilocode/web-shared/lib/ai-gateway/custom-routers'
+);
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetEnhancedOpenRouterModels = jest.mocked(getEnhancedOpenRouterModels);
@@ -61,6 +71,7 @@ const mockedTagOpenAiChatGptByokModels = jest.mocked(tagOpenAiChatGptByokModels)
 const mockedGetAvailableModelsForOrganization = jest.mocked(getAvailableModelsForOrganization);
 const mockedGetCachedRoutingTable = jest.mocked(getCachedRoutingTable);
 const mockedGetAutoFreeCandidates = jest.mocked(getAutoFreeCandidates);
+const mockedListUsableCustomRouters = jest.mocked(listUsableCustomRouters);
 
 function makeModel(id: string): OpenRouterModel {
   return {
@@ -96,6 +107,7 @@ describe('GET /api/openrouter/models', () => {
     mockedGetAvailableModelsForOrganization.mockResolvedValue(null);
     mockedGetCachedRoutingTable.mockResolvedValue(null);
     mockedGetAutoFreeCandidates.mockResolvedValue([]);
+    mockedListUsableCustomRouters.mockResolvedValue([]);
   });
 
   test('leaves BYOK availability undefined for unauthenticated requests', async () => {
@@ -252,5 +264,65 @@ describe('GET /api/openrouter/models', () => {
         allowedModel,
       ],
     });
+  });
+
+  test('adds the custom routers usable in the organization context', async () => {
+    const allowedModel = makeModel('openai/gpt-5.4-mini');
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-id' },
+      organizationId: 'org-1',
+      authFailedResponse: null,
+    } as never);
+    mockedGetAvailableModelsForOrganization.mockResolvedValue({ data: [allowedModel] } as never);
+    mockedListUsableCustomRouters.mockResolvedValue([
+      {
+        id: '00000000-0000-4000-8000-000000000001',
+        ownerType: 'org',
+        ownerId: 'org-1',
+        slug: 'team',
+        name: 'Team',
+        baseRouter: 'efficient',
+        mode: 'cost_per_accuracy',
+        entries: [
+          { kind: 'gateway', model: allowedModel.id },
+          { kind: 'gateway', model: 'openai/denied' },
+        ],
+        defaultEntryKey: `gateway:${allowedModel.id}`,
+      },
+    ]);
+
+    const response = await handleModelsRequest();
+
+    expect(response.status).toBe(200);
+    expect(mockedListUsableCustomRouters).toHaveBeenCalledWith({
+      userId: 'user-id',
+      organizationId: 'org-1',
+    });
+    await expect(response.json()).resolves.toEqual({
+      data: [
+        allowedModel,
+        {
+          id: 'kilo-auto/custom/org/team',
+          name: 'Team',
+          autoRouting: { models: [allowedModel.id] },
+        },
+      ],
+    });
+  });
+
+  test('serves the catalog without custom routers when loading them fails', async () => {
+    const publicModel = makeModel('public/model');
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-id' },
+      organizationId: null,
+      authFailedResponse: null,
+    } as never);
+    mockedAddUserByokAvailability.mockResolvedValue([publicModel]);
+    mockedListUsableCustomRouters.mockRejectedValue(new Error('database unavailable'));
+
+    const response = await handleModelsRequest();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ data: [publicModel] });
   });
 });

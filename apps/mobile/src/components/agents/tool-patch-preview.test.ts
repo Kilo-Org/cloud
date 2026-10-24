@@ -95,6 +95,22 @@ describe('ToolPatchPreview', () => {
     expect(findText(root, 'src/b.ts')).toHaveLength(1);
   });
 
+  it('renders a repo-relative header for an absolute cloud workspace path', () => {
+    const root = rootElement(
+      render(
+        makeModel({
+          files: [
+            makeFile({
+              path: '/workspace/user-1/sessions/ses_abc123/src/nested/a.ts',
+            }),
+          ],
+        })
+      )
+    );
+    expect(findText(root, 'src/nested/a.ts')).toHaveLength(1);
+    expect(findText(root, '/workspace/user-1/sessions/ses_abc123/src/nested/a.ts')).toHaveLength(0);
+  });
+
   it('renders the operation label for every file', () => {
     const add = makeFile({ path: 'src/a.ts', operation: 'add' });
     const update = makeFile({ path: 'src/b.ts', operation: 'update' });

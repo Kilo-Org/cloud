@@ -309,16 +309,20 @@ export function filterSummariesByProvenance(
 }
 
 /**
- * Assemble a SPARSE custom routing table for the requested ready/current Pool
- * entries only. Uses per-route summaries from each profile's provenance run
- * only — exact (model, variant) AND run_id must match; no cross-run leakage.
- * Omits route keys with no graded candidates; returns null when no requested
- * entry contributes. Candidates carry exact `variant` (never reasoningEffort).
+ * Assemble a SPARSE custom routing table for the requested ready Pool entries
+ * only. Uses per-route summaries from each profile's provenance run only —
+ * exact (model, variant) AND run_id must match; no cross-run leakage. Omits
+ * route keys with no graded candidates; returns null when no requested entry
+ * contributes. Candidates carry exact `variant` (never reasoningEffort), and
+ * `stale: true` when their entry was measured under an older engine identity.
  */
 export function buildCustomRoutingTable(params: {
   generatedAt: string;
+  router?: AutoRouter;
+  engineIdentity?: string;
   minAccuracy: number;
   accuracyNoiseBand?: number;
+  frontierMinAccuracyDelta?: number;
   switchCostFactor: number;
   bestAccuracySwitchThreshold: number;
   productionTokenProfile?: ProductionTokenProfile | null;
@@ -327,10 +331,11 @@ export function buildCustomRoutingTable(params: {
   prices?: ReadonlyMap<string, CandidatePricing | null>;
   perCaseResults?: OfflineSweep['pairs'];
   complexityLabels?: ComplexityLabels;
-  /** Ready current profiles with provenance run ids. */
+  /** Ready profiles with provenance run ids. */
   readyEntries: readonly {
     entry: BenchmarkPair;
     runId: string;
+    stale?: boolean;
   }[];
   /**
    * Summaries from provenance runs, each carrying its measuring `runId`.
@@ -350,6 +355,7 @@ export function buildCustomRoutingTable(params: {
   if (readyEntries.length === 0) return null;
 
   const filtered = filterSummariesByProvenance(readyEntries, summaries);
+  const stalePairs = new Set(readyEntries.filter(r => r.stale).map(r => benchmarkPairKey(r.entry)));
 
   const routes: CustomRoutingTable['routes'] = {};
   for (const routeKey of TAXONOMY_ROUTE_KEYS) {
@@ -366,6 +372,9 @@ export function buildCustomRoutingTable(params: {
           pricing: params.prices?.get(s.model) ?? null,
           // Exact-pair identity only — never emit reasoningEffort on custom tables.
           variant: s.variant ?? null,
+          ...(stalePairs.has(benchmarkPairKey({ model: s.model, variant: s.variant ?? null }))
+            ? { stale: true }
+            : {}),
         })),
       minAccuracy,
       {
@@ -398,8 +407,11 @@ export function buildCustomRoutingTable(params: {
       variant: r.entry.variant,
     })),
     {
+      router: params.router,
+      engineIdentity: params.engineIdentity,
       minAccuracy,
       accuracyNoiseBand: params.accuracyNoiseBand,
+      frontierMinAccuracyDelta: params.frontierMinAccuracyDelta,
       switchCostFactor,
       bestAccuracySwitchThreshold,
       productionTokenProfile: params.productionTokenProfile,

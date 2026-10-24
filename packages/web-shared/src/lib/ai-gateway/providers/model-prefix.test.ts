@@ -6,7 +6,6 @@ import { isGlmModel } from './zai';
 import { isMinimaxModel } from './minimax';
 import { isStepModel } from './stepfun';
 import { isCodestralModel, isMistralModel } from './mistral';
-import { inferVercelFirstPartyInferenceProviderForModel } from './openrouter/inference-provider-id';
 
 describe('provider predicates match substrings, regardless of prefix', () => {
   test('isClaudeModel', () => {
@@ -60,13 +59,5 @@ describe('provider predicates match substrings, regardless of prefix', () => {
     expect(isMistralModel('mistralai/codestral')).toBe(true);
     expect(isCodestralModel('mistralai/codestral')).toBe(true);
     expect(isCodestralModel('mistralai/devstral-2')).toBe(false);
-  });
-
-  test('inferVercelFirstPartyInferenceProviderForModel', () => {
-    expect(inferVercelFirstPartyInferenceProviderForModel('anthropic/claude-sonnet-4.5')).toBe(
-      'anthropic'
-    );
-    expect(inferVercelFirstPartyInferenceProviderForModel('openai/gpt-5-nano')).toBe('openai');
-    expect(inferVercelFirstPartyInferenceProviderForModel('openai/gpt-oss')).toBe(null);
   });
 });

@@ -59,6 +59,7 @@ import {
   anonymousFreeModelLimitResponse,
   accountFreeModelLimitResponse,
   temporarilyUnavailableResponse,
+  internalServerErrorResponse,
   creditsBlockedResponse,
   unavailableModelResponse,
   storeAndPreviousResponseIdIsNotSupported,
@@ -90,7 +91,7 @@ import {
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
   gatewayRateLimitKey,
-  isGatewayAccountRateLimited,
+  checkGatewayAccountRateLimit,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
@@ -240,7 +241,11 @@ export async function handleLlmProxyRequest(
   // connection on every flooded request. The key comes from the signed token
   // instead, which costs no query.
   const accountKey = gatewayRateLimitKey(request.headers, ipAddress);
-  if (await isGatewayAccountRateLimited(request, accountKey)) {
+  const admission = await checkGatewayAccountRateLimit(request, accountKey);
+  if (admission === 'unavailable') {
+    return internalServerErrorResponse();
+  }
+  if (admission === 'rate-limited') {
     console.warn(`Gateway account rate limit exceeded, user: ${accountKey}`);
     return NextResponse.json(
       {

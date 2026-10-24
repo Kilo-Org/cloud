@@ -15,6 +15,18 @@ import type { NextRequest } from 'next/server';
 const MISSING_RULE_REPORT_INTERVAL_MS = 60_000;
 const lastMissingRuleReportAt = new Map<string, number>();
 
+/**
+ * Outcome of a firewall rate-limit check.
+ *
+ * `rule-missing` means the rule id is absent from the project's firewall
+ * configuration. `checkRateLimit` answers HTTP 404 with `rateLimited: false` for
+ * that case, so it has to be a verdict of its own rather than an admitted
+ * request: only the caller knows whether the traffic it guards may proceed
+ * without the cap. A cap that guards admission must treat `rule-missing` as a
+ * refusal.
+ */
+export type FirewallRateLimitVerdict = 'allowed' | 'limited' | 'rule-missing';
+
 type FirewallRateLimitRule = {
   /** Rate limit ID of the `@vercel/firewall` rule in the project's firewall configuration. */
   id: string;
@@ -27,17 +39,14 @@ type FirewallRateLimitRule = {
 /**
  * Counts the request against a Vercel Firewall rate limit rule.
  *
- * `checkRateLimit` reports an unknown rule id as "not rate limited", so the
- * Sentry report below is the only signal that the rule has gone missing.
- *
  * Only the host and address headers are passed on: `checkRateLimit` copies
  * every header it is given onto its own request, and inference requests carry
  * the caller's credentials.
  */
-export async function isFirewallRateLimited(
+export async function checkFirewallRateLimit(
   request: NextRequest,
   rule: FirewallRateLimitRule
-): Promise<boolean> {
+): Promise<FirewallRateLimitVerdict> {
   const host = request.headers.get('host') ?? new URL(request.url).host;
   if (!host) {
     throw new Error(`Cannot check the '${rule.id}' rate limit without a host header`);
@@ -61,7 +70,8 @@ export async function isFirewallRateLimited(
         tags: { source: rule.sentrySource },
       });
     }
+    return 'rule-missing';
   }
 
-  return rateLimited;
+  return rateLimited ? 'limited' : 'allowed';
 }

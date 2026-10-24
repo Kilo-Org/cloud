@@ -1,6 +1,6 @@
 import 'server-only';
 import type { NextRequest } from 'next/server';
-import { isFirewallRateLimited } from '@kilocode/web-shared/lib/ai-gateway/firewall-rate-limit';
+import { checkFirewallRateLimit } from '@kilocode/web-shared/lib/ai-gateway/firewall-rate-limit';
 
 /**
  * Vercel Firewall rate limits shared by all free models, custom LLMs excluded.
@@ -23,12 +23,13 @@ export function freeModelRateLimitKey(subject: FreeModelRateLimitSubject): strin
   return subject.kind === 'account' ? `user:${subject.kiloUserId}` : `ip:${subject.ipAddress}`;
 }
 
-export function isFreeModelRateLimited(
+export async function isFreeModelRateLimited(
   request: NextRequest,
   subject: FreeModelRateLimitSubject
 ): Promise<boolean> {
-  return isFirewallRateLimited(request, {
+  const verdict = await checkFirewallRateLimit(request, {
     ...FREE_MODEL_RATE_LIMIT_RULES[subject.kind],
     key: freeModelRateLimitKey(subject),
   });
+  return verdict === 'limited';
 }

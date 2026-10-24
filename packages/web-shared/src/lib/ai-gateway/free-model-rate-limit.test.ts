@@ -37,4 +37,13 @@ describe('isFreeModelRateLimited', () => {
       expect.objectContaining({ rateLimitKey: 'free-model-inference:ip:203.0.113.7' })
     );
   });
+
+  it('preserves the free-model fairness policy', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false, error: 'not-found' });
+    const request = new NextRequest('https://gateway.example.com/api/gateway/chat/completions');
+
+    await expect(
+      isFreeModelRateLimited(request, { kind: 'account', kiloUserId: 'user-123' })
+    ).resolves.toBe(false);
+  });
 });

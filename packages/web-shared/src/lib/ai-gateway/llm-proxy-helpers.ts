@@ -131,6 +131,13 @@ export function invalidTokenResponse() {
   );
 }
 
+export function internalServerErrorResponse() {
+  return NextResponse.json(
+    { error: 'Internal Server Error', message: 'An internal server error occurred.' },
+    { status: 500 }
+  );
+}
+
 export function temporarilyUnavailableResponse() {
   return NextResponse.json(
     {

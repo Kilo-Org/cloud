@@ -9,7 +9,7 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import {
   gatewayRateLimitKey,
-  isGatewayAccountRateLimited,
+  checkGatewayAccountRateLimit,
 } from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
 import {
   getOrganizationProviderPrivacy,
@@ -18,6 +18,7 @@ import {
   extractHeaderAndLimitLength,
   modelNotAllowedResponse,
   wrapInSafeNextResponse,
+  internalServerErrorResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
@@ -69,7 +70,14 @@ export async function handleSystemOneRequest(request: NextRequest) {
   const startedAt = performance.now();
   const startedAtMs = Date.now();
   const ipAddress = rawClientIp(request);
-  if (await isGatewayAccountRateLimited(request, gatewayRateLimitKey(request.headers, ipAddress))) {
+  const admission = await checkGatewayAccountRateLimit(
+    request,
+    gatewayRateLimitKey(request.headers, ipAddress)
+  );
+  if (admission === 'unavailable') {
+    return internalServerErrorResponse();
+  }
+  if (admission === 'rate-limited') {
     return errorResponse('Rate limit exceeded', 'rate_limit_exceeded', 429);
   }
 

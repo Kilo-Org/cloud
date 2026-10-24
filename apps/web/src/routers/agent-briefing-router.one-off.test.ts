@@ -1034,6 +1034,96 @@ it('keeps settlement pending within the generation deadline', async () => {
     .where(eq(agent_briefing_reports.id, report.id));
   expect(persisted.next_charge_check_at).not.toBeNull();
 });
+it('keeps queued usage scheduled past the inference grace until the sweep sees its commit', async () => {
+  const { caller, report, generationId, usageId } = await prepareFailedSummary('uncommitted');
+  const deadline = new Date(Date.now() - 20 * 60_000).toISOString();
+  await db
+    .update(agent_briefing_reports)
+    .set({
+      generation_deadline_at: deadline,
+      next_charge_check_at: new Date(Date.now() - 60_000).toISOString(),
+      summary: {
+        ...report.summary,
+        chargeAccounting: {
+          baselineCostMicrodollars: 100,
+          generations: [
+            {
+              id: generationId,
+              usageId,
+              deadlineAt: deadline,
+              deliveryAt: new Date().toISOString(),
+              delivery: 'queued',
+            },
+          ],
+        },
+      },
+    })
+    .where(eq(agent_briefing_reports.id, report.id));
+
+  await sweepAgentBriefings();
+  const [waiting] = await db
+    .select()
+    .from(agent_briefing_reports)
+    .where(eq(agent_briefing_reports.id, report.id));
+  expect(waiting.next_charge_check_at).not.toBeNull();
+  expect(waiting.summary).toMatchObject({
+    chargeStatus: 'pending',
+    costMicrodollars: 1300,
+    canRetry: false,
+  });
+  expect(
+    (await caller.list({ scope: 'personal' })).reports.find(item => item.id === report.id)
+  ).toMatchObject({ summary: { chargeStatus: 'pending', costMicrodollars: 1300 } });
+
+  await insertSummaryCharge(generationId, 300, usageId);
+  await db
+    .update(agent_briefing_reports)
+    .set({ next_charge_check_at: new Date(Date.now() - 60_000).toISOString() })
+    .where(eq(agent_briefing_reports.id, report.id));
+  await sweepAgentBriefings();
+  const [settled] = await db
+    .select()
+    .from(agent_briefing_reports)
+    .where(eq(agent_briefing_reports.id, report.id));
+  expect(settled.next_charge_check_at).toBeNull();
+  expect(settled.summary).toMatchObject({
+    chargeStatus: 'settled',
+    costMicrodollars: 1600,
+    canRetry: true,
+  });
+  expect(
+    (await caller.list({ scope: 'personal' })).reports.find(item => item.id === report.id)
+  ).toMatchObject({ summary: { chargeStatus: 'settled', costMicrodollars: 1600 } });
+});
+
+it('ends queued reconciliation after the queue delivery window', async () => {
+  const { report, generationId, usageId } = await prepareFailedSummary('uncommitted');
+  const deadline = new Date(Date.now() - 15 * 86_400_000).toISOString();
+  const deliveryAt = new Date(Date.now() - 15 * 86_400_000).toISOString();
+  await db
+    .update(agent_briefing_reports)
+    .set({
+      generation_deadline_at: deadline,
+      next_charge_check_at: new Date(Date.now() - 60_000).toISOString(),
+      summary: {
+        ...report.summary,
+        chargeAccounting: {
+          baselineCostMicrodollars: 100,
+          generations: [
+            { id: generationId, usageId, deadlineAt: deadline, deliveryAt, delivery: 'queued' },
+          ],
+        },
+      },
+    })
+    .where(eq(agent_briefing_reports.id, report.id));
+  await sweepAgentBriefings();
+  const [persisted] = await db
+    .select()
+    .from(agent_briefing_reports)
+    .where(eq(agent_briefing_reports.id, report.id));
+  expect(persisted.next_charge_check_at).toBeNull();
+  expect(persisted.summary).toMatchObject({ chargeStatus: 'settled', costMicrodollars: 1300 });
+});
 
 it('keeps generations without receipt accounting pending', async () => {
   const { caller, report, generationId } = await prepareFailedSummary('committed');

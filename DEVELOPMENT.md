@@ -601,6 +601,7 @@ An alias remains unavailable when its target is missing or has no usable pricing
 The gateway rejects an alias request if provider routing selects a different target from the priced catalog target.
 The structured report remains available when generation fails or reaches a limit.
 Summary charges accumulate across a report's generations: each generation keeps its settlement record, a pending update preserves the reconciled total, and retry becomes available only when every tracked generation's usage is final.
+The settlement record also keeps the gateway's delivery outcome: a queued usage event keeps its generation open for the usage queue's delivery window, because queue acceptance precedes the committed row, while a failed accounting closes its generation at once.
 
 Apply database migrations before deploying the session-ingest, notification, gateway, and web changes.
 The CLI status producer must send occurrence timestamps and transition identities for reliable historical blocker counts.

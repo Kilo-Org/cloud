@@ -482,8 +482,16 @@ async function queueSummary(
 }
 type BriefingTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-/** Margin past a generation's own deadline before the committed ledger is final. */
+/** Margin past a generation's deadline before a receipt's missing row is final. */
 const CHARGE_REPAIR_GRACE_MS = 10 * 60_000;
+
+/**
+ * How long a queued usage delivery keeps its generation open. Queue acceptance
+ * precedes persistence, and Cloudflare Queues allows message retention up to 14
+ * days. A queued event can therefore commit long after the inference request that
+ * produced it ended.
+ */
+const CHARGE_QUEUE_DELIVERY_WINDOW_MS = 14 * 86_400_000;
 
 function chargeAccounting(row: BriefingReportRow) {
   return briefingChargeAccountingSchema.parse(
@@ -527,22 +535,30 @@ async function reconcileLockedBriefingCharge(
   const total =
     accounting.baselineCostMicrodollars +
     charges.reduce((cost, charge) => cost + Number(charge.cost), 0);
-  // The gateway's accounting runs inside its own request lifetime, so a finished
-  // generation whose deadline has passed cannot produce another row. That bound
-  // is what lets a lost receipt still settle from the committed ledger.
+  // A receipt names its delivery outcome: the ledger row is authoritative once it
+  // exists, while a queued delivery can still arrive until the queue's retention
+  // window closes. Only receipts without that marker use the request deadline.
   const now = Date.now();
   const settlements = accounting.generations.map(generation => {
     const charge = chargesByGeneration.get(generation.id);
     if (generation.usageId !== null && charge?.usageIds.includes(generation.usageId) === true)
       return 'settled' as const;
+    const final = charge === undefined ? ('unreachable' as const) : ('repaired' as const);
     const deadline =
       generation.deadlineAt ??
       (generation.id === row.generation_id ? row.generation_deadline_at : null);
-    if (deadline === null)
+    const deadlineMs = deadline === null ? null : Date.parse(deadline);
+    if (generation.delivery === 'queued') {
+      // Receipts write the delivery time; a missing one falls back to the request
+      // deadline, which is never later than the queue acceptance it bounds.
+      const anchorMs =
+        generation.deliveryAt === undefined ? deadlineMs : Date.parse(generation.deliveryAt);
+      if (anchorMs === null) return 'waiting' as const;
+      return now < anchorMs + CHARGE_QUEUE_DELIVERY_WINDOW_MS ? ('waiting' as const) : final;
+    }
+    if (deadlineMs === null)
       return generation.settlementToken ? ('waiting' as const) : ('unreachable' as const);
-    if (now >= Date.parse(deadline) + CHARGE_REPAIR_GRACE_MS)
-      return charge === undefined ? ('unreachable' as const) : ('repaired' as const);
-    return 'waiting' as const;
+    return now >= deadlineMs + CHARGE_REPAIR_GRACE_MS ? final : ('waiting' as const);
   });
   const settled = settlements.every(
     settlement => settlement === 'settled' || settlement === 'repaired'

@@ -7,6 +7,13 @@ import type { UsageAccountingResult } from '@kilocode/web-shared/lib/ai-gateway/
 
 export const BRIEFING_SETTLEMENT_HEADER = 'X-Kilo-Briefing-Settlement';
 
+/**
+ * What the gateway reported for a generation's usage write. `committed` means the
+ * row was written before the response; `queued` means only queue acceptance is
+ * known.
+ */
+export const briefingChargeDeliverySchema = z.enum(['committed', 'queued']);
+
 export const briefingChargeAccountingSchema = z.object({
   baselineCostMicrodollars: z.number().nonnegative(),
   generations: z.array(
@@ -15,6 +22,8 @@ export const briefingChargeAccountingSchema = z.object({
       settlementToken: z.string().optional(),
       usageId: z.uuid().nullable(),
       deadlineAt: z.string().datetime().optional(),
+      deliveryAt: z.string().datetime().optional(),
+      delivery: briefingChargeDeliverySchema.optional(),
     })
   ),
 });
@@ -28,6 +37,9 @@ export async function recordBriefingUsage(input: {
 }): Promise<void> {
   const usage = input.usage;
   if (!usage || !input.settlementToken || !z.uuid().safeParse(usage.usageId).success) return;
+  const delivery = usage.status === 'queued' ? 'queued' : 'committed';
+  // Queue acceptance precedes this receipt, so it anchors a full retention window.
+  const deliveryAt = new Date().toISOString();
 
   // The gateway runs in sfo1 while db is the Frankfurt primary: this is the rare
   // post-response write for a briefing request, and it takes a row lock so the
@@ -63,10 +75,12 @@ export async function recordBriefingUsage(input: {
       return;
     }
 
+    const path = sql`ARRAY['chargeAccounting', 'generations', ${String(index)}]::text[]`;
+    const receipt = JSON.stringify({ usageId: usage.usageId, delivery, deliveryAt });
     await tx
       .update(agent_briefing_reports)
       .set({
-        summary: sql`jsonb_set(${agent_briefing_reports.summary}, ARRAY['chargeAccounting', 'generations', ${String(index)}, 'usageId']::text[], ${JSON.stringify(usage.usageId)}::jsonb)`,
+        summary: sql`jsonb_set(${agent_briefing_reports.summary}, ${path}, coalesce(${agent_briefing_reports.summary} #> ${path}, '{}'::jsonb) || ${receipt}::jsonb)`,
       })
       .where(eq(agent_briefing_reports.id, report.id));
   });

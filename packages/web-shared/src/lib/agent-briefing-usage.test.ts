@@ -82,7 +82,14 @@ describe('recordBriefingUsage', () => {
         chargeAccounting: {
           ...prepared.summary.chargeAccounting,
           generations: prepared.summary.chargeAccounting.generations.map(entry =>
-            entry.id === prepared.input.generationId ? { ...entry, usageId: result.usageId } : entry
+            entry.id === prepared.input.generationId
+              ? {
+                  ...entry,
+                  usageId: result.usageId,
+                  delivery: status === 'queued' ? 'queued' : 'committed',
+                  deliveryAt: expect.any(String),
+                }
+              : entry
           ),
         },
       };
@@ -118,6 +125,8 @@ describe('recordBriefingUsage', () => {
           id: prepared.input.generationId,
           settlementToken: prepared.input.settlementToken,
           usageId: expect.stringMatching(`${first.usageId}|${second.usageId}`),
+          delivery: 'committed',
+          deliveryAt: expect.any(String),
         },
       ],
     });

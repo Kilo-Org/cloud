@@ -36,8 +36,10 @@ import {
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { Text } from '@/components/ui/text';
 import { useAgentProfile, useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
+import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
+import { usePopWhenFocused } from '@/lib/navigation/pop-when-focused';
 import { useTRPC } from '@/lib/trpc';
 import {
   getProfileAgentsPath,
@@ -92,6 +94,7 @@ export function ProfileOverviewScreen({
   stack: ProfileManagementStack;
 }>) {
   const router = useRouter();
+  const popWhenFocused = usePopWhenFocused();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const colors = useThemeColors();
@@ -102,6 +105,7 @@ export function ProfileOverviewScreen({
   const profileQuery = useAgentProfile(profileId, organizationId);
   const { update, deleteProfile, setAsDefault, clearDefault } =
     useAgentProfileMutations(organizationId);
+  const canManage = useCanManageOrganizationProfiles(organizationId);
 
   const profile = profileQuery.data;
   const isOrgOwned = organizationId !== undefined;
@@ -144,7 +148,9 @@ export function ProfileOverviewScreen({
     try {
       await deleteProfile.mutateAsync({ profileId });
       toast.success(t('profiles.deletedToast', { name: profileName }));
-      router.back();
+      // Back during the delete already left this profile; a second pop would
+      // remove the profiles list beneath it.
+      popWhenFocused();
     } catch (error) {
       if (deleteErrorMessage(error) === 'blocked') {
         toast.error(t('profiles.deleteBlocked'));
@@ -215,6 +221,7 @@ export function ProfileOverviewScreen({
               profile={profile}
               isSaving={update.isPending}
               onSave={saveMetadata}
+              disabled={!canManage}
             />
 
             <PreferenceRow
@@ -222,7 +229,7 @@ export function ProfileOverviewScreen({
               title={t('profiles.defaultSectionTitle')}
               subtitle={t(defaultDescriptionKey(isOrgOwned))}
               value={profile.isDefault}
-              disabled={defaultPending}
+              disabled={!canManage || defaultPending}
               busy={defaultPending}
               onValueChange={next => {
                 if (next) {
@@ -233,7 +240,11 @@ export function ProfileOverviewScreen({
               }}
             />
 
-            <ProfileRepoPinsSection profileId={profileId} organizationId={organizationId} />
+            <ProfileRepoPinsSection
+              profileId={profileId}
+              organizationId={organizationId}
+              canManage={canManage}
+            />
 
             <View className="gap-1">
               <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
@@ -255,17 +266,19 @@ export function ProfileOverviewScreen({
               </View>
             </View>
 
-            <Button
-              variant="destructive"
-              loading={deleteProfile.isPending}
-              disabled={deleteProfile.isPending}
-              onPress={() => {
-                confirmDelete(profile.name);
-              }}
-            >
-              <Trash2 size={16} color={colors.destructiveForeground} />
-              <Text>{t('common.delete')}</Text>
-            </Button>
+            {!canManage ? null : (
+              <Button
+                variant="destructive"
+                loading={deleteProfile.isPending}
+                disabled={deleteProfile.isPending}
+                onPress={() => {
+                  confirmDelete(profile.name);
+                }}
+              >
+                <Trash2 size={16} color={colors.destructiveForeground} />
+                <Text>{t('common.delete')}</Text>
+              </Button>
+            )}
           </>
         ) : null}
       </TabScreenScrollView>

@@ -45,7 +45,7 @@ export function CommentBodyField({
       // Compact min-height so half-detent + keyboard-open both keep footer
       // CTAs on-screen at scroll offset 0; multiline still grows on type.
       className={cn(
-        'rounded-md border border-input bg-background pl-3 pr-3 py-1.5 text-sm leading-5 text-foreground',
+        'rounded-md border border-input bg-background pl-3 pr-3 py-1.5 text-sm leading-[1.25rem] text-foreground',
         'focus:border-ring',
         keyboardVisible ? 'max-h-16 min-h-12' : 'min-h-14 max-h-28'
       )}
@@ -142,7 +142,10 @@ export function ContextPreview({
         {path} {side} {lineLabel}
       </Text>
       {previewText.length > 0 ? (
-        <Text className="font-mono-medium text-[12px] leading-4 text-foreground" numberOfLines={1}>
+        <Text
+          className="font-mono-medium text-[12px] leading-[1rem] text-foreground"
+          numberOfLines={1}
+        >
           {previewText}
         </Text>
       ) : null}

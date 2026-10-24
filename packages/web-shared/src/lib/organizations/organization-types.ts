@@ -50,7 +50,7 @@ export const OrganizationNameSchema = z
   .string()
   .trim()
   .min(1, 'Organization name is required')
-  .max(100, 'Organization name must be less than 100 characters');
+  .max(100, 'Organization name must be 100 characters or fewer');
 
 export const OrganizationCreateRequestSchema = z.object({
   name: OrganizationNameSchema,
@@ -118,18 +118,7 @@ export const InvitedOrganizationMemberSchema = z.object({
   currentDailyUsageUsd: z.number().nullable(),
 });
 
-type InvitedMember = {
-  email: string;
-  role: OrganizationRole;
-  inviteDate: string | null;
-  inviteToken: string;
-  inviteId: string; // Database ID for deletion
-  status: 'invited';
-  inviteUrl: string;
-  emailStatus: 'pending' | 'sending' | 'delivered' | 'failed' | null;
-  dailyUsageLimitUsd: number | null;
-  currentDailyUsageUsd: number | null;
-};
+type InvitedMember = z.infer<typeof InvitedOrganizationMemberSchema>;
 
 export const ActiveOrganizationMemberSchema = z.object({
   id: z.string(),
@@ -143,16 +132,7 @@ export const ActiveOrganizationMemberSchema = z.object({
   currentDailyUsageUsd: z.number().nullable(),
 });
 
-type ActiveMember = {
-  id: string;
-  name: string;
-  email: string;
-  role: OrganizationRole;
-  status: 'active';
-  inviteDate: string | null;
-  imageUrl?: string | null;
-  dailyUsageLimitUsd: number | null;
-  currentDailyUsageUsd: number | null;
+type ActiveMember = z.infer<typeof ActiveOrganizationMemberSchema> & {
   childOrganizationMemberships?: ChildOrganizationMembership[];
 };
 

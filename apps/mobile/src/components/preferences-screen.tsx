@@ -96,7 +96,7 @@ export function PreferencesScreen() {
           className="rounded-lg bg-secondary px-3"
           last
           onPress={() => {
-            router.push('/(app)/(tabs)/(3_profile)/notifications' as Href);
+            router.push('/(app)/notifications' as Href);
           }}
         />
         <ConfigureRow

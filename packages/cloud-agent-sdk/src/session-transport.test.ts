@@ -457,6 +457,7 @@ describe('session transport delegation (cloud agent)', () => {
 
     await connectSession(session);
     await session.send({
+      messageId: 'msg_123456789abc123456789AB001',
       payload: {
         type: 'prompt',
         prompt: 'hello',
@@ -468,6 +469,7 @@ describe('session transport delegation (cloud agent)', () => {
     expect(api.send).toHaveBeenCalledTimes(1);
     expect(api.send).toHaveBeenCalledWith({
       sessionId: cloudAgentSessionId,
+      messageId: 'msg_123456789abc123456789AB001',
       payload: { type: 'prompt', prompt: 'hello', mode: 'auto', model: 'test/model-1' },
     });
 
@@ -484,6 +486,7 @@ describe('session transport delegation (cloud agent)', () => {
 
     await connectSession(session);
     await session.send({
+      messageId: 'msg_123456789abc123456789AB002',
       payload: {
         type: 'prompt',
         prompt: 'hello',
@@ -495,6 +498,7 @@ describe('session transport delegation (cloud agent)', () => {
 
     expect(api.send).toHaveBeenCalledWith({
       sessionId: cloudAgentSessionId,
+      messageId: 'msg_123456789abc123456789AB002',
       payload: { type: 'prompt', prompt: 'hello', mode: 'auto', model: 'test/model-1' },
       attachments,
     });

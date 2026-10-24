@@ -7690,15 +7690,8 @@
           "type": "boolean"
         },
         "messageId": {
-          "anyOf": [
-            {
-              "type": "string",
-              "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string",
+          "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
         },
         "attachments": {
           "type": "object",
@@ -7748,7 +7741,8 @@
       },
       "required": [
         "cloudAgentSessionId",
-        "payload"
+        "payload",
+        "messageId"
       ]
     },
     "tags": [
@@ -18295,15 +18289,8 @@
           "type": "boolean"
         },
         "messageId": {
-          "anyOf": [
-            {
-              "type": "string",
-              "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string",
+          "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
         },
         "attachments": {
           "type": "object",
@@ -18354,7 +18341,8 @@
       "required": [
         "organizationId",
         "cloudAgentSessionId",
-        "payload"
+        "payload",
+        "messageId"
       ]
     },
     "tags": [

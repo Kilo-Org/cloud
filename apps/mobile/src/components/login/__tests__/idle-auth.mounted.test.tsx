@@ -937,6 +937,48 @@ describe('IdleAuth email continue copy', () => {
     });
     expect(openBrowserAsync).toHaveBeenCalledWith(PRIVACY_URL);
   });
+
+  it('reads the whole sentence from one accessible wrapper in visible order', async () => {
+    const start = vi.fn<StartFn>();
+    const renderer = await mountIdleAuth(start);
+
+    // Android's screen reader does not keep the row's visual order once the
+    // line wraps (pt-BR announced the Privacy link before Terms), so the
+    // wrapper — not the flattened children — carries the sentence.
+    const wrapper = renderer.root.find(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'View' &&
+        n.props.accessible === true &&
+        typeof n.props.accessibilityLabel === 'string' &&
+        n.props.accessibilityLabel.includes('By continuing')
+    );
+    expect(wrapper.props.accessibilityRole).toBe('text');
+    expect(wrapper.props.accessibilityLabel).toBe(
+      'By continuing you agree to our Terms and Privacy Policy.'
+    );
+    expect(wrapper.props.accessibilityActions).toEqual([
+      { name: 'openTerms', label: 'Terms' },
+      { name: 'openPrivacy', label: 'Privacy Policy' },
+    ]);
+
+    // The wrapper's action handlers open the same URLs the hidden links do.
+    const handleAction = wrapper.props.onAccessibilityAction as (event: {
+      nativeEvent: { actionName: string };
+    }) => void;
+    act(() => {
+      handleAction({ nativeEvent: { actionName: 'openTerms' } });
+    });
+    expect(openBrowserAsync).toHaveBeenCalledWith(TERMS_URL);
+    act(() => {
+      handleAction({ nativeEvent: { actionName: 'openPrivacy' } });
+    });
+    expect(openBrowserAsync).toHaveBeenCalledWith(PRIVACY_URL);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
 });
 
 describe('IdleAuth email validation layout', () => {
@@ -958,9 +1000,11 @@ describe('IdleAuth email validation layout', () => {
     // The message renders in the field's own flow: no zero-opacity reserve, so
     // no empty hole under the input on the happy path.
     expect(field.props.reserveErrorMessages).toBeUndefined();
-    expect(
-      renderer.root.findAllByProps({ importantForAccessibility: 'no-hide-descendants' })
-    ).toHaveLength(0);
+    // The legal sentence's wrapper hides its children from the a11y tree; the
+    // field contributes none, so every hidden node belongs to the sentence.
+    expect(field.findAllByProps({ importantForAccessibility: 'no-hide-descendants' })).toHaveLength(
+      0
+    );
     const button = findButton(renderer.root, 'Continue with email');
     expect(button.props.disabled).toBe(false);
     const siblings = field.parent?.children;
@@ -1064,9 +1108,22 @@ describe('IdleAuth layout repairs', () => {
     // the input; the two-line 'Unable to deliver email...' message reserved a
     // 35pt hole the owner measured as a 50pt input-to-Continue gap.
     expect(renderer.root.findByType('FormField').props.reserveErrorMessages).toBeUndefined();
-    expect(
-      renderer.root.findAllByProps({ importantForAccessibility: 'no-hide-descendants' })
-    ).toHaveLength(0);
+    // The only `no-hide-descendants` nodes on the screen are the legal
+    // sentence's own five children under its accessible wrapper.
+    const hidden = renderer.root.findAllByProps({
+      importantForAccessibility: 'no-hide-descendants',
+    });
+    expect(hidden).toHaveLength(5);
+    const wrapper = renderer.root.find(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'View' &&
+        n.props.accessible === true &&
+        typeof n.props.accessibilityLabel === 'string' &&
+        n.props.accessibilityLabel.includes('By continuing')
+    );
+    const wrapperNodes = new Set(wrapper.findAll(() => true));
+    expect(hidden.every(node => wrapperNodes.has(node))).toBe(true);
 
     act(() => {
       renderer.unmount();
@@ -1112,6 +1169,53 @@ describe('IdleAuth layout repairs', () => {
       renderer.unmount();
     });
   });
+
+  it.each([
+    ['zh-Hans', '条款', '继续即表示你同意我们的条款和隐私政策。'],
+    ['zh-Hant', '條款', '繼續即表示你同意我們的條款和隱私權政策。'],
+    ['ja', '利用規約', '続行すると、利用規約およびプライバシーポリシーに同意したことになります。'],
+    ['th', 'ข้อกำหนด', 'การดำเนินการต่อแสดงว่าคุณยอมรับข้อกำหนดและนโยบายความเป็นส่วนตัว.'],
+    ['lo', 'ຂໍ້ກຳນົດ', 'ການສືບຕໍ່ໝາຍຄວາມວ່າທ່ານຍອມຮັບຂໍ້ກຳນົດແລະນະໂຍບາຍຄວາມເປັນສ່ວນຕົວ.'],
+    ['km', 'លក្ខខណ្ឌ', 'តាមរយៈការបន្ត អ្នកយល់ព្រមតាមលក្ខខណ្ឌនិងគោលការណ៍ឯកជនភាព។'],
+    [
+      'my',
+      'စည်းကမ်းချက်များ',
+      'ဆက်လုပ်ခြင်းဖြင့် သင်သည် ကျွန်ုပ်တို့၏စည်းကမ်းချက်များနှင့်ကိုယ်ရေးအချက်အလက် မူဝါဒကို သဘောတူလက်ခံပါသည်။',
+    ],
+  ])(
+    'abuts the %s legal sentence, the connector and the spoken label to the words',
+    async (language, terms, expected) => {
+      await act(async () => {
+        await i18n.changeLanguage(language);
+      });
+      try {
+        const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+        // Chinese separates no words with spaces, so the catalog carries
+        // neither a separator before the Terms link nor spaces around the
+        // conjunction: the row and the wrapper's label render the same
+        // unspaced sentence.
+        expect(legalSentence(renderer.root)).toBe(expected);
+        const wrapper = renderer.root.find(
+          n =>
+            typeof n.type === 'string' &&
+            (n.type as string) === 'View' &&
+            n.props.accessible === true &&
+            typeof n.props.accessibilityLabel === 'string' &&
+            n.props.accessibilityLabel.includes(terms)
+        );
+        expect(wrapper.props.accessibilityLabel).toBe(expected);
+
+        act(() => {
+          renderer.unmount();
+        });
+      } finally {
+        await act(async () => {
+          await i18n.changeLanguage('en');
+        });
+      }
+    }
+  );
 
   it('cancels the inline link box height so the sentence keeps a text-xs line', async () => {
     // The audit floor stays on the node's own rect...

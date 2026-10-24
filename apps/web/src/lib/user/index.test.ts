@@ -29,6 +29,7 @@ import {
   organizations,
   user_feedback,
   cloud_agent_feedback,
+  cloud_agent_webhook_triggers,
   user_admin_notes,
   magic_link_tokens,
   device_sessions,
@@ -65,6 +66,7 @@ import {
   user_push_tokens,
   user_activity_tokens,
   user_notification_preferences,
+  user_notification_history,
   agent_briefing_reports,
   agent_briefing_events,
   agent_briefing_context_preferences,
@@ -82,6 +84,7 @@ import {
   agent_environment_profile_mcp_servers,
   agent_environment_profile_skills,
   cloud_agent_sandbox_allocation_settings,
+  cloud_agent_environments,
   deleted_user_email_tombstones,
   impact_attribution_touches,
   impact_advocate_participants,
@@ -116,7 +119,6 @@ import {
   coding_plan_subscriptions,
   byok_api_keys,
   openai_chatgpt_connections,
-  deployments_ephemeral,
   operation_ledgers,
   analytics_event_outbox,
   bouncer_credit_event_outbox,
@@ -243,7 +245,6 @@ describe('User', () => {
     await db.delete(todo_lists);
     await db.delete(user_deletion_steps);
     await db.delete(user_deletion_requests);
-    await db.delete(deployments_ephemeral);
     await db.delete(operation_ledgers);
     await db.delete(analytics_event_outbox);
     await db.delete(user_data_export_parts);
@@ -325,6 +326,8 @@ describe('User', () => {
     await db.delete(kiloclaw_instances);
     await db.delete(agent_environment_profile_skills);
     await db.delete(agent_environment_profile_mcp_servers);
+    await db.delete(cloud_agent_webhook_triggers);
+    await db.delete(cloud_agent_environments);
     await db.delete(agent_environment_profiles);
     await db.delete(github_branch_pull_requests);
     await db.delete(code_review_memory_proposals);
@@ -951,6 +954,138 @@ describe('User', () => {
       if (!signedIn.success) return;
       expect(signedIn.isNew).toBe(false);
       expect(verifyAdmission).not.toHaveBeenCalled();
+    });
+
+    describe('while email signups are disabled', () => {
+      const emailArgs = (email: string) => ({
+        google_user_email: email,
+        google_user_name: 'Email User',
+        google_user_image_url: '',
+        hosted_domain: null,
+        provider: 'email' as const,
+        provider_account_id: email,
+      });
+      const headers = () => new Headers({ 'x-forwarded-for': '203.0.113.90' });
+
+      afterEach(() => {
+        process.env.EMAIL_SIGNUPS_ENABLED = 'true';
+      });
+
+      it('refuses a new email account before Bouncer, Stripe, or user creation', async () => {
+        const email = 'email-signup-disabled-new@example.com';
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const result = await createOrUpdateUser(emailArgs(email), undefined, true, headers());
+
+        expect(result).toEqual({ success: false, error: 'EMAIL-SIGNUP-DISABLED' });
+        expect(mockSignupDecide).not.toHaveBeenCalled();
+        expect(createStripeCustomer).not.toHaveBeenCalled();
+        expect(
+          await db.query.kilocode_users.findFirst({
+            where: eq(kilocode_users.google_user_email, email),
+          })
+        ).toBeUndefined();
+      });
+
+      it('signs in an existing email user', async () => {
+        const email = 'email-signup-disabled-existing@example.com';
+        const created = await createOrUpdateUser(emailArgs(email), undefined, true, headers());
+        expect(created.success).toBe(true);
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const signedIn = await createOrUpdateUser(emailArgs(email), undefined, true, headers());
+
+        expect(signedIn.success).toBe(true);
+        if (!signedIn.success) return;
+        expect(signedIn.isNew).toBe(false);
+      });
+
+      it('links email to an existing OAuth user on their first magic link', async () => {
+        const email = 'email-signup-disabled-oauth@example.com';
+        const created = await createOrUpdateUser(
+          {
+            ...emailArgs(email),
+            provider: 'google',
+            provider_account_id: 'google-email-signup-disabled',
+          },
+          undefined,
+          false,
+          headers()
+        );
+        expect(created.success).toBe(true);
+        if (!created.success) return;
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const signedIn = await createOrUpdateUser(emailArgs(email), undefined, true, headers());
+
+        expect(signedIn.success).toBe(true);
+        if (!signedIn.success) return;
+        expect(signedIn.user.id).toBe(created.user.id);
+        expect(signedIn.isNew).toBe(false);
+      });
+
+      it('keeps EMAIL-ALREADY-USED for a normalized match of an existing account', async () => {
+        const created = await createOrUpdateUser(
+          emailArgs('emailsignupdisabledalias@gmail.com'),
+          undefined,
+          true,
+          headers()
+        );
+        expect(created.success).toBe(true);
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const result = await createOrUpdateUser(
+          emailArgs('email.signup.disabled.alias@gmail.com'),
+          undefined,
+          true,
+          headers()
+        );
+
+        expect(result).toEqual({ success: false, error: 'EMAIL-ALREADY-USED' });
+      });
+
+      it('refuses a case variant of a legacy account without a normalized email', async () => {
+        await insertTestUser({
+          id: 'email-signup-disabled-legacy',
+          google_user_email: 'Legacy.Case@Example.com',
+          normalized_email: null,
+        });
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const result = await createOrUpdateUser(
+          emailArgs('legacy.case@example.com'),
+          undefined,
+          true,
+          headers()
+        );
+
+        expect(result).toEqual({ success: false, error: 'EMAIL-ALREADY-USED' });
+        expect(createStripeCustomer).not.toHaveBeenCalled();
+        expect(
+          await db.query.kilocode_users.findFirst({
+            where: eq(kilocode_users.google_user_email, 'legacy.case@example.com'),
+          })
+        ).toBeUndefined();
+      });
+
+      it('still creates a new OAuth account', async () => {
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const result = await createOrUpdateUser(
+          {
+            ...emailArgs('email-signup-disabled-google-new@example.com'),
+            provider: 'google',
+            provider_account_id: 'google-email-signup-disabled-new',
+          },
+          undefined,
+          false,
+          headers()
+        );
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.isNew).toBe(true);
+      });
     });
 
     it.each([
@@ -2065,6 +2200,96 @@ describe('User', () => {
       expect(rows[0].created_by).toBe(connector.id);
     });
 
+    it('detaches deleted personal profiles while retaining organization webhooks and unrelated profile references', async () => {
+      const user = await insertTestUser({
+        google_user_email: `webhook-profile-delete-${randomUUID()}@example.com`,
+      });
+      const owner = await insertTestUser({
+        google_user_email: `webhook-profile-owner-${randomUUID()}@example.com`,
+      });
+      const organization = await createTestOrganization(
+        `Webhook profile cleanup ${randomUUID()}`,
+        owner.id,
+        0
+      );
+      await db
+        .insert(organization_memberships)
+        .values({ organization_id: organization.id, kilo_user_id: user.id, role: 'member' });
+      const [deletedProfile, otherProfile, organizationProfile] = await db
+        .insert(agent_environment_profiles)
+        .values([
+          { owned_by_user_id: user.id, name: 'Deleted personal profile' },
+          { owned_by_user_id: owner.id, name: 'Other personal profile' },
+          { owned_by_organization_id: organization.id, name: 'Organization profile' },
+        ])
+        .returning();
+      const [creatorTrigger, otherCreatorTrigger, botTrigger, personalTrigger] = await db
+        .insert(cloud_agent_webhook_triggers)
+        .values([
+          {
+            trigger_id: 'deleted-creator-profile',
+            organization_id: organization.id,
+            github_repo: 'owner/repo',
+            profile_id: deletedProfile.id,
+          },
+          {
+            trigger_id: 'other-creator-profile',
+            organization_id: organization.id,
+            github_repo: 'owner/repo',
+            profile_id: otherProfile.id,
+          },
+          {
+            trigger_id: 'organization-profile',
+            organization_id: organization.id,
+            github_repo: 'owner/repo',
+            profile_id: organizationProfile.id,
+          },
+          {
+            trigger_id: 'deleted-personal-trigger',
+            user_id: user.id,
+            github_repo: 'owner/repo',
+            profile_id: deletedProfile.id,
+          },
+        ])
+        .returning();
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+      expect(
+        await db
+          .select({
+            id: cloud_agent_webhook_triggers.id,
+            profileId: cloud_agent_webhook_triggers.profile_id,
+          })
+          .from(cloud_agent_webhook_triggers)
+          .where(eq(cloud_agent_webhook_triggers.organization_id, organization.id))
+      ).toEqual(
+        expect.arrayContaining([
+          { id: creatorTrigger.id, profileId: null },
+          { id: otherCreatorTrigger.id, profileId: otherProfile.id },
+          { id: botTrigger.id, profileId: organizationProfile.id },
+        ])
+      );
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_webhook_triggers)
+          .where(eq(cloud_agent_webhook_triggers.id, personalTrigger.id))
+      ).toEqual([]);
+      expect(
+        await db
+          .select()
+          .from(agent_environment_profiles)
+          .where(eq(agent_environment_profiles.id, deletedProfile.id))
+      ).toEqual([]);
+      expect(
+        await db
+          .select({ id: agent_environment_profiles.id })
+          .from(agent_environment_profiles)
+          .where(inArray(agent_environment_profiles.id, [otherProfile.id, organizationProfile.id]))
+      ).toEqual(expect.arrayContaining([{ id: otherProfile.id }, { id: organizationProfile.id }]));
+    });
+
     it('removes personal sandbox allocation settings while keeping the organization rows', async () => {
       const user = await insertTestUser({
         google_user_email: `sandbox-settings-cleanup-${randomUUID()}@example.com`,
@@ -2466,6 +2691,46 @@ describe('User', () => {
           .from(cloud_agent_pending_uploads)
           .where(eq(cloud_agent_pending_uploads.id, otherPending.id))
       ).toHaveLength(1);
+    });
+
+    it('preserves attachment cleanup work until completion', async () => {
+      const user = await insertTestUser();
+      const id = crypto.randomUUID();
+      await db.insert(cloud_agent_pending_uploads).values({
+        id,
+        kilo_user_id: user.id,
+        object_key: `${user.id}/cloud-agent/${crypto.randomUUID()}.bin`,
+        message_uuid: crypto.randomUUID(),
+        attachment_id: crypto.randomUUID(),
+        byte_size: 42,
+        status: 'linked',
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      });
+      mockR2Send.mockRejectedValue(new Error('R2 unavailable'));
+      try {
+        await expect(softDeleteUser(user.id)).rejects.toThrow(
+          'Cloud Agent attachment cleanup incomplete'
+        );
+        expect(
+          await db
+            .select({
+              id: cloud_agent_pending_uploads.id,
+              status: cloud_agent_pending_uploads.status,
+            })
+            .from(cloud_agent_pending_uploads)
+            .where(eq(cloud_agent_pending_uploads.id, id))
+        ).toEqual([{ id, status: 'pending' }]);
+      } finally {
+        mockR2Send.mockResolvedValue({});
+      }
+
+      await softDeleteUser(user.id);
+      expect(
+        await db
+          .select({ id: cloud_agent_pending_uploads.id })
+          .from(cloud_agent_pending_uploads)
+          .where(eq(cloud_agent_pending_uploads.id, id))
+      ).toEqual([]);
     });
 
     it('deletes user data export state and dependent multipart and outbox rows', async () => {
@@ -3152,87 +3417,6 @@ describe('User', () => {
       expect(userFeedbackCount?.value).toBe(0);
       expect(userProposalCount?.value).toBe(0);
       expect(orgProposalCount?.value).toBe(1);
-    });
-
-    it('should scrub ephemeral deployment ownership and schedule immediate cleanup', async () => {
-      const user = await insertTestUser({
-        google_user_email: 'ephemeral-deployment-delete@example.com',
-      });
-      const otherUser = await insertTestUser({
-        google_user_email: 'ephemeral-deployment-delete-other@example.com',
-      });
-      const cleanupClaimToken = randomUUID();
-      const claimedUntil = '2026-06-03T18:00:00.000Z';
-      const originalCleanupAt = '2026-06-04T18:00:00.000Z';
-      const originalUpdatedAt = '2026-06-02T18:00:00.000Z';
-
-      await db.insert(deployments_ephemeral).values([
-        {
-          owned_by_user_id: user.id,
-          source_type: 'html',
-          internal_worker_name: `qdpl-${randomUUID()}`,
-          deployment_slug: 'soft-delete-ephemeral',
-          status: 'active',
-          expires_at: originalCleanupAt,
-          next_cleanup_at: originalCleanupAt,
-          cleanup_claim_token: cleanupClaimToken,
-          cleanup_claimed_until: claimedUntil,
-          updated_at: originalUpdatedAt,
-        },
-        {
-          owned_by_user_id: otherUser.id,
-          source_type: 'html',
-          internal_worker_name: `qdpl-${randomUUID()}`,
-          deployment_slug: 'soft-delete-ephemeral-other',
-          status: 'active',
-          expires_at: originalCleanupAt,
-          next_cleanup_at: originalCleanupAt,
-          cleanup_claim_token: cleanupClaimToken,
-          cleanup_claimed_until: claimedUntil,
-          updated_at: originalUpdatedAt,
-        },
-      ]);
-
-      await softDeleteUser(user.id);
-      const afterSoftDelete = Date.now();
-
-      const rows = await db
-        .select()
-        .from(deployments_ephemeral)
-        .orderBy(deployments_ephemeral.deployment_slug);
-      const otherDeployment = rows.find(row => row.owned_by_user_id === otherUser.id);
-      const scrubbedDeployment = rows.find(row => row.deployment_slug === 'soft-delete-ephemeral');
-
-      expect(scrubbedDeployment).toEqual(
-        expect.objectContaining({
-          owned_by_user_id: null,
-          status: 'cleanup_retry',
-          cleanup_claim_token: null,
-          cleanup_claimed_until: null,
-        })
-      );
-      if (!scrubbedDeployment) throw new Error('Expected scrubbed ephemeral deployment');
-      const nextCleanupAt = new Date(scrubbedDeployment.next_cleanup_at).getTime();
-      expect(nextCleanupAt).toBeGreaterThan(afterSoftDelete - 5_000);
-      expect(nextCleanupAt).toBeLessThanOrEqual(afterSoftDelete);
-      expect(new Date(scrubbedDeployment.updated_at).getTime()).toBe(nextCleanupAt);
-      expect(otherDeployment).toEqual(
-        expect.objectContaining({
-          owned_by_user_id: otherUser.id,
-          status: 'active',
-          cleanup_claim_token: cleanupClaimToken,
-        })
-      );
-      if (!otherDeployment) throw new Error('Expected untouched ephemeral deployment');
-      expect(new Date(otherDeployment.next_cleanup_at).getTime()).toBe(
-        new Date(originalCleanupAt).getTime()
-      );
-      expect(new Date(otherDeployment.cleanup_claimed_until ?? '').getTime()).toBe(
-        new Date(claimedUntil).getTime()
-      );
-      expect(new Date(otherDeployment.updated_at).getTime()).toBe(
-        new Date(originalUpdatedAt).getTime()
-      );
     });
 
     it('should rotate and scrub App Store account-linked Kilo Pass data', async () => {
@@ -5319,6 +5503,40 @@ describe('User', () => {
       expect(skills).toHaveLength(0);
     });
 
+    it('deletes user-owned repository environments without touching another owner', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+
+      await db.insert(cloud_agent_environments).values([
+        {
+          owned_by_user_id: user.id,
+          name: 'mine',
+          platform: 'github',
+          repo_full_name: 'acme/widgets',
+        },
+        {
+          owned_by_user_id: otherUser.id,
+          name: 'theirs',
+          platform: 'github',
+          repo_full_name: 'acme/widgets',
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      const environments = await db
+        .select()
+        .from(cloud_agent_environments)
+        .where(eq(cloud_agent_environments.owned_by_user_id, otherUser.id));
+      expect(environments.map(environment => environment.name)).toEqual(['theirs']);
+
+      const deletedUserEnvironments = await db
+        .select()
+        .from(cloud_agent_environments)
+        .where(eq(cloud_agent_environments.owned_by_user_id, user.id));
+      expect(deletedUserEnvironments).toHaveLength(0);
+    });
+
     it('should nullify user_feedback FK', async () => {
       const user = await insertTestUser();
       await db.insert(user_feedback).values({
@@ -5527,6 +5745,30 @@ describe('User', () => {
         .from(user_push_tokens)
         .where(eq(user_push_tokens.user_id, user.id));
       expect(tokens).toHaveLength(0);
+    });
+
+    it('should delete user_notification_history rows', async () => {
+      const user = await insertTestUser();
+      const other = await insertTestUser();
+      const historyRow = {
+        category: 'chatMessages',
+        push_type: 'chat.message',
+        payload: { type: 'chat.message' },
+        i18n_key: 'chat.message',
+        i18n_params: { conversationTitle: 'Hello' },
+        fallback_title: 'Kilo',
+        fallback_body: 'New message',
+        dedupe_bucket: Math.floor(Date.now() / 3_600_000),
+      };
+      await db.insert(user_notification_history).values([
+        { ...historyRow, user_id: user.id, idempotency_key: 'history-user' },
+        { ...historyRow, user_id: other.id, idempotency_key: 'history-other' },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      const remaining = await db.select().from(user_notification_history);
+      expect(remaining.map(row => row.idempotency_key)).toEqual(['history-other']);
     });
 
     it('should delete user_notification_preferences', async () => {

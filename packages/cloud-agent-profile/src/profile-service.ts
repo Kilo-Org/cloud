@@ -1,5 +1,4 @@
 import type { WorkerDb } from '@kilocode/db';
-import { TRPCError } from '@trpc/server';
 import {
   agent_environment_profiles,
   agent_environment_profile_vars,
@@ -19,7 +18,6 @@ import {
   verifyProfileOwnership,
 } from './profile-utils';
 import { withProfileTransaction } from './database';
-import { countBindingsForProfile } from './repo-binding-db';
 import { listMcpServersForProfile } from './profile-mcp-service';
 import { listSkillsForProfile } from './profile-skills-service';
 import { listAgentsForProfile } from './profile-agents-service';
@@ -84,28 +82,17 @@ export async function updateProfile(
 }
 
 /**
- * Delete a profile and cascade to vars and commands. For an organization-owned
- * profile that is bound to a repository, only an organization manager may
- * delete it: the repo-binding FK cascade would otherwise let a member strip
- * protected bindings.
+ * Delete a profile and cascade to vars and commands. Callers authorize
+ * organization-owned profile deletion themselves (organization managers only,
+ * enforced in the agent-profiles router).
  */
 export async function deleteProfile(
   db: ProfileDatabase,
   profileId: string,
-  owner: ProfileOwner,
-  canManageOrganizationProfiles: boolean
+  owner: ProfileOwner
 ): Promise<void> {
   await withProfileTransaction(db, async tx => {
     await lockProfileOwnership(tx, profileId, owner);
-    if (owner.type === 'organization' && !canManageOrganizationProfiles) {
-      const boundCount = await countBindingsForProfile(tx, profileId);
-      if (boundCount > 0) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Only organization owners and admins can delete a profile bound to a repository',
-        });
-      }
-    }
     await tx.delete(agent_environment_profiles).where(eq(agent_environment_profiles.id, profileId));
   });
 }
@@ -127,7 +114,6 @@ export async function listProfiles(db: WorkerDb, owner: ProfileOwner): Promise<P
     .where(buildOwnershipCondition(owner))
     .orderBy(agent_environment_profiles.name);
 
-  // Get var and command counts for each profile
   const profileIds = profiles.map(p => p.id);
 
   if (profileIds.length === 0) {
@@ -227,7 +213,7 @@ export async function listProfiles(db: WorkerDb, owner: ProfileOwner): Promise<P
 }
 
 /**
- * Get a single profile with vars and commands.
+ * Get a single profile with all of its collections.
  * Secret values are masked.
  */
 export async function getProfile(
@@ -300,13 +286,11 @@ export async function setDefaultProfile(
   await verifyProfileOwnership(db, profileId, owner);
 
   await db.transaction(async tx => {
-    // Clear existing default
     await tx
       .update(agent_environment_profiles)
       .set({ is_default: false })
       .where(and(buildOwnershipCondition(owner), eq(agent_environment_profiles.is_default, true)));
 
-    // Set new default
     await tx
       .update(agent_environment_profiles)
       .set({ is_default: true })

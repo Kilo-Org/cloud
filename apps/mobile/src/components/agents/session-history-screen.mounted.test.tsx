@@ -31,6 +31,7 @@ const listState = vi.hoisted(() => ({
   storedFetchedSinceMount: true,
   storedLoadedPageCount: 1,
   organization: { organizationId: null as string | null, isLoaded: true },
+  organizations: [] as { organizationId: string; organizationName: string }[],
   storedQuery: vi.fn<(options: Parameters<typeof useAgentSessions>[0]) => void>(),
   searchQuery: vi.fn<(options: Parameters<typeof useAgentSessionSearch>[0]) => void>(),
   repositoryQuery: vi.fn<(options: Parameters<typeof useRecentAgentRepositories>[0]) => void>(),
@@ -95,9 +96,10 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   Platform: platformState,
-  Keyboard: { addListener: keyboardState.addListener },
+  Keyboard: { dismiss: vi.fn(), addListener: keyboardState.addListener },
   KeyboardAvoidingView: 'KeyboardAvoidingView',
   AppState: { addEventListener: appState.addEventListener },
+  ActivityIndicator: 'ActivityIndicator',
 }));
 // The modal mock below still loads the real module through `importOriginal`,
 // which imports `react-native-safe-area-context`; that package's `react-native`
@@ -106,14 +108,24 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
-vi.mock('@/components/ui/icons', () => ({ Check: 'Check', X: 'X' }));
+vi.mock('@/components/ui/icons', () => ({
+  Check: 'Check',
+  X: 'X',
+  ChevronDown: 'ChevronDown',
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ accentSoftForeground: '#1a1a10' }),
+  useThemeColors: () => ({
+    accentSoftForeground: '#1a1a10',
+    mutedForeground: '#666666',
+    primary: '#0055ff',
+  }),
 }));
+const routerPush = vi.hoisted(() => vi.fn());
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => focusState.current }),
+  useRouter: () => ({ push: routerPush }),
   useFocusEffect: (effect: () => void) => {
     focusCallbacks.current.add(effect);
   },
@@ -231,6 +243,26 @@ vi.mock('@/lib/persist/drafts', () => ({
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => listState.organization,
 }));
+// The scope control reads the account list from the tRPC options it is handed;
+// keep the mobile client (and its expo imports) out of this suite.
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({
+    organizations: {
+      list: {
+        queryOptions: () => ({
+          queryKey: ['organizations', 'list'],
+          queryFn: () => Promise.resolve(listState.organizations),
+        }),
+      },
+    },
+  }),
+}));
+vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'account' }) }));
+// The shared scope control reaches the skeleton (expo-linear-gradient) and the
+// theme colors (expo-router themes); neither is the subject of this suite.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/context-picker-sheet', () => ({ ContextPickerSheet: 'ContextPickerSheet' }));
+vi.mock('@/lib/a11y/motion', () => ({ useMotionPolicy: () => ({ reducedMotion: false }) }));
 
 const mountedRenderers: TestRenderer.ReactTestRenderer[] = [];
 
@@ -310,6 +342,7 @@ describe('SessionHistoryScreen', () => {
     listState.storedFetchedSinceMount = true;
     listState.storedLoadedPageCount = 1;
     Object.assign(listState.organization, { organizationId: null, isLoaded: true });
+    listState.organizations = [];
     listState.storedQuery.mockClear();
     listState.searchQuery.mockClear();
     listState.repositoryQuery.mockClear();
@@ -319,6 +352,7 @@ describe('SessionHistoryScreen', () => {
     focusCallbacks.current = new Set();
     handleRefetchSpy.mockClear();
     handleRefetchSpy.mockResolvedValue(undefined);
+    routerPush.mockClear();
   });
 
   afterEach(() => {
@@ -393,8 +427,8 @@ describe('SessionHistoryScreen', () => {
       expect(findNodeByType(renderer, 'SessionListSearchHeader')).toBe(searchHeader);
       const tree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
       expect(
-        tree.children.slice(0, 3).map(child => (typeof child === 'string' ? child : child.type))
-      ).toEqual(['ScreenHeader', 'SessionListSearchHeader', 'KeyboardAvoidingView']);
+        tree.children.slice(0, 4).map(child => (typeof child === 'string' ? child : child.type))
+      ).toEqual(['ScreenHeader', 'View', 'SessionListSearchHeader', 'KeyboardAvoidingView']);
     }
   });
 
@@ -431,6 +465,26 @@ describe('SessionHistoryScreen', () => {
     expect(options.map(option => option.gitUrl)).toEqual(gitUrls);
   });
 
+  it('keeps Retry busy until the history refetch settles', async () => {
+    const { promise: pendingRefetch, resolve: settleRefetch } = Promise.withResolvers<undefined>();
+    handleRefetchSpy.mockReturnValueOnce(pendingRefetch);
+    listState.isError = true;
+    const renderer = await renderScreen();
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isRetrying).toBe(false);
+
+    act(() => {
+      (content.props.onRetry as () => void)();
+    });
+    expect(findNodeByType(renderer, 'AgentSessionListContent').props.isRetrying).toBe(true);
+
+    await act(async () => {
+      settleRefetch(undefined);
+      await pendingRefetch;
+    });
+    expect(findNodeByType(renderer, 'AgentSessionListContent').props.isRetrying).toBe(false);
+  });
+
   it('keeps a selected project row that is no longer in the recent repositories', async () => {
     const recent = 'https://github.com/kilo/alpha.git';
     const stale = 'https://github.com/kilo/removed.git';
@@ -453,6 +507,26 @@ describe('SessionHistoryScreen', () => {
     const modal = findNodeByType(renderer, 'SessionFilterModal');
     const options = modal.props.projectOptions as { gitUrl: string }[];
     expect(options.map(option => option.gitUrl)).toEqual([recent, stale]);
+  });
+
+  it('opens the new-session composer from the empty history body', async () => {
+    const renderer = await renderScreen();
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.hasAnySessions).toBe(false);
+    act(() => {
+      (content.props.onCreateSession as () => void)();
+    });
+    expect(routerPush).toHaveBeenCalledWith('/(app)/agent-chat/new');
+  });
+
+  it('keeps the current organization when the empty history starts a session', async () => {
+    Object.assign(listState.organization, { organizationId: 'org-drain', isLoaded: true });
+    const renderer = await renderScreen();
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    act(() => {
+      (content.props.onCreateSession as () => void)();
+    });
+    expect(routerPush).toHaveBeenCalledWith('/(app)/agent-chat/new?organizationId=org-drain');
   });
 
   it('keeps saved repository and platform selections after a successful history retry', async () => {
@@ -579,6 +653,36 @@ describe('SessionHistoryScreen', () => {
       expect(findNodeByType(renderer, 'AgentSessionListContent').props.isLoading).toBe(!loaded);
     }
   );
+
+  // The history list is scoped to the selected account, so the scope is named
+  // above it: an organization scope with no rows otherwise reads as "no past
+  // sessions" while the user's personal CLI sessions sit in another scope.
+  it.each([
+    { organizationId: 'org-1', expected: 'Engineering' },
+    { organizationId: null, expected: 'Personal' },
+  ])('names the account the history is scoped to ($expected)', async test => {
+    listState.organizations = [{ organizationId: 'org-1', organizationName: 'Engineering' }];
+    listState.organization = { organizationId: test.organizationId, isLoaded: true };
+    const renderer = await renderScreen();
+    const scopeLabel = () =>
+      findNodesByType(renderer, 'Text').find(node => node.children.includes(test.expected));
+    await waitFor(() => scopeLabel() !== undefined);
+    expect(
+      findNodesByType(renderer, 'Pressable').filter(
+        node => node.props.accessibilityHint === 'Select account'
+      )
+    ).toHaveLength(1);
+    // The scope sits directly under the header, before the list body.
+    const header = findNodeByType(renderer, 'ScreenHeader');
+    const scopeControl = findNodesByType(renderer, 'Pressable').find(
+      node => node.props.accessibilityHint === 'Select account'
+    );
+    const screen = header.parent;
+    const index = screen?.children.findIndex(
+      child => typeof child !== 'string' && child.findAll(node => node === scopeControl).length > 0
+    );
+    expect(index).toBe(1);
+  });
 
   // Regression: the empty state ("No past sessions") must not flash on the
   // cold-open render. React Query v5 reports `isFetching: false` until the
@@ -713,7 +817,9 @@ describe('SessionHistoryScreen', () => {
     await waitFor(() => content.props.activeSessionIds === nextIds);
     expect(content.props.activeSessionIds).toBe(nextIds);
     expect(activeQuery?.getObserversCount()).toBe(1);
-    expect(queryClient.getQueryCache().getAll()).toHaveLength(1);
+    // One active-session cache entry, however many account-scoped queries the
+    // screen also mounts.
+    expect(queryClient.getQueryCache().findAll({ queryKey })).toHaveLength(1);
   });
 
   it('refetches stored sessions through the wrapped refetch on route focus', async () => {

@@ -14,9 +14,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // recovery behavior is driven by the test seams below.
 
 const store = new Map<string, string>();
-// Every SQL statement Drizzle prepares, in order. `PRAGMA key`, the probes, and
-// the migration all pass through `prepareSync`, so this is the whole statement
-// stream for one open.
+// Every SQL statement in the order it ran. All three seams append: `getFirstSync`
+// (the cipher and journal-mode probes), `execSync` (`PRAGMA key`, busy_timeout),
+// and `prepareSync` (Drizzle's queries and the migration), so this is the whole
+// statement stream for one open.
 const sqlLog: string[] = [];
 let randomCallCount = 0;
 let failNextProbe = false;

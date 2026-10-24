@@ -146,13 +146,22 @@
   ],
   "de": ["block", "manual review", "no changes needed", "open", "open pull request", "pr opened"],
   "el": [
+    "{{count}} open",
+    "archived ({{count}})",
     "balanced",
+    "completed ({{count}})",
     "critical",
     "no changes needed",
+    "none",
     "open",
     "open pull request",
     "pr opened",
-    "remediation blocked"
+    "remediation blocked",
+    "review",
+    "{{displaycount}} failed",
+    "{{displaycount}} passed",
+    "{{displaycount}} skipped",
+    "{{loaded}} of {{total}} files loaded"
   ],
   "es": [
     "analysis failed",
@@ -368,6 +377,9 @@
     "open",
     "open pull request",
     "reactions",
+    "review",
+    "search sessions",
+    "stopped",
     "superseded",
     "tokens"
   ],
@@ -471,6 +483,7 @@
     "github connection expired",
     "manual review",
     "no changes needed",
+    "open pull request",
     "pr opened",
     "remediation failed",
     "review",
@@ -870,6 +883,7 @@
     "copied",
     "deleted",
     "dismissed",
+    "edit",
     "open",
     "open pull request",
     "remediation blocked",
@@ -985,6 +999,7 @@
     "superseded"
   ],
   "zh-Hans": [
+    "block",
     "commit",
     "file",
     "files",

@@ -5,7 +5,12 @@ import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { AgentFormSheet } from '@/components/profiles/agent-form-sheet';
-import { agentRows, type AgentSource } from '@/components/profiles/profile-agents-model';
+import {
+  AGENT_VISIBILITY_LABEL_KEYS,
+  agentRows,
+  type AgentSource,
+  type AgentVisibility,
+} from '@/components/profiles/profile-agents-model';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -19,7 +24,10 @@ import {
   useAgentProfile,
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
+import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_AGENTS: AgentProfileDetail['agents'] = [];
@@ -38,11 +46,11 @@ function isSlugConflict(error: unknown): boolean {
 type AgentRowViewProps = Readonly<{
   name: string;
   slug: string;
-  visibility: string;
+  visibility: AgentVisibility;
   description: string;
   model: string;
-  onEdit: () => void;
-  onDelete: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }>;
 
 /** One agent row: name, slug, visibility, optional model and description, edit/delete. */
@@ -69,7 +77,7 @@ function AgentRowView({
             {slug}
           </Text>
           <Text className="text-xs uppercase tracking-wide text-muted-foreground">
-            {visibility}
+            {t(AGENT_VISIBILITY_LABEL_KEYS[visibility])}
           </Text>
         </View>
         {model.length > 0 ? (
@@ -83,22 +91,26 @@ function AgentRowView({
           </Text>
         ) : null}
       </View>
-      <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
-        accessibilityRole="button"
-        accessibilityLabel={t('profiles.agents.edit')}
-        onPress={onEdit}
-      >
-        <Pencil size={18} color={colors.mutedForeground} />
-      </Pressable>
-      <Pressable
-        className="h-11 w-11 items-center justify-center active:opacity-70"
-        accessibilityRole="button"
-        accessibilityLabel={t('common.delete')}
-        onPress={onDelete}
-      >
-        <Trash2 size={18} color={colors.destructive} />
-      </Pressable>
+      {onEdit !== undefined ? (
+        <Pressable
+          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+          accessibilityRole="button"
+          accessibilityLabel={t('profiles.agents.edit')}
+          onPress={onEdit}
+        >
+          <Pencil size={18} color={colors.mutedForeground} />
+        </Pressable>
+      ) : null}
+      {onDelete !== undefined ? (
+        <Pressable
+          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.delete')}
+          onPress={onDelete}
+        >
+          <Trash2 size={18} color={colors.destructive} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -122,6 +134,7 @@ export function ProfileAgentsScreen({
   const { confirm, dialog } = useConfirmDialog();
   const profileQuery = useAgentProfile(profileId, organizationId);
   const { createAgent, updateAgent, deleteAgent } = useAgentProfileSectionMutations(organizationId);
+  const canManage = useCanManageOrganizationProfiles(organizationId);
 
   const agents = profileQuery.data?.agents ?? NO_AGENTS;
   const rows = agentRows(agents);
@@ -204,9 +217,11 @@ export function ProfileAgentsScreen({
         description={null}
         placement="top"
         action={
-          <Button onPress={startAdd}>
-            <Text>{t('profiles.agents.add')}</Text>
-          </Button>
+          canManage ? (
+            <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
+              <Text>{t('profiles.agents.add')}</Text>
+            </Button>
+          ) : null
         }
       />
     );
@@ -226,19 +241,29 @@ export function ProfileAgentsScreen({
               visibility={row.visibility}
               description={row.description}
               model={row.model}
-              onEdit={() => {
-                setForm({ source });
-                setServerSlugConflict(false);
-              }}
-              onDelete={() => {
-                confirmDelete(source);
-              }}
+              onEdit={
+                canManage
+                  ? () => {
+                      setForm({ source });
+                      setServerSlugConflict(false);
+                    }
+                  : undefined
+              }
+              onDelete={
+                canManage
+                  ? () => {
+                      confirmDelete(source);
+                    }
+                  : undefined
+              }
             />
           );
         })}
-        <Button onPress={startAdd}>
-          <Text>{t('profiles.agents.add')}</Text>
-        </Button>
+        {canManage ? (
+          <Button onPress={startAdd}>
+            <Text>{t('profiles.agents.add')}</Text>
+          </Button>
+        ) : null}
       </>
     );
   }

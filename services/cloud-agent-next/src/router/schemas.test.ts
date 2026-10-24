@@ -20,7 +20,7 @@ import {
 import { parseCanonicalBitbucketCloneUrl } from '../types.js';
 
 const validMessageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
-const validSessionId = 'agent_12345678-1234-1234-1234-123456789012';
+const validSessionId = 'workspace_12345678-1234-1234-1234-123456789012';
 const validKiloSessionId = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
 const validImages = {
   path: '123e4567-e89b-12d3-a456-426614174000',
@@ -726,12 +726,12 @@ describe('prepareSession clone-only variant', () => {
     expect(
       PrepareSessionInput.safeParse({
         ...baseCloneInput,
-        cloneFromKiloSessionId: 'agent_invalid',
+        cloneFromKiloSessionId: 'workspace_invalid',
       }).success
     ).toBe(false);
   });
 
-  it('rejects an agent_ UUID cloneFromKiloSessionId', () => {
+  it('rejects an workspace_ UUID cloneFromKiloSessionId', () => {
     expect(
       PrepareSessionInput.safeParse({
         ...baseCloneInput,
@@ -1040,9 +1040,9 @@ describe('getMessageResult contract', () => {
         messageId: validMessageId,
       }).success
     ).toBe(true);
-    expect(GetMessageResultInput.safeParse({ cloudAgentSessionId: 'agent_invalid' }).success).toBe(
-      false
-    );
+    expect(
+      GetMessageResultInput.safeParse({ cloudAgentSessionId: 'workspace_invalid' }).success
+    ).toBe(false);
     expect(
       GetMessageResultInput.safeParse({ cloudAgentSessionId: validSessionId, messageId: 'msg_bad' })
         .success

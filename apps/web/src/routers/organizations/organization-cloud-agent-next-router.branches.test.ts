@@ -258,7 +258,11 @@ describe('organizationCloudAgentNextRouter.listRepositoryBranches', () => {
       platform: 'github',
       repository: { fullName: 'octocat/hello' },
     });
-    expect(result).toEqual({ defaultBranch: 'main', branches: ['main', 'feature/x'] });
+    expect(result).toEqual({
+      defaultBranch: 'main',
+      branches: ['main', 'feature/x'],
+      truncated: false,
+    });
     expect(mockGetIntegrationsByOrganization).toHaveBeenCalledWith(ORG_ID, 'github', 'agent');
     expect(mockListBranches).toHaveBeenCalledWith(
       { type: 'org', id: ORG_ID },
@@ -280,7 +284,11 @@ describe('organizationCloudAgentNextRouter.listRepositoryBranches', () => {
       platform: 'github',
       repository: { fullName: 'octocat/hello' },
     });
-    expect(result).toEqual({ defaultBranch: 'main', branches: ['main', 'feature/x'] });
+    expect(result).toEqual({
+      defaultBranch: 'main',
+      branches: ['main', 'feature/x'],
+      truncated: false,
+    });
     expect(mockListBranches).toHaveBeenCalledTimes(1);
     expect(mockListBranches).toHaveBeenCalledWith(
       { type: 'org', id: ORG_ID },
@@ -315,7 +323,11 @@ describe('organizationCloudAgentNextRouter.listRepositoryBranches', () => {
       platform: 'github',
       repository: { fullName: 'octocat/hello' },
     });
-    expect(result).toEqual({ defaultBranch: 'main', branches: ['main', 'feature/x'] });
+    expect(result).toEqual({
+      defaultBranch: 'main',
+      branches: ['main', 'feature/x'],
+      truncated: false,
+    });
     expect(mockListBranches.mock.calls.map(call => call[1])).toEqual(['int-primary', 'int-second']);
   });
 
@@ -387,7 +399,11 @@ describe('organizationCloudAgentNextRouter.listRepositoryBranches', () => {
       platform: 'gitlab',
       repository: { fullName: 'group/proj' },
     });
-    expect(result).toEqual({ defaultBranch: 'dev', branches: ['dev', 'release'] });
+    expect(result).toEqual({
+      defaultBranch: 'dev',
+      branches: ['dev', 'release'],
+      truncated: false,
+    });
     // The cache match authorizes the project; the token releases for the
     // acting user inside the organization.
     expect(mockGetValidGitLabToken).toHaveBeenCalledWith(gitlabIntegration, {
@@ -447,6 +463,7 @@ describe('organizationCloudAgentNextRouter.listRepositoryBranches', () => {
     expect(result).toEqual({
       defaultBranch: 'master',
       branches: ['master', 'feat', 'release'],
+      truncated: false,
     });
   });
 
@@ -463,7 +480,91 @@ describe('organizationCloudAgentNextRouter.listRepositoryBranches', () => {
       platform: 'bitbucket',
       repository: { fullName: 'acme/widgets' },
     });
-    expect(result).toEqual({ defaultBranch: null, branches: ['any'] });
+    expect(result).toEqual({ defaultBranch: null, branches: ['any'], truncated: false });
+  });
+
+  it('reports a partial listing when the provider still pages after the page budget', async () => {
+    // A default the pages already contain: no duplicate is added, so the count
+    // is exactly the pages the budget allows.
+    mockRequestBitbucketJson.mockResolvedValue({ mainbranch: { name: 'branch-3' } });
+    let page = 0;
+    mockFetchPage.mockImplementation(async () => {
+      page += 1;
+      return {
+        values: [{ name: `branch-${page}`, type: 'branch' }],
+        nextCursor: `cursor-${page}`,
+      };
+    });
+    const result = await caller.listRepositoryBranches({
+      organizationId: ORG_ID,
+      platform: 'bitbucket',
+      repository: { fullName: 'acme/widgets' },
+    });
+    // The walk is still bounded (20 pages now), but the answer says so instead
+    // of presenting the first pages as the repository's whole branch set.
+    expect(mockFetchPage).toHaveBeenCalledTimes(20);
+    expect(result.truncated).toBe(true);
+    expect(result.branches).toHaveLength(20);
+    expect(result.branches).toEqual(Array.from({ length: 20 }, (_, i) => `branch-${i + 1}`));
+  });
+
+  it('offers the provider default branch even when no page of a partial walk returns it', async () => {
+    mockRequestBitbucketJson.mockResolvedValue({ mainbranch: { name: 'zzz-default' } });
+    let page = 0;
+    mockFetchPage.mockImplementation(async () => {
+      page += 1;
+      return {
+        values: [{ name: `aaa-${page}`, type: 'branch' }],
+        nextCursor: `cursor-${page}`,
+      };
+    });
+    const result = await caller.listRepositoryBranches({
+      organizationId: ORG_ID,
+      platform: 'bitbucket',
+      repository: { fullName: 'acme/widgets' },
+    });
+    // The session checks out the default branch, so a partial walk must still
+    // offer it — first in the list, where the picker shows it preselected.
+    expect(result.truncated).toBe(true);
+    expect(result.branches[0]).toBe('zzz-default');
+    expect(result.branches).toHaveLength(21);
+  });
+
+  it('adds a default branch the provider pages never contain, without claiming truncation', async () => {
+    mockRequestBitbucketJson.mockResolvedValue({ mainbranch: { name: 'trunk' } });
+    mockFetchPage.mockResolvedValueOnce({
+      values: [{ name: 'feat', type: 'branch' }],
+      nextCursor: null,
+    });
+    const result = await caller.listRepositoryBranches({
+      organizationId: ORG_ID,
+      platform: 'bitbucket',
+      repository: { fullName: 'acme/widgets' },
+    });
+    expect(result).toEqual({
+      defaultBranch: 'trunk',
+      branches: ['trunk', 'feat'],
+      truncated: false,
+    });
+  });
+
+  it('keeps the collected list when a repeating cursor ends the walk', async () => {
+    let page = 0;
+    mockFetchPage.mockImplementation(async () => {
+      page += 1;
+      return {
+        values: [{ name: `branch-${page}`, type: 'branch' }],
+        // The same cursor again: paging cannot advance, so nothing is held back.
+        nextCursor: 'same-cursor',
+      };
+    });
+    const result = await caller.listRepositoryBranches({
+      organizationId: ORG_ID,
+      platform: 'bitbucket',
+      repository: { fullName: 'acme/widgets' },
+    });
+    expect(mockFetchPage).toHaveBeenCalledTimes(2);
+    expect(result.truncated).toBe(false);
   });
 
   it('surfaces a retryable refs failure as a retry error, never as an empty success', async () => {

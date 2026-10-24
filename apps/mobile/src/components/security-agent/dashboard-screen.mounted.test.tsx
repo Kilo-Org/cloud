@@ -4,8 +4,9 @@
 // (missing-configuration rejection, persistence failure) ends the intent — the
 // hook rotates the operation key, so both sync controls ("Sync now" header
 // button and the "Sync findings" empty-state action) must disable and the
-// inline copy must explain the state. The missing-configuration rejection shows
-// the state-specific configuration copy in place of the raw server message.
+// inline copy must explain the state. The hook maps every failure onto catalog
+// copy before it reaches the screen, so the banner renders the mapped message;
+// these cases feed the real mapper's output.
 // Retryable failures keep both controls enabled so the user can retry under the
 // same hoisted key.
 
@@ -14,7 +15,16 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import {
+  mapSecuritySyncOperationError,
+  SECURITY_AMBIGUOUS_MESSAGE,
+} from '@/lib/security-agent-ledger';
 import { buildLocalizedMetrics, DashboardScreen } from './dashboard-screen';
+
+// The security mutation hooks hoist an operation key through
+// `@/lib/operation-key`, whose expo-crypto root import loads a native binding
+// this node project does not have.
+vi.mock('expo-crypto', () => ({ randomUUID: () => '00000000-0000-4000-8000-000000000000' }));
 
 const PERSISTENCE_FAILED_MESSAGE = vi.hoisted(
   () => 'We could not record this action. Please try again later.'
@@ -41,8 +51,9 @@ const config = vi.hoisted(() => ({
 }));
 const dashboardStats = vi.hoisted(() => ({
   isLoading: false,
+  isPending: false,
   isError: false,
-  data: { sla: { overall: { total: 0 } } },
+  data: undefined as Record<string, unknown> | undefined,
   refetch: vi.fn(),
 }));
 const lastSync = vi.hoisted(() => ({
@@ -153,6 +164,7 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
 }));
 vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
   useSecurityDismissFailures: () => dismissFailures,
+  securityDismissFailureCopy: (draft: { lastError: string }) => draft.lastError,
 }));
 vi.mock('@/lib/persist/use-mutation-outbox', () => ({
   useMutationOutbox: () => outbox,
@@ -166,25 +178,6 @@ vi.mock('@/components/security-agent/security-command-retry-card', () => ({
   }) => {
     retryCards.cards.push(props);
     return null;
-  },
-}));
-// Faithful-enough mirror of the real classifier (covered by its own suite):
-// the persistence-failure and replay-failed markers and the
-// missing-configuration rejection are non-retryable, the rest (transport,
-// in-progress copy, ambiguous, settle-failed) are retryable.
-vi.mock('@/lib/hooks/use-security-agent-mutations', () => ({
-  isSecurityConfigurationError: (error: unknown) =>
-    error instanceof Error && error.message === CONFIGURATION_ERROR_MESSAGE,
-  securityConfigurationCopy: () => CONFIGURATION_COPY,
-  securitySyncReconcileCopy: () => RECONCILE_COPY,
-  isSecuritySyncRetryable: (error: unknown) => {
-    const message = error instanceof Error ? error.message : '';
-    return !(
-      message === 'We could not record this action. Please try again later.' ||
-      message === 'This action did not complete. Please try again.' ||
-      message === 'operation_key_reuse_mismatch' ||
-      message === CONFIGURATION_ERROR_MESSAGE
-    );
   },
 }));
 vi.mock('@kilocode/app-shared/security-agent', () => ({
@@ -214,7 +207,7 @@ vi.mock('@/components/security-agent/audit-report-button', () => ({
 vi.mock('@/components/security-agent/dashboard-sections', () => ({
   DashboardSections: () => null,
 }));
-vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/spinning-icon', () => ({ SpinningIcon: () => null }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({
@@ -239,16 +232,21 @@ function renderScreen(): R {
   return r;
 }
 
+type SyncControlKey = 'securityAgent.dashboard.syncNow' | 'securityAgent.dashboard.syncFindings';
+
 function syncButtons(root: I): I[] {
+  const syncNow = i18n.t('securityAgent.dashboard.syncNow');
+  const syncFindings = i18n.t('securityAgent.dashboard.syncFindings');
   return root.findAll(
     n =>
       typeof n.type === 'string' &&
       (n.type as string) === 'Pressable' &&
-      (n.props.accessibilityLabel === 'Sync now' || n.props.accessibilityLabel === 'Sync findings')
+      (n.props.accessibilityLabel === syncNow || n.props.accessibilityLabel === syncFindings)
   );
 }
 
-function findSyncButton(root: I, label: 'Sync now' | 'Sync findings'): I {
+function findSyncButton(root: I, key: SyncControlKey): I {
+  const label = i18n.t(key);
   const nodes = syncButtons(root).filter(n => n.props.accessibilityLabel === label);
   const n = nodes[0];
   if (!n) {
@@ -297,6 +295,7 @@ describe('DashboardScreen sync control terminal states', () => {
     triggerSync.error = null;
     config.data = { slaEnabled: true };
     dashboardStats.isLoading = false;
+    dashboardStats.isPending = false;
     dashboardStats.isError = false;
     dashboardStats.data = { sla: { overall: { total: 0 } } };
     lastSync.data = undefined;
@@ -326,16 +325,31 @@ describe('DashboardScreen sync control terminal states', () => {
 
   it('keeps both sync controls enabled after a retryable error and shows its copy', () => {
     triggerSync.isError = true;
-    triggerSync.error = new Error(IN_PROGRESS_COPY);
+    triggerSync.error = mapSecuritySyncOperationError(new Error('operation_in_progress'));
     const root = renderScreen();
 
     expect(syncDisabledStates(root.root)).toEqual([false, false]);
     expect(renderedTexts(root.root)).toContain(IN_PROGRESS_COPY);
   });
 
+  it('renders the translated ambiguous copy under ja and keeps both controls retryable', async () => {
+    await i18n.changeLanguage('ja');
+    try {
+      triggerSync.isError = true;
+      triggerSync.error = mapSecuritySyncOperationError(new Error(SECURITY_AMBIGUOUS_MESSAGE));
+      const root = renderScreen();
+
+      expect(syncDisabledStates(root.root)).toEqual([false, false]);
+      expect(renderedTexts(root.root)).toContain(i18n.t('securityAgent.mutations.ambiguous'));
+      expect(renderedTexts(root.root)).not.toContain(SECURITY_AMBIGUOUS_MESSAGE);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
+  });
+
   it('disables both sync controls and shows configuration-specific copy after a missing-configuration error', () => {
     triggerSync.isError = true;
-    triggerSync.error = new Error(CONFIGURATION_ERROR_MESSAGE);
+    triggerSync.error = mapSecuritySyncOperationError(new Error(CONFIGURATION_ERROR_MESSAGE));
     const root = renderScreen();
 
     expect(syncDisabledStates(root.root)).toEqual([true, true]);
@@ -346,7 +360,7 @@ describe('DashboardScreen sync control terminal states', () => {
 
   it('disables both sync controls and shows the error copy after another non-retryable error', () => {
     triggerSync.isError = true;
-    triggerSync.error = new Error(PERSISTENCE_FAILED_MESSAGE);
+    triggerSync.error = mapSecuritySyncOperationError(new Error(PERSISTENCE_FAILED_MESSAGE));
     const root = renderScreen();
 
     expect(syncDisabledStates(root.root)).toEqual([true, true]);
@@ -362,7 +376,7 @@ describe('DashboardScreen sync control terminal states', () => {
 
   it('submits the sync through the header control with the current repo filter', () => {
     const root = renderScreen();
-    const syncNow = findSyncButton(root.root, 'Sync now');
+    const syncNow = findSyncButton(root.root, 'securityAgent.dashboard.syncNow');
 
     act(() => {
       (syncNow.props.onPress as () => void)();
@@ -681,5 +695,61 @@ describe('DashboardScreen reconcile card states', () => {
     });
 
     expect(outbox.refresh).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('DashboardScreen pending stats', () => {
+  const resolvedData = {
+    analysis: {
+      total: 3,
+      exploitable: 0,
+      needsReview: 1,
+      triageComplete: 0,
+      analyzing: 0,
+      notAnalyzed: 0,
+      failed: 0,
+    },
+    severity: { critical: 1, high: 1 },
+    sla: {
+      overall: { total: 0, withinSla: 0, overdue: 0 },
+      bySeverity: { critical: { overdue: 0 }, high: { overdue: 0 } },
+      dueSoon: { total: 0, exploitable: 0 },
+      untrackedCount: 0,
+    },
+  };
+
+  it('paints the metric skeleton while a paused stats read is still pending', () => {
+    // A NetInfo-paused read is pending without fetching, so `isLoading` is
+    // false. The body must still show its loading state instead of an empty
+    // metrics row.
+    dashboardStats.isPending = true;
+    dashboardStats.isLoading = false;
+    dashboardStats.data = undefined;
+    sharedMetrics.build.mockReturnValue([dashboardMetric('openFindings')]);
+
+    const root = renderScreen();
+
+    expect(
+      root.root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Skeleton')
+    ).toHaveLength(4);
+    expect(renderedTexts(root.root)).not.toContain(
+      i18n.t('securityAgent.dashboardMetrics.openFindings')
+    );
+  });
+
+  it('replaces the skeleton with the metric once the read resolves', () => {
+    dashboardStats.isPending = false;
+    dashboardStats.isLoading = false;
+    dashboardStats.data = resolvedData;
+    sharedMetrics.build.mockReturnValue([dashboardMetric('openFindings')]);
+
+    const root = renderScreen();
+
+    expect(
+      root.root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Skeleton')
+    ).toHaveLength(0);
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.dashboardMetrics.openFindings')
+    );
   });
 });

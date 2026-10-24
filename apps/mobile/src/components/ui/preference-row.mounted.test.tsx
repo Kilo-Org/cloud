@@ -8,6 +8,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { PreferenceRow } from './preference-row';
 
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
   Pressable: 'Pressable',
@@ -35,6 +36,9 @@ function renderRow(props: {
   value: boolean;
   disabled?: boolean;
   onValueChange: (next: boolean) => void;
+  resolveValue?: () => boolean;
+  subtitle?: string;
+  inactiveSubtitle?: string;
 }) {
   act(() => {
     const element = createElement(PreferenceRow, {
@@ -127,5 +131,80 @@ describe('PreferenceRow', () => {
     const pressable = root.find(node => Object.is(node.type, 'Pressable'));
     expect(pressable.props.accessible).toBe(false);
     expect(pressable.props.importantForAccessibility).toBe('no-hide-descendants');
+  });
+
+  it('flips the newest requested value, not the rendered one, on either control', () => {
+    // The rendered value lags a store write. Three presses in a row must each
+    // flip what the last one asked for, whichever control receives them.
+    let requested = false;
+    const seen: boolean[] = [];
+    const root = renderRow({
+      value: false,
+      resolveValue: () => requested,
+      onValueChange: next => {
+        seen.push(next);
+        requested = next;
+      },
+    });
+    const label = root.find(node => Object.is(node.type, 'Pressable'));
+    const toggle = root.find(node => Object.is(node.type, 'Switch'));
+
+    act(() => {
+      (label.props.onPress as () => void)();
+      (toggle.props.onValueChange as (next: boolean) => void)(false);
+      (label.props.onPress as () => void)();
+    });
+
+    expect(seen).toEqual([true, false, true]);
+  });
+
+  it('paints only the visible subtitle while reserving the other one invisibly', () => {
+    const root = renderRow({
+      value: false,
+      subtitle: 'Applies now',
+      inactiveSubtitle: 'Has no effect right now',
+      onValueChange: () => undefined,
+    });
+    const textOf = (container: typeof root) =>
+      container.findAll(node => Object.is(node.type, 'Text')).map(node => node.props.children);
+
+    // The reservation holds both strings so the row can be as tall as either.
+    const reservation = root.find(
+      node => Object.is(node.type, 'View') && node.props.className === 'flex-row opacity-0'
+    );
+    expect(reservation.props.importantForAccessibility).toBe('no-hide-descendants');
+    expect(reservation.props.accessibilityElementsHidden).toBe(true);
+    expect(reservation.props.pointerEvents).toBe('none');
+    expect(textOf(reservation)).toEqual(['Applies now', 'Has no effect right now']);
+
+    // Only the visible copy is painted.
+    const overlay = root.find(
+      node => Object.is(node.type, 'View') && node.props.className === 'absolute inset-x-0 top-0'
+    );
+    expect(textOf(overlay)).toEqual(['Applies now']);
+
+    const toggle = root.find(node => Object.is(node.type, 'Switch'));
+    expect(toggle.props.accessibilityHint).toBe('Applies now');
+  });
+
+  it('stacks the two reserved copies so the taller one sets the row height', () => {
+    const root = renderRow({
+      value: false,
+      subtitle: 'Short copy',
+      inactiveSubtitle: 'A noticeably longer inactive subtitle that wraps further',
+      onValueChange: () => undefined,
+    });
+    const copies = root
+      .find(node => Object.is(node.type, 'View') && node.props.className === 'flex-row opacity-0')
+      .findAll(node => Object.is(node.type, 'Text'));
+
+    expect(copies.map(node => node.props.children)).toEqual([
+      'Short copy',
+      'A noticeably longer inactive subtitle that wraps further',
+    ]);
+    // Both are full width in one row; the second is pulled back over the first,
+    // so the row is as tall as the taller copy instead of the sum.
+    expect(copies[0]?.props.className).toContain('w-full');
+    expect(copies[1]?.props.className).toContain('-ms-[100%]');
   });
 });

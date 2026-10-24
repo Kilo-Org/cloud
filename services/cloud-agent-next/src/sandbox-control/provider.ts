@@ -112,6 +112,12 @@ export type ProviderStartupCommand = { argv: readonly string[] };
 export type ProviderAdapter = {
   describeRuntime?(ref: string): CloudAgentRunContainer | undefined;
   ensureBillingAdmission(ref: string, billing?: SandboxBillingInput): Promise<void>;
+  /**
+   * Read the stored compute-billing block without admitting or waking anything.
+   * A provider that keeps the state outside the sandbox omits this; the caller
+   * then keeps its own check.
+   */
+  isBillingBlocked?(ref: string | null): Promise<boolean>;
   create(intent: ProviderCreateIntent): Promise<{ providerRef: string } | { unresolved: true }>;
   launch(
     ref: string,

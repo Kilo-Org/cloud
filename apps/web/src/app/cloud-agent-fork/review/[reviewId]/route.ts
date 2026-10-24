@@ -4,12 +4,14 @@
  * Opening the posted link renders the confirmation page (`./confirm`), and the
  * session is prepared only from a same-origin submission of that page's form.
  *
- * The prompt is derived server side from the review row, so this endpoint
- * cannot be used to inject arbitrary prompt text into a cloud agent session.
+ * The prompt is derived server side from the review row and the review comments
+ * it selects, so this endpoint cannot be used to inject arbitrary prompt text
+ * into a cloud agent session.
  */
 
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
 import { buildFixReviewPrompt } from '@/lib/code-reviews/prompts/fix-review-prompt';
 import {
   DEFAULT_CODE_REVIEW_MODE,
@@ -17,6 +19,7 @@ import {
   REVIEW_FIX_SESSION_RATE_WINDOW_SECONDS,
 } from '@/lib/code-reviews/core/constants';
 import { isSessionStartRateLimited } from '@/lib/code-reviews/core/session-start-rate-limit';
+import { selectFixReviewCommentsForReview } from '@/lib/code-reviews/fix-review/select-comments';
 import { resolveBotModelSlug } from '@/lib/bot/model';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { createCallerFactory, createTRPCContext } from '@kilocode/web-shared/lib/trpc/init';
@@ -166,9 +169,25 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return relativeRedirect(`${confirmationPath(reviewId)}?error=rate_limited`, 303);
     }
 
+    const selection = await selectFixReviewCommentsForReview({
+      repositoryFullName: review.repo_full_name,
+      pullNumber: review.pr_number,
+      prAuthor: review.pr_author,
+      initiatorKiloUserId: ctx.user.id,
+      integration,
+    });
+
     const sessionInput = {
       githubRepo: review.repo_full_name,
-      prompt: buildFixReviewPrompt(review.pr_url),
+      prompt: buildFixReviewPrompt({
+        prUrl: review.pr_url,
+        repositoryFullName: review.repo_full_name,
+        pullNumber: review.pr_number,
+        headRef: review.head_ref,
+        comments: selection.comments,
+        omittedCommentCount: selection.omittedCount,
+        nonce: randomUUID(),
+      }),
       mode: DEFAULT_CODE_REVIEW_MODE,
       model: resolveBotModelSlug(integration),
       autoInitiate: true,

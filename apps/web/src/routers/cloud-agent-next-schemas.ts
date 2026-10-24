@@ -1,3 +1,4 @@
+import { setupCommandsSchema } from '@kilocode/cloud-agent-profile/setup-script';
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
@@ -146,7 +147,6 @@ export const cloudAgentGetAttachmentUploadUrlSchema = z
   })
   .superRefine((data, ctx) => {
     if (data.extension) {
-      // Relaxed surface: contentType only needs the type/subtype shape.
       if (!CLOUD_AGENT_ATTACHMENT_RELAXED_CONTENT_TYPE_REGEX.test(data.contentType)) {
         ctx.addIssue({
           code: 'custom',
@@ -174,17 +174,6 @@ export const cloudAgentGetAttachmentUploadUrlSchema = z
 export const cloudAgentGetAttachmentDownloadUrlSchema = z.object({
   messageUuid: z.uuid(),
   filename: cloudAgentRelaxedAttachmentFilenameSchema,
-});
-
-/**
- * Send-time finalization input for the pending-upload ledger. The object keys
- * are full R2 keys produced by the upload presign; the server scopes the link
- * to the caller's own rows, so the array needs no per-key structure beyond a
- * length cap that reuses the landed attachment-count constant.
- */
-export const cloudAgentLinkPendingUploadsSchema = z.object({
-  messageUuid: z.uuid(),
-  objectKeys: z.array(z.string().min(1).max(1024)).min(1).max(CLOUD_AGENT_ATTACHMENT_MAX_COUNT),
 });
 
 /**
@@ -349,11 +338,14 @@ export const agentModeSendMessageSchema = z
  * Discriminated execution payload for follow-up messages and prepared-session
  * initialization. Mirrors the worker's SendMessageV2Payload schema; both
  * variants ride the same execution pipeline on the cloud-agent-next side.
+ * Free-text fields are bounded by `CLOUD_AGENT_PROMPT_MAX_LENGTH` so both
+ * entry paths enforce one limit: `arguments` expands into the prompt through
+ * `$1`/`$ARGUMENTS`, and `command` stays a bare catalog name.
  */
 export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('prompt'),
-    prompt: z.string().min(1),
+    prompt: z.string().min(1).max(CLOUD_AGENT_PROMPT_MAX_LENGTH),
     mode: agentModeSendMessageSchema,
     model: z.string().min(1),
     variant: z
@@ -365,14 +357,15 @@ export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('command'),
     command: z.string().min(1),
-    arguments: z.string().default(''),
+    arguments: z.string().max(CLOUD_AGENT_PROMPT_MAX_LENGTH).default(''),
   }),
 ]);
 
 /**
  * Send-only execution payload for follow-up messages. Mirrors
  * `sendMessageNextPayloadSchema` but allows an empty prompt, because a
- * follow-up send may carry attachments or images with no text. Used only by
+ * follow-up send may carry attachments or images with no text; that is the
+ * only difference, since both paths keep the shared length cap. Used only by
  * `baseSendMessageNextSchema.payload`; prepare `initialPayload` keeps the
  * `.min(1)` prompt via `sendMessageNextPayloadSchema`.
  */
@@ -446,7 +439,7 @@ const PrepareSessionSharedFields = {
 
   // Optional configuration
   envVars: z.record(z.string().max(256), z.string().max(256)).optional(),
-  setupCommands: z.array(z.string().max(500)).max(20).optional(),
+  setupCommands: setupCommandsSchema.optional(),
   mcpServers: z.record(z.string(), mcpServerConfigNextSchema).optional(),
   runtimeSkills: z.array(runtimeSkillInputSchema).max(50).optional(),
   runtimeAgents: z.array(runtimeAgentInputSchema).max(20).optional(),
@@ -461,7 +454,7 @@ const PrepareSessionSharedFields = {
 };
 
 const PrepareSessionNonCloneVariant = z.object({
-  prompt: z.string().min(1).max(100_000),
+  prompt: z.string().min(1).max(CLOUD_AGENT_PROMPT_MAX_LENGTH),
   initialMessageId: messageIdNextSchema.optional(),
   initialPayload: sendMessageNextPayloadSchema.optional(),
   autoInitiate: z.boolean().optional(),

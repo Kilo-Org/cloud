@@ -57,6 +57,7 @@ type AttachmentReference = { path: string; files: string[] };
 const mockPrepareSession = jest.fn<
   (input: {
     githubRepo?: string;
+    githubIntegrationId?: string;
     gitUrl?: string;
     platform?: 'github' | 'gitlab' | 'bitbucket';
     bitbucketWorkspaceUuid?: string;
@@ -179,6 +180,9 @@ const mockFetchGitHubRepositoriesForOrganization = jest.fn<
     syncedAt: null;
   }>
 >();
+const mockResolveGitHubIntegrationIdForRepository = jest.fn<
+  (owner: unknown, repositoryFullName: string) => Promise<string | null>
+>(() => Promise.resolve(null));
 const mockFetchGitLabRepositoriesForOrganization = jest.fn<
   (
     organizationId: string,
@@ -249,6 +253,10 @@ jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
 jest.mock('@/lib/cloud-agent/github-integration-helpers', () => ({
   fetchGitHubRepositoriesForOrganization: mockFetchGitHubRepositoriesForOrganization,
   fetchAllGitHubRepositoriesForOrganization: mockFetchGitHubRepositoriesForOrganization,
+}));
+
+jest.mock('@/lib/cloud-agent/github-integration-resolution', () => ({
+  resolveGitHubIntegrationIdForRepository: mockResolveGitHubIntegrationIdForRepository,
 }));
 
 jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
@@ -1799,6 +1807,63 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
     githubRepo: 'acme/repo',
   };
 
+  it('forwards the GitHub connection that owns the selected repository', async () => {
+    const integrationId = '123e4567-e89b-12d3-a456-426614174030';
+    mockResolveGitHubIntegrationIdForRepository.mockResolvedValueOnce(integrationId);
+    const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+    await caller.prepareSession({
+      organizationId: ORGANIZATION_ID,
+      prompt: 'Test prompt',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+    });
+
+    expect(mockResolveGitHubIntegrationIdForRepository).toHaveBeenCalledWith(
+      { type: 'org', id: ORGANIZATION_ID },
+      'acme/repo'
+    );
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({ githubRepo: 'acme/repo', githubIntegrationId: integrationId })
+    );
+  });
+
+  it('keeps an explicitly supplied GitHub connection without resolving another', async () => {
+    const supplied = '123e4567-e89b-12d3-a456-426614174031';
+    const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+    await caller.prepareSession({
+      organizationId: ORGANIZATION_ID,
+      prompt: 'Test prompt',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+      githubIntegrationId: supplied,
+    });
+
+    expect(mockResolveGitHubIntegrationIdForRepository).not.toHaveBeenCalled();
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({ githubIntegrationId: supplied })
+    );
+  });
+
+  it('sends no GitHub connection when none of them owns the repository', async () => {
+    const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+    await caller.prepareSession({
+      organizationId: ORGANIZATION_ID,
+      prompt: 'Test prompt',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+    });
+
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.not.objectContaining({ githubIntegrationId: expect.anything() })
+    );
+  });
+
   it.each(SELECTABLE_SANDBOX_ALLOCATIONS)(
     'forwards the normalized legacy organization sandbox preset %s',
     async sandboxAllocation => {
@@ -2006,7 +2071,7 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
     expect(mockPrepareSession).not.toHaveBeenCalled();
   });
 
-  it('routes free models through the AppBuilder client so the worker skips the balance minimum', async () => {
+  it('routes free models through the skipped-balance client so the worker skips the balance minimum', async () => {
     mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValueOnce({
       isFree: true,
       hasUserByokAvailable: false,
@@ -2036,7 +2101,7 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
     expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
   });
 
-  it('routes BYOK-capable paid models through the AppBuilder client so the worker skips the balance minimum', async () => {
+  it('routes BYOK-capable paid models through the skipped-balance client so the worker skips the balance minimum', async () => {
     mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValueOnce({
       isFree: false,
       hasUserByokAvailable: true,

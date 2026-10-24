@@ -549,7 +549,18 @@ export const webhookTriggersRouter = createTRPCRouter({
 
       let actorRole: OrganizationRole | undefined;
       if (input.organizationId) {
-        actorRole = await ensureOrganizationAccess(ctx, input.organizationId);
+        try {
+          actorRole = await ensureOrganizationAccess(
+            ctx,
+            input.organizationId,
+            TRIGGER_WRITE_ROLES
+          );
+        } catch (error) {
+          if (!(error instanceof TRPCError) || error.code !== 'UNAUTHORIZED') {
+            throw error;
+          }
+          actorRole = await ensureOrganizationAccess(ctx, input.organizationId);
+        }
       }
 
       // Verify ownership via PostgreSQL

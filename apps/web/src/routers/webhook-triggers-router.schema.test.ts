@@ -525,6 +525,55 @@ describe('webhook trigger variant inputs', () => {
     }
   );
 
+  it('keeps child members editable when they also inherit a billing manager role', async () => {
+    mockEnsureOrganizationAccess.mockImplementation(async (_ctx, _organizationId, roles) =>
+      roles?.includes('member') ? 'member' : 'billing_manager'
+    );
+    mockGetWorkerTrigger.mockResolvedValue({
+      found: true,
+      config: { ...triggerConfig, executionUserId: user.id },
+    });
+
+    await expect(
+      createCaller({ user }).get({
+        triggerId: 'trigger-id',
+        organizationId: '00000000-0000-4000-8000-000000000001',
+      })
+    ).resolves.toMatchObject({ canEdit: true, canEditReason: null, canRun: true });
+  });
+
+  it('preserves read-only access when a billing manager has no write role', async () => {
+    mockEnsureOrganizationAccess
+      .mockRejectedValueOnce(new TRPCError({ code: 'UNAUTHORIZED' }))
+      .mockResolvedValueOnce('billing_manager');
+
+    await expect(
+      createCaller({ user }).get({
+        triggerId: 'trigger-id',
+        organizationId: '00000000-0000-4000-8000-000000000001',
+      })
+    ).resolves.toMatchObject({ canEdit: false, canEditReason: 'role', canRun: false });
+    expect(mockEnsureOrganizationAccess.mock.calls.map(call => call[2])).toEqual([
+      ['owner', 'admin', 'member'],
+      undefined,
+    ]);
+  });
+
+  it('does not fall back to read access after an unexpected authorization failure', async () => {
+    mockEnsureOrganizationAccess.mockRejectedValueOnce(
+      new TRPCError({ code: 'INTERNAL_SERVER_ERROR' })
+    );
+
+    await expect(
+      createCaller({ user }).get({
+        triggerId: 'trigger-id',
+        organizationId: '00000000-0000-4000-8000-000000000001',
+      })
+    ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+    expect(mockEnsureOrganizationAccess).toHaveBeenCalledTimes(1);
+    expect(mockGetWorkerTrigger).not.toHaveBeenCalled();
+  });
+
   it('allows the creator to edit without changing execution identity', async () => {
     mockGetWorkerTrigger.mockResolvedValue({
       found: true,

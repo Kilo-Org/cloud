@@ -1652,10 +1652,9 @@ export default function CloudChatPage({
   const preparationRowShowsProgress = preparationAttempts.some(
     attempt => attempt.status === 'running'
   );
+  const isReconnecting = statusIndicator?.code === 'reconnecting-to-agent';
   const visibleStatusIndicator =
-    (statusIndicator?.type === 'progress' &&
-      statusIndicator.code !== 'reconnecting-to-agent' &&
-      preparationRowShowsProgress) ||
+    (statusIndicator?.type === 'progress' && !isReconnecting && preparationRowShowsProgress) ||
     isCommitSummaryRepresented(statusIndicator, commitsAfterMessage)
       ? null
       : statusIndicator;
@@ -1988,7 +1987,9 @@ export default function CloudChatPage({
                                     />
                                   ) : (
                                     <TranscriptStatusSlot
-                                      yieldToPreparationRow={preparationRowShowsProgress}
+                                      yieldToPreparationRow={
+                                        preparationRowShowsProgress && !isReconnecting
+                                      }
                                       workingMessages={
                                         chatTabActive &&
                                         isStreaming &&

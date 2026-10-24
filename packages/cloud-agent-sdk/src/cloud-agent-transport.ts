@@ -370,8 +370,12 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
             return;
           }
 
-          // Completing a turn does not terminate the stream.
-          if (event.type === 'stopped' && event.reason !== 'complete') {
+          // Service state decides whether a wrapper disconnect is terminal.
+          // Only unconditional terminals suppress later transport events here.
+          if (
+            event.type === 'stopped' &&
+            (event.reason === 'error' || event.reason === 'interrupted')
+          ) {
             terminalReceived = true;
           }
 

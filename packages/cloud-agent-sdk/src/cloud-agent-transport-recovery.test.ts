@@ -415,25 +415,32 @@ describe('Cloud Agent stream recovery after a backend outage', () => {
     harness.transport.destroy();
   });
 
-  it('reports reconnecting and exhaustion after a completed turn without another stream frame', async () => {
-    const harness = createHarness();
-    await connect(harness);
-    receive(createEvent('complete', {}));
+  it.each(['complete', 'complete then wrapper disconnect'])(
+    'reports reconnecting and exhaustion after %s without another stream frame',
+    async sequence => {
+      const harness = createHarness();
+      await connect(harness);
+      receive(createEvent('complete', {}));
+      if (sequence === 'complete then wrapper disconnect') {
+        receive(createEvent('wrapper_disconnected', {}));
+      }
+      expect(harness.state.getStatus()).toEqual({ type: 'idle' });
 
-    closeSocket();
-    expect(harness.state.getActivity()).toEqual({ type: 'reconnecting' });
-    expect(harness.onError).not.toHaveBeenCalled();
+      closeSocket();
+      expect(harness.state.getActivity()).toEqual({ type: 'reconnecting' });
+      expect(harness.onError).not.toHaveBeenCalled();
 
-    await exhaustRetries();
-    expect(harness.state.getStatus()).toEqual({ type: 'disconnected' });
-    expect(harness.onError).toHaveBeenCalledWith('Connection to agent lost');
-    expect(
-      harness.serviceEvents.filter(
-        event => event.type === 'stopped' && event.reason === 'transport-disconnected'
-      )
-    ).toHaveLength(1);
-    harness.transport.destroy();
-  });
+      await exhaustRetries();
+      expect(harness.state.getStatus()).toEqual({ type: 'disconnected' });
+      expect(harness.onError).toHaveBeenCalledWith('Connection to agent lost');
+      expect(
+        harness.serviceEvents.filter(
+          event => event.type === 'stopped' && event.reason === 'transport-disconnected'
+        )
+      ).toHaveLength(1);
+      harness.transport.destroy();
+    }
+  );
 
   it('treats a repeated auth close as terminal without a reconnecting event', async () => {
     const harness = createHarness();
@@ -498,17 +505,17 @@ describe('Cloud Agent stream recovery after a backend outage', () => {
     expect(harness.state.getActivity()).toEqual({ type: 'idle' });
     expect(harness.onError).toHaveBeenCalledTimes(1);
 
-    // The wire stop set the per-socket guard, so this close is silent.
+    // Service state owns the wrapper terminal even when transport recovery starts.
     closeSocket();
-    expect(harness.serviceEvents.filter(e => e.type === 'reconnecting')).toHaveLength(0);
+    expect(harness.state.getStatus()).toEqual({ type: 'disconnected' });
+    expect(harness.state.getActivity()).toEqual({ type: 'idle' });
+    expect(harness.onError).toHaveBeenCalledTimes(1);
 
     await jest.advanceTimersByTimeAsync(600);
-    // A non-root-status message on the recovery socket fires onReconnected,
-    // which clears the transport guard, without clearing the wrapper terminal.
+    // A recovery frame before the status snapshot keeps the wrapper terminal.
     receive(createEvent('commands.available', { commands: [] }));
 
-    // Close before a normalized `connected`: the transport now emits
-    // reconnecting, but the wrapper terminal outranks the projection.
+    // Another close before the status snapshot still preserves the terminal.
     closeSocket();
     expect(harness.serviceEvents).toContainEqual({ type: 'reconnecting' });
     expect(harness.state.getStatus()).toEqual({ type: 'disconnected' });
@@ -556,8 +563,7 @@ describe('Cloud Agent stream recovery after a backend outage', () => {
     expect(harness.state.getStatus()).toEqual({ type: 'disconnected' });
 
     closeSocket();
-    // The close still emits reconnecting (onReconnected cleared the guard), but
-    // the projection preserves the wrapper terminal.
+    // A child status cannot release the root's wrapper terminal.
     expect(harness.serviceEvents).toContainEqual({ type: 'reconnecting' });
     expect(harness.state.getStatus()).toEqual({ type: 'disconnected' });
     expect(harness.state.getActivity()).toEqual({ type: 'idle' });
@@ -569,7 +575,7 @@ describe('Cloud Agent stream recovery after a backend outage', () => {
     harness.transport.destroy();
   });
 
-  it('clears the wrapper terminal and the transport guard when connected arrives', async () => {
+  it('clears the wrapper terminal when connected arrives', async () => {
     const harness = createHarness();
     await connect(harness);
 
@@ -627,7 +633,7 @@ describe('Cloud Agent stream recovery after a backend outage', () => {
     harness.transport.destroy();
   });
 
-  it('clears the transport guard on a same-socket root idle status', async () => {
+  it('releases the wrapper terminal on a same-socket root idle status', async () => {
     const harness = createHarness();
     await connect(harness);
 
@@ -647,7 +653,7 @@ describe('Cloud Agent stream recovery after a backend outage', () => {
     harness.transport.destroy();
   });
 
-  it('does not clear the transport guard on a same-socket child idle status', async () => {
+  it('preserves the wrapper terminal on a same-socket child idle status', async () => {
     const harness = createHarness();
     await connect(harness);
 
@@ -657,12 +663,10 @@ describe('Cloud Agent stream recovery after a backend outage', () => {
     receive(kilocode('session.status', { sessionID: 'child-1', status: { type: 'idle' } }));
     expect(harness.state.getStatus()).toEqual({ type: 'disconnected' });
 
-    const reconnectingBefore = harness.serviceEvents.filter(e => e.type === 'reconnecting').length;
     closeSocket();
-    expect(harness.serviceEvents.filter(e => e.type === 'reconnecting')).toHaveLength(
-      reconnectingBefore
-    );
     expect(harness.state.getStatus()).toEqual({ type: 'disconnected' });
+    expect(harness.state.getActivity()).toEqual({ type: 'idle' });
+    expect(harness.onError).toHaveBeenCalledTimes(1);
 
     harness.transport.destroy();
   });

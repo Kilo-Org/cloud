@@ -615,6 +615,21 @@ describe('CloudChatPage terminal ownership across navigation', () => {
       sessionId: 'ses_recent',
       message: 'Installing dependencies',
     });
+    expect(dom.container.querySelector('[role="status"]')?.classList.contains('h-0')).toBe(true);
+  });
+
+  it('keeps reconnecting visible while a preparation row shows progress', () => {
+    mockAtomValues.statusIndicator = {
+      type: 'progress',
+      code: 'reconnecting-to-agent',
+      message: 'Reconnecting to agent…',
+    };
+    mockAtomValues.preparationAttempts = [{ status: 'running', steps: [] }];
+    render();
+
+    const slot = dom.container.querySelector('[role="status"]');
+    expect(slot?.textContent).toContain('Reconnecting to agent');
+    expect(slot?.classList.contains('h-0')).toBe(false);
   });
 
   it('keeps the conversation, composer and PTY mounted while a file is selected in the changes view', () => {

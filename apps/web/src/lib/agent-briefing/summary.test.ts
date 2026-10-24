@@ -17,13 +17,16 @@ describe('briefing model pricing', () => {
   const target: StoredModel = {
     id: 'deepseek/test-flash',
     name: 'DeepSeek Flash',
+    reasoning: { mandatory: false, supported_efforts: ['low'] },
     endpoints: [{ pricing: { prompt: '0.000001', completion: '0.000002' } }],
   };
+  const plain: StoredModel = { ...target, id: 'vendor/plain', reasoning: undefined };
 
   beforeEach(() => {
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
       [alias.id]: alias,
       [target.id]: target,
+      [plain.id]: plain,
     });
   });
 
@@ -35,6 +38,20 @@ describe('briefing model pricing', () => {
     await expect(briefingPriceBound(alias.id, 'Overnight activity', 1)).rejects.toThrow(
       'spend_limit_too_low'
     );
+  });
+
+  it('leaves a reasoning model output room for reasoning before the answer within the spend limit', async () => {
+    const roomy = await briefingPriceBound(target.id, 'Overnight activity', 2_000_000);
+    expect(roomy.maxTokens).toBeGreaterThan(8192);
+    expect(roomy.upperBound).toBeLessThanOrEqual(2_000_000);
+    const tight = await briefingPriceBound(target.id, 'Overnight activity', 20_000);
+    expect(tight.maxTokens).toBeLessThan(roomy.maxTokens);
+    expect(tight.upperBound).toBeLessThanOrEqual(20_000);
+  });
+
+  it('keeps a model without reasoning within the output limit every model accepts', async () => {
+    const quote = await briefingPriceBound(plain.id, 'Overnight activity', 2_000_000);
+    expect(quote.maxTokens).toBeLessThanOrEqual(2048);
   });
 
   it.each([undefined, { ...target, endpoints: [] }])(

@@ -91,6 +91,7 @@ export function PickerSheet({
         // keyboardShouldPersistTaps keeps a first tap on a row working while
         // a picker's search field holds the keyboard open.
         <ScrollView
+          nestedScrollEnabled
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingBottom: bottom + 16 }}
         >

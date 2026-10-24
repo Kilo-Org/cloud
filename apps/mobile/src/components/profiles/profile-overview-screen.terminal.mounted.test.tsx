@@ -35,6 +35,9 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
     clearDefault: { mutate: vi.fn(), isPending: false },
   }),
 }));
+vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
+  useCanManageOrganizationProfiles: () => true,
+}));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
   getCommittedConnectivityStatus: () => 'online',
   useCommittedConnectivityStatus: () => 'online',
@@ -43,6 +46,7 @@ vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } })
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: h.back, push: h.push, replace: h.replace }),
 }));
+vi.mock('@/lib/navigation/pop-when-focused', () => ({ usePopWhenFocused: () => h.back }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     agentProfiles: {

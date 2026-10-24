@@ -25,6 +25,7 @@ import { KeyRound } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useAgentProfile, useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_VARS: readonly ProfileVarSource[] = [];
@@ -60,6 +61,7 @@ export function ProfileVariablesScreen({
   const { confirm, dialog } = useConfirmDialog();
   const profileQuery = useAgentProfile(profileId, organizationId);
   const { setVar, deleteVar } = useAgentProfileMutations(organizationId);
+  const canManage = useCanManageOrganizationProfiles(organizationId);
 
   const profile = profileQuery.data;
   const serverVars: readonly ProfileVarSource[] = profile?.vars ?? NO_VARS;
@@ -142,6 +144,7 @@ export function ProfileVariablesScreen({
       initial={initial}
       existingKeys={vars.map(variable => variable.key)}
       isSaving={setVar.isPending}
+      requireValue
       onCancel={closeForm}
       onSave={saveEdit}
     />
@@ -168,9 +171,11 @@ export function ProfileVariablesScreen({
         description={null}
         placement="top"
         action={
-          <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
-            <Text>{t('profiles.addVariable')}</Text>
-          </Button>
+          canManage ? (
+            <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
+              <Text>{t('profiles.addVariable')}</Text>
+            </Button>
+          ) : null
         }
       />
     );
@@ -185,19 +190,27 @@ export function ProfileVariablesScreen({
               key={row.key}
               row={row}
               isDeleting={deleteVar.isPending}
-              onEdit={() => {
-                setEditingKey(row.key);
-              }}
-              onDelete={() => {
-                confirmDelete(row.key);
-              }}
+              onEdit={
+                canManage
+                  ? () => {
+                      setEditingKey(row.key);
+                    }
+                  : undefined
+              }
+              onDelete={
+                canManage
+                  ? () => {
+                      confirmDelete(row.key);
+                    }
+                  : undefined
+              }
             />
           )
         )}
 
         {isAdding ? renderEditForm(true, initialVariableEdit(undefined)) : null}
 
-        {editingKey === null ? (
+        {editingKey === null && canManage ? (
           <Button onPress={startAdd}>
             <Text>{t('profiles.addVariable')}</Text>
           </Button>

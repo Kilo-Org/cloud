@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useGitHubStatus, useGitLabStatus } from '@/lib/hooks/use-code-reviewer';
 import { useReviewList } from '@/lib/hooks/use-code-reviews';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
@@ -153,11 +154,12 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
         description={t('codeReviewer.reviewList.noReviewsDescription')}
         action={
           <Button
+            className={STATE_ACTION_CLASS}
             onPress={() => {
               router.push(
                 (hasConnectedProvider
-                  ? `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/manual-review`
-                  : `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}`) as Href
+                  ? `/(app)/code-reviewer/${scope}/manual-review`
+                  : `/(app)/code-reviewer/${scope}`) as Href
               );
             }}
           >
@@ -205,9 +207,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
                 index < reviews.length - 1 && 'border-b-[0.5px] border-hair-soft'
               )}
               onPress={() => {
-                router.push(
-                  `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/reviews/${review.id}` as Href
-                );
+                router.push(`/(app)/code-reviewer/${scope}/reviews/${review.id}` as Href);
               }}
             >
               <Text className="text-sm font-medium" numberOfLines={1}>

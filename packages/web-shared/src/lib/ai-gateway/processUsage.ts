@@ -95,6 +95,7 @@ import {
   extractVercelIsByok,
   extractVercelUpstreamId,
   isResponseInterruptedError,
+  reportUpstreamStreamError,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import {
   calculateCost_mUsd,
@@ -1083,6 +1084,9 @@ export function countAndStoreUsage(
     }
   };
 
+  const usesUserCredentials =
+    usageContext.user_byok || usageContext.provider === OPENAI_CHATGPT_PROVIDER_ID;
+
   if (clonedReponse.body) {
     if (usageContext.api_kind === 'responses') {
       usageStatsPromise = usageContext.isStreaming
@@ -1091,7 +1095,8 @@ export function countAndStoreUsage(
             usageContext.kiloUserId,
             openrouterRequestSpan,
             usageContext.provider,
-            clonedReponse.status
+            clonedReponse.status,
+            usesUserCredentials
           )
         : parseResponseText(content =>
             parseResponsesMicrodollarUsageFromString(content, clonedReponse.status)
@@ -1104,7 +1109,8 @@ export function countAndStoreUsage(
             usageContext.kiloUserId,
             openrouterRequestSpan,
             usageContext.provider,
-            clonedReponse.status
+            clonedReponse.status,
+            usesUserCredentials
           )
         : parseResponseText(content =>
             parseMicrodollarUsageFromString(content, usageContext.kiloUserId, clonedReponse.status)
@@ -1117,7 +1123,8 @@ export function countAndStoreUsage(
             usageContext.kiloUserId,
             openrouterRequestSpan,
             usageContext.provider,
-            clonedReponse.status
+            clonedReponse.status,
+            usesUserCredentials
           )
         : parseResponseText(content =>
             parseMessagesMicrodollarUsageFromString(content, clonedReponse.status)
@@ -1158,7 +1165,8 @@ export async function parseMicrodollarUsageFromStream(
   kiloUserId: string,
   openrouterRequestSpan: Span | undefined,
   provider: ProviderId,
-  statusCode: number
+  statusCode: number,
+  usesUserCredentials: boolean
 ): Promise<MicrodollarUsageStats> {
   // End the request span immediately as this function starts
   openrouterRequestSpan?.end();
@@ -1213,20 +1221,19 @@ export async function parseMicrodollarUsageFromStream(
         if (typeof error.code === 'number') {
           effectiveStatusCode = error.code;
         }
-        if (error.message === 'Upstream error from Nvidia: Service temporarily overloaded') {
-          console.info(`OpenRouter error: ${error.message}`, {
-            source: 'sse_processing',
+        reportUpstreamStreamError({
+          label: 'OpenRouter error',
+          source: 'sse_processing',
+          error,
+          usesUserCredentials,
+          logContext: {
             provider,
-            code: error.code,
+            inference_provider: json.provider ?? inference_provider,
             messageId: json.id ?? messageId,
             model: json.model ?? model,
-          });
-        } else {
-          captureException(new Error(`OpenRouter error: ${error.message}`), {
-            tags: { source: 'sse_processing' },
-            extra: { json, event },
-          });
-        }
+          },
+          sentryExtra: { json, event },
+        });
       }
 
       model = json.model ?? model;

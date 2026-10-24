@@ -483,6 +483,19 @@ function getActionRequiredTerminalReason(
 const MAX_FAILED_SESSION_TOKENS_FOR_AUTO_RETRY = 100_000;
 const MAX_FAILED_SESSION_COST_MUSD_FOR_AUTO_RETRY = 200_000;
 
+// Pre-dispatch codes that only mean the session never reached the agent: the
+// sandbox never connected, the workspace never finished, the runtime or the
+// Kilo server never came up, or preparation timed out. None of them can have
+// spent model usage, so an unmeasurable usage read must not forfeit the single
+// infra retry. Codes that describe a request the platform rejected, missing
+// metadata, or a missing model stay out: a retry would repeat the same answer.
+const SESSIONLESS_PRE_DISPATCH_FAILURE_CODES: ReadonlySet<string> = new Set([
+  'sandbox_connect_failed',
+  'workspace_setup_failed',
+  'kilo_server_failed',
+  'wrapper_start_failed',
+]);
+
 function hasKnownUnretryableTerminalReason(terminalReason?: CodeReviewTerminalReason): boolean {
   return (
     terminalReason === 'billing' ||
@@ -578,13 +591,14 @@ async function shouldSkipAutoRetryForFailedSessionUsage(params: {
 
   const usage = await getSessionUsageFromBilling(params.failedCliSessionId, params.reviewCreatedAt);
   if (!usage) {
-    // A pre-dispatch sandbox or workspace setup failure means the agent never
-    // ran, so an unmeasurable attempt cannot have spent model usage and the
-    // spend guard must not block the single infra retry.
+    // A pre-dispatch failure means the agent never ran, so an unmeasurable
+    // attempt cannot have spent model usage and the spend guard must not block
+    // the single infra retry.
+    const failureCode = params.failure?.code;
     const allowUnavailableUsage =
       params.failure?.stage === 'pre_dispatch' &&
-      (params.failure.code === 'sandbox_connect_failed' ||
-        params.failure.code === 'workspace_setup_failed');
+      !!failureCode &&
+      SESSIONLESS_PRE_DISPATCH_FAILURE_CODES.has(failureCode);
     logExceptInTest('[code-review-status] Auto-retry token guard could not measure usage', {
       reviewId: params.reviewId,
       failedAttemptId: params.failedAttemptId,

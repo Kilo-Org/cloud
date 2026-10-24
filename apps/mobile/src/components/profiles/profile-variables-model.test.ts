@@ -32,8 +32,34 @@ describe('variableRows', () => {
 
 describe('validateVariableInput', () => {
   it('accepts a non-empty key within the 1..256 bound', () => {
-    expect(validateVariableInput({ key: 'API_KEY', value: '' })).toBeNull();
+    expect(validateVariableInput({ key: 'API_KEY', value: 'x' })).toBeNull();
     expect(validateVariableInput({ key: 'a'.repeat(256), value: 'x' })).toBeNull();
+  });
+
+  it('requires a value only when the caller asks for it', () => {
+    expect(validateVariableInput({ key: 'API_KEY', value: '' }, [], { requireValue: true })).toBe(
+      'value-required'
+    );
+    expect(
+      validateVariableInput({ key: 'API_KEY', value: '   ' }, [], { requireValue: true })
+    ).toBe('value-required');
+    expect(
+      validateVariableInput({ key: 'API_KEY', value: ' x ' }, [], { requireValue: true })
+    ).toBeNull();
+    // The session draft editor leaves the rule off: prepare-session and web accept
+    // an empty value, so a blank one still passes there.
+    expect(validateVariableInput({ key: 'API_KEY', value: '' })).toBeNull();
+    expect(validateVariableInput({ key: 'API_KEY', value: '' }, [], {})).toBeNull();
+  });
+
+  it('keeps the key rules ahead of the value rule', () => {
+    expect(validateVariableInput({ key: '', value: '' }, [], { requireValue: true })).toBe('empty');
+    expect(
+      validateVariableInput({ key: 'a'.repeat(257), value: '' }, [], { requireValue: true })
+    ).toBe('too-long');
+    expect(
+      validateVariableInput({ key: 'foo-bar', value: '' }, ['FOO_BAR'], { requireValue: true })
+    ).toBe('duplicate');
   });
 
   it('reports an empty key after trimming', () => {

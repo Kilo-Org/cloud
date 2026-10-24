@@ -99,6 +99,34 @@ describe('background one-off briefing state', () => {
     client.clear();
   });
 
+  it('keeps one preparation observer and one failure notice after the form hands off its draft', async () => {
+    const form = mount();
+    await act(async () => {
+      await state().prepare(input);
+    });
+    await waitForReview();
+    act(() => {
+      state().reset();
+    });
+    const review = mount(draft.id, form.client);
+    await waitForReview();
+    expect(
+      form.client
+        .getQueryCache()
+        .find({ queryKey: ['preparation', draft.id] })
+        ?.getObserversCount()
+    ).toBe(1);
+    mocks.status.mockRejectedValue(new Error('Status unavailable'));
+    await act(async () => {
+      await state().refresh();
+    });
+    await waitFor(() => state().error !== null);
+    expect(mocks.toast).toHaveBeenCalledExactlyOnceWith('agentBriefing.reviewFailed');
+    form.renderer.unmount();
+    review.renderer.unmount();
+    form.client.clear();
+  });
+
   it('resumes a persisted draft on a fresh screen and requires explicit paid confirmation', async () => {
     const first = mount(draft.id);
     await waitForReview();

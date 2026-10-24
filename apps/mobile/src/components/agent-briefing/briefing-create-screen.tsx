@@ -95,6 +95,7 @@ export function BriefingCreateScreen() {
     });
     if (draft) {
       router.push(`${BRIEFING_PATH}/prepare/${draft.id}` as Href);
+      creation.reset();
     }
   };
 

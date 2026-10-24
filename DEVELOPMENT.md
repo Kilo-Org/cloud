@@ -627,6 +627,11 @@ Manual preparation persists an unpublished draft through `startOneOffPreparation
 Attempt claims prevent concurrent or stale workers from overwriting a newer attempt.
 Interrupted preparation reaches a terminal failure and requires explicit retry.
 The summary cron recovers pending preparation independently of paid summary work.
+Preparation scheduler failures are logged without discarding completed summary job results.
+Preparations use the existing indexed `next_refresh_at` marker: pending work is immediately due,
+running work is due at its deadline, and terminal attempts clear the marker.
+Expiry checks use this due index, and each preparation collection batch selects at most five drafts.
+Scheduled refresh excludes one-off drafts.
 Preparation does not publish a report, invoke inference, or authorize a charge.
 `createOneOff` remains the explicit cost-confirmation step.
 Deploy the backend before releasing the new mobile client.

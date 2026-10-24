@@ -2,7 +2,9 @@ import { createElement } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { type CreateBriefingState } from '@/lib/hooks/use-create-briefing';
+import { draft } from '@/lib/hooks/use-create-briefing-test-utils';
 import { act, TestRenderer } from '@/test/renderer';
+import { waitFor } from '@/test/render-with-providers';
 
 import { BriefingCreateScreen } from './briefing-create-screen';
 
@@ -10,6 +12,8 @@ const state = vi.hoisted(() => ({
   draft: null as CreateBriefingState['draft'],
   preparing: true,
   reset: vi.fn(),
+  prepare: vi.fn<CreateBriefingState['prepare']>(),
+  push: vi.fn(),
 }));
 vi.mock('react-native', () => ({ View: 'View', ScrollView: 'ScrollView' }));
 vi.mock('react-i18next', () => ({
@@ -17,7 +21,7 @@ vi.mock('react-i18next', () => ({
 }));
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ context: 'personal' }),
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: state.push }),
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -53,6 +57,8 @@ beforeEach(() => {
   state.draft = null;
   state.preparing = true;
   state.reset.mockClear();
+  state.prepare.mockReset();
+  state.push.mockReset();
 });
 afterEach(() => {
   act(() => {
@@ -116,4 +122,19 @@ it('allows another period and context while an accepted draft prepares in the ba
     button('Organization').props.onPress();
   });
   expect(button('Organization').props.accessibilityState?.selected).toBe(true);
+});
+
+it('releases the create state after opening the persisted preparation', async () => {
+  state.preparing = false;
+  state.prepare.mockResolvedValue(draft);
+  mount();
+  act(() => {
+    button('agentBriefing.reviewBriefing').props.onPress();
+  });
+  await waitFor(() => state.reset.mock.calls.length === 1);
+  expect(state.push).toHaveBeenCalledWith(`/agent-briefing/prepare/${draft.id}`);
+  expect(state.reset).toHaveBeenCalledTimes(1);
+  expect(state.push.mock.invocationCallOrder[0]).toBeLessThan(
+    state.reset.mock.invocationCallOrder[0] ?? 0
+  );
 });

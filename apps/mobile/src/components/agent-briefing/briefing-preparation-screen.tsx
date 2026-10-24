@@ -52,7 +52,7 @@ export function BriefingPreparationScreen() {
             void confirm();
           }}
           onReviewAgain={() => {
-            void creation.refresh();
+            router.dismissTo(`${BRIEFING_PATH}/create` as Href);
           }}
         />
       );

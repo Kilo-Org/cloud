@@ -12,16 +12,32 @@ import {
 } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import * as evidence from '@/lib/agent-briefing/evidence';
+import type * as Preparation from '@/lib/agent-briefing/preparation';
+import type * as Summary from '@/lib/agent-briefing/summary';
 import {
   generatePendingOneOffBriefingPreparations,
   runOneOffBriefingPreparation,
 } from '@/lib/agent-briefing/preparation';
-import { generatePendingAgentBriefings } from '@/lib/agent-briefing/sweep';
+import { runBriefingSummary } from '@/lib/agent-briefing/summary';
+import { generatePendingAgentBriefings, sweepAgentBriefings } from '@/lib/agent-briefing/sweep';
 import { agentBriefingRouter } from './agent-briefing-router';
 
 jest.mock('@/lib/agent-briefing/evidence', () => {
   const actual = jest.requireActual<typeof evidence>('@/lib/agent-briefing/evidence');
   return { ...actual, collectBriefingEvidence: jest.fn(actual.collectBriefingEvidence) };
+});
+jest.mock('@/lib/agent-briefing/preparation', () => {
+  const actual = jest.requireActual<typeof Preparation>('@/lib/agent-briefing/preparation');
+  return {
+    ...actual,
+    generatePendingOneOffBriefingPreparations: jest.fn(
+      actual.generatePendingOneOffBriefingPreparations
+    ),
+  };
+});
+jest.mock('@/lib/agent-briefing/summary', () => {
+  const actual = jest.requireActual<typeof Summary>('@/lib/agent-briefing/summary');
+  return { ...actual, runBriefingSummary: jest.fn(actual.runBriefingSummary) };
 });
 const realCollect = jest.requireActual<typeof evidence>(
   '@/lib/agent-briefing/evidence'
@@ -221,6 +237,7 @@ it('marks abandoned work as timed out on read and fences a stale worker after an
     .update(agent_briefing_reports)
     .set({
       facts: sql`jsonb_set(${agent_briefing_reports.facts}, '{preparation,deadlineAt}', ${JSON.stringify(new Date(Date.now() - 1000).toISOString())}::jsonb)`,
+      next_refresh_at: new Date(Date.now() - 1000).toISOString(),
     })
     .where(eq(agent_briefing_reports.id, input.requestId));
   const failed = await caller.oneOffPreparation({ reportId: input.requestId });
@@ -253,6 +270,105 @@ it('recovers a pending draft through the existing summary scheduler without sche
     generation_id: null,
     summary: { status: 'disabled' },
   });
+});
+
+it('returns completed summary jobs when preparation scheduling rejects', async () => {
+  const caller = agentBriefingRouter.createCaller({ user });
+  const input = period();
+  await seedActivity(input.startAt);
+  await caller.startOneOffPreparation(input);
+  await runOneOffBriefingPreparation(input.requestId);
+  const ready = await caller.oneOffPreparation({ reportId: input.requestId });
+  await caller.createOneOff({
+    reportId: input.requestId,
+    estimateToken: ready.prepared?.estimate?.estimateToken,
+  });
+  const schedulingError = new Error('Preparation scheduling unavailable');
+  const logged = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+  jest.mocked(generatePendingOneOffBriefingPreparations).mockRejectedValueOnce(schedulingError);
+  jest.mocked(runBriefingSummary).mockResolvedValueOnce();
+  expect(await generatePendingAgentBriefings()).toEqual({
+    attempted: 1,
+    fulfilled: 1,
+    rejected: 0,
+    preparations: null,
+  });
+  expect(runBriefingSummary).toHaveBeenCalledWith(input.requestId);
+  expect(logged).toHaveBeenCalledWith(
+    'Agent briefing preparation scheduler rejected',
+    schedulingError
+  );
+});
+
+it('returns a published report when an owner resumes its preparation link', async () => {
+  const caller = agentBriefingRouter.createCaller({ user });
+  const input = period();
+  await seedActivity(input.startAt);
+  await caller.startOneOffPreparation(input);
+  await runOneOffBriefingPreparation(input.requestId);
+  const ready = await caller.oneOffPreparation({ reportId: input.requestId });
+  const published = await caller.createOneOff({
+    reportId: input.requestId,
+    estimateToken: ready.prepared?.estimate?.estimateToken,
+  });
+  const resumedCaller = agentBriefingRouter.createCaller({ user });
+  const resumed = await resumedCaller.oneOffPreparation({ reportId: input.requestId });
+  expect(resumed.prepared?.report).toEqual(published);
+  expect(resumed.prepared?.report.publishedAt).not.toBeNull();
+  expect((await resumedCaller.oneOffDrafts({})).drafts).toEqual([]);
+  expect(await resumedCaller.createOneOff({ reportId: input.requestId })).toEqual(published);
+});
+
+it('expires abandoned pending and running attempts and clears their due markers', async () => {
+  const caller = agentBriefingRouter.createCaller({ user });
+  const pending = await caller.startOneOffPreparation(period());
+  const running = await caller.startOneOffPreparation(period());
+  const expiredAt = new Date(Date.now() - 1000).toISOString();
+  await db
+    .update(agent_briefing_reports)
+    .set({
+      next_refresh_at: expiredAt,
+      facts: sql`jsonb_set(${agent_briefing_reports.facts}, '{preparation,deadlineAt}', ${JSON.stringify(expiredAt)}::jsonb)`,
+    })
+    .where(eq(agent_briefing_reports.kilo_user_id, user.id));
+  await db
+    .update(agent_briefing_reports)
+    .set({
+      facts: sql`jsonb_set(${agent_briefing_reports.facts}, '{preparation,status}', '"running"'::jsonb)`,
+    })
+    .where(eq(agent_briefing_reports.id, running.id));
+  expect(await generatePendingOneOffBriefingPreparations()).toEqual({ attempted: 0, rejected: 0 });
+  expect((await caller.oneOffPreparation({ reportId: pending.id })).draft).toMatchObject({
+    status: 'failed',
+    error: 'time_limit',
+  });
+  expect((await caller.oneOffPreparation({ reportId: running.id })).draft).toMatchObject({
+    status: 'failed',
+    error: 'time_limit',
+  });
+  expect(
+    await db.select({ dueAt: agent_briefing_reports.next_refresh_at }).from(agent_briefing_reports)
+  ).toEqual([{ dueAt: null }, { dueAt: null }]);
+  expect(evidence.collectBriefingEvidence).not.toHaveBeenCalled();
+});
+
+it('keeps one-off preparations out of scheduled refresh and processes five due drafts per batch', async () => {
+  const caller = agentBriefingRouter.createCaller({ user });
+  const future = await caller.startOneOffPreparation(period());
+  await db
+    .update(agent_briefing_reports)
+    .set({ next_refresh_at: new Date(Date.now() + 60_000).toISOString() })
+    .where(eq(agent_briefing_reports.id, future.id));
+  await Promise.all(Array.from({ length: 6 }, () => caller.startOneOffPreparation(period())));
+  expect(await sweepAgentBriefings()).toMatchObject({ activeReports: 0 });
+  expect(evidence.collectBriefingEvidence).not.toHaveBeenCalled();
+  expect(await generatePendingOneOffBriefingPreparations()).toEqual({ attempted: 5, rejected: 0 });
+  expect(await generatePendingOneOffBriefingPreparations()).toEqual({ attempted: 1, rejected: 0 });
+  expect(
+    (await db.select({ revision: agent_briefing_reports.revision }).from(agent_briefing_reports))
+      .map(row => row.revision)
+      .sort()
+  ).toEqual([0, 1, 1, 1, 1, 1, 1]);
 });
 
 it('stops exposing an organization draft when membership is revoked before collection', async () => {

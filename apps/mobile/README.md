@@ -210,6 +210,7 @@ Catalog checks verify structure, not translation meaning. Verify corrected copy 
 - Review starts persisted background activity collection.
 - Leave and return through **Unconfirmed briefs** to continue the same review, including after an app restart.
 - The creation form stays usable while activity collection continues in the background.
+- **Prepare a new review** returns to the creation form to choose a new context or period.
 - Collection has a two-minute deadline. Failed or interrupted collection becomes a visible terminal failure; retrying is explicit and keeps the original request and evidence cutoff.
 - Review coverage, the payer, the model, and the cost limit before creating a paid summary.
 - Incomplete history remains available with a coverage warning. Missing data does not mean zero activity.

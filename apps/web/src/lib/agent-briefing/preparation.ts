@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { and, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { withDeadline, RequestDeadlineError } from '@kilocode/event-service';
@@ -62,6 +62,7 @@ export async function expireOneOffBriefingPreparations(now = new Date(), userId?
     .update(agent_briefing_reports)
     .set({
       updated_at: now.toISOString(),
+      next_refresh_at: null,
       facts: sql`jsonb_set(${agent_briefing_reports.facts}, '{preparation}', ${agent_briefing_reports.facts}->'preparation' || '{"status":"failed","error":"time_limit"}'::jsonb)`,
     })
     .where(
@@ -69,6 +70,7 @@ export async function expireOneOffBriefingPreparations(now = new Date(), userId?
         eq(agent_briefing_reports.kind, 'one_off'),
         eq(agent_briefing_reports.revision, 0),
         userId === undefined ? undefined : eq(agent_briefing_reports.kilo_user_id, userId),
+        lte(agent_briefing_reports.next_refresh_at, now.toISOString()),
         sql`${agent_briefing_reports.facts}->'preparation'->>'status' IN ('pending', 'running')`,
         sql`${agent_briefing_reports.facts}->'preparation'->>'deadlineAt' <= ${now.toISOString()}`
       )
@@ -194,7 +196,7 @@ export async function startOneOffBriefingPreparation(
       night_start_at: new Date(start).toISOString(),
       cutoff_at: new Date(end).toISOString(),
       morning_end_at: new Date(Date.parse(createdAt) + 30 * 86400_000).toISOString(),
-      next_refresh_at: null,
+      next_refresh_at: createdAt,
       revision: 0,
       facts,
       evidence_hash: createHash('sha256').update(JSON.stringify(facts)).digest('hex'),
@@ -225,6 +227,7 @@ export async function startOneOffBriefingPreparation(
       .set({
         facts: sql`jsonb_set(${agent_briefing_reports.facts}, '{preparation}', ${JSON.stringify(state)}::jsonb)`,
         updated_at: createdAt,
+        next_refresh_at: createdAt,
       })
       .where(
         and(
@@ -260,6 +263,7 @@ export async function runOneOffBriefingPreparation(reportId: string): Promise<vo
     .set({
       facts: sql`jsonb_set(${agent_briefing_reports.facts}, '{preparation}', ${JSON.stringify(running)}::jsonb)`,
       updated_at: running.startedAt,
+      next_refresh_at: running.deadlineAt,
     })
     .where(
       and(
@@ -300,6 +304,7 @@ export async function runOneOffBriefingPreparation(reportId: string): Promise<vo
         evidence_hash: createHash('sha256').update(JSON.stringify(facts)).digest('hex'),
         revision: 1,
         updated_at: new Date().toISOString(),
+        next_refresh_at: null,
       })
       .where(claim);
   } catch (error) {
@@ -314,6 +319,7 @@ export async function runOneOffBriefingPreparation(reportId: string): Promise<vo
       .set({
         facts: sql`jsonb_set(${agent_briefing_reports.facts}, '{preparation}', ${JSON.stringify({ ...running, status: 'failed', error: failure })}::jsonb)`,
         updated_at: new Date().toISOString(),
+        next_refresh_at: null,
       })
       .where(claim);
     console.error('Agent briefing preparation failed', { reportId, failure });
@@ -329,10 +335,11 @@ export async function generatePendingOneOffBriefingPreparations() {
       and(
         eq(agent_briefing_reports.kind, 'one_off'),
         eq(agent_briefing_reports.revision, 0),
+        lte(agent_briefing_reports.next_refresh_at, new Date().toISOString()),
         sql`${agent_briefing_reports.facts}->'preparation'->>'status' = 'pending'`
       )
     )
-    .orderBy(agent_briefing_reports.created_at)
+    .orderBy(agent_briefing_reports.next_refresh_at)
     .limit(5);
   const results = await Promise.allSettled(rows.map(row => runOneOffBriefingPreparation(row.id)));
   return {

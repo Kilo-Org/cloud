@@ -377,7 +377,10 @@ export async function generatePendingAgentBriefings() {
     .limit(10);
   const [results, preparations] = await Promise.all([
     Promise.allSettled(reports.map(report => runBriefingSummary(report.id))),
-    generatePendingOneOffBriefingPreparations(),
+    generatePendingOneOffBriefingPreparations().catch(error => {
+      console.error('Agent briefing preparation scheduler rejected', error);
+      return null;
+    }),
   ]);
   const rejected = results.filter(result => result.status === 'rejected').length;
   if (rejected > 0) console.error('Agent briefing summary jobs rejected', { rejected });

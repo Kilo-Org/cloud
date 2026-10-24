@@ -73,11 +73,13 @@ const originalFetch = globalThis.fetch;
  * call so a test may exercise the sentinel fallback after a failed attempt.
  */
 function setupChallengeFetch(challenge = 'server-challenge') {
-  const fn = vi.fn<typeof fetch>().mockImplementation(async () => {
-    // A fresh Response per call: a body can be read only once.
-    await Promise.resolve();
-    return Response.json({ challenge });
-  });
+  const fn = vi
+    .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+    .mockImplementation(async () => {
+      // A fresh Response per call: a body can be read only once.
+      await Promise.resolve();
+      return Response.json({ challenge });
+    });
   globalThis.fetch = fn;
   return fn;
 }
@@ -306,7 +308,9 @@ describe('getAdmission', () => {
   });
 
   it('throws a retryable error when the challenge endpoint fails', async () => {
-    globalThis.fetch = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 500 }));
+    globalThis.fetch = vi
+      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+      .mockResolvedValue(new Response(null, { status: 500 }));
     const getAdmission = await loadGetAdmission();
 
     await expect(getAdmission()).rejects.toThrow(ADMISSION_CHALLENGE_FAILED);

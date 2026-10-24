@@ -132,6 +132,7 @@ function withFileProviderTarget(config) {
       groupName,
       productFile,
       widgetFiles: relativePaths.filter(file => file.endsWith('.swift')),
+      resourceFileRefs: [],
     });
     addPbxGroup(xcodeProject, { targetName: TARGET_NAME, widgetFiles: relativePaths });
     return projectConfig;

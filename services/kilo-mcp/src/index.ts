@@ -1084,6 +1084,8 @@ export class KiloMcpOAuthStore extends OAuthStore {
     store: this,
     revokeGrant: (grantId, userId) =>
       getOAuthApi(providerOptions, this.env).revokeGrant(grantId, userId),
+    // Built lazily: only a reuse rejection emits, and the factory is pure.
+    analytics: () => createMcpAnalytics({ env: this.env, ctx: this.ctx }),
   });
 
   fetch(request: Request): Promise<Response> {

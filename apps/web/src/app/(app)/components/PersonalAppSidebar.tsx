@@ -13,7 +13,6 @@ import {
   Cable,
   Cloud,
   Bot,
-  Database,
   List,
   Shield,
   Key,
@@ -31,7 +30,6 @@ import OrganizationSwitcher from './OrganizationSwitcher';
 import SidebarMenuList from './SidebarMenuList';
 import SidebarPromoBanner from './SidebarPromoBanner';
 import SidebarUserFooter from './SidebarUserFooter';
-import { isEnabledForUser } from '@/lib/code-indexing/util';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -157,15 +155,6 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
             title: 'Gas Town',
             icon: Factory,
             url: '/gastown',
-          },
-        ]
-      : []),
-    ...(user && isEnabledForUser(user)
-      ? [
-          {
-            title: 'Managed Indexing',
-            icon: Database,
-            url: '/code-indexing',
           },
         ]
       : []),

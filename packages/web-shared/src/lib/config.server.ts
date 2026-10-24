@@ -199,6 +199,9 @@ export const QDRANT_CLUSTER_RAM_GB = Number(getEnvVariable('QDRANT_CLUSTER_RAM_G
 export const MILVUS_ADDRESS = getEnvVariable('MILVUS_ADDRESS');
 export const MILVUS_TOKEN = getEnvVariable('MILVUS_TOKEN');
 
+// Cloud managed code indexing. Disabled unless explicitly enabled.
+export const CODE_INDEXING_ENABLED = getEnvVariable('CODE_INDEXING_ENABLED') === 'true';
+
 // Slack
 export const SLACK_CLIENT_ID = getEnvVariable('SLACK_CLIENT_ID');
 export const SLACK_CLIENT_SECRET = getEnvVariable('SLACK_CLIENT_SECRET');

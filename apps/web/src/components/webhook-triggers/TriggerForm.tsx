@@ -1,4 +1,6 @@
 'use client';
+import type { WebhookBodySchema } from '@kilocode/worker-utils/webhook-body-validation';
+import { BodyValidationField } from './BodyValidationField';
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
@@ -56,7 +58,7 @@ import {
 import { TimezoneSelector } from './TimezoneSelector';
 import { ScheduleBuilder } from './ScheduleBuilder';
 import { cn } from '@/lib/utils';
-import { AlertCircle, Check, Clock, Copy, Loader2, Webhook } from 'lucide-react';
+import { Check, Clock, Copy, Loader2, Webhook } from 'lucide-react';
 import { toast } from 'sonner';
 import type { AgentMode } from '@/components/cloud-agent/types';
 
@@ -72,7 +74,8 @@ export type TriggerFormData = {
   variant?: string | null;
   sandboxAllocation?: SandboxAllocation | null;
   promptTemplate: string;
-  profileId: string;
+  profileId?: string | null;
+  bodySchema?: WebhookBodySchema | null;
   autoCommit?: boolean;
   condenseOnComplete?: boolean;
   isActive?: boolean;
@@ -99,6 +102,7 @@ export type TriggerFormProps = {
     sandboxAllocation?: SandboxAllocation | null;
     promptTemplate: string;
     profileId?: string;
+    bodySchema?: WebhookBodySchema | null;
     autoCommit?: boolean;
     condenseOnComplete?: boolean;
     isActive?: boolean;
@@ -133,7 +137,7 @@ export type TriggerFormProps = {
  * Key behaviors:
  * - Trigger ID auto-transforms to lowercase-hyphenated format
  * - Trigger ID and GitHub repo are read-only in edit mode
- * - Profile is REQUIRED for webhook triggers (unlike manual sessions)
+ * - Profiles are optional and resolved at execution time
  * - Shows webhook URL with copy button in edit mode
  * - Shows delete button with confirmation in edit mode
  */
@@ -162,10 +166,13 @@ export function TriggerForm({
   const { data: session } = useSession();
   const isEditMode = formMode === 'edit';
   const [runAsCreator, setRunAsCreator] = useState(!!initialData?.executionUserId);
-  const creatorLabel =
-    isEditMode && initialData?.executionUserId !== session?.user?.id
-      ? 'Webhook creator'
-      : session?.user?.name || session?.user?.email || 'Your account';
+  const isOtherCreator =
+    isEditMode &&
+    !!initialData?.executionUserId &&
+    initialData.executionUserId !== session?.user?.id;
+  const creatorLabel = isOtherCreator
+    ? 'Webhook creator'
+    : session?.user?.name || session?.user?.email || 'Your account';
 
   // Form state
   const [activationMode, setActivationMode] = useState<'webhook' | 'scheduled'>(
@@ -232,6 +239,10 @@ export function TriggerForm({
       (activationMode === 'scheduled' ? SCHEDULED_DEFAULT_PROMPT : WEBHOOK_DEFAULT_PROMPT)
   );
   const [profileId, setProfileId] = useState<string | null>(initialData?.profileId ?? null);
+  const [bodySchema, setBodySchema] = useState<WebhookBodySchema | null>(
+    initialData?.bodySchema ?? null
+  );
+  const [bodySchemaValid, setBodySchemaValid] = useState(true);
   const [autoCommit, setAutoCommit] = useState(initialData?.autoCommit ?? false);
   const [condenseOnComplete, setCondenseOnComplete] = useState(
     initialData?.condenseOnComplete ?? false
@@ -261,6 +272,8 @@ export function TriggerForm({
       setSandboxAllocation(initialData.sandboxAllocation ?? 'automatic');
       setPromptTemplate(initialData.promptTemplate);
       setProfileId(initialData.profileId ?? null);
+      setBodySchema(initialData.bodySchema ?? null);
+      setBodySchemaValid(true);
       setAutoCommit(initialData.autoCommit ?? false);
       setCondenseOnComplete(initialData.condenseOnComplete ?? false);
       setIsActive(initialData.isActive ?? true);
@@ -380,8 +393,8 @@ export function TriggerForm({
       errors.push('Prompt template is required');
     }
 
-    if (!profileId) {
-      errors.push('Profile is required');
+    if (!isScheduled && !bodySchemaValid) {
+      errors.push('Fix the body validation schema before saving');
     }
 
     if (!isScheduled && webhookAuthHeaderError) {
@@ -418,6 +431,8 @@ export function TriggerForm({
     model,
     promptTemplate,
     profileId,
+    bodySchema,
+    bodySchemaValid,
     webhookAuthHeaderError,
     webhookAuthSecretError,
     runAsCreator,
@@ -433,7 +448,7 @@ export function TriggerForm({
   const isFormValid = formErrors.length === 0;
 
   const getFormData = useCallback((): TriggerFormData | undefined => {
-    if (!isFormValid || !profileId) {
+    if (!isFormValid) {
       toast.error('Please fix form errors before submitting');
       return undefined;
     }
@@ -475,7 +490,9 @@ export function TriggerForm({
         ? { sandboxAllocation: submittedSandboxAllocation }
         : {}),
       promptTemplate: promptTemplate.trim(),
-      profileId,
+      profileId:
+        isEditMode && profileId === (initialData?.profileId ?? null) ? undefined : profileId,
+      ...(!isScheduled ? { bodySchema } : {}),
       autoCommit,
       condenseOnComplete,
       isActive: isEditMode ? isActive : undefined,
@@ -484,6 +501,8 @@ export function TriggerForm({
   }, [
     isFormValid,
     profileId,
+    bodySchema,
+    bodySchemaValid,
     triggerId,
     runAsCreator,
     organizationId,
@@ -496,6 +515,7 @@ export function TriggerForm({
     model,
     variant,
     initialData?.variant,
+    initialData?.profileId,
     sandboxAllocation,
     initialSandboxAllocation,
     promptTemplate,
@@ -733,6 +753,7 @@ export function TriggerForm({
                   value={runAsCreator ? 'creator' : 'organization-bot'}
                   onValueChange={value => {
                     setRunAsCreator(value === 'creator');
+                    setProfileId(null);
                     if (value === 'creator') setWebhookAuthEnabled(true);
                   }}
                   disabled={isEditMode || isLoading}
@@ -759,9 +780,9 @@ export function TriggerForm({
                 </p>
                 {runAsCreator && (
                   <p className="text-muted-foreground max-w-prose text-xs">
-                    Organization profiles and repository settings remain shared. Members who can
-                    edit them can affect runs under your identity. Enable this only if you trust
-                    those members.
+                    Organization repository and default profiles remain shared. Members who can edit
+                    them can affect runs under your identity. Enable this only if you trust those
+                    members.
                   </p>
                 )}
               </div>
@@ -859,32 +880,50 @@ export function TriggerForm({
               </div>
             )}
 
-            {/* Profile Selection (Required) */}
+            {/* Optional execution profile */}
             <div className="space-y-2">
-              <Label>
-                Environment Profile <span className="text-red-400">*</span>
-              </Label>
-              <ProfileSelector
-                organizationId={organizationId}
-                selectedProfileId={profileId}
-                onProfileSelect={setProfileId}
-                disabled={isLoading}
-                orgProfilesOnly={!!organizationId}
-                onRepoDefaultsClick={() => setShowRepoDefaults(true)}
-              />
+              <Label>Environment Profile (optional)</Label>
+              {isOtherCreator ? (
+                <p className="text-sm">
+                  {profileId ? 'Saved creator profile (unchanged)' : 'Use defaults'}
+                </p>
+              ) : (
+                <ProfileSelector
+                  organizationId={runAsCreator ? undefined : organizationId}
+                  emptyLabel="Use defaults"
+                  savedSelectionLabel={
+                    isEditMode && profileId === initialData?.profileId
+                      ? 'Saved profile (unchanged)'
+                      : undefined
+                  }
+                  selectedProfileId={profileId}
+                  onProfileSelect={setProfileId}
+                  disabled={isLoading}
+                  orgProfilesOnly={!!organizationId}
+                  onRepoDefaultsClick={() => setShowRepoDefaults(true)}
+                />
+              )}
               <RepoProfileBindingsDialog
                 organizationId={organizationId}
                 open={showRepoDefaults}
                 onOpenChange={setShowRepoDefaults}
               />
-              {!profileId && (
-                <p className="flex items-center gap-1 text-xs text-amber-400">
-                  <AlertCircle className="h-3 w-3" />A profile is required for webhook triggers
-                </p>
-              )}
               <p className="text-muted-foreground text-xs">
-                Profile secrets will be resolved at webhook execution time
+                {isOtherCreator
+                  ? 'Only the trigger creator can change its personal environment profile. The saved setting is kept.'
+                  : 'Use defaults applies repository settings and the effective default profile. Selected profiles override default profile settings. Secrets resolve when the trigger runs.'}
               </p>
+            </div>
+
+            <div hidden={isScheduled}>
+              <BodyValidationField
+                initialSchema={initialData?.bodySchema}
+                disabled={isLoading}
+                onChange={(schema, valid) => {
+                  setBodySchema(schema);
+                  setBodySchemaValid(valid);
+                }}
+              />
             </div>
 
             {/* Webhook Authentication (webhook mode only) */}

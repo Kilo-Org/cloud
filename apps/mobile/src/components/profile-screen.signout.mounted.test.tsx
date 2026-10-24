@@ -14,6 +14,8 @@ const platform = vi.hoisted(() => ({ os: 'android' as 'android' | 'ios' }));
 const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 
 vi.mock('react-native', () => ({
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   Alert: { alert: alertFn },
   Modal: 'Modal',
   Platform: {
@@ -109,9 +111,7 @@ vi.mock('@/lib/auth/push-registration-reconciliation', () => ({
   attemptPushRegistrationReconciliation: vi.fn(),
 }));
 
-// The queries the actions section does not depend on stay deferred, so the
-// sign-out tile is exercised without their interaction-manager flush.
-vi.mock('@/lib/hooks/use-after-interactions', () => ({ useAfterInteractions: () => false }));
+vi.mock('@/lib/hooks/use-after-idle', () => ({ useAfterIdle: () => false }));
 
 vi.mock('@/lib/profile-agent-navigation', () => ({
   getCodeReviewerProfilePath: () => '/code-reviewer',

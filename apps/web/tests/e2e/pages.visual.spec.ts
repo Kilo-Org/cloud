@@ -16,7 +16,6 @@ test.describe('Top-Level Pages', () => {
     { name: 'Cloud', url: '/cloud' },
     { name: 'Cloud Chat', url: '/cloud/chat' },
     { name: 'Cloud Sessions', url: '/cloud/sessions' },
-    { name: 'Code Indexing', url: '/code-indexing' },
     { name: 'Code Reviewer', url: '/code-reviews' },
     { name: 'Usage', url: '/usage' },
     { name: 'Invoices', url: '/invoices' },

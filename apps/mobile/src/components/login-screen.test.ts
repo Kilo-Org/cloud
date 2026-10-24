@@ -41,7 +41,10 @@ const setLanguagePickerBridge = vi.hoisted(() => vi.fn());
 const announcingWarning = vi.hoisted(() => vi.fn());
 // `sessionEnded` is toggled per test to drive the login screen's announcement
 // effect without re-mocking the module.
-const authState = vi.hoisted(() => ({ sessionEnded: false }));
+const authState = vi.hoisted(() => ({
+  sessionEnded: false,
+  token: undefined as string | undefined,
+}));
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
@@ -73,7 +76,11 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { warning: announcingWarning },
 }));
 vi.mock('@/lib/auth/auth-context', () => ({
-  useAuth: () => ({ sessionEnded: authState.sessionEnded, signIn: vi.fn() }),
+  useAuth: () => ({
+    sessionEnded: authState.sessionEnded,
+    signIn: vi.fn(),
+    token: authState.token,
+  }),
 }));
 vi.mock('@/lib/auth/use-device-auth', () => ({
   useDeviceAuth: () => ({
@@ -95,9 +102,8 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#111827', mutedForeground: '#6b7280' }),
 }));
 vi.mock('@/lib/login-draft', () => ({
-  clearLoginDrafts: vi.fn(),
   clearPersistedLoginDrafts: vi.fn(),
-  persistLoginDrafts: vi.fn(),
+  persistLoginDrafts: vi.fn().mockResolvedValue(undefined),
   restoreLoginDrafts: vi.fn().mockResolvedValue(null),
 }));
 vi.mock('@/lib/picker-bridge', () => ({
@@ -343,6 +349,7 @@ describe('login-screen language globe', () => {
     deviceAuth.error = undefined;
     deviceAuth.verificationUrl = undefined;
     deviceAuth.resumed = false;
+    authState.token = undefined;
     push.mockClear();
     setLanguagePickerBridge.mockClear();
   });
@@ -619,8 +626,10 @@ describe('login-screen idle skeleton', () => {
     deviceAuth.error = undefined;
     deviceAuth.verificationUrl = undefined;
     deviceAuth.resumed = false;
+    authState.token = undefined;
     vi.mocked(restoreLoginDrafts).mockResolvedValue({ email: '', ssoRecovery: null });
     vi.mocked(clearPersistedLoginDrafts).mockClear();
+    vi.mocked(persistLoginDrafts).mockClear();
   });
 
   it('shows a form skeleton until the draft restore finishes', async () => {
@@ -671,6 +680,70 @@ describe('login-screen idle skeleton', () => {
     expect(clearPersistedLoginDrafts).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
+  });
+
+  it('persists the drafts when the screen unmounts so a rotation remount restores them', async () => {
+    const renderer = await mountLoginScreen();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(persistLoginDrafts).not.toHaveBeenCalled();
+
+    renderer.unmount();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(persistLoginDrafts).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips unmount persistence once the mount completed a sign-in', async () => {
+    deviceAuth.status = 'approved';
+    deviceAuth.token = 'tok';
+    // signIn's mock does not publish through the context; the completed
+    // sign-in publishes the token there, which is what retires the drafts.
+    authState.token = 'tok';
+
+    const renderer = await mountLoginScreen();
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    renderer.unmount();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(persistLoginDrafts).not.toHaveBeenCalled();
+  });
+
+  it('skips unmount persistence when a non-device sign-in published its token', async () => {
+    // Email-code, Apple, Google, and passkey sign-ins complete without the
+    // device-auth approved path: they publish the token through the auth
+    // context directly. The unmount persistence must stay off for them too,
+    // or the typed email would pre-fill the next login as the previous
+    // account's address.
+    const renderer = await mountLoginScreen();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    authState.token = 'provider-token';
+    await act(async () => {
+      renderer.update(createElement(LoginScreen));
+      await Promise.resolve();
+    });
+
+    renderer.unmount();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(persistLoginDrafts).not.toHaveBeenCalled();
   });
 });
 

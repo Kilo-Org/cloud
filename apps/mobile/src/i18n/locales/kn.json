@@ -53,6 +53,7 @@
     "connected": "ಸಂಪರ್ಕಗೊಂಡಿದೆ",
     "couldNotLoadModels": "ಮಾದರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "couldNotLoadRepositories": "ರೆಪೊಸಿಟರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+    "noRepositoriesFound": "ಯಾವುದೇ ರೆಪೊಸಿಟರಿ ಕಂಡುಬಂದಿಲ್ಲ",
     "critical": "ಗಂಭೀರ",
     "delete": "ಅಳಿಸಿ",
     "deleted": "ಅಳಿಸಲಾಗಿದೆ",
@@ -87,6 +88,7 @@
     "connect": "ಸಂಪರ್ಕ ಕಲ್ಪಿಸಿ",
     "connectBitbucket": "Bitbucket ಸಂಪರ್ಕ ಕಲ್ಪಿಸಿ",
     "connectGitlab": "GitLab ಸಂಪರ್ಕ ಕಲ್ಪಿಸಿ",
+    "connectProvider": "ಸೇವಾ ಪೂರೈಕೆದಾರರನ್ನು ಸಂಪರ್ಕಿಸಿ",
     "contentTruncated": "ವಿಷಯವನ್ನು ಮೊಟಕುಗೊಳಿಸಲಾಗಿದೆ",
     "copyLink": "ಲಿಂಕ್ ನಕಲಿಸಿ",
     "couldNotLoadOrganizations": "ಸಂಸ್ಥೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
@@ -145,7 +147,8 @@
     "agent": "ಏಜೆಂಟ್",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "ಬದಲಾವಣೆಗಳು"
+    "changes": "ಬದಲಾವಣೆಗಳು",
+    "organizationTrialEnded": "ಸಂಸ್ಥೆಯ ಪ್ರಾಯೋಗಿಕ ಅವಧಿ ಮುಗಿದಿದೆ ಮತ್ತು ಅದಕ್ಕೆ ಯಾವುದೇ ಸಕ್ರಿಯ ಯೋಜನೆ ಇಲ್ಲ. ಸಂಸ್ಥೆಯ ಮಾಲೀಕರು kilo.ai ನಲ್ಲಿ ಬಿಲ್ಲಿಂಗ್ ನವೀಕರಿಸಬಹುದು, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
   },
   "language": {
     "restarting": "ಆಯ್ಕೆ ಮಾಡಿದ ಭಾಷೆಯನ್ನು ಅನ್ವಯಿಸಲು ಮರುಪ್ರಾರಂಭಿಸಲಾಗುತ್ತಿದೆ",
@@ -182,7 +185,7 @@
     "codeArrivalHint": "ಈ ವಿಳಾಸವು ಅರ್ಹವಾಗಿದ್ದರೆ, ಕೋಡ್ ಒಂದು ನಿಮಿಷದೊಳಗೆ ಬರುತ್ತದೆ.",
     "verifyCode": "ಕೋಡ್ ಪರಿಶೀಲಿಸಿ",
     "resendCode": "ಕೋಡ್ ಮತ್ತೆ ಕಳುಹಿಸಿ",
-    "termsPrefix": "ಮುಂದುವರಿಸುವ ಮೂಲಕ ನೀವು ನಮ್ಮ",
+    "termsPrefix": "ಮುಂದುವರಿಸುವ ಮೂಲಕ ನೀವು ನಮ್ಮ ",
     "terms": "ನಿಯಮಗಳು",
     "termsConnector": " ಮತ್ತು ",
     "termsSuffix": "ಗೆ ಒಪ್ಪುತ್ತೀರಿ.",
@@ -224,7 +227,7 @@
     "hideBalance": "ಉಳಿಕೆ ಮರೆಮಾಡಿ",
     "showBalance": "ಉಳಿಕೆ ತೋರಿಸಿ",
     "balanceHidden": "ಉಳಿಕೆ ಮರೆಮಾಡಲಾಗಿದೆ",
-    "bonusCreditsExpiring": "{{amount}} ಮೊತ್ತದ ಬೋನಸ್ ಕ್ರೆಡಿಟ್‌ಗಳ ಅವಧಿ {{date}} ರಂದು ಮುಗಿಯುತ್ತದೆ.",
+    "bonusCreditsExpiring": "{{amount}} ಮೊತ್ತದ ಕ್ರೆಡಿಟ್‌ಗಳ ಅವಧಿ {{date}} ರಂದು ಮುಗಿಯುತ್ತದೆ.",
     "signOutTitle": "ಸೈನ್ ಔಟ್ ಮಾಡಬೇಕೆ?",
     "signOutMessage": "ನಿಮ್ಮ ಕಾರ್ಯಸ್ಥಳವನ್ನು ಪ್ರವೇಶಿಸಲು ಮತ್ತೆ ಸೈನ್ ಇನ್ ಮಾಡಬೇಕು.",
     "deleteAccountTitle": "ಖಾತೆಯನ್ನು ಅಳಿಸಬೇಕೆ?",
@@ -293,7 +296,8 @@
     "condenseToolCallsSubtitle": "ಸತತ ಸಾಧನ ಕರೆಗಳನ್ನು ನೀವು ತೆರೆಯಬಹುದಾದ ಒಂದು ಸಾಲಿನಲ್ಲಿ ಗುಂಪು ಮಾಡಿ.",
     "toolSummaryTranslation": "ಸಾಧನ ಸಾರಾಂಶಗಳನ್ನು ಅನುವಾದಿಸಿ",
     "toolSummaryTranslationSubtitle": "ಪ್ರತಿ ಸಾಧನ ಸಾರಾಂಶವನ್ನು ನಿಮ್ಮ ಆ್ಯಪ್ ಭಾಷೆಗೆ ಅನುವಾದಿಸಲು ಮಾದರಿಗೆ ಕಳುಹಿಸಿ. ಅನುವಾದ ವಿಫಲವಾದರೆ ಮೂಲವನ್ನು ತೋರಿಸಲಾಗುತ್ತದೆ.",
-    "toolSummaryTranslationModelUnavailableNotice": "ಈ ಮಾದರಿಯನ್ನು ಇನ್ನು ಮುಂದೆ ನೀಡಲಾಗುವುದಿಲ್ಲ. ಇನ್ನೊಂದನ್ನು ಆಯ್ಕೆಮಾಡಲು $t(common.model) ಅನ್ನು ಟ್ಯಾಪ್ ಮಾಡಿ."
+    "toolSummaryTranslationModelUnavailableNotice": "ಈ ಮಾದರಿಯನ್ನು ಇನ್ನು ಮುಂದೆ ನೀಡಲಾಗುವುದಿಲ್ಲ. ಇನ್ನೊಂದನ್ನು ಆಯ್ಕೆಮಾಡಲು $t(common.model) ಅನ್ನು ಟ್ಯಾಪ್ ಮಾಡಿ.",
+    "autoExpandThinkingInactiveSubtitle": "ಯೋಚನೆಯ ವಿವರಗಳನ್ನು ಮರೆಮಾಡಿದಾಗ ಯಾವುದೇ ಪರಿಣಾಮ ಇರುವುದಿಲ್ಲ."
   },
   "prReview": {
     "pullRequestUnavailable": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಭ್ಯವಿಲ್ಲ",
@@ -622,9 +626,15 @@
       "viewOnGitHub": "GitHubನಲ್ಲಿ PR ವೀಕ್ಷಿಸಿ",
       "noChecksReported": "ಯಾವುದೇ ತಪಾಸಣೆಗಳು ವರದಿಯಾಗಿಲ್ಲ",
       "passed": "{{displayCount}} ಯಶಸ್ವಿ",
+      "passed_one": "{{displayCount}} ಯಶಸ್ವಿ",
+      "passed_other": "{{displayCount}} ಯಶಸ್ವಿ",
       "failed": "{{displayCount}} ವಿಫಲ",
+      "failed_one": "{{displayCount}} ವಿಫಲ",
+      "failed_other": "{{displayCount}} ವಿಫಲ",
       "pending": "{{displayCount}} ಬಾಕಿ",
       "skipped": "{{displayCount}} ಬಿಟ್ಟುಬಿಡಲಾಗಿದೆ",
+      "skipped_one": "{{displayCount}} ಬಿಟ್ಟುಬಿಡಲಾಗಿದೆ",
+      "skipped_other": "{{displayCount}} ಬಿಟ್ಟುಬಿಡಲಾಗಿದೆ",
       "checksCount": "{{displayCount}} ತಪಾಸಣೆಗಳು",
       "checksCount_one": "{{displayCount}} ತಪಾಸಣೆ",
       "checksCount_other": "{{displayCount}} ತಪಾಸಣೆಗಳು",
@@ -669,7 +679,8 @@
       "gitlabDescription": "ಮೊಬೈಲ್‌ನಲ್ಲಿ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಲು ನಿಮ್ಮ GitLab ಖಾತೆಯನ್ನು ಸಂಪರ್ಕಿಸಿ.",
       "bitbucketDescription": "ಮೊಬೈಲ್‌ನಲ್ಲಿ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಲು ಈ ಸಂಸ್ಥೆಯನ್ನು Bitbucketಗೆ ಸಂಪರ್ಕಿಸಿ.",
       "bitbucketOrgOnlyDescription": "ಅದರ Bitbucket ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಲು ಮೇಲಿನ ಖಾತೆಯನ್ನು ಒಂದು ಸಂಸ್ಥೆಗೆ ಬದಲಾಯಿಸಿ.",
-      "contextLine": "{{organization}} ಗಾಗಿ"
+      "contextLine": "{{organization}} ಗಾಗಿ",
+      "contextLinePersonal": "ನಿಮ್ಮ ವೈಯಕ್ತಿಕ ಖಾತೆಗಾಗಿ"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1399,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "GitLab ನಲ್ಲಿ ಇನ್ನಷ್ಟು ಗುಂಪುಗಳು ಅಥವಾ ಪ್ರಾಜೆಕ್ಟ್‌ಗಳಿಗೆ ಪ್ರವೇಶ ನೀಡಬೇಕಾಗಬಹುದು.",
       "installGithubApp": "ರೆಪೊಸಿಟರಿಗಳಲ್ಲಿ GitHub ಅಪ್ಲಿಕೇಶನ್ ಅನ್ನು ಸ್ಥಾಪಿಸಿ",
       "installGithubAppDescription": "ಪರಿಶೀಲಿಸಬೇಕಾದ ರೆಪೊಸಿಟರಿಗಳನ್ನು ಪ್ರವೇಶಿಸಲು Kilo GitHub ಅಪ್ಲಿಕೇಶನ್‌ಗೆ ಅನುಮತಿ ನೀಡಿ.",
-      "noRepositoriesFound": "ಯಾವುದೇ ರೆಪೊಸಿಟರಿ ಕಂಡುಬಂದಿಲ್ಲ",
       "repositoryAccess": "ರೆಪೊಸಿಟರಿ ಪ್ರವೇಶ"
     },
     "style": {
@@ -1429,6 +1439,8 @@
       "showMore": "ಇನ್ನಷ್ಟು ತೋರಿಸಿ",
       "created": "ರಚಿಸಲಾಗಿದೆ",
       "started": "ಪ್ರಾರಂಭಿಸಲಾಗಿದೆ",
+      "reviewEnded": "ಕೊನೆಗೊಂಡಿದೆ",
+      "severityNitpick": "ಸೂಕ್ಷ್ಮ",
       "tokens": "ಟೋಕನ್‌ಗಳು",
       "tokensInOut": "{{input}} ಇನ್‌ಪುಟ್ / {{output}} ಔಟ್‌ಪುಟ್",
       "council": "ಪರಿಶೀಲನಾ ಮಂಡಳಿ",
@@ -1452,7 +1464,13 @@
       "sessionError": "ಸೆಷನ್‌ನಲ್ಲಿ ದೋಷ: {{error}}.",
       "statusWithValue": "ಸ್ಥಿತಿ: {{status}}",
       "toolName": "ಸಾಧನ: {{name}}",
-      "toolNameError": "ಸಾಧನ {{name}} ನಲ್ಲಿ ದೋಷ ಉಂಟಾಗಿದೆ."
+      "toolNameError": "ಸಾಧನ {{name}} ನಲ್ಲಿ ದೋಷ ಉಂಟಾಗಿದೆ.",
+      "cancelReasonSuperseded": "ಹೊಸ ಕಮಿಟ್ ಅನ್ನು ಪುಶ್ ಮಾಡಲಾಗಿರುವುದರಿಂದ, ಈ ಪರಿಶೀಲನೆಯನ್ನು ಬದಲಿಸಲಾಗಿದೆ.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} ಸಂಪರ್ಕ ಕಡಿತಗೊಂಡಿದ್ದರಿಂದ, ಈ ಪರಿಶೀಲನೆಯನ್ನು ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ. ಅದನ್ನು ಮರುಸಂಪರ್ಕಿಸಿ, ನಂತರ ಪರಿಶೀಲನೆಯನ್ನು ಮತ್ತೆ ನಡೆಸಿ.",
+      "cancelReasonBitbucketReviewerDisabled": "Bitbucket ಗಾಗಿ Code Reviewer ಅನ್ನು ಆಫ್ ಮಾಡಲಾಗಿದ್ದರಿಂದ, ಈ ಪರಿಶೀಲನೆಯನ್ನು ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ. ಅದನ್ನು ಮತ್ತೆ ಸಕ್ರಿಯಗೊಳಿಸಿ, ನಂತರ ಪರಿಶೀಲನೆಯನ್ನು ಮತ್ತೆ ನಡೆಸಿ.",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಬದಲಾಗಿರುವುದರಿಂದ, ಈ ಪರಿಶೀಲನೆಯನ್ನು ಬದಲಿಸಲಾಗಿದೆ.",
+      "cancelReasonCancelled": "ಈ ಪರಿಶೀಲನೆಯನ್ನು ರದ್ದುಗೊಳಿಸಲಾಗಿದೆ.",
+      "cancelReasonInterrupted": "ಈ ಪರಿಶೀಲನೆಯು ಅಡಚಣೆಗೊಳಗಾಯಿತು."
     },
     "reviewMemory": {
       "title": "ಪರಿಶೀಲನೆಯ ಸ್ಮರಣೆ",
@@ -1473,13 +1491,20 @@
       "invalidUrl": "ಮಾನ್ಯವಾದ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ URL ನಮೂದಿಸಿ.",
       "couldNotCheckProviderStatus": "ಸೇವಾ ಪೂರೈಕೆದಾರರ ಸ್ಥಿತಿಯನ್ನು ಪರಿಶೀಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "couldNotLoadProviders": "ನೀವು ಸಂಪರ್ಕಿಸಿದ ಸೇವಾ ಪೂರೈಕೆದಾರರನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
-      "connectProvider": "ಸೇವಾ ಪೂರೈಕೆದಾರರನ್ನು ಸಂಪರ್ಕಿಸಿ",
       "connectProviderDescription": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ನ ಪರಿಶೀಲನೆಯನ್ನು ನೀವೇ ಪ್ರಾರಂಭಿಸಲು GitHub ಅನ್ನು ಸಂಪರ್ಕಿಸಿ.",
       "pullRequestUrl": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ URL",
       "instructions": "ಸೂಚನೆಗಳು (ಐಚ್ಛಿಕ)",
       "instructionsPlaceholder": "ಪರಿಶೀಲಕರು ಗಮನಹರಿಸಬೇಕಾದ ನಿರ್ದಿಷ್ಟ ವಿಷಯಗಳು…",
       "starting": "ಪರಿಶೀಲನೆ ಪ್ರಾರಂಭಿಸಲಾಗುತ್ತಿದೆ…",
-      "start": "ಪರಿಶೀಲನೆ ಪ್ರಾರಂಭಿಸಿ"
+      "start": "ಪರಿಶೀಲನೆ ಪ್ರಾರಂಭಿಸಿ",
+      "startNotFound": "ಆ {{requestNoun}} ಅನ್ನು {{provider}} ನಿಂದ ಓದಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. URL ಅನ್ನು ಮತ್ತು ರೆಪೊಸಿಟರಿಯು ಪ್ರವೇಶಿಸಬಹುದಾಗಿದೆಯೇ ಎಂಬುದನ್ನು ಪರಿಶೀಲಿಸಿ.",
+      "startRateLimited": "{{provider}} ಸದ್ಯಕ್ಕೆ ವಿನಂತಿಗಳನ್ನು ಸೀಮಿತಗೊಳಿಸುತ್ತಿದೆ. ಕೆಲವು ನಿಮಿಷಗಳ ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "startNotAllowed": "ಆ {{requestNoun}} ಪರಿಶೀಲನೆಯನ್ನು ಪ್ರಾರಂಭಿಸಲು ನಿಮಗೆ ಪ್ರವೇಶವಿಲ್ಲ. ನಿಮ್ಮ ಅನುಮತಿಗಳನ್ನು ಮತ್ತು ನಿಮ್ಮ ಸಂಸ್ಥೆಯ ಯೋಜನೆಯನ್ನು ಪರಿಶೀಲಿಸಿ.",
+      "startProviderNeedsAttention": "ಹಸ್ತಚಾಲಿತ ಪರಿಶೀಲನೆಗಳಿಗೆ ಪ್ರಮಾಣಿತ {{provider}} ಸಂಪರ್ಕ ಅಗತ್ಯವಿದೆ. ಅದನ್ನು ಸಂಪರ್ಕಿಸಿ ಮತ್ತು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "startAlreadyRunning": "ಆ {{requestNoun}} ಗಾಗಿ ಒಂದು ಪರಿಶೀಲನೆ ಈಗಾಗಲೇ ನಡೆಯುತ್ತಿದೆ.",
+      "startRejected": "ಆ {{requestNoun}} ಅನ್ನು ಪರಿಶೀಲಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. ಅದು ತೆರೆದಿದೆಯೇ, ಡ್ರಾಫ್ಟ್ ಅಲ್ಲವೇ ಮತ್ತು URL ಸರಿಯಾಗಿದೆಯೇ ಎಂದು ಖಚಿತಪಡಿಸಿ.",
+      "startProviderUnavailable": "ಆ {{requestNoun}} ಅನ್ನು ಓದಲು {{provider}} ಅನ್ನು ಸಂಪರ್ಕಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+      "startFailed": "ಪರಿಶೀಲನೆಯನ್ನು ಪ್ರಾರಂಭಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
     },
     "notConnectedReadOnly": "{{platform}} ಸಂಪರ್ಕಗೊಂಡಿಲ್ಲ. ಸಂಸ್ಥೆಯ ಮಾಲೀಕರು ಮತ್ತು ನಿರ್ವಾಹಕರು ಮಾತ್ರ ಅದನ್ನು ಸಂಪರ್ಕಿಸಬಹುದು.",
     "gitlab": {
@@ -1593,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "ಯಾವುದೇ ಫಿಲ್ಟರ್‌ಗಳು ಲಭ್ಯವಿಲ್ಲ",
-      "noFiltersDescription": "ಹಿಂದಕ್ಕೆ ಹೋಗಿ, ಪತ್ತೆಯಾದ ಸಮಸ್ಯೆಗಳ ಪಟ್ಟಿಯಿಂದ ಫಿಲ್ಟರ್‌ಗಳನ್ನು ಮತ್ತೆ ತೆರೆಯಿರಿ.",
       "title": "ಪತ್ತೆಯಾದ ಸಮಸ್ಯೆಗಳ ಫಿಲ್ಟರ್‌ಗಳು",
       "reset": "ಮರುಹೊಂದಿಸಿ",
       "severity": "ತೀವ್ರತೆ",
@@ -1731,7 +1754,7 @@
       "deadlinePassed": "ಗಡುವು ಕಳೆದಿದೆ",
       "deadlinePassedDetail": "{{critical}} ಗಂಭೀರ, {{high}} ಹೆಚ್ಚು",
       "dueThisWeek": "ಈ ವಾರ ಗಡುವು",
-      "dueThisWeekDetail": "{{exploitable}} ಸಮಸ್ಯೆಗಳನ್ನು ದುರ್ಬಳಕೆ ಮಾಡಬಹುದೆಂದು ದೃಢಪಟ್ಟಿದೆ",
+      "dueThisWeekDetail": "ಇವುಗಳಲ್ಲಿ {{exploitable}} ಸಮಸ್ಯೆಗಳನ್ನು ದುರ್ಬಳಕೆ ಮಾಡಬಹುದೆಂದು ದೃಢಪಟ್ಟಿದೆ",
       "noDeadline": "ಗಡುವು ಇಲ್ಲ",
       "reviewSlaAssignment": "SLA ಗಡುವಿನ ನಿಗದಿಯನ್ನು ಪರಿಶೀಲಿಸಿ",
       "allOpenFindingsTracked": "ಎಲ್ಲ ಬಾಕಿ ಸಮಸ್ಯೆಗಳ ಮೇಲ್ವಿಚಾರಣೆ ನಡೆಯುತ್ತಿದೆ"
@@ -1891,11 +1914,17 @@
       "actorSystem": "Kilo ವ್ಯವಸ್ಥೆ",
       "couldNotLoad": "ಆಡಿಟ್ ವರದಿಯನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "events": "ಘಟನೆಗಳು",
+      "eventConfidence": "ವಿಶ್ವಾಸ: {{confidence}}",
+      "eventReason": "ಕಾರಣ: {{reason}}",
+      "eventsCount_one": "{{displayCount}} ಘಟನೆ",
+      "eventsCount_other": "{{displayCount}} ಘಟನೆಗಳು",
       "generated": "{{generatedAt}} ರಂದು ರಚಿಸಲಾಗಿದೆ.",
       "noActivity": "ಯಾವುದೇ ಚಟುವಟಿಕೆ ದಾಖಲಾಗಿಲ್ಲ",
       "noActivityDescription": "{{start}} ರಿಂದ {{end}} ವರೆಗೆ ಪತ್ತೆಯಾದ ಭದ್ರತಾ ಸಮಸ್ಯೆಗಳ ಕುರಿತು ವರದಿಯಲ್ಲಿ ಸೇರಿಸಬಹುದಾದ ಯಾವುದೇ ಚಟುವಟಿಕೆ Kilo ದಲ್ಲಿ ದಾಖಲಾಗಿಲ್ಲ.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "ರೆಪೊಸಿಟರಿ ದಾಖಲಾಗಿಲ್ಲ",
+      "reasonUnknown": "ಗುರುತಿಸಲಾಗದ ಕಾರಣ",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "ವರದಿಯ ಸಾರಾಂಶ",
       "title": "ಆಡಿಟ್ ವರದಿ",
       "unavailable": "ಆಡಿಟ್ ವರದಿ ಲಭ್ಯವಿಲ್ಲ",
@@ -1948,8 +1977,9 @@
       "couldNotLoad": "ಭದ್ರತಾ ಏಜೆಂಟ್ ಅನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "installApp": "GitHub ಅಪ್ಲಿಕೇಶನ್ ಅನ್ನು ಸ್ಥಾಪಿಸಿ",
       "reauthorizeButton": "GitHub ಅಪ್ಲಿಕೇಶನ್‌ಗೆ ಮತ್ತೆ ಅನುಮತಿ ನೀಡಿ",
-      "reauthorizeDescription": "Dependabot ಎಚ್ಚರಿಕೆಗಳನ್ನು ಪ್ರವೇಶಿಸಲು ಭದ್ರತಾ ಏಜೆಂಟ್‌ಗೆ vulnerability_alerts ಅನುಮತಿ ಬೇಕು. ಈ ಅನುಮತಿಯನ್ನು ನೀಡಲು GitHub ಅಪ್ಲಿಕೇಶನ್‌ಗೆ ಮತ್ತೆ ಅಧಿಕಾರ ನೀಡಿ.",
+      "reauthorizeDescription": "Dependabot ಎಚ್ಚರಿಕೆಗಳನ್ನು ಓದಲು ಭದ್ರತಾ ಏಜೆಂಟ್‌ಗೆ ಅನುಮತಿ ಬೇಕು. ಈ ಅನುಮತಿಯನ್ನು ನೀಡಲು GitHub ಅಪ್ಲಿಕೇಶನ್‌ಗೆ ಮತ್ತೆ ಅಧಿಕಾರ ನೀಡಿ.",
       "reauthorizeTitle": "ಹೆಚ್ಚುವರಿ ಅನುಮತಿಗಳು ಅಗತ್ಯ",
+      "retryFailed": "ಭದ್ರತಾ ಏಜೆಂಟ್ ಅನ್ನು ಲೋಡ್ ಮಾಡಲು ಇನ್ನೂ ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "setupFailed": "GitHub ಸೆಟಪ್ ಪ್ರಾರಂಭಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
     },
     "queuedActionUntracked": "ಸರದಿಗೆ ಸೇರಿಸಿದ ಕಾರ್ಯದ ಸ್ಥಿತಿಯನ್ನು ಇನ್ನು ತಿಳಿಯಲು ಸಾಧ್ಯವಾಗುತ್ತಿಲ್ಲ. ಇತ್ತೀಚಿನ ಸ್ಥಿತಿಯನ್ನು ನೋಡಲು ರಿಫ್ರೆಶ್ ಮಾಡಿ.",
@@ -2112,7 +2142,8 @@
       "dollar_other": "ಡಾಲರ್‌ಗಳು",
       "costSpoken": "ವೆಚ್ಚ {{cost}}",
       "costSpokenWithTime": "ವೆಚ್ಚ {{cost}}, {{time}}",
-      "pullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ {{number}}"
+      "pullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ {{number}}",
+      "spokenJoiner": ", ಮತ್ತು"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
@@ -2231,6 +2262,9 @@
       "noRepositoriesVisibleGitlab": "ಯಾವುದೇ ರೆಪೊಸಿಟರಿಗಳು ಕಾಣಿಸುತ್ತಿಲ್ಲ. GitLab ಗೆ ರೆಪೊಸಿಟರಿಗಳನ್ನು ಪ್ರವೇಶಿಸಲು ಅನುಮತಿ ಇದೆಯೇ ಎಂದು ಪರಿಶೀಲಿಸಿ. ನಂತರ ಪಟ್ಟಿಯನ್ನು ನವೀಕರಿಸಿ.",
       "noRepositoriesVisibleBitbucket": "ಯಾವುದೇ ರೆಪೊಸಿಟರಿಗಳು ಕಾಣಿಸುತ್ತಿಲ್ಲ. Bitbucket ಗೆ ರೆಪೊಸಿಟರಿಗಳನ್ನು ಪ್ರವೇಶಿಸಲು ಅನುಮತಿ ಇದೆಯೇ ಎಂದು ಪರಿಶೀಲಿಸಿ. ನಂತರ ಪಟ್ಟಿಯನ್ನು ನವೀಕರಿಸಿ.",
       "bitbucketOrganizationsOnly": "Bitbucket ಸಂಸ್ಥೆಗಳಿಗೆ ಮಾತ್ರ ಲಭ್ಯ.",
+      "githubNeedsAttention": "GitHub ಅನ್ನು ಪುನಃ ಸಂಪರ್ಕಿಸಬೇಕು",
+      "githubNeedsAttentionDescription": "Kilo GitHub ಅಪ್ಲಿಕೇಶನ್ ಅನ್ನು ಪುನಃ ಸಂಪರ್ಕಿಸಿ, ನಂತರ ಅದರ ರೆಪೊಸಿಟರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಪಟ್ಟಿಯನ್ನು ನವೀಕರಿಸಿ.",
+      "partialRepositories": "ಕೆಲವು GitHub ರೆಪೊಸಿಟರಿಗಳು ಲೋಡ್ ಆಗಲಿಲ್ಲ.",
       "branchPickerTitle": "ಶಾಖೆ ಆಯ್ಕೆಮಾಡಿ",
       "branchDefault": "ಡೀಫಾಲ್ಟ್",
       "branchAccessibility": "ಶಾಖೆ: {{label}}",
@@ -2238,13 +2272,13 @@
       "branchLoadError": "ಶಾಖೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
       "branchUnavailable": "ಈ ರಿಪೋಜಿಟರಿಗೆ ಶಾಖೆಗಳು ಲಭ್ಯವಿಲ್ಲ. ಪ್ರೊವೈಡರ್ ಬಳಿ ನಿಮ್ಮ ಪ್ರವೇಶವನ್ನು ಪರಿಶೀಲಿಸಿ, ನಂತರ ಬೇರೆ ರಿಪೋಜಿಟರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
       "branchEmpty": "ಯಾವುದೇ ಶಾಖೆಗಳು ಲಭ್ಯವಿಲ್ಲ",
+      "branchListIncomplete": "ಕೆಲವೇ ಶಾಖೆಗಳನ್ನು ಮಾತ್ರ ತೋರಿಸಲಾಗಿದೆ. ಈ ಪಟ್ಟಿಯಲ್ಲಿ ಒಳಗೊಳ್ಳಬಹುದಾದಕ್ಕಿಂತ ಹೆಚ್ಚು ಶಾಖೆಗಳು ಈ ರಿಪೋಜಿಟರಿಯಲ್ಲಿವೆ.",
       "branchPlaceholder": "ಶಾಖೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ",
       "runOnWithTarget": "{{target}} ನಲ್ಲಿ ಚಲಾಯಿಸಿ",
       "environment": "ಪರಿಸರ",
       "couldNotLoadEnvironment": "ನಿಮ್ಮ ಪರಿಸರವನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "retryLoadingEnvironment": "ಪರಿಸರವನ್ನು ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
       "defaultEnvironment": "ಡೀಫಾಲ್ಟ್ ಪರಿಸರ",
-      "environmentSummary": "{{commands}} ಆಜ್ಞೆಗಳು · {{mcp}} MCP · {{skills}} ಕೌಶಲ್ಯಗಳು · {{agents}} ಏಜೆಂಟ್‌ಗಳು",
       "leaveChanges": "ಹಾಗೆಯೇ ಬಿಡಿ",
       "commitAndPush": "ಕಮಿಟ್ ಮಾಡಿ, ಪುಶ್ ಮಾಡಿ",
       "startSession": "ಸೆಶನ್ ಪ್ರಾರಂಭಿಸಿ",
@@ -2463,7 +2497,71 @@
       "preparationComplete": "ಸಿದ್ಧತೆ ಪೂರ್ಣಗೊಂಡಿದೆ",
       "preparationFailed": "ಸಿದ್ಧತೆ ವಿಫಲವಾಗಿದೆ",
       "setupCommand": "ಸೆಟಪ್ ಆಜ್ಞೆ {{index}}",
-      "setupCommandOf": "ಒಟ್ಟು {{displayCount}} ಸೆಟಪ್ ಆಜ್ಞೆಗಳಲ್ಲಿ {{index}} ನೇ ಆಜ್ಞೆ"
+      "setupCommandOf": "ಒಟ್ಟು {{displayCount}} ಸೆಟಪ್ ಆಜ್ಞೆಗಳಲ್ಲಿ {{index}} ನೇ ಆಜ್ಞೆ",
+      "stepWorkspaceSetup": "ವರ್ಕ್‌ಸ್ಪೇಸ್ ಸೆಟಪ್",
+      "stepDiskCheck": "ಡಿಸ್ಕ್ ಪರಿಶೀಲನೆ",
+      "stepCloning": "ರೆಪೊಸಿಟರಿಯನ್ನು ಕ್ಲೋನ್ ಮಾಡಲಾಗುತ್ತಿದೆ",
+      "stepBranch": "ಬ್ರಾಂಚ್ ಅನ್ನು ಸಿದ್ಧಪಡಿಸಲಾಗುತ್ತಿದೆ",
+      "stepDevcontainerSetup": "ಡೆವ್ ಕಂಟೇನರ್ ಸೆಟಪ್",
+      "stepWorkspaceRestore": "ವರ್ಕ್‌ಸ್ಪೇಸ್ ಅನ್ನು ಮರುಸ್ಥಾಪಿಸಲಾಗುತ್ತಿದೆ",
+      "stepWorkspaceBackup": "ವರ್ಕ್‌ಸ್ಪೇಸ್ ಅನ್ನು ಉಳಿಸಲಾಗುತ್ತಿದೆ",
+      "stepSandboxProvision": "ಸ್ಯಾಂಡ್‌ಬಾಕ್ಸ್ ಅನ್ನು ಒದಗಿಸಲಾಗುತ್ತಿದೆ",
+      "stepSandboxBoot": "ಸ್ಯಾಂಡ್‌ಬಾಕ್ಸ್ ಅನ್ನು ಪ್ರಾರಂಭಿಸಲಾಗುತ್ತಿದೆ",
+      "stepSnapshotFallback": "ಸ್ನ್ಯಾಪ್‌ಶಾಟ್ ಇಲ್ಲದೆ ಮರುಪ್ರಯತ್ನಿಸಲಾಗುತ್ತಿದೆ",
+      "stepKiloServer": "Kilo ಅನ್ನು ಪ್ರಾರಂಭಿಸಲಾಗುತ್ತಿದೆ",
+      "stepKiloSession": "ಸೆಷನ್ ಅನ್ನು ಸಿದ್ಧಪಡಿಸಲಾಗುತ್ತಿದೆ",
+      "stepRestoreIncomplete": "ಸೆಷನ್ ಮರುಸ್ಥಾಪನೆ ಅಪೂರ್ಣ",
+      "stepReady": "ಪರಿಸರ ಸಿದ್ಧವಾಗಿದೆ",
+      "stepFailed": "ಪರಿಸರ ಸೆಟಪ್ ವಿಫಲವಾಗಿದೆ",
+      "stepUnknown": "ಪರಿಸರ ಸೆಟಪ್",
+      "detailCreatingSandbox": "ಸ್ಯಾಂಡ್‌ಬಾಕ್ಸ್ ಅನ್ನು ರಚಿಸಲಾಗುತ್ತಿದೆ",
+      "detailUpdatingRepository": "ರೆಪೊಸಿಟರಿಯನ್ನು ನವೀಕರಿಸಲಾಗುತ್ತಿದೆ",
+      "detailCheckingOutBranch": "ಬ್ರಾಂಚ್ ಅನ್ನು ಚೆಕ್‌ಔಟ್ ಮಾಡಲಾಗುತ್ತಿದೆ",
+      "detailRunningSetupCommands": "ಸೆಟಪ್ ಆಜ್ಞೆಗಳನ್ನು ಚಲಾಯಿಸಲಾಗುತ್ತಿದೆ",
+      "detailSavingRepository": "ವೇಗವಾದ ಪ್ರಾರಂಭಕ್ಕಾಗಿ ರೆಪೊಸಿಟರಿಯನ್ನು ಉಳಿಸಲಾಗುತ್ತಿದೆ",
+      "detailStartingKiloRuntime": "Kilo ರನ್‌ಟೈಮ್ ಅನ್ನು ಪ್ರಾರಂಭಿಸಲಾಗುತ್ತಿದೆ",
+      "detailPreparingKiloSession": "Kilo ಸೆಷನ್ ಅನ್ನು ಸಿದ್ಧಪಡಿಸಲಾಗುತ್ತಿದೆ",
+      "detailWaitingForPreviousSandbox": "ಹಿಂದಿನ ಸ್ಯಾಂಡ್‌ಬಾಕ್ಸ್ ನಿಲ್ಲುವವರೆಗೆ ಕಾಯಲಾಗುತ್ತಿದೆ",
+      "detailRetryingSandboxCreation": "ಸ್ಯಾಂಡ್‌ಬಾಕ್ಸ್ ರಚನೆಯನ್ನು ಮರುಪ್ರಯತ್ನಿಸಲಾಗುತ್ತಿದೆ",
+      "detailPreviousSnapshotFailed": "ಹಿಂದಿನ ಸ್ನ್ಯಾಪ್‌ಶಾಟ್ ಪ್ರಾರಂಭ ವಿಫಲವಾಗಿದೆ. ಸ್ನ್ಯಾಪ್‌ಶಾಟ್ ಇಲ್ಲದೆ ಮರುಪ್ರಯತ್ನಿಸಲಾಗುತ್ತಿದೆ.",
+      "detailSnapshotStartupFailed": "ಸ್ನ್ಯಾಪ್‌ಶಾಟ್ ಪ್ರಾರಂಭ ವಿಫಲವಾಗಿದೆ. ಸ್ನ್ಯಾಪ್‌ಶಾಟ್ ಇಲ್ಲದೆ ಮರುಪ್ರಯತ್ನಿಸಲಾಗುತ್ತಿದೆ.",
+      "detailStartingSandboxWithoutSnapshot": "ಸ್ನ್ಯಾಪ್‌ಶಾಟ್ ಇಲ್ಲದೆ ಸ್ಯಾಂಡ್‌ಬಾಕ್ಸ್ ಅನ್ನು ಪ್ರಾರಂಭಿಸಲಾಗುತ್ತಿದೆ",
+      "detailSettingUpWorkspace": "ವರ್ಕ್‌ಸ್ಪೇಸ್ ಅನ್ನು ಸಿದ್ಧಪಡಿಸಲಾಗುತ್ತಿದೆ",
+      "detailRestoringSession": "ಸೆಷನ್ ಅನ್ನು ಮರುಸ್ಥಾಪಿಸಲಾಗುತ್ತಿದೆ",
+      "detailWarmWorkspaceReused": "ಬಿಸಿ ವರ್ಕ್‌ಸ್ಪೇಸ್ ಅನ್ನು ಮರುಬಳಕೆ ಮಾಡಲಾಗಿದೆ",
+      "detailRetryingClone": "ಕ್ಲೋನ್ ಮರುಪ್ರಯತ್ನ (ಒಟ್ಟು {{total}} ಪ್ರಯತ್ನಗಳಲ್ಲಿ {{attempt}} ನೇ ಪ್ರಯತ್ನ)",
+      "detailSetupCommandFailed": "ಸೆಟಪ್ ಆಜ್ಞೆ {{index}} ವಿಫಲವಾಗಿದೆ",
+      "detailSetupCommandTimedOut": "ಸೆಟಪ್ ಆಜ್ಞೆ {{index}} ಅವಧಿ ಮೀರಿದೆ",
+      "detailColdRestore": "ಕೋಲ್ಡ್ ರಿಸ್ಟೋರ್, ಸ್ನ್ಯಾಪ್‌ಶಾಟ್ ಅನ್ವಯಿಸಲಾಗಿದೆ, ಒಟ್ಟು {{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ {{applied}} ಫೈಲ್‌ಗಳನ್ನು ಮರುಸ್ಥಾಪಿಸಲಾಗಿದೆ",
+      "detailProgressPercent": "{{percent}}% ಪೂರ್ಣಗೊಂಡಿದೆ",
+      "detailRestoreIncompleteReport": "ಸೆಷನ್ ಮರುಸ್ಥಾಪನೆ ಅಪೂರ್ಣ: ಒಟ್ಟು {{total}} ಫೈಲ್‌ಗಳಲ್ಲಿ {{skipped}} ಫೈಲ್‌ಗಳನ್ನು ಮರುಸ್ಥಾಪಿಸಲಾಗಿಲ್ಲ ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "ಕಾಣೆಯಾಗಿದೆ: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} ಮತ್ತು {{omitted}} ಹೆಚ್ಚಿನವು",
+      "detailReasonPatchFailed": "ಪ್ಯಾಚ್ ಅನ್ವಯವಾಗಲಿಲ್ಲ",
+      "detailReasonOutsideWorkspace": "ಹಾದಿಯು ವರ್ಕ್‌ಸ್ಪೇಸ್‌ನ ಹೊರಗಿದೆ",
+      "detailReasonMissingContent": "ಸ್ನ್ಯಾಪ್‌ಶಾಟ್ ಫೈಲ್‌ಗೆ ಯಾವುದೇ ವಿಷಯವನ್ನು ಹೊಂದಿರಲಿಲ್ಲ",
+      "detailReasonIndexResetFailed": "ವಿಫಲವಾದ ಅನ್ವಯಿಕೆಯ ನಂತರ ಅನುಕ್ರಮಣಿಕೆಯನ್ನು ಮರುಹೊಂದಿಸಲಾಗಲಿಲ್ಲ",
+      "detailReasonUnlinkFailed": "ಫೈಲ್ ಅನ್ನು ತೆಗೆಯಲಾಗಲಿಲ್ಲ",
+      "detailReasonWriteFailed": "ಫೈಲ್ ಅನ್ನು ಬರೆಯಲಾಗಲಿಲ್ಲ",
+      "detailReasonUnknown": "ಅಜ್ಞಾತ ಕಾರಣ",
+      "detailUnknown": "ಇನ್ನೂ ಸಿದ್ಧಪಡಿಸಲಾಗುತ್ತಿದೆ",
+      "errorPreparationTimeout": "ಪರಿಸರ ಸಿದ್ಧತೆಯ ಅವಧಿ ಮೀರಿದೆ",
+      "errorWorkspaceSetupFailed": "ವರ್ಕ್‌ಸ್ಪೇಸ್ ಸೆಟಪ್ ವಿಫಲವಾಗಿದೆ",
+      "errorCredentialUpgradeRequired": "ಈ ಸೆಷನ್‌ನಲ್ಲಿ ಅಗತ್ಯ ಕ್ರೆಡೆನ್ಶಿಯಲ್ ಅಪ್‌ಗ್ರೇಡ್ ಇಲ್ಲ. ಮುಂದುವರಿಸಲು ಹೊಸ ಸೆಷನ್ ಪ್ರಾರಂಭಿಸಿ.",
+      "errorAgentUnavailable": "ಏಜೆಂಟ್ ಲಭ್ಯವಿಲ್ಲ",
+      "errorBillingBlocked": "ಸ್ಯಾಂಡ್‌ಬಾಕ್ಸ್ ಬಿಲ್ಲಿಂಗ್‌ಗೆ ಹೆಚ್ಚುವರಿ ಕ್ರೆಡಿಟ್‌ಗಳು ಬೇಕಾಗಿವೆ",
+      "errorBillingUnavailable": "ಸ್ಯಾಂಡ್‌ಬಾಕ್ಸ್ ಬಿಲ್ಲಿಂಗ್ ಅಥವಾ ಸಾಮರ್ಥ್ಯ ಪರಿಶೀಲನೆ ಲಭ್ಯವಿಲ್ಲ. ಕೆಲವೇ ಸಮಯದಲ್ಲಿ ಮರುಪ್ರಯತ್ನಿಸಿ.",
+      "errorContainerLimitReached": "ಕಂಟೇನರ್ ಮಿತಿ ತಲುಪಿದೆ. ಮತ್ತೊಂದನ್ನು ಪ್ರಾರಂಭಿಸುವ ಮೊದಲು ಈಗಿರುವ ಕಂಟೇನರ್ ಅನ್ನು ನಿಲ್ಲಿಸಿ.",
+      "errorInvalidConfiguration": "ಸ್ಯಾಂಡ್‌ಬಾಕ್ಸ್ ಸಂರಚನೆ ಅಮಾನ್ಯ ಅಥವಾ ಬೆಂಬಲಿತವಲ್ಲ",
+      "errorRuntimeArtifactUnauthorized": "ರನ್‌ಟೈಮ್ ಡೌನ್‌ಲೋಡ್‌ಗೆ ಅಧಿಕೃತತೆ ಇಲ್ಲ",
+      "errorRuntimeArtifactInvalid": "ರನ್‌ಟೈಮ್ ಆರ್ಟಿಫ್ಯಾಕ್ಟ್ ಪರಿಶೀಲನೆ ವಿಫಲವಾಗಿದೆ",
+      "errorRuntimeCliProbeFailed": "ರನ್‌ಟೈಮ್ CLI ಮೌಲ್ಯೀಕರಣ ವಿಫಲವಾಗಿದೆ",
+      "errorRuntimeSupervisorMissing": "ರನ್‌ಟೈಮ್ ಸೂಪರ್‌ವೈಸರ್ ಕಾಣೆಯಾಗಿದೆ",
+      "errorConnectionLost": "ಸ್ಯಾಂಡ್‌ಬಾಕ್ಸ್ ಸಂಪರ್ಕ ಕಡಿದುಹೋಗಿದೆ",
+      "errorSandboxLost": "ಸ್ಯಾಂಡ್‌ಬಾಕ್ಸ್ ಕಳೆದುಹೋಗಿದೆ",
+      "errorAgentRestarted": "ಏಜೆಂಟ್ ಮರುಪ್ರಾರಂಭವಾಗಿದೆ",
+      "errorSandboxOutOfMemory": "ಸ್ಯಾಂಡ್‌ಬಾಕ್ಸ್ ಮೆಮೊರಿ ಖಾಲಿಯಾಗಿದೆ",
+      "errorPreparationDidNotComplete": "ಸಿದ್ಧತೆ ಪೂರ್ಣಗೊಂಡಿಲ್ಲ"
     },
     "permissionCard": {
       "title": "ಅನುಮತಿ ಅಗತ್ಯವಿದೆ",
@@ -2475,7 +2573,10 @@
       "allowOnceAccessibility": "ಒಮ್ಮೆ ಅನುಮತಿಸಿ",
       "alwaysAllow": "ಯಾವಾಗಲೂ ಅನುಮತಿಸಿ",
       "alwaysAllowAccessibility": "ಯಾವಾಗಲೂ ಅನುಮತಿಸಿ",
-      "retrying": "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸುತ್ತಿದೆ…"
+      "retrying": "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸುತ್ತಿದೆ…",
+      "retryDeny": "ನಿರಾಕರಿಸಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
+      "retryAllowOnce": "ಒಮ್ಮೆ ಅನುಮತಿಸಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
+      "retryAlwaysAllow": "ಯಾವಾಗಲೂ ಅನುಮತಿಸಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ"
     },
     "questionCard": {
       "title": "ಏಜೆಂಟ್‌ಗೆ ನಿಮ್ಮ ಉತ್ತರ ಬೇಕಿದೆ",
@@ -2851,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "ಆಲಿಸಲಾಗುತ್ತಿದೆ...",
-    "staysOff": "ಮಾತನ್ನು ಆನ್‌ಲೈನ್‌ನಲ್ಲಿ ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸಲು ಅನುಮತಿಸುವವರೆಗೆ ಧ್ವನಿ ಇನ್‌ಪುಟ್ ನಿಷ್ಕ್ರಿಯವಾಗಿರುತ್ತದೆ.",
     "onlineTitle": "ಮಾತನ್ನು ಆನ್‌ಲೈನ್‌ನಲ್ಲಿ ಸಂಸ್ಕರಿಸಲಾಗುತ್ತದೆ",
     "onlineMessage": "ಈ ಸಾಧನದಲ್ಲಿ ಆಫ್‌ಲೈನ್‌ನಲ್ಲಿ ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. ನಿಮ್ಮ ಧ್ವನಿಮುದ್ರಣವನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸಲು {{provider}} ಗೆ ಕಳುಹಿಸಲಾಗುತ್ತದೆ. Kilo ಧ್ವನಿಮುದ್ರಣವನ್ನು ಸಂಗ್ರಹಿಸುವುದಿಲ್ಲ.",
     "allow": "ಅನುಮತಿಸಿ",
@@ -3027,22 +3127,16 @@
     "boundary": {
       "backToProfile": "ಪ್ರೊಫೈಲ್‌ಗೆ ಹಿಂತಿರುಗಿ",
       "loadErrorMessage": "ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
-
       "chooseAccount": "ಖಾತೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ",
       "loadErrorTitle": "ನಿಮ್ಮ ಸಂಸ್ಥೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "membershipLostNotice": "ಈ ಸಂಸ್ಥೆಗೆ ನಿಮಗೆ ಇನ್ನು ಪ್ರವೇಶವಿಲ್ಲ. {{target}}ಗೆ ಬದಲಾಯಿಸಲಾಗಿದೆ.",
       "noOrganization": "ಯಾವುದೇ ಸಂಸ್ಥೆ ಇಲ್ಲ",
-
       "noOrganizationDescription": "ಈ ಖಾತೆಯು ಯಾವುದೇ ಸಂಸ್ಥೆಯ ಭಾಗವಲ್ಲ. ಸದಸ್ಯರ ಆಮಂತ್ರಣಗಳು ಮತ್ತು ಕಡಿಮೆ ಬ್ಯಾಲೆನ್ಸ್ ಎಚ್ಚರಿಕೆಗಳಂತಹ ಸಂಸ್ಥೆ ವೈಶಿಷ್ಟ್ಯಗಳನ್ನು ಬಳಸಲು ವೆಬ್‌ನಲ್ಲಿ ಸಂಸ್ಥೆಯನ್ನು ರಚಿಸಿ ಅಥವಾ ಸೇರಿ.",
-
       "openWebOrganizations": "ವೆಬ್‌ನಲ್ಲಿ ಸಂಸ್ಥೆಗಳನ್ನು ತೆರೆಯಿರಿ",
-
       "organizationUnavailable": "ಸಂಸ್ಥೆ ಲಭ್ಯವಿಲ್ಲ.",
       "selectDescriptionWithOrganizations": "ನೀವು ಒಂದು ಅಥವಾ ಹೆಚ್ಚು ಸಂಸ್ಥೆಗಳಿಗೆ ಸೇರಿದ್ದೀರಿ. ಈ ಸ್ಕ್ರೀನ್ ಬಳಸಬೇಕಾದ ಖಾತೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
-
       "selectOrganization": "ಸಂಸ್ಥೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ",
       "unavailableDescription": "ಈ ಸಂಸ್ಥೆ ಇನ್ನು ಲಭ್ಯವಿಲ್ಲ. ಮುಂದುವರಿಯಲು ನಿಮ್ಮ ಪ್ರೊಫೈಲ್‌ನಿಂದ ಬೇರೆ ಸಂಸ್ಥೆಯನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
-
       "unavailableSessionsDescription": "ಈ ಸಂಸ್ಥೆ ಇನ್ನು ಲಭ್ಯವಿಲ್ಲ. ಅದರ ಸೆಷನ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗುವುದಿಲ್ಲ.",
       "accessDeniedDescription": "ಈ ಸಂಸ್ಥೆಗೆ ನಿಮಗೆ ಪ್ರವೇಶವಿಲ್ಲ."
     },
@@ -3070,7 +3164,11 @@
       "permissionDenied": "ಸದಸ್ಯರನ್ನು ಆಹ್ವಾನಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
       "roleMember": "ನಿಮ್ಮ ಪಾತ್ರ: ಸದಸ್ಯ.",
       "sendInvite": "ಆಹ್ವಾನ ಕಳುಹಿಸಿ",
-      "title": "ಸದಸ್ಯರನ್ನು ಆಹ್ವಾನಿಸಿ"
+      "title": "ಸದಸ್ಯರನ್ನು ಆಹ್ವಾನಿಸಿ",
+      "alreadyInvited": "ಅವರನ್ನು ಈಗಾಗಲೇ ಆಹ್ವಾನಿಸಲಾಗಿದೆ ಅಥವಾ ಅವರು ಈಗಾಗಲೇ ಸದಸ್ಯರಾಗಿದ್ದಾರೆ.",
+      "sendError": "ಆಹ್ವಾನವನ್ನು ಕಳುಹಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "pendingInvitation": "ಈ ಇಮೇಲ್‌ಗೆ ಈಗಾಗಲೇ ಬಾಕಿ ಇರುವ ಆಹ್ವಾನವಿದೆ.",
+      "alreadyMember": "ಈ ವ್ಯಕ್ತಿ ಈಗಾಗಲೇ ಈ ಸಂಸ್ಥೆಯ ಸದಸ್ಯರಾಗಿದ್ದಾರೆ."
     },
     "invoices": {
       "downloadA11y": "ಇನ್‌ವಾಯ್ಸ್ {{number}} ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ",
@@ -3139,7 +3237,13 @@
       "inviteCreated": "ಆಹ್ವಾನ ರಚಿಸಲಾಗಿದೆ",
       "pendingInvitations": "ಬಾಕಿ ಇರುವ ಆಹ್ವಾನಗಳು",
       "resendInvite": "ಆಹ್ವಾನವನ್ನು ಮತ್ತೆ ಕಳುಹಿಸಿ",
-      "shareInviteLink": "ಆಹ್ವಾನ ಲಿಂಕ್ ಹಂಚಿಕೊಳ್ಳಿ"
+      "shareInviteLink": "ಆಹ್ವಾನ ಲಿಂಕ್ ಹಂಚಿಕೊಳ್ಳಿ",
+      "resendInviteError": "ಆಹ್ವಾನವನ್ನು ಮತ್ತೆ ಕಳುಹಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      "inviteNotResendable": "ಈ ಆಹ್ವಾನವನ್ನು ಇನ್ನು ಮುಂದೆ ಮತ್ತೆ ಕಳುಹಿಸಲಾಗುವುದಿಲ್ಲ.",
+      "ownerAuthority": "ಸಂಸ್ಥೆಯ ಮಾಲೀಕರು ಮಾತ್ರ ಮಾಲೀಕರನ್ನು ನಿರ್ವಹಿಸಬಹುದು.",
+      "ownRoleChange": "ನೀವು ನಿಮ್ಮ ಸ್ವಂತ ಪಾತ್ರವನ್ನು ಬದಲಾಯಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ.",
+      "inviteExpired": "ಈ ಆಹ್ವಾನದ ಅವಧಿ ಮುಗಿದಿದೆ.",
+      "inviteAccepted": "ಈ ಆಹ್ವಾನವನ್ನು ಈಗಾಗಲೇ ಸ್ವೀಕರಿಸಲಾಗಿದೆ."
     },
     "usageStats": {
       "inputTokens": "ಇನ್‌ಪುಟ್ ಟೋಕನ್‌ಗಳು",
@@ -3287,7 +3391,8 @@
     "noneChosen": "ಯಾವುದನ್ನೂ ಆಯ್ಕೆ ಮಾಡಿಲ್ಲ",
     "emptyTitle": "ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವ ಯಾವುದೇ ಮಾದರಿಗಳಿಲ್ಲ",
     "emptyDescription": "Kilo Gateway ಪ್ರಸ್ತುತ ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವ ಯಾವುದೇ ಮಾದರಿಗಳನ್ನು ಒದಗಿಸುತ್ತಿಲ್ಲ.",
-    "loadFailed": "ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವ ಮಾದರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."
+    "loadFailed": "ಮಾತನ್ನು ಪಠ್ಯಕ್ಕೆ ಪರಿವರ್ತಿಸುವ ಮಾದರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+    "choose": "ಮಾದರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ"
   },
   "voiceLanguage": {
     "title": "ಧ್ವನಿ ಇನ್‌ಪುಟ್ ಭಾಷೆ",
@@ -3382,6 +3487,11 @@
       "serverChecking": "ಈ ಸರ್ವರ್ ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ…",
       "serverUnreachable": "ಈ ಸರ್ವರ್ ತಲುಪಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
       "serverOff": "ಈ ಸರ್ವರ್ ಆಫ್ ಆಗಿದೆ",
+      "app": {
+        "label": "ಉಪಕರಣ ಇಂಟರ್ಫೇಸ್",
+        "failed": "ಈ ಉಪಕರಣದ ಇಂಟರ್ಫೇಸ್ ಅನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ.",
+        "empty": "ಈ ಉಪಕರಣದ ಇಂಟರ್ಫೇಸ್‌ನಲ್ಲಿ ತೋರಿಸಲು ಏನೂ ಇಲ್ಲ."
+      },
       "serverToolCount_one": "{{count}} ಸಾಧನ",
       "serverToolCount_other": "{{count}} ಸಾಧನಗಳು"
     },
@@ -3497,6 +3607,7 @@
       "fromHuggingFace": "Hugging Face ನಿಂದ",
       "loading": "ಮಾದರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ",
       "noResults": "ಯಾವುದೇ ಮಾದರಿಗಳು ಕಂಡುಬಂದಿಲ್ಲ",
+      "noResultsForQuery": "\"{{query}}\" ಗಾಗಿ ಯಾವುದೇ ಮಾದರಿಗಳು ಕಂಡುಬಂದಿಲ್ಲ",
       "noFits": "ಈ ಸಾಧನಕ್ಕೆ ಯಾವುದೇ ಮಾದರಿ ಹೊಂದುವುದಿಲ್ಲ",
       "noFitsDescription": "ದೊಡ್ಡ ಮಾದರಿಗಳು $t(common.all) ಟ್ಯಾಬ್‌ನಲ್ಲಿವೆ.",
       "fit": {
@@ -3527,8 +3638,6 @@
       "quantizations": "ಕ್ವಾಂಟೈಸೇಶನ್‌ಗಳು",
       "quantizationsHelp": "ಚಿಕ್ಕ ಫೈಲ್‌ಗಳು ಕಡಿಮೆ ಮೆಮೊರಿ ಮತ್ತು ಸಂಗ್ರಹಣೆ ಬಳಸುತ್ತವೆ. ದೊಡ್ಡ ಫೈಲ್‌ಗಳು ಸಾಮಾನ್ಯವಾಗಿ ಉತ್ತಮ ಉತ್ತರಗಳನ್ನು ನೀಡುತ್ತವೆ.",
       "quantDetail": "{{size}} ಡೌನ್‌ಲೋಡ್ · ಸುಮಾರು {{memory}} ಮೆಮೊರಿ",
-      "downloadQuant": "{{quant}} ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ",
-      "downloadModelA11y": "{{name}} ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ",
       "detailsA11y": "ವಿವರಗಳು: {{name}}",
       "loadingModel": "ಮಾದರಿ ವಿವರಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ",
       "couldNotLoadModel": "ಈ ಮಾದರಿಯನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
@@ -3573,13 +3682,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "ಈ ಮಾದರಿ ಯೋಚನೆಯ ಮಟ್ಟವನ್ನು ಬೆಂಬಲಿಸುತ್ತದೆ"
-    }
+    },
+    "creditsRequired": "ಈ ಸಂದೇಶವನ್ನು ಕಳುಹಿಸಲು ಸಾಕಷ್ಟು ಕ್ರೆಡಿಟ್‌ಗಳಿಲ್ಲ. ಕ್ರೆಡಿಟ್‌ಗಳನ್ನು ಸೇರಿಸಿ ಮತ್ತು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
   },
   "settingsTools": {
     "confirmTitle": "ಈ ಬದಲಾವಣೆ ದೃಢೀಕರಿಸುವುದೇ?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "ನಿಮ್ಮ ಇತ್ತೀಚಿನ ರೆಪೊಸಿಟರಿ",
+      "confirmMessage": "ರೆಪೊಸಿಟರಿ: {{repository}}. ಪ್ರಾಂಪ್ಟ್: {{prompt}}",
+      "confirmTitle": "ಈ ಏಜೆಂಟ್ ಪ್ರಾರಂಭಿಸಬೇಕೇ?",
       "promptRequired": "ಏಜೆಂಟ್ ಆರಂಭಿಸಲು ಪ್ರಾಂಪ್ಟ್ ಬೇಕು. ಪ್ರಾಂಪ್ಟ್ ಸೇರಿಸಿ ಮತ್ತು ಅದನ್ನು ಮತ್ತೆ ರನ್ ಮಾಡಿ.",
       "repositoryRequired": "ಏಜೆಂಟ್ ಆರಂಭಿಸಲು ರೆಪೊಸಿಟರಿ ಬೇಕು. Kilo ತೆರೆಯಿರಿ, ಒಂದನ್ನು ಆಯ್ಕೆಮಾಡಿ ಮತ್ತು ಅದನ್ನು ಮತ್ತೆ ರನ್ ಮಾಡಿ.",
       "repositoryUnknown": "Kilo, {{repository}} ಅನ್ನು GitHub ಅಥವಾ GitLab ರೆಪೊಸಿಟರಿ ಎಂದು ಗುರುತಿಸುವುದಿಲ್ಲ. Kilo ನಲ್ಲಿ ಬೇರೆ ರೆಪೊಸಿಟರಿ ಆಯ್ಕೆಮಾಡಿ.",
@@ -3609,7 +3722,9 @@
     "spend24h": "ಕಳೆದ 24 ಗಂಟೆಗಳ ಖರ್ಚು",
     "multiplierError": "1 ಅಥವಾ ಹೆಚ್ಚಿನ ಗುಣಕವನ್ನು ನಮೂದಿಸಿ",
     "permissionDenied": "ಖರ್ಚಿನ ಎಚ್ಚರಿಕೆಗಳನ್ನು ನಿರ್ವಹಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
-    "pushOffByCategory": "ಅಧಿಸೂಚನೆಗಳಲ್ಲಿ ಆಫ್"
+    "pushOffByCategory": "ಅಧಿಸೂಚನೆಗಳಲ್ಲಿ ಆಫ್",
+    "multiplierMaxError": "{{max}} ಅಥವಾ ಕಡಿಮೆ ಗುಣಕವನ್ನು ನಮೂದಿಸಿ",
+    "thresholdMaxError": "{{max}} ಅಥವಾ ಕಡಿಮೆ ಮೊತ್ತವನ್ನು ನಮೂದಿಸಿ."
   },
   "profiles": {
     "title": "ಪ್ರೊಫೈಲ್ಗಳು",
@@ -3619,16 +3734,17 @@
     "emptyDescription": "ಸೆಷನ್‌ಗಳಾದ್ಯಂತ ಪರಿಸರ ವೇರಿಯಬಲ್‌ಗಳು, ಸೆಟಪ್ ಕಮಾಂಡ್‌ಗಳು ಮತ್ತು ಕೌಶಲ್ಯಗಳನ್ನು ಮರುಬಳಕೆ ಮಾಡಲು ಪ್ರೊಫೈಲ್ ಅನ್ನು ರಚಿಸಿ.",
     "loadFailed": "ಪ್ರೊಫೈಲ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
     "counts": {
+      "vars_one": "{{count}} ಅಸ್ಥಿರ",
+      "vars_other": "{{count}} ಅಸ್ಥಿರಗಳು",
       "mcp": "{{count}} MCP",
-      "varsShort": "{{count}}ಅ",
-      "skillsShort": "{{count}}ಕ",
-      "commandsShort": "{{count}}ಆ",
-      "commands_one": "{{count}} ಆಜ್ಞೆ",
-      "commands_other": "{{count}} ಆಜ್ಞೆಗಳು",
       "skills_one": "{{count}} ಕೌಶಲ್ಯ",
       "skills_other": "{{count}} ಕೌಶಲ್ಯಗಳು",
-      "vars_one": "{{count}} ಅಸ್ಥಿರ",
-      "vars_other": "{{count}} ಅಸ್ಥಿರಗಳು"
+      "commands_one": "{{count}} ಆಜ್ಞೆ",
+      "commands_other": "{{count}} ಆಜ್ಞೆಗಳು",
+      "setupCommands_one": "{{count}} ಹೊಂದಿಸುವ ಆಜ್ಞೆ",
+      "setupCommands_other": "{{count}} ಹೊಂದಿಸುವ ಆಜ್ಞೆಗಳು",
+      "agents_one": "{{count}} ಏಜೆಂಟ್",
+      "agents_other": "{{count}} ಏಜೆಂಟ್‌ಗಳು"
     },
     "nameLabel": "ಪ್ರೊಫೈಲ್ ಹೆಸರು",
     "namePlaceholder": "ಉದಾ. ಬ್ಯಾಕೆಂಡ್ ಡೀಬಗ್ ಮಾಡುವಿಕೆ",
@@ -3656,6 +3772,8 @@
     "keyTooLong": "ಕೀಲಿಯು 256 ಅಕ್ಷರಗಳು ಅಥವಾ ಕಡಿಮೆ ಇರಬೇಕು",
     "keyDuplicate": "ಈ ಕೀಲಿಯು ಈಗಾಗಲೇ ಪ್ರೊಫೈಲ್ನಲ್ಲಿದೆ",
     "valueLabel": "ಮೌಲ್ಯ",
+    "valueRequired": "ಮೌಲ್ಯವನ್ನು ನಮೂದಿಸಿ",
+    "tooLong": "ಗರಿಷ್ಠವಾಗಿ {{max}} ಅಕ್ಷರಗಳನ್ನು ಬಳಸಿ",
     "secrets": {
       "markSecret": "ರಹಸ್ಯವೆಂದು ಗುರುತಿಸಿ",
       "masked": "ಗುಪ್ತ ಮೌಲ್ಯ",
@@ -3684,6 +3802,8 @@
     "skillNameInvalid": "ಕೌಶಲ್ಯದ ಹೆಸರು ಅಕ್ಷರ ಅಥವಾ ಅಂಕೆಯೊಂದಿಗೆ ಪ್ರಾರಂಭವಾಗಬೇಕು ಮತ್ತು ಸಣ್ಣ ಅಕ್ಷರಗಳು, ಅಂಕೆಗಳು ಮತ್ತು ಡ್ಯಾಶ್‌ಗಳನ್ನು ಮಾತ್ರ ಬಳಸಬೇಕು",
     "skillContentRequired": "ಕೌಶಲ್ಯ ವಿಷಯದ ಅಗತ್ಯವಿದೆ",
     "skillSaveFailed": "ಕೌಶಲ್ಯವನ್ನು ಉಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
+    "skillSourceCustom": "ಕಸ್ಟಮ್",
+    "skillSourceMarketplace": "ಮಾರುಕಟ್ಟೆ",
     "skillsHint": "SKILL.md ಅನ್ನು ಅಂಟಿಸಿ ಮತ್ತು ಅದರ ಹೆಸರು ತುಂಬುತ್ತದೆ; ಡ್ರ್ಯಾಗ್ ಮತ್ತು ಡ್ರಾಪ್ ಇಲ್ಲದೆ ನಿಮ್ಮ ಫೋನ್‌ನಿಂದ ಕೌಶಲ್ಯವನ್ನು ಸೇರಿಸಿ.",
     "skillEditTitle": "ಕೌಶಲ್ಯ ಸಂಪಾದಿಸಿ",
     "mcp": {
@@ -3704,7 +3824,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "ಸರ್ವರ್ ಹೆಸರನ್ನು ನಮೂದಿಸಿ",
-      "nameInvalid": "ಹೆಸರು ಅಕ್ಷರಗಳು, ಸಂಖ್ಯೆಗಳು, ಅಂಡರ್‌ಸ್ಕೋರ್‌ಗಳು ಮತ್ತು ಡ್ಯಾಶ್‌ಗಳನ್ನು ಮಾತ್ರ ಬಳಸಬಹುದು",
+      "nameInvalid": "ಹೆಸರು ASCII ಅಕ್ಷರಗಳು, ಸಂಖ್ಯೆಗಳು, ಅಂಡರ್‌ಸ್ಕೋರ್‌ಗಳು ಮತ್ತು ಡ್ಯಾಶ್‌ಗಳನ್ನು ಮಾತ್ರ ಬಳಸಬಹುದು, ಗರಿಷ್ಠ 100 ಅಕ್ಷರಗಳವರೆಗೆ",
       "commandRequired": "ಆಜ್ಞೆಯನ್ನು ನಮೂದಿಸಿ",
       "commandTooLong": "ಗರಿಷ್ಠ 50 ಆರ್ಗ್ಯುಮೆಂಟ್ಗಳನ್ನು ಬಳಸಿ, ಪ್ರತಿಯೊಂದೂ 500 ಅಕ್ಷರಗಳು",
       "urlRequired": "URL ಅನ್ನು ನಮೂದಿಸಿ",
@@ -3732,16 +3852,16 @@
       "stepsPlaceholder": "ಉದಾ. 50",
       "temperature": "ತಾಪಮಾನ",
       "temperaturePlaceholder": "ಉದಾ. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "ಉದಾ. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "ನನ್ನ ಏಜೆಂಟ್",
       "promptPlaceholder": "ನೀವು ಒಂದು ...",
       "tools": "ಪರಿಕರಗಳು",
       "visibility": "ಗೋಚರತೆ",
-      "visibilityPrimary": "ಪ್ರಾಥಮಿಕ - ಪಿಕ್ಕರ್‌ನಲ್ಲಿ ತೋರಿಸಲಾಗಿದೆ",
-      "visibilitySubagent": "ಸಬ್ಜೆಂಟ್ - ಇತರರಿಂದ ಮಾತ್ರ ಕರೆಯಬಹುದು",
-      "visibilityAll": "ಎಲ್ಲಾ - ಎರಡೂ",
+      "visibilityPrimary": "ಪ್ರಾಥಮಿಕ — ಪಿಕ್ಕರ್‌ನಲ್ಲಿ ತೋರಿಸಲಾಗಿದೆ",
+      "visibilitySubagent": "ಸಬ್ಜೆಂಟ್ — ಇತರರಿಂದ ಮಾತ್ರ ಕರೆಯಬಹುದು",
+      "visibilityAll": "ಎಲ್ಲಾ — ಎರಡೂ",
       "modePrimary": "ಪ್ರಾಥಮಿಕ ಮಾತ್ರ",
       "modeSubagent": "ಸಬ್ಜೆಂಟ್ ಮಾತ್ರ",
       "modeAll": "ಎಲ್ಲಾ ಮೋಡ್‌ಗಳು",
@@ -3749,7 +3869,7 @@
       "deleteFailed": "ಏಜೆಂಟ್ ಅನ್ನು ಅಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
       "nameRequired": "ಏಜೆಂಟ್ ಹೆಸರನ್ನು ನಮೂದಿಸಿ",
       "slugRequired": "ಏಜೆಂಟ್ ಸ್ಲಗ್ ಅನ್ನು ನಮೂದಿಸಿ",
-      "slugInvalid": "ಸ್ಲಗ್ ಅಕ್ಷರದಿಂದ ಪ್ರಾರಂಭವಾಗಬೇಕು ಮತ್ತು ಸಣ್ಣ ಅಕ್ಷರಗಳು, ಅಂಕೆಗಳು ಮತ್ತು ಡ್ಯಾಶ್‌ಗಳನ್ನು ಮಾತ್ರ ಬಳಸಬೇಕು",
+      "slugInvalid": "ಸ್ಲಗ್ ASCII ಸಣ್ಣ ಅಕ್ಷರದಿಂದ ಪ್ರಾರಂಭವಾಗಬೇಕು ಮತ್ತು ASCII ಸಣ್ಣ ಅಕ್ಷರಗಳು, ಅಂಕೆಗಳು ಮತ್ತು ಡ್ಯಾಶ್‌ಗಳನ್ನು ಮಾತ್ರ ಬಳಸಬೇಕು, ಗರಿಷ್ಠ 50 ಅಕ್ಷರಗಳವರೆಗೆ",
       "slugConflict": "ಆ ಸ್ಲಗ್ ಅನ್ನು ಈಗಾಗಲೇ ಒಳನಿರ್ಮಿತ ಏಜೆಂಟ್ ಅಥವಾ ಈ ಪ್ರೊಫೈಲ್‌ನಲ್ಲಿನ ಇನ್ನೊಂದು ಏಜೆಂಟ್ ಬಳಸುತ್ತಿದೆ",
       "edit": "ಎಡಿಟ್ ಏಜೆಂಟ್"
     },
@@ -3794,7 +3914,9 @@
       "pinFailed": "ರೆಪೋವನ್ನು ಪಿನ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
       "unboundToast": "ರೆಪೊ ಅನ್ಬೌಂಡ್",
       "unbindFailed": "ರೆಪೊವನ್ನು ಅನ್‌ಬೈಂಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ"
-    }
+    },
+    "variablesDeleteFailed": "ವೇರಿಯಬಲ್ ಅನ್ನು ಅಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
+    "deleteCommand": "ಆಜ್ಞೆ {{position}} ಅನ್ನು ಅಳಿಸಿ"
   },
   "credits": {
     "title": "ಕ್ರೆಡಿಟ್ ಖರೀದಿಸಿ",
@@ -3830,7 +3952,8 @@
       "archive": "ಆರ್ಕೈವ್ ಮಾಡಿ",
       "unarchive": "ಆರ್ಕೈವ್‌ನಿಂದ ಹಿಂತಿರುಗಿಸಿ",
       "deleteTitle": "{{name}} ಅಳಿಸಬೇಕೆ?",
-      "deleteMessage": "ಅದರ ಕಾರ್ಯಗಳೂ ಅಳಿಸಲ್ಪಡುತ್ತವೆ. ಸೆಶನ್‌ಗಳು ಉಳಿಯುತ್ತವೆ."
+      "deleteMessage": "ಅದರ ಕಾರ್ಯಗಳೂ ಅಳಿಸಲ್ಪಡುತ್ತವೆ. ಸೆಶನ್‌ಗಳು ಉಳಿಯುತ್ತವೆ.",
+      "createFailed": "ಪಟ್ಟಿಯನ್ನು ರಚಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ"
     },
     "listSettings": {
       "title": "ಪಟ್ಟಿ ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
@@ -3898,20 +4021,20 @@
     }
   },
   "agentBriefing": {
-    "title": "ಬೆಳಗಿನ ಸಾರಾಂಶ",
+    "title": "ಏಜೆಂಟ್ ಸಾರಾಂಶ",
     "atLeast": "≥{{value}}",
     "coverageHint": "ಕೆಲವು ಹಳೆಯ ಚಟುವಟಿಕೆಗಳು ಕಾಣೆಯಾಗಿರಬಹುದು. ≥ ಎಂದರೆ ಕನಿಷ್ಠ ಇಷ್ಟು; ಅಜ್ಞಾತ ಎಂದರೆ ಶೂನ್ಯವಲ್ಲ.",
     "available": "ಲಭ್ಯವಿರುವ ಸಾರಾಂಶಗಳು",
     "history": "ಸಾರಾಂಶ ಇತಿಹಾಸ",
-    "historyHint": "ವಜಾಗೊಳಿಸಿದ ವರದಿಗಳು ಸೇರಿದಂತೆ ವರದಿಗಳನ್ನು 30 ದಿನಗಳವರೆಗೆ ಇರಿಸಲಾಗುತ್ತದೆ.",
+    "historyHint": "ವಜಾಗೊಳಿಸಿದವುಗಳು ಸೇರಿದಂತೆ ಸಾರಾಂಶಗಳನ್ನು 30 ದಿನಗಳವರೆಗೆ ಇರಿಸಲಾಗುತ್ತದೆ.",
     "settings": "ಸಾರಾಂಶ ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
-    "empty": "ರಾತ್ರಿಯ ಚಟುವಟಿಕೆ ಇಲ್ಲ",
-    "emptyHint": "ಸಕ್ರಿಯ ರಾತ್ರಿಯ ನಂತರ ನಿಮ್ಮ ಕ್ಲೌಡ್ ಮತ್ತು CLI ಕೋಡಿಂಗ್ ಸೆಷನ್‌ಗಳು ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ.",
+    "empty": "ಈ ಸಾರಾಂಶ ಅವಧಿಯಲ್ಲಿ ಚಟುವಟಿಕೆ ಇಲ್ಲ",
+    "emptyHint": "ನಿಗದಿತ ಸಾರಾಂಶದಲ್ಲಿ ಚಟುವಟಿಕೆ ಇದ್ದಾಗ ನಿಮ್ಮ ಕ್ಲೌಡ್ ಮತ್ತು CLI ಕೋಡಿಂಗ್ ಸೆಷನ್‌ಗಳು ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ.",
     "loadError": "ಸಾರಾಂಶಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ",
-    "sessions": "ರಾತ್ರಿ ಸಕ್ರಿಯ",
+    "sessions": "ಅವಧಿಯಲ್ಲಿ ಸಕ್ರಿಯ",
     "pullRequests": "ತೆರೆದ PRs",
     "blockers": "ಹೊಸ ಅಡಚಣೆಗಳು",
-    "spend": "ರಾತ್ರಿಯ ವೆಚ್ಚ",
+    "spend": "ಅವಧಿಯ ವೆಚ್ಚ",
     "view": "ಸಾರಾಂಶ ಓದಿ",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -3933,13 +4056,13 @@
     "sources": "ಸಾಕ್ಷ್ಯ ಮತ್ತು ಕಲಾಕೃತಿಗಳು",
     "timezone": "ಸಾರಾಂಶ ಸಮಯ ವಲಯ",
     "deviceTimezone": "ಸಾಧನದ ಸಮಯ ವಲಯ ಬಳಸಿ",
-    "timezoneHint": "IANA ಸಮಯ ವಲಯ, ಉದಾಹರಣೆಗೆ Europe/Berlin. ವೇಳಾಪಟ್ಟಿ ಬದಲಾವಣೆಗಳು ಮುಂದಿನ ರಾತ್ರಿಗಳಿಗೆ ಅನ್ವಯಿಸುತ್ತವೆ.",
-    "nightStart": "ರಾತ್ರಿ ಆರಂಭ",
-    "morningStart": "ರಾತ್ರಿ ಅಂತ್ಯ / ಬೆಳಿಗ್ಗೆ ಆರಂಭ",
-    "morningEnd": "ಬೆಳಿಗ್ಗೆ ಅಂತ್ಯ",
-    "timeHint": "ಬೆಳಿಗ್ಗೆ ಮುಗಿದಾಗ, ಆಫ್‌ಲೈನ್‌ನಲ್ಲೂ, ಹೋಮ್ ಕಾರ್ಡ್ ಲೈವ್ ಸ್ಥಿತಿಯನ್ನು ಮರುಸ್ಥಾಪಿಸುತ್ತದೆ.",
-    "invalidSchedule": "ಮಾನ್ಯ ಸಮಯ ವಲಯ ಮತ್ತು ಅತಿಕ್ರಮಿಸದ, ಖಾಲಿಯಲ್ಲದ ರಾತ್ರಿ ಹಾಗೂ ಬೆಳಗಿನ ಅವಧಿಗಳನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
-    "notificationsHint": "ನಿಮ್ಮ ಮೊದಲ ವರದಿ ಸಿದ್ಧವಾದಾಗ ಪ್ರತಿ ಬೆಳಿಗ್ಗೆ ಒಂದು ಸಾಮಾನ್ಯ ಅಧಿಸೂಚನೆ. ಪಾವತಿಸಿದ AI ಸಾರಾಂಶಗಳಿಂದ ಸ್ವತಂತ್ರ.",
+    "timezoneHint": "IANA ಸಮಯ ವಲಯ, ಉದಾಹರಣೆಗೆ Europe/Berlin. ವೇಳಾಪಟ್ಟಿ ಬದಲಾವಣೆಗಳು ಮುಂದಿನ ಸಾರಾಂಶಗಳಿಗೆ ಅನ್ವಯಿಸುತ್ತವೆ.",
+    "nightStart": "ಸಾರಾಂಶ ಅವಧಿ ಆರಂಭ",
+    "morningStart": "ಸಾರಾಂಶ ಸಿದ್ಧವಾಗುವ ಸಮಯ",
+    "morningEnd": "ಸಾರಾಂಶ ಲಭ್ಯವಿರುವವರೆಗೆ",
+    "timeHint": "ಸಾರಾಂಶ ಅವಧಿ ಮುಗಿದಾಗ, ಆಫ್‌ಲೈನ್‌ನಲ್ಲೂ, ಹೋಮ್ ಕಾರ್ಡ್ ಲೈವ್ ಸ್ಥಿತಿಯನ್ನು ಮರುಸ್ಥಾಪಿಸುತ್ತದೆ.",
+    "invalidSchedule": "ಮಾನ್ಯ ಸಮಯ ವಲಯ ಮತ್ತು ಖಾಲಿಯಲ್ಲದ ಸಾರಾಂಶ ಅವಧಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
+    "notificationsHint": "ಪ್ರತಿ ನಿಗದಿತ ಸಾರಾಂಶಕ್ಕೆ ಒಂದು ಸಾಮಾನ್ಯ ಅಧಿಸೂಚನೆ. ಪಾವತಿಸಿದ AI ಸಾರಾಂಶಗಳಿಂದ ಸ್ವತಂತ್ರ.",
     "notificationPermission": "ನಿಮ್ಮ ಸಾರಾಂಶ ಪಡೆಯಲು $t(common.notifications) ನಲ್ಲಿ ಸಾಧನದ ಅಧಿಸೂಚನೆಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ.",
     "aiOptIn": "ಪಾವತಿಸಿದ AI ಸಾರಾಂಶಗಳು",
     "aiHint": "ಈ ಸಂದರ್ಭಕ್ಕೆ ಮಾತ್ರ ಐಚ್ಛಿಕ. ಆಯ್ದ, ಮರೆಮಾಡಿದ ಆಯ್ದ ಭಾಗಗಳು ಮತ್ತು ರಚನಾತ್ಮಕ ಸಂಗತಿಗಳನ್ನು ನಿಮ್ಮ ಆ್ಯಪ್ ಭಾಷೆಯಲ್ಲಿ ನಿಮ್ಮ ಮಾದರಿಗೆ ಕಳುಹಿಸಲಾಗುತ್ತದೆ. ಶುಲ್ಕಗಳು ಈ ಸಂದರ್ಭದ ಬ್ಯಾಲೆನ್ಸ್ ಬಳಸುತ್ತವೆ.",
@@ -3957,7 +4080,7 @@
     "contextSettings": "AI ಸೆಟ್ಟಿಂಗ್‌ಗಳು · {{context}}",
     "allContexts": "ವೈಯಕ್ತಿಕ ಮತ್ತು ಸಂಸ್ಥೆಯ ಸಾರಾಂಶಗಳು ಪ್ರತ್ಯೇಕವಾಗಿರುತ್ತವೆ.",
     "create": "ಸಾರಾಂಶ ರಚಿಸಿ",
-    "oneOff": "ಒಂದು ಬಾರಿಯ",
+    "oneOff": "ಬೇಡಿಕೆಯ ಮೇರೆಗೆ",
     "createdAt": "{{time}} ರಚಿಸಲಾಗಿದೆ",
     "chooseContext": "ಒಂದು ಸಂದರ್ಭವನ್ನು ಆಯ್ಕೆಮಾಡಿ",
     "period": "ಸಾರಾಂಶದ ಅವಧಿ",
@@ -3979,13 +4102,16 @@
     "emptyPeriod": "ಈ ಅವಧಿಯಲ್ಲಿ ಯಾವುದೇ ಚಟುವಟಿಕೆ ಕಂಡುಬಂದಿಲ್ಲ. AI ಸಾರಾಂಶ ರಚಿಸಲಾಗುವುದಿಲ್ಲ ಮತ್ತು ಶುಲ್ಕ ವಿಧಿಸಲಾಗುವುದಿಲ್ಲ.",
     "emptyHistory": "ಉಳಿಸಿದ ಸಾರಾಂಶಗಳಿಲ್ಲ",
     "historicalStateHint": "ಸೆಷನ್ ಸ್ಥಿತಿಯು ಆಯ್ಕೆಮಾಡಿದ ಅವಧಿಯ ಅಂತ್ಯದ ಸ್ಥಿತಿಯನ್ನು ಪ್ರತಿಬಿಂಬಿಸುತ್ತದೆ, ಪ್ರಸ್ತುತ ನೇರ ಸ್ಥಿತಿಯನ್ನಲ್ಲ.",
-    "oneOffHint": "ಆಯ್ಕೆಮಾಡಿದ ಮತ್ತು ಸೂಕ್ಷ್ಮ ಮಾಹಿತಿಯನ್ನು ಮರೆಮಾಚಿದ ಆಧಾರಗಳನ್ನು AI ನಿಮ್ಮ ಆ್ಯಪ್ ಭಾಷೆಯಲ್ಲಿ ಪಡೆಯುತ್ತದೆ. ಈ ಒಂದು ಬಾರಿಯ ವರದಿಯು ನಿಮ್ಮ ಬೆಳಗಿನ ವೇಳಾಪಟ್ಟಿ ಅಥವಾ AI ಆದ್ಯತೆಗಳನ್ನು ಬದಲಾಯಿಸುವುದಿಲ್ಲ.",
+    "oneOffHint": "ಆಯ್ಕೆಮಾಡಿದ ಮತ್ತು ಸೂಕ್ಷ್ಮ ಮಾಹಿತಿಯನ್ನು ಮರೆಮಾಚಿದ ಆಧಾರಗಳನ್ನು AI ನಿಮ್ಮ ಆ್ಯಪ್ ಭಾಷೆಯಲ್ಲಿ ಪಡೆಯುತ್ತದೆ. ಈ ಬೇಡಿಕೆಯ ಮೇರೆಗಿನ ಸಾರಾಂಶವು ನಿಮ್ಮ ನಿಗದಿತ ಸಾರಾಂಶ ಅಥವಾ AI ಆದ್ಯತೆಗಳನ್ನು ಬದಲಾಯಿಸುವುದಿಲ್ಲ.",
     "createOffline": "ಸಾರಾಂಶವನ್ನು ಪರಿಶೀಲಿಸಲು ಅಥವಾ ರಚಿಸಲು ಇಂಟರ್ನೆಟ್‌ಗೆ ಸಂಪರ್ಕಿಸಿ. ಶುಲ್ಕದ ವಿನಂತಿಗಳನ್ನು ಆಫ್‌ಲೈನ್‌ನಲ್ಲಿ ಎಂದಿಗೂ ಸರತಿಗೆ ಸೇರಿಸಲಾಗುವುದಿಲ್ಲ.",
     "estimateInputTooLarge": "ಈ ಅವಧಿಯಲ್ಲಿನ ಆಧಾರಗಳ ಪ್ರಮಾಣವು ಆಯ್ಕೆಮಾಡಿದ ಮಾದರಿಗೆ ತುಂಬಾ ಹೆಚ್ಚಾಗಿದೆ.",
     "estimatePermissionUnavailable": "ಈ ಸಂದರ್ಭದ ಬಾಕಿ ಮೊತ್ತವನ್ನು ಬಳಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
+    "createFailed": "ಈ ಸಾರಾಂಶವನ್ನು ರಚಿಸಲಾಗಲಿಲ್ಲ.",
+    "reviewFailed": "ಈ ಸಾರಾಂಶವನ್ನು ಪರಿಶೀಲಿಸಲಾಗಲಿಲ್ಲ.",
     "estimatePricingUnavailable": "ಈ ಮಾದರಿಯ ಬೆಲೆ ಲಭ್ಯವಿಲ್ಲ.",
     "estimateBalanceUnavailable": "ಪಾವತಿಸಿದ ಸಾರಾಂಶಕ್ಕೆ ಸಾಕಷ್ಟು ಬ್ಯಾಲೆನ್ಸ್ ಇಲ್ಲ.",
     "estimateModelNotAllowed": "ಈ ಮಾದರಿಗೆ ಇಲ್ಲಿ ಅನುಮತಿ ಇಲ್ಲ.",
-    "estimateSpendLimitTooLow": "ಈ ಸಾರಾಂಶವನ್ನು ಅನುಮತಿಸಲು ಖರ್ಚಿನ ರಕ್ಷಣಾ ಮಿತಿಯನ್ನು ಹೆಚ್ಚಿಸಿ."
+    "estimateSpendLimitTooLow": "ಈ ಸಾರಾಂಶವನ್ನು ಅನುಮತಿಸಲು ಖರ್ಚಿನ ರಕ್ಷಣಾ ಮಿತಿಯನ್ನು ಹೆಚ್ಚಿಸಿ.",
+    "saved": "ಸಾರಾಂಶ ಸೆಟ್ಟಿಂಗ್‌ಗಳು ಉಳಿಸಲಾಗಿವೆ"
   }
 }

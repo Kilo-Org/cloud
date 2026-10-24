@@ -57,13 +57,18 @@ const flashListMock = vi.hoisted(
 
 vi.mock('react-native', () => ({
   FlatList: 'FlatList',
+  Platform: { OS: 'android' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
+  BackHandler: {
+    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+  },
 }));
 vi.mock('@shopify/flash-list', () => ({ FlashList: flashListMock }));
 vi.mock('expo-router', () => ({
   useRouter: () => router,
+  useNavigation: () => ({ isFocused: () => true }),
   useFocusEffect: (effect: EffectCallback) => {
     // The route focus effect runs on mount and clears the bridge on unmount.
     useEffect(effect, [effect]);

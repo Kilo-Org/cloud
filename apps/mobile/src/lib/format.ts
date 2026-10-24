@@ -122,28 +122,54 @@ export function firstGrapheme(value: string, locale: string): string {
   );
 }
 
-export function parseLocalizedNumber(value: string, locale: string): number | null {
+const DECIMAL_DIGIT = /\p{Nd}/u;
+
+/**
+ * Fold every Unicode decimal digit to ASCII. A keypad's digits follow its own
+ * script, not the active app language: an Arabic keyboard types `٢٥` while the
+ * `ar` locale formats with Latin digits. Unicode encodes each decimal digit set
+ * as ten consecutive code points in ascending order, but adjacent sets share no
+ * separator (the mathematical alphabets form one 50-code-point run), so a
+ * digit's value is its offset from the start of its run modulo ten.
+ */
+export function foldDecimalDigits(value: string): string {
+  return value.replaceAll(/\p{Nd}/gu, digit => {
+    const codePoint = digit.codePointAt(0) ?? 0;
+    let start = codePoint;
+    while (DECIMAL_DIGIT.test(String.fromCodePoint(start - 1))) {
+      start -= 1;
+    }
+    return String((codePoint - start) % 10);
+  });
+}
+
+/**
+ * A number typed in the active locale as a plain ASCII decimal literal, or
+ * `null` when the input is not one. Callers that compare magnitudes use this
+ * form: a literal too large for a JS number stays a digit string instead of
+ * collapsing into the same `null` a non-number produces.
+ */
+export function normalizeLocalizedNumber(value: string, locale: string): string | null {
   const parts = numberFormat(locale, { useGrouping: true }).formatToParts(-12_345.6);
   const part = (type: Intl.NumberFormatPartTypes, fallback: string) =>
     parts.find(item => item.type === type)?.value ?? fallback;
   const group = part('group', ',');
   const decimal = part('decimal', '.');
   const minus = part('minusSign', '-');
-  const digits = new Map(
-    Array.from({ length: 10 }, (_, digit) => [
-      numberFormat(locale, { useGrouping: false }).format(digit),
-      String(digit),
-    ])
-  );
-  let normalized = value.trim().replaceAll(/[\u061C\u200E\u200F]/g, '');
-  for (const [local, ascii] of digits) {
-    normalized = normalized.split(local).join(ascii);
-  }
+  let normalized = foldDecimalDigits(value.trim().replaceAll(/[\u061C\u200E\u200F]/g, ''));
   if (/^[\s\u00A0\u202F]+$/u.test(group)) {
     normalized = normalized.replaceAll(/[ \u00A0\u202F]/gu, group);
   }
   normalized = normalized.split(group).join('').split(decimal).join('.').split(minus).join('-');
   if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalized)) {
+    return null;
+  }
+  return normalized;
+}
+
+export function parseLocalizedNumber(value: string, locale: string): number | null {
+  const normalized = normalizeLocalizedNumber(value, locale);
+  if (normalized === null) {
     return null;
   }
   const parsed = Number(normalized);

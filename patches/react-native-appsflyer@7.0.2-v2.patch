@@ -1,8 +1,7 @@
 diff --git a/android/build.gradle b/android/build.gradle
-index 72eb7862a2530439bd7227adc0649fcfa33fcb80..7f673a4731cdb427fc5da2fb120a58c90d01686b 100755
 --- a/android/build.gradle
 +++ b/android/build.gradle
-@@ -85,7 +85,7 @@ repositories {
+@@ -85,7 +85,7 @@
  }
  
  dependencies {
@@ -11,11 +10,37 @@ index 72eb7862a2530439bd7227adc0649fcfa33fcb80..7f673a4731cdb427fc5da2fb120a58c9
      implementation "com.facebook.react:react-native:${safeExtGet('reactNativeVersion', '+')}"
      implementation "com.android.installreferrer:installreferrer:${safeExtGet('installReferrerVersion', '2.2')}"
      if (includeConnector){
+diff --git a/expo/withAppsFlyerIos.js b/expo/withAppsFlyerIos.js
+--- a/expo/withAppsFlyerIos.js
++++ b/expo/withAppsFlyerIos.js
+@@ -68,6 +68,23 @@
+ 
+   if (appDelegateContents.includes(SWIFT_DID_FINISH_LAUNCHING_IDENTIFIER) && !appDelegateContents.includes(RNAPPSFLYER_SWIFT_DID_FINISH_LAUNCHING_CODE)) {
+     appDelegateContents = appDelegateContents.replace(SWIFT_DID_FINISH_LAUNCHING_IDENTIFIER, `${SWIFT_DID_FINISH_LAUNCHING_IDENTIFIER}\n    ${RNAPPSFLYER_SWIFT_DID_FINISH_LAUNCHING_CODE}`);
++  }
++
++  // SDK 58 forwards scene links through AppDelegate but no longer generates these overrides.
++  for (const [signature, forwarding] of [
++    [SWIFT_OPENURL_IDENTIFIER, 'return super.application(app, open: url, options: options)'],
++    [SWIFT_CONTINUE_USER_ACTIVITY_IDENTIFIER, 'return super.application(application, continue: userActivity, restorationHandler: restorationHandler)'],
++  ]) {
++    if (!appDelegateContents.includes(signature)) {
++      const classStart = appDelegateContents.indexOf('class AppDelegate');
++      const classEnd = classStart < 0 ? -1 : appDelegateContents.indexOf('\n}', classStart);
++      if (classEnd < 0) {
++        throw new Error('Cannot attach AppsFlyer lifecycle handlers to AppDelegate');
++      }
++      appDelegateContents = appDelegateContents.slice(0, classEnd) +
++        `\n${signature}\n    ${forwarding}\n  }\n` +
++        appDelegateContents.slice(classEnd);
++    }
+   }
+ 
+   if (appDelegateContents.includes(SWIFT_OPENURL_IDENTIFIER) && !appDelegateContents.includes(RNAPPSFLYER_SWIFT_OPENURL_CODE)) {
 diff --git a/index.ts b/index.ts
-index 8500ac7746987997d16be5f47c2b1ea77cdef4b1..95d31de8620298062e12b879c68cb4cdbe7a9040 100644
 --- a/index.ts
 +++ b/index.ts
-@@ -16,6 +16,7 @@ import {
+@@ -16,6 +16,7 @@
  export * from "@appsflyer-sdk/js-core-plugin";
  
  // 7.0.0+ has no legacy-bridge fallback — fail fast on Old Architecture instead of a confusing native crash later; skipped under Jest (no RN globals).
@@ -23,7 +48,7 @@ index 8500ac7746987997d16be5f47c2b1ea77cdef4b1..95d31de8620298062e12b879c68cb4cd
  if (typeof jest === "undefined") {
    const isNewArchitectureEnabled =
      (globalThis as any).RN$Bridgeless === true ||
-@@ -54,7 +55,7 @@ export type SubscriptionPurchaseEventDataSource = PurchaseEventDataSourceBase;
+@@ -54,7 +55,7 @@
  export type InAppPurchaseEventDataSource = PurchaseEventDataSourceBase;
  
  export interface PurchaseConnector {
@@ -32,7 +57,7 @@ index 8500ac7746987997d16be5f47c2b1ea77cdef4b1..95d31de8620298062e12b879c68cb4cd
    startObservingTransactions(): void;
    stopObservingTransactions(): void;
  
-@@ -257,7 +258,7 @@ AppsFlyerPurchaseConnector.create = (config: PurchaseConnectorConfig) => {
+@@ -257,7 +258,7 @@
    if (!config) {
      throw new MissingConfigurationException();
    }

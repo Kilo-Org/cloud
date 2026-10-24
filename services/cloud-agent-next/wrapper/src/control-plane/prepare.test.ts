@@ -1551,8 +1551,8 @@ describe('createPreparationManager', () => {
       await manager.prepare(routeSpec({ setupCommands: ['pnpm install'] }));
 
       expect(runProcess).toHaveBeenCalledWith(
-        'sh',
-        ['-c', 'pnpm install'],
+        'bash',
+        ['-e', '-o', 'pipefail', '-c', 'pnpm install'],
         expect.objectContaining({
           inactivityTimeoutMs: 300_000,
           hardTimeoutMs: 480_000,

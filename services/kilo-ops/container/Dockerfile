@@ -1,4 +1,4 @@
-FROM grafana/grafana-oss:13.0.1
+FROM grafana/grafana-oss:13.0.1@sha256:0f86bada30d65ef9d0183b90c1e2682ac92d53d95da8bed322b984ea78a4a73a
 
 USER root
 RUN apk add --no-cache --upgrade ca-certificates \

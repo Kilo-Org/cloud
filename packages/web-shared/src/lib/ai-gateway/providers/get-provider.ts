@@ -208,10 +208,21 @@ export type GetProviderInput = {
   /** Resolves organization/group provider policy only when selecting a managed
    * gateway. Direct BYOK and custom LLM routes remain exempt. */
   getRoutingProviderConfig?: () => Promise<OpenRouterProviderConfig | undefined>;
+  /** The request carries a spend ceiling. Only a provider that can cap the
+   * price of the route it serves may take it. */
+  boundedSpending?: boolean;
 };
 
 export async function getProvider(input: GetProviderInput): Promise<GetProviderResult> {
-  const { requestedModel, request, user, organizationId, botId, getRoutingProviderConfig } = input;
+  const {
+    requestedModel,
+    request,
+    user,
+    organizationId,
+    botId,
+    getRoutingProviderConfig,
+    boundedSpending = false,
+  } = input;
 
   if (isLocalFakeLlmEnabled() && isLocalFakeDeterministicModel(requestedModel)) {
     const localFakeProvider = getLocalFakeLlmProvider();
@@ -278,6 +289,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 
   if (
     eligibleForVercelRouting &&
+    !boundedSpending &&
     (await shouldRouteToVercel(requestedModel, request, resolveRoutingProviderConfig))
   ) {
     return {

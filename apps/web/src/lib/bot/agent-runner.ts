@@ -1,4 +1,5 @@
 import { BOT_USER_AGENT, BOT_VERSION, MAX_ITERATIONS, SUMMARY_MODEL } from '@/lib/bot/constants';
+import { getGitHubRepositoryFullNameFromThread } from '@/lib/bot/github-thread';
 import { botPlatforms, type BotPlatform } from '@/lib/bot/platforms';
 import { buildPrSignature } from '@/lib/bot/pr-signature';
 import {
@@ -12,6 +13,7 @@ import spawnCloudAgentSession, {
   spawnCloudAgentInputSchema,
 } from '@/lib/bot/tools/spawn-cloud-agent-session';
 import { buildSessionUrl } from '@/lib/cloud-agent-next/session-url';
+import { prepareCloudAgentWorkflowUser } from '@/lib/auth/cloud-agent-workflow-user';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { ownerFromIntegration } from '@/lib/integrations/core/owner';
@@ -25,7 +27,11 @@ import {
   getGitLabRepositoryContext,
 } from '@/lib/slack-bot/gitlab-repository-context';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import {
+  generateApiToken,
+  generateCloudAgentWorkflowToken,
+  TOKEN_EXPIRY,
+} from '@kilocode/web-shared/lib/tokens';
 import { captureException } from '@sentry/nextjs';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { PlatformIntegration, User } from '@kilocode/db';
@@ -56,6 +62,11 @@ type RunBotAgentParams = {
   attachments?: CloudAgentAttachments;
   completedStepCount?: number;
   initialSteps?: BotRequestStep[];
+  /**
+   * GitHub login of the account that triggered this run. Absent for
+   * continuations that carry no verified account identity.
+   */
+  actorLogin?: string;
   onSessionReady?: (params: {
     kiloSessionId: string;
     cloudAgentSessionId: string;
@@ -283,11 +294,21 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
             completedStepsInCurrentRun: collectedSteps.length,
           });
 
+          const cloudAgentToken = generateCloudAgentWorkflowToken(
+            await prepareCloudAgentWorkflowUser(params.user),
+            {
+              organizationId: owner.type === 'org' ? owner.id : undefined,
+              tokenSource: 'kilo-bot',
+              createdOnPlatform: chatPlatform,
+              expiresIn: TOKEN_EXPIRY.oneHour,
+            }
+          );
+
           const result = await spawnCloudAgentSession(
             args,
             modelSlug,
             params.platformIntegration,
-            authToken,
+            cloudAgentToken,
             params.botRequestId,
             ({ kiloSessionId, cloudAgentSessionId }) => {
               startedCloudAgentSession = true;
@@ -309,6 +330,8 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
               chatPlatform,
               currentStep,
               attachments: params.attachments,
+              actorLogin: params.actorLogin,
+              threadRepository: getGitHubRepositoryFullNameFromThread(params.thread.id),
             }
           );
 

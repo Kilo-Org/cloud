@@ -11,7 +11,6 @@ import {
   Shield,
   ShieldCheck,
   Ban,
-  Database,
   DatabaseBackup,
   BarChart,
   Bot,
@@ -205,11 +204,6 @@ const productEngineeringItems: MenuItem[] = [
     title: () => 'Email Testing',
     url: '/admin/email-testing',
     icon: () => <MailCheck />,
-  },
-  {
-    title: () => 'Managed Indexing',
-    url: '/admin/code-indexing',
-    icon: () => <Database />,
   },
   {
     title: () => 'Gas Town',

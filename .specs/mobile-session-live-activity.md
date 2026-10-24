@@ -384,6 +384,18 @@ observable behavior is the same.
 
 ## Changelog
 
+### 2026-10-23 -- The aggregate Approve names its request
+
+- The aggregate ask records the pending request its surface shows, and the
+  Approve action answers only that request: a live request that differs leaves
+  the session waiting and MUST NOT be answered. This is the revalidation rule
+  Actions rule 2 states for the session card, applied to the aggregate surfaces.
+- Approve appears on an aggregate surface only while the ask names a request. A
+  record without one keeps Approve off that surface until a fresh selection
+  binds one.
+- A replaced request MUST NOT clear the session's needs-input mark: the session
+  still waits on the live request.
+
 ### 2026-10-21 -- Failure facts come from the row that reports them
 
 - Added Updates rule 6: a content state carries a failure only while its

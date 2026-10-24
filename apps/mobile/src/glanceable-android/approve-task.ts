@@ -181,7 +181,9 @@ export async function handleApproveTask(input?: unknown): Promise<void> {
     }
     await showApproving(ask);
     const result = await runGlanceableApprove({ now: () => Date.now() });
-    askEnded = result.kind === 'approved' || result.kind === 'gone';
+    // A replaced request ends nothing: the session still waits on the live one,
+    // so the republish must keep its row instead of skipping it.
+    askEnded = result.kind === 'approved' || (result.kind === 'gone' && result.replaced !== true);
     if (result.kind === 'gone') {
       // Answered elsewhere or no longer pending: dropping the record drops Approve.
       recordWaitingAsk(null);

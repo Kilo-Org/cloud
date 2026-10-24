@@ -1528,6 +1528,11 @@ export class SessionIngestDO extends DurableObject<Env> {
         await upload.abort();
         return null;
       }
+      const current = await this.env.SESSION_INGEST_R2.head(key);
+      if (current?.etag !== reservationEtag) {
+        await upload.abort();
+        return null;
+      }
       return await upload.complete(uploadedParts);
     } catch (error) {
       await upload?.abort().catch(() => {});

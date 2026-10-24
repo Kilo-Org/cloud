@@ -3733,6 +3733,7 @@
     "title": "Perfís",
     "entrySubtitle": "Reutiliza a configuración do contorno en todas as sesións",
     "newProfile": "Novo perfil",
+    "openHint": "Abre o perfil",
     "emptyTitle": "Aínda non hai perfís",
     "emptyDescription": "Crea un perfil para reutilizar as variables de ambiente, os comandos de configuración e as habilidades nas sesións.",
     "loadFailed": "Non se puideron cargar os perfís",

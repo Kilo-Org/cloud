@@ -3825,6 +3825,7 @@
     "title": "Profily",
     "entrySubtitle": "Opätovne použite nastavenia prostredia v rámci relácií",
     "newProfile": "Nový profil",
+    "openHint": "Otvorí profil",
     "emptyTitle": "Zatiaľ žiadne profily",
     "emptyDescription": "Vytvorte profil na opätovné použitie premenných prostredia, príkazov nastavenia a zručností v rámci relácií.",
     "loadFailed": "Profily sa nepodarilo načítať",

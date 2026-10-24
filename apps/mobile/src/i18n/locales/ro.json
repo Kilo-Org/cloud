@@ -3779,6 +3779,7 @@
     "title": "Profiluri",
     "entrySubtitle": "Reutilizați setările de mediu între sesiuni",
     "newProfile": "Profil nou",
+    "openHint": "Deschide profilul",
     "emptyTitle": "Niciun profil încă",
     "emptyDescription": "Creați un profil pentru a reutiliza variabilele de mediu, comenzile de configurare și abilitățile în sesiuni.",
     "loadFailed": "Profilurile nu au putut fi încărcate",

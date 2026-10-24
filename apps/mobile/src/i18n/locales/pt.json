@@ -3779,6 +3779,7 @@
     "title": "Perfis",
     "entrySubtitle": "Reutilizar definições de ambiente entre sessões",
     "newProfile": "Novo perfil",
+    "openHint": "Abre o perfil",
     "emptyTitle": "Ainda não há perfis",
     "emptyDescription": "Crie um perfil para reutilizar variáveis de ambiente, comandos de configuração e competências entre sessões.",
     "loadFailed": "Não foi possível carregar perfis",

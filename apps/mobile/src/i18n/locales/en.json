@@ -3827,6 +3827,7 @@
     "title": "Profiles",
     "entrySubtitle": "Reuse environment settings across sessions",
     "newProfile": "New profile",
+    "openHint": "Opens the profile",
     "emptyTitle": "No profiles yet",
     "emptyDescription": "Create a profile to reuse environment variables, setup commands, and skills across sessions.",
     "loadFailed": "Couldn't load profiles",

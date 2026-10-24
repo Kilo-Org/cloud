@@ -883,7 +883,9 @@
       "bannerBody": "Bu cihaz üçün push bildirişlər deaktivdir, ona görə də yeni bildirişlər bura gəlməyəcək.",
       "bannerAction": "Bildiriş parametrləri",
       "emptyTitle": "Hələ bildiriş yoxdur",
+      "emptyCategoryTitle": "Bu kateqoriyada bildiriş yoxdur",
       "emptyBody": "Bu hesabın aldığı bildirişlər burada görünür. Onlar {{days}} gün saxlanılır.",
+      "capped": "Ən son bildirişlər göstərilir.",
       "loadError": "Bildiriş tarixçəsini yükləmək mümkün olmadı.",
       "openFailed": "Bu bildiriş artıq heç yerdə açılmır."
     },

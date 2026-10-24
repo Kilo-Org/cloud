@@ -883,7 +883,9 @@
       "bannerBody": "Push jakinarazpenak desgaituta daude gailu honetan, beraz, berriak ez dira hona iritsiko.",
       "bannerAction": "Jakinarazpenen ezarpenak",
       "emptyTitle": "Oraindik ez dago jakinarazpenik",
+      "emptyCategoryTitle": "Kategoria honetan ez dago jakinarazpenik",
       "emptyBody": "Kontu honek jasotzen dituen jakinarazpenak hemen agertzen dira. {{days}} egunez gordetzen dira.",
+      "capped": "Azken jakinarazpenak erakusten dira.",
       "loadError": "Ezin izan da jakinarazpenen historia kargatu.",
       "openFailed": "Jakinarazpen hau jada ez da inon irekitzen."
     },

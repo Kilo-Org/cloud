@@ -921,7 +921,9 @@
       "bannerBody": "Push oznámení jsou pro toto zařízení vypnutá, takže nová sem nebudou přicházet.",
       "bannerAction": "Nastavení oznámení",
       "emptyTitle": "Zatím žádná oznámení",
+      "emptyCategoryTitle": "V této kategorii nejsou žádná oznámení",
       "emptyBody": "Oznámení, která tento účet obdrží, se zobrazují zde. Uchovávají se {{days}} dní.",
+      "capped": "Zobrazují se nejnovější oznámení.",
       "loadError": "Historii oznámení se nepodařilo načíst.",
       "openFailed": "Toto oznámení se už nikde neotevře."
     },

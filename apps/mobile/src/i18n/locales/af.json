@@ -883,7 +883,9 @@
       "bannerBody": "Push-kennisgewings is af vir hierdie toestel, so nuwe kennisgewings sal nie hier aankom nie.",
       "bannerAction": "Kennisgewingsinstellings",
       "emptyTitle": "Nog geen kennisgewings nie",
+      "emptyCategoryTitle": "Geen kennisgewings in hierdie kategorie nie",
       "emptyBody": "Kennisgewings wat hierdie rekening ontvang, verskyn hier. Hulle word vir {{days}} dae bewaar.",
+      "capped": "Die mees onlangse kennisgewings word gewys.",
       "loadError": "Kon nie kennisgewingsgeskiedenis laai nie.",
       "openFailed": "Hierdie kennisgewing open nêrens meer nie."
     },

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted harness: the paged list, its states, the chip filter, the row tap and the push banner share one fake tRPC surface */
 import { createElement, type ReactElement } from 'react';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -42,6 +43,14 @@ const state = vi.hoisted(() => {
     gate,
     /** The inputs `infiniteQueryOptions` was built with, newest last. */
     historyInputs: [] as { category?: string }[],
+    /** The option objects the screen built, newest last. */
+    historyOptions: [] as Record<string, unknown>[],
+    /** Rows on page one while a fixture wants a second page. */
+    pageSize: undefined as number | undefined,
+    /** A failure for a non-first page only. */
+    pageError: undefined as Error | undefined,
+    /** The rendered list's paging hook, so a test can drive a next page. */
+    listProps: undefined as { onEndReached?: () => void; onRefresh?: () => void } | undefined,
   };
 });
 
@@ -55,15 +64,24 @@ vi.mock('@shopify/flash-list', () => ({
   FlashList: ({
     data,
     renderItem,
+    onEndReached,
+    refreshControl,
+    ListFooterComponent,
   }: {
     data: Row[];
     renderItem: (info: { item: Row }) => ReactElement;
-  }) =>
-    createElement(
+    onEndReached?: () => void;
+    refreshControl?: { props: { onRefresh?: () => void } };
+    ListFooterComponent?: ReactElement;
+  }) => {
+    state.listProps = { onEndReached, onRefresh: refreshControl?.props.onRefresh };
+    return createElement(
       'FlashList',
       null,
-      data.map(item => createElement('Cell', { key: item.id }, renderItem({ item })))
-    ),
+      data.map(item => createElement('Cell', { key: item.id }, renderItem({ item }))),
+      ListFooterComponent ?? null
+    );
+  },
 }));
 
 vi.mock('react-native', () => ({
@@ -82,7 +100,7 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 0 }));
+vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 24 }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'jwt' }) }));
 vi.mock('@/lib/hooks/use-now-ticker', () => ({ useNowTicker: () => NOW }));
 vi.mock('@/lib/hooks/use-notification-master-gate', () => ({
@@ -101,19 +119,33 @@ vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     user: {
       getNotificationHistory: {
-        infiniteQueryOptions: (input: { category?: string }, options: object) => {
+        queryKey: () => ['user', 'getNotificationHistory'],
+        infiniteQueryOptions: (input: { category?: string }, options: Record<string, unknown>) => {
           state.historyInputs.push(input);
+          state.historyOptions.push(options);
           return {
             queryKey: ['user', 'getNotificationHistory', input],
             initialPageParam: undefined,
-            queryFn: () => {
+            queryFn: ({ pageParam }: { pageParam: string | undefined }) => {
+              if (pageParam !== undefined && state.pageError) {
+                throw state.pageError;
+              }
               if (state.historyError) {
                 throw state.historyError;
               }
               const items = state.rows.filter(
                 entry => input.category === undefined || entry.category === input.category
               );
-              return { items, nextCursor: null };
+              if (state.pageSize === undefined) {
+                return { items, nextCursor: null };
+              }
+              if (pageParam === undefined) {
+                return {
+                  items: items.slice(0, state.pageSize),
+                  nextCursor: items.length > state.pageSize ? 'page-2' : null,
+                };
+              }
+              return { items: items.slice(state.pageSize), nextCursor: null };
             },
             ...options,
           };
@@ -170,6 +202,18 @@ function press(node: ReactTestInstance | undefined) {
   });
 }
 
+/** The screen's button props, read once so the chip assertions stay typed. */
+type ChipProps = { role?: string; accessibilityState?: { selected?: boolean } };
+
+function chipProps(node: ReactTestInstance | undefined): ChipProps | undefined {
+  return node?.props as ChipProps | undefined;
+}
+
+/** The footer's bottom padding, read once so the clearance assertion stays typed. */
+function footerPadding(node: ReactTestInstance): number | undefined {
+  return (node.props as { style?: { paddingBottom?: number } }).style?.paddingBottom;
+}
+
 /** The node whose `Text` child holds `value`. */
 function withText(nodes: ReactTestInstance[], value: string) {
   return nodes.find(
@@ -191,6 +235,10 @@ beforeEach(() => {
   state.preferences = { capabilities: {} };
   state.gate = { loading: false, settled: true, permissionGranted: true, pushEnabled: true };
   state.historyInputs = [];
+  state.historyOptions = [];
+  state.pageSize = undefined;
+  state.pageError = undefined;
+  state.listProps = undefined;
   vi.clearAllMocks();
 });
 
@@ -289,5 +337,77 @@ describe('NotificationHistoryScreen', () => {
 
     const texts = byType('Text').map(node => node.props.children);
     expect(texts).not.toContain('Notification settings');
+  });
+
+  it('announces the chip row as a tab list with the selected chip marked', async () => {
+    state.rows = [row({ category: 'chatMessages', pushType: 'chat.message' })];
+    await mount();
+
+    const chip = withText(byType('Button'), 'Chat messages');
+    expect(chipProps(chip)).toMatchObject({
+      role: 'tab',
+      accessibilityState: { selected: false },
+    });
+
+    press(chip);
+    await waitFor(
+      () =>
+        chipProps(withText(byType('Button'), 'Chat messages'))?.accessibilityState?.selected ===
+        true
+    );
+  });
+
+  it('says a category has nothing rather than that the account has nothing', async () => {
+    state.rows = [row({ category: 'balanceAlerts' })];
+    await mount();
+    press(withText(byType('Button'), 'Chat messages'));
+    await waitFor(() => byType('EmptyState').length === 1);
+
+    const empty = byType('EmptyState')[0];
+    expect(empty?.props).toMatchObject({ title: 'No notifications in this category' });
+    // The retention window describes the whole list, not one empty category.
+    expect(empty?.props.description).toBeUndefined();
+  });
+
+  it('collapses retained pages on a refresh instead of re-reading their cursors', async () => {
+    state.pageSize = 3;
+    state.rows = [1, 2, 3, 4, 5].map(index =>
+      row({ id: `row-${index}`, title: `stored ${index}` })
+    );
+    await mount();
+    expect(byType('Cell')).toHaveLength(3);
+
+    act(() => {
+      state.listProps?.onEndReached?.();
+    });
+    await waitFor(() => byType('Cell').length === 5);
+
+    act(() => {
+      state.listProps?.onRefresh?.();
+    });
+    await waitFor(() => byType('Cell').length === 3);
+  });
+
+  it('keeps the tab-bar clearance under the next-page retry', async () => {
+    state.pageSize = 1;
+    state.rows = [row({ id: 'row-1' }), row({ id: 'row-2' })];
+    await mount();
+
+    state.pageError = new Error('paging failed');
+    act(() => {
+      state.listProps?.onEndReached?.();
+    });
+    await waitFor(() => withText(byType('Button'), 'Retry loading more') !== undefined);
+
+    // 24dp of tab bar plus the footer's own 32dp.
+    const footer = byType('View').find(node => footerPadding(node) === 56);
+    expect(footer).toBeDefined();
+  });
+
+  it('turns off the network gate so an offline first load can fail into its retry', async () => {
+    state.rows = [row()];
+    await mount();
+
+    expect(state.historyOptions.at(-1)).toMatchObject({ networkMode: 'always' });
   });
 });

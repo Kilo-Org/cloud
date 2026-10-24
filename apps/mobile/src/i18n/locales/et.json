@@ -883,7 +883,9 @@
       "bannerBody": "Tõuketeavitused on selle seadme jaoks välja lülitatud, seega uued siia ei jõua.",
       "bannerAction": "Teavituste seaded",
       "emptyTitle": "Teavitusi veel pole",
+      "emptyCategoryTitle": "Selles kategoorias pole teavitusi",
       "emptyBody": "Teavitused, mille see konto saab, kuvatakse siin. Neid säilitatakse {{days}} päeva.",
+      "capped": "Kuvatakse kõige hiljutisemad teavitused.",
       "loadError": "Teavituste ajaloo laadimine ebaõnnestus.",
       "openFailed": "See teavitus ei avane enam kuskil."
     },

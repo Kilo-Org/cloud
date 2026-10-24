@@ -883,7 +883,9 @@
       "bannerBody": "Push-ilmoitukset ovat pois päältä tällä laitteella, joten uudet ilmoitukset eivät saavu tänne.",
       "bannerAction": "Ilmoitusasetukset",
       "emptyTitle": "Ei vielä ilmoituksia",
+      "emptyCategoryTitle": "Ei ilmoituksia tässä kategoriassa",
       "emptyBody": "Tämän tilin vastaanottamat ilmoitukset näkyvät täällä. Ne säilytetään {{days}} päivää.",
+      "capped": "Näytetään uusimmat ilmoitukset.",
       "loadError": "Ilmoitushistoriaa ei voitu ladata.",
       "openFailed": "Tämä ilmoitus ei enää avaudu missään."
     },

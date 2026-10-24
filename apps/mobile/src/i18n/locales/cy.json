@@ -959,7 +959,9 @@
       "bannerBody": "Mae hysbysiadau gwthio wedi'u diffodd ar gyfer y ddyfais hon, felly ni fydd rhai newydd yn cyrraedd yma.",
       "bannerAction": "Gosodiadau hysbysiadau",
       "emptyTitle": "Dim hysbysiadau eto",
+      "emptyCategoryTitle": "Dim hysbysiadau yn y categori hwn",
       "emptyBody": "Bydd hysbysiadau a ddaw i'r cyfrif hwn yn ymddangos yma. Cânt eu cadw am {{days}} diwrnod.",
+      "capped": "Yn dangos y hysbysiadau diweddaraf.",
       "loadError": "Methu llwytho hanes hysbysiadau.",
       "openFailed": "Nid yw'r hysbysiad hwn yn agor yn unman mwyach."
     },

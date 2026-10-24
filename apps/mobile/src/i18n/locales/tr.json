@@ -359,7 +359,9 @@
       "bannerBody": "Bu cihazda anlık bildirimler kapalı, bu nedenle yenileri buraya gelmez.",
       "bannerAction": "Bildirim ayarları",
       "emptyTitle": "Henüz bildirim yok",
+      "emptyCategoryTitle": "Bu kategoride bildirim yok",
       "emptyBody": "Bu hesabın aldığı bildirimler burada görünür. {{days}} gün boyunca saklanır.",
+      "capped": "En son bildirimler gösteriliyor.",
       "loadError": "Bildirim geçmişi yüklenemedi.",
       "openFailed": "Bu bildirim artık hiçbir yerde açılmıyor."
     },

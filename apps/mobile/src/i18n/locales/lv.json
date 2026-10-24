@@ -902,7 +902,9 @@
       "bannerBody": "Push paziņojumi šajā ierīcē ir izslēgti, tāpēc jaunie šeit netiks saņemti.",
       "bannerAction": "Paziņojumu iestatījumi",
       "emptyTitle": "Vēl nav paziņojumu",
+      "emptyCategoryTitle": "Šajā kategorijā nav paziņojumu",
       "emptyBody": "Paziņojumi, ko šis konts saņem, parādās šeit. Tie tiek glabāti {{days}} dienas.",
+      "capped": "Tiek rādīti jaunākie paziņojumi.",
       "loadError": "Neizdevās ielādēt paziņojumu vēsturi.",
       "openFailed": "Šis paziņojums vairs nekur neatveras."
     },

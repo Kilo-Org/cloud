@@ -921,7 +921,9 @@
       "bannerBody": "Potisna obvestila so za to napravo izklopljena, zato nova ne bodo prispela sem.",
       "bannerAction": "Nastavitve obvestil",
       "emptyTitle": "Ni še obvestil",
+      "emptyCategoryTitle": "Ni obvestil v tej kategoriji",
       "emptyBody": "Obvestila, ki jih prejme ta račun, se prikažejo tukaj. Hranijo se {{days}} dni.",
+      "capped": "Prikazana so najnovejša obvestila.",
       "loadError": "Zgodovine obvestil ni bilo mogoče naložiti.",
       "openFailed": "To obvestilo se ne odpre več nikjer."
     },

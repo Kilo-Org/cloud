@@ -902,7 +902,9 @@
       "bannerBody": "Push obavijesti su isključene za ovaj uređaj, pa nove neće stizati ovdje.",
       "bannerAction": "Postavke obavijesti",
       "emptyTitle": "Još nema obavijesti",
+      "emptyCategoryTitle": "Nema obavijesti u ovoj kategoriji",
       "emptyBody": "Obavijesti koje ovaj račun primi pojavljuju se ovdje. Čuvaju se {{days}} dana.",
+      "capped": "Prikazuju se najnovije obavijesti.",
       "loadError": "Nije moguće učitati historiju obavijesti.",
       "openFailed": "Ova obavijest se više ne otvara nigdje."
     },

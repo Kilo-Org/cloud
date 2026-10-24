@@ -883,7 +883,9 @@
       "bannerBody": "Push-aviseringar är avstängda för den här enheten, så nya aviseringar kommer inte fram hit.",
       "bannerAction": "Aviseringsinställningar",
       "emptyTitle": "Inga aviseringar än",
+      "emptyCategoryTitle": "Inga aviseringar i den här kategorin",
       "emptyBody": "Aviseringar som det här kontot tar emot visas här. De sparas i {{days}} dagar.",
+      "capped": "Visar de senaste aviseringarna.",
       "loadError": "Kunde inte läsa in aviseringshistoriken.",
       "openFailed": "Den här aviseringen öppnas inte längre någonstans."
     },

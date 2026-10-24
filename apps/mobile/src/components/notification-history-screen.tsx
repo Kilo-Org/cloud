@@ -1,12 +1,11 @@
 import { FlashList } from '@shopify/flash-list';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, View, type ViewStyle } from 'react-native';
+import { ScrollView, View, type ViewStyle } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { NOTIFICATION_HISTORY_RETENTION_DAYS } from '@kilocode/notifications';
 
 import { EmptyState } from '@/components/empty-state';
@@ -22,63 +21,32 @@ import { setPendingDeepLink } from '@/lib/deep-link-launch';
 import { pendingDeepLinkOptionsForData } from '@/lib/notification-actions';
 import {
   NOTIFICATION_HISTORY_FILTERS,
-  notificationHistoryCopy,
   type NotificationHistoryFilter,
   notificationHistoryFilters,
   notificationHistoryTarget,
 } from '@/lib/notification-history';
 import { useNotificationMasterGate } from '@/lib/hooks/use-notification-master-gate';
+import { type HistoryRow, HistoryRowView } from '@/components/notification-history-row';
 import { useNowTicker } from '@/lib/hooks/use-now-ticker';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { hasRetentionBudget, withInfiniteRetention } from '@/lib/query/infinite-retention';
+import {
+  hasRetentionBudget,
+  reconcileFirstPage,
+  withInfiniteRetention,
+} from '@/lib/query/infinite-retention';
 import { useTRPC } from '@/lib/trpc';
-import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 /** Rows requested per page; the server defaults to the same 30. */
 const PAGE_SIZE = 30;
 /** How often a row's relative time is re-read while the screen stays open. */
 const RELATIVE_TIME_TICK_MS = 60_000;
 
-const SETTINGS_ROUTE = '/(app)/notifications' as Href;
+/** Retained pages; the bound refuses the next page rather than dropping the newest. */
+const MAX_PAGES = 10;
 
 const listStyle = { flex: 1 } satisfies ViewStyle;
 const listContentContainerStyle = { paddingHorizontal: 16 } satisfies ViewStyle;
-
-type HistoryPage = inferRouterOutputs<MobileRouter>['user']['getNotificationHistory'];
-type HistoryRow = HistoryPage['items'][number];
-
-type HistoryRowProps = Readonly<{
-  row: HistoryRow;
-  now: number;
-  onOpen: (payload: Record<string, unknown>) => void;
-}>;
-
-function HistoryRowView({ row, now, onOpen }: HistoryRowProps) {
-  const { i18n } = useTranslation();
-  const copy = notificationHistoryCopy(row, i18n.language);
-  return (
-    <Pressable
-      className="mb-3 rounded-2xl border border-border bg-card px-4 py-3 active:opacity-70"
-      accessibilityRole="button"
-      onPress={() => {
-        onOpen(row.payload);
-      }}
-    >
-      <View className="flex-row items-start gap-3">
-        <Text className="flex-1 text-sm font-medium" numberOfLines={2}>
-          {copy.title}
-        </Text>
-        <Text variant="muted" className="text-xs">
-          {timeAgo(parseTimestamp(row.createdAt), undefined, now)}
-        </Text>
-      </View>
-      <Text variant="muted" className="mt-1 text-sm" numberOfLines={3}>
-        {copy.body}
-      </Text>
-    </Pressable>
-  );
-}
 
 /** One filter chip. Single-select, so the active one carries `selected`. */
 function FilterChip({
@@ -90,7 +58,9 @@ function FilterChip({
     <Button
       variant={active ? 'secondary' : 'ghost'}
       size="sm"
-      accessibilityRole="tab"
+      // `Button` pins `role="button"`; a real role must replace it, because
+      // `role` outranks `accessibilityRole`.
+      role="tab"
       accessibilityState={{ selected: active }}
       onPress={onPress}
     >
@@ -116,6 +86,7 @@ export function NotificationHistoryScreen() {
   const { token: authToken } = useAuth();
   const gate = useNotificationMasterGate();
   const now = useNowTicker(RELATIVE_TIME_TICK_MS);
+  const queryClient = useQueryClient();
   const paddingBottom = useTabBarBottomPadding();
   const [category, setCategory] = useState<NotificationHistoryFilter['category']>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -135,16 +106,31 @@ export function NotificationHistoryScreen() {
           // next page: `maxPages` alone would drop index 0, which is the newest
           // page.
           getNextPageParam: (lastPage, pages) =>
-            hasRetentionBudget(pages.length) ? (lastPage.nextCursor ?? undefined) : undefined,
+            hasRetentionBudget(pages.length, MAX_PAGES)
+              ? (lastPage.nextCursor ?? undefined)
+              : undefined,
+          // A first load while offline must settle into the error state and its
+          // retry rather than pausing in `pending`, which would leave the
+          // skeleton on screen for as long as the device stays offline.
+          networkMode: 'always',
+          // `networkMode: 'always'` also drops the derived reconnect refetch,
+          // so ask for it back.
+          refetchOnReconnect: true,
         }
-      )
+      ),
+      MAX_PAGES
     )
   );
 
-  const items = useMemo(
+  const flatItems = useMemo(
     () => query.data?.pages.flatMap(page => page.items) ?? [],
     [query.data?.pages]
   );
+  // `reconcileFirstPage` empties the cached pages before page one refetches, so
+  // the rows a refresh started from stay on screen until it delivers. Without
+  // the hold the list would flash its empty state and lose its scroll.
+  const [refreshHold, setRefreshHold] = useState<HistoryRow[] | null>(null);
+  const items = flatItems.length > 0 ? flatItems : (refreshHold ?? []);
   const hasListContent = items.length > 0 || query.isFetchNextPageError;
   // A query that is disabled never leaves `pending`; only a signed-in read can.
   const loading = authToken != null && query.isPending && !query.isError;
@@ -157,8 +143,7 @@ export function NotificationHistoryScreen() {
         toast.error(t('notifications.history.openFailed'));
         return;
       }
-      // The same slot a notification response fills, so the root layout owns
-      // the organization switch and the navigation.
+      // The same slot a notification response fills: the root layout navigates.
       setPendingDeepLink(target.href, 'notification', pendingDeepLinkOptionsForData(target.data));
     },
     [t]
@@ -172,13 +157,27 @@ export function NotificationHistoryScreen() {
   const handleRefresh = () => {
     void (async () => {
       setRefreshing(true);
+      setRefreshHold(items);
       try {
-        const result = await query.refetch();
-        if (result.isError) {
+        // A retained page is a keyset window that only stays contiguous with
+        // the page above it while page one's newest row is unchanged. Rows that
+        // arrived since would move page one's tail past the older pages'
+        // cursors, so a refresh collapses the list and reloads from the newest
+        // row instead of re-requesting every retained window.
+        const prefix = trpc.user.getNotificationHistory.queryKey();
+        reconcileFirstPage(queryClient, prefix);
+        await queryClient.refetchQueries(
+          { queryKey: prefix, type: 'active' },
+          // `cancelRefetch: false` awaits the page-one fetch the invalidate
+          // started instead of cancelling it and issuing a second one.
+          { cancelRefetch: false }
+        );
+        if (queryClient.getQueryState(prefix)?.status === 'error') {
           toast.error(t('common.couldNotRefresh'));
         }
       } finally {
         setRefreshing(false);
+        setRefreshHold(null);
       }
     })();
   };
@@ -188,10 +187,20 @@ export function NotificationHistoryScreen() {
     ? notificationHistoryFilters(preferences.data.capabilities)
     : NOTIFICATION_HISTORY_FILTERS;
 
-  let footer = <View style={{ height: paddingBottom }} pointerEvents="none" />;
+  // The page bound, not the server, ends the list: say so.
+  const capped = !query.hasNextPage && (query.data?.pages.at(-1)?.nextCursor ?? null) !== null;
+  let footer = (
+    <View className="pb-8" style={{ paddingBottom: paddingBottom + 32 }}>
+      {capped ? (
+        <Text variant="muted" className="text-center text-xs">
+          {t('notifications.history.capped')}
+        </Text>
+      ) : null}
+    </View>
+  );
   if (query.isFetchNextPageError) {
     footer = (
-      <View className="pb-8">
+      <View className="pb-8" style={{ paddingBottom: paddingBottom + 32 }}>
         <Button
           variant="ghost"
           onPress={() => {
@@ -220,7 +229,7 @@ export function NotificationHistoryScreen() {
               variant="outline"
               size="sm"
               onPress={() => {
-                router.push(SETTINGS_ROUTE);
+                router.push('/(app)/notifications' as Href);
               }}
             >
               <Text>{t('notifications.history.bannerAction')}</Text>
@@ -279,10 +288,19 @@ export function NotificationHistoryScreen() {
             <EmptyState
               icon={BellOff}
               refreshControl={refreshControl}
-              title={t('notifications.history.emptyTitle')}
-              description={t('notifications.history.emptyBody', {
-                days: NOTIFICATION_HISTORY_RETENTION_DAYS,
-              })}
+              title={t(
+                category === null
+                  ? 'notifications.history.emptyTitle'
+                  : 'notifications.history.emptyCategoryTitle'
+              )}
+              // The retention window describes the whole list, not one category.
+              description={
+                category === null
+                  ? t('notifications.history.emptyBody', {
+                      days: NOTIFICATION_HISTORY_RETENTION_DAYS,
+                    })
+                  : undefined
+              }
             />
           ) : null}
 

@@ -883,7 +883,9 @@
       "bannerBody": "Beeksisoonni push meeshaa kanaaf cufamaniiru, kanaaf haaraan asitti hin dhufan.",
       "bannerAction": "Qindaa'ina beeksisaa",
       "emptyTitle": "Ammatti beeksisoonni hin jiran",
+      "emptyCategoryTitle": "Beeksisoonni rammii kana keessatti hin jiran",
       "emptyBody": "Beeksisoonni herregni kun fudhatu asitti mul'atu. Guyyaa {{days}}f ni eegamu.",
+      "capped": "Beeksisoonni haaraan agarsiifamaa jiran.",
       "loadError": "Seenaa beeksisaa fiduu hin dandeenye.",
       "openFailed": "Beeksisni kun amma bakka tokkollee hin banamu."
     },

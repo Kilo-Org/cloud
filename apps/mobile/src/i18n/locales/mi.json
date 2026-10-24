@@ -883,7 +883,9 @@
       "bannerBody": "Kua weto ngā pānui pana mō tēnei taputapu, nō reira kāore e tae mai he pānui hou ki konei.",
       "bannerAction": "Ngā tautuhinga whakamōhiotanga",
       "emptyTitle": "Kāore anō he whakamōhiotanga",
+      "emptyCategoryTitle": "Kāore he whakamōhiotanga i tēnei kāwai",
       "emptyBody": "Ka puta mai ki konei ngā whakamōhiotanga ka riro i tēnei pūkete. Ka tiakina mō {{days}} rā.",
+      "capped": "E whakaatu ana i ngā whakamōhiotanga tino hou.",
       "loadError": "Kāore i taea te uta i te hītori whakamōhiotanga.",
       "openFailed": "Kāore tēnei whakamōhiotanga e taea te whakatuwhera i tētahi wāhi ināianei."
     },

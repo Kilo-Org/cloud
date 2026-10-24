@@ -883,7 +883,9 @@
       "bannerBody": "Pushnotifikationer er slået fra på denne enhed, så nye ankommer ikke her.",
       "bannerAction": "Notifikationsindstillinger",
       "emptyTitle": "Ingen notifikationer endnu",
+      "emptyCategoryTitle": "Ingen notifikationer i denne kategori",
       "emptyBody": "Notifikationer, som denne konto modtager, vises her. De gemmes i {{days}} dage.",
+      "capped": "Viser de seneste notifikationer.",
       "loadError": "Kunne ikke indlæse notifikationshistorikken.",
       "openFailed": "Denne notifikation kan ikke længere åbnes nogen steder."
     },

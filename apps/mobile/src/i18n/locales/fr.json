@@ -300,7 +300,9 @@
       "bannerBody": "Les notifications push sont désactivées pour cet appareil, les nouvelles n'arriveront donc pas ici.",
       "bannerAction": "Paramètres des notifications",
       "emptyTitle": "Aucune notification pour l'instant",
+      "emptyCategoryTitle": "Aucune notification dans cette catégorie",
       "emptyBody": "Les notifications reçues par ce compte apparaissent ici. Elles sont conservées pendant {{days}} jours.",
+      "capped": "Affichage des notifications les plus récentes.",
       "loadError": "Impossible de charger l'historique des notifications.",
       "openFailed": "Cette notification ne s'ouvre plus nulle part."
     },

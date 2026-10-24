@@ -327,7 +327,9 @@
       "bannerBody": "As notificações push estão desativadas neste dispositivo, então novas notificações não chegarão aqui.",
       "bannerAction": "Configurações de notificações",
       "emptyTitle": "Nenhuma notificação ainda",
+      "emptyCategoryTitle": "Nenhuma notificação nesta categoria",
       "emptyBody": "As notificações que esta conta recebe aparecem aqui. Elas são mantidas por {{days}} dias.",
+      "capped": "Mostrando as notificações mais recentes.",
       "loadError": "Não foi possível carregar o histórico de notificações.",
       "openFailed": "Esta notificação não abre mais em lugar nenhum."
     },

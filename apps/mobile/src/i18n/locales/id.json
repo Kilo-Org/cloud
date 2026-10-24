@@ -359,7 +359,9 @@
       "bannerBody": "Notifikasi push nonaktif untuk perangkat ini, jadi notifikasi baru tidak akan masuk di sini.",
       "bannerAction": "Pengaturan notifikasi",
       "emptyTitle": "Belum ada notifikasi",
+      "emptyCategoryTitle": "Tidak ada notifikasi di kategori ini",
       "emptyBody": "Notifikasi yang diterima akun ini akan muncul di sini. Notifikasi disimpan selama {{days}} hari.",
+      "capped": "Menampilkan notifikasi terbaru.",
       "loadError": "Tidak dapat memuat riwayat notifikasi.",
       "openFailed": "Notifikasi ini tidak lagi dapat dibuka di mana pun."
     },

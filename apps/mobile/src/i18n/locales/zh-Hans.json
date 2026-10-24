@@ -359,7 +359,9 @@
       "bannerBody": "此设备的推送通知已关闭，因此新通知不会在此处送达。",
       "bannerAction": "通知设置",
       "emptyTitle": "暂无通知",
+      "emptyCategoryTitle": "此类别中暂无通知",
       "emptyBody": "此账户收到的通知会显示在这里。通知会保留 {{days}} 天。",
+      "capped": "仅显示最近的通知。",
       "loadError": "无法加载通知历史。",
       "openFailed": "此通知已无法在任何位置打开。"
     },

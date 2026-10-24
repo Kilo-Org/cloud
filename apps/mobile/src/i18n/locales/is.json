@@ -883,7 +883,9 @@
       "bannerBody": "Slökkt er á push-tilkynningum fyrir þetta tæki, svo nýjar munu ekki berast hingað.",
       "bannerAction": "Stillingar tilkynninga",
       "emptyTitle": "Engar tilkynningar ennþá",
+      "emptyCategoryTitle": "Engar tilkynningar í þessum flokki",
       "emptyBody": "Tilkynningar sem þessi reikningur fær birtast hér. Þær eru geymdar í {{days}} daga.",
+      "capped": "Nýjustu tilkynningarnar eru sýndar.",
       "loadError": "Ekki tókst að hlaða tilkynningasögu.",
       "openFailed": "Þessi tilkynning opnast hvergi lengur."
     },

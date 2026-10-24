@@ -902,7 +902,9 @@
       "bannerBody": "Push obaveštenja su isključena za ovaj uređaj, pa nova neće stizati ovde.",
       "bannerAction": "Podešavanja obaveštenja",
       "emptyTitle": "Još nema obaveštenja",
+      "emptyCategoryTitle": "Nema obaveštenja u ovoj kategoriji",
       "emptyBody": "Obaveštenja koja ovaj nalog prima prikazuju se ovde. Čuvaju se {{days}} dana.",
+      "capped": "Prikazuju se najnovija obaveštenja.",
       "loadError": "Učitavanje istorije obaveštenja nije uspelo.",
       "openFailed": "Ovo obaveštenje se više ne otvara nigde."
     },

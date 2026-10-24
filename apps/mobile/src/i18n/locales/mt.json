@@ -940,7 +940,9 @@
       "bannerBody": "In-notifiki push huma mitfija għal dan l-apparat, għalhekk dawk ġodda mhux se jaslu hawn.",
       "bannerAction": "Impostazzjonijiet tan-notifiki",
       "emptyTitle": "Għad m'hemmx notifiki",
+      "emptyCategoryTitle": "Għad m'hemmx notifiki f'din il-kategorija",
       "emptyBody": "In-notifiki li jirċievi dan il-kont jidhru hawn. Jinżammu għal {{days}} ġranet.",
+      "capped": "Qed jintwerew in-notifiki l-aktar reċenti.",
       "loadError": "Ma setgħetx tiġi mgħobbija l-kronoloġija tan-notifiki.",
       "openFailed": "Din in-notifika m'għadhiex tinfetaħ imkien."
     },

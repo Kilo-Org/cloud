@@ -21,6 +21,13 @@ import {
   serializeBriefing,
 } from '@/lib/agent-briefing/store';
 import {
+  listOneOffBriefingDrafts,
+  oneOffBriefingDraftRow,
+  oneOffBriefingDraftSchema,
+  startOneOffBriefingPreparation,
+  runOneOffBriefingPreparation,
+} from '@/lib/agent-briefing/preparation';
+import {
   estimateBriefingSummary,
   createOneOffBriefing,
   queueBriefingSummary,
@@ -174,8 +181,7 @@ export const agentBriefingRouter = createTRPCRouter({
     )
     .output(z.object({ report: briefingReportSchema, estimate: briefingEstimateSchema.nullable() }))
     .mutation(async ({ ctx, input }) => {
-      const row = await prepareOneOffBriefing(ctx.user.id, input);
-      const report = await serializeBriefing(row);
+      const report = await serializeBriefing(await prepareOneOffBriefing(ctx.user.id, input));
       const estimate =
         report.scorecard.sessions === 0
           ? null
@@ -184,6 +190,55 @@ export const agentBriefingRouter = createTRPCRouter({
               reportId: report.id,
             });
       return { report, estimate };
+    }),
+  startOneOffPreparation: baseProcedure
+    .input(
+      z.object({
+        requestId: z.uuid(),
+        organizationId: z.uuid().optional(),
+        startAt: z.string().datetime({ offset: true }),
+        endAt: z.string().datetime({ offset: true }),
+        timezone: timezoneSchema,
+        language: z.string().min(1).max(35),
+      })
+    )
+    .output(oneOffBriefingDraftSchema)
+    .mutation(async ({ ctx, input }) => {
+      const draft = await startOneOffBriefingPreparation(ctx.user.id, input);
+      if (draft.status === 'pending') after(() => runOneOffBriefingPreparation(draft.id));
+      return draft;
+    }),
+  oneOffDrafts: baseProcedure
+    .input(
+      z.object({ cursor: z.uuid().optional(), limit: z.number().int().min(1).max(100).default(20) })
+    )
+    .output(
+      z.object({ drafts: z.array(oneOffBriefingDraftSchema), nextCursor: z.string().nullable() })
+    )
+    .query(({ ctx, input }) => listOneOffBriefingDrafts(ctx.user.id, input)),
+  oneOffPreparation: baseProcedure
+    .input(reportInput)
+    .output(
+      z.object({
+        draft: oneOffBriefingDraftSchema,
+        prepared: z
+          .object({ report: briefingReportSchema, estimate: briefingEstimateSchema.nullable() })
+          .nullable(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const { row, draft } = await oneOffBriefingDraftRow(ctx.user.id, input.reportId);
+      if (draft.status === 'pending') after(() => runOneOffBriefingPreparation(draft.id));
+      if (draft.status !== 'ready') return { draft, prepared: null };
+      const report = await serializeBriefing(await briefingReportRow(ctx.user.id, row.id));
+      const estimate =
+        report.scorecard.sessions === 0
+          ? null
+          : await estimateBriefingSummary(ctx.user, {
+              organizationId: row.organization_id ?? undefined,
+              reportId: report.id,
+            });
+      return { draft, prepared: { report, estimate } };
     }),
   createOneOff: baseProcedure
     .input(reportInput.extend({ estimateToken: z.string().optional() }))

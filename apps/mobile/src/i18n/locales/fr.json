@@ -4090,7 +4090,7 @@
     "emptyHint": "Vos sessions de code cloud et CLI apparaissent ici lorsqu’un briefing planifié a de l’activité.",
     "loadError": "Impossible de charger les briefings",
     "sessions": "Actives dans la fenêtre",
-    "pullRequests": "PRs ouvertes",
+    "pullRequests": "PRs ouvertes pendant la période",
     "blockers": "Nouveaux blocages",
     "spend": "Dépenses dans la fenêtre",
     "view": "Lire le briefing",
@@ -4123,7 +4123,7 @@
     "notificationsHint": "Une notification générique par briefing planifié. Indépendante des résumés AI payants.",
     "notificationPermission": "Activez les notifications de l’appareil dans $t(common.notifications) pour recevoir votre briefing.",
     "aiOptIn": "Résumés AI payants",
-    "aiHint": "Facultatif, pour ce contexte uniquement. Des extraits choisis et masqués ainsi que des faits structurés sont envoyés à votre modèle dans la langue de l’app. Les frais sont débités du solde de ce contexte.",
+    "aiHint": "Facultatif, pour ce contexte uniquement. Des extraits choisis dont les données sensibles ont été masquées ainsi que des faits structurés sont envoyés à votre modèle dans la langue de l’app. Les frais sont débités du solde de ce contexte.",
     "defaultModel": "Utiliser le modèle par défaut de Kilo",
     "duration": "Limite de temps (minutes)",
     "spendLimit": "Limite de dépense (USD)",
@@ -4170,6 +4170,12 @@
     "estimatePermissionUnavailable": "Vous n’avez pas l’autorisation d’utiliser le solde de ce contexte.",
     "createFailed": "Impossible de créer ce briefing.",
     "reviewFailed": "Impossible d'examiner ce briefing.",
-    "saved": "Paramètres du briefing enregistrés"
+    "saved": "Paramètres du briefing enregistrés",
+    "preparing": "Préparation de votre briefing…",
+    "preparationHint": "Vous pouvez quitter cette page et y revenir pendant la collecte de l’activité. Aucun traitement AI ne démarre et aucuns frais ne sont facturés tant que vous n’avez pas consulté l’aperçu et confirmé l’estimation.",
+    "resumeReview": "Continuer l’examen",
+    "preparationFailed": "Impossible de collecter l’activité pour ce briefing. Réessayez.",
+    "preparationTimedOut": "La collecte de l’activité a pris trop de temps. Réessayez.",
+    "preparationDrafts": "Briefings en attente de confirmation"
   }
 }

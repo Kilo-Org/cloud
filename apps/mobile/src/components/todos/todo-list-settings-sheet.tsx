@@ -9,12 +9,13 @@ import { ModelSelector } from '@/components/agents/model-selector';
 import { RepoSelector } from '@/components/agents/repo-selector';
 import { PickerSheet } from '@/components/picker-sheet';
 import { QueryError } from '@/components/query-error';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
-import { useTodoListMutations, useTodoLists } from '@/lib/hooks/use-todos';
+import { reportNothing, useTodoListMutations, useTodoLists } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   TODO_LIST_EMOJI_MAX_LENGTH,
@@ -41,22 +42,25 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const { create, update } = useTodoListMutations(organizationId);
+  const { create, update } = useTodoListMutations(organizationId, reportNothing);
   const scope = organizationId ?? undefined;
   const { repositories, recents, groups } = useNewSessionRepos({ organizationId: scope });
   const { models, isLoading: isLoadingModels } = useAvailableModels(scope);
 
   const nameRef = useRef(list?.name ?? '');
   const emojiRef = useRef(list?.emoji ?? '');
+  // The first render's stored text: `defaultValue` must not follow the cached
+  // list, or a failed update rolling back would overwrite what the user typed.
+  const [storedName] = useState(list?.name ?? '');
+  const [storedEmoji] = useState(list?.emoji ?? '');
   const [hasName, setHasName] = useState(Boolean(list?.name.trim()));
   const [gitUrl, setGitUrl] = useState(list?.gitUrl ?? null);
   const [mode, setMode] = useState(list?.mode ?? null);
   const [model, setModel] = useState(list?.model ?? null);
   const [variant, setVariant] = useState(list?.variant ?? null);
-  // A failed create keeps the form open with the typed values; the toast the hook
-  // raises renders behind this sheet, so the failure is also stated on the sheet.
-  const [createFailed, setCreateFailed] = useState(false);
-  const saving = create.isPending;
+  const [saveFailed, setSaveFailed] = useState(false);
+  const savingRef = useRef(false);
+  const saving = create.isPending || update.isPending;
 
   const { requestClose, dialog } = useSheetDismissGuard({
     isDirty: () =>
@@ -89,43 +93,45 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
     }, [])
   );
 
-  function save() {
-    const name = nameRef.current.trim();
-    if (name.length === 0) {
+  async function save() {
+    const trimmedName = nameRef.current.trim();
+    if (trimmedName.length === 0 || savingRef.current) {
       return;
     }
-    const emoji = emojiRef.current.trim();
+    const trimmedEmoji = emojiRef.current.trim();
     const fields = {
-      name,
-      emoji: emoji.length > 0 ? emoji : null,
+      name: trimmedName,
+      emoji: trimmedEmoji.length > 0 ? trimmedEmoji : null,
       gitUrl,
       mode,
       model,
       variant,
     };
-    if (list) {
-      update.mutate({ id: list.id, ...fields });
-      router.back();
-      return;
-    }
-    setCreateFailed(false);
-    create.mutate(
-      { organizationId, ...fields },
-      {
-        onSuccess: created => {
-          if (afterCreate === 'back') {
-            router.back();
-            return;
-          }
+    savingRef.current = true;
+    setSaveFailed(false);
+    try {
+      // An existing list updates in place; a new one is created in the route's
+      // context. Either way the sheet closes only once the write succeeded.
+      if (list) {
+        await update.mutateAsync({ id: list.id, ...fields });
+        router.back();
+      } else {
+        const created = await create.mutateAsync({ organizationId, ...fields });
+        if (afterCreate === 'back') {
+          router.back();
+        } else {
           // Replace the form sheet with the created list: Back from the list then
           // lands on the lists view the sheet was opened from.
           router.replace(todoListPath(created.id));
-        },
-        onError: () => {
-          setCreateFailed(true);
-        },
+        }
       }
-    );
+    } catch {
+      // The fields and the sheet stay, so the user can retry in place; the
+      // status line below the fields is this save's only error surface.
+      setSaveFailed(true);
+    } finally {
+      savingRef.current = false;
+    }
   }
 
   return (
@@ -133,25 +139,21 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
       <PickerSheet
         title={list ? t('todos.listSettings.title') : t('todos.lists.newList')}
         doneLabel={t('common.save')}
-        onDone={save}
+        onDone={() => {
+          void save();
+        }}
         onCancel={requestClose}
         disabled={saving}
         doneDisabled={!hasName || saving}
       >
         <View className="gap-5 px-4 pt-2">
-          {createFailed ? (
-            <Text accessibilityRole="alert" className="text-sm text-destructive">
-              {t('todos.lists.createFailed')}
-            </Text>
-          ) : null}
           <View className="flex-row gap-3">
             <View className="w-20 gap-2">
               <FieldLabel>{t('todos.listSettings.emoji')}</FieldLabel>
               <Input
-                defaultValue={list?.emoji ?? ''}
+                defaultValue={storedEmoji}
                 onChangeText={text => {
                   emojiRef.current = text;
-                  setCreateFailed(false);
                 }}
                 maxLength={TODO_LIST_EMOJI_MAX_LENGTH}
                 accessibilityLabel={t('todos.listSettings.emoji')}
@@ -161,15 +163,16 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
             <View className="min-w-0 flex-1 gap-2">
               <FieldLabel>{t('todos.listSettings.name')}</FieldLabel>
               <Input
-                defaultValue={list?.name ?? ''}
+                defaultValue={storedName}
                 autoFocus={!list}
                 onChangeText={text => {
                   nameRef.current = text;
-                  setCreateFailed(false);
                   const next = text.trim().length > 0;
                   setHasName(current => (current === next ? current : next));
                 }}
-                onSubmitEditing={save}
+                onSubmitEditing={() => {
+                  void save();
+                }}
                 returnKeyType="done"
                 maxLength={TODO_LIST_NAME_MAX_LENGTH}
                 placeholder={t('todos.listSettings.namePlaceholder')}
@@ -237,6 +240,10 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
             </View>
           </View>
           {saving ? <ActivityIndicator color={colors.mutedForeground} /> : null}
+          <AccessibleStatus
+            message={saveFailed ? t('todos.listSettings.saveFailed') : null}
+            className="text-sm"
+          />
         </View>
       </PickerSheet>
       {dialog}

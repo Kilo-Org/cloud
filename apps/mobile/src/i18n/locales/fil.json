@@ -4064,8 +4064,8 @@
     "defaultModel": "Gamitin ang default na model ng Kilo",
     "duration": "Limitasyon sa oras (minuto)",
     "spendLimit": "Limitasyon sa gastos (USD)",
-    "safeguardHint": "Tiyak na limitasyon bawat buod, hindi pang-araw-araw na budget. Default: 10 minuto at $2. Ilalathala ang ulat pagkalipas ng hanggang limang minuto habang nagpapatuloy ang paggawa sa loob ng mga limitasyong ito.",
-    "invalidSafeguards": "Maglagay ng positibo at tiyak na limitasyon sa oras at gastos.",
+    "safeguardHint": "Mga limitasyong may hangganan bawat buod, hindi pang-araw-araw na budget. Default: 10 minuto at $2. Ilalathala ang ulat pagkalipas ng hanggang limang minuto habang nagpapatuloy ang paggawa sa loob ng mga limitasyong ito.",
+    "invalidSafeguards": "Maglagay ng mga positibong limitasyon sa oras at gastos na may hangganang halaga.",
     "estimate": "Tantiya {{estimate}} · maximum {{maximum}}",
     "estimateUnavailable": "Hindi available ang bayad na buod para sa mga setting na ito.",
     "estimatePricingUnavailable": "Walang available na presyo para sa modelong ito.",
@@ -4107,6 +4107,12 @@
     "estimatePermissionUnavailable": "Wala kang pahintulot na gamitin ang balanse ng kontekstong ito.",
     "createFailed": "Hindi magawa ang briefing na ito.",
     "reviewFailed": "Hindi masuri ang briefing na ito.",
-    "saved": "Na-save na ang mga setting ng briefing"
+    "saved": "Na-save na ang mga setting ng briefing",
+    "preparing": "Inihahanda ang iyong briefing…",
+    "preparationHint": "Maaari kang umalis at bumalik habang kinokolekta ang aktibidad. Hindi magsisimula ang gawain ng AI o ang pagsingil hangga’t hindi mo nasusuri at nakukumpirma ang tantiya.",
+    "resumeReview": "Ipagpatuloy ang pagsusuri",
+    "preparationFailed": "Hindi makolekta ang aktibidad para sa briefing na ito. Subukan muli.",
+    "preparationTimedOut": "Masyadong nagtagal ang pagkolekta ng aktibidad. Subukan muli.",
+    "preparationDrafts": "Mga briefing na hindi pa nakukumpirma"
   }
 }

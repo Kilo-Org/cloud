@@ -39,7 +39,10 @@ import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { captureOrganizationMemberJoined } from '@kilocode/web-shared/lib/organizations/organization-member-analytics';
 import { failureResult, successResult } from '@kilocode/web-shared/lib/maybe-result';
-import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
+import {
+  bumpOrganizationGroupPolicyRevision,
+  lockOrganizationGroupPolicy,
+} from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { enforceOrganizationCreationLimit } from '@kilocode/web-shared/lib/organizations/organization-creation-limit';
 
 export async function getOrganizationById(
@@ -690,6 +693,11 @@ export async function acceptOrganizationInvite(
         return failureResult('Invitation is for a different email address');
       }
 
+      // Keep the membership-mutation advisory lock before the policy lock, and
+      // both before the organization row lock, matching SSO joins and settings writes.
+      await lockOrganizationMembershipMutation(tx, invitation.organization_id, userId);
+      await lockOrganizationGroupPolicy(tx, invitation.organization_id);
+
       const [organization] = await tx
         .select()
         .from(organizations)
@@ -725,8 +733,6 @@ export async function acceptOrganizationInvite(
       } else if (ssoPolicy.status === 'required' && acceptingUserDomain === ssoPolicy.domain) {
         return failureResult('Invitation requires authentication through organization SSO');
       }
-
-      await lockOrganizationMembershipMutation(tx, invitation.organization_id, userId);
 
       const existingMembership = await tx
         .select()

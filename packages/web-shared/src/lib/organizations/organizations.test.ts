@@ -22,6 +22,7 @@ import {
   getOrganizationMembers,
   acceptOrganizationInvite,
   updateOrganizationSettings,
+  mutateOrganizationSettings,
   markOrganizationAsDeleted,
 } from './organizations';
 import { getOrganizationGroupPolicyContext } from './organization-group-policy-context.server';
@@ -1831,6 +1832,65 @@ describe('Organizations', () => {
         });
         expect(after.policyRevision).toBe(1);
       });
+      test('does not deadlock concurrent invite acceptance and settings mutation', async () => {
+        const owner = await insertTestUser();
+        const invitee = await insertTestUser();
+        const organization = await createOrganization('Concurrent organization update', owner.id);
+        // Create the policy settings row first: its insert holds a key-share lock
+        // on the organization row, which would hide the ordering under test.
+        await db.transaction(tx =>
+          bumpOrganizationGroupPolicyRevision(tx, organization.id, owner.id)
+        );
+        const invitation = await inviteUserToOrganization(
+          organization.id,
+          owner.id,
+          invitee.google_user_email,
+          'member'
+        );
+
+        const { promise: settingsLockHeld, resolve: signalSettingsLockHeld } =
+          Promise.withResolvers<number>();
+        const { promise: settingsMayProceed, resolve: allowSettingsMutation } =
+          Promise.withResolvers<void>();
+
+        const settingsMutation = db.transaction(async tx => {
+          await bumpOrganizationGroupPolicyRevision(tx, organization.id, owner.id);
+          const backend = await tx.execute<{ pid: number }>(
+            sql`SELECT pg_backend_pid()::int AS pid`
+          );
+          const pid = backend.rows[0]?.pid;
+          if (pid === undefined) throw new Error('PostgreSQL backend pid unavailable');
+          signalSettingsLockHeld(pid);
+          await settingsMayProceed;
+          return await mutateOrganizationSettings(organization.id, current => current.settings, tx);
+        });
+
+        const holderPid = await settingsLockHeld;
+        const acceptance = acceptOrganizationInvite(invitee.id, invitation.token);
+        let acceptanceBlocked = false;
+        try {
+          for (let attempt = 0; attempt < 2000 && !acceptanceBlocked; attempt += 1) {
+            const waiting = await db.execute(sql`
+              SELECT 1
+              FROM pg_stat_activity
+              WHERE datname = current_database()
+                AND wait_event_type = 'Lock'
+                AND ${holderPid} = ANY(pg_blocking_pids(pid))
+            `);
+            acceptanceBlocked = waiting.rows.length > 0;
+          }
+          expect(acceptanceBlocked).toBe(true);
+        } finally {
+          allowSettingsMutation();
+        }
+
+        const [settingsResult, acceptanceResult] = await Promise.all([
+          settingsMutation,
+          acceptance,
+        ]);
+        expect(settingsResult).toEqual(organization.settings);
+        expect(acceptanceResult.success).toBe(true);
+      }, 20000);
 
       test('should update invitation timestamps correctly', async () => {
         const owner = await insertTestUser();

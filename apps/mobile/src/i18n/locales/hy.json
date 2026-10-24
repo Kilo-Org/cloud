@@ -53,6 +53,7 @@
     "connected": "Միացված է",
     "couldNotLoadModels": "Չհաջողվեց բեռնել մոդելները։",
     "couldNotLoadRepositories": "Չհաջողվեց բեռնել պահոցները։",
+    "noRepositoriesFound": "Պահոցներ չեն գտնվել",
     "critical": "Կրիտիկական",
     "delete": "Ջնջել",
     "deleted": "Ջնջված",
@@ -87,6 +88,7 @@
     "connect": "Միացնել",
     "connectBitbucket": "Միացնել Bitbucket-ը",
     "connectGitlab": "Միացնել GitLab-ը",
+    "connectProvider": "Մատակարարի միացում",
     "contentTruncated": "Բովանդակությունը կրճատված է",
     "copyLink": "Պատճենել հղումը",
     "couldNotLoadOrganizations": "Չհաջողվեց բեռնել կազմակերպությունները։",
@@ -1407,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "Հնարավոր է՝ պետք է GitLab-ում ավելի շատ խմբերի կամ նախագծերի հասանելիություն տրամադրես։",
       "installGithubApp": "GitHub հավելվածի տեղադրում պահոցներում",
       "installGithubAppDescription": "Kilo-ի GitHub հավելվածին տրամադրիր այն պահոցների հասանելիությունը, որոնք ուզում ես ստուգել։",
-      "noRepositoriesFound": "Պահոցներ չեն գտնվել",
       "repositoryAccess": "պահոցի հասանելիություն"
     },
     "style": {
@@ -1489,7 +1490,6 @@
       "invalidUrl": "Մուտքագրիր միավորման հարցման վավեր URL։",
       "couldNotCheckProviderStatus": "Չհաջողվեց ստուգել մատակարարի կարգավիճակը։",
       "couldNotLoadProviders": "Չհաջողվեց բեռնել քո միացրած մատակարարները։ Կրկին փորձիր։",
-      "connectProvider": "Մատակարարի միացում",
       "connectProviderDescription": "Միացրու GitHub-ը՝ միավորման հարցման ձեռքով ստուգում սկսելու համար։",
       "pullRequestUrl": "Միավորման հարցման URL",
       "instructions": "Հրահանգներ (ըստ ցանկության)",

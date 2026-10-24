@@ -53,6 +53,7 @@
     "connected": "Свързан",
     "couldNotLoadModels": "Моделите не се заредиха.",
     "couldNotLoadRepositories": "Хранилищата не се заредиха.",
+    "noRepositoriesFound": "Не са намерени хранилища",
     "critical": "Критично",
     "delete": "Изтрий",
     "deleted": "Изтрито",
@@ -87,6 +88,7 @@
     "connect": "Свържи",
     "connectBitbucket": "Свържи Bitbucket",
     "connectGitlab": "Свържи GitLab",
+    "connectProvider": "Свържи доставчик",
     "contentTruncated": "Съдържанието е съкратено",
     "copyLink": "Копирай връзката",
     "couldNotLoadOrganizations": "Организациите не се заредиха.",
@@ -1407,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "Може да се наложи да предоставиш достъп до повече групи или проекти в GitLab.",
       "installGithubApp": "Инсталирай приложението за GitHub в хранилищата",
       "installGithubAppDescription": "Предостави на приложението на Kilo за GitHub достъп до хранилищата, които искаш да бъдат преглеждани.",
-      "noRepositoriesFound": "Не са намерени хранилища",
       "repositoryAccess": "достъп до хранилища"
     },
     "style": {
@@ -1489,7 +1490,6 @@
       "invalidUrl": "Въведи валиден URL адрес на заявка за сливане.",
       "couldNotCheckProviderStatus": "Не успяхме да проверим състоянието на доставчика.",
       "couldNotLoadProviders": "Не успяхме да заредим свързаните доставчици. Моля, опитай отново.",
-      "connectProvider": "Свържи доставчик",
       "connectProviderDescription": "Свържи GitHub, за да започнеш ръчен преглед на заявка за сливане.",
       "pullRequestUrl": "URL адрес на заявка за сливане",
       "instructions": "Инструкции (по желание)",

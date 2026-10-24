@@ -1,5 +1,5 @@
 {
-  "id": "2f44a66f-f001-4987-8b90-feb3e4428048",
+  "id": "c4c9111e-08c7-4dc3-9b6c-d9859f50241b",
   "prevId": "fd56687a-56e0-4224-9142-329998ec4347",
   "version": "7",
   "dialect": "postgresql",
@@ -11325,6 +11325,30 @@
           "primaryKey": false,
           "notNull": false
         },
+        "requesting_client_id": {
+          "name": "requesting_client_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "requesting_client_name": {
+          "name": "requesting_client_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "requesting_redirect_origin": {
+          "name": "requesting_redirect_origin",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "client_confirmed_at": {
+          "name": "client_confirmed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -22065,13 +22089,6 @@
         },
         "attempts": {
           "name": "attempts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "legacy_attempts": {
-          "name": "legacy_attempts",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,

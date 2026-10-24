@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Nem érhetők el szűrők",
-      "noFiltersDescription": "Lépj vissza, és nyisd meg újra a szűrőket a találatok listájából.",
       "title": "Találatok szűrése",
       "reset": "Visszaállítás",
       "severity": "Súlyosság",
@@ -2954,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "Beszéd figyelése…",
-    "staysOff": "A hangbevitel kikapcsolva marad, amíg nem engedélyezed az online átírást.",
     "onlineTitle": "Online beszédfeldolgozás",
     "onlineMessage": "Ez az eszköz nem tud internetkapcsolat nélkül beszédet átírni. A felvételedet ennek a szolgáltatónak küldjük el, hogy szöveggé alakítsa: {{provider}}. A Kilo nem tárolja a hangfelvételt.",
     "allow": "Engedélyezés",

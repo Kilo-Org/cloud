@@ -1640,8 +1640,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Nav pieejamu filtru",
-      "noFiltersDescription": "Atgriezies konstatējumu sarakstā un vēlreiz atver filtrus.",
       "title": "Filtrēt konstatējumus",
       "reset": "Atiestatīt",
       "severity": "Smaguma pakāpe",
@@ -2997,7 +2995,6 @@
   },
   "voiceInput": {
     "listening": "Klausās…",
-    "staysOff": "Balss ievade paliks izslēgta, līdz atļausi runas pārvēršanu tekstā tiešsaistē.",
     "onlineTitle": "Runa tiek apstrādāta tiešsaistē",
     "onlineMessage": "Šī ierīce nevar pārvērst runu tekstā bezsaistē. Tavs ieraksts tiek nosūtīts pakalpojuma sniedzējam {{provider}}, lai to pārvērstu tekstā. Kilo nesaglabā audioierakstu.",
     "allow": "Atļaut",

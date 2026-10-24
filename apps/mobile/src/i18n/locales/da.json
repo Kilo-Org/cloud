@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Ingen filtre tilgængelige",
-      "noFiltersDescription": "Gå tilbage, og åbn filtrene igen fra listen over fund.",
       "title": "Filtrering af fund",
       "reset": "Nulstil",
       "severity": "Alvorlighed",
@@ -2954,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "Lytter...",
-    "staysOff": "Diktering er slået fra, indtil du tillader transskription på nettet.",
     "onlineTitle": "Tale behandles på nettet",
     "onlineMessage": "Denne enhed kan ikke omdanne tale til tekst uden internetforbindelse. Din optagelse sendes til {{provider}} for at blive omdannet til tekst. Kilo gemmer ikke lyden.",
     "allow": "Tillad",

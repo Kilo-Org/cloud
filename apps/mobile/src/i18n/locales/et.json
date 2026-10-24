@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Filtreid pole saadaval",
-      "noFiltersDescription": "Mine tagasi ja ava filtrid leidude loendist uuesti.",
       "title": "Leidude filtreerimine",
       "reset": "Lähtesta",
       "severity": "Raskusaste",
@@ -2954,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "Kuulamine...",
-    "staysOff": "Häälsisestus jääb välja lülitatuks, kuni lubad kõne veebis tekstiks teisendada.",
     "onlineTitle": "Kõnet töödeldakse veebis",
     "onlineMessage": "See seade ei saa kõnet ilma võrguühenduseta tekstiks teisendada. Sinu salvestus saadetakse teenusepakkujale {{provider}}, kes teisendab selle tekstiks. Kilo ei säilita helisalvestist.",
     "allow": "Luba",

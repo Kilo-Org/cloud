@@ -2105,8 +2105,15 @@
     {
       "idx": 300,
       "version": "7",
-      "when": 1792868642010,
-      "tag": "0300_flaky_magdalene",
+      "when": 1792869596255,
+      "tag": "0300_device_auth_client_details",
+      "breakpoints": true
+    },
+    {
+      "idx": 301,
+      "version": "7",
+      "when": 1792875799929,
+      "tag": "0301_conscious_taskmaster",
       "breakpoints": true
     }
   ]

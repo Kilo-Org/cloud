@@ -30,7 +30,7 @@ const asking = (
 };
 
 const run = (tool: ReturnType<typeof questionTool>, one: ToolCall) =>
-  Effect.runPromise(Effect.either(tool.run(one)));
+  Effect.runPromise(Effect.result(tool.run(one)));
 
 const said = async (
   answers: readonly Answer[],
@@ -38,7 +38,7 @@ const said = async (
 ): Promise<string> => {
   const { ask } = asking(answers);
   const got = await run(questionTool(ask), call({ questions }));
-  return got._tag === 'Right' ? got.right : `failed: ${String(got.left.cause)}`;
+  return got._tag === 'Success' ? got.success : `failed: ${String(got.failure.cause)}`;
 };
 
 it('asks everything in one call and answers in the order the model asked', async () => {
@@ -64,7 +64,7 @@ it('asks everything in one call and answers in the order the model asked', async
   expect(asked).toHaveLength(1);
   /* The model's order, not the caller's. A model reading its own questions back
      out of order has to work out which answer went with which. */
-  expect(got._tag === 'Right' && got.right).toBe(
+  expect(got._tag === 'Success' && got.success).toBe(
     'Which database? [db]\npostgres\n\nWhich region? [where]\neu-west-1'
   );
 });
@@ -115,7 +115,7 @@ it('hands the model back what was wrong with its arguments', async () => {
 
   const got = await run(questionTool(ask), call({ questions: [{ prompt: 'no id' }] }));
 
-  expect(got._tag === 'Left' && String(got.left.cause)).toContain('questions[0].id');
+  expect(got._tag === 'Failure' && String(got.failure.cause)).toContain('questions[0].id');
   /* And nobody was disturbed over a call the model got wrong. */
   expect(asked).toEqual([]);
 });
@@ -125,7 +125,7 @@ it('hands the model back arguments that are not JSON at all', async () => {
 
   const got = await run(questionTool(ask), { id: 'tc_1', name: 'question', arguments: '{oops' });
 
-  expect(got._tag).toBe('Left');
+  expect(got._tag).toBe('Failure');
 });
 
 it('fails the call rather than the session when the asking itself fails', async () => {
@@ -135,7 +135,9 @@ it('fails the call rather than the session when the asking itself fails', async 
 
   /* A failed result, which the model can act on. Anything else would end a
      session because somebody closed a window. */
-  expect(got._tag === 'Left' && String(got.left.cause)).toContain('nobody is at the terminal');
+  expect(got._tag === 'Failure' && String(got.failure.cause)).toContain(
+    'nobody is at the terminal'
+  );
 });
 
 it('never asks over itself, so two rounds reach one person one at a time', async () => {

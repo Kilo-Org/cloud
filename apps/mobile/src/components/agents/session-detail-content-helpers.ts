@@ -114,6 +114,9 @@ type LastVisibleFailureInput = {
   pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
   /** Canceled rows kept locally, keyed by message id. */
   canceledQueuedMessages: ReadonlyMap<string, StoredMessage>;
+  /** The same transcript rule the screen merged the rows with, so the walk
+   * below cannot count a row that was dropped from the list. */
+  dropUnrenderableUserRows?: boolean;
 };
 
 /**
@@ -131,14 +134,14 @@ export function lastVisibleMessageFailure({
   messages,
   pendingMessages,
   canceledQueuedMessages,
+  dropUnrenderableUserRows,
 }: LastVisibleFailureInput): MessageFailure | null {
-  // The transcript drops a message whose parts render nothing (unless its
-  // delivery failed and its typed footer is the row's surface), so such a
-  // message owns no row and cannot state a failure. Walk back to the last row
-  // `mergeSessionTranscript` actually renders: reading `displayedMessages.at(-1)`
-  // let a dropped failure suppress the footer's own line and leave the failure
-  // with no surface at all.
-  const last = lastRenderedMessage(displayedMessages, pendingMessages);
+  // Only a rendered row can own the failure statement. Contentless assistant
+  // errors render their failure footer; other invisible messages are skipped.
+  // Walk back to the last row `mergeSessionTranscript` actually renders: reading
+  // `displayedMessages.at(-1)` let a dropped failure suppress the footer's own
+  // line and leave the failure with no surface at all.
+  const last = lastRenderedMessage(displayedMessages, pendingMessages, dropUnrenderableUserRows);
   if (last === undefined) {
     return null;
   }
@@ -160,11 +163,15 @@ export function lastVisibleMessageFailure({
  */
 function lastRenderedMessage(
   displayedMessages: readonly StoredMessage[],
-  pendingMessages: ReadonlyMap<string, MessageDeliveryState>
+  pendingMessages: ReadonlyMap<string, MessageDeliveryState>,
+  dropUnrenderableUserRows: boolean | undefined
 ): StoredMessage | undefined {
   for (let i = displayedMessages.length - 1; i >= 0; i -= 1) {
     const message = displayedMessages[i];
-    if (message !== undefined && transcriptRendersMessage(message, pendingMessages)) {
+    if (
+      message !== undefined &&
+      transcriptRendersMessage(message, pendingMessages, dropUnrenderableUserRows)
+    ) {
       return message;
     }
   }

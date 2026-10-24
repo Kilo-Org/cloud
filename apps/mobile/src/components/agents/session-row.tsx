@@ -152,7 +152,7 @@ export function StoredSessionRow({
   const needsInput = shouldShowNeedsInput({
     status: session.status,
     raiseId,
-    isAcked: isAttentionAcked(session.session_id, raiseId),
+    isAcked: isAttentionAcked(session.session_id, { raiseId, status: session.status }),
   });
   useEffect(() => {
     reconcileSessionAttention(session.session_id, session.status, session.status_updated_at);

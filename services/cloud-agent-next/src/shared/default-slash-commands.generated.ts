@@ -18,7 +18,7 @@ export type SlashCommandInfo = {
  *
  * Regenerate with `pnpm --filter cloud-agent-next update-default-slash-commands`.
  */
-export const DEFAULT_SLASH_COMMANDS_SOURCE = 'kilo@7.8.15';
+export const DEFAULT_SLASH_COMMANDS_SOURCE = 'kilo@7.8.17';
 
 /**
  * Default slash command catalog used when no live wrapper-reported catalog is

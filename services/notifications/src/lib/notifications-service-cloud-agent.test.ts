@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  pushDataSchema,
   sendCloudAgentSessionNotificationInputSchema,
   sendSessionReadyNotificationInputSchema,
   type DispatchPushInput,
@@ -31,12 +32,10 @@ const ALL_ON: UserNotificationPreferences = {
   securityFindingsEnabled: true,
 };
 
-const mockDispatchPush = vi.fn(
-  async (_input: DispatchPushInput): Promise<DispatchPushOutcome> => ({
-    kind: 'delivered',
-    tokenCount: 1,
-  })
-);
+const mockDispatchPush = vi.fn(async (_input: DispatchPushInput): Promise<DispatchPushOutcome> => ({
+  kind: 'delivered',
+  tokenCount: 1,
+}));
 
 function createDeps(
   options: {
@@ -832,6 +831,32 @@ describe('attention raise detail on push data', () => {
       category: 'attention',
       attentionKind: 'question',
     });
+  });
+
+  it('omits an empty session PR url so the payload still parses on the device', async () => {
+    const deps = createDeps({ session: { title: 'Refactor auth module', prUrl: '' } });
+
+    await dispatchCloudAgentSessionPush(
+      {
+        userId: 'user-1',
+        cliSessionId: 'ses_1',
+        executionId: 'attention:req_3',
+        status: 'completed',
+        body: 'Kilo needs your input.',
+        category: 'attention',
+        attentionKind: 'permission',
+      },
+      deps
+    );
+
+    const call = mockDispatchPush.mock.calls[0]?.[0] as DispatchPushInput;
+    expect(call.push.data).toEqual({
+      type: 'cloud_agent_session',
+      cliSessionId: 'ses_1',
+      category: 'attention',
+      attentionKind: 'permission',
+    });
+    expect(pushDataSchema.safeParse(call.push.data).success).toBe(true);
   });
 
   it('sends an attention push from an old producer with no attentionKind key and no throw', async () => {

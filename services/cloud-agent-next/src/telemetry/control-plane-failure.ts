@@ -100,6 +100,8 @@ export function classifyControlPlaneFailure(
     // Spec §10 reasons for the new plane (the mapping's one owner).
     case 'workspace_setup_failed':
       return { stage: 'pre_dispatch', code: 'workspace_setup_failed' };
+    case 'credential_upgrade_required':
+      return { stage: 'pre_dispatch', code: 'workspace_setup_failed' };
     case 'billing_blocked':
       return { stage: 'pre_dispatch', code: 'payment_required' };
     case 'container_limit_reached':

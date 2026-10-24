@@ -51,11 +51,13 @@ export const SESSION_TRANSCRIPT_STALE_TIME_MS = 60_000;
  * fetching on the critical path.
  */
 export async function prefetchSessionTranscript(
-  queryClient: Pick<QueryClient, 'prefetchQuery'>,
+  queryClient: Pick<QueryClient, 'query'>,
   options: { queryKey: readonly unknown[] }
 ): Promise<void> {
-  await queryClient.prefetchQuery({
-    ...options,
-    staleTime: SESSION_TRANSCRIPT_STALE_TIME_MS,
-  });
+  await queryClient
+    .query({
+      ...options,
+      staleTime: SESSION_TRANSCRIPT_STALE_TIME_MS,
+    })
+    .catch(() => undefined);
 }

@@ -1,4 +1,4 @@
-import { withSentryConfig } from '@sentry/nextjs';
+import { withSentryConfig } from '@sentry/nextjs/config';
 import createMDX from '@next/mdx';
 import { statSync } from 'fs';
 import { resolve } from 'path';

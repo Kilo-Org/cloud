@@ -90,7 +90,8 @@ function createHarness(input: HarnessInput) {
       throw input.destroyRejection;
     }
   });
-  const ackSessionAttention = vi.fn<(kiloSessionId: string) => void>();
+  const ackSessionAttention =
+    vi.fn<(kiloSessionId: string, status: string, statusUpdatedAt?: string | null) => void>();
   let listCall = 0;
   const listSessions = vi.fn(async (_organizationId: string | null) => {
     listCall += 1;
@@ -169,7 +170,11 @@ describe('approveFrontAgent', () => {
     expect(registered.manager.switchSession).not.toHaveBeenCalled();
     expect(harness.destroyLiveSessionManager).not.toHaveBeenCalled();
     expect(harness.headless.manager.switchSession).not.toHaveBeenCalled();
-    expect(harness.ackSessionAttention).toHaveBeenCalledWith('session-1');
+    expect(harness.ackSessionAttention).toHaveBeenCalledWith(
+      'session-1',
+      'permission',
+      '2026-01-01T00:00:00.000Z'
+    );
     // The refresh carries the post-approval rows, so the count drops without
     // waiting for the background push.
     expect(refreshedRows(harness)).toEqual([BUSY_ROW]);
@@ -187,7 +192,11 @@ describe('approveFrontAgent', () => {
     expect(harness.headless.manager.switchSession).toHaveBeenCalledWith('session-1');
     expect(harness.headless.manager.respondToPermission).toHaveBeenCalledWith('perm-2', 'once');
     expect(harness.destroyLiveSessionManager).toHaveBeenCalledTimes(1);
-    expect(harness.ackSessionAttention).toHaveBeenCalledWith('session-1');
+    expect(harness.ackSessionAttention).toHaveBeenCalledWith(
+      'session-1',
+      'permission',
+      '2026-01-01T00:00:00.000Z'
+    );
   });
 
   it('returns nothing-to-approve for a question-only front and still refreshes the surfaces', async () => {
@@ -349,7 +358,11 @@ describe('approveFrontAgent', () => {
     const outcome = await approveFrontAgent(harness.deps);
 
     expect(outcome).toEqual({ kind: 'approved' });
-    expect(harness.ackSessionAttention).toHaveBeenCalledWith('session-1');
+    expect(harness.ackSessionAttention).toHaveBeenCalledWith(
+      'session-1',
+      'permission',
+      '2026-01-01T00:00:00.000Z'
+    );
   });
 
   it('fails without rejecting when the headless manager factory rejects', async () => {

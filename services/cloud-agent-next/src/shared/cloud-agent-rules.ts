@@ -16,7 +16,7 @@ function formatDuration(ms: number): string {
 
 export type CloudAgentRulesInput = {
   bashDefaultTimeoutMs?: string | number | null;
-  /** Unknown on the legacy wrapper path; the reserved-port rule is then left out. */
+  /** Omit the reserved-port rule when the sandbox kind is unknown. */
   sandboxProvider?: AgentSandboxProvider;
 };
 

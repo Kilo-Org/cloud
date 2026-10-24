@@ -54,8 +54,10 @@ export function isCatalogLoadFailureResult(
   result: Pick<CliRunResult, 'text' | 'stderrTail' | 'costUsd' | 'timedOut'>
 ): boolean {
   if (result.text.length > 0 || (result.costUsd ?? 0) !== 0 || result.timedOut) return false;
-  return /\bfailed to load (?:the )?(?:kilo )?model catalog\b/i.test(
-    stripVTControlCharacters(result.stderrTail)
+  const diagnostic = stripVTControlCharacters(result.stderrTail);
+  return (
+    /\bfailed to load (?:the )?(?:kilo )?model catalog\b/i.test(diagnostic) ||
+    /\bno models are currently available\b/i.test(diagnostic)
   );
 }
 

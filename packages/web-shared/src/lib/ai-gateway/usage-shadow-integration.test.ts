@@ -249,7 +249,7 @@ beforeEach(() => {
     } else warn(...args);
   });
   jest.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
-    sent.push(JSON.parse(String(init?.body)) as UsageRecordRequest);
+    sent.push(JSON.parse(init?.body as string) as UsageRecordRequest);
     return new Response(null, { status: 202 });
   });
   db.transaction.mockImplementation(
@@ -939,7 +939,7 @@ describe('queued usage accounting', () => {
             .mockRejectedValue(new Error('sensitive-secret-prompt'));
         else
           jest.mocked(fetch).mockImplementation(async (_url, init) => {
-            sent.push(JSON.parse(String(init?.body)) as UsageRecordRequest);
+            sent.push(JSON.parse(init?.body as string) as UsageRecordRequest);
             if (failure === 'timeout') {
               await new Promise((_resolve, reject) =>
                 init?.signal?.addEventListener(
@@ -1059,7 +1059,7 @@ describe('queued usage accounting', () => {
       config.USAGE_QUEUE_ONLY_ENABLED = true;
       process.env.VERCEL_REGION = region;
       jest.mocked(fetch).mockImplementation(async (_url, init) => {
-        sent.push(JSON.parse(String(init?.body)) as UsageRecordRequest);
+        sent.push(JSON.parse(init?.body as string) as UsageRecordRequest);
         return new Response(null, { status });
       });
       const report = jest.requireMock<{ reportUsageEvent: jest.Mock }>(

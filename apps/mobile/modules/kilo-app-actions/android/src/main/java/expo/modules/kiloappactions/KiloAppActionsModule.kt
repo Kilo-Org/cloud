@@ -6,6 +6,7 @@ import expo.modules.kotlin.jni.JavaScriptFunction
 import expo.modules.kotlin.jni.JavaScriptValue
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import expo.modules.kotlin.types.ConverterContext
 
 /**
  * The Android half of the shared app-action contract.
@@ -26,7 +27,7 @@ class KiloAppActionsModule : Module() {
      * not lost. JS runs each returned payload through the same dispatcher.
      */
     Function("registerAppActionDispatcher") { handler: JavaScriptFunction<JavaScriptValue> ->
-      AppActionDispatcher.register(handler) { block ->
+      AppActionDispatcher.register(handler, appContext) { block ->
         // A JSI function may only be invoked on the JS thread, and an entry point
         // calls in from the main thread. `appContext.reactContext` is typed as a
         // plain Android `Context`, so the hop goes through the runtime's
@@ -67,6 +68,7 @@ internal object AppActionDispatcher {
   /** The registered JS dispatcher and the hop that puts a call on its thread. */
   private class Registration(
     val handler: JavaScriptFunction<JavaScriptValue>,
+    val converterContext: ConverterContext,
     val queue: (() -> Unit) -> Unit
   )
 
@@ -79,9 +81,10 @@ internal object AppActionDispatcher {
   /** Stores the JS dispatcher and returns the payloads that arrived first. */
   fun register(
     next: JavaScriptFunction<JavaScriptValue>,
+    converterContext: ConverterContext,
     queue: (() -> Unit) -> Unit
   ): List<String> = synchronized(lock) {
-    registration = Registration(next, queue)
+    registration = Registration(next, converterContext, queue)
     val pending = buffered.toList()
     buffered.clear()
     pending
@@ -107,7 +110,7 @@ internal object AppActionDispatcher {
       // captures to Sentry), so a throw here only means this payload produced no
       // result for the caller.
       runCatching {
-        val returned = active.handler(payload)
+        val returned = active.handler(payload, converterContext = active.converterContext)
         if (returned.isString()) {
           complete(payload, returned.getString())
         }

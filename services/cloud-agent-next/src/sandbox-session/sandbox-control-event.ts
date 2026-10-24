@@ -4,6 +4,7 @@ import { extractEntityId } from '../session/ingest-handlers/entity-id.js';
 import type { EventId } from '../types/ids.js';
 import type { StoredEvent } from '../websocket/types.js';
 import { slimPersistedKilocodeEvent } from '../shared/ingest-frame.js';
+import { projectSafeAssistantError, projectSafeSessionError } from '../shared/assistant-failure.js';
 
 const PERSISTED_KILO_EVENT_NAMES: ReadonlySet<string> = new Set([
   'message.removed',
@@ -100,6 +101,30 @@ export type SandboxControlSessionEventInput = {
   timestamp?: string;
 };
 
+function publicEventProperties({
+  type,
+  properties,
+}: SandboxControlSessionEventInput): Record<string, unknown> {
+  if (type === 'session.error') {
+    return {
+      ...properties,
+      error: projectSafeSessionError(properties.error, properties.reason),
+    };
+  }
+  const key =
+    type === 'message.updated' ? 'info' : type === 'message.part.updated' ? 'part' : undefined;
+  if (key === undefined) return properties;
+  const carrier = properties[key];
+  if (typeof carrier !== 'object' || carrier === null || Array.isArray(carrier)) return properties;
+  if (key === 'info' && (!('role' in carrier) || carrier.role !== 'assistant')) return properties;
+  if (!('error' in carrier) || carrier.error === undefined || carrier.error === null)
+    return properties;
+  return {
+    ...properties,
+    [key]: { ...carrier, error: projectSafeAssistantError(carrier.error) },
+  };
+}
+
 export function persistSandboxControlSessionEvent(params: {
   sessionId: string;
   payload: SandboxControlSessionEventInput;
@@ -136,11 +161,12 @@ export function persistSandboxControlSessionEvent(params: {
     });
     return { applied: true };
   }
+  const properties = publicEventProperties(params.payload);
   const timestamp = params.payload.timestamp ? Date.parse(params.payload.timestamp) : Date.now();
   const livePayload = JSON.stringify({
     type: params.payload.type,
     event: params.payload.type,
-    properties: params.payload.properties,
+    properties,
   });
   const entityId =
     params.payload.type === 'autocommit_completed' &&
@@ -153,7 +179,7 @@ export function persistSandboxControlSessionEvent(params: {
       slimPersistedKilocodeEvent({
         type: params.payload.type,
         event: params.payload.type,
-        properties: params.payload.properties,
+        properties,
       })
     );
     eventId = params.eventQueries.upsert({

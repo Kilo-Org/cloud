@@ -896,6 +896,9 @@ export const AdminActionAuditAction = z.enum([
   'organization.gitlab_webhook_secret.rotate',
   'organization.bitbucket.update',
   'organization.webhook_session.share',
+  'credit_campaign.create',
+  'credit_campaign.update',
+  'credit_campaign.set_active',
 ]);
 
 export type AdminActionAuditAction = z.infer<typeof AdminActionAuditAction>;
@@ -1339,23 +1342,6 @@ export const REVIEW_MEMORY_PROPOSAL_STATUSES = [
 export type ReviewMemoryProposalStatus = (typeof REVIEW_MEMORY_PROPOSAL_STATUSES)[number];
 
 export type ReviewMemoryEvidenceItem = { excerpt: string; prNumber: number | null };
-
-// --- Deployment types ---
-
-export const providerSchema = z.enum(['github', 'git', 'app-builder']);
-
-export type Provider = z.infer<typeof providerSchema>;
-
-export const buildStatusSchema = z.enum([
-  'queued',
-  'building',
-  'deploying',
-  'deployed',
-  'failed',
-  'cancelled',
-]);
-
-export type BuildStatus = z.infer<typeof buildStatusSchema>;
 
 // --- Code Reviewer analytics ---
 
@@ -2200,10 +2186,13 @@ export type DirectByokModelFlag = z.infer<typeof DirectByokModelFlagSchema>;
 export const DirectByokModelSchema = z.object({
   id: z.string(),
   name: z.string(),
+  description: z.string().optional(),
   flags: z.array(DirectByokModelFlagSchema).readonly().optional(),
   context_length: z.number(),
   max_completion_tokens: z.number(),
   reasoning_options: z.array(ReasoningOptionSchema).optional(),
+  /** The OpenRouter catalog model ID that models.dev identifies as the same model. */
+  catalog_model_id: z.string().optional(),
 });
 
 export const DirectByokModelArraySchema = z.array(DirectByokModelSchema);
@@ -2306,11 +2295,27 @@ export const CustomLlmSecureProxyCredentialsSchema = z.object({
 
 export type CustomLlmSecureProxyCredentials = z.infer<typeof CustomLlmSecureProxyCredentialsSchema>;
 
+/**
+ * Signs requests with AWS Signature Version 4 using IAM access keys, for Amazon
+ * Bedrock's OpenAI-compatible and Anthropic Messages endpoints on
+ * `bedrock-runtime` or `bedrock-mantle`. Bedrock API keys need no signing and
+ * use `api_key` (or `x-api-key` on Anthropic routes).
+ */
+export const CustomLlmAwsBedrockCredentialsSchema = z.object({
+  type: z.literal('aws_bedrock'),
+  region: z.string().min(1),
+  access_key_id: z.string().min(1),
+  secret_access_key: z.string().min(1),
+});
+
+export type CustomLlmAwsBedrockCredentials = z.infer<typeof CustomLlmAwsBedrockCredentialsSchema>;
+
 export const CustomLlmCredentialsSchema = z.discriminatedUnion('type', [
   CustomLlmApiKeyCredentialsSchema,
   CustomLlmXApiKeyCredentialsSchema,
   GoogleServiceAccountKeySchema,
   CustomLlmSecureProxyCredentialsSchema,
+  CustomLlmAwsBedrockCredentialsSchema,
 ]);
 
 export type CustomLlmCredentials = z.infer<typeof CustomLlmCredentialsSchema>;
@@ -2418,6 +2423,74 @@ export const VercelModelIdOverridesConfigSchema = z.object({
 });
 
 export type VercelModelIdOverridesConfig = z.infer<typeof VercelModelIdOverridesConfigSchema>;
+
+export const PREFERRED_PROVIDER_ORDER_MAX_RULES = 200;
+export const PREFERRED_PROVIDER_ORDER_MAX_PROVIDERS = 20;
+
+/** An OpenRouter provider slug, optionally with an endpoint variant such as `minimax/fp8`. */
+export const PreferredProviderSlugSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^[a-z0-9.-]+(\/[a-z0-9.-]+)?$/,
+    'Provider slugs may only contain lowercase letters, digits, . and -, with at most one /'
+  );
+
+const PreferredProviderOrderSubstringSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^[a-z0-9./:~-]+$/,
+    'Substrings may only contain lowercase letters, digits, and . / : ~ -'
+  );
+
+function uniqueStringArray<T extends z.ZodString>(item: T, label: string) {
+  return z.array(item).superRefine((values, ctx) => {
+    const seen = new Set<string>();
+    for (const [index, value] of values.entries()) {
+      if (seen.has(value)) {
+        ctx.addIssue({ code: 'custom', message: `Duplicate ${label} "${value}"`, path: [index] });
+      }
+      seen.add(value);
+    }
+  });
+}
+
+/**
+ * Matches a model ID that contains at least one `includes` substring and no
+ * `excludes` substring.
+ */
+export const PreferredProviderOrderRuleSchema = z
+  .object({
+    includes: uniqueStringArray(PreferredProviderOrderSubstringSchema, 'substring').min(1),
+    excludes: uniqueStringArray(PreferredProviderOrderSubstringSchema, 'substring').optional(),
+    providers: uniqueStringArray(PreferredProviderSlugSchema, 'provider')
+      .min(1)
+      .max(PREFERRED_PROVIDER_ORDER_MAX_PROVIDERS),
+  })
+  .superRefine(({ includes, excludes }, ctx) => {
+    for (const [index, exclude] of (excludes ?? []).entries()) {
+      if (includes.includes(exclude)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `"${exclude}" is both included and excluded`,
+          path: ['excludes', index],
+        });
+      }
+    }
+  });
+
+export type PreferredProviderOrderRule = z.infer<typeof PreferredProviderOrderRuleSchema>;
+
+/**
+ * Ordered rules: the first matching rule decides the provider order. Stored as
+ * an array because jsonb does not keep object key order.
+ */
+export const PreferredProviderOrderConfigSchema = z.object({
+  rules: z.array(PreferredProviderOrderRuleSchema).max(PREFERRED_PROVIDER_ORDER_MAX_RULES),
+});
+
+export type PreferredProviderOrderConfig = z.infer<typeof PreferredProviderOrderConfigSchema>;
 
 // --- StoredModel ---
 

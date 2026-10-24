@@ -765,7 +765,8 @@ describe('parseTranscriptionUsageFromResponse', () => {
     const result = parseTranscriptionUsageFromResponse(
       makeResponse(),
       200,
-      'openai/gpt-4o-mini-transcribe'
+      'openai/gpt-4o-mini-transcribe',
+      'openrouter'
     );
 
     expect(result.cost_mUsd).toBe(20);
@@ -787,7 +788,8 @@ describe('parseTranscriptionUsageFromResponse', () => {
         },
       }),
       200,
-      'openai/gpt-4o-mini-transcribe'
+      'openai/gpt-4o-mini-transcribe',
+      'openrouter'
     );
 
     expect(result.cost_mUsd).toBe(40);
@@ -798,7 +800,8 @@ describe('parseTranscriptionUsageFromResponse', () => {
     const result = parseTranscriptionUsageFromResponse(
       makeResponse(),
       200,
-      'openai/gpt-4o-mini-transcribe'
+      'openai/gpt-4o-mini-transcribe',
+      'openrouter'
     );
 
     expect(result.generation_time).toBe(2.5);
@@ -811,7 +814,8 @@ describe('parseTranscriptionUsageFromResponse', () => {
     const result = parseTranscriptionUsageFromResponse(
       JSON.stringify(parsed),
       200,
-      'openai/whisper-1'
+      'openai/whisper-1',
+      'openrouter'
     );
 
     expect(result.model).toBe('openai/whisper-1');
@@ -824,7 +828,8 @@ describe('parseTranscriptionUsageFromResponse', () => {
     const result = parseTranscriptionUsageFromResponse(
       JSON.stringify(parsed),
       200,
-      'openai/gpt-4o-mini-transcribe'
+      'openai/gpt-4o-mini-transcribe',
+      'openrouter'
     );
 
     expect(result.hasError).toBe(true);

@@ -46,7 +46,10 @@ import type {
   GatewayChatApiKind,
   ProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { computeOpenRouterCostFields } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
+import {
+  computeOpenRouterCostFields,
+  providerReportsIsByok,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
@@ -1370,7 +1373,8 @@ export function parseEmbeddingUsageFromResponse(
 export function parseTranscriptionUsageFromResponse(
   responseText: string,
   statusCode: number,
-  requestedModel: string
+  requestedModel: string,
+  provider: ProviderId
 ): MicrodollarUsageStats {
   const json = JSON.parse(responseText) as TranscriptionResponse;
   const base = {
@@ -1391,7 +1395,8 @@ export function parseTranscriptionUsageFromResponse(
   const cost = computeOpenRouterCostFields(
     json.usage ?? {},
     base,
-    'transcription_usage_processing'
+    'transcription_usage_processing',
+    providerReportsIsByok(provider)
   );
 
   return {
@@ -1473,7 +1478,12 @@ export function countAndStoreTranscriptionUsage(
     : clonedResponse
         .text()
         .then(text =>
-          parseTranscriptionUsageFromResponse(text, statusCode, usageContext.requested_model)
+          parseTranscriptionUsageFromResponse(
+            text,
+            statusCode,
+            usageContext.requested_model,
+            usageContext.provider
+          )
         )
         .catch(() => null);
 

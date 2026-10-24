@@ -1336,11 +1336,23 @@ type TranscriptionResponse = {
   usage?: TranscriptionUsage;
 };
 
+// An upstream error can arrive without a JSON body, such as an empty 429 or an
+// HTML error page from an edge proxy. It still carries no usage, so treat it like
+// a JSON error body. A successful response that is not JSON stays a parse failure.
+function parseEmbeddingResponse(responseText: string, statusCode: number): EmbeddingResponse {
+  try {
+    return JSON.parse(responseText) as EmbeddingResponse;
+  } catch (error) {
+    if (statusCode >= 400) return {};
+    throw error;
+  }
+}
+
 export function parseEmbeddingUsageFromResponse(
   responseText: string,
   statusCode: number
 ): MicrodollarUsageStats {
-  const json = JSON.parse(responseText) as EmbeddingResponse;
+  const json = parseEmbeddingResponse(responseText, statusCode);
   const usage = json.usage;
   const hasError = !json.model || statusCode >= 400;
 

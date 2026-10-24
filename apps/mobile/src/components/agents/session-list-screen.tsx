@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- The live list keeps its query, pull-refresh, keyboard container, and FAB orchestration together on one screen. */
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
-import { AppState, I18nManager, Pressable, View } from 'react-native';
+import { AppState, I18nManager, Keyboard, Pressable, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { RefreshControl } from '@/components/ui/refresh-control';
@@ -40,7 +40,7 @@ import { Button } from '@/components/ui/button';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { STATE_ACTION_CLASS, textActionTargetClass } from '@/lib/a11y/tap-target';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
@@ -55,10 +55,8 @@ import {
   useScrollToTop,
 } from 'expo-router';
 
-/** `segmentControl` renders under the header: the Agents tab's Sessions | To-dos switch. */
-export function AgentSessionListScreen({
-  segmentControl,
-}: Readonly<{ segmentControl?: ReactNode }> = {}) {
+/** `tabHeader` renders under the header: the account scope line and the Agents tab's Sessions | To-dos switch. */
+export function AgentSessionListScreen({ tabHeader }: Readonly<{ tabHeader?: ReactNode }> = {}) {
   const router = useRouter();
   const navigation = useNavigation();
   const { t } = useTranslation();
@@ -268,17 +266,22 @@ export function AgentSessionListScreen({
   // labeled by its destination (`viewHistoryAction`), while the header links to
   // the same route with its own destination copy (`historyLabel`) over a
   // non-empty live list.
+  //
+  // The label is one eyebrow line, so without a box of its own the control's
+  // frame would be that line — 14.7pt, far under the 44pt minimum a tap target
+  // needs. `textActionTargetClass()` is the frame, and the accessibility rect
+  // reports it, which `hitSlop` never does. The slop is gone with it: the box
+  // is the target, and the old 12pt vertical slop would reach into the New
+  // session button above the empty-state link, whose stack gap is 10.5pt.
   const historyControl = (label: string) => (
     <Pressable
       onPress={() => {
         router.push('/(app)/(tabs)/(2_agents)/history' as Href);
       }}
-      // left slop capped against the gap, right slop reaches 44pt wide
-      hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
       accessibilityRole="button"
       accessibilityLabel={label}
       testID="agents-view-history"
-      className="min-w-0 shrink justify-center active:opacity-70"
+      className={cn(textActionTargetClass(), 'min-w-0 shrink justify-center active:opacity-70')}
     >
       {/* An eyebrow-scale label, with the same LTR-only treatment: the
           letterspaced capitals break a cursive script's joins, so an RTL
@@ -303,6 +306,9 @@ export function AgentSessionListScreen({
         <SessionFilterButton
           activeCount={query.activeFilterCount}
           onPress={() => {
+            // The search field sits above this button; without the dismissal
+            // the keyboard stays up and covers the sheet’s Apply row.
+            Keyboard.dismiss();
             setShowFilterModal(true);
           }}
           testID="agents-open-filters"
@@ -553,7 +559,7 @@ export function AgentSessionListScreen({
           inlineActions={content === 'empty' ? undefined : headerActions}
           inlineActionsWidth={inlineActionsWidth}
         />
-        {segmentControl}
+        {tabHeader}
         {hasLiveRows || isSearching ? (
           <SessionListSearchHeader
             inputRef={query.searchInputRef}

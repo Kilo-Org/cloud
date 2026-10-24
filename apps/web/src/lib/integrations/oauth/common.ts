@@ -234,19 +234,26 @@ export async function handleStatefulPlatformOAuthConnect(
 
     return NextResponse.redirect(buildOAuthUrl(state));
   } catch (error) {
-    captureException(error, {
-      tags: {
-        endpoint: `${platform}/connect`,
-        source,
-      },
-      extra: {
-        organizationId,
-      },
-    });
+    const denialCode = organizationAccessDenialErrorCode(error);
+    if (!denialCode) {
+      captureException(error, {
+        tags: {
+          endpoint: `${platform}/connect`,
+          source,
+        },
+        extra: {
+          organizationId,
+        },
+      });
+    }
 
     return NextResponse.redirect(
       new URL(
-        buildIntegrationOAuthConnectErrorPath(platform, organizationId, 'oauth_init_failed'),
+        buildIntegrationOAuthConnectErrorPath(
+          platform,
+          organizationId,
+          denialCode ?? 'oauth_init_failed'
+        ),
         APP_URL
       )
     );

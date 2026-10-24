@@ -4,6 +4,7 @@ import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/pro
 
 export default {
   id: 'chutes-byok',
+  models_dev_id: 'chutes',
   base_url: 'https://llm.chutes.ai/v1',
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions'],

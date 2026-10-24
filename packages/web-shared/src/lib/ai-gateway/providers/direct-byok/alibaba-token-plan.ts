@@ -4,6 +4,7 @@ import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/pro
 
 export default {
   id: 'alibaba-token-plan',
+  models_dev_id: 'alibaba-token-plan',
   base_url: 'https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1',
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions'],

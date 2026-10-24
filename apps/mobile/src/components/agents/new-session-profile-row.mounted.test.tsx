@@ -206,7 +206,7 @@ describe('new-session environment feedback', () => {
       expect(title?.props.numberOfLines).toBe(1);
       expect(summary?.props.numberOfLines).toBe(2);
       for (const line of lines) {
-        expect(line.props.className).toContain('text-sm leading-5');
+        expect(line.props.className).toContain('text-sm leading-[1.25rem]');
         expect(line.props.children).not.toBe('');
       }
     }

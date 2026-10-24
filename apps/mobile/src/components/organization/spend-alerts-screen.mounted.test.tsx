@@ -724,7 +724,7 @@ describe('SpendAlertsScreen push agreement', () => {
 
     press(byType(renderer, 'Pressable')[0]);
 
-    expect(router.push).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/notifications');
+    expect(router.push).toHaveBeenCalledWith('/(app)/notifications');
   });
 
   it('points the push row at Notifications when the viewer has no device', async () => {

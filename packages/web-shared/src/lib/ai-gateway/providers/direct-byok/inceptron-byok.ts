@@ -4,6 +4,7 @@ import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/pro
 
 export default {
   id: 'inceptron-byok',
+  models_dev_id: 'inceptron',
   base_url: 'https://api.inceptron.io/v1',
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions'],

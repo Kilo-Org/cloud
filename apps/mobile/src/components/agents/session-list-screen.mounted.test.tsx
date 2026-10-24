@@ -178,6 +178,7 @@ vi.mock('react-native', () => ({
     },
   },
   Keyboard: {
+    dismiss: vi.fn(),
     addListener: (
       event: string,
       listener: (event: { endCoordinates: { height: number } }) => void
@@ -731,6 +732,30 @@ describe('AgentSessionListScreen live presentation', () => {
       nodes('Pressable').filter(node => node.props.accessibilityLabel === 'Session history')
     ).toHaveLength(0);
   });
+
+  it.each([
+    ['ios', 'min-h-[44px]'],
+    ['android', 'min-h-[48px]'],
+  ])(
+    'gives the history link its own %s touch-target frame in both placements',
+    async (os, frame) => {
+      // The link's only child is one eyebrow line, so its own rect used to be
+      // that line (14.7pt on device) and a control-size audit reads exactly
+      // that rect: `hitSlop` widens the touch region, never the rect. Both
+      // placements share the control, so both carry the same frame.
+      state.platform.OS = os;
+      await renderScreen();
+      expect(action('Session history').props.className).toContain(frame);
+      expect(action('Session history').props.hitSlop).toBeUndefined();
+
+      state.live.activeSessions = [row];
+      await renderScreen();
+      const headerLink = action(i18n.t('agents.sessionList.pastSessions'));
+      expect(headerLink.props.testID).toBe('agents-view-history');
+      expect(headerLink.props.className).toContain(frame);
+      expect(headerLink.props.hitSlop).toBeUndefined();
+    }
+  );
 
   it('uses shared scrolling and refresh while preserving the large-text creation action', async () => {
     state.topInset = 44;
@@ -1373,7 +1398,9 @@ describe('AgentSessionListScreen header and admission', () => {
     expect(header().props.eyebrow).toBe(i18n.t('agents.liveCount', { count: 1 }));
     expect(text()).not.toContain(organizationName);
     expect(
-      nodes('Pressable').filter(node => node.props.accessibilityHint === 'Select account')
+      nodes('Pressable').filter(
+        node => node.props.accessibilityHint === i18n.t('profile.selectAccount')
+      )
     ).toHaveLength(0);
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: true });
     expect(
@@ -1448,6 +1475,8 @@ describe('AgentSessionListScreen header and admission', () => {
     expect(actions.props.className).toContain('min-h-11');
     expect(actions.props.className).toContain('shrink');
     expect(header().props.headerRight).toBeUndefined();
+    // The account scope line is the tab's (rendered through `tabHeader`), not
+    // this screen's: the screen itself never draws an account control.
     expect(
       nodes('Pressable').filter(node => node.props.accessibilityHint === 'Select account')
     ).toHaveLength(0);
@@ -2369,7 +2398,7 @@ describe('Live list admission and lifecycle', () => {
       expect(nodes('Pressable').some(node => node.props.testID === 'agents-new-session-fab')).toBe(
         false
       );
-      expect(text()).not.toContain('Engineering');
+      expect(text()).not.toContain(row.title);
     }
     if (mode === 'membership paused') {
       expect(listSkeletons()).toHaveLength(8);

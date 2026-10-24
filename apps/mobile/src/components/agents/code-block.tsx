@@ -55,7 +55,7 @@ type CodeBlockProps = {
 /**
  * Mono sizing on every rendered code text: one per chunk of a fence.
  */
-const CODE_LINE_CLASSNAME = 'font-mono text-xs leading-4';
+const CODE_LINE_CLASSNAME = 'font-mono text-xs leading-[1rem]';
 
 /** `UITextView` with `className` mapped to `style`, like the built-in `Text`. */
 const SelectableCodeText = styled(UITextView, { className: 'style' });

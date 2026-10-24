@@ -65,9 +65,10 @@ type Props = {
   profileId: string;
   organizationId: string | undefined;
   agents: ProfileAgent[];
+  readOnly?: boolean;
 };
 
-export function ProfileAgentsTab({ profileId, organizationId, agents }: Props) {
+export function ProfileAgentsTab({ profileId, organizationId, agents, readOnly = false }: Props) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -88,6 +89,7 @@ export function ProfileAgentsTab({ profileId, organizationId, agents }: Props) {
             agent={agent}
             profileId={profileId}
             organizationId={organizationId}
+            readOnly={readOnly}
             onEdit={() => setEditingId(agent.id)}
           />
         )
@@ -100,14 +102,16 @@ export function ProfileAgentsTab({ profileId, organizationId, agents }: Props) {
           onDone={() => setIsAdding(false)}
         />
       ) : (
-        <Button
-          variant="outline"
-          className="h-11 w-full border-dashed"
-          onClick={() => setIsAdding(true)}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add agent
-        </Button>
+        !readOnly && (
+          <Button
+            variant="outline"
+            className="h-11 w-full border-dashed"
+            onClick={() => setIsAdding(true)}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add agent
+          </Button>
+        )
       )}
 
       {agents.length === 0 && !isAdding && (
@@ -121,11 +125,13 @@ function AgentRow({
   agent,
   profileId,
   organizationId,
+  readOnly = false,
   onEdit,
 }: {
   agent: ProfileAgent;
   profileId: string;
   organizationId: string | undefined;
+  readOnly?: boolean;
   onEdit: () => void;
 }) {
   const { deleteAgent } = useProfileMutations({ organizationId });
@@ -166,28 +172,32 @@ function AgentRow({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={onEdit} aria-label="Edit agent">
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
-          <InlineDeleteConfirmation
-            onDelete={async () => {
-              setDeleting(true);
-              try {
-                await deleteAgent.mutateAsync({
-                  profileId,
-                  organizationId,
-                  agentId: agent.id,
-                });
-                toast.success(`Agent "${agent.name}" deleted`);
-              } catch (error) {
-                console.error('Failed to delete agent:', error);
-                toast.error('Failed to delete agent');
-              } finally {
-                setDeleting(false);
-              }
-            }}
-            isLoading={deleting}
-          />
+          {!readOnly && (
+            <>
+              <Button variant="ghost" size="sm" onClick={onEdit} aria-label="Edit agent">
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+              <InlineDeleteConfirmation
+                onDelete={async () => {
+                  setDeleting(true);
+                  try {
+                    await deleteAgent.mutateAsync({
+                      profileId,
+                      organizationId,
+                      agentId: agent.id,
+                    });
+                    toast.success(`Agent "${agent.name}" deleted`);
+                  } catch (error) {
+                    console.error('Failed to delete agent:', error);
+                    toast.error('Failed to delete agent');
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+                isLoading={deleting}
+              />
+            </>
+          )}
         </div>
       </div>
     </div>

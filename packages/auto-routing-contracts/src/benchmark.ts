@@ -11,6 +11,7 @@ import {
 import { ReasoningEffortSchema } from './reasoning';
 import { TaxonomyRouteKeySchema } from './taxonomy';
 import { AutoRouterSchema, DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
+import { OwnerTypeSchema } from './owner';
 import {
   PolicySettingComputedMapSchema,
   PolicySettingOverridesSchema,
@@ -19,10 +20,6 @@ import {
 
 export { ReasoningEffortSchema } from './reasoning';
 export type { ReasoningEffort } from './reasoning';
-
-// Matches AutoRoutingModeOwnerTypeSchema in index.ts. Declared here (not
-// imported) to avoid a circular package-root dependency.
-const BenchmarkProfileOwnerTypeSchema = z.enum(['user', 'org']);
 
 export const BenchmarkKindSchema = z.enum(['classifier', 'decider']);
 export type BenchmarkKind = z.infer<typeof BenchmarkKindSchema>;
@@ -460,7 +457,7 @@ export type BenchmarkProfileEntryStatus = z.infer<typeof BenchmarkProfileEntrySt
 export const RegisterBenchmarkProfilesRequestSchema = z
   .object({
     router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
-    ownerType: BenchmarkProfileOwnerTypeSchema,
+    ownerType: OwnerTypeSchema,
     ownerId: z.string().trim().min(1),
     entries: EfficientModelPoolSchema,
     // Subset of `entries` the owner explicitly retries after a terminal failure.
@@ -487,7 +484,7 @@ export type RegisterBenchmarkProfilesRequest = z.input<
 >;
 
 export const SyncBenchmarkSubscriptionsRequestSchema = z.object({
-  ownerType: BenchmarkProfileOwnerTypeSchema,
+  ownerType: OwnerTypeSchema,
   ownerId: z.string().trim().min(1),
   entries: EfficientModelPoolSchema.nullable(),
   restorePrevious: z.boolean().optional(),
@@ -496,10 +493,15 @@ export type SyncBenchmarkSubscriptionsRequest = z.infer<
   typeof SyncBenchmarkSubscriptionsRequestSchema
 >;
 
-export const BenchmarkProfileStatusesRequestSchema = z
+/**
+ * Owner-scoped Efficient model pool request. Two endpoints take exactly this
+ * body — benchmark profile status and the custom routing table — and both names
+ * below stay exported so each call site keeps its own contract name.
+ */
+const OwnerScopedPoolRequestSchema = z
   .object({
     router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
-    ownerType: BenchmarkProfileOwnerTypeSchema.optional(),
+    ownerType: OwnerTypeSchema.optional(),
     ownerId: z.string().trim().min(1).optional(),
     entries: EfficientModelPoolSchema,
   })
@@ -512,6 +514,8 @@ export const BenchmarkProfileStatusesRequestSchema = z
       });
     }
   });
+
+export const BenchmarkProfileStatusesRequestSchema = OwnerScopedPoolRequestSchema;
 export type BenchmarkProfileStatusesRequest = z.input<typeof BenchmarkProfileStatusesRequestSchema>;
 
 export const BenchmarkProfileStatusesResponseSchema = z.object({
@@ -529,22 +533,7 @@ export const BenchmarkProfileQuotaErrorSchema = z.object({
 });
 export type BenchmarkProfileQuotaError = z.infer<typeof BenchmarkProfileQuotaErrorSchema>;
 
-export const CustomRoutingTableRequestSchema = z
-  .object({
-    router: AutoRouterSchema.default(DEFAULT_AUTO_ROUTER),
-    ownerType: BenchmarkProfileOwnerTypeSchema.optional(),
-    ownerId: z.string().trim().min(1).optional(),
-    entries: EfficientModelPoolSchema,
-  })
-  .superRefine((request, ctx) => {
-    if ((request.ownerType === undefined) !== (request.ownerId === undefined)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: [request.ownerType === undefined ? 'ownerType' : 'ownerId'],
-        message: 'ownerType and ownerId must be provided together',
-      });
-    }
-  });
+export const CustomRoutingTableRequestSchema = OwnerScopedPoolRequestSchema;
 export type CustomRoutingTableRequest = z.input<typeof CustomRoutingTableRequestSchema>;
 
 export const CustomRoutingTableResponseSchema = z.object({

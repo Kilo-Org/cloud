@@ -32,7 +32,11 @@ import {
   type BitbucketRepositoryAccess,
   type BitbucketReviewOwner,
 } from './bitbucket-authorization';
-import { FILE_LINES_MAX } from '@/lib/github-pr-review/dtos';
+import {
+  FILE_LINES_MAX,
+  FILE_READ_MAX_BYTES,
+  FILE_READ_TOO_LARGE_MESSAGE,
+} from '@/lib/github-pr-review/dtos';
 
 const BITBUCKET_API_ORIGIN = 'https://api.bitbucket.org';
 const BITBUCKET_PAGE_SIZE = 50;
@@ -193,6 +197,11 @@ const BitbucketPageSchema = z.object({
   next: z.string().nullable().optional(),
 });
 
+/** `GET /src/{ref}/{path}?format=meta` describes the file instead of returning it. */
+const BitbucketFileMetadataSchema = z.object({
+  size: z.number().nullable().optional(),
+});
+
 function mapPullRequestState(state: string): ProviderPrSummary['state'] {
   if (state === 'MERGED') return 'merged';
   if (state === 'OPEN') return 'open';
@@ -277,6 +286,8 @@ async function fetchBoundedText(
     method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
     body?: unknown;
     accept?: string;
+    /** Response byte limit for this request; the transport ceiling otherwise. */
+    maxBytes?: number;
   }
 ): Promise<string | null> {
   const method = request.method ?? 'GET';
@@ -327,16 +338,19 @@ async function fetchBoundedText(
           throw new BitbucketReviewError('retryable', 'Bitbucket returned an unexpected response.');
         }
         totalBytes += value.byteLength;
-        if (totalBytes > MAX_BITBUCKET_RESPONSE_BYTES) {
+        const maxBytes = request.maxBytes ?? MAX_BITBUCKET_RESPONSE_BYTES;
+        if (totalBytes > maxBytes) {
           try {
             await reader.cancel();
           } catch {
             // The bounded read remains failed if cancellation itself fails.
           }
-          throw new BitbucketReviewError(
-            'retryable',
-            'The Bitbucket response exceeded the size limit.'
-          );
+          throw request.maxBytes === undefined
+            ? new BitbucketReviewError(
+                'retryable',
+                'The Bitbucket response exceeded the size limit.'
+              )
+            : new BitbucketReviewError('too_large', FILE_READ_TOO_LARGE_MESSAGE);
         }
         chunks.push(value);
       }
@@ -364,6 +378,7 @@ async function requestBitbucketText(
     const text = await fetchBoundedText(`${BITBUCKET_API_ORIGIN}${path}`, {
       accessToken: access.accessToken,
       accept: '*/*',
+      maxBytes: FILE_READ_MAX_BYTES,
     });
     return text ?? '';
   } catch (error) {
@@ -630,6 +645,17 @@ export type BitbucketFileLines = {
 };
 
 /**
+ * A file above the shared read budget is a non-retryable too_large rejection.
+ * Both observations of the blob (the `format=meta` size and the delivered text)
+ * pass through here.
+ */
+function assertFileWithinReadBudget(size: number | null | undefined): void {
+  if (typeof size === 'number' && size > FILE_READ_MAX_BYTES) {
+    throw new BitbucketReviewError('too_large', FILE_READ_TOO_LARGE_MESSAGE);
+  }
+}
+
+/**
  * A 1-based inclusive line window of a file at a commit, for comment context.
  * A missing file is a non-retryable not_found.
  */
@@ -652,10 +678,23 @@ export async function getFileLines(
       throw new BitbucketReviewError('not_found', 'The file was not found at this commit.');
     }
     const encodedPath = cleanPath.split('/').map(encodeURIComponent).join('/');
-    const text = await requestBitbucketText(
-      access,
-      `/2.0/repositories/${repositorySegment(access.repository)}/src/${encodeURIComponent(ref)}/${encodedPath}`
-    );
+    const sourcePath = `/2.0/repositories/${repositorySegment(access.repository)}/src/${encodeURIComponent(ref)}/${encodedPath}`;
+    // The `format=meta` probe is best effort: it reports the file size before
+    // the body read, and when the provider cannot answer it the body read
+    // enforces the same ceiling, so a failed probe never fails a read that
+    // would otherwise succeed.
+    let probedSize: number | null | undefined;
+    try {
+      const metadata = BitbucketFileMetadataSchema.safeParse(
+        await requestBitbucketJson<unknown>(access, sourcePath, { query: { format: 'meta' } })
+      );
+      if (metadata.success) probedSize = metadata.data.size;
+    } catch {
+      probedSize = undefined;
+    }
+    assertFileWithinReadBudget(probedSize);
+    const text = await requestBitbucketText(access, sourcePath);
+    assertFileWithinReadBudget(Buffer.byteLength(text));
     const allLines = text.split('\n');
     const start = Math.max(1, Math.min(startLine, allLines.length));
     // Bound the window by the same shared cap the GitHub adapter applies, so

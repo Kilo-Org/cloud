@@ -5,7 +5,11 @@ import { PassThrough } from 'stream';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import type { Owner } from '@/lib/integrations/core/types';
 import { GitLabInstanceUrlError } from '@/lib/integrations/platforms/gitlab/instance-url';
-import { FILE_LINES_MAX } from '@/lib/github-pr-review/dtos';
+import {
+  FILE_LINES_MAX,
+  FILE_READ_MAX_BYTES,
+  FILE_READ_TOO_LARGE_MESSAGE,
+} from '@/lib/github-pr-review/dtos';
 import {
   getFileLines,
   getMergeRequest,
@@ -386,23 +390,32 @@ describe('listChangedFiles', () => {
 });
 
 describe('getFileLines', () => {
+  function serveFileBody(body: string) {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/repository/files/file.txt/raw')) {
+        return new Response(body, { status: 200, headers: { 'content-type': 'text/plain' } });
+      }
+      return jsonResponse([]);
+    });
+  }
+
   it('returns the 1-based inclusive slice with the total line count', async () => {
-    mockFetchGitLabRootTextFileAtRef.mockResolvedValue('a\nb\nc\nd\ne');
+    serveFileBody('a\nb\nc\nd\ne');
 
     const result = await getFileLines(OWNER, PROJECT_PATH, 'sha-head', 'file.txt', 2, 4);
 
     expect(result).toEqual({ lines: ['b', 'c', 'd'], totalLines: 5 });
-    expect(mockFetchGitLabRootTextFileAtRef).toHaveBeenCalledWith(
-      'glpat-mock-token',
-      PROJECT_PATH,
-      'file.txt',
-      'sha-head',
-      INSTANCE_URL
-    );
+    const requested = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(requested.pathname).toContain(encodeURIComponent(PROJECT_PATH));
+    expect(
+      requested.pathname.endsWith(`/repository/files/${encodeURIComponent('file.txt')}/raw`)
+    ).toBe(true);
+    expect(requested.searchParams.get('ref')).toBe('sha-head');
+    expect(mockFetchGitLabRootTextFileAtRef).not.toHaveBeenCalled();
   });
 
   it('refuses a missing file as non-retryable not_found', async () => {
-    mockFetchGitLabRootTextFileAtRef.mockResolvedValue(null);
+    fetchMock.mockImplementation(async () => new Response(null, { status: 404 }));
 
     await expect(
       getFileLines(OWNER, PROJECT_PATH, 'sha-head', 'gone.txt', 1, 5)
@@ -411,7 +424,7 @@ describe('getFileLines', () => {
 
   it('caps the returned window at the shared FILE_LINES_MAX', async () => {
     const content = Array.from({ length: 600 }, (_, index) => `line ${index + 1}`).join('\n');
-    mockFetchGitLabRootTextFileAtRef.mockResolvedValue(content);
+    serveFileBody(content);
 
     const result = await getFileLines(OWNER, PROJECT_PATH, 'sha-head', 'file.txt', 1, 600);
 
@@ -419,6 +432,65 @@ describe('getFileLines', () => {
     expect(result.lines).toHaveLength(FILE_LINES_MAX);
     expect(result.lines[0]).toBe('line 1');
     expect(result.lines.at(-1)).toBe(`line ${FILE_LINES_MAX}`);
+  });
+
+  it('reads the file body inside the byte budget', async () => {
+    // Three chunks of half the budget: the third one passes the budget, so the
+    // reader stops there and never pulls the remaining chunks.
+    let pulled = 0;
+    const chunk = 'x'.repeat(FILE_READ_MAX_BYTES / 2);
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (pulled >= 6) {
+          controller.close();
+          return;
+        }
+        pulled += 1;
+        controller.enqueue(new TextEncoder().encode(chunk));
+      },
+    });
+    fetchMock.mockImplementation(async () => new Response(stream, { status: 200 }));
+
+    const error = await captureRejection(
+      getFileLines(OWNER, PROJECT_PATH, 'sha-head', 'file.txt', 1, 2)
+    );
+
+    expect(error.kind).toBe('too_large');
+    expect(error.retryable).toBe(false);
+    expect(error.message).toBe(FILE_READ_TOO_LARGE_MESSAGE);
+    // The stream prefetches at most one chunk past the read that crosses the
+    // budget, so the body is abandoned well before its six chunks are pulled.
+    expect(pulled).toBeLessThan(6);
+  });
+
+  it('rejects a declared oversized body without reading it', async () => {
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          controller.enqueue(new Uint8Array(FILE_READ_MAX_BYTES + 1));
+        },
+        cancel() {
+          cancelled = true;
+        },
+      },
+      { highWaterMark: 0 }
+    );
+    fetchMock.mockImplementation(
+      async () =>
+        new Response(stream, {
+          status: 200,
+          headers: { 'content-length': String(FILE_READ_MAX_BYTES + 1) },
+        })
+    );
+
+    const error = await captureRejection(
+      getFileLines(OWNER, PROJECT_PATH, 'sha-head', 'file.txt', 1, 2)
+    );
+
+    expect(error.kind).toBe('too_large');
+    expect(error.message).toBe(FILE_READ_TOO_LARGE_MESSAGE);
+    expect(cancelled).toBe(true);
   });
 });
 
@@ -1080,6 +1152,19 @@ describe('request transport binds to the resolved address (no DNS rebinding)', (
       kind: 'retryable',
       retryable: true,
     });
+  });
+
+  it('stops a bound file read at the shared read budget', async () => {
+    mockBoundResponse({ status: 200, body: Buffer.alloc(FILE_READ_MAX_BYTES + 1, 0x61) });
+
+    const error = await captureRejection(
+      getFileLines(OWNER, PROJECT_PATH, 'sha-head', 'file.txt', 1, 2)
+    );
+
+    expect(error.kind).toBe('too_large');
+    expect(error.retryable).toBe(false);
+    expect(error.message).toBe(FILE_READ_TOO_LARGE_MESSAGE);
+    expect(mockHttpsRequest).toHaveBeenCalledTimes(1);
   });
 
   it('classifies a bound 404 as not_found without leaking the instance URL', async () => {

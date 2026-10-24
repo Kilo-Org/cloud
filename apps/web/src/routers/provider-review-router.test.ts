@@ -429,6 +429,30 @@ describe('providerReviewRouter inbox connection failures', () => {
 
 // ----- the shared operation ledger ------------------------------------------------
 
+describe('providerReviewRouter file line reads', () => {
+  const fileLines = { ref: 'abc123', path: 'src/app.ts', startLine: 1, endLine: 5 };
+
+  it('surfaces an oversized file as PAYLOAD_TOO_LARGE on the GitLab arm', async () => {
+    gitlabRead.getFileLines.mockRejectedValueOnce(
+      new GitLabReviewError('too_large', 'The file exceeds the review read limit.')
+    );
+
+    await expect(caller.getFileLines({ ...gitlabBase, ...fileLines })).rejects.toMatchObject({
+      code: 'PAYLOAD_TOO_LARGE',
+    });
+  });
+
+  it('surfaces an oversized file as PAYLOAD_TOO_LARGE on the Bitbucket arm', async () => {
+    bitbucketRead.getFileLines.mockRejectedValueOnce(
+      new BitbucketReviewError('too_large', 'The file exceeds the review read limit.')
+    );
+
+    await expect(caller.getFileLines({ ...bitbucketBase, ...fileLines })).rejects.toMatchObject({
+      code: 'PAYLOAD_TOO_LARGE',
+    });
+  });
+});
+
 describe('providerReviewRouter ledger', () => {
   it('admits provider writes into the shared pr domain with a provider-tagged resource key', async () => {
     await caller.addComment({

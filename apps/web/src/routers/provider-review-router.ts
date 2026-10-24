@@ -389,6 +389,10 @@ function toProviderTrpcError(error: unknown): TRPCError {
         return new TRPCError({ code: 'CONFLICT', message: error.message });
       case 'bad_request':
         return new TRPCError({ code: 'BAD_REQUEST', message: error.message });
+      case 'too_large':
+        // The file is outside the review read budget, so no retry helps; the
+        // distinct code lets the caller tell it from a malformed request.
+        return new TRPCError({ code: 'PAYLOAD_TOO_LARGE', message: error.message });
       case 'retryable':
         return new TRPCError({ code: 'BAD_GATEWAY', message: error.message });
     }

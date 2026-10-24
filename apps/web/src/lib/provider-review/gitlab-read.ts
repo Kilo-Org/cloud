@@ -26,7 +26,6 @@ import type {
 } from '@kilocode/app-shared/provider-review';
 import {
   fetchGitLabMergeRequest,
-  fetchGitLabRootTextFileAtRef,
   fetchGitLabUser,
   getMRHeadCommit,
   type GitLabDiscussion,
@@ -37,7 +36,11 @@ import {
   resolveGitLabUrlSafely,
   type GitLabResolvedUrl,
 } from '@/lib/integrations/platforms/gitlab/instance-url';
-import { FILE_LINES_MAX } from '@/lib/github-pr-review/dtos';
+import {
+  FILE_LINES_MAX,
+  FILE_READ_MAX_BYTES,
+  FILE_READ_TOO_LARGE_MESSAGE,
+} from '@/lib/github-pr-review/dtos';
 import {
   authorizeOwner,
   authorizeProject,
@@ -164,37 +167,55 @@ export async function requestGitLabJson<T>(
   }
 }
 
+type GitLabFetchInit = RequestInit & {
+  /**
+   * Response byte limit for this request. A file read passes the shared read
+   * budget here, so the bound transport stops as soon as the body passes it and
+   * answers `too_large`; otherwise the transport ceiling applies.
+   */
+  maxResponseBytes?: number;
+};
+
 /**
  * Resolve the URL once (refusing unsafe hosts), then send the request bound
  * to the resolved address. Only an IP literal or gitlab.com keeps the plain
  * transport — the same split the adapter's fetchGitLabOnce makes. Both
- * transports read the reply within MAX_GITLAB_RESPONSE_BYTES; the plain
- * transport returns it buffered within that limit.
+ * transports bound the body; the shared file-read budget is tighter when set.
  */
-async function fetchGitLabValidated(url: string, init: RequestInit): Promise<Response> {
+async function fetchGitLabValidated(url: string, init: GitLabFetchInit): Promise<Response> {
+  const { maxResponseBytes, ...requestInit } = init;
   const resolvedUrl = await resolveGitLabUrlSafely(url);
   if (!resolvedUrl.address) {
-    return readBoundedGitLabResponse(await fetch(url, { ...init, redirect: 'manual' }));
+    return readBoundedGitLabResponse(
+      await fetch(url, { ...requestInit, redirect: 'manual' }),
+      maxResponseBytes
+    );
   }
   return fetchGitLabBoundToAddress({ ...resolvedUrl, address: resolvedUrl.address }, init);
 }
 
 /**
- * Read the plain transport's reply within MAX_GITLAB_RESPONSE_BYTES, mirroring
- * fetchGitLabBoundToAddress: a declared length above the limit is answered
- * without reading the body, and the reply is otherwise returned buffered
- * within the limit.
+ * Read the plain transport's reply within the tighter request limit when
+ * present, otherwise within MAX_GITLAB_RESPONSE_BYTES.
  */
-async function readBoundedGitLabResponse(response: Response): Promise<Response> {
+async function readBoundedGitLabResponse(
+  response: Response,
+  maxResponseBytes?: number
+): Promise<Response> {
+  const limit = maxResponseBytes ?? MAX_GITLAB_RESPONSE_BYTES;
+  const tooLargeError =
+    maxResponseBytes === undefined
+      ? new Error(GITLAB_RESPONSE_TOO_LARGE_MESSAGE)
+      : new GitLabReviewError('too_large', FILE_READ_TOO_LARGE_MESSAGE);
   // Response rejects a body for these statuses, so they keep their own object.
   if (response.body === null || [204, 205, 304].includes(response.status)) {
     return response;
   }
 
   const declaredLength = Number(response.headers.get('content-length'));
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_GITLAB_RESPONSE_BYTES) {
+  if (Number.isFinite(declaredLength) && declaredLength > limit) {
     await response.body.cancel().catch(() => undefined);
-    throw new Error(GITLAB_RESPONSE_TOO_LARGE_MESSAGE);
+    throw tooLargeError;
   }
 
   const reader = response.body.getReader();
@@ -205,9 +226,9 @@ async function readBoundedGitLabResponse(response: Response): Promise<Response> 
       const { done, value } = await reader.read();
       if (done) break;
       responseBytes += value.byteLength;
-      if (responseBytes > MAX_GITLAB_RESPONSE_BYTES) {
+      if (responseBytes > limit) {
         await reader.cancel().catch(() => undefined);
-        throw new Error(GITLAB_RESPONSE_TOO_LARGE_MESSAGE);
+        throw tooLargeError;
       }
       chunks.push(value);
     }
@@ -236,7 +257,7 @@ async function readBoundedGitLabResponse(response: Response): Promise<Response> 
  */
 function fetchGitLabBoundToAddress(
   { url, address, family }: GitLabResolvedUrl & { address: string },
-  init: RequestInit
+  init: GitLabFetchInit
 ): Promise<Response> {
   const request = url.protocol === 'https:' ? https.request : http.request;
   const headers = new Headers(init.headers);
@@ -261,11 +282,15 @@ function fetchGitLabBoundToAddress(
       response => {
         const chunks: Buffer[] = [];
         let responseBytes = 0;
+        const maxResponseBytes = init.maxResponseBytes ?? MAX_GITLAB_RESPONSE_BYTES;
         response.on('data', chunk => {
           const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
           responseBytes += buffer.byteLength;
-          if (responseBytes > MAX_GITLAB_RESPONSE_BYTES) {
-            const error = new Error(GITLAB_RESPONSE_TOO_LARGE_MESSAGE);
+          if (responseBytes > maxResponseBytes) {
+            const error =
+              init.maxResponseBytes === undefined
+                ? new Error('GitLab response exceeded size limit')
+                : new GitLabReviewError('too_large', FILE_READ_TOO_LARGE_MESSAGE);
             response.destroy(error);
             req.destroy(error);
             reject(error);
@@ -545,6 +570,77 @@ export type GitLabFileLines = {
 };
 
 /**
+ * Read a response body with the shared byte budget as the hard limit: the
+ * stream is abandoned as soon as the budget is passed, and a file above the
+ * budget is a non-retryable too_large rejection.
+ */
+async function readBodyWithinReadBudget(response: Response): Promise<string> {
+  const reader = response.body?.getReader();
+  if (!reader) return '';
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      totalBytes += value.byteLength;
+      if (totalBytes > FILE_READ_MAX_BYTES) {
+        try {
+          await reader.cancel();
+        } catch {
+          // The rejection below stands even if cancellation itself fails.
+        }
+        throw new GitLabReviewError('too_large', FILE_READ_TOO_LARGE_MESSAGE);
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  if (totalBytes === 0) return '';
+  const merged = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(merged);
+}
+
+/**
+ * The raw body of one file at a ref, through the same guarded transport as the
+ * JSON reads, with the byte budget enforced while the body streams. A missing
+ * file is null.
+ */
+async function readFileTextWithinReadBudget(
+  access: { accessToken: string; instanceUrl: string },
+  projectPath: string,
+  filePath: string,
+  ref: string
+): Promise<string | null> {
+  const url = buildGitLabUrl(
+    access.instanceUrl,
+    `/api/v4/projects/${encodeURIComponent(projectPath)}/repository/files/${encodeURIComponent(filePath)}/raw`,
+    { ref }
+  );
+  const response = await fetchGitLabValidated(url, {
+    headers: { Authorization: `Bearer ${access.accessToken}` },
+    maxResponseBytes: FILE_READ_MAX_BYTES,
+    method: 'GET',
+    redirect: 'manual',
+    signal: AbortSignal.timeout(GITLAB_REQUEST_TIMEOUT_MS),
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new GitLabApiStatusError(
+      response.status,
+      `GitLab GET request failed: ${response.status}`
+    );
+  }
+  return readBodyWithinReadBudget(response);
+}
+
+/**
  * A 1-based inclusive line window of a file at a ref, for comment context.
  * A missing file is a non-retryable not_found.
  */
@@ -559,13 +655,7 @@ export async function getFileLines(
 ): Promise<GitLabFileLines> {
   const access = await authorizeProject(owner, projectPath, instanceHint);
   try {
-    const text = await fetchGitLabRootTextFileAtRef(
-      access.accessToken,
-      access.projectPath,
-      path,
-      ref,
-      access.instanceUrl
-    );
+    const text = await readFileTextWithinReadBudget(access, access.projectPath, path, ref);
     if (text === null) {
       throw new GitLabReviewError('not_found', 'The file was not found at this ref.');
     }

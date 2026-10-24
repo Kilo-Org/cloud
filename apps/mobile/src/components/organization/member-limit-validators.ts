@@ -1,5 +1,6 @@
 import { i18n } from '@/i18n';
 import { formatNumber, parseLocalizedNumber } from '@/lib/format';
+import { knownServerErrorMessage } from '@/lib/server-error-copy';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 const MAX_DAILY_LIMIT_USD = 2000;
@@ -40,10 +41,11 @@ export type SaveErrorCopy = Readonly<{
 
 /**
  * A save rejected by the input schema is a value outside the allowed range, so
- * it belongs on the field, with the sentence the field's own rule uses. Every
- * other failure — transport, permission, a member that is gone — gets the
- * settings line. The raw server message never reaches the UI: a schema
- * rejection carries a JSON array of zod issues, not a sentence.
+ * it belongs on the field, with the sentence the field's own rule uses. Another
+ * failure the app can name — a lapsed plan, a lost authority — gets its own
+ * line; everything else falls back to the settings line. The raw server message
+ * never reaches the UI: a schema rejection carries a JSON array of zod issues,
+ * not a sentence.
  */
 export function saveErrorCopy(error: unknown): SaveErrorCopy {
   if (readTrpcErrorField(error, 'code') === 'BAD_REQUEST') {
@@ -54,5 +56,8 @@ export function saveErrorCopy(error: unknown): SaveErrorCopy {
       }),
     };
   }
-  return { field: 'form', message: i18n.t('common.couldNotSaveSetting') };
+  return {
+    field: 'form',
+    message: knownServerErrorMessage(error) ?? i18n.t('common.couldNotSaveSetting'),
+  };
 }

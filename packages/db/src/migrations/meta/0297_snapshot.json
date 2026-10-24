@@ -1,5 +1,5 @@
 {
-  "id": "69ff7d93-64ec-4197-9f8e-2ef26a1c58f7",
+  "id": "f3abc364-273c-444a-824b-7db65a082252",
   "prevId": "2d61ccea-6389-4ab3-a6fd-492cc75f6550",
   "version": "7",
   "dialect": "postgresql",
@@ -5518,22 +5518,6 @@
           "method": "btree",
           "with": {}
         },
-        "idx_cloud_agent_code_reviews_started_at_effective": {
-          "name": "idx_cloud_agent_code_reviews_started_at_effective",
-          "columns": [
-            {
-              "expression": "COALESCE(\"started_at\", \"updated_at\", \"created_at\")",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"cloud_agent_code_reviews\".\"status\" NOT IN ('pending', 'queued') AND COALESCE(\"cloud_agent_code_reviews\".\"terminal_reason\", '') <> 'abandoned'",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
         "idx_cloud_agent_code_reviews_terminal_missing_completed_at": {
           "name": "idx_cloud_agent_code_reviews_terminal_missing_completed_at",
           "columns": [
@@ -6919,7 +6903,7 @@
         },
         "CHK_cloud_agent_webhook_triggers_cloud_agent_fields": {
           "name": "CHK_cloud_agent_webhook_triggers_cloud_agent_fields",
-          "value": "(\n        \"cloud_agent_webhook_triggers\".\"target_type\" != 'cloud_agent' OR\n        (\"cloud_agent_webhook_triggers\".\"github_repo\" IS NOT NULL AND \"cloud_agent_webhook_triggers\".\"profile_id\" IS NOT NULL)\n      )"
+          "value": "(\n        \"cloud_agent_webhook_triggers\".\"target_type\" != 'cloud_agent' OR\n        \"cloud_agent_webhook_triggers\".\"github_repo\" IS NOT NULL\n      )"
         },
         "CHK_cloud_agent_webhook_triggers_kiloclaw_fields": {
           "name": "CHK_cloud_agent_webhook_triggers_kiloclaw_fields",

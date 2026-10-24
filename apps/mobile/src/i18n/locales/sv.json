@@ -53,6 +53,7 @@
     "connected": "Ansluten",
     "couldNotLoadModels": "Det gick inte att läsa in modellerna.",
     "couldNotLoadRepositories": "Det gick inte att läsa in kodarkiven.",
+    "noRepositoriesFound": "Inga kodarkiv hittades",
     "critical": "Kritisk",
     "delete": "Ta bort",
     "deleted": "Borttagen",
@@ -87,6 +88,7 @@
     "connect": "Anslut",
     "connectBitbucket": "Anslut Bitbucket",
     "connectGitlab": "Anslut GitLab",
+    "connectProvider": "Anslut en leverantör",
     "contentTruncated": "Innehållet har kortats av",
     "copyLink": "Kopiera länk",
     "couldNotLoadOrganizations": "Det gick inte att läsa in organisationerna.",
@@ -145,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Ändringar"
+    "changes": "Ändringar",
+    "organizationTrialEnded": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. En organisationsägare kan uppdatera faktureringen på kilo.ai och sedan försöka igen."
   },
   "language": {
     "restarting": "Startar om för att byta språk",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Du kan behöva bevilja åtkomst till fler grupper eller projekt på GitLab.",
       "installGithubApp": "Installera GitHub-appen på kodarkiv",
       "installGithubAppDescription": "Ge Kilos GitHub-app åtkomst till de kodarkiv du vill få granskade.",
-      "noRepositoriesFound": "Inga kodarkiv hittades",
       "repositoryAccess": "åtkomst till kodarkiv"
     },
     "style": {
@@ -1489,7 +1491,6 @@
       "invalidUrl": "Ange en giltig URL till en pull-begäran",
       "couldNotCheckProviderStatus": "Kunde inte kontrollera leverantörens status",
       "couldNotLoadProviders": "Vi kunde inte läsa in dina anslutna leverantörer. Försök igen.",
-      "connectProvider": "Anslut en leverantör",
       "connectProviderDescription": "Anslut GitHub för att starta en manuell granskning av en pull-begäran.",
       "pullRequestUrl": "URL till pull-begäran",
       "instructions": "Instruktioner (valfritt)",
@@ -3168,7 +3169,9 @@
       "sendInvite": "Skicka inbjudan",
       "title": "Bjud in medlem",
       "alreadyInvited": "Personen är redan inbjuden eller redan medlem.",
-      "sendError": "Inbjudan kunde inte skickas."
+      "sendError": "Inbjudan kunde inte skickas.",
+      "pendingInvitation": "Den här e-postadressen har redan en väntande inbjudan.",
+      "alreadyMember": "Den här personen är redan medlem i den här organisationen."
     },
     "invoices": {
       "downloadA11y": "Ladda ner faktura {{number}}",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "Väntande inbjudningar",
       "resendInvite": "Skicka inbjudan igen",
       "shareInviteLink": "Dela inbjudningslänk",
-      "resendInviteError": "Inbjudan kunde inte skickas igen."
+      "resendInviteError": "Inbjudan kunde inte skickas igen.",
+      "inviteNotResendable": "Den här inbjudan kan inte längre skickas igen.",
+      "ownerAuthority": "Endast en organisationsägare kan hantera ägare.",
+      "ownRoleChange": "Du kan inte ändra din egen roll.",
+      "inviteExpired": "Den här inbjudan har gått ut.",
+      "inviteAccepted": "Den här inbjudan har redan accepterats."
     },
     "usageStats": {
       "inputTokens": "Inmatade token",

@@ -53,6 +53,7 @@
     "connected": "Қосылған",
     "couldNotLoadModels": "Модельдерді жүктеу мүмкін болмады.",
     "couldNotLoadRepositories": "Репозиторийлерді жүктеу мүмкін болмады.",
+    "noRepositoriesFound": "Репозиторийлер табылмады",
     "critical": "Өте жоғары",
     "delete": "Жою",
     "deleted": "Жойылды",
@@ -87,6 +88,7 @@
     "connect": "Қосу",
     "connectBitbucket": "Bitbucket-ті қосу",
     "connectGitlab": "GitLab-ты қосу",
+    "connectProvider": "Провайдерді қосу",
     "contentTruncated": "Мазмұн қысқартылды",
     "copyLink": "Сілтемені көшіру",
     "couldNotLoadOrganizations": "Ұйымдарды жүктеу мүмкін болмады.",
@@ -145,7 +147,8 @@
     "agent": "Агент",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Өзгерістер"
+    "changes": "Өзгерістер",
+    "organizationTrialEnded": "Ұйымның сынақ мерзімі аяқталды және оның белсенді жоспары жоқ. Ұйым иесі kilo.ai сайтында төлем ақпаратын жаңартып, содан кейін қайталап көре алады."
   },
   "language": {
     "restarting": "Тілді қолдану үшін қайта іске қосылуда",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "GitLab-та қосымша топтарға немесе жобаларға кіруге рұқсат беру қажет болуы мүмкін.",
       "installGithubApp": "GitHub қолданбасын репозиторийлерге орнатыңыз",
       "installGithubAppDescription": "GitHub-тағы Kilo қолданбасына тексерілетін репозиторийлерге кіруге рұқсат беріңіз.",
-      "noRepositoriesFound": "Репозиторийлер табылмады",
       "repositoryAccess": "репозиторийге кіру рұқсаты"
     },
     "style": {
@@ -1489,7 +1491,6 @@
       "invalidUrl": "Біріктіру сұрауының жарамды URL мекенжайын енгізіңіз.",
       "couldNotCheckProviderStatus": "Провайдердің күйін тексеру мүмкін болмады.",
       "couldNotLoadProviders": "Қосылған провайдерлерді жүктеу мүмкін болмады. Қайталап көріңіз.",
-      "connectProvider": "Провайдерді қосу",
       "connectProviderDescription": "Біріктіру сұрауын қолмен тексеруді бастау үшін GitHub-ты қосыңыз.",
       "pullRequestUrl": "Біріктіру сұрауының URL мекенжайы",
       "instructions": "Нұсқаулар (міндетті емес)",
@@ -3168,7 +3169,9 @@
       "sendInvite": "Шақыру жіберу",
       "title": "Мүшені шақыру",
       "alreadyInvited": "Бұл мекенжайға шақыру бұрын жіберілген немесе ол әлдеқашан ұйым мүшесі болып табылады.",
-      "sendError": "Шақыруды жіберу мүмкін болмады."
+      "sendError": "Шақыруды жіберу мүмкін болмады.",
+      "pendingInvitation": "Бұл электрондық пошта мекенжайына күтіп тұрған шақыру бар.",
+      "alreadyMember": "Бұл адам осы ұйымның мүшесі болып табылады."
     },
     "invoices": {
       "downloadA11y": "{{number}} шотын жүктеп алу",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "Жауап күтілген шақырулар",
       "resendInvite": "Шақыруды қайта жіберу",
       "shareInviteLink": "Шақыру сілтемесімен бөлісу",
-      "resendInviteError": "Шақыруды қайта жіберу мүмкін болмады."
+      "resendInviteError": "Шақыруды қайта жіберу мүмкін болмады.",
+      "inviteNotResendable": "Бұл шақыруды енді қайта жіберуге болмайды.",
+      "ownerAuthority": "Тек ұйым иесі ғана иелерді басқара алады.",
+      "ownRoleChange": "Өз рөліңізді өзгерте алмайсыз.",
+      "inviteExpired": "Бұл шақырудың мерзімі бітті.",
+      "inviteAccepted": "Бұл шақыру әлдеқашан қабылданған."
     },
     "usageStats": {
       "inputTokens": "Кіріс токендері",

@@ -53,6 +53,7 @@
     "connected": "Ühendatud",
     "couldNotLoadModels": "Mudeleid ei õnnestunud laadida.",
     "couldNotLoadRepositories": "Hoidlaid ei õnnestunud laadida.",
+    "noRepositoriesFound": "Hoidlaid ei leitud",
     "critical": "Kriitiline",
     "delete": "Kustuta",
     "deleted": "Kustutatud",
@@ -87,6 +88,7 @@
     "connect": "Ühenda",
     "connectBitbucket": "Ühenda Bitbucket",
     "connectGitlab": "Ühenda GitLab",
+    "connectProvider": "Teenusepakkuja ühendamine",
     "contentTruncated": "Sisu kärbitud",
     "copyLink": "Kopeeri link",
     "couldNotLoadOrganizations": "Organisatsioone ei õnnestunud laadida.",
@@ -145,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Muudatused"
+    "changes": "Muudatused",
+    "organizationTrialEnded": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Organisatsiooni omanik saab arveldust kilo.ai keskkonnas uuendada ja seejärel uuesti proovida."
   },
   "language": {
     "restarting": "Keele vahetamiseks taaskäivitatakse rakendus",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Võimalik, et pead GitLabis andma juurdepääsu veel mõnele rühmale või projektile.",
       "installGithubApp": "GitHubi rakenduse paigaldamine hoidlatele",
       "installGithubAppDescription": "Anna Kilo GitHubi rakendusele juurdepääs hoidlatele, mille koodi soovid üle vaadata.",
-      "noRepositoriesFound": "Hoidlaid ei leitud",
       "repositoryAccess": "juurdepääs hoidlatele"
     },
     "style": {
@@ -1489,7 +1491,6 @@
       "invalidUrl": "Sisesta kehtiv tõmbetaotluse URL.",
       "couldNotCheckProviderStatus": "Teenusepakkuja olekut ei õnnestunud kontrollida.",
       "couldNotLoadProviders": "Ühendatud teenusepakkujaid ei õnnestunud laadida. Proovi uuesti.",
-      "connectProvider": "Teenusepakkuja ühendamine",
       "connectProviderDescription": "Ühenda GitHub, et käivitada tõmbetaotluse ülevaatus käsitsi.",
       "pullRequestUrl": "Tõmbetaotluse URL",
       "instructions": "Juhised (valikulised)",
@@ -3168,7 +3169,9 @@
       "sendInvite": "Saada kutse",
       "title": "Kutsu liige",
       "alreadyInvited": "Ta on juba kutsutud või juba liige.",
-      "sendError": "Kutset ei õnnestunud saata."
+      "sendError": "Kutset ei õnnestunud saata.",
+      "pendingInvitation": "Sellele e-posti aadressile on juba saadetud kutse, mis on ootel.",
+      "alreadyMember": "See isik on juba selle organisatsiooni liige."
     },
     "invoices": {
       "downloadA11y": "Laadi alla arve {{number}}",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "Ootel kutsed",
       "resendInvite": "Saada kutse uuesti",
       "shareInviteLink": "Jaga kutselinki",
-      "resendInviteError": "Kutset ei õnnestunud uuesti saata."
+      "resendInviteError": "Kutset ei õnnestunud uuesti saata.",
+      "inviteNotResendable": "Seda kutset ei saa enam uuesti saata.",
+      "ownerAuthority": "Ainult organisatsiooni omanik saab omanikke hallata.",
+      "ownRoleChange": "Sa ei saa oma rolli muuta.",
+      "inviteExpired": "See kutse on aegunud.",
+      "inviteAccepted": "See kutse on juba vastu võetud."
     },
     "usageStats": {
       "inputTokens": "Sisendtokenid",

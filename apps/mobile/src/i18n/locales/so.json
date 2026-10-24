@@ -53,6 +53,7 @@
     "connected": "Ku xiran",
     "couldNotLoadModels": "Moodeellada lama soo rari karin.",
     "couldNotLoadRepositories": "Kaydadka lama soo rari karin.",
+    "noRepositoriesFound": "Ma jiraan kaydad la helay",
     "critical": "Halis daran",
     "delete": "Tirtir",
     "deleted": "La tirtiray",
@@ -87,6 +88,7 @@
     "connect": "Ku xir",
     "connectBitbucket": "Ku xir Bitbucket",
     "connectGitlab": "Ku xir GitLab",
+    "connectProvider": "Ku xidh bixiye",
     "contentTruncated": "Nuxurka waa la gaabiyay",
     "copyLink": "Nuqul ka samee xiriiriyaha",
     "couldNotLoadOrganizations": "Ururrada lama soo rari karin.",
@@ -145,7 +147,8 @@
     "agent": "Wakiil",
     "durationMinuteShort": "daq",
     "durationHourShort": "saac",
-    "changes": "Isbeddellada"
+    "changes": "Isbeddellada",
+    "organizationTrialEnded": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Milkiilaha ururku wuxuu cusboonaysiin karaa biilasha kilo.ai, ka dibna isku day mar kale."
   },
   "language": {
     "restarting": "Dib ayaa loo bilaabayaa si luqadda loo adeegsado",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Waxaa laga yaabaa inaad u baahato inaad oggolaato gelitaanka kooxo ama mashaariic dheeraad ah oo ku jira GitLab.",
       "installGithubApp": "Abka GitHub ku rakib kaydadka",
       "installGithubAppDescription": "U oggolow abka Kilo ee GitHub inuu galo kaydadka aad rabto in dib loo eego.",
-      "noRepositoriesFound": "Ma jiraan kaydad la helay",
       "repositoryAccess": "oggolaanshaha gelitaanka kaydka"
     },
     "style": {
@@ -1489,7 +1491,6 @@
       "invalidUrl": "Geli URL ansax ah oo codsi isku dar ah.",
       "couldNotCheckProviderStatus": "Xaaladda bixiyaha lama hubin karin.",
       "couldNotLoadProviders": "Bixiyeyaashaaga ku xiran lama soo dejin karin. Fadlan mar kale isku day.",
-      "connectProvider": "Ku xidh bixiye",
       "connectProviderDescription": "Ku xidh GitHub si aad adigu u bilowdo dib-u-eegista codsi isku dar ah.",
       "pullRequestUrl": "URL-ka codsiga isku darka",
       "instructions": "Tilmaamo (ikhtiyaari)",
@@ -3168,7 +3169,9 @@
       "sendInvite": "Dir casuumaad",
       "title": "Casuum xubin",
       "alreadyInvited": "Isaga ama iyadu horeba waa la casuumay ama horeba waa xubin.",
-      "sendError": "Casuumaadda lama diri karin."
+      "sendError": "Casuumaadda lama diri karin.",
+      "pendingInvitation": "Iimaylkani horeyba wuxuu leeyahay casuumaad sugaysa.",
+      "alreadyMember": "Qofkani horeyba waa xubin ka mid ah ururkan."
     },
     "invoices": {
       "downloadA11y": "Soo deji qaansheegta {{number}}",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "Casuumaadaha sugaya",
       "resendInvite": "Dib u dir casuumaadda",
       "shareInviteLink": "Wadaag xiriiriyaha casuumaadda",
-      "resendInviteError": "Casuumaadda dib lama diri karin."
+      "resendInviteError": "Casuumaadda dib lama diri karin.",
+      "inviteNotResendable": "Casuumaaddan mar dambe dib looma diri karo.",
+      "ownerAuthority": "Kaliya milkiilaha ururka ayaa maamuli kara milkiilayaasha.",
+      "ownRoleChange": "Ma beddeli kartid doorkaaga.",
+      "inviteExpired": "Casuumaaddan waqtigeedii wuu dhammaaday.",
+      "inviteAccepted": "Casuumaaddan mar hore ayaa la aqbalay."
     },
     "usageStats": {
       "inputTokens": "Halbeegyada qoraalka la geliyay",

@@ -53,6 +53,7 @@
     "connected": "Gekoppeld",
     "couldNotLoadModels": "De modellen konden niet worden geladen.",
     "couldNotLoadRepositories": "De coderepository's konden niet worden geladen.",
+    "noRepositoriesFound": "Geen repositories gevonden",
     "critical": "Kritiek",
     "delete": "Verwijderen",
     "deleted": "Verwijderd",
@@ -87,6 +88,7 @@
     "connect": "Koppelen",
     "connectBitbucket": "Bitbucket koppelen",
     "connectGitlab": "GitLab koppelen",
+    "connectProvider": "Platform koppelen",
     "contentTruncated": "Inhoud ingekort",
     "copyLink": "Link kopiëren",
     "couldNotLoadOrganizations": "De organisaties konden niet worden geladen.",
@@ -145,7 +147,8 @@
     "agent": "Tussenpersoon",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Wijzigingen"
+    "changes": "Wijzigingen",
+    "organizationTrialEnded": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Een eigenaar van de organisatie kan de facturering bijwerken op kilo.ai en het daarna opnieuw proberen."
   },
   "language": {
     "restarting": "Opnieuw starten om de taal in te stellen",
@@ -883,7 +886,6 @@
       "gitlabNoRepositoriesDescription": "Je moet mogelijk toegang verlenen tot meer groepen of projecten op GitLab.",
       "installGithubApp": "Installeer de GitHub-app op repositories",
       "installGithubAppDescription": "Geef de Kilo GitHub-app toegang tot de repositories die je wilt laten beoordelen.",
-      "noRepositoriesFound": "Geen repositories gevonden",
       "repositoryAccess": "toegang tot repositories"
     },
     "style": {
@@ -907,7 +909,6 @@
     "followReviewMd": "REVIEW.md volgen",
     "followReviewMdSubtitle": "Volg de REVIEW.md-instructiebestanden per repository",
     "manualReview": {
-      "connectProvider": "Platform koppelen",
       "connectProviderDescription": "Koppel GitHub om een handmatige review van een PR te starten.",
       "couldNotCheckProviderStatus": "De platformstatus kon niet worden gecontroleerd.",
       "couldNotLoadProviders": "Je gekoppelde platformen konden niet worden geladen. Probeer het opnieuw.",
@@ -3167,7 +3168,9 @@
       "sendInvite": "Uitnodiging verzenden",
       "title": "Lid uitnodigen",
       "alreadyInvited": "Dit e-mailadres is al uitgenodigd of is al lid.",
-      "sendError": "De uitnodiging kon niet worden verzonden."
+      "sendError": "De uitnodiging kon niet worden verzonden.",
+      "pendingInvitation": "Dit e-mailadres heeft al een openstaande uitnodiging.",
+      "alreadyMember": "Deze persoon is al lid van deze organisatie."
     },
     "invoices": {
       "downloadA11y": "Factuur {{number}} downloaden",
@@ -3237,7 +3240,12 @@
       "pendingInvitations": "Openstaande uitnodigingen",
       "resendInvite": "Uitnodiging opnieuw verzenden",
       "shareInviteLink": "Uitnodigingslink delen",
-      "resendInviteError": "De uitnodiging kon niet opnieuw worden verzonden."
+      "resendInviteError": "De uitnodiging kon niet opnieuw worden verzonden.",
+      "inviteNotResendable": "Deze uitnodiging kan niet meer opnieuw worden verzonden.",
+      "ownerAuthority": "Alleen een organisatie-eigenaar kan eigenaren beheren.",
+      "ownRoleChange": "Je kunt je eigen rol niet wijzigen.",
+      "inviteExpired": "Deze uitnodiging is verlopen.",
+      "inviteAccepted": "Deze uitnodiging is al geaccepteerd."
     },
     "usageStats": {
       "inputTokens": "Invoertokens",

@@ -68,6 +68,43 @@ export const COMPACT_CONTROL_BOX_CLASS = 'h-[32px] w-[32px] items-center justify
 export const COMPACT_CONTROL_HIT_SLOP_DP = 8;
 
 /**
+ * The box a clear control inside a search field renders. Explicit whole pixels,
+ * because the size audit measures this node: the 16pt glyph inside it measured
+ * 16dp and the audit reported the control as untappable. 38pt matches the
+ * sibling search fields (`model-catalog-search.tsx`,
+ * `session-list-search-header.tsx`) and stays under the shared `Input`'s 44pt
+ * `min-h`, so revealing the control never grows the field row.
+ */
+export const SEARCH_FIELD_CLEAR_BOX_CLASS = 'h-[38px] w-[38px] items-center justify-center';
+
+/**
+ * Per-side `hitSlop` of an in-field clear control on the side that faces the
+ * input: the search row's `gap-2`, which is 7pt, not 8, because NativeWind v5
+ * fixes 1rem at 14pt. A full {@link COMPACT_CONTROL_HIT_SLOP_DP} there would
+ * reach into the input's own tap area, so the facing side stops at the gap
+ * while the outer side keeps 8. Across: 38 + 7 + 8 = 53pt. Down: 38 + 8 + 8 =
+ * 54pt. Both carry past `DESIGN.md:364`'s {@link TOUCH_TARGET_DP} rather than
+ * onto it, for the same whole-pixel reason as {@link COMPACT_CONTROL_HIT_SLOP_DP}.
+ */
+export const SEARCH_FIELD_CLEAR_FACING_HIT_SLOP_DP = 7;
+
+/**
+ * The per-side `hitSlop` of the clear control at the end of a search field's
+ * row. The control sits at the field's logical end, so the side facing the
+ * input is the logical start; `hitSlop` is physical and a flex-row mirrors in
+ * RTL, so that capped side is the left edge in LTR and the right edge in RTL.
+ */
+export function searchFieldClearHitSlop() {
+  const facingIsLeft = !I18nManager.isRTL;
+  return {
+    top: COMPACT_CONTROL_HIT_SLOP_DP,
+    bottom: COMPACT_CONTROL_HIT_SLOP_DP,
+    left: facingIsLeft ? SEARCH_FIELD_CLEAR_FACING_HIT_SLOP_DP : COMPACT_CONTROL_HIT_SLOP_DP,
+    right: facingIsLeft ? COMPACT_CONTROL_HIT_SLOP_DP : SEARCH_FIELD_CLEAR_FACING_HIT_SLOP_DP,
+  };
+}
+
+/**
  * The frame a compact `h-11` control renders, in pt. NativeWind's rem is 14pt
  * here, so `h-11` (2.75rem) measures 38.5pt on device: above the
  * {@link MIN_TAP_TARGET_DP} floor a control-size audit accepts, and

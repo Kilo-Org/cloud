@@ -6,21 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { Input } from '@/components/ui/input';
-import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
+import { SEARCH_FIELD_CLEAR_BOX_CLASS, searchFieldClearHitSlop } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-
-// The row's `gap-2` compiles to 7pt, not 8pt: NativeWind v5 fixes 1rem at
-// 14pt. The clear control's left slop is capped at that gap, so its touch
-// region meets the input's instead of covering it — the same cap
-// `session-list-header-actions.tsx` applies to the two header controls facing
-// each other. 38 + 8 + 7 = 53pt across and 38 + 8 + 8 = 54pt down both clear
-// the 44pt target.
-const CLEAR_HIT_SLOP = {
-  top: COMPACT_CONTROL_HIT_SLOP_DP,
-  bottom: COMPACT_CONTROL_HIT_SLOP_DP,
-  right: COMPACT_CONTROL_HIT_SLOP_DP,
-  left: 7,
-};
 
 type SessionListSearchHeaderProps = {
   inputRef: RefObject<TextInput | null>;
@@ -123,16 +110,17 @@ export function SessionListSearchHeader({
             accessibilityRole="button"
             // The frame, not the 16pt glyph, is what the size audit measures.
             // One size, spelled as whole pixels the mounted test compiles: the
-            // 38pt box clears the 28dp floor, and the shared 8pt slop carries the
+            // shared 38pt box clears the 28dp floor, and its slop carries the
             // reach past the 44pt target rather than onto it, because
             // `@/lib/a11y/tap-target` records a 44dp target measuring 43.81dp at
             // density 420. The row's `min-h-[51px]` already holds this box plus
             // the field's 10.5pt padding and 2pt border. A second `h-*`/`w-*`
             // pair here would set the same properties and leave the real size to
-            // Tailwind's emit order. `-mr-2` keeps the glyph near its old inset
-            // and the frame's left edge inside the field's right padding.
-            hitSlop={CLEAR_HIT_SLOP}
-            className="-mr-2 h-[38px] w-[38px] items-center justify-center active:opacity-70"
+            // Tailwind's emit order. The shared slop caps the side facing the
+            // input at the row's `gap-2` in either writing direction, and
+            // `-me-2` keeps the glyph near its old inset in both.
+            hitSlop={searchFieldClearHitSlop()}
+            className={`${SEARCH_FIELD_CLEAR_BOX_CLASS} -me-2 active:opacity-70`}
           >
             <X size={16} color={colors.mutedForeground} />
           </Pressable>

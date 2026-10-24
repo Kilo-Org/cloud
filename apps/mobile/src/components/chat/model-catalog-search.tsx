@@ -75,7 +75,7 @@ export function ModelSearchField({ search }: Readonly<{ search: ModelSearch }>) 
           accessibilityLabel={t('common.clearSearch')}
           accessibilityRole="button"
           hitSlop={COMPACT_CONTROL_HIT_SLOP_DP}
-          className="-mr-2 h-[38px] w-[38px] items-center justify-center active:opacity-70"
+          className="-me-2 h-[38px] w-[38px] items-center justify-center active:opacity-70"
         >
           <X size={16} color={colors.mutedForeground} />
         </Pressable>

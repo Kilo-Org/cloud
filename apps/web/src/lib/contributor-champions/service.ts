@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { fetchWithBackoff } from '@kilocode/web-shared/lib/fetchWithBackoff';
 import {
   CONTRIBUTOR_CHAMPION_TEAM_EMAILS,
@@ -16,7 +16,7 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq, gte, isNotNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
-import { grantCreditForCategory, type DbOrTx } from '@kilocode/web-shared/lib/promotionalCredits';
+import { grantCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { captureException } from '@sentry/nextjs';
@@ -102,7 +102,7 @@ function computeWindowGrant(input: {
 }
 
 async function readContributorMembershipCreditState(
-  tx: DbOrTx,
+  tx: DrizzleTransaction,
   contributorId: string
 ): Promise<ContributorMembershipCreditState | null> {
   // Lock the membership row, not just the contributor row: refreshContributorChampionCredits
@@ -132,7 +132,7 @@ async function readContributorMembershipCreditState(
 }
 
 async function grantContributorChampionCredit(
-  tx: DbOrTx,
+  tx: DrizzleTransaction,
   input: {
     contributorId: string;
     linkedKiloUserId: string | null;

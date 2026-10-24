@@ -112,14 +112,26 @@ type Chat = {
    * at zero too.
    */
   counted: ReadonlyMap<string, ModelUsage>;
+  /**
+   * Set while the chat is being let go: it has left the live ones and its scope
+   * is closing. Nothing asks it anything more, and an answer that is still
+   * settling drops what was queued instead of opening a round on it.
+   */
+  closing: boolean;
   readonly chatScope: string;
   readonly org: ChatOrg;
 };
 
 const chats = new Map<string, Chat>();
 
-/** One open at a time per chat, so entering a screen twice opens one session. */
-const opening = new Map<string, Promise<void>>();
+/**
+ * One operation at a time per chat: opening one, and letting one go.
+ *
+ * A screen entering twice opens one session, and a chat that is closing has
+ * finished closing before the same id is opened again — which is what keeps a
+ * close from writing over the chat that replaced it.
+ */
+const pending = new Map<string, Promise<void>>();
 
 /**
  * One runtime per scope, because whose credit pays is part of the wiring and a
@@ -263,6 +275,7 @@ export async function startChat(
     waiting: [],
     pendingTools: undefined,
     counted: new Map(),
+    closing: false,
     ...place,
   });
   change(handle.id, {
@@ -294,39 +307,70 @@ export async function enterChat(place: ChatPlace, sessionId: string): Promise<vo
     await enterChat(place, followed);
     return;
   }
-  const already = opening.get(sessionId);
-  if (already !== undefined) {
-    await already;
-  }
+  await oneAtATime(sessionId, () => openIn(place, sessionId));
+}
+
+/**
+ * Runs one operation on a chat after the one before it, and never two at once.
+ *
+ * An open that ran beside a close would install a session the close then writes
+ * the old state over: the closing chat has already left the live ones, so the
+ * open reads none, opens one, and the close that lands afterwards forgets its
+ * state and settles it unavailable — a live chat saying it is not here. Queued,
+ * the open reads the live ones only after the close is done, which is the only
+ * moment its answer is final.
+ */
+function oneAtATime(sessionId: string, work: () => Promise<void>): Promise<void> {
+  const previous = pending.get(sessionId);
+  /* The next operation waits on this one's turn rather than on its result: an
+     operation that failed is over either way, and whoever waits on the turn
+     instead of calling — a question typed while a screen opens — is not its
+     caller and must not be left holding its failure. */
+  const turn = Promise.withResolvers<undefined>();
+  pending.set(sessionId, turn.promise);
+  const done = (async () => {
+    await previous;
+    try {
+      await work();
+    } finally {
+      if (pending.get(sessionId) === turn.promise) {
+        pending.delete(sessionId);
+      }
+      turn.resolve(undefined);
+    }
+  })();
+  return done;
+}
+
+/**
+ * Opens a chat in a place, or settles one that place may not read.
+ *
+ * The live chats are read when it is this chat's turn rather than when the
+ * screen asked, so a chat another place opened, or the one this place let go,
+ * has finished changing before this decides.
+ */
+async function openIn(place: ChatPlace, sessionId: string): Promise<void> {
   const held = chats.get(sessionId);
   if (held !== undefined) {
-    /* Reading after the open above rather than before it, so a chat another
-       place opened while this one waited is read too. */
     if (held.chatScope === place.chatScope) {
       return;
     }
     await settleUnavailable(sessionId);
     return;
   }
-  const work = (async () => {
-    try {
-      await reopen(place, sessionId);
-    } catch (error) {
-      /* Opening the store, the session, or its history can fail. The chat is
-         not left saying it is opening with the rejection swallowing it: it
-         settles idle with the reason, so entering it again is possible rather
-         than a screen that spins forever. */
-      change(sessionId, {
-        status: 'idle',
-        failed: openReason(error),
-        failureKey: backendFailureKey(error),
-      });
-    } finally {
-      opening.delete(sessionId);
-    }
-  })();
-  opening.set(sessionId, work);
-  await work;
+  try {
+    await reopen(place, sessionId);
+  } catch (error) {
+    /* Opening the store, the session, or its history can fail. The chat is not
+       left saying it is opening with the rejection swallowing it: it settles
+       idle with the reason, so entering it again is possible rather than a
+       screen that spins forever. */
+    change(sessionId, {
+      status: 'idle',
+      failed: openReason(error),
+      failureKey: backendFailureKey(error),
+    });
+  }
 }
 
 /**
@@ -352,6 +396,12 @@ async function settleUnavailable(sessionId: string): Promise<void> {
          longer reachable from here. The state below is what the screen draws
          either way. */
     }
+  }
+  /* A move can take the conversation onto another session while that close
+     runs, and that session is live and belongs to whoever moved it. This
+     settles an id nothing holds, so it does not blank one that does. */
+  if (snapshotOf(sessionId).sessionId !== sessionId) {
+    return;
   }
   change(sessionId, {
     status: 'idle',
@@ -457,6 +507,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       waiting: [],
       pendingTools: undefined,
       counted: new Map(),
+      closing: false,
       ...place,
     });
     change(sessionId, {
@@ -503,7 +554,7 @@ export async function say(
     /* A person can type before the session has finished opening, and a
        question asked of a chat that is not there yet used to vanish with the
        composer reporting success. It waits for the open instead. */
-    await opening.get(current);
+    await pending.get(current);
     const held = chats.get(current);
     if (held?.answering !== undefined) {
       /* A session answers one question at a time, and the composer stays open
@@ -764,6 +815,14 @@ async function settle(
  * so only a question whose answer landed is asked here.
  */
 async function drain(sessionId: string, chat: Chat, failed: boolean): Promise<void> {
+  /* The chat was let go while it was still answering: it has left the live
+     ones and its scope is closing. There is nothing left to move or to ask, and
+     asking would wait on that close from inside the answer it is interrupting. */
+  if (chat.closing) {
+    chat.pendingTools = undefined;
+    chat.waiting.length = 0;
+    return;
+  }
   let current = sessionId;
   if (chat.pendingTools !== undefined) {
     chat.pendingTools = undefined;
@@ -867,9 +926,10 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
           waiting: [],
           pendingTools: undefined,
           counted: new Map(),
+          closing: false,
           ...place,
         }
-      : { ...chat, handle, scope, answering: undefined, counted: new Map() }
+      : { ...chat, handle, scope, answering: undefined, counted: new Map(), closing: false }
   );
   /* The record describes the session the chat is now, and the move changed its
      effort: carrying the one it moved off would make the details sheet report
@@ -1174,8 +1234,13 @@ async function halt(sessionId: string, chat: Chat): Promise<boolean> {
  * the store writes the conversation as the scope closes, and a database that is
  * full or already shut refuses. Whatever is left of the attempt is then not
  * something the registry answers with.
+ *
+ * Every caller runs this as the chat's one operation at a time, so an open
+ * queued behind it installs its session after this has finished rather than
+ * under a close that would then forget it.
  */
 async function endChat(sessionId: string, chat: Chat): Promise<void> {
+  chat.closing = true;
   chats.delete(sessionId);
   await halt(sessionId, chat);
   /* Whatever was still waiting goes with the chat. Asking it now would open a
@@ -1196,14 +1261,16 @@ async function endChat(sessionId: string, chat: Chat): Promise<void> {
  */
 export async function releaseChat(sessionId: string): Promise<void> {
   const current = snapshotOf(sessionId).sessionId;
-  const chat = chats.get(current);
-  if (chat === undefined) {
-    /* Deleting a chat that was never opened still has a state subscribed by the
-       row that was tapped, so it is forgotten here too. */
-    forgetState(current);
-    return;
-  }
-  await endChat(current, chat);
+  await oneAtATime(current, async () => {
+    const chat = chats.get(current);
+    if (chat === undefined) {
+      /* Deleting a chat that was never opened still has a state subscribed by
+         the row that was tapped, so it is forgotten here too. */
+      forgetState(current);
+      return;
+    }
+    await endChat(current, chat);
+  });
 }
 
 /** Ends every chat, which is what signing out does before the wipe. */

@@ -105,6 +105,11 @@ const recordFailure = vi.hoisted(() => ({ next: false }));
 let continuesWith: readonly string[] = [];
 /** Every session whose scope was closed, so a leaked one can be told from one released. */
 const released: string[] = [];
+/**
+ * Holds a scope's close open, so a test can open the same chat again while the
+ * close still runs, which is the moment the ordering is about.
+ */
+let closing: Promise<void> | undefined = undefined;
 
 /**
  * The Kilo MCP connection, faked the way the plugin is: what is under test is
@@ -210,7 +215,8 @@ const handleFor = (id: string) => {
 /** Opens a session that is released when the scope holding it closes. */
 const openInScope = (id: string) =>
   Effect.acquireRelease(Effect.succeed(handleFor(id)), () =>
-    Effect.sync(() => {
+    Effect.promise(async () => {
+      await closing;
       released.push(id);
     })
   );
@@ -486,6 +492,7 @@ beforeEach(async () => {
   }
   asked.length = 0;
   released.length = 0;
+  closing = undefined;
   finish = undefined;
   emitEvent = undefined;
   storedHistory = undefined;
@@ -1118,6 +1125,80 @@ describe('opening a chat where it was recorded', () => {
 
     expect(continued).toContain(opened);
     expect(snapshotOf(opened)).toMatchObject({ status: 'idle', turns: [TURN], failureKey: null });
+  });
+
+  it('finishes a close before reopening the chat from its own place', async () => {
+    /* The chat this run starts has no scope of its own to close, so it is let
+       go and opened from the store first: the one that continues is the chat
+       whose close a test can hold open. */
+    await releaseChat(opened);
+    await enterChat(place, opened);
+    continued = [];
+    released.length = 0;
+
+    const gate = Promise.withResolvers<undefined>();
+    closing = gate.promise;
+
+    const foreign = enterChat(otherAccount, opened);
+    await settled();
+    expect(released).not.toContain(opened);
+
+    const reopening = enterChat(place, opened);
+    await settled();
+    expect(continued).not.toContain(opened);
+
+    gate.resolve(undefined);
+    await Promise.all([foreign, reopening]);
+    await settled();
+
+    expect(released).toContain(opened);
+    expect(continued).toContain(opened);
+    expect(snapshotOf(opened)).toMatchObject({ status: 'idle', turns: [TURN], failureKey: null });
+  });
+
+  it('leaves a chat a tool retry moved while the chat was being let go', async () => {
+    /* The retry reads the chat, then waits on the server. The chat is let go
+       from another place in that wait, and the retry lands on the session it
+       moved onto after the chat has left the live ones. */
+    /* The chat this run starts carries no scope of its own, so it is opened
+       from the store first: the one that continues is the chat whose close a
+       test can hold open. */
+    await releaseChat(opened);
+    await enterChat(place, opened);
+    continued = [];
+    released.length = 0;
+
+    mcp.tools.push({ definition: { name: 'mcp_kilo_read-file' } });
+    const server = Promise.withResolvers<undefined>();
+    mcp.ensure.mockImplementationOnce(async () => {
+      await server.promise;
+      return { status: 'ready' as const, tools: mcp.tools };
+    });
+    const retrying = retryKiloMcp(opened);
+    await settled();
+
+    const gate = Promise.withResolvers<undefined>();
+    closing = gate.promise;
+    const foreign = enterChat(otherAccount, opened);
+    await settled();
+
+    server.resolve(undefined);
+    await settled();
+    const carried = snapshotOf(opened).sessionId;
+    expect(carried).toBe('s2');
+
+    gate.resolve(undefined);
+    await Promise.all([foreign, retrying]);
+    await settled();
+
+    /* The let-go id settles for itself and says nothing about the chat that
+       carried on: that one is live, and it keeps its transcript. */
+    expect(snapshotOf(carried)).toMatchObject({
+      status: 'idle',
+      turns: [TURN],
+      failureKey: null,
+    });
+    await releaseChat(carried);
   });
 
   it('keeps an organization’s chat out of the personal place', async () => {

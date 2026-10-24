@@ -53,6 +53,7 @@
     "connected": "Gekoppeld",
     "couldNotLoadModels": "De modellen konden niet worden geladen.",
     "couldNotLoadRepositories": "De coderepository's konden niet worden geladen.",
+    "noRepositoriesFound": "Geen repositories gevonden",
     "critical": "Kritiek",
     "delete": "Verwijderen",
     "deleted": "Verwijderd",
@@ -87,6 +88,7 @@
     "connect": "Koppelen",
     "connectBitbucket": "Bitbucket koppelen",
     "connectGitlab": "GitLab koppelen",
+    "connectProvider": "Platform koppelen",
     "contentTruncated": "Inhoud ingekort",
     "copyLink": "Link kopiëren",
     "couldNotLoadOrganizations": "De organisaties konden niet worden geladen.",
@@ -883,7 +885,6 @@
       "gitlabNoRepositoriesDescription": "Je moet mogelijk toegang verlenen tot meer groepen of projecten op GitLab.",
       "installGithubApp": "Installeer de GitHub-app op repositories",
       "installGithubAppDescription": "Geef de Kilo GitHub-app toegang tot de repositories die je wilt laten beoordelen.",
-      "noRepositoriesFound": "Geen repositories gevonden",
       "repositoryAccess": "toegang tot repositories"
     },
     "style": {
@@ -907,7 +908,6 @@
     "followReviewMd": "REVIEW.md volgen",
     "followReviewMdSubtitle": "Volg de REVIEW.md-instructiebestanden per repository",
     "manualReview": {
-      "connectProvider": "Platform koppelen",
       "connectProviderDescription": "Koppel GitHub om een handmatige review van een PR te starten.",
       "couldNotCheckProviderStatus": "De platformstatus kon niet worden gecontroleerd.",
       "couldNotLoadProviders": "Je gekoppelde platformen konden niet worden geladen. Probeer het opnieuw.",

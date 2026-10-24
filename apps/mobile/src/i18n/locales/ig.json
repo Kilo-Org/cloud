@@ -53,6 +53,7 @@
     "connected": "Ejikọrọ",
     "couldNotLoadModels": "Enweghị ike ibudata ihe nlereanya.",
     "couldNotLoadRepositories": "Enweghị ike ibudata ebe nchekwa koodu.",
+    "noRepositoriesFound": "A hụghị ebe nchekwa",
     "critical": "Dị oké njọ",
     "delete": "Hichapụ",
     "deleted": "Ehichapụrụ",
@@ -87,6 +88,7 @@
     "connect": "Jikọọ",
     "connectBitbucket": "Jikọọ Bitbucket",
     "connectGitlab": "Jikọọ GitLab",
+    "connectProvider": "Jikọọ onye na-enye ọrụ",
     "contentTruncated": "Ebipụrụ akụkụ ọdịnaya",
     "copyLink": "Detuo njikọ",
     "couldNotLoadOrganizations": "Enweghị ike ibudata òtù.",
@@ -1407,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "O nwere ike ịdị mkpa inye ikike ịnweta otu ma ọ bụ ọrụ ndị ọzọ na GitLab.",
       "installGithubApp": "Wụnye ngwa GitHub na ebe nchekwa",
       "installGithubAppDescription": "Nye ngwa Kilo maka GitHub ikike ịnweta ebe nchekwa ịchọrọ ka a nyochaa.",
-      "noRepositoriesFound": "A hụghị ebe nchekwa",
       "repositoryAccess": "ikike ịnweta ebe nchekwa"
     },
     "style": {
@@ -1489,7 +1490,6 @@
       "invalidUrl": "Tinye URL arịrịọ njikọ dị irè.",
       "couldNotCheckProviderStatus": "Enweghị ike ịlele ọnọdụ onye na-enye ọrụ.",
       "couldNotLoadProviders": "Anyị enweghị ike ibudata ndị na-enye ọrụ ị jikọrọ. Biko nwaa ọzọ.",
-      "connectProvider": "Jikọọ onye na-enye ọrụ",
       "connectProviderDescription": "Jikọọ GitHub iji jiri aka malite nyocha arịrịọ njikọ.",
       "pullRequestUrl": "URL arịrịọ njikọ",
       "instructions": "Ntụziaka (ọ bụghị iwu)",

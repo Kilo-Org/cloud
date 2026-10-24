@@ -53,6 +53,7 @@
     "connected": "Ansluten",
     "couldNotLoadModels": "Det gick inte att läsa in modellerna.",
     "couldNotLoadRepositories": "Det gick inte att läsa in kodarkiven.",
+    "noRepositoriesFound": "Inga kodarkiv hittades",
     "critical": "Kritisk",
     "delete": "Ta bort",
     "deleted": "Borttagen",
@@ -87,6 +88,7 @@
     "connect": "Anslut",
     "connectBitbucket": "Anslut Bitbucket",
     "connectGitlab": "Anslut GitLab",
+    "connectProvider": "Anslut en leverantör",
     "contentTruncated": "Innehållet har kortats av",
     "copyLink": "Kopiera länk",
     "couldNotLoadOrganizations": "Det gick inte att läsa in organisationerna.",
@@ -1407,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "Du kan behöva bevilja åtkomst till fler grupper eller projekt på GitLab.",
       "installGithubApp": "Installera GitHub-appen på kodarkiv",
       "installGithubAppDescription": "Ge Kilos GitHub-app åtkomst till de kodarkiv du vill få granskade.",
-      "noRepositoriesFound": "Inga kodarkiv hittades",
       "repositoryAccess": "åtkomst till kodarkiv"
     },
     "style": {
@@ -1489,7 +1490,6 @@
       "invalidUrl": "Ange en giltig URL till en pull-begäran",
       "couldNotCheckProviderStatus": "Kunde inte kontrollera leverantörens status",
       "couldNotLoadProviders": "Vi kunde inte läsa in dina anslutna leverantörer. Försök igen.",
-      "connectProvider": "Anslut en leverantör",
       "connectProviderDescription": "Anslut GitHub för att starta en manuell granskning av en pull-begäran.",
       "pullRequestUrl": "URL till pull-begäran",
       "instructions": "Instruktioner (valfritt)",

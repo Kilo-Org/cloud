@@ -53,6 +53,7 @@
     "connected": "已連結",
     "couldNotLoadModels": "無法載入模型。",
     "couldNotLoadRepositories": "無法載入存放庫。",
+    "noRepositoriesFound": "找不到存放庫",
     "critical": "嚴重",
     "delete": "刪除",
     "deleted": "已刪除",
@@ -87,6 +88,7 @@
     "connect": "連結",
     "connectBitbucket": "連結 Bitbucket",
     "connectGitlab": "連結 GitLab",
+    "connectProvider": "連結平台",
     "contentTruncated": "內容已截斷",
     "copyLink": "複製連結",
     "couldNotLoadOrganizations": "無法載入組織。",
@@ -883,7 +885,6 @@
       "gitlabNoRepositoriesDescription": "你可能需要授權存取 GitLab 上的更多群組或專案。",
       "installGithubApp": "為存放庫安裝 GitHub App",
       "installGithubAppDescription": "請授權 Kilo GitHub App 存取要審查的存放庫。",
-      "noRepositoriesFound": "找不到存放庫",
       "repositoryAccess": "存放庫存取權限"
     },
     "style": {
@@ -907,7 +908,6 @@
     "followReviewMd": "遵循 REVIEW.md",
     "followReviewMdSubtitle": "遵循每個存放庫的 REVIEW.md 指示檔案",
     "manualReview": {
-      "connectProvider": "連結平台",
       "connectProviderDescription": "連結 GitHub，即可手動開始審查 PR。",
       "couldNotCheckProviderStatus": "無法檢查平台狀態。",
       "couldNotLoadProviders": "無法載入已連結的平台。請再試一次。",

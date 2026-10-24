@@ -62,6 +62,10 @@ By default, the script looks for kilo-cli at `$HOME/projects/kilo-cli`. Override
 - GitHub CLI (`gh`) and GitLab CLI (`glab`)
 - Wrapper bundle built inside the container
 
+Both sandbox Dockerfiles configure the [Git stable PPA](https://launchpad.net/~git-core/+archive/ubuntu/ppa) directly.
+APT verifies the repository with its signing key in a dedicated `signed-by` keyring.
+This retains current Git packages without calling the Launchpad API through `add-apt-repository`.
+
 ## API Documentation
 
 ### Overview

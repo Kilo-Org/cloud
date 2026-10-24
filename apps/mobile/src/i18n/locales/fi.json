@@ -53,6 +53,7 @@
     "connected": "Yhdistetty",
     "couldNotLoadModels": "Mallien lataaminen epäonnistui.",
     "couldNotLoadRepositories": "Koodivarastojen lataaminen epäonnistui.",
+    "noRepositoriesFound": "Koodivarastoja ei löytynyt",
     "critical": "Kriittinen",
     "delete": "Poista",
     "deleted": "Poistettu",
@@ -87,6 +88,7 @@
     "connect": "Yhdistä",
     "connectBitbucket": "Yhdistä Bitbucket-tili",
     "connectGitlab": "Yhdistä GitLab-tili",
+    "connectProvider": "Yhdistä palveluntarjoaja",
     "contentTruncated": "Sisältö katkaistu",
     "copyLink": "Kopioi linkki",
     "couldNotLoadOrganizations": "Organisaatioiden lataaminen epäonnistui.",
@@ -1407,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "Sinun on ehkä myönnettävä käyttöoikeus useampiin ryhmiin tai projekteihin GitLabissa.",
       "installGithubApp": "Asenna GitHub-sovellus koodivarastoihin",
       "installGithubAppDescription": "Anna Kilon GitHub-sovellukselle käyttöoikeus koodivarastoihin, jotka haluat katselmoida.",
-      "noRepositoriesFound": "Koodivarastoja ei löytynyt",
       "repositoryAccess": "koodivaraston käyttöoikeus"
     },
     "style": {
@@ -1489,7 +1490,6 @@
       "invalidUrl": "Anna kelvollinen muutospyynnön URL-osoite.",
       "couldNotCheckProviderStatus": "Palveluntarjoajan tilaa ei voitu tarkistaa.",
       "couldNotLoadProviders": "Yhdistettyjä palveluntarjoajia ei voitu ladata. Yritä uudelleen.",
-      "connectProvider": "Yhdistä palveluntarjoaja",
       "connectProviderDescription": "Yhdistä GitHub, niin voit käynnistää muutospyynnön katselmoinnin manuaalisesti.",
       "pullRequestUrl": "Muutospyynnön URL-osoite",
       "instructions": "Ohjeet (valinnaiset)",

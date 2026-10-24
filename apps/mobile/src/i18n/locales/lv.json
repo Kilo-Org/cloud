@@ -53,6 +53,7 @@
     "connected": "Pievienots",
     "couldNotLoadModels": "Neizdevās ielādēt modeļus.",
     "couldNotLoadRepositories": "Neizdevās ielādēt repozitorijus.",
+    "noRepositoriesFound": "Nav atrasts neviens repozitorijs",
     "critical": "Kritisks",
     "delete": "Dzēst",
     "deleted": "Dzēsts",
@@ -87,6 +88,7 @@
     "connect": "Pievienot",
     "connectBitbucket": "Pievienot Bitbucket",
     "connectGitlab": "Pievienot GitLab",
+    "connectProvider": "Pievieno pakalpojuma sniedzēju",
     "contentTruncated": "Saturs saīsināts",
     "copyLink": "Kopēt saiti",
     "couldNotLoadOrganizations": "Neizdevās ielādēt organizācijas.",
@@ -1429,7 +1431,6 @@
       "gitlabNoRepositoriesDescription": "Iespējams, tev jāpiešķir piekļuve papildu grupām vai projektiem pakalpojumā GitLab.",
       "installGithubApp": "Instalē GitHub lietotni repozitorijos",
       "installGithubAppDescription": "Piešķir Kilo GitHub lietotnei piekļuvi repozitorijiem, kuru kodu vēlies pārskatīt.",
-      "noRepositoriesFound": "Nav atrasts neviens repozitorijs",
       "repositoryAccess": "piekļuve repozitorijiem"
     },
     "style": {
@@ -1511,7 +1512,6 @@
       "invalidUrl": "Ievadi derīgu izmaiņu pieprasījuma URL.",
       "couldNotCheckProviderStatus": "Neizdevās pārbaudīt pakalpojuma sniedzēja statusu.",
       "couldNotLoadProviders": "Neizdevās ielādēt tavus pievienotos pakalpojumu sniedzējus. Lūdzu, mēģini vēlreiz.",
-      "connectProvider": "Pievieno pakalpojuma sniedzēju",
       "connectProviderDescription": "Pievieno GitHub, lai manuāli sāktu izmaiņu pieprasījuma koda pārskatīšanu.",
       "pullRequestUrl": "Izmaiņu pieprasījuma URL",
       "instructions": "Norādījumi (neobligāti)",

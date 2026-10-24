@@ -159,6 +159,17 @@ function updateValueRecord(
   return Object.keys(out).length > 0 ? out : undefined;
 }
 
+/**
+ * Convert user input → config shape with encrypted env/header values.
+ * On update, `existing` carries the previously stored encrypted envelopes
+ * so keys left as the masked placeholder round-trip unchanged.
+ *
+ * The round-trip is bound to an unchanged destination: when a masked value is
+ * submitted for a different remote URL, a different local command, or a
+ * different transport type, the stored envelope no longer corresponds to
+ * where the caller is sending it, so the update is rejected and the caller
+ * must submit the plaintext values again.
+ */
 function buildStoredConfig(
   publicKeyBase64: string,
   input: McpServerInput,

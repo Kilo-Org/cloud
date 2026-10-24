@@ -53,6 +53,7 @@
     "connected": "ເຊື່ອມຕໍ່ແລ້ວ",
     "couldNotLoadModels": "ບໍ່ສາມາດໂຫຼດໂມເດວໄດ້.",
     "couldNotLoadRepositories": "ບໍ່ສາມາດໂຫຼດຄັງໂຄ້ດໄດ້.",
+    "noRepositoriesFound": "ບໍ່ພົບຄັງໂຄ້ດ",
     "critical": "ຮ້າຍແຮງ",
     "delete": "ລຶບ",
     "deleted": "ລຶບແລ້ວ",
@@ -87,6 +88,7 @@
     "connect": "ເຊື່ອມຕໍ່",
     "connectBitbucket": "ເຊື່ອມຕໍ່ Bitbucket",
     "connectGitlab": "ເຊື່ອມຕໍ່ GitLab",
+    "connectProvider": "ເຊື່ອມຕໍ່ຜູ້ໃຫ້ບໍລິການ",
     "contentTruncated": "ສະແດງເນື້ອຫາບໍ່ຄົບ",
     "copyLink": "ຄັດລອກລິ້ງ",
     "couldNotLoadOrganizations": "ບໍ່ສາມາດໂຫຼດລາຍຊື່ອົງກອນໄດ້.",
@@ -1407,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "ເຈົ້າອາດຕ້ອງໃຫ້ສິດເຂົ້າເຖິງກຸ່ມ ຫຼື ໂຄງການເພີ່ມໃນ GitLab.",
       "installGithubApp": "ຕິດຕັ້ງແອັບ GitHub ໃນຄັງໂຄ້ດ",
       "installGithubAppDescription": "ໃຫ້ສິດແອັບ GitHub ຂອງ Kilo ເຂົ້າເຖິງຄັງໂຄ້ດທີ່ເຈົ້າຕ້ອງການໃຫ້ກວດທານ.",
-      "noRepositoriesFound": "ບໍ່ພົບຄັງໂຄ້ດ",
       "repositoryAccess": "ສິດເຂົ້າເຖິງຄັງໂຄ້ດ"
     },
     "style": {
@@ -1489,7 +1490,6 @@
       "invalidUrl": "ໃສ່ URL ຂອງຄຳຂໍລວມໂຄ້ດທີ່ຖືກຕ້ອງ.",
       "couldNotCheckProviderStatus": "ບໍ່ສາມາດກວດສອບສະຖານະຂອງຜູ້ໃຫ້ບໍລິການໄດ້.",
       "couldNotLoadProviders": "ບໍ່ສາມາດໂຫຼດລາຍການຜູ້ໃຫ້ບໍລິການທີ່ທ່ານເຊື່ອມຕໍ່ໄວ້ໄດ້. ກະລຸນາລອງອີກຄັ້ງ.",
-      "connectProvider": "ເຊື່ອມຕໍ່ຜູ້ໃຫ້ບໍລິການ",
       "connectProviderDescription": "ເຊື່ອມຕໍ່ GitHub ເພື່ອເລີ່ມກວດສອບຄຳຂໍລວມໂຄ້ດດ້ວຍຕົນເອງ.",
       "pullRequestUrl": "URL ຂອງຄຳຂໍລວມໂຄ້ດ",
       "instructions": "ຄຳແນະນຳ (ບໍ່ຈຳເປັນຕ້ອງໃສ່)",

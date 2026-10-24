@@ -53,6 +53,7 @@
     "connected": "Mifandray",
     "couldNotLoadModels": "Tsy tafiditra ny modely.",
     "couldNotLoadRepositories": "Tsy tafiditra ny tahirin-kaody.",
+    "noRepositoriesFound": "Tsy nisy tahirin-kaody hita",
     "critical": "Tena avo",
     "delete": "Fafao",
     "deleted": "Voafafa",
@@ -87,6 +88,7 @@
     "connect": "Ampifandraiso",
     "connectBitbucket": "Ampifandraiso ny Bitbucket",
     "connectGitlab": "Ampifandraiso ny GitLab",
+    "connectProvider": "Ampifandraiso ny mpanome tolotra",
     "contentTruncated": "Nohafohy ny votoaty",
     "copyLink": "Adikao ny rohy",
     "couldNotLoadOrganizations": "Tsy tafiditra ny fikambanana.",
@@ -1407,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "Mety mila manome alalana hidirana amin'ny vondrona na tetikasa fanampiny ao amin'ny GitLab ianao.",
       "installGithubApp": "Apetraho amin'ny tahirin-kaody ny rindranasa GitHub",
       "installGithubAppDescription": "Omeo alalana hiditra amin'ny tahirin-kaody tianao hohamarinina ny rindranasa Kilo ao amin'ny GitHub.",
-      "noRepositoriesFound": "Tsy nisy tahirin-kaody hita",
       "repositoryAccess": "alalana hidirana amin'ny tahirin-kaody"
     },
     "style": {
@@ -1489,7 +1490,6 @@
       "invalidUrl": "Ampidiro ny URL manan-kery an'ny PR.",
       "couldNotCheckProviderStatus": "Tsy nety nohamarinina ny satan'ny mpanome tolotra.",
       "couldNotLoadProviders": "Tsy nety nampidirina ny mpanome tolotra nampifandraisinao. Andramo indray azafady.",
-      "connectProvider": "Ampifandraiso ny mpanome tolotra",
       "connectProviderDescription": "Ampifandraiso ny GitHub mba hanombohana mivantana ny fanamarinana PR.",
       "pullRequestUrl": "URL-n'ny PR",
       "instructions": "Torolalana (tsy voatery)",

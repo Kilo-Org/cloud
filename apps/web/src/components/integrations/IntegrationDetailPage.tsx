@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -23,6 +24,7 @@ export type IntegrationDetailSearchParams = Promise<{
 
 type DetailRenderProps = {
   organizationId?: string;
+  role?: OrganizationRole;
   search: Awaited<IntegrationDetailSearchParams>;
 };
 
@@ -90,7 +92,7 @@ const integrationDetailRegistry = {
     title: 'Slack Integration',
     userSubtitle: 'Connect your Slack workspace to receive notifications',
     organizationSubtitle: organizationName => `Manage Slack integration for ${organizationName}`,
-    render: async ({ organizationId, search }) => {
+    render: async ({ organizationId, search, role }) => {
       const { SlackIntegrationDetails } =
         await import('@/components/integrations/SlackIntegrationDetails');
       return (
@@ -98,6 +100,7 @@ const integrationDetailRegistry = {
           organizationId={organizationId}
           success={search.success === 'installed'}
           error={search.error}
+          canManage={!role || role === 'owner' || role === 'admin'}
         />
       );
     },
@@ -203,9 +206,10 @@ function IntegrationDetailsFallback() {
 async function PlatformIntegrationDetails({
   platform,
   organizationId,
+  role,
   search,
 }: DetailRenderProps & { platform: IntegrationDetailPlatform }) {
-  return getIntegrationDetailEntry(platform).render({ organizationId, search });
+  return getIntegrationDetailEntry(platform).render({ organizationId, role, search });
 }
 
 function SuspendedIntegrationDetails(
@@ -268,7 +272,7 @@ export async function OrganizationIntegrationDetailPage({
   return (
     <OrganizationByPageLayout
       params={params}
-      render={({ organization }) => (
+      render={({ role, organization }) => (
         <>
           <div className="space-y-4">
             <BackLink
@@ -282,6 +286,7 @@ export async function OrganizationIntegrationDetailPage({
           <SuspendedIntegrationDetails
             platform={detailPlatform}
             organizationId={organization.id}
+            role={role}
             search={{ ...search, returnTo: returnTo ?? undefined }}
           />
         </>

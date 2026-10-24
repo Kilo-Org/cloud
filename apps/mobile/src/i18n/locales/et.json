@@ -53,6 +53,7 @@
     "connected": "Ühendatud",
     "couldNotLoadModels": "Mudeleid ei õnnestunud laadida.",
     "couldNotLoadRepositories": "Hoidlaid ei õnnestunud laadida.",
+    "noRepositoriesFound": "Hoidlaid ei leitud",
     "critical": "Kriitiline",
     "delete": "Kustuta",
     "deleted": "Kustutatud",
@@ -87,6 +88,7 @@
     "connect": "Ühenda",
     "connectBitbucket": "Ühenda Bitbucket",
     "connectGitlab": "Ühenda GitLab",
+    "connectProvider": "Teenusepakkuja ühendamine",
     "contentTruncated": "Sisu kärbitud",
     "copyLink": "Kopeeri link",
     "couldNotLoadOrganizations": "Organisatsioone ei õnnestunud laadida.",
@@ -1407,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "Võimalik, et pead GitLabis andma juurdepääsu veel mõnele rühmale või projektile.",
       "installGithubApp": "GitHubi rakenduse paigaldamine hoidlatele",
       "installGithubAppDescription": "Anna Kilo GitHubi rakendusele juurdepääs hoidlatele, mille koodi soovid üle vaadata.",
-      "noRepositoriesFound": "Hoidlaid ei leitud",
       "repositoryAccess": "juurdepääs hoidlatele"
     },
     "style": {
@@ -1489,7 +1490,6 @@
       "invalidUrl": "Sisesta kehtiv tõmbetaotluse URL.",
       "couldNotCheckProviderStatus": "Teenusepakkuja olekut ei õnnestunud kontrollida.",
       "couldNotLoadProviders": "Ühendatud teenusepakkujaid ei õnnestunud laadida. Proovi uuesti.",
-      "connectProvider": "Teenusepakkuja ühendamine",
       "connectProviderDescription": "Ühenda GitHub, et käivitada tõmbetaotluse ülevaatus käsitsi.",
       "pullRequestUrl": "Tõmbetaotluse URL",
       "instructions": "Juhised (valikulised)",

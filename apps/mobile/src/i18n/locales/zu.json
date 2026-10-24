@@ -53,6 +53,7 @@
     "connected": "Ixhunyiwe",
     "couldNotLoadModels": "Asikwazanga ukulayisha amamodeli.",
     "couldNotLoadRepositories": "Asikwazanga ukulayisha izinqolobane zekhodi.",
+    "noRepositoriesFound": "Azikho izinqolobane zekhodi ezitholakele",
     "critical": "Okubucayi",
     "delete": "Susa",
     "deleted": "Kususiwe",
@@ -87,6 +88,7 @@
     "connect": "Xhuma",
     "connectBitbucket": "Xhuma i-Bitbucket",
     "connectGitlab": "Xhuma i-GitLab",
+    "connectProvider": "Xhuma umhlinzeki",
     "contentTruncated": "Okuqukethwe kunqanyuliwe",
     "copyLink": "Kopisha isixhumanisi",
     "couldNotLoadOrganizations": "Asikwazanga ukulayisha izinhlangano.",
@@ -1407,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "Kungenzeka udinge ukunikeza ukufinyelela kumaqembu noma amaphrojekthi engeziwe ku-GitLab.",
       "installGithubApp": "Faka uhlelo lokusebenza lwe-GitHub ezinqolobaneni zekhodi",
       "installGithubAppDescription": "Nika uhlelo lokusebenza lwe-Kilo ku-GitHub imvume yokufinyelela ezinqolobaneni zekhodi ofuna zihlolwe.",
-      "noRepositoriesFound": "Azikho izinqolobane zekhodi ezitholakele",
       "repositoryAccess": "ukufinyelela enqolobaneni yekhodi"
     },
     "style": {
@@ -1489,7 +1490,6 @@
       "invalidUrl": "Faka i-URL evumelekile yesicelo sokuhlanganisa ikhodi.",
       "couldNotCheckProviderStatus": "Asikwazanga ukuhlola isimo somhlinzeki.",
       "couldNotLoadProviders": "Asikwazanga ukulayisha abahlinzeki bakho abaxhunyiwe. Sicela uzame futhi.",
-      "connectProvider": "Xhuma umhlinzeki",
       "connectProviderDescription": "Xhuma i-GitHub ukuze uqalise ngokwakho ukuhlolwa kwesicelo sokuhlanganisa ikhodi.",
       "pullRequestUrl": "I-URL yesicelo sokuhlanganisa ikhodi",
       "instructions": "Imiyalo (ayidingekile)",

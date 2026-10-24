@@ -127,6 +127,10 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 2. `pnpm start`
 3. open installed app on your phone
 
+Production Android builds use the EAS `large` resource class to give Gradle and
+JavaScript bundling more memory. Development, preview, and iOS builds retain
+their default resource classes. The production builder requires a paid EAS plan.
+
 ### iOS
 
 1. add your device to the list of internal devices using `pnpx eas-cli device:create`
@@ -166,6 +170,16 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 - Use `--display=1` for the outer display and `--display=3` for the inner display.
 - An inactive display produces a black screenshot.
 - Type a draft, change the appearance in both directions, and verify the draft stays readable.
+
+## Diagram host checks
+
+Mermaid uses a packaged renderer and a shared HTML host document.
+Run `pnpm --filter web exec playwright install chromium`, then
+`pnpm --filter web run test:mobile-mermaid` for its browser regression suite.
+CI runs the same command when the host document, its renderer asset, or the
+suite changes.
+The suite needs no backend or signed-in account and includes flowcharts and
+data-image diagrams.
 
 ## Agent brief localization
 

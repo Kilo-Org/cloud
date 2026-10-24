@@ -219,10 +219,15 @@ describe('AttributionsTrackRequestBody', () => {
 });
 
 describe('attribution tracking request validation', () => {
+  const orgLimit = jest.fn(async () => ({ success: true }));
+  const userLimit = jest.fn(async () => ({ success: true }));
+
   const env = () =>
     ({
       ENVIRONMENT: 'development',
       NEXTAUTH_SECRET: { get: async () => 'secret' },
+      ATTRIBUTION_TRACK_ORG_RATE_LIMITER: { limit: orgLimit },
+      ATTRIBUTION_TRACK_USER_RATE_LIMITER: { limit: userLimit },
     }) as unknown as HonoContext['Bindings'];
 
   const trackRequest = async (init: RequestInit) => {
@@ -233,6 +238,8 @@ describe('attribution tracking request validation', () => {
 
   beforeEach(() => {
     trackAttribution.mockClear().mockReturnValue({ id: 1 });
+    orgLimit.mockClear().mockResolvedValue({ success: true });
+    userLimit.mockClear().mockResolvedValue({ success: true });
   });
 
   it('returns 413 for a declared Content-Length above the body budget', async () => {
@@ -314,5 +321,61 @@ describe('attribution tracking request validation', () => {
       user_id: USER_ID,
       organization_id: ORGANIZATION_ID,
     });
+  });
+
+  it('charges both counters with the authenticated organization and user', async () => {
+    await trackRequest({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(validPayload()),
+    });
+
+    expect(orgLimit).toHaveBeenCalledTimes(1);
+    expect(orgLimit).toHaveBeenCalledWith({ key: ORGANIZATION_ID });
+    expect(userLimit).toHaveBeenCalledTimes(1);
+    expect(userLimit).toHaveBeenCalledWith({ key: USER_ID });
+  });
+
+  it('returns 429 when the user counter is at capacity', async () => {
+    userLimit.mockResolvedValue({ success: false });
+
+    const response = await trackRequest({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(validPayload()),
+    });
+
+    expect(response.status).toBe(429);
+    expect(trackAttribution).not.toHaveBeenCalled();
+  });
+
+  it('returns 429 when the organization counter is at capacity', async () => {
+    orgLimit.mockResolvedValue({ success: false });
+
+    const response = await trackRequest({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(validPayload()),
+    });
+
+    expect(response.status).toBe(429);
+    expect(trackAttribution).not.toHaveBeenCalled();
+  });
+
+  it('answers 429 before reading a body above the byte budget', async () => {
+    userLimit.mockResolvedValue({ success: false });
+    const oversized = JSON.stringify(validPayload()).padEnd(MAX_TRACK_BODY_BYTES + 1, ' ');
+
+    const response = await trackRequest({
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': String(Buffer.byteLength(oversized)),
+      },
+      body: oversized,
+    });
+
+    expect(response.status).toBe(429);
+    expect(trackAttribution).not.toHaveBeenCalled();
   });
 });

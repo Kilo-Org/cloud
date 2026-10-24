@@ -62,8 +62,20 @@ app.get('/attributions/whoami', c => {
 
 // POST /attributions/track - Track a new attribution
 app.post('/attributions/track', async c => {
+  const env = c.env;
   const user_id = c.get('user_id');
   const organization_id = c.get('organization_id');
+
+  // Apply the per-organization and the per-user limits before the body is read.
+  // Both counters are charged on every request, and each key keeps its own
+  // counter because a Rate Limit binding counts per key within a location.
+  const [organizationOutcome, userOutcome] = await Promise.all([
+    env.ATTRIBUTION_TRACK_ORG_RATE_LIMITER.limit({ key: organization_id }),
+    env.ATTRIBUTION_TRACK_USER_RATE_LIMITER.limit({ key: user_id }),
+  ]);
+  if (!organizationOutcome.success || !userOutcome.success) {
+    return c.json(resError('Too many attribution requests, slow down'), 429);
+  }
 
   // Read the body with a bounded reader against the fixed byte budget.
   let bodyText: string | undefined;

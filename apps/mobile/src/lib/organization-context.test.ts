@@ -1,7 +1,7 @@
 /* oxlint-disable @typescript-eslint/no-unsafe-call @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable max-lines -- selection persistence and membership recovery share one provider harness */
 import { type QueryClient } from '@tanstack/react-query';
-import { createElement } from 'react';
+import { type ComponentType, createElement, type ReactNode, useState } from 'react';
 import { act } from '@/test/renderer';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -66,7 +66,22 @@ type OrganizationContextValue = {
   setOrganizationId: (id: string | null) => void;
 };
 
-async function mountProvider(): Promise<{
+/**
+ * Hands the provider a new token while the tree stays mounted, the way an
+ * access-token rotation does: the same account and no auth-epoch bump.
+ */
+const tokenRotation: { set: (token: string) => void } = { set: () => undefined };
+
+function RotatingTokenAuth({ children }: { children: ReactNode }): ReactNode {
+  const [token, setToken] = useState('t');
+  tokenRotation.set = setToken;
+  hoisted.useAuth.mockReturnValue({ token });
+  return createElement(OrganizationProvider, null, children);
+}
+
+async function mountProvider(
+  wrapper: ComponentType<{ children: ReactNode }> = OrganizationProvider
+): Promise<{
   getCtx: () => OrganizationContextValue;
   queryClient: QueryClient;
   unmount: () => void;
@@ -77,7 +92,7 @@ async function mountProvider(): Promise<{
     return null;
   }
 
-  const ui = await renderWithProviders(createElement(Consumer), { wrapper: OrganizationProvider });
+  const ui = await renderWithProviders(createElement(Consumer), { wrapper });
   // Let the provider's restore read settle. The list may still be pending, so
   // this only guarantees the read decided whether a default resolution is owed.
   await act(async () => {
@@ -247,6 +262,125 @@ describe('OrganizationProvider.setOrganizationId', () => {
       ORGANIZATION_PERSONAL_STORAGE_KEY,
       'personal'
     );
+
+    unmount();
+  });
+
+  /**
+   * Storage double backed by one map whose calls park on demand, so a test can
+   * rotate the token while a save is in flight and then release it.
+   */
+  function installStorageDouble(): {
+    stored: Map<string, string>;
+    park: () => void;
+    releaseAll: () => Promise<void>;
+  } {
+    const stored = new Map<string, string>();
+    const gates: (() => void)[] = [];
+    let parked = false;
+    async function waitWhileParked(): Promise<void> {
+      if (!parked) {
+        return;
+      }
+      const { promise, resolve } = Promise.withResolvers<undefined>();
+      gates.push(() => {
+        resolve(undefined);
+      });
+      await promise;
+    }
+    hoisted.getItemAsync.mockImplementation(async (key: string) => {
+      await Promise.resolve();
+      return stored.get(key) ?? null;
+    });
+    hoisted.setAccountMetadata.mockImplementation(async (key: string, value: string) => {
+      await waitWhileParked();
+      stored.set(key, value);
+    });
+    hoisted.deleteAccountMetadata.mockImplementation(async (key: string) => {
+      await waitWhileParked();
+      stored.delete(key);
+    });
+    return {
+      stored,
+      park: () => {
+        parked = true;
+      },
+      releaseAll: async () => {
+        parked = false;
+        // Every parked call is released at once; callers await the observable
+        // state with `waitFor` rather than a fixed delay.
+        await act(async () => {
+          for (const release of gates.splice(0)) {
+            release();
+          }
+          await Promise.resolve();
+        });
+      },
+    };
+  }
+
+  /** Rotates the access token without a sign-out, as the refresh path does. */
+  async function rotateToken(): Promise<void> {
+    await act(async () => {
+      tokenRotation.set('t2');
+      await Promise.resolve();
+    });
+  }
+
+  it('keeps a fresh Personal choice when the token rotates while its save is in flight', async () => {
+    const storage = installStorageDouble();
+    hoisted.list.mockResolvedValue([
+      { organizationId: 'org-a', organizationName: 'A org', role: 'member' },
+    ]);
+    const { getCtx, unmount } = await mountProvider(RotatingTokenAuth);
+    // The default organization is the stored selection before the switch.
+    await waitFor(() => storage.stored.get(ORGANIZATION_STORAGE_KEY) === 'org-a');
+    expect(getCtx().organizationId).toBe('org-a');
+
+    // The explicit Personal choice parks on its first write, and a rotation
+    // lands while that save is still in flight.
+    storage.park();
+    await act(() => {
+      getCtx().setOrganizationId(null);
+    });
+    await rotateToken();
+    await storage.releaseAll();
+
+    // The pair the user chose is the one stored, and the restore publishes it
+    // instead of falling back to the default organization.
+    await waitFor(() => storage.stored.get(ORGANIZATION_PERSONAL_STORAGE_KEY) === 'personal');
+    expect(storage.stored.has(ORGANIZATION_STORAGE_KEY)).toBe(false);
+    await waitFor(() => getCtx().organizationId === null);
+    expect(getCtx().organizationId).toBeNull();
+
+    unmount();
+  });
+
+  it('lands the last of two queued selections when the token rotates', async () => {
+    const storage = installStorageDouble();
+    hoisted.list.mockResolvedValue([
+      { organizationId: 'org-a', organizationName: 'A org', role: 'member' },
+      { organizationId: 'org-b', organizationName: 'B org', role: 'member' },
+      { organizationId: 'org-c', organizationName: 'C org', role: 'member' },
+    ]);
+    const { getCtx, unmount } = await mountProvider(RotatingTokenAuth);
+    await waitFor(() => storage.stored.get(ORGANIZATION_STORAGE_KEY) === 'org-a');
+
+    storage.park();
+    await act(() => {
+      getCtx().setOrganizationId('org-b');
+    });
+    await act(() => {
+      getCtx().setOrganizationId('org-c');
+    });
+    expect(getCtx().organizationId).toBe('org-c');
+    await rotateToken();
+    await storage.releaseAll();
+
+    await waitFor(() => storage.stored.get(ORGANIZATION_STORAGE_KEY) === 'org-c');
+    expect(storage.stored.has(ORGANIZATION_PERSONAL_STORAGE_KEY)).toBe(false);
+    await waitFor(() => getCtx().organizationId === 'org-c');
+    expect(getCtx().organizationId).toBe('org-c');
 
     unmount();
   });

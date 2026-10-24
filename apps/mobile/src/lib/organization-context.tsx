@@ -82,6 +82,14 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     error: null,
   });
   const generation = useRef(0);
+  // Orders the stored pair's writers: a newer selection, a sign-out, or an
+  // account switch supersedes an in-flight save. `restore` deliberately does
+  // not bump it: a token rotation re-runs `restore` for the same account, and
+  // that must not cancel the save of a selection the user just made.
+  const saveGeneration = useRef(0);
+  // Settles when the last scheduled save has settled. A restore reads the pair
+  // a save that began before it left behind, instead of a half-written one.
+  const savesSettled = useRef<Promise<void>>(Promise.resolve());
   const activeId = useRef<string | null>(null);
   // Set by `restore` when nothing explicit is stored: the organization list
   // owns the publish then. A ref (not state) so `setOrganizationId` clears it
@@ -116,12 +124,15 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
       // A stored organization is an explicit choice; the marker beside it is an
       // explicit Personal choice. An absent value is 'not chosen yet': the
       // organization list decides the default and the effect below publishes it.
-      // A legacy absent value is treated the same way. The reads are direct:
-      // restore decides whether the app is loaded, so it never waits on a save.
+      // A legacy absent value is treated the same way. A save that began before
+      // this restore owns the pair until it settles, so it is awaited first; a
+      // save that begins later supersedes this restore (it bumps `generation`),
+      // so the reads below are discarded rather than published half-written.
       // The two reads are kept apart: a stored organization stands alone, so a
       // marker-read failure must not discard it. The marker is only consulted
       // when no organization is stored, and a failure there stays a restore
       // error — the selection is then genuinely undetermined.
+      await savesSettled.current;
       const stored = await SecureStore.getItemAsync(ORGANIZATION_STORAGE_KEY);
       const marker =
         stored === null ? await SecureStore.getItemAsync(ORGANIZATION_PERSONAL_STORAGE_KEY) : null;
@@ -152,40 +163,52 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
   }, [token]);
 
   const persist = useCallback(async (id: string | null) => {
+    // A selection supersedes any restore still deciding what to publish.
     generation.current += 1;
-    const operation = generation.current;
+    saveGeneration.current += 1;
+    const save = saveGeneration.current;
     const epoch = currentAuthEpoch();
     setState(current => ({ ...current, isSaving: true }));
     let error: 'save' | null = null;
+    // Registered before the first await, so a restore that starts now waits for
+    // this whole pair: it reads what the save leaves behind, never a key of it.
+    const writes = chainSave(SELECTION_QUEUE_KEY, async () => {
+      // Only the selection the provider still publishes is written: a newer
+      // selection, a sign-in, or a sign-out owns the stored state, and its
+      // own save (or the sign-out cleanup, whose deletes chain behind these
+      // keys) writes the pair this save would have written. A restore does
+      // not own the pair: it reads it after this save settles.
+      if (saveGeneration.current !== save || !isCurrentAuthEpoch(epoch)) {
+        return;
+      }
+      // Keep the pair ordered with saves, but stop between keys if a new
+      // selection or auth epoch supersedes this one. Its queued save, or
+      // sign-out cleanup, owns the remaining storage update.
+      await (id
+        ? setAccountMetadata(ORGANIZATION_STORAGE_KEY, id)
+        : deleteAccountMetadata(ORGANIZATION_STORAGE_KEY));
+      if (saveGeneration.current !== save || !isCurrentAuthEpoch(epoch)) {
+        return;
+      }
+      await (id
+        ? deleteAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY)
+        : setAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY, PERSONAL_MARKER));
+    });
+    // A restore only needs the pair to have settled, so its own rejection is
+    // swallowed here; this save reports the failure in its state below.
+    savesSettled.current = (async () => {
+      try {
+        await writes;
+      } catch {
+        // Reported by this save's own `error` state.
+      }
+    })();
     try {
-      // One slot per account: a save queued behind this one only starts once
-      // both keys of this pair have settled, and the newest selection is always
-      // the last one written.
-      await chainSave(SELECTION_QUEUE_KEY, async () => {
-        // Only the selection the provider still publishes is written: a newer
-        // selection, a sign-in, or a sign-out owns the stored state, and its
-        // own save (or the sign-out cleanup, whose deletes chain behind these
-        // keys) writes the pair this save would have written.
-        if (generation.current !== operation || !isCurrentAuthEpoch(epoch)) {
-          return;
-        }
-        // Keep the pair ordered with saves, but stop between keys if a new
-        // selection or auth epoch supersedes this one. Its queued save, or
-        // sign-out cleanup, owns the remaining storage update.
-        await (id
-          ? setAccountMetadata(ORGANIZATION_STORAGE_KEY, id)
-          : deleteAccountMetadata(ORGANIZATION_STORAGE_KEY));
-        if (generation.current !== operation || !isCurrentAuthEpoch(epoch)) {
-          return;
-        }
-        await (id
-          ? deleteAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY)
-          : setAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY, PERSONAL_MARKER));
-      });
+      await writes;
     } catch {
       error = 'save';
     }
-    if (generation.current === operation && isCurrentAuthEpoch(epoch)) {
+    if (saveGeneration.current === save && isCurrentAuthEpoch(epoch)) {
       setState(current => ({ ...current, error, isSaving: false }));
     }
   }, []);
@@ -296,6 +319,9 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
       void restore();
     } else {
       generation.current += 1;
+      // A signed-out account owns no stored selection: a save still in flight
+      // must not write the pair after the sign-out cleanup deleted it.
+      saveGeneration.current += 1;
       activeId.current = null;
       awaitingDefault.current = false;
       defaultFence.current = null;
@@ -305,6 +331,8 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
       setState({ token, organizationId: null, isLoaded: true, isSaving: false, error: null });
     }
     return () => {
+      // A token change cancels the previous restore's publication, not a save:
+      // a rotation is the same account, and its save must still land.
       generation.current += 1;
     };
   }, [token, restore]);

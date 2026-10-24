@@ -28,12 +28,13 @@ vi.mock('react-native', () => ({
       return rn.statusHeight;
     },
   },
-}));
-vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => safeArea,
+  BackHandler: {
+    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+  },
 }));
 vi.mock('expo-router', () => ({
   useNavigation: () => ({
+    isFocused: () => true,
     addListener: (event: string, handler: () => void) => {
       let set = navigationEvents.listeners.get(event);
       if (!set) {
@@ -46,6 +47,10 @@ vi.mock('expo-router', () => ({
       };
     },
   }),
+  useRouter: () => ({ back: vi.fn() }),
+}));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => safeArea,
 }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));

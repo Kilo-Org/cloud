@@ -289,13 +289,13 @@ jest.mock('@/lib/r2/cloud-agent-attachments', () => ({
 }));
 
 jest.mock('@/lib/r2/cloud-agent-pending-uploads', () => ({
-  linkAttachmentsForDispatch: jest.fn(async () => {}),
+  linkAttachmentsForDispatch: jest.fn(async () => ['user-1/cloud-agent/linked/a.md']),
   linkPendingUploads: jest.fn(),
   releasePendingUploads: jest.fn(),
 }));
 
-jest.mock('@/lib/cloud-agent-next/release-unadmitted-send', () => ({
-  releaseUnadmittedSend: jest.fn(async () => {}),
+jest.mock('@/lib/cloud-agent-next/release-refused-send', () => ({
+  releaseRefusedSend: jest.fn(async () => {}),
 }));
 
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => {
@@ -1037,18 +1037,22 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
     );
   });
 
-  it('asks the Worker whether a failed send was admitted before keeping the rows', async () => {
+  it('hands a refused send the rows this dispatch linked', async () => {
     const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
     const attachments = {
       path: '12345678-1234-4234-9234-123456789abc',
       files: ['87654321-4321-4321-8321-cba987654321.md'],
     };
-    const releaseUnadmittedSend = jest.mocked(
-      jest.requireMock<{ releaseUnadmittedSend: (input: unknown) => Promise<void> }>(
-        '@/lib/cloud-agent-next/release-unadmitted-send'
-      ).releaseUnadmittedSend
+    const releaseRefusedSend = jest.mocked(
+      jest.requireMock<{ releaseRefusedSend: (input: unknown) => Promise<void> }>(
+        '@/lib/cloud-agent-next/release-refused-send'
+      ).releaseRefusedSend
     );
-    mockSendMessage.mockRejectedValueOnce(new TRPCClientError('worker unavailable'));
+    mockSendMessage.mockRejectedValueOnce(
+      new TRPCClientError('refused', {
+        result: { error: { code: -32600, message: 'refused', data: { httpStatus: 400 } } },
+      })
+    );
 
     await expect(
       caller.sendMessage({
@@ -1058,14 +1062,13 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
         payload: { type: 'prompt', prompt: 'Read notes', mode: 'code', model: 'test' },
         attachments,
       })
-    ).rejects.toThrow('worker unavailable');
+    ).rejects.toThrow('refused');
 
-    expect(releaseUnadmittedSend).toHaveBeenCalledWith({
+    expect(releaseRefusedSend).toHaveBeenCalledWith({
       attachments,
-      client: expect.anything(),
-      cloudAgentSessionId: 'agent_123',
+      error: expect.any(TRPCClientError),
       kiloUserId: 'user-1',
-      messageId: SEND_MESSAGE_ID,
+      linkedObjectKeys: ['user-1/cloud-agent/linked/a.md'],
     });
   });
 

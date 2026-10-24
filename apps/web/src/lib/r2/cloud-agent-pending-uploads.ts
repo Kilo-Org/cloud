@@ -157,6 +157,8 @@ export async function admitPendingUpload({
 }
 
 export type LinkPendingUploadsResult = {
+  /** Object keys this call moved from 'pending' to 'linked', one per row. */
+  linkedObjectKeys: string[];
   /**
    * Requested keys whose row the message does not hold: 'reaped', so the object
    * behind them is gone or being deleted, or 'pending' again after a released
@@ -184,9 +186,10 @@ export function attachmentObjectKeys(
  * transaction finds every requested key whose row is not 'linked', which covers
  * a row a concurrent release or claim took first and a row a failed delete put
  * back for a later attempt. Rows whose object keys are not in the supplied set
- * stay 'pending', so a partial key set leaves unmatched uploads to be reaped. A
- * row already 'linked' belongs to an earlier dispatch of the same message and is
- * not reported.
+ * stay 'pending', so a partial key set leaves unmatched uploads to be reaped. It
+ * also returns the keys this call linked, which is the set one dispatch may hand
+ * back if the worker later refuses its turn; a row already 'linked' belongs to an
+ * earlier dispatch and is not in either list.
  */
 async function linkPendingUploadsInTransaction(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
@@ -194,9 +197,9 @@ async function linkPendingUploadsInTransaction(
   messageUuid: string,
   objectKeys: string[]
 ): Promise<LinkPendingUploadsResult> {
-  if (objectKeys.length === 0) return { unlinkedObjectKeys: [] };
+  if (objectKeys.length === 0) return { linkedObjectKeys: [], unlinkedObjectKeys: [] };
 
-  await tx
+  const linked = await tx
     .update(cloud_agent_pending_uploads)
     .set({ status: 'linked' })
     .where(
@@ -206,7 +209,8 @@ async function linkPendingUploadsInTransaction(
         eq(cloud_agent_pending_uploads.status, 'pending'),
         inArray(cloud_agent_pending_uploads.object_key, objectKeys)
       )
-    );
+    )
+    .returning({ object_key: cloud_agent_pending_uploads.object_key });
 
   // Read back every requested key the message does not hold. A row is left
   // 'reaped' when a release or a claim took it, and is returned to 'pending' when
@@ -224,7 +228,10 @@ async function linkPendingUploadsInTransaction(
       )
     );
 
-  return { unlinkedObjectKeys: rows.map(row => row.object_key) };
+  return {
+    linkedObjectKeys: linked.map(row => row.object_key),
+    unlinkedObjectKeys: rows.map(row => row.object_key),
+  };
 }
 
 /** Link a message's attachment rows and report the ones it does not hold. */
@@ -233,7 +240,7 @@ export async function linkPendingUploads(
   messageUuid: string,
   objectKeys: string[]
 ): Promise<LinkPendingUploadsResult> {
-  if (objectKeys.length === 0) return { unlinkedObjectKeys: [] };
+  if (objectKeys.length === 0) return { linkedObjectKeys: [], unlinkedObjectKeys: [] };
 
   return db.transaction(tx =>
     linkPendingUploadsInTransaction(tx, kiloUserId, messageUuid, objectKeys)
@@ -251,17 +258,22 @@ export const CLOUD_AGENT_ATTACHMENT_EXPIRED_MESSAGE =
  * refused message keeps every row as it was and a retry after the user
  * re-attaches the file links them all. Keys with no ledger row belong to an
  * uploader that predates the ledger and are left alone.
+ *
+ * Returns the object keys this call moved to 'linked'. The composer's attachment
+ * path is stable across sends from one page, so a later dispatch that finds the
+ * rows already linked links nothing; this list is what lets one dispatch hand
+ * back exactly its own rows.
  */
 export async function linkAttachmentsForDispatch(
   kiloUserId: string,
   attachments: DispatchAttachments | undefined
-): Promise<void> {
-  if (!attachments || attachments.files.length === 0) return;
+): Promise<string[]> {
+  if (!attachments || attachments.files.length === 0) return [];
 
-  await db.transaction(async tx => {
+  return db.transaction(async tx => {
     // The link and the refusal share one transaction, so a message whose
     // dispatch is refused keeps all of its rows reapable.
-    const { unlinkedObjectKeys } = await linkPendingUploadsInTransaction(
+    const { linkedObjectKeys, unlinkedObjectKeys } = await linkPendingUploadsInTransaction(
       tx,
       kiloUserId,
       attachments.path,
@@ -273,22 +285,24 @@ export async function linkAttachmentsForDispatch(
         message: CLOUD_AGENT_ATTACHMENT_EXPIRED_MESSAGE,
       });
     }
+    return linkedObjectKeys;
   });
 }
 
 /**
- * Hand one message's attachment rows back to the abandoned-upload lifecycle
- * after the worker stated it never admitted the turn. Only the rows this message
- * still holds are moved back, so a row another message holds or the reaper
- * already took keeps its state. The rows keep their original lease, so the
- * reaper claims them on its next run once that lease lapses. Returns the number
- * of rows handed back.
+ * Hand back exactly the rows one dispatch linked, after the worker refused that
+ * turn. The caller supplies the keys the link returned, so an attachment an
+ * earlier accepted send holds keeps its state even though the composer reuses
+ * the path. The rows keep their original lease, so the abandoned-upload reaper
+ * claims them on its next run once that lease lapses. Returns the number of rows
+ * handed back.
  */
 export async function releaseUnadmittedUploads(
   kiloUserId: string,
-  attachments: DispatchAttachments
+  messageUuid: string,
+  linkedObjectKeys: string[]
 ): Promise<number> {
-  if (attachments.files.length === 0) return 0;
+  if (linkedObjectKeys.length === 0) return 0;
 
   const released = await db
     .update(cloud_agent_pending_uploads)
@@ -296,12 +310,9 @@ export async function releaseUnadmittedUploads(
     .where(
       and(
         eq(cloud_agent_pending_uploads.kilo_user_id, kiloUserId),
-        eq(cloud_agent_pending_uploads.message_uuid, attachments.path),
+        eq(cloud_agent_pending_uploads.message_uuid, messageUuid),
         eq(cloud_agent_pending_uploads.status, 'linked'),
-        inArray(
-          cloud_agent_pending_uploads.object_key,
-          attachmentObjectKeys(kiloUserId, attachments)
-        )
+        inArray(cloud_agent_pending_uploads.object_key, linkedObjectKeys)
       )
     )
     .returning({ id: cloud_agent_pending_uploads.id });

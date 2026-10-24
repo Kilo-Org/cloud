@@ -8,7 +8,7 @@ import {
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
 import { isPublicRepoUrlEnabled } from '@/lib/cloud-agent-next/public-repo-url';
-import { releaseUnadmittedSend } from '@/lib/cloud-agent-next/release-unadmitted-send';
+import { releaseRefusedSend } from '@/lib/cloud-agent-next/release-refused-send';
 import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
 import { createWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import { assertSessionWorktree } from '@/lib/cloud-agent-next/worktree-review-access';
@@ -371,6 +371,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
       // Tokens are refreshed inside cloud-agent-next (GitHub App installation
       // for GitHub, GIT_TOKEN_SERVICE for managed GitLab).
       const { attachments, images } = input;
+      let linkedObjectKeys: string[] = [];
       try {
         // Link the attachment rows before the worker can accept the turn: the
         // link is what keeps their objects out of the abandoned-upload reaper,
@@ -378,7 +379,7 @@ export const cloudAgentNextRouter = createTRPCRouter({
         // could report an accepted send as failed. Only ATTACHMENT rows are
         // admitted (images are never admitted; only
         // generateCloudAgentAttachmentUploadUrl admits).
-        await linkAttachmentsForDispatch(ctx.user.id, attachments);
+        linkedObjectKeys = await linkAttachmentsForDispatch(ctx.user.id, attachments);
       } catch (error) {
         rethrowCloudAgentError(error);
       }
@@ -392,15 +393,14 @@ export const cloudAgentNextRouter = createTRPCRouter({
           messageId: input.messageId,
         });
       } catch (error) {
-        // A send can fail after the worker accepted the turn, so the rows are
-        // only returned to the reaper when the worker states that it never
-        // admitted this message.
-        await releaseUnadmittedSend({
+        // A send can fail after the worker accepted the turn, so only the rows
+        // this dispatch linked are handed back, and only when the worker itself
+        // refused the turn.
+        await releaseRefusedSend({
           attachments,
-          client,
-          cloudAgentSessionId: input.cloudAgentSessionId,
+          error,
           kiloUserId: ctx.user.id,
-          messageId: input.messageId,
+          linkedObjectKeys,
         });
         rethrowCloudAgentError(error);
       }

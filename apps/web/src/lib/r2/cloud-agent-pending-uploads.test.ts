@@ -909,7 +909,7 @@ describe('cloud-agent pending-upload ledger', () => {
     });
 
     const linked = await linkPendingUploads(kiloUserId, messageUuid, [objectKey]);
-    expect(linked).toEqual({ unlinkedObjectKeys: [] });
+    expect(linked).toEqual({ linkedObjectKeys: [objectKey], unlinkedObjectKeys: [] });
 
     const summary = await reapAbandonedUploads();
 
@@ -945,10 +945,11 @@ describe('cloud-agent pending-upload ledger', () => {
       status: 'linked',
     });
 
-    const released = await releaseUnadmittedUploads(kiloUserId, {
-      path: unadmittedMessage,
-      files: [`${unadmittedAttachment}.bin`],
-    });
+    const released = await releaseUnadmittedUploads(
+      kiloUserId,
+      unadmittedMessage,
+      [buildObjectKey(kiloUserId, unadmittedMessage, unadmittedAttachment)]
+    );
 
     expect(released).toBe(1);
     const rows = await db
@@ -975,10 +976,9 @@ describe('cloud-agent pending-upload ledger', () => {
       status: 'linked',
     });
 
-    await releaseUnadmittedUploads(kiloUserId, {
-      path: messageUuid,
-      files: [`${attachment}.bin`],
-    });
+    await releaseUnadmittedUploads(kiloUserId, messageUuid, [
+      buildObjectKey(kiloUserId, messageUuid, attachment),
+    ]);
     const summary = await reapAbandonedUploads();
 
     expect(summary.reaped).toBe(1);
@@ -1007,7 +1007,7 @@ describe('cloud-agent pending-upload ledger', () => {
     await reapAbandonedUploads();
 
     const linked = await linkPendingUploads(kiloUserId, messageUuid, [objectKey]);
-    expect(linked).toEqual({ unlinkedObjectKeys: [objectKey] });
+    expect(linked).toEqual({ linkedObjectKeys: [], unlinkedObjectKeys: [objectKey] });
     const [after] = await db
       .select({ status: cloud_agent_pending_uploads.status })
       .from(cloud_agent_pending_uploads)
@@ -1073,16 +1073,48 @@ describe('cloud-agent pending-upload ledger', () => {
       expiresAt: future,
     });
 
-    await linkAttachmentsForDispatch(kiloUserId, {
+    const linkedKeys = await linkAttachmentsForDispatch(kiloUserId, {
       path: messageUuid,
       files: [`${attachment}.bin`, legacyFile],
     });
+
+    expect(linkedKeys).toEqual([buildObjectKey(kiloUserId, messageUuid, attachment)]);
 
     const [after] = await db
       .select({ status: cloud_agent_pending_uploads.status })
       .from(cloud_agent_pending_uploads)
       .where(eq(cloud_agent_pending_uploads.id, row));
     expect(after?.status).toBe('linked');
+  });
+
+  it('links nothing for a dispatch whose rows an earlier send already holds', async () => {
+    const kiloUserId = `ca-user-${crypto.randomUUID()}`;
+    const messageUuid = crypto.randomUUID();
+    const attachment = crypto.randomUUID();
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    const row = await insertPendingRow({
+      kiloUserId,
+      messageUuid,
+      attachmentId: attachment,
+      expiresAt: future,
+      status: 'linked',
+    });
+
+    // The composer reuses one attachment path across sends, so a second send
+    // finds the rows of the first one already linked and links none of them.
+    const linkedKeys = await linkAttachmentsForDispatch(kiloUserId, {
+      path: messageUuid,
+      files: [`${attachment}.bin`],
+    });
+
+    expect(linkedKeys).toEqual([]);
+    const [after] = await db
+      .select({ status: cloud_agent_pending_uploads.status })
+      .from(cloud_agent_pending_uploads)
+      .where(eq(cloud_agent_pending_uploads.id, row));
+    expect(after?.status).toBe('linked');
+    expect(mockSend).not.toHaveBeenCalled();
   });
 
   it('leaves every row of a refused message reapable', async () => {

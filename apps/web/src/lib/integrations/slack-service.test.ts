@@ -55,11 +55,6 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
-const mockGetDefaultAllowedModel = jest.fn();
-jest.mock('@/lib/slack-bot/model-allow-list', () => ({
-  getDefaultAllowedModel: (...args: unknown[]) => mockGetDefaultAllowedModel(...args),
-}));
-
 import type { Owner } from '@/lib/integrations/core/types';
 import type { SlackInstallation } from '@chat-adapter/slack';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';

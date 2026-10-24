@@ -724,6 +724,77 @@ describe('repository environment service', () => {
   });
 
   describe('loadEnvironmentForSession', () => {
+    test('does not mix variable values with a concurrent configuration revision', async () => {
+      const user = await insertTestUser();
+      const owner = userOwner(user.id);
+      const id = await createEnv({
+        owner,
+        createdByUserId: user.id,
+        name: 'Consistent',
+        platform: 'github',
+        repoFullName: 'acme/consistent',
+        plainVars: { VALUE: 'before' },
+      });
+      let edited = false;
+      // Commit an edit after the first real read; keep the SQL and transaction real.
+      const wrapQuery = (query: object): object =>
+        new Proxy(query, {
+          get(target, key) {
+            const value: unknown = Reflect.get(target, key, target);
+            if (typeof value !== 'function') return value;
+            if (key === 'then')
+              return (
+                resolve: (value: unknown) => unknown,
+                reject: (error: unknown) => unknown
+              ) => {
+                const read = Reflect.apply(value, target, [
+                  (rows: unknown) => rows,
+                ]) as Promise<unknown>;
+                return read
+                  .then(async rows => {
+                    if (!edited) {
+                      edited = true;
+                      await updateEnv({ owner, environmentId: id, plainVars: { VALUE: 'after' } });
+                    }
+                    return rows;
+                  })
+                  .then(resolve, reject);
+              };
+            return (...args: unknown[]) => {
+              const next: unknown = Reflect.apply(value, target, args);
+              return next !== null && typeof next === 'object' ? wrapQuery(next) : next;
+            };
+          },
+        });
+      const instrument = <T extends object>(database: T): T =>
+        new Proxy(database, {
+          get(target, key) {
+            const value: unknown = Reflect.get(target, key, target);
+            if (typeof value !== 'function') return value;
+            if (key === 'select')
+              return (...args: unknown[]) =>
+                wrapQuery(Reflect.apply(value, target, args) as object);
+            if (key === 'transaction')
+              return (body: (tx: object) => unknown, ...options: unknown[]) =>
+                Reflect.apply(value, target, [(tx: object) => body(instrument(tx)), ...options]);
+            return value.bind(target);
+          },
+        });
+      const loaded = await loadEnvironmentForSession(instrument(db), {
+        owner,
+        repository: { platform: 'github', repoFullName: 'acme/consistent' },
+      });
+      expect(edited).toBe(true);
+      expect(loaded?.reference.configurationRevision).toBe(1);
+      expect(loaded?.layer.envVars).toEqual({ VALUE: 'before' });
+      const current = await loadEnvironmentForSession(db, {
+        owner,
+        repository: { platform: 'github', repoFullName: 'acme/consistent' },
+      });
+      expect(current?.reference.configurationRevision).toBe(2);
+      expect(current?.layer.envVars).toEqual({ VALUE: 'after' });
+    });
+
     test('returns vars, envelopes, ordered commands, and size for the repository', async () => {
       const user = await insertTestUser();
       await createEnv({

@@ -701,22 +701,29 @@ export async function loadEnvironmentForSession(
   db: WorkerDb,
   input: { owner: EnvironmentOwner; repository: EnvironmentRepositoryIdentity }
 ): Promise<EnvironmentForSession | null> {
-  const environment = await readActiveEnvironment(
-    db,
-    identityCondition(input.owner, input.repository)
-  );
-  if (!environment) return null;
+  return db.transaction(
+    async tx => {
+      const environment = await readActiveEnvironment(
+        tx,
+        identityCondition(input.owner, input.repository)
+      );
+      if (!environment) return null;
 
-  const { plainVars, encryptedSecrets } = splitVariables(await readVariables(db, environment.id));
-  return {
-    layer: {
-      envVars: plainVars,
-      encryptedSecrets,
-      setupCommands: environment.commands,
+      const { plainVars, encryptedSecrets } = splitVariables(
+        await readVariables(tx, environment.id)
+      );
+      return {
+        layer: {
+          envVars: plainVars,
+          encryptedSecrets,
+          setupCommands: environment.commands,
+        },
+        reference: referenceOf(environment),
+        sandboxAllocation: environment.sandbox_allocation,
+      };
     },
-    reference: referenceOf(environment),
-    sandboxAllocation: environment.sandbox_allocation,
-  };
+    { isolationLevel: 'repeatable read', accessMode: 'read only' }
+  );
 }
 
 /**

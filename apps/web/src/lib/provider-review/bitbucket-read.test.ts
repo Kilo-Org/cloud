@@ -1268,6 +1268,73 @@ describe('listInbox', () => {
     expect(requests).toHaveLength(4);
   });
 
+  it('ends a repository whose final provider page omits the next link', async () => {
+    // Both repositories share one timestamp. The first has a single extra row
+    // on its last page, which Bitbucket answers without a `next` key, while the
+    // second keeps paginating: the finished repository must not be asked for a
+    // page that does not exist.
+    const tiedAt = '2026-09-02T00:00:00.000000+00:00';
+    const rowsBySlug: Record<string, InboxRow[]> = {
+      'repo-a': Array.from({ length: 51 }, (_, index) =>
+        inboxPr(100 + index, tiedAt, 'acme/repo-a')
+      ),
+      'repo-b': Array.from({ length: 100 }, (_, index) =>
+        inboxPr(500 + index, tiedAt, 'acme/repo-b')
+      ),
+    };
+    mockReadCachedRepositories.mockResolvedValue({
+      status: 'available',
+      repositories: Object.keys(rowsBySlug).map((slug, index) => ({
+        id: `87654321-4321-4321-4321-${String(index).padStart(12, '0')}`,
+        workspaceUuid: WORKSPACE.uuid,
+        name: slug,
+        fullName: `acme/${slug}`,
+        private: true,
+        defaultBranch: 'main',
+      })),
+      syncedAt: '2026-09-06T00:00:00.000Z',
+    });
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      const parsed = new URL(full);
+      const match = parsed.pathname.match(/^\/2\.0\/repositories\/acme\/([^/]+)\/pullrequests$/);
+      const rows = match ? rowsBySlug[match[1]] : undefined;
+      if (!match || !rows) return jsonResponse({ pagelen: 50, values: [] });
+      const page = Number(parsed.searchParams.get('page') ?? '1');
+      const values = rows.slice((page - 1) * 50, page * 50);
+      if (values.length === 0) {
+        // What Bitbucket answers for a page past the collection.
+        return jsonResponse(
+          { type: 'error', error: { message: 'Page number does not exist' } },
+          404
+        );
+      }
+      return jsonResponse(
+        rows.length > page * 50
+          ? { pagelen: 50, values, next: 'https://api.bitbucket.org/2.0/next?page=2' }
+          : { pagelen: 50, values }
+      );
+    });
+
+    const served: number[] = [];
+    let cursor: string | undefined;
+    for (let load = 0; load < 6; load += 1) {
+      const page = await listInbox(ORG_OWNER, cursor);
+      served.push(
+        ...page.items.flatMap(item => (item.ref && 'prId' in item.ref ? [item.ref.prId] : []))
+      );
+      cursor = page.nextCursor ?? undefined;
+      if (cursor === undefined) break;
+    }
+
+    expect(new Set(served).size).toBe(151);
+    expect(served).toHaveLength(151);
+    expect(cursor).toBeUndefined();
+  });
+
   it('reads one provider page per repository on every inbox page', async () => {
     // 12 repositories × 5 open PRs: every load reads one page per repository.
     const rowsBySlug: Record<string, InboxRow[]> = {};

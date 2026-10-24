@@ -1049,7 +1049,7 @@ export async function listInbox(
           (item, rowIndex) => ({ item, repoKey: key, rowIndex })
         );
         const served = position?.pages.get(key)?.served ?? 0;
-        pageReads.push({ key, page, rows, hadNext: parsedPage.data.next !== null });
+        pageReads.push({ key, page, rows, hadNext: Boolean(parsedPage.data.next) });
         const merged = [...window, ...rows.slice(served)].sort(compareInboxCandidates);
         if (merged.length > BITBUCKET_PAGE_SIZE) beyondWindow = true;
         window = merged.slice(0, BITBUCKET_PAGE_SIZE);

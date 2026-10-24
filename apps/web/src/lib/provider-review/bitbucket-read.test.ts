@@ -1026,11 +1026,11 @@ describe('listInbox', () => {
       .digest('base64url')}`;
 
   /** A continuation token in the shape the read layer issues. */
-  const inboxCursor = (identity: string, boundary: string, pages = Buffer.alloc(2)) =>
+  const inboxCursor = (identity: string, ceiling: string, pages = Buffer.alloc(2)) =>
     createSignedToken({
       kind: 'bitbucket-inbox-cursor',
       identity,
-      boundary,
+      ceiling,
       pages: pages.toString('base64url'),
     });
 
@@ -1081,9 +1081,10 @@ describe('listInbox', () => {
     expect(result.nextCursor).toBeNull();
   });
 
-  it('continues one repository from the signed boundary', async () => {
+  it('continues one repository from the signed ceiling', async () => {
     // 60 open PRs: the first load serves the newest 50 and hands back a signed
-    // boundary; the next load asks only for rows at or below that boundary.
+    // continuation; the next load re-reads the first page, skips the rows
+    // already served, and reads the second page in the same load.
     const requests: InboxRequest[] = [];
     serveInbox({ repo: minutesFixture(100, 60) }, requests);
 
@@ -1095,13 +1096,13 @@ describe('listInbox', () => {
     expect(requests[0]).toMatchObject({ slug: 'repo', query: 'state="OPEN"', page: '1' });
 
     const second = await listInbox(ORG_OWNER, first.nextCursor!);
-    // One provider page for the continuation too, carrying the boundary of
-    // the last row already served.
+    // The first load's page was fully served, so the continuation moves to the
+    // second provider page under the first load's ceiling.
     expect(requests).toHaveLength(2);
     expect(requests[1]).toMatchObject({
       slug: 'repo',
-      query: 'state="OPEN" AND updated_on <= 2026-09-02T00:10:00+00:00',
-      page: '1',
+      query: 'state="OPEN" AND updated_on <= 2026-09-02T00:59:00+00:00',
+      page: '2',
     });
     expect(second.items).toHaveLength(10);
     expect(second.items[0]?.ref).toMatchObject({ prId: 109 });
@@ -1113,18 +1114,18 @@ describe('listInbox', () => {
     expect(new Set(served).size).toBe(60);
   });
 
-  it('continues past a boundary that carries microseconds', async () => {
-    // The window ends on a timestamp inside the second's millisecond group; the
-    // row in the same millisecond from another repository still follows.
+  it('keeps the ceiling precise enough for rows inside one millisecond', async () => {
+    // 51 rows share a millisecond and differ only below it: the window serves
+    // the newest 50, and the continuation must keep the last one, whose
+    // provider timestamp sits above a millisecond-truncated ceiling.
     const requests: InboxRequest[] = [];
     serveInbox(
       {
-        'repo-a': [
-          inboxPr(300, '2026-09-02T00:00:02.400902+00:00', 'acme/repo-a'),
-          inboxPr(301, '2026-09-02T00:00:02.400500+00:00', 'acme/repo-a'),
-        ],
-        'repo-b': Array.from({ length: 49 }, (_, index) =>
-          inboxPr(400 + index, `2026-09-02T00:02:${String(index).padStart(2, '0')}.900100+00:00`)
+        repo: Array.from({ length: 51 }, (_, index) =>
+          inboxPr(
+            300 + index,
+            `2026-09-02T00:00:02.${String(410101 + index).padStart(6, '0')}+00:00`
+          )
         ),
       },
       requests
@@ -1132,19 +1133,16 @@ describe('listInbox', () => {
 
     const first = await listInbox(ORG_OWNER);
     expect(first.items).toHaveLength(50);
-    expect(first.items[49]?.ref).toMatchObject({ prId: 300 });
+    expect(requests).toHaveLength(1);
 
     const second = await listInbox(ORG_OWNER, first.nextCursor!);
-    expect(requests).toHaveLength(4);
-    expect(
-      requests.filter(
-        request =>
-          request.query === 'state="OPEN" AND updated_on <= 2026-09-02T00:00:02.400902+00:00'
-      )
-    ).toHaveLength(2);
+    expect(first.nextCursor).toBeTruthy();
+    expect(requests[1]).toMatchObject({
+      query: 'state="OPEN" AND updated_on <= 2026-09-02T00:00:02.410151+00:00',
+    });
     expect(
       second.items.map(item => (item.ref && 'prId' in item.ref ? item.ref.prId : null))
-    ).toEqual([301]);
+    ).toEqual([300]);
     expect(second.nextCursor).toBeNull();
   });
 
@@ -1227,12 +1225,50 @@ describe('listInbox', () => {
     expect(second.items).toHaveLength(50);
     expect(second.items[0]?.ref).toMatchObject({ prId: 149 });
     expect(second.nextCursor).toBeNull();
-    expect(requests).toHaveLength(4);
+    // repo-b has nothing left, so the continuation reads only repo-a.
+    expect(requests).toHaveLength(3);
+    expect(requests[2]).toMatchObject({
+      slug: 'repo-a',
+      query: 'state="OPEN" AND updated_on <= 2026-09-02T01:49:00+00:00',
+      page: '1',
+    });
 
     const served = [...first.items, ...second.items].flatMap(item =>
       item.ref && 'prId' in item.ref ? [item.ref.prId] : []
     );
     expect(new Set(served).size).toBe(100);
+  });
+
+  it('serves every row once when one repository spans provider pages and another is older', async () => {
+    // repo-a has 100 rows with distinct times, two provider pages of 50;
+    // repo-b has one row older than every repo-a row. Every load reads one
+    // provider page per repository, so repo-b's single row must not drag the
+    // continuation below repo-a's second page.
+    const base = Date.UTC(2026, 8, 2, 0, 0, 0);
+    const requests: InboxRequest[] = [];
+    serveInbox(
+      {
+        'repo-a': Array.from({ length: 100 }, (_, index) =>
+          inboxPr(100 + index, new Date(base - index * 1000).toISOString())
+        ),
+        'repo-b': [inboxPr(900, new Date(base - 1000 * 1000).toISOString())],
+      },
+      requests
+    );
+
+    const served: number[] = [];
+    let cursor: string | undefined;
+    for (let load = 0; load < 10; load += 1) {
+      const page = await listInbox(ORG_OWNER, cursor);
+      served.push(
+        ...page.items.flatMap(item => (item.ref && 'prId' in item.ref ? [item.ref.prId] : []))
+      );
+      cursor = page.nextCursor ?? undefined;
+      if (cursor === undefined) break;
+    }
+
+    expect(new Set(served).size).toBe(101);
+    expect(served).toHaveLength(101);
   });
 
   it('serves every tied row when another repository also sits at the boundary', async () => {
@@ -1335,8 +1371,9 @@ describe('listInbox', () => {
     expect(cursor).toBeUndefined();
   });
 
-  it('reads one provider page per repository on every inbox page', async () => {
-    // 12 repositories × 5 open PRs: every load reads one page per repository.
+  it('reads one provider page per repository that still has rows', async () => {
+    // 12 repositories × 5 open PRs: the first load reads one page per
+    // repository, and the continuation reads only the two with rows left.
     const rowsBySlug: Record<string, InboxRow[]> = {};
     for (let repo = 0; repo < 12; repo += 1) {
       rowsBySlug[`repo-${repo}`] = Array.from({ length: 5 }, (_, index) =>
@@ -1355,7 +1392,7 @@ describe('listInbox', () => {
     expect(requests).toHaveLength(12);
 
     const second = await listInbox(ORG_OWNER, first.nextCursor!);
-    expect(requests).toHaveLength(24);
+    expect(requests).toHaveLength(14);
     expect(second.items).toHaveLength(10);
     expect(second.nextCursor).toBeNull();
     expect(requests.every(request => request.page === '1')).toBe(true);
@@ -1426,7 +1463,7 @@ describe('listInbox', () => {
     const foreign = createSignedToken({
       kind: 'bitbucket-inbox-cursor',
       identity: 'bitbucket-inbox:evil',
-      boundary: '2026-09-02T00:10:00.000+00:00',
+      ceiling: '2026-09-02T00:10:00.000+00:00',
       pages: Buffer.alloc(2).toString('base64url'),
     });
     const page = await listInbox(ORG_OWNER, foreign);
@@ -1458,7 +1495,7 @@ describe('listInbox', () => {
       JSON.stringify({
         kind: 'bitbucket-inbox-cursor',
         identity: inboxIdentity(['repo']),
-        boundary: '2026-09-02T00:10:00.000+00:00',
+        ceiling: '2026-09-02T00:10:00.000+00:00',
         pages: Buffer.alloc(2).toString('base64url'),
         iat: Math.floor(Date.now() / 1000) - 2 * 60 * 60,
         nonce: 'expired-nonce',

@@ -282,7 +282,7 @@ describe('providerReviewRouter inputs', () => {
     const base = {
       kind: 'bitbucket-inbox-cursor',
       identity: 'bitbucket-inbox:acme',
-      boundary: '2026-09-02T00:00:00.000000+00:00',
+      ceiling: '2026-09-02T00:00:00.000000+00:00',
       served: [],
       pages: [],
     };

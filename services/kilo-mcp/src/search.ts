@@ -1,4 +1,8 @@
 import type { Catalog, CatalogRow, SearchResult, SemanticCandidates } from './types';
+import {
+  cloudAgentAuthorityInputSchema,
+  type CloudAgentAuthority,
+} from '../../../packages/worker-utils/src/cloud-agent-authority';
 
 /** Default number of search rows returned when the caller omits `limit`. */
 export const DEFAULT_SEARCH_LIMIT = 10;
@@ -93,6 +97,8 @@ export type SearchCatalogOptions = {
    * guarded (`admin` or `debug`) row from the ranking.
    */
   includeGuarded?: boolean;
+  allowedPaths?: readonly string[];
+  cloudAgentAuthority?: CloudAgentAuthority;
 };
 
 /**
@@ -145,6 +151,7 @@ export async function searchCatalogDetailed(
   // that answer costs no second embedding or Vectorize query.
   let hiddenGuardedMatches = false;
   for (const row of Object.values(catalog)) {
+    if (options.allowedPaths && !options.allowedPaths.includes(row.path)) continue;
     const blobTokens = new Set(tokenize(row.searchBlob));
     const score = lexicalScore(queryTokens, normalizedQuery, row, blobTokens);
     if (isGuardedRow(row) && !includeGuarded) {
@@ -158,7 +165,9 @@ export async function searchCatalogDetailed(
       summary: row.summary,
       tags: row.tags,
       score,
-      inputSchema: row.inputSchema,
+      inputSchema: options.cloudAgentAuthority
+        ? cloudAgentAuthorityInputSchema(options.cloudAgentAuthority)
+        : row.inputSchema,
       blobTokens,
       ...(isGuardedRow(row) ? { requiresApproval: true as const } : {}),
     };
@@ -187,6 +196,7 @@ export async function searchCatalogDetailed(
   for (const candidate of candidates) {
     const row = catalog[candidate.path];
     if (!row) continue;
+    if (options.allowedPaths && !options.allowedPaths.includes(row.path)) continue;
     // A semantic candidate must not smuggle a guarded row past the same gate
     // the lexical pass applies; the withheld candidate is the semantic form of
     // a hidden match and feeds the same single-pass signal.
@@ -204,7 +214,9 @@ export async function searchCatalogDetailed(
         summary: row.summary,
         tags: row.tags,
         score: candidate.score * minLexicalScore * 0.5,
-        inputSchema: row.inputSchema,
+        inputSchema: options.cloudAgentAuthority
+          ? cloudAgentAuthorityInputSchema(options.cloudAgentAuthority)
+          : row.inputSchema,
         blobTokens: new Set(),
         ...(isGuardedRow(row) ? { requiresApproval: true as const } : {}),
       };

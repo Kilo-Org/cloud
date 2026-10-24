@@ -198,11 +198,19 @@ describe('CLI catalog load failures', () => {
     ).toBe(true);
   });
 
+  it('treats an empty catalog as a transient catalog failure', () => {
+    const empty = {
+      ...emptyResult,
+      stderrTail: 'Model not found: kilo/candidate/model. No models are currently available.',
+    };
+    expect(isCatalogLoadFailureResult(empty)).toBe(true);
+    expect(isExactModelUnavailableResult(empty, 'candidate/model')).toBe(false);
+  });
+
   it.each([
     { text: 'answer' },
     { costUsd: 0.01 },
     { timedOut: true },
-    { stderrTail: 'Model not found: kilo/candidate/model. No models are currently available.' },
     { stderrTail: 'Provider API failed (network). Check your connection and credentials.' },
     { stderrTail: '' },
   ])('preserves measurements and unrelated failures: %j', overrides => {
@@ -329,7 +337,6 @@ describe('exact CLI model unavailability', () => {
     for (const diagnostic of [
       'Error: Model not found: kilo/candidate/model\nTry: `kilo models` to list available models',
       '\u001b[31mError:\u001b[0m Model not found: candidate/model',
-      'Error: Model not found: kilo/candidate/model. No models are currently available.',
       'Error: Model not found: kilo/candidate/model. Did you mean: candidate/other?',
     ]) {
       expect(
@@ -356,7 +363,7 @@ describe('exact CLI model unavailability', () => {
     ).toBe(false);
   });
 
-  it('persists stderr lookup failures even when the CLI returns a successful process exit', () => {
+  it('does not retain a lookup identity for an empty catalog', () => {
     const result = parseContainerRunResponse(
       {
         exitCode: 0,
@@ -368,8 +375,9 @@ describe('exact CLI model unavailability', () => {
       Date.now(),
       'candidate/model'
     );
-    expect(result.unavailableModelId).toBe('candidate/model');
-    expect(isExactModelUnavailableResult(result, 'different/model')).toBe(false);
+    expect(result.unavailableModelId).toBeUndefined();
+    expect(isCatalogLoadFailureResult(result)).toBe(true);
+    expect(isExactModelUnavailableResult(result, 'candidate/model')).toBe(false);
   });
 
   it.each([

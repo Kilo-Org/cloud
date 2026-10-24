@@ -11,15 +11,48 @@ import {
   resetHookSlots,
   seedRecents,
 } from './pr-review-entry-screen-test-utils';
+import { prLinkDraft } from '@/lib/pr-review/pr-link-draft';
 
 beforeEach(() => {
   vi.clearAllMocks();
   resetHookSlots();
   mocks.clipboard.current = '';
+  mocks.clipboardHasString.current = false;
+  prLinkDraft.text = '';
   seedRecents([]);
 });
 
 describe('provider-neutral URL field', () => {
+  it('names the active context between the header and the inbox', async () => {
+    const tree = await renderLoaded();
+    expect(findAll(tree, 'PrReviewContextLine')).toHaveLength(1);
+  });
+
+  it('labels and placeholders name both review nouns, no provider host', async () => {
+    const tree = await renderLoaded();
+    const input = find(tree, 'Input', () => true);
+    expect(input.props?.placeholder).toBe('Pull request or merge request URL');
+    expect(input.props?.accessibilityLabel).toBe('Enter a pull request or merge request URL');
+    expect(String(input.props?.placeholder)).not.toContain('github');
+  });
+
+  it('draws the placeholder as one ellipsized line instead of the wrapping native hint', async () => {
+    const tree = await renderLoaded();
+    const input = find(tree, 'Input', () => true);
+    // pr-review-home finding: at font scale 2 the native EditText lays the long
+    // placeholder hint out on two lines while Yoga sizes the field to one line,
+    // so the second line is clipped. `numberOfLines` cannot stop that — RN
+    // never marks a single-line input as single-line, so the hint still wraps —
+    // hence the visible placeholder is the one-line overlay below. The native
+    // hint stays set (the device digest binds the field's text and hint to the
+    // placeholder copy) but is transparent on both platforms so it cannot draw.
+    expect(input.props?.placeholder).toBe('Pull request or merge request URL');
+    expect(input.props?.placeholderTextColor).toBe('transparent');
+    expect(input.props?.numberOfLines).toBe(1);
+    const overlay = find(tree, 'PrLinkPlaceholder', () => true);
+    expect(overlay.props?.label).toBe('Pull request or merge request URL');
+  });
+
   it('hides the placeholder overlay once the field has text', async () => {
     const before = await renderLoaded();
     expect(findAll(before, 'PrLinkPlaceholder')).toHaveLength(1);
@@ -168,6 +201,81 @@ describe('provider-neutral URL field', () => {
     expect(mocks.toastError).not.toHaveBeenCalled();
   });
 
+  it('reports a denied paste instead of an empty clipboard', async () => {
+    mocks.clipboard.current = '';
+    mocks.clipboardHasString.current = true;
+    const tree = await renderLoaded();
+    const paste = find(
+      tree,
+      'Pressable',
+      p => p.accessibilityLabel === 'Paste pull request or merge request link'
+    );
+    await (propsOf(paste).onPress as () => Promise<void>)();
+    await flush();
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      'Paste access was denied. Allow paste and try again.'
+    );
+    expect(mocks.toastError).not.toHaveBeenCalledWith('Clipboard is empty');
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it('keeps the empty-clipboard copy when the clipboard has no text either', async () => {
+    const tree = await renderLoaded();
+    const paste = find(
+      tree,
+      'Pressable',
+      p => p.accessibilityLabel === 'Paste pull request or merge request link'
+    );
+    await (propsOf(paste).onPress as () => Promise<void>)();
+    await flush();
+    expect(mocks.toastError).toHaveBeenCalledWith('Clipboard is empty');
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it('keeps the pasted link and Open enabled when the entry screen remounts', async () => {
+    const link = 'https://gitlab.com/acme/api/-/merge_requests/3';
+    mocks.clipboard.current = link;
+    const tree = await renderLoaded();
+    const paste = find(
+      tree,
+      'Pressable',
+      p => p.accessibilityLabel === 'Paste pull request or merge request link'
+    );
+    await (propsOf(paste).onPress as () => Promise<void>)();
+    await flush();
+    expect(mocks.push).toHaveBeenCalledWith(
+      '/(app)/pr-review/gitlab/acme/api/3?instance=https%3A%2F%2Fgitlab.com'
+    );
+
+    resetHookSlots();
+    const remounted = render();
+    expect(find(remounted, 'Input', () => true).props?.defaultValue).toBe(link);
+    expect(
+      find(remounted, 'Button', p => p.accessibilityLabel === 'Open pull request or merge request')
+        .props?.disabled
+    ).toBe(false);
+    expect(findAll(remounted, 'PrLinkPlaceholder')).toHaveLength(0);
+  });
+
+  it('drops the stored link when the clear control empties the field', async () => {
+    const tree = await renderLoaded();
+    const input = find(tree, 'Input', () => true);
+    (propsOf(input).onChangeText as (value: string) => void)(
+      'https://github.com/octocat/hello-world/pull/42'
+    );
+    const withText = render();
+    const clear = find(withText, 'Pressable', p => p.accessibilityLabel === 'Clear link');
+    (propsOf(clear).onPress as () => void)();
+
+    resetHookSlots();
+    const remounted = render();
+    expect(find(remounted, 'Input', () => true).props?.defaultValue).toBe('');
+    expect(
+      find(remounted, 'Button', p => p.accessibilityLabel === 'Open pull request or merge request')
+        .props?.disabled
+    ).toBe(true);
+  });
+
   it('paste of plain text shows inline feedback without navigating', async () => {
     mocks.clipboard.current = 'just some notes';
     const tree = await renderLoaded();
@@ -194,6 +302,31 @@ describe('provider-neutral URL field', () => {
     const input = find(before, 'Input', () => true);
     (propsOf(input).onChangeText as (value: string) => void)('anything');
     const after = render();
-    expect(find(after, 'Pressable', p => p.accessibilityLabel === 'Clear link')).toBeTruthy();
+    const clear = find(after, 'Pressable', p => p.accessibilityLabel === 'Clear link');
+    expect(clear).toBeTruthy();
+    // Icon-only like the paste control, so its own box carries Android's 48dp
+    // minimum instead of a smaller frame plus hit slop.
+    expect(String(clear.props?.className)).toContain(
+      'h-[48px] w-[48px] items-center justify-center'
+    );
+    expect(clear.props?.hitSlop).toBeUndefined();
+  });
+
+  it('gives the paste control the shared 48dp icon target with no hit slop', async () => {
+    const tree = await renderLoaded();
+    const paste = find(
+      tree,
+      'Pressable',
+      p => p.accessibilityLabel === 'Paste pull request or merge request link'
+    );
+    // The audit reads the node's own rect, so the box — not a hit slop —
+    // carries the 48dp minimum Android requires. The literal matches
+    // ICON_TARGET_BOX_CLASS; importing the module here would pull
+    // react-native into a suite whose harness mocks it wholesale.
+    expect(String(paste.props?.className)).toContain(
+      'h-[48px] w-[48px] items-center justify-center'
+    );
+    expect(String(paste.props?.className)).not.toContain('h-11 w-11');
+    expect(paste.props?.hitSlop).toBeUndefined();
   });
 });

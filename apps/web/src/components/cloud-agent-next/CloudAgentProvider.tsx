@@ -219,6 +219,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
       fetchSnapshotPage: (id, options) => fetchWebSessionSnapshotPage(trpcClient, id, options),
       readCachedSnapshotPage: transcriptCache.read,
       writeCachedSnapshotPage: transcriptCache.write,
+      invalidateCachedSnapshotPage: transcriptCache.invalidate,
 
       userWebConnection: sharedConnection,
 
@@ -345,7 +346,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
       },
 
       fetchSession: async (kiloSessionId: KiloSessionId): Promise<FetchedSessionData> => {
-        const sessionResult = await queryClient.fetchQuery({
+        const sessionResult = await queryClient.query({
           ...trpc.cliSessionsV2.getWithRuntimeState.queryOptions(
             { session_id: kiloSessionId },
             { trpc: { context: { skipBatch: true } } }

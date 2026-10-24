@@ -4,7 +4,13 @@ import { DEFAULT_BACKEND_URL } from './constants.js';
 import { logger } from './logger.js';
 import type { Env } from './types.js';
 import type { PersistenceEnv } from './persistence/types.js';
-import { fetchSessionMetadata } from './session-service.js';
+import { fetchSessionMetadata } from './session/metadata.js';
+import { verifyKiloTokenForPolicy } from '@kilocode/worker-utils/kilo-token-policy';
+import {
+  issueRuntimeProxyAttestation,
+  RUNTIME_PROXY_ATTESTATION_HEADER,
+} from '@kilocode/worker-utils/runtime-proxy-attestation';
+import { resolveSecret } from './auth.js';
 
 const MIN_BALANCE_DOLLARS = 1;
 
@@ -49,6 +55,40 @@ export async function validateBalanceOnly(
   const isControlToken =
     claims !== null && typeof claims === 'object' && claims.aud === CLOUD_AGENT_NEXT_AUDIENCE;
   const balancePath = isControlToken ? '/api/cloud-agent-next/balance' : '/api/profile/balance';
+  if (claims !== null && typeof claims === 'object' && claims.runtimeAuthorization !== undefined) {
+    try {
+      const secret = await resolveSecret(env.NEXTAUTH_SECRET);
+      if (!secret) throw new Error();
+      const verified = await verifyKiloTokenForPolicy(token, secret, {
+        audience: 'kilo-api',
+        mode: 'required',
+      });
+      const authorization = verified.claims.runtimeAuthorization;
+      if (
+        !authorization ||
+        authorization.resourceKind !== 'cloud-agent-next' ||
+        verified.claims.organizationId !== orgId
+      )
+        throw new Error();
+      headers.set(
+        RUNTIME_PROXY_ATTESTATION_HEADER,
+        await issueRuntimeProxyAttestation({
+          secret,
+          audience: 'kilo-api',
+          userId: verified.userId,
+          authorizationId: authorization.id,
+          resourceId: authorization.resourceId,
+          bearer: token,
+        })
+      );
+    } catch {
+      return {
+        success: false,
+        status: 500,
+        message: 'Failed to verify runtime balance authorization',
+      };
+    }
+  }
 
   let response: Response;
   try {

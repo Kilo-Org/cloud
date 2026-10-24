@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
-import { type useNativeAuth } from '@/lib/auth/use-native-auth';
+import { type BusyAction } from '@/lib/auth/use-native-auth';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { canSubmitEmailCode } from './email-otp-state';
 
@@ -35,13 +35,19 @@ function formatCodeDestination(message: string, email: string): string {
 export function EmailOtpForm({
   email,
   busy,
+  error,
   onVerify,
+  onCodeChange,
   onResend,
   onBack,
 }: Readonly<{
   email: string;
-  busy: ReturnType<typeof useNativeAuth>['busy'];
+  busy: BusyAction;
+  /** A verify refusal in the active language, rendered above the verify button. */
+  error?: string;
   onVerify: (code: string) => void;
+  /** Fires on every code-input change so the caller can retire a stale refusal message. */
+  onCodeChange?: () => void;
   onResend: () => void;
   onBack: () => void;
 }>) {
@@ -83,9 +89,15 @@ export function EmailOtpForm({
         onChangeText={value => {
           codeRef.current = value;
           setHasCompleteCode(/^\d{6}$/.test(value));
+          onCodeChange?.();
         }}
         accessibilityLabel={formFieldA11y({ label: t('login.signInCodeField'), required: true })}
       />
+      {error ? (
+        <Text className="text-center text-sm text-destructive" accessibilityLiveRegion="polite">
+          {error}
+        </Text>
+      ) : null}
       <Button
         size="lg"
         className="flex-row gap-2"

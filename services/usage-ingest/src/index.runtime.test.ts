@@ -34,6 +34,17 @@ it.each([undefined, 'staging'])(
           ...(env === 'staging' ? { vars: { USAGE_INGEST_MODE: 'receipt' } } : {}),
           secrets: { USAGE_INGEST_PUBLISH_SECRET: 'synthetic-local-secret' },
         },
+        ...(env === 'staging'
+          ? [
+              {
+                configPath: new URL('../wrangler.writer-relay.jsonc', import.meta.url),
+                vars: {
+                  USAGE_WRITER_URL:
+                    'https://must-not-call-writer.invalid/api/internal/usage/record',
+                },
+              },
+            ]
+          : []),
       ],
     });
     try {

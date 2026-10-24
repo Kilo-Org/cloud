@@ -91,6 +91,7 @@ import {
 } from '@/lib/pr-review/discussion/review-discussion-types';
 import { mergeDiscussionListItemsBySortKey } from '@/lib/pr-review/discussion/merge-discussion-list-items';
 import { useMotionPolicy } from '@/lib/a11y/motion';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import {
   expandedForThread,
   expandThread,
@@ -311,7 +312,13 @@ export function PrReviewDiscussionTab({
 
   // ── First-page error / terminal states ─────────────────────────────
   const isEmpty = isDiscussionEmpty(threads, conversation);
-  const retainedContentError = !isEmpty && firstPageErrorState?.kind === 'retryable';
+  // A retryable gateway-class failure (retryable or service-unavailable)
+  // with already-loaded rows keeps them: the error renders as a later-page
+  // retry footer, not a tab-level blank.
+  const retainedContentError =
+    !isEmpty &&
+    (firstPageErrorState?.kind === 'retryable' ||
+      firstPageErrorState?.kind === 'service-unavailable');
   const view = selectDiscussionTabView({
     firstPageErrorState: retainedContentError ? null : firstPageErrorState,
     isPending: query.isPending && isEmpty,
@@ -409,6 +416,7 @@ export function PrReviewDiscussionTab({
       action={
         onRequestFiles ? (
           <Button
+            className={STATE_ACTION_CLASS}
             variant="outline"
             onPress={onRequestFiles}
             accessibilityLabel={t('prReview.discussion.reviewFiles')}
@@ -468,7 +476,7 @@ export function PrReviewDiscussionTab({
   if (view.kind === 'reconnect') {
     return (
       <>
-        <CenteredState className="px-6">
+        <CenteredState contentContainerClassName="px-6">
           <PrReviewReconnectNotice />
         </CenteredState>
         {dialog}
@@ -481,6 +489,22 @@ export function PrReviewDiscussionTab({
         <QueryError
           variant="server"
           title={t('prReview.discussion.couldNotLoad')}
+          onRetry={() => {
+            void query.refetch();
+          }}
+          isRetrying={query.isFetching}
+        />
+        {dialog}
+      </>
+    );
+  }
+  if (view.kind === 'service-unavailable') {
+    return (
+      <>
+        <QueryError
+          variant="server"
+          title={t('prReview.reviewServiceUnavailable')}
+          message={t('prReview.reviewServiceUnavailableDescription')}
           onRetry={() => {
             void query.refetch();
           }}

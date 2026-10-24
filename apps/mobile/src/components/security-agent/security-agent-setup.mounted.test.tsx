@@ -1,5 +1,6 @@
 import { act, createElement } from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { toast } from 'sonner-native';
 
 import { CenteredState } from '@/components/centered-state';
 import { Button } from '@/components/ui/button';
@@ -45,6 +46,10 @@ it('centers setup, disables Connect while authorizing, and refreshes on return',
       description: 'Authorize the GitHub App.',
       buttonLabel: 'Connect',
       url: 'https://github.com/apps/kilo',
+      resolveUrl: async () => {
+        await Promise.resolve();
+        return 'https://github.com/apps/kilo';
+      },
       onConnected,
     })
   );
@@ -52,6 +57,9 @@ it('centers setup, disables Connect while authorizing, and refreshes on return',
   const button = body.findByType(Button);
   expect(button.props.disabled).toBe(false);
   act(button.props.onPress as () => void);
+  await act(async () => {
+    await Promise.resolve();
+  });
   expect(button.props.disabled).toBe(true);
   expect(authorization).toHaveBeenCalledWith('https://github.com/apps/kilo');
   expect(onConnected).not.toHaveBeenCalled();
@@ -60,5 +68,31 @@ it('centers setup, disables Connect while authorizing, and refreshes on return',
     await result.promise;
   });
   expect(onConnected).toHaveBeenCalledOnce();
+  expect(button.props.disabled).toBe(false);
+});
+
+it('toasts the setup failure and stays mounted when no URL can be resolved', async () => {
+  const onConnected = vi.fn().mockResolvedValue(undefined);
+  mounted = await renderWithProviders(
+    createElement(SecurityAgentSetup, {
+      title: 'Connect GitHub',
+      description: 'Authorize the GitHub App.',
+      buttonLabel: 'Connect',
+      resolveUrl: async () => {
+        await Promise.resolve();
+        return undefined;
+      },
+      onConnected,
+    })
+  );
+  const body = mounted.renderer.root.findByType(CenteredState);
+  const button = body.findByType(Button);
+  act(button.props.onPress as () => void);
+  await act(async () => {
+    await Promise.resolve();
+  });
+  expect(authorization).not.toHaveBeenCalled();
+  expect(onConnected).not.toHaveBeenCalled();
+  expect(toast.error).toHaveBeenCalledWith('securityAgent.scopeEntry.setupFailed');
   expect(button.props.disabled).toBe(false);
 });

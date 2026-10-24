@@ -103,6 +103,7 @@ export type ControlPlaneSetupEvent = z.infer<typeof controlPlaneSetupEventSchema
 export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'preparation_timeout',
   'workspace_setup_failed',
+  'credential_upgrade_required',
   'agent_unavailable',
   'billing_blocked',
   'billing_unavailable',
@@ -726,6 +727,21 @@ export const controlPlaneSessionCredentialsPayloadSchema = z
       .strict()
       .optional(),
     kilo: z.object({ token: z.string().min(1).max(4096) }).strict(),
+    cloudAgentMcp: z
+      .object({
+        url: z.union([
+          z.literal('https://mcp.kiloapps.io/mcp'),
+          z
+            .string()
+            .regex(
+              /^http:\/\/(?:localhost|127\.0\.0\.1|host\.docker\.internal)(?::\d{1,5})?\/mcp$/
+            ),
+        ]),
+        token: z.string().min(1).max(65536),
+        expiresAt: z.number().int().positive(),
+      })
+      .strict()
+      .optional(),
     // Spec §6: when the route runs behind the runtime credential proxy, the
     // Worker-facade handle and facade targets travel here, not in the route
     // spec. The wrapper prefers these over the spec's alias and targets.
@@ -975,10 +991,7 @@ const controlPlaneWorktreeResultFrameSchema = z.discriminatedUnion('ok', [
 
 /**
  * Worktree-deletion payload (R2, spec §6 "Billing, credentials and deletion").
- * Same contract the legacy plane sends for `worktree.prepareDeletion` and
- * `worktree.delete` (`worktreeDeletePayloadSchema`), so the wrapper can reuse
- * `control/delete-worktree.ts` unchanged. Both requests answer with the shared
- * `worktree.result` frame.
+ * Both deletion requests answer with the shared `worktree.result` frame.
  */
 export const controlPlaneWorktreeDeletionPayloadSchema = z
   .object({

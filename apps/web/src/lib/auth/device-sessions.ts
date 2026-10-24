@@ -1,11 +1,18 @@
 import 'server-only';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { device_sessions, device_refresh_tokens, kilocode_users } from '@kilocode/db/schema';
+import {
+  device_sessions,
+  device_refresh_tokens,
+  kilocode_users,
+  user_auth_provider,
+} from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
 import { eq, and, isNull, gt, sql, getTableColumns } from 'drizzle-orm';
 import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
 import { createHash, randomBytes } from 'node:crypto';
-import { persistAttestedKeyTx, type VerifyAdmissionOk } from './native-admission';
+import { persistAttestedKey, type VerifyAdmissionOk } from './native-admission';
+import { checkDomainSignInEligibility } from './email-signin-eligibility';
 
 const REFRESH_TOKEN_BYTES = 32;
 
@@ -34,6 +41,52 @@ async function revokeForReuse(deviceSessionId: string, revokedAt: string): Promi
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
+}
+
+type RenewalDomainPolicy = 'allow' | 'revoke' | 'unavailable';
+
+/**
+ * Decides whether a session may renew against the domain policy of the
+ * account's current email. `revoke` means the domain is refused; `unavailable`
+ * means the policy could not be evaluated and the caller must not treat it as
+ * a refusal.
+ *
+ * A domain that requires SSO allows renewal when the account is linked to that
+ * domain's SSO authority, since such an account signs in through SSO.
+ */
+async function evaluateRenewalDomainPolicy(user: {
+  id: string;
+  google_user_email: string;
+}): Promise<RenewalDomainPolicy> {
+  const eligibility = await checkDomainSignInEligibility(user.google_user_email);
+  if (eligibility.ok) {
+    return 'allow';
+  }
+
+  if (eligibility.status >= 500) {
+    return 'unavailable';
+  }
+
+  if (eligibility.errorCode === 'BLOCKED') {
+    return 'revoke';
+  }
+
+  const domain = getLowerDomainFromEmail(user.google_user_email);
+  if (domain) {
+    const ssoLink = await db.query.user_auth_provider.findFirst({
+      where: and(
+        eq(user_auth_provider.kilo_user_id, user.id),
+        eq(user_auth_provider.provider, 'workos'),
+        eq(user_auth_provider.hosted_domain, domain)
+      ),
+      columns: { kilo_user_id: true },
+    });
+    if (ssoLink) {
+      return 'allow';
+    }
+  }
+
+  return 'revoke';
 }
 
 function generateRefreshToken(): string {
@@ -100,9 +153,12 @@ export async function issueSessionCredentials(
  * Rotate a refresh token. On success, returns a new token pair.
  * On failure, returns null with an error code.
  *
- * Precondition checks (session validity, user blocked_reason) happen BEFORE
- * the atomic consume, so a blocked refusal does not consume the token.
- * An unknown or expired token is refused without revocation.
+ * Precondition checks (session validity, user blocked_reason, and the domain
+ * policy of the account's current email) happen BEFORE the atomic consume, so a
+ * refusal does not consume the token. A domain that requires SSO keeps renewing
+ * for an account linked to that domain's SSO authority; a refused domain
+ * revokes the session. A policy that cannot be evaluated throws without
+ * revoking. An unknown or expired token is refused without revocation.
  *
  * Reuse detection: a consumed token is a replay, and the session is revoked,
  * when the session chain has advanced past it (a later token was consumed) or
@@ -140,22 +196,30 @@ export async function rotateRefreshToken(
   const tokenHash = hashToken(refreshToken);
   const now = new Date().toISOString();
 
-  // Step 1: Look up the token row to check validity and reuse BEFORE consuming.
-  // `firstReadAt` is the database time of this request's first read.
+  // Steps 1-3: Look up the token, its parent session, and the user in one
+  // joined read BEFORE consuming. `firstReadAt` is the database time of this
+  // request's first read. The joins are inner: a missing session or user row
+  // yields no row, which refuses without revocation, and the full user row
+  // read here is the one token generation consumes later.
   const [row] = await db
     .select({
       ...getTableColumns(device_refresh_tokens),
       firstReadAt: sql<string>`clock_timestamp()::text`,
+      session: device_sessions,
+      user: kilocode_users,
     })
     .from(device_refresh_tokens)
+    .innerJoin(device_sessions, eq(device_sessions.id, device_refresh_tokens.device_session_id))
+    .innerJoin(kilocode_users, eq(kilocode_users.id, device_sessions.kilo_user_id))
     .where(eq(device_refresh_tokens.token_hash, tokenHash))
     .limit(1);
 
-  // Unknown token: refuse without revocation.
+  // Unknown token, or a token whose session or user no longer exists: refuse
+  // without revocation.
   if (!row) {
     return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
   }
-  const { firstReadAt } = row;
+  const { firstReadAt, session, user } = row;
 
   // Expired token: refuse without revocation.
   if (new Date(row.expires_at) <= new Date()) {
@@ -169,33 +233,28 @@ export async function rotateRefreshToken(
     return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
   }
 
-  // Step 2: Check parent session validity BEFORE consuming.
-  const [session] = await db
-    .select()
-    .from(device_sessions)
-    .where(eq(device_sessions.id, row.device_session_id))
-    .limit(1);
-
-  if (!session) {
-    return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
-  }
-
+  // Parent session validity BEFORE consuming.
   if (session.revoked_at) {
     return { ok: false, error: 'SESSION_REVOKED' };
   }
 
-  // Step 3: Check user blocked_reason BEFORE consuming.
-  const [user] = await db
-    .select({ id: kilocode_users.id, blocked_reason: kilocode_users.blocked_reason })
-    .from(kilocode_users)
-    .where(eq(kilocode_users.id, session.kilo_user_id))
-    .limit(1);
-
-  if (!user) {
-    return { ok: false, error: 'INVALID_REFRESH_TOKEN' };
+  // User blocked_reason BEFORE consuming.
+  if (user.blocked_reason) {
+    return { ok: false, error: 'USER_BLOCKED' };
   }
 
-  if (user.blocked_reason) {
+  // Step 3b: Apply the domain policy that governs renewal, before the consume,
+  // so a refusal leaves the token untouched. A verdict that could not be
+  // evaluated throws: renewal stops instead of proceeding unverified.
+  const renewalPolicy = await evaluateRenewalDomainPolicy(user);
+  if (renewalPolicy === 'unavailable') {
+    throw new Error('Domain sign-in policy could not be evaluated for refresh rotation');
+  }
+  if (renewalPolicy === 'revoke') {
+    await revokeDeviceSession(session.id, 'domain_ineligible');
+    console.warn('[native-refresh] domain not eligible; session revoked', {
+      deviceSessionId: session.id,
+    });
     return { ok: false, error: 'USER_BLOCKED' };
   }
 
@@ -203,18 +262,6 @@ export async function rotateRefreshToken(
   // transaction. If issuing the replacement fails, the transaction rolls back
   // and the old token remains usable, so the client can retry with it.
   const outcome = await db.transaction(async tx => {
-    // Fetch the full user for token generation BEFORE consuming, so a missing
-    // user refuses without burning the token.
-    const [fullUser] = await tx
-      .select()
-      .from(kilocode_users)
-      .where(eq(kilocode_users.id, session.kilo_user_id))
-      .limit(1);
-
-    if (!fullUser) {
-      return { kind: 'missing_user' } as const;
-    }
-
     // Step 4: Lock the parent session row and recheck revoked_at INSIDE the
     // transaction, before consuming. The pre-transaction session check above
     // can be raced by a revokeDeviceSession that commits between that read and
@@ -321,7 +368,7 @@ export async function rotateRefreshToken(
 
     // Step 7: Issue the replacement pair in the same transaction.
     const accessToken = generateApiToken(
-      fullUser,
+      user,
       { deviceSessionId: lockedSession.id },
       { expiresIn: TOKEN_EXPIRY.oneHour }
     );
@@ -380,10 +427,8 @@ export async function createDeviceSessionWithAttestedKey(params: {
   verification: VerifyAdmissionOk;
 }): Promise<{ token: string; refreshToken: string; expiresIn: number; sessionId: string }> {
   return await db.transaction(async tx => {
-    // Persist the attested key inside the transaction
-    await persistAttestedKeyTx(tx, params.userId, params.verification);
+    await persistAttestedKey(params.userId, params.verification, tx);
 
-    // Create the device session
     const [session] = await tx
       .insert(device_sessions)
       .values({
@@ -396,7 +441,6 @@ export async function createDeviceSessionWithAttestedKey(params: {
       throw new Error('Failed to create device session');
     }
 
-    // Issue credentials
     const accessToken = generateApiToken(
       params.user,
       { deviceSessionId: session.id },

@@ -42,6 +42,7 @@ import {
   fetchSessionDiff,
   deleteSession as deleteSessionIngest,
   shareSession as shareSessionIngest,
+  SessionShareTooLargeError,
   unshareSession as unshareSessionIngest,
 } from '@/lib/session-ingest-client';
 import {
@@ -49,6 +50,7 @@ import {
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
   cloudAgentWorktreeIdSchema,
   isDefaultSessionTitle,
+  sessionShareOptionsSchema,
   projectPrivateWorktreePaths,
   validateKiloSdkMessagesCursor,
   type SessionDiffRead,
@@ -819,9 +821,10 @@ const RenameSessionInputSchema = z.object({
   title: z.string().trim().min(1).max(200),
 });
 
-const ShareSessionInputSchema = z.object({
+const UnshareSessionInputSchema = z.object({
   session_id: sessionIdField,
 });
+const ShareSessionInputSchema = UnshareSessionInputSchema.extend(sessionShareOptionsSchema.shape);
 
 function addCreatedOnPlatformConditions(
   whereConditions: SQL[],
@@ -1847,12 +1850,14 @@ export const cliSessionsV2Router = createTRPCRouter({
    * (`platform`/`pr_url`/`pr_number` plus `pr_head_ref`/`pr_head_sha`). The
    * fetched PR is accepted only when `verifySessionPullRequestLink` confirms
    * the link names the session's repo, the PR base and head repositories are
-   * that same repo, the PR head ref is the session's branch, and (when
-   * reported) the session head SHA is the PR head or one of its commits. On
-   * failure the link is left unverified and no live PR is returned (the read
-   * path still shows the session's own pending partial); there is no
-   * branch-name fallback. On success `pr_link_verified_at` is set and the
-   * state cache is upserted by PR identity `(git_url, pr_number, tenant)`.
+   * that same repo, the PR head ref is the branch the session reported pushing
+   * (its `pr_head_ref`, or the stored session branch when the link carries no
+   * head ref), and (when reported) the session head SHA is the PR head or one
+   * of its commits. On failure the link is left unverified and no live PR is
+   * returned (the read path still shows the session's own pending partial);
+   * there is no branch-name fallback. On success `pr_link_verified_at` is set
+   * and the state cache is upserted by PR identity `(git_url, pr_number,
+   * tenant)`.
    */
   refreshAssociatedPullRequest: baseProcedure
     .input(z.object({ sessionId: z.string().min(1) }))
@@ -2229,7 +2234,7 @@ export const cliSessionsV2Router = createTRPCRouter({
     const { session_id } = input;
     const session = await getSessionWithAccessCheck(session_id, ctx);
 
-    if (session.cloud_agent_session_id) {
+    if (session.cloud_agent_session_id && SESSION_ID_RE.test(session.cloud_agent_session_id)) {
       const authToken = (
         await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
           headers: ctx.headersList,
@@ -2320,17 +2325,21 @@ export const cliSessionsV2Router = createTRPCRouter({
   /**
    * Share a V2 session by issuing an opaque JWT share token.
    *
-   * Delegates to the session-ingest worker which is idempotent — if the session
-   * already has an active share generation, the existing one is reused.
+   * Delegates to the session-ingest worker, which rotates the public
+   * capability. Each call issues a fresh share generation and invalidates the
+   * previous link.
    */
   share: baseProcedure.input(ShareSessionInputSchema).mutation(async ({ ctx, input }) => {
-    const { session_id } = input;
+    const { session_id, ...shareOptions } = input;
     await getSessionWithAccessCheck(session_id, ctx);
 
     try {
-      const result = await shareSessionIngest(session_id, ctx.user.id);
+      const result = await shareSessionIngest(session_id, ctx.user.id, shareOptions);
       return { share_token: result.share_token };
     } catch (error) {
+      if (error instanceof SessionShareTooLargeError) {
+        throw new TRPCError({ code: 'PAYLOAD_TOO_LARGE', message: error.message, cause: error });
+      }
       captureException(error, {
         tags: { source: 'cli-sessions-v2-router', endpoint: 'share' },
         extra: { session_id },
@@ -2349,7 +2358,7 @@ export const cliSessionsV2Router = createTRPCRouter({
    * Owner-only, matching the session-ingest worker. A missing or inaccessible
    * session is NOT_FOUND. Worker 404 is mapped the same way.
    */
-  unshare: baseProcedure.input(ShareSessionInputSchema).mutation(async ({ ctx, input }) => {
+  unshare: baseProcedure.input(UnshareSessionInputSchema).mutation(async ({ ctx, input }) => {
     const { session_id } = input;
     await getSessionWithAccessCheck(session_id, ctx);
 

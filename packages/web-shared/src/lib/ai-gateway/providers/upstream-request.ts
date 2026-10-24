@@ -18,6 +18,8 @@ import { after, NextResponse } from 'next/server';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
 import { buildSecureProxyRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/secure-proxy';
+import { signBedrockRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/aws-bedrock-signing';
+import type { CustomLlmAwsBedrockCredentials } from '@kilocode/db/schema-types';
 import {
   isUpstreamUrlPolicyEnforced,
   rejectDisallowedUpstreamUrls,
@@ -258,6 +260,33 @@ function upstreamFetchFailureResponse(
   );
 }
 
+async function buildSignedBedrockRequest({
+  url,
+  method,
+  headers,
+  body,
+  credentials,
+}: {
+  url: string;
+  method: string;
+  headers: Headers;
+  body: OpenRouterChatCompletionRequest | GatewayResponsesRequest | GatewayMessagesRequest;
+  credentials: CustomLlmAwsBedrockCredentials;
+}) {
+  const serializedBody = JSON.stringify(body);
+  return {
+    url,
+    headers: await signBedrockRequest({
+      url,
+      method,
+      headers,
+      body: serializedBody,
+      credentials,
+    }),
+    body: serializedBody,
+  };
+}
+
 export async function upstreamRequest({
   chatApi,
   search,
@@ -290,7 +319,7 @@ export async function upstreamRequest({
     }
   } else if (provider.apiKeyHeader === 'x-api-key') {
     headers.set('x-api-key', provider.apiKey);
-  } else {
+  } else if (!provider.awsBedrock) {
     headers.set('Authorization', `Bearer ${provider.apiKey}`);
   }
   headers.set('Content-Type', 'application/json');
@@ -337,7 +366,15 @@ export async function upstreamRequest({
           upstreamHeaders: headers,
           body,
         })
-      : { url: targetUrl, headers, body: JSON.stringify(body) };
+      : provider.awsBedrock
+        ? await buildSignedBedrockRequest({
+            url: targetUrl,
+            method,
+            headers,
+            body,
+            credentials: provider.awsBedrock,
+          })
+        : { url: targetUrl, headers, body: JSON.stringify(body) };
 
     // SSRF guard: see upstream-url-policy.ts. The secure proxy fetches the
     // upstream URL from the relay body, so both hops are checked.

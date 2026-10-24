@@ -4,9 +4,10 @@ import {
 } from '@kilocode/app-shared/security-agent';
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { FolderGit2 } from '@/components/ui/icons';
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
@@ -21,6 +22,7 @@ import { ChoiceRow } from '@/components/ui/choice-row';
 import { RadioGroup } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
@@ -48,11 +50,15 @@ type RepositoryRow = NonNullable<ReturnType<typeof useSecurityAgentRepositories>
 // last row can still scroll clear of the bar.
 const listStyle = { flex: 1 } satisfies ViewStyle;
 
+// The gutter each row keeps inside the safe-area side insets: in landscape they
+// are what clear the sensor housing, and portrait insets are zero.
+const LIST_CONTENT_GUTTER = 24;
+
 function RepositorySettingsSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('common.repositories')} />
+      <ScreenHeader className="px-6" title={t('common.repositories')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-11 w-full rounded-lg" />
         <Skeleton className="h-11 w-full rounded-lg" />
@@ -72,21 +78,22 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
 
   const [mode, setMode] = useState<RepositorySelectionMode>('all');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const hydratedRef = useRef(false);
-  const initialConfigRef = useRef<Partial<FlattenedSecurityAgentConfig>>({});
+  // The saved baseline the draft is compared against. State rather than a ref:
+  // a successful save must re-render, so `dirty` (and the back guard that
+  // reads it) reflects the saved values by the time the header action leaves.
+  const [baseline, setBaseline] = useState<Partial<FlattenedSecurityAgentConfig> | null>(null);
 
   // Local state initialized from the loaded config exactly once — later
   // config refetches (e.g. after this screen's own save) shouldn't clobber
   // in-progress edits.
   useEffect(() => {
-    if (hydratedRef.current || !config.data) {
+    if (baseline !== null || !config.data) {
       return;
     }
-    hydratedRef.current = true;
-    initialConfigRef.current = config.data;
+    setBaseline(config.data);
     setMode(config.data.repositorySelectionMode);
     setSelectedIds(config.data.selectedRepositoryIds);
-  }, [config.data]);
+  }, [baseline, config.data]);
 
   // The repositories screen stays reachable while the agent is disabled so a
   // user with integration repos but no effective selection can pick repos and
@@ -96,13 +103,11 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
 
   const valid = mode === 'all' || selectedIds.length > 0;
   const patch = { repositorySelectionMode: mode, selectedRepositoryIds: selectedIds };
-  const dirty =
-    hydratedRef.current &&
-    getSettingsDirtyState(initialConfigRef.current, patch, valid) !== 'clean';
+  const dirty = baseline !== null && getSettingsDirtyState(baseline, patch, valid) !== 'clean';
 
   const handleSave = async () => {
     await save.mutateAsync(patch);
-    initialConfigRef.current = { ...initialConfigRef.current, ...patch };
+    setBaseline(previous => ({ ...previous, ...patch }));
   };
 
   const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
@@ -122,9 +127,17 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   }, []);
 
   const paddingBottom = useTabBarBottomPadding();
+  const insets = useSafeAreaInsets();
+  // One content-container style for the whole list, so every row — recycled or
+  // not — starts at the same offset and a rotation re-derives it once.
   const listContentContainerStyle = useMemo(
-    () => ({ paddingHorizontal: 24, paddingTop: 16, paddingBottom }),
-    [paddingBottom]
+    () => ({
+      paddingTop: 16,
+      paddingLeft: insets.left + LIST_CONTENT_GUTTER,
+      paddingRight: insets.right + LIST_CONTENT_GUTTER,
+      paddingBottom,
+    }),
+    [insets.left, insets.right, paddingBottom]
   );
 
   // Hoisted so the FlashList keeps one renderer identity across toggles and
@@ -225,6 +238,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
               description={t('securityAgent.repositories.noRepositoriesDescription')}
               action={
                 <Button
+                  className={STATE_ACTION_CLASS}
                   variant="outline"
                   onPress={() => {
                     void (async () => {
@@ -276,6 +290,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        className="px-6"
         title={t('common.repositories')}
         onBack={onBack}
         headerRight={

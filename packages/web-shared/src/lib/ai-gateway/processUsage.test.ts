@@ -289,6 +289,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     ['messages', 'undici terminated'],
     ['chat_completions', 'cross-realm undici terminated'],
   ] as const)('handles %s response.text() %s errors', async (apiKind, errorName) => {
+    jest.mocked(captureMessage).mockClear();
     const streamError =
       errorName === 'undici terminated'
         ? new TypeError('terminated', {
@@ -316,6 +317,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
         undefined
       )
     ).resolves.toBeNull();
+    expect(captureMessage).not.toHaveBeenCalled();
   });
 
   test('captures numeric error.code from in-stream error event as status_code_override', async () => {

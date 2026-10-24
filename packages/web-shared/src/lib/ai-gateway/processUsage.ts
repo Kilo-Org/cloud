@@ -1072,6 +1072,11 @@ export function countAndStoreUsage(
   openrouterRequestSpan: Span | undefined
 ) {
   let usageStatsPromise: Promise<MicrodollarUsageStats | null> = Promise.resolve(null);
+  // An interrupted non-streaming body (gateway duration budget, upstream disconnect)
+  // never delivers its usage object, so there is nothing to record and no reason to
+  // report the missing usage as suspicious. A client disconnect does not interrupt it
+  // in production; see "Vercel request cancellation" in apps/ai-gateway/AGENTS.md.
+  let responseInterrupted = false;
 
   const parseResponseText = async (
     parse: (content: string) => MicrodollarUsageStats
@@ -1079,7 +1084,10 @@ export function countAndStoreUsage(
     try {
       return parse(await clonedReponse.text());
     } catch (error) {
-      if (isResponseInterruptedError(error)) return null;
+      if (isResponseInterruptedError(error)) {
+        responseInterrupted = true;
+        return null;
+      }
       throw error;
     }
   };
@@ -1132,7 +1140,9 @@ export function countAndStoreUsage(
     }
   }
 
-  return usageStatsPromise.then(usageStats => processTokenData(usageStats, usageContext));
+  return usageStatsPromise.then(usageStats =>
+    responseInterrupted ? null : processTokenData(usageStats, usageContext)
+  );
 }
 
 export function processOpenRouterUsage(

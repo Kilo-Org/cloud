@@ -393,7 +393,8 @@ export async function createPRComment(
 }
 
 /**
- * Checks whether a comment containing the given marker already exists on a PR.
+ * Checks whether a comment containing the given marker, authored by this App,
+ * already exists on a PR.
  */
 export async function hasPRCommentWithMarker(
   installationId: string,
@@ -413,7 +414,11 @@ export async function hasPRCommentWithMarker(
     per_page: 100,
   });
 
-  return comments.some(c => c.body?.includes(marker));
+  const appId = String(getGitHubAppCredentials(appType).appId);
+
+  return comments.some(
+    c => c.body?.includes(marker) && String(c.performed_via_github_app?.id ?? '') === appId
+  );
 }
 
 /**

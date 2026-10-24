@@ -1161,6 +1161,13 @@ export async function fetchGitLabMergeRequest(params: {
 
 /**
  * Looks for the <!-- kilo-review --> marker in MR notes.
+ *
+ * Only notes authored by the GitLab account that owns the access token are
+ * candidates, so the note Kilo reuses is always one it can attribute to its
+ * own posting identity. The identity follows the credential in use: when a
+ * project token is replaced, the next lookup matches notes from the new
+ * identity and the pipeline composes a fresh summary note; later lookups
+ * update that note as usual.
  */
 export async function findKiloReviewNote(
   accessToken: string,
@@ -1168,6 +1175,7 @@ export async function findKiloReviewNote(
   mrIid: number,
   instanceUrl: string = DEFAULT_GITLAB_URL
 ): Promise<{ noteId: number; body: string } | null> {
+  const tokenUser = await fetchGitLabUser(accessToken, instanceUrl);
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
@@ -1211,7 +1219,9 @@ export async function findKiloReviewNote(
     totalNotes: notes.length,
   });
 
-  const markedNotes = notes.filter(n => n.body?.includes('<!-- kilo-review -->') && !n.system);
+  const markedNotes = notes.filter(
+    n => n.body?.includes('<!-- kilo-review -->') && !n.system && n.author.id === tokenUser.id
+  );
 
   if (markedNotes.length > 0) {
     const latestNote = markedNotes.sort((a, b) => {
@@ -1310,6 +1320,7 @@ export async function createMRNote(
 
 /**
  * Checks whether a note containing the given marker already exists on a GitLab MR.
+ * Only notes authored by the GitLab account that owns the access token count.
  * Paginates through all notes (consistent with findKiloReviewNote).
  */
 export async function hasMRNoteWithMarker(
@@ -1319,6 +1330,7 @@ export async function hasMRNoteWithMarker(
   marker: string,
   instanceUrl: string = DEFAULT_GITLAB_URL
 ): Promise<boolean> {
+  const tokenUser = await fetchGitLabUser(accessToken, instanceUrl);
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
@@ -1344,8 +1356,8 @@ export async function hasMRNoteWithMarker(
       throw new Error(`GitLab MR notes fetch failed: ${response.status} ${error}`);
     }
 
-    const notes = (await response.json()) as Array<{ body: string }>;
-    if (notes.some(n => n.body?.includes(marker))) {
+    const notes = (await response.json()) as Array<{ body: string; author: { id: number } }>;
+    if (notes.some(n => n.body?.includes(marker) && n.author.id === tokenUser.id)) {
       return true;
     }
 

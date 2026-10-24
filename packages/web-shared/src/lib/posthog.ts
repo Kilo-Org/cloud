@@ -21,20 +21,11 @@ export default function PostHogClient(): Pick<
     };
   }
   // Single shared PostHog client for the process.
-  // Disabled outside production to avoid sending real events during tests/dev.
-  instance = new PostHog(isProduction ? key : key || 'disabled', {
+  instance = new PostHog(key, {
     host: 'https://us.i.posthog.com',
     flushAt: 1,
     flushInterval: 0,
-    disabled: !isProduction,
   });
-
-  // if (!isProduction) {
-  //   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  //   (instance as any).capture = function (...args: any[]) {
-  //     console.log('POSTHOG CAPTURE', ...args);
-  //   };
-  // }
 
   return instance;
 }

@@ -7,6 +7,7 @@ jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 import { captureException } from '@sentry/nextjs';
 import type { InternalDispatchSpendAlertRequest } from '@kilocode/notifications';
 import {
+  dispatchAgentBriefingPush,
   dispatchLowBalancePush,
   dispatchSecurityFindingPush,
   dispatchSecurityLifecyclePush,
@@ -54,6 +55,41 @@ describe('notifications-worker-client internal dispatch', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  it.each([
+    'delivered',
+    'duplicate',
+    'suppressed_preference',
+    'suppressed_expired',
+    'suppressed_access',
+  ])('dispatches the user/date briefing contract and accepts outcome %s', async outcome => {
+    fetchMock.mockResolvedValue(okResponse([{ userId: 'oauth/github/123', outcome }]));
+    const input = {
+      userId: 'oauth/github/123',
+      localDate: '2026-10-15',
+      expiresAt: '2026-10-15T12:00:00.000Z',
+    };
+    await expect(dispatchAgentBriefingPush(input)).resolves.toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe('https://notifications.test/internal/v1/dispatch');
+    expect(JSON.parse(options.body as string)).toEqual({ kind: 'agent_briefing', ...input });
+  });
+
+  it('retries a refused briefing with unchanged user/date/expiry identity', async () => {
+    fetchMock
+      .mockResolvedValueOnce(okResponse([{ userId: 'user-1', outcome: 'failed' }]))
+      .mockResolvedValueOnce(okResponse([{ userId: 'user-1', outcome: 'duplicate' }]));
+    await expect(
+      dispatchAgentBriefingPush({
+        userId: 'user-1',
+        localDate: '2026-10-15',
+        expiresAt: '2026-10-15T12:00:00.000Z',
+      })
+    ).resolves.toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0][1].body).toBe(fetchMock.mock.calls[1][1].body);
   });
 
   it('posts the spend_alert variant to the internal dispatch endpoint', async () => {

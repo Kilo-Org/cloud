@@ -9,6 +9,8 @@ import {
 import { buildControlPlaneSessionRegistration } from '../control-plane/session/registration.js';
 
 const FULL_MODEL = 'kilo/fake-deterministic';
+const MODERN_KILO_TOKEN =
+  'eyJhbGciOiJub25lIn0.eyJydW50aW1lQXV0aG9yaXphdGlvbiI6eyJpZCI6InJhXzEifX0.c2ln';
 
 describe('buildControlPlanePromptPayload', () => {
   it('strips the kilo provider prefix from the wrapper-facing model', () => {
@@ -54,7 +56,7 @@ describe('buildControlPlaneCreateInput', () => {
     async ({ egressMode, egressAllowlist }) => {
       const command = {
         identity: { sessionId: 'workspace_12345678-1234-1234-1234-123456789abc', userId: 'usr_1' },
-        auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: 'token' },
+        auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: MODERN_KILO_TOKEN },
         message: {
           initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
           turn: { type: 'prompt' as const, prompt: 'hi' },
@@ -105,7 +107,10 @@ describe('buildControlPlaneCreateInput', () => {
             sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
             userId: 'usr_1',
           },
-          auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: 'token' },
+          auth: {
+            kiloSessionId: 'ses_12345678901234567890123456',
+            kilocodeToken: MODERN_KILO_TOKEN,
+          },
           message: {
             initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
             turn: { type: 'prompt', prompt: 'hi' },
@@ -139,7 +144,10 @@ describe('buildControlPlaneCreateInput', () => {
             sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
             userId: 'usr_1',
           },
-          auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: 'token' },
+          auth: {
+            kiloSessionId: 'ses_12345678901234567890123456',
+            kilocodeToken: MODERN_KILO_TOKEN,
+          },
           message: {
             initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
             turn: { type: 'prompt', prompt: 'hi' },
@@ -176,7 +184,10 @@ describe('buildControlPlaneCreateInput', () => {
             sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
             userId: 'usr_1',
           },
-          auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: 'token' },
+          auth: {
+            kiloSessionId: 'ses_12345678901234567890123456',
+            kilocodeToken: MODERN_KILO_TOKEN,
+          },
           message: {
             initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
             turn: { type: 'prompt', prompt: 'hi' },
@@ -199,7 +210,7 @@ describe('buildControlPlaneCreateInput', () => {
     }
   );
 
-  it('keeps the full model in stored metadata while dispatching the stripped id', async () => {
+  it('pins code review on Cloudflare Containers to the code-review instance size', async () => {
     const input = await buildControlPlaneCreateInput({
       command: {
         identity: {
@@ -207,6 +218,35 @@ describe('buildControlPlaneCreateInput', () => {
           userId: 'usr_1',
         },
         auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: 'token' },
+        message: {
+          initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+          turn: { type: 'prompt', prompt: 'hi' },
+        },
+        agent: { mode: 'code', model: FULL_MODEL },
+        workspace: {
+          sandboxId: 'sbx-0123456789abcdef0123456789abcdef0123456789abcdef',
+          sandboxProvider: 'cloudflare-containers',
+          sandboxKind: 'code-review',
+        },
+      },
+      env: {} as Env,
+      attachments: [],
+      agent: { mode: 'code', model: FULL_MODEL },
+    });
+    expect(input.sandboxSelection.configuration).toEqual({
+      provider: 'cloudflare-containers',
+      instance: 'code-review',
+    });
+  });
+
+  it('keeps the full model in stored metadata while dispatching the stripped id', async () => {
+    const input = await buildControlPlaneCreateInput({
+      command: {
+        identity: {
+          sessionId: 'workspace_12345678-1234-1234-1234-123456789abc',
+          userId: 'usr_1',
+        },
+        auth: { kiloSessionId: 'ses_12345678901234567890123456', kilocodeToken: MODERN_KILO_TOKEN },
         message: {
           initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
           turn: { type: 'prompt', prompt: 'hi' },

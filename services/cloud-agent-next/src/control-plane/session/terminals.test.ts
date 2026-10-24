@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { parseSessionMetadata } from '../../persistence/session-metadata.js';
 import type { ControlPlaneControlResult } from '../../shared/control-plane-protocol.js';
+import {
+  SANDBOX_STATUS_DETAIL_MESSAGES,
+  type SandboxStatusSnapshot,
+} from '../../shared/sandbox-status.js';
 import { createControlPlaneTerminals } from './terminals.js';
 
 vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
@@ -62,6 +66,17 @@ function pty(id: string) {
   };
 }
 
+function sandboxStatus(status: 'active' | 'sleeping'): SandboxStatusSnapshot {
+  return {
+    status,
+    provider: 'Cloudflare',
+    observedAt: 1,
+    detailCode: status === 'sleeping' ? 'sandbox_stopped' : 'sandbox_ready',
+    inactivityTimeoutMs: 600_000,
+    estimatedSleepAt: null,
+  };
+}
+
 function record(wrapperId: string, ptyId: string) {
   return {
     ptyId,
@@ -75,27 +90,70 @@ function record(wrapperId: string, ptyId: string) {
   };
 }
 
-function fixture() {
+function fixture(
+  overrides: {
+    isRouteReady?: boolean;
+    getSandboxStatus?: () => Promise<SandboxStatusSnapshot>;
+  } = {}
+) {
   const { storage, values } = fakeStorage();
-  const request = vi.fn(
-    async (): Promise<ControlPlaneControlResult> => ({
-      ok: true,
-      result: { pty: pty('pty_new') },
-    })
-  );
+  const request = vi.fn(async (): Promise<ControlPlaneControlResult> => ({
+    ok: true,
+    result: { pty: pty('pty_new') },
+  }));
   const terminals = createControlPlaneTerminals({
     state: { storage } as unknown as DurableObjectState,
     sessionId: SESSION_ID,
     getMetadata: () => metadata(),
     getDirectory: () => DIRECTORY,
     getWrapperId: async () => CURRENT_WRAPPER,
-    isRouteReady: () => true,
+    isRouteReady: () => overrides.isRouteReady ?? true,
+    getSandboxStatus: overrides.getSandboxStatus ?? (async () => sandboxStatus('active')),
     request,
   });
   return { terminals, values, request };
 }
 
 describe('V2 control-plane terminals projection', () => {
+  it('reports a sleeping sandbox without forwarding a terminal request', async () => {
+    const { terminals, request } = fixture({
+      isRouteReady: false,
+      getSandboxStatus: async () => sandboxStatus('sleeping'),
+    });
+
+    await expect(
+      terminals.create({ operationId: '66666666-6666-4666-8666-666666666666' })
+    ).resolves.toEqual({
+      success: false,
+      error: SANDBOX_STATUS_DETAIL_MESSAGES.sandbox_stopped,
+    });
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('keeps the workspace message for a sandbox that is not asleep', async () => {
+    const { terminals, request } = fixture({
+      isRouteReady: false,
+      getSandboxStatus: async () => sandboxStatus('active'),
+    });
+
+    await expect(
+      terminals.create({ operationId: '77777777-7777-4777-8777-777777777777' })
+    ).resolves.toEqual({
+      success: false,
+      error: 'Terminal unavailable until the workspace is prepared',
+    });
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a real terminal RPC failure instead of the workspace message', async () => {
+    const { terminals, request } = fixture();
+    request.mockRejectedValueOnce(new Error('PTY allocation failed'));
+
+    await expect(
+      terminals.create({ operationId: '88888888-8888-4888-8888-888888888888' })
+    ).resolves.toEqual({ success: false, error: 'PTY allocation failed' });
+  });
+
   it('ends running records and clears completions for a replaced wrapper', async () => {
     const { terminals, values, request } = fixture();
     const operationId = '44444444-4444-4444-8444-444444444444';

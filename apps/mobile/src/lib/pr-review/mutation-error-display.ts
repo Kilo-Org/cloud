@@ -12,6 +12,7 @@
 
 import { i18n } from '@/i18n';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
+import { type ProviderPrPlatform } from '@/lib/pr-review/provider-pr-ref';
 import {
   isPrOperationAmbiguous,
   isPrOperationPersistenceFailed,
@@ -40,7 +41,7 @@ type MutationErrorDisplay = {
 type Classification = ReturnType<typeof classifyPrReviewMutationError>;
 
 type MutationErrorDisplayOptions = {
-  /** The raw thrown error, used for the retryable composer / edit-comment copy. */
+  /** The raw thrown error, read for the ambiguous / persistence markers and the 404 code. */
   readonly rawError?: unknown;
   /**
    * The connected provider's noun, already translated (s6f): on the submit
@@ -49,7 +50,29 @@ type MutationErrorDisplayOptions = {
    * GitHub copy. Absent (GitHub), the exact pre-s6 copy stays.
    */
   readonly term?: string;
+  /**
+   * The surface's connected provider: the reconnect copy names it so a GitLab
+   * or Bitbucket surface never announces a GitHub connection. Absent (GitHub)
+   * keeps `prReview.connectionExpired` byte-for-byte.
+   */
+  readonly platform?: ProviderPrPlatform;
 };
+
+/**
+ * The reconnect message for a surface's connected provider. GitHub (and an
+ * unknown platform) keeps `prReview.connectionExpired`; the provider arms
+ * reuse the reconnect notice's own titles, which every catalog already
+ * translates, so the announced status and the visible notice agree.
+ */
+export function reconnectExpiredMessage(platform: ProviderPrPlatform | undefined): string {
+  if (platform === 'gitlab') {
+    return i18n.t('prReview.reconnectNotice.gitlabTitle');
+  }
+  if (platform === 'bitbucket') {
+    return i18n.t('prReview.reconnectNotice.bitbucketTitle');
+  }
+  return i18n.t('prReview.connectionExpired');
+}
 
 /**
  * The bad-request inline copy per surface. The submit surface words the
@@ -69,8 +92,8 @@ function badRequestMessage(surface: MutationErrorDisplaySurface, term?: string):
 }
 
 /**
- * Maps a mutation classification (and optional raw error for retryable
- * composer copy) to the inline message the sheet should show.
+ * Maps a mutation classification (and the raw error for the ambiguous /
+ * persistence / 404 markers) to the inline message the sheet should show.
  */
 export function mutationErrorDisplay(
   surface: MutationErrorDisplaySurface,
@@ -87,7 +110,7 @@ export function mutationErrorDisplay(
   // `reconcile_pending`. Use the bad-request kind (no retry CTA) with the
   // honest server copy, not the surface-specific validation copy.
   if (isPrOperationPersistenceFailed(rawError)) {
-    return { kind: 'bad-request', message: i18n.t('prReview.operation.persistenceFailed') };
+    return { kind: 'bad-request', message: i18n.t('common.actionNotRecorded') };
   }
   if (classification.kind === 'forbidden') {
     return { kind: 'forbidden', message: classification.message };
@@ -104,14 +127,25 @@ export function mutationErrorDisplay(
     return { kind: 'not-found', message: i18n.t('prReview.discussion.commentEditUnavailable') };
   }
   if (classification.kind === 'reconnect') {
-    return { kind: 'reconnect', message: i18n.t('prReview.connectionExpired') };
+    return { kind: 'reconnect', message: reconnectExpiredMessage(options?.platform) };
+  }
+  // The server's raw text never reaches the inline box, whatever the
+  // retryable carrier was. A rate limit gets the localized wait copy (the
+  // server's "try again in about N minutes" is English-only); a conflict
+  // names the reload-and-retry recovery. Both before the submit return, so
+  // every surface gets them.
+  if (readTrpcErrorField(rawError, 'code') === 'TOO_MANY_REQUESTS') {
+    return { kind: 'retryable', message: i18n.t('prReview.mutationError.rateLimited') };
+  }
+  if (readTrpcErrorField(rawError, 'code') === 'CONFLICT') {
+    return { kind: 'retryable', message: i18n.t('prReview.mutationError.conflict') };
   }
   if (surface === 'submit') {
     return { kind: 'retryable', message: i18n.t('prReview.mutationError.couldNotSubmitReview') };
   }
   const message =
-    rawError instanceof Error && rawError.message.length > 0
-      ? rawError.message
+    surface === 'edit-comment'
+      ? i18n.t('prReview.discussion.commentEditFailed')
       : i18n.t('prReview.mutationError.couldNotPostComment');
   return { kind: 'retryable', message };
 }

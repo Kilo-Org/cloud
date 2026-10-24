@@ -2,6 +2,63 @@ import 'server-only';
 
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { pool } from '@kilocode/web-shared/lib/drizzle';
+import type { MicrodollarUsage } from '@kilocode/db/schema';
+import type { UsageRecordWriteOutcome } from './processUsage.types';
+
+export type UsageRecordObservationContext = {
+  entrypoint: 'gateway' | 'writer_endpoint' | 'unknown';
+  writer_caller: 'queue' | 'region_handoff' | 'unknown';
+};
+
+function completionSuccessSampleRate(): 1 | 0.01 {
+  const vercelEnv = process.env.VERCEL_ENV;
+  if (vercelEnv === 'production') return 0.01;
+  if (process.env.VERCEL_TARGET_ENV === 'staging' || vercelEnv) return 1;
+  return process.env.NODE_ENV === 'production' ? 0.01 : 1;
+}
+
+/** Persistence completion signals shared by direct gateway writes and the HTTP writer. */
+export async function observeUsageRecordCompletion(
+  usage: Pick<MicrodollarUsage, 'id' | 'created_at'>,
+  write: () => Promise<UsageRecordWriteOutcome | null>,
+  context: UsageRecordObservationContext = { entrypoint: 'unknown', writer_caller: 'unknown' }
+): Promise<UsageRecordWriteOutcome | null> {
+  const startedAt = performance.now();
+  let outcome: 'recorded' | 'duplicate' | 'not_recorded' | 'error' = 'error';
+  try {
+    const result = await write();
+    outcome = result ? (result.wasRedelivery ? 'duplicate' : 'recorded') : 'not_recorded';
+    return result;
+  } finally {
+    // Observability must not turn a completed write into a retry or replace its exception.
+    try {
+      const level = outcome === 'recorded' || outcome === 'duplicate' ? 'info' : 'warn';
+      const sampleRate = level === 'info' ? completionSuccessSampleRate() : 1;
+      if (sampleRate === 1 || Math.random() < sampleRate) {
+        const createdAt = Date.parse(usage.created_at);
+        const region = process.env.VERCEL_REGION;
+        console[level](
+          JSON.stringify({
+            level,
+            event: 'usage_record_completion',
+            sample_rate: sampleRate,
+            usage_id: usage.id,
+            outcome,
+            entrypoint: context.entrypoint,
+            writer_caller: context.writer_caller,
+            duration_ms: Math.round(performance.now() - startedAt),
+            ...(Number.isFinite(createdAt)
+              ? { event_age_ms: Math.max(0, Date.now() - createdAt) }
+              : {}),
+            execution_region: region === 'fra1' || region === 'sfo1' ? region : 'unknown',
+          })
+        );
+      }
+    } catch {
+      // Preserve both the original result and exception when logging is unavailable.
+    }
+  }
+}
 
 /**
  * Diagnostics for the Frankfurt-local usage write.
@@ -22,8 +79,8 @@ import { pool } from '@kilocode/web-shared/lib/drizzle';
  * - Event-loop starvation, which would inflate every phase including ones that do
  *   no I/O at all. The delay histogram settles that one.
  *
- * Everything here is read-only and allocation-light. Emission is gated on a
- * duration threshold plus a small random sample, and it replaces a log line that
+ * Detailed phase/pool diagnostics are read-only and allocation-light. Their emission is gated on
+ * a duration threshold plus a small random sample, and replaces a log line that
  * serialized ~30KB of interpolated SQL per failure, so net log volume falls.
  */
 

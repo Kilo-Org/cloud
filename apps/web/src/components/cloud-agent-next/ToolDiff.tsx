@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useLayoutEffect, useRef } from 'react';
 import type { DiffEditorProps, DiffOnMount } from '@monaco-editor/react';
+import { cloudAgentFileLabel } from '@kilocode/app-shared/cloud-agent';
 import { cn } from '@/lib/utils';
 import { getFilename } from './toolCardUtils';
 import {
@@ -189,11 +190,11 @@ export function ToolDiffStats({ additions, deletions }: ToolFileChanges) {
 
 export function ToolFilePath({ filePath }: { filePath: string | undefined }) {
   if (!filePath) return null;
-  const normalized = filePath.replaceAll('\\', '/');
+  const normalized = cloudAgentFileLabel(filePath);
   const filename = getFilename(normalized);
   const directory = normalized.slice(0, -filename.length);
   return (
-    <span className="inline-flex max-w-full min-w-0 gap-2" title={filePath}>
+    <span className="inline-flex max-w-full min-w-0 gap-2" title={normalized}>
       <span className="text-foreground max-w-[65%] min-w-0 shrink-0 truncate">{filename}</span>
       {directory && <span className="text-muted-foreground min-w-0 truncate">{directory}</span>}
     </span>

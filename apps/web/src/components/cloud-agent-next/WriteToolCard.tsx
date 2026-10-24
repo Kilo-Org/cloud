@@ -1,4 +1,5 @@
 import { FilePlus } from 'lucide-react';
+import { cloudAgentFileLabel } from '@kilocode/app-shared/cloud-agent';
 import { ToolCardShell } from './ToolCardShell';
 import { ToolDiagnostics, ToolDiff, ToolDiffStats, ToolFilePath } from './ToolDiff';
 import { ToolCodeBlock } from './ToolOutput';
@@ -16,6 +17,7 @@ export function WriteToolCard({ toolPart }: WriteToolCardProps) {
   const filePath =
     metadata.filediff?.file ??
     (typeof input.filePath === 'string' && input.filePath.trim() ? input.filePath : undefined);
+  const displayFilePath = filePath ? cloudAgentFileLabel(filePath) : undefined;
   const content = typeof input.content === 'string' ? input.content : undefined;
   const patch = getUnifiedPatch(metadata.filediff?.patch);
   const error = state.status === 'error' ? state.error : undefined;
@@ -24,18 +26,18 @@ export function WriteToolCard({ toolPart }: WriteToolCardProps) {
     <ToolCardShell
       icon={FilePlus}
       title="Write"
-      subtitle={filePath ? <ToolFilePath filePath={filePath} /> : undefined}
+      subtitle={displayFilePath ? <ToolFilePath filePath={displayFilePath} /> : undefined}
       badge={<ToolDiffStats {...metadata.filediff} />}
       status={state.status}
     >
-      {filePath && (
-        <div className="text-muted-foreground font-mono text-xs break-all">{filePath}</div>
+      {displayFilePath && (
+        <div className="text-muted-foreground font-mono text-xs break-all">{displayFilePath}</div>
       )}
       <ToolDiff
         patch={patch}
         original={content !== undefined ? '' : undefined}
         modified={content}
-        filePath={filePath}
+        filePath={displayFilePath}
         textLabel="Written content (compared with an empty file)"
       />
       {patch === undefined &&

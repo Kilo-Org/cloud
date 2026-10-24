@@ -31,7 +31,7 @@ afterEach(() => vi.restoreAllMocks());
 describe('shadow usage receipts', () => {
   it('logs only safe receipt fields before acknowledging each message once', () => {
     vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-08-05T10:11:14.945Z'));
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const log = vi.spyOn(console, 'info').mockImplementation(() => {});
     const messages = [
       message(usage),
       message(
@@ -43,8 +43,10 @@ describe('shadow usage receipts', () => {
     expect(worker.queue(receipts, env)).toBeUndefined();
     messages.forEach((msg, index) => {
       expect(JSON.parse(log.mock.calls[index][0])).toEqual({
+        level: 'info',
         event: 'usage_ingest_receipt',
         outcome: 'received',
+        queue_action: 'ack',
         queue_message_id: msg.id,
         delivery_attempts: 2,
         usage_id: index === 0 ? usage.core.id : '4f2504e0-4f89-11d3-9a0c-0305e82c3302',
@@ -62,13 +64,13 @@ describe('shadow usage receipts', () => {
 
   it('clamps clock skew to zero event age', () => {
     vi.spyOn(Date, 'now').mockReturnValue(0);
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const log = vi.spyOn(console, 'info').mockImplementation(() => {});
     expect(worker.queue(batch([message(usage)]), env)).toBeUndefined();
     expect(JSON.parse(log.mock.calls[0][0]).event_age_ms).toBe(0);
   });
 
   it('continues through an invalid body in a mixed successful batch', () => {
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const log = vi.spyOn(console, 'info').mockImplementation(() => {});
     const messages = [message(usage, 'first'), message(null, 'invalid'), message(usage, 'last')];
     expect(worker.queue(batch(messages), env)).toBeUndefined();
     expect(log.mock.calls.map(([value]) => JSON.parse(value).outcome)).toEqual([
@@ -88,13 +90,15 @@ describe('shadow usage receipts', () => {
     'sensitive body',
     { ...usage, core: { ...usage.core, id: 'sensitive invalid id' } },
   ])('logs a categorical invalid receipt and discards malformed messages without leakage', body => {
-    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const log = vi.spyOn(console, 'info').mockImplementation(() => {});
     const msg = message(body);
     expect(worker.queue(batch([msg]), env)).toBeUndefined();
     expect(log).toHaveBeenCalledExactlyOnceWith(
       JSON.stringify({
+        level: 'info',
         event: 'usage_ingest_receipt',
         outcome: 'invalid',
+        queue_action: 'ack',
         queue_message_id: msg.id,
         delivery_attempts: 2,
       })
@@ -107,7 +111,7 @@ describe('shadow usage receipts', () => {
     'throws on logging failure without acknowledging failed or later messages',
     body => {
       const log = vi
-        .spyOn(console, 'log')
+        .spyOn(console, 'info')
         .mockImplementationOnce(() => {})
         .mockImplementationOnce(() => {
           throw new Error('synthetic logging failure');

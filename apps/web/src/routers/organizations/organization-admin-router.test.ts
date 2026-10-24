@@ -1,6 +1,7 @@
 import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
+  admin_action_audit_logs,
   organizations,
   credit_transactions,
   organization_seats_purchases,
@@ -12,6 +13,7 @@ import {
   kilo_pass_org_allocation_plan_rows,
   kilo_pass_org_issuance_snapshots,
   kilo_pass_org_term_versions,
+  cli_sessions_v2,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, sql } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -20,6 +22,23 @@ import {
   addUserToOrganization,
   markOrganizationAsDeleted,
 } from '@kilocode/web-shared/lib/organizations/organizations';
+import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
+import { closeCloudAgentOrgStreams } from '@/lib/cloud-agent-next/cloud-agent-client';
+
+const mockAfterResponse = jest.fn(async (_work: () => void | Promise<void>) => {});
+
+jest.mock('@/lib/session-ingest-client', () => ({
+  invalidateOrganizationSessionAccess: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
+  closeCloudAgentOrgStreams: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('@/lib/after-response', () => ({
+  runAfterResponse: (work: () => void | Promise<void>) => mockAfterResponse(work),
+}));
+
 import { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { KiloPassOrgBonusMode } from '@kilocode/db/schema-types';
 import { fetchExpiringTransactionsForOrganization } from '@kilocode/web-shared/lib/creditExpiration';
@@ -30,12 +49,24 @@ jest.mock('@/lib/organizations/organization-billing', () => ({
   getOrCreateStripeCustomerIdForOrganization: jest.fn().mockResolvedValue('cus_test_admin_org'),
 }));
 
+async function runScheduledAfterResponse(): Promise<void> {
+  const callbacks = mockAfterResponse.mock.calls.map(([callback]) => callback);
+  mockAfterResponse.mockClear();
+  await Promise.all(callbacks.map(callback => callback()));
+}
+
 let adminUser: User;
 let adminWithoutCreditAccess: User;
 let nonAdminUser: User;
 let testOrganization: Organization;
 
 describe('organization admin router', () => {
+  beforeEach(() => {
+    mockAfterResponse.mockClear();
+    jest.mocked(invalidateOrganizationSessionAccess).mockClear();
+    jest.mocked(closeCloudAgentOrgStreams).mockClear();
+  });
+
   beforeAll(async () => {
     adminUser = await insertTestUser({
       google_user_email: 'admin-org-admin@admin.example.com',
@@ -61,6 +92,256 @@ describe('organization admin router', () => {
 
   afterAll(async () => {
     await db.delete(organizations).where(eq(organizations.id, testOrganization.id));
+  });
+
+  describe('admin action audit logging', () => {
+    it('records create, trial override, and delete against the organization', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      const { organization } = await caller.organizations.admin.create({ name: 'Audited Org' });
+      await caller.organizations.admin.updateFreeTrialEndAt({
+        organizationId: organization.id,
+        free_trial_end_at: '2099-01-01T00:00:00.000Z',
+      });
+      await caller.organizations.admin.delete({ organizationId: organization.id });
+
+      const audits = await db
+        .select()
+        .from(admin_action_audit_logs)
+        .where(
+          and(
+            eq(admin_action_audit_logs.target_type, 'organization'),
+            eq(admin_action_audit_logs.target_id, organization.id)
+          )
+        );
+
+      expect(audits.map(audit => audit.action).sort()).toEqual([
+        'organization.create',
+        'organization.delete',
+        'organization.free_trial_end.set',
+      ]);
+      expect(audits.every(audit => audit.actor_id === adminUser.id)).toBe(true);
+      expect(
+        audits.find(audit => audit.action === 'organization.free_trial_end.set')?.metadata
+      ).toMatchObject({ freeTrialEndAt: '2099-01-01T00:00:00.000Z' });
+    });
+
+    it('revokes organization shares and invalidates every affected member on delete', async () => {
+      const member = await insertTestUser();
+      const otherUser = await insertTestUser();
+      const organization = await createTestOrganization(
+        `Delete share ${crypto.randomUUID()}`,
+        adminUser.id,
+        0
+      );
+      const otherOrganization = await createTestOrganization(
+        `Other share ${crypto.randomUUID()}`,
+        otherUser.id,
+        0
+      );
+      await addUserToOrganization(organization.id, member.id, 'member');
+
+      const ownerOrgSession = `ses_delete_${crypto.randomUUID()}`;
+      const memberOrgSession = `ses_delete_${crypto.randomUUID()}`;
+      const personalSession = `ses_delete_${crypto.randomUUID()}`;
+      const otherOrgSession = `ses_delete_${crypto.randomUUID()}`;
+      const ownerOrgPublicId = crypto.randomUUID();
+      const memberOrgPublicId = crypto.randomUUID();
+      const personalPublicId = crypto.randomUUID();
+      const otherOrgPublicId = crypto.randomUUID();
+
+      jest.mocked(invalidateOrganizationSessionAccess).mockClear();
+      jest.mocked(closeCloudAgentOrgStreams).mockClear();
+
+      try {
+        await db.insert(cli_sessions_v2).values([
+          {
+            session_id: ownerOrgSession,
+            kilo_user_id: adminUser.id,
+            organization_id: organization.id,
+            public_id: ownerOrgPublicId,
+          },
+          {
+            session_id: memberOrgSession,
+            kilo_user_id: member.id,
+            organization_id: organization.id,
+            public_id: memberOrgPublicId,
+          },
+          {
+            session_id: personalSession,
+            kilo_user_id: adminUser.id,
+            organization_id: null,
+            public_id: personalPublicId,
+          },
+          {
+            session_id: otherOrgSession,
+            kilo_user_id: otherUser.id,
+            organization_id: otherOrganization.id,
+            public_id: otherOrgPublicId,
+          },
+        ]);
+
+        const caller = await createCallerForUser(adminUser.id);
+        await caller.organizations.admin.delete({ organizationId: organization.id });
+        await runScheduledAfterResponse();
+
+        const shares = await db
+          .select({
+            sessionId: cli_sessions_v2.session_id,
+            publicId: cli_sessions_v2.public_id,
+          })
+          .from(cli_sessions_v2)
+          .where(
+            inArray(cli_sessions_v2.session_id, [
+              ownerOrgSession,
+              memberOrgSession,
+              personalSession,
+              otherOrgSession,
+            ])
+          );
+        const bySession = new Map(shares.map(share => [share.sessionId, share.publicId]));
+
+        expect(bySession.get(ownerOrgSession)).toBeNull();
+        expect(bySession.get(memberOrgSession)).toBeNull();
+        expect(bySession.get(personalSession)).toBe(personalPublicId);
+        expect(bySession.get(otherOrgSession)).toBe(otherOrgPublicId);
+        expect(invalidateOrganizationSessionAccess).toHaveBeenCalledWith(
+          adminUser.id,
+          organization.id
+        );
+        expect(invalidateOrganizationSessionAccess).toHaveBeenCalledWith(
+          member.id,
+          organization.id
+        );
+        expect(invalidateOrganizationSessionAccess).not.toHaveBeenCalledWith(
+          otherUser.id,
+          organization.id
+        );
+      } finally {
+        await db
+          .delete(cli_sessions_v2)
+          .where(
+            inArray(cli_sessions_v2.session_id, [
+              ownerOrgSession,
+              memberOrgSession,
+              personalSession,
+              otherOrgSession,
+            ])
+          );
+        await db
+          .delete(organization_memberships)
+          .where(
+            inArray(organization_memberships.organization_id, [
+              organization.id,
+              otherOrganization.id,
+            ])
+          );
+        await db
+          .delete(organizations)
+          .where(inArray(organizations.id, [organization.id, otherOrganization.id]));
+      }
+    });
+
+    it('runs post-delete invalidation after durable deletion, share clearing, and audit recording', async () => {
+      const member = await insertTestUser();
+      const organization = await createTestOrganization(
+        `Delete invalidation ${crypto.randomUUID()}`,
+        adminUser.id,
+        0
+      );
+      await addUserToOrganization(organization.id, member.id, 'member');
+      const organizationSession = `ses_delete_after_response_${crypto.randomUUID()}`;
+      const personalSession = `ses_delete_after_response_${crypto.randomUUID()}`;
+      const organizationPublicId = crypto.randomUUID();
+      const personalPublicId = crypto.randomUUID();
+
+      try {
+        await db.insert(cli_sessions_v2).values([
+          {
+            session_id: organizationSession,
+            kilo_user_id: adminUser.id,
+            organization_id: organization.id,
+            public_id: organizationPublicId,
+          },
+          {
+            session_id: personalSession,
+            kilo_user_id: adminUser.id,
+            organization_id: null,
+            public_id: personalPublicId,
+          },
+        ]);
+
+        const caller = await createCallerForUser(adminUser.id);
+        await expect(
+          caller.organizations.admin.delete({ organizationId: organization.id })
+        ).resolves.toBeDefined();
+
+        // The mutation is durable before the deferred callback is invoked.
+        expect(invalidateOrganizationSessionAccess).not.toHaveBeenCalled();
+        expect(mockAfterResponse).toHaveBeenCalledTimes(1);
+
+        const [deleted] = await db
+          .select({ deletedAt: organizations.deleted_at })
+          .from(organizations)
+          .where(eq(organizations.id, organization.id));
+        expect(deleted?.deletedAt).not.toBeNull();
+
+        const shares = await db
+          .select({
+            sessionId: cli_sessions_v2.session_id,
+            publicId: cli_sessions_v2.public_id,
+          })
+          .from(cli_sessions_v2)
+          .where(inArray(cli_sessions_v2.session_id, [organizationSession, personalSession]));
+        const bySession = new Map(shares.map(share => [share.sessionId, share.publicId]));
+        expect(bySession.get(organizationSession)).toBeNull();
+        expect(bySession.get(personalSession)).toBe(personalPublicId);
+
+        const audits = await db
+          .select({ action: admin_action_audit_logs.action })
+          .from(admin_action_audit_logs)
+          .where(
+            and(
+              eq(admin_action_audit_logs.target_type, 'organization'),
+              eq(admin_action_audit_logs.target_id, organization.id)
+            )
+          );
+        expect(audits.map(audit => audit.action)).toContain('organization.delete');
+
+        jest
+          .mocked(invalidateOrganizationSessionAccess)
+          .mockRejectedValueOnce(new Error('invalidation unavailable'));
+        await expect(runScheduledAfterResponse()).resolves.toBeUndefined();
+
+        const [stillDeleted] = await db
+          .select({ deletedAt: organizations.deleted_at })
+          .from(organizations)
+          .where(eq(organizations.id, organization.id));
+        expect(stillDeleted?.deletedAt).not.toBeNull();
+        const [stillCleared] = await db
+          .select({ publicId: cli_sessions_v2.public_id })
+          .from(cli_sessions_v2)
+          .where(eq(cli_sessions_v2.session_id, organizationSession));
+        expect(stillCleared?.publicId).toBeNull();
+        const stillAudited = await db
+          .select({ action: admin_action_audit_logs.action })
+          .from(admin_action_audit_logs)
+          .where(
+            and(
+              eq(admin_action_audit_logs.target_type, 'organization'),
+              eq(admin_action_audit_logs.target_id, organization.id)
+            )
+          );
+        expect(stillAudited.map(audit => audit.action)).toContain('organization.delete');
+      } finally {
+        await db
+          .delete(cli_sessions_v2)
+          .where(inArray(cli_sessions_v2.session_id, [organizationSession, personalSession]));
+        await db
+          .delete(organization_memberships)
+          .where(eq(organization_memberships.organization_id, organization.id));
+        await db.delete(organizations).where(eq(organizations.id, organization.id));
+      }
+    });
   });
 
   describe('getDetails', () => {

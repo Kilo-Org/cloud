@@ -167,7 +167,10 @@ export type SandboxIdlePolicy = 'interactive' | 'unattended';
  * prepare could reuse.
  */
 export function sandboxIdlePolicyForOrigins(origins: readonly unknown[]): SandboxIdlePolicy {
-  return origins.length === 0 || origins.includes('cloud-agent-web') ? 'interactive' : 'unattended';
+  return origins.length === 0 ||
+    origins.some(origin => origin === 'cloud-agent-web' || origin === 'desktop')
+    ? 'interactive'
+    : 'unattended';
 }
 
 // Positive integer divisor that shortens internal deadline timers for local E2E. Pass `env` on the Worker/DO side or `process.env` in the wrapper. Development-only by absence from production config; do not add it to wrangler.jsonc.

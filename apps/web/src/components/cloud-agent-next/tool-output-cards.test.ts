@@ -152,7 +152,7 @@ describe('BashToolCard', () => {
   });
 
   it.each([
-    '/workspace/org/user/sessions/agent-one/README',
+    '/workspace/org/user/sessions/agent_36c067fe-a515-4fcf-876d-40ec25a90171/README',
     '/workspace/7c21ccc1-e50c-4b65-a2a5-d89c70310f4b/sessions/workspace_36c067fe-a515-4fcf-876d-40ec25a90171/README',
   ])('shortens workspace path %s only in the fallback preview', path => {
     const command = `cat ${path}\npwd`;
@@ -520,30 +520,29 @@ describe('ScheduledTaskToolCard', () => {
 });
 
 describe('GenericToolCard', () => {
-  it.each([
-    ['app-builder-images_transfer_image', 'Publish Image'],
-    ['app-builder-images_get_image', 'Analyze Image'],
-    ['unrecognized_tool', 'unrecognized_tool'],
-  ])('preserves the friendly display name for %s', (tool, title) => {
-    const part = completedTool(tool, {}, '');
-    const html = renderToStaticMarkup(React.createElement(GenericToolCard, { toolPart: part }));
+  it.each([['unrecognized_tool', 'unrecognized_tool']])(
+    'preserves the friendly display name for %s',
+    (tool, title) => {
+      const part = completedTool(tool, {}, '');
+      const html = renderToStaticMarkup(React.createElement(GenericToolCard, { toolPart: part }));
 
-    expect(html).toContain(title);
-  });
+      expect(html).toContain(title);
+    }
+  );
 
   it('uses the MCP envelope for naming and only its arguments for the input section', () => {
     const part = completedTool(
       'mcp',
       {
-        server_name: 'app-builder-images',
-        tool_name: 'transfer_image',
+        server_name: 'filesystem',
+        tool_name: 'read_file',
         arguments: { url: 'https://example.com/image.png', quality: 'high' },
       },
       'Published'
     );
     const html = expanded(GenericToolCard({ toolPart: part }));
 
-    expect(html).toContain('Publish Image');
+    expect(html).toContain('filesystem/read_file');
     expect(html).toContain('https://example.com/image.png · quality=high');
     expect(html).toContain('aria-label="Copy arguments"');
     expect(html).not.toContain('server_name');

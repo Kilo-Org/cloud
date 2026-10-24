@@ -60,7 +60,7 @@ async function sendThroughSecureProxy(disable_url_suffix: boolean) {
   return {
     url,
     headers: new Headers(init?.headers),
-    body: SecureProxyRequestBodySchema.parse(JSON.parse(String(init?.body))),
+    body: SecureProxyRequestBodySchema.parse(JSON.parse(init?.body as string)),
     sent: body,
   };
 }

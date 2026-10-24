@@ -909,13 +909,20 @@ describe('normalize', () => {
   });
 
   describe('session.queue.changed', () => {
+    it.each([{ queued: ['m1', 'm2'] }, { queued: [] }])(
+      'ignores Kilo queue snapshots in Cloud events (queued: $queued)',
+      ({ queued }) => {
+        const data = { sessionID: 'ses-1', queued };
+        expect(normalize(createRaw('session.queue.changed', data))).toBeNull();
+        expect(normalize(createKilocode('session.queue.changed', data))).toBeNull();
+      }
+    );
+
     it('normalizes a populated snapshot with sessionId and queued list', () => {
-      const result = normalize(
-        createRaw('session.queue.changed', {
-          sessionID: 'ses-1',
-          queued: ['m1', 'm2', 'm3'],
-        })
-      );
+      const result = normalizeCliEvent('session.queue.changed', {
+        sessionID: 'ses-1',
+        queued: ['m1', 'm2', 'm3'],
+      });
       expect(result).toEqual({
         type: 'queue.changed',
         sessionId: 'ses-1',
@@ -924,9 +931,7 @@ describe('normalize', () => {
     });
 
     it('normalizes an empty snapshot (replay-on-subscribe empty case)', () => {
-      const result = normalize(
-        createRaw('session.queue.changed', { sessionID: 'ses-1', queued: [] })
-      );
+      const result = normalizeCliEvent('session.queue.changed', { sessionID: 'ses-1', queued: [] });
       expect(result).toEqual({
         type: 'queue.changed',
         sessionId: 'ses-1',
@@ -935,22 +940,20 @@ describe('normalize', () => {
     });
 
     it('returns null when sessionID is missing', () => {
-      expect(normalize(createRaw('session.queue.changed', { queued: ['m1'] }))).toBeNull();
+      expect(normalizeCliEvent('session.queue.changed', { queued: ['m1'] })).toBeNull();
     });
 
     it('returns null when sessionID is not a string', () => {
-      expect(
-        normalize(createRaw('session.queue.changed', { sessionID: 42, queued: [] }))
-      ).toBeNull();
+      expect(normalizeCliEvent('session.queue.changed', { sessionID: 42, queued: [] })).toBeNull();
     });
 
     it('returns null when queued is missing', () => {
-      expect(normalize(createRaw('session.queue.changed', { sessionID: 'ses-1' }))).toBeNull();
+      expect(normalizeCliEvent('session.queue.changed', { sessionID: 'ses-1' })).toBeNull();
     });
 
     it('returns null when queued is not an array', () => {
       expect(
-        normalize(createRaw('session.queue.changed', { sessionID: 'ses-1', queued: 'm1' }))
+        normalizeCliEvent('session.queue.changed', { sessionID: 'ses-1', queued: 'm1' })
       ).toBeNull();
     });
 
@@ -968,21 +971,12 @@ describe('normalize', () => {
     });
 
     it('is classified as a ServiceEvent, not a ChatEvent', () => {
-      const result = normalize(
-        createRaw('session.queue.changed', { sessionID: 'ses-1', queued: ['m1'] })
-      );
-      expect(result).not.toBeNull();
-      expect(isChatEvent(result!)).toBe(false);
-    });
-
-    it('normalizes via normalizeCliEvent without a CloudAgentEvent envelope', () => {
-      expect(
-        normalizeCliEvent('session.queue.changed', { sessionID: 'ses-1', queued: ['m1'] })
-      ).toEqual({
-        type: 'queue.changed',
-        sessionId: 'ses-1',
+      const result = normalizeCliEvent('session.queue.changed', {
+        sessionID: 'ses-1',
         queued: ['m1'],
       });
+      expect(result).not.toBeNull();
+      expect(isChatEvent(result!)).toBe(false);
     });
   });
 

@@ -177,6 +177,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@cfworker/json-schema": "catalog:",
     "@chromatic-com/playwright": "0.12.8",
     "@jest/globals": "30.3.0",
     "@octokit/graphql-schema": "15.26.1",

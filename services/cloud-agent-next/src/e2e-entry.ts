@@ -1,15 +1,18 @@
 /**
  * e2e-only Worker entrypoint.
  *
- * It mounts the `/__e2e/*` inspect surface and otherwise forwards every request
- * (and queue/scheduled event) to the production Worker unchanged. Production
- * keeps `main = src/index.ts`; this file is referenced only by the rendered e2e
- * config and the dedicated Workers test config, so no production route,
- * dependency or secret changes and the surface is unreachable on the production
- * Worker by construction.
+ * It mounts the `/__e2e/*` inspect surface, requires the e2e key for the
+ * session-start procedures when the render enables that gate, and otherwise
+ * forwards every request (and queue/scheduled event) to the production Worker
+ * unchanged. Production keeps `main = src/index.ts`; this file is referenced
+ * only by the rendered e2e config and the dedicated Workers test config, so no
+ * production route, dependency or secret changes and the surface is unreachable
+ * on the production Worker by construction.
  */
 
+import { timingSafeEqual } from '@kilocode/encryption';
 import production from './index.js';
+import { extractProcedureNames } from './balance-validation.js';
 import { e2eSurfaceApp } from './e2e-surface/app.js';
 import type { Env } from './types.js';
 
@@ -26,11 +29,66 @@ export {
 export { SandboxControlV2 as SandboxControl } from './control-plane/sandbox/sandbox-do.js';
 export { SandboxSessionV2 as SandboxSession } from './control-plane/session/session-do.js';
 export { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
+export { CloudAgentSession } from './persistence/CloudAgentSession.js';
 export { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
 export { E2eCallbackSink } from './persistence/E2eCallbackSink.js';
 
+const INTERNAL_API_KEY_HEADER = 'x-internal-api-key';
+
+/**
+ * Every user-token procedure that can start a session's container: the two
+ * creation routes, and the three that enqueue work whose alarm-driven flusher
+ * starts or restores the sandbox for an existing session. `prepareSession` is
+ * already behind `internalApiProtectedProcedure` (secret plus token), so it
+ * needs no entry here.
+ */
+const SESSION_START_PROCEDURES: Record<string, true> = {
+  start: true,
+  createWorktreeChat: true,
+  send: true,
+  sendMessageV2: true,
+  initiateFromKilocodeSessionV2: true,
+};
+
 function isE2eSurfacePath(pathname: string): boolean {
   return pathname === '/__e2e' || pathname.startsWith('/__e2e/');
+}
+
+/**
+ * A tRPC mutation path carries one procedure, or a batch of them when
+ * `?batch=1`. The gate classifies the request through the same parser the
+ * router uses — the percent-decoded path, split on commas only for a batch — so
+ * the procedure it inspects is the one tRPC dispatches. A path the parser cannot
+ * decode counts as a session start, so the gate fails closed. Only POST can
+ * invoke a mutation, so GET queries stay outside the gate.
+ */
+export function isSessionStartRequest(method: string, url: URL): boolean {
+  if (method !== 'POST') return false;
+  const procedures = extractProcedureNames(url.pathname, url.searchParams.get('batch') === '1');
+  if (procedures === null) return true;
+  return procedures.some(procedure => SESSION_START_PROCEDURES[procedure] === true);
+}
+
+/**
+ * The admission gate for the rendered e2e Worker. It is active only when
+ * `E2E_SESSION_ADMISSION` names the credential, and only the deployed render
+ * (which is addressed publicly) writes that var; local renders keep it unset so
+ * the local web app, which presents its own internal secret, is unaffected.
+ *
+ * The presented value is compared with the e2e-scoped `INTERNAL_API_SECRET` —
+ * the same secret the `/__e2e/*` surface and the internal procedures use — in
+ * constant time. An unset or empty binding fails closed, and the check runs
+ * before the production app, so no token verification, balance check or
+ * Hyperdrive dereference happens for a request that cannot be admitted.
+ */
+export function admitSessionStart(request: Request, env: Env): Response | null {
+  if (env.E2E_SESSION_ADMISSION !== 'internal-key') return null;
+  const expected = env.INTERNAL_API_SECRET;
+  const presented = request.headers.get(INTERNAL_API_KEY_HEADER);
+  if (!expected || !presented || !timingSafeEqual(presented, expected)) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+  return null;
 }
 
 export default {
@@ -38,6 +96,10 @@ export default {
     const url = new URL(request.url);
     if (isE2eSurfacePath(url.pathname)) {
       return e2eSurfaceApp.fetch(request, env, ctx);
+    }
+    if (isSessionStartRequest(request.method, url)) {
+      const denial = admitSessionStart(request, env);
+      if (denial) return denial;
     }
     return production.fetch(request, env, ctx);
   },

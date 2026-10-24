@@ -87,8 +87,46 @@ function withStrictlyPublicFetch(config) {
   return config;
 }
 
+/**
+ * The rendered Worker must not read or write the source config's data stores.
+ * `E2E_HYPERDRIVE_ID` and `E2E_R2_BUCKET` name the dedicated e2e resources and
+ * are required: a missing value, or the source config's own value, refuses the
+ * render instead of falling back to the shared stores.
+ */
+function requireE2eDataStore(name, value, sourceConfig) {
+  const candidate = typeof value === 'string' ? value.trim() : '';
+  if (candidate.length === 0) {
+    throw new Error(
+      `${name} is required: point it at the dedicated e2e data store (see the provisioning steps in test/e2e/deploy/README.md).`
+    );
+  }
+  // The render drops `dev` and `env`, so every section of the source config
+  // contributes the values compared here.
+  const sections = [sourceConfig, sourceConfig.dev, ...Object.values(sourceConfig.env ?? {})];
+  const sourceValues = sections
+    .flatMap(section =>
+      section === undefined || section === null
+        ? []
+        : ((name === 'E2E_HYPERDRIVE_ID' ? section.hyperdrive : section.r2_buckets) ?? [])
+    )
+    .map(entry => (name === 'E2E_HYPERDRIVE_ID' ? entry.id : entry.bucket_name))
+    .filter(sourceValue => typeof sourceValue === 'string' && sourceValue.length > 0);
+  if (sourceValues.includes(candidate)) {
+    throw new Error(
+      `${name} must name a dedicated e2e data store, not one the source config binds (${candidate}); refusing to render shared data stores.`
+    );
+  }
+  return candidate;
+}
+
 export function buildE2eWorkerConfig(sourceConfig, overrides) {
   const { workerUrl, kiloOpenRouterBase } = overrides;
+  const hyperdriveId = requireE2eDataStore(
+    'E2E_HYPERDRIVE_ID',
+    overrides.hyperdriveId,
+    sourceConfig
+  );
+  const r2Bucket = requireE2eDataStore('E2E_R2_BUCKET', overrides.r2Bucket, sourceConfig);
   const config = structuredClone(sourceConfig);
 
   config.$schema = '../node_modules/wrangler/config-schema.json';
@@ -152,6 +190,18 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
   config.durable_objects = withCallbackBinding(config.durable_objects);
   withStrictlyPublicFetch(config);
 
+  // Data stores come from the operator, never from the source config. The
+  // deployed Worker writes session rows, usage rows and logs, so it must not
+  // share them with the production deployment.
+  config.hyperdrive = [
+    { binding: 'HYPERDRIVE', id: hyperdriveId },
+    ...(config.hyperdrive ?? []).filter(entry => entry.binding !== 'HYPERDRIVE'),
+  ];
+  config.r2_buckets = [
+    { binding: 'R2_BUCKET', bucket_name: r2Bucket },
+    ...(config.r2_buckets ?? []).filter(entry => entry.binding !== 'R2_BUCKET'),
+  ];
+
   config.vars = {
     ...config.vars,
     WORKER_URL: workerUrl,
@@ -170,6 +220,9 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     // churn would trip the per-account concurrent-container cap.
     CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: 'true',
     CREDENTIAL_CONTAINMENT_ENABLED: 'false',
+    // Session starts on the publicly addressed deployment require the e2e key
+    // in addition to the user token. The local render leaves this unset.
+    E2E_SESSION_ADMISSION: 'internal-key',
   };
 
   config.secrets_store_secrets = config.secrets_store_secrets ?? [];
@@ -408,6 +461,8 @@ if (isMain) {
       rendered = buildE2eWorkerConfig(sourceConfig, {
         workerUrl,
         kiloOpenRouterBase,
+        hyperdriveId: process.env.E2E_HYPERDRIVE_ID,
+        r2Bucket: process.env.E2E_R2_BUCKET,
       });
     } catch (error) {
       console.error(error instanceof Error ? error.message : error);

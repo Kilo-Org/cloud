@@ -617,6 +617,12 @@ export type Env = {
   PER_SESSION_SANDBOX_ORG_IDS?: string;
   /** 'true' disables the per-account concurrent-container cap. Set only on the disposable e2e Worker. */
   CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED?: string;
+  /**
+   * `'internal-key'` makes the rendered e2e Worker admit the session-start
+   * procedures only when `x-internal-api-key` matches `INTERNAL_API_SECRET`.
+   * Set only by the deployed e2e render; unset everywhere else.
+   */
+  E2E_SESSION_ADMISSION?: string;
   /** Comma-separated user or org IDs whose Code Reviewer sessions use the Cloudflare Containers runtime. `*` includes personal. */
   CODE_REVIEW_CONTAINERS_ORG_IDS?: string;
   RUNTIME_ISOLATION_ENABLED?: string;

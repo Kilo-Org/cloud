@@ -191,8 +191,9 @@ export async function trpcCall<T>(
       headers['x-internal-api-key'] = config.internalApiSecret;
     }
   }
-  if (opts?.internalApiSecret) {
-    headers['x-internal-api-key'] = opts.internalApiSecret;
+  const internalApiSecret = opts?.internalApiSecret ?? config.internalApiSecret;
+  if (internalApiSecret) {
+    headers['x-internal-api-key'] = internalApiSecret;
   }
   const fetchOpts: RequestInit = { method, headers, signal: opts?.signal };
   if (method === 'POST') {
@@ -314,7 +315,10 @@ async function startSessionUnified(
           : {}),
       },
     },
-    { signal: args.signal }
+    {
+      ...(config.internalApiSecret ? { internalApiSecret: config.internalApiSecret } : {}),
+      signal: args.signal,
+    }
   );
 }
 

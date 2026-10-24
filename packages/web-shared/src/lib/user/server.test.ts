@@ -54,6 +54,10 @@ import {
 import { signKiloToken } from '@kilocode/worker-utils/kilo-token';
 import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import {
+  DEVICE_SESSION_CACHE_TTL_MS,
+  resetDeviceSessionCacheForTest,
+} from '@kilocode/web-shared/lib/auth/device-session-cache';
 
 // Same namespace UUID used in user.server.ts
 const USER_UUID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
@@ -62,6 +66,11 @@ beforeEach(() => {
   mockHeaders.mockReset();
   mockGetServerSession.mockReset();
   mockRedirect.mockClear();
+  resetDeviceSessionCacheForTest();
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 function signPolicyClaims(claims: Record<string, unknown>, secret = NEXTAUTH_SECRET): string {
@@ -683,6 +692,40 @@ describe('getUserFromAuth', () => {
     expect(result.authFailedResponse?.status).toBe(401);
     expect(result.user).toBeNull();
     expect(result.credentialsRejected).toBe(true);
+  });
+
+  test('serves the cached session answer, then rechecks it after the revocation window', async () => {
+    const user = await insertTestUser({
+      google_user_email: `api-token-session-window-${crypto.randomUUID()}@example.com`,
+      api_token_pepper: 'session-window-pepper',
+    });
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: user.id })
+      .returning({ id: device_sessions.id });
+    const token = generateApiToken(user, { deviceSessionId: session!.id });
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    let clock = Date.now();
+    jest.spyOn(Date, 'now').mockImplementation(() => clock);
+
+    expect((await getUserFromAuth({ adminOnly: false })).user?.id).toBe(user.id);
+
+    // Revoked without the app's invalidation, as another instance would.
+    await db
+      .update(device_sessions)
+      .set({ revoked_at: new Date().toISOString(), revoked_reason: 'logout' })
+      .where(eq(device_sessions.id, session!.id));
+
+    // Inside the window the cached answer is served without a database read.
+    expect((await getUserFromAuth({ adminOnly: false })).user?.id).toBe(user.id);
+
+    clock += DEVICE_SESSION_CACHE_TTL_MS;
+    const afterWindow = await getUserFromAuth({ adminOnly: false });
+
+    expect(afterWindow.authFailedResponse?.status).toBe(401);
+    expect(afterWindow.user).toBeNull();
+    expect(afterWindow.credentialsRejected).toBe(true);
   });
 
   test('web-session branch leaves deviceSessionId undefined', async () => {

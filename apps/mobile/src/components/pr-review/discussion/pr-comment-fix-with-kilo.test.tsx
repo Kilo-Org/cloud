@@ -9,7 +9,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FIX_WITH_KILO_HIT_SLOP } from '@/lib/pr-review/comment-trailing-controls';
 import { type PrCommentKind } from '@/lib/pr-review/fix-with-kilo';
-import { type ProviderPrRef, ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
+import {
+  type ProviderPrRef,
+  ProviderPrScopeProvider,
+  ProviderPrWebUrlProvider,
+} from '@/lib/pr-review/provider-pr-ref';
 import { type SharePayload } from '@/lib/share-payload';
 
 import { PrCommentFixWithKilo } from './pr-comment-fix-with-kilo';
@@ -97,13 +101,14 @@ const baseProps: CtaProps = {
 
 async function renderCta(
   props: Partial<CtaProps> = {},
-  scope?: { ref: ProviderPrRef; organizationId: string | null }
+  scope?: { ref: ProviderPrRef; organizationId: string | null },
+  serverWebUrl: string | null = null
 ): Promise<TestRenderer.ReactTestRenderer> {
   const cta = createElement(PrCommentFixWithKilo, { ...baseProps, ...props });
-  const tree: ReactElement = scope ? (
-    <ProviderPrScopeProvider value={scope}>{cta}</ProviderPrScopeProvider>
-  ) : (
-    cta
+  const tree: ReactElement = (
+    <ProviderPrWebUrlProvider value={serverWebUrl}>
+      {scope ? <ProviderPrScopeProvider value={scope}>{cta}</ProviderPrScopeProvider> : cta}
+    </ProviderPrWebUrlProvider>
   );
   let renderer: TestRenderer.ReactTestRenderer | null = null;
   await act(async () => {
@@ -175,36 +180,46 @@ describe('PrCommentFixWithKilo', () => {
     renderer.unmount();
   });
 
-  it('empty: a GitLab MR with no instance hint renders no control at all', async () => {
-    const renderer = await renderCta(
+  it('empty: a GitLab comment renders nothing until the read names a URL', async () => {
+    // No URL published for the loaded MR — with or without an instance hint
+    // on the ref — so the control has no link to offer.
+    const withoutHint = await renderCta(
       { owner: 'group/sub', repo: 'repo', number: 12, commentId: 12 },
       { ref: GITLAB_REF_WITHOUT_HINT, organizationId: null }
     );
+    const withHint = await renderCta(
+      { owner: 'group/sub', repo: 'repo', number: 12, commentId: 12 },
+      { ref: GITLAB_REF_WITH_HINT, organizationId: null }
+    );
 
-    expect(findPressables(renderer)).toHaveLength(0);
-
-    renderer.unmount();
+    for (const renderer of [withoutHint, withHint]) {
+      expect(findPressables(renderer)).toHaveLength(0);
+      renderer.unmount();
+    }
   });
 
   it.each([
     {
       platform: 'gitlab',
       ref: GITLAB_REF_WITH_HINT,
-      url: 'https://gitlab.example.com/group/sub/repo/-/merge_requests/12#note_12',
+      serverWebUrl: 'https://gitlab.other.example/group/sub/repo/-/merge_requests/12',
+      url: 'https://gitlab.other.example/group/sub/repo/-/merge_requests/12#note_12',
       href: '/(app)/agent-chat/new?organizationId=org_1&shareId=share-1',
     },
     {
       platform: 'bitbucket',
       ref: BITBUCKET_REF,
+      serverWebUrl: null,
       url: 'https://bitbucket.org/acme/api/pull-requests/42#comment-12',
       href: '/(app)/agent-chat/new?organizationId=org_1&shareId=share-1',
     },
   ])(
     'happy: a $platform comment with a host stages its anchor and no repo prefill',
-    async ({ ref, url, href }) => {
+    async ({ ref, serverWebUrl, url, href }) => {
       const renderer = await renderCta(
         { owner: 'group/sub', repo: 'repo', number: 12, commentId: 12, kind: 'conversation' },
-        { ref, organizationId: 'org_1' }
+        { ref, organizationId: 'org_1' },
+        serverWebUrl
       );
       pressCta(renderer);
 
@@ -261,13 +276,15 @@ describe('PrCommentFixWithKilo', () => {
   // either scope — fails.
   //
   // Scenarios cover every provider surface the row can render on, plus the
-  // no-CTA case (a GitLab MR with no instance hint), so the parity claim holds
-  // for the empty state too.
+  // no-CTA case (a GitLab MR the read has not named a host for), so the
+  // parity claim holds for the empty state too.
   describe('platform parity', () => {
     type Scenario = {
       readonly name: string;
       readonly props: Partial<CtaProps>;
       readonly scope: { ref: ProviderPrRef; organizationId: string | null } | undefined;
+      /** The loaded MR's own URL, as the review screen publishes it. */
+      readonly serverWebUrl?: string | null;
       /** The row must show no control at all on either platform. */
       readonly rendersNothing?: boolean;
     };
@@ -289,9 +306,10 @@ describe('PrCommentFixWithKilo', () => {
           kind: 'conversation',
         },
         scope: { ref: GITLAB_REF_WITH_HINT, organizationId: 'org_1' },
+        serverWebUrl: 'https://gitlab.example.com/group/sub/repo/-/merge_requests/12',
       },
       {
-        name: 'a GitLab comment with no instance hint',
+        name: 'a GitLab comment with no loaded URL',
         props: {
           owner: 'group/sub',
           repo: 'repo',
@@ -314,7 +332,11 @@ describe('PrCommentFixWithKilo', () => {
       pushMock.mockClear();
       putSharePayloadMock.mockClear();
 
-      const renderer = await renderCta(scenario.props, scenario.scope);
+      const renderer = await renderCta(
+        scenario.props,
+        scenario.scope,
+        scenario.serverWebUrl ?? null
+      );
       const buttons = findPressables(renderer);
       if (buttons.length > 0) {
         pressCta(renderer);

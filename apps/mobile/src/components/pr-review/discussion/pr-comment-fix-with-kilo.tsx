@@ -4,10 +4,11 @@
 // The provider ref comes from the live scope, so the link names the surface
 // the row is actually on: the GitHub route supplies the synthesized triple
 // and a null organization, the provider layout supplies the GitLab/Bitbucket
-// ref plus its organization. A comment with no addressable provider URL (a
-// GitLab MR deep-linked with no instance hint) renders NOTHING — the row
-// shows no CTA rather than a dead or failing one, the same rule the reactions
-// capability gate (`comment-row.tsx`) follows.
+// ref plus its organization. The URL itself comes from the loaded PR/MR
+// (`useProviderPrWebUrl`, published by the review screen), and a comment the
+// app cannot address renders NOTHING — the row shows no CTA rather than a
+// dead or failing one, the same rule the reactions capability gate
+// (`comment-row.tsx`) follows.
 //
 // The press is pure navigation: stage the pre-written message in the share
 // payload and push the new-session route. No I/O, no mutation, so there is
@@ -30,7 +31,7 @@ import {
   type PrCommentKind,
   prCommentWebUrl,
 } from '@/lib/pr-review/fix-with-kilo';
-import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
+import { useProviderPrScope, useProviderPrWebUrl } from '@/lib/pr-review/provider-pr-ref';
 import { putSharePayload } from '@/lib/share-payload';
 
 // The pill's hit slop lives with the trailing-group gap in
@@ -54,11 +55,12 @@ export function PrCommentFixWithKilo({
   kind,
 }: Readonly<PrCommentFixWithKiloProps>) {
   const scope = useProviderPrScope({ owner, repo, number });
+  const serverWebUrl = useProviderPrWebUrl();
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
 
-  const commentUrl = prCommentWebUrl(scope.ref, kind, commentId);
+  const commentUrl = prCommentWebUrl({ ref: scope.ref, serverWebUrl }, kind, commentId);
   if (commentUrl === null) {
     return null;
   }

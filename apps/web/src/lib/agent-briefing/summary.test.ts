@@ -37,6 +37,15 @@ describe('briefing model pricing', () => {
     );
   });
 
+  it('leaves output room for reasoning before the answer within the spend limit', async () => {
+    const roomy = await briefingPriceBound(target.id, 'Overnight activity', 2_000_000);
+    expect(roomy.maxTokens).toBeGreaterThan(8192);
+    expect(roomy.upperBound).toBeLessThanOrEqual(2_000_000);
+    const tight = await briefingPriceBound(target.id, 'Overnight activity', 20_000);
+    expect(tight.maxTokens).toBeLessThan(roomy.maxTokens);
+    expect(tight.upperBound).toBeLessThanOrEqual(20_000);
+  });
+
   it.each([undefined, { ...target, endpoints: [] }])(
     'rejects an alias whose target has no priced routes',
     async unavailableTarget => {

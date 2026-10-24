@@ -59,6 +59,9 @@ const responseSchema = z.object({
   choices: z.array(z.object({ message: z.object({ content: z.string().max(32_000) }) })).min(1),
 });
 const MAX_INPUT_BYTES = 32_000;
+// Reasoning models spend output tokens on hidden reasoning before the answer, so the cap must
+// leave room for both.
+const MAX_OUTPUT_TOKENS = 16_384;
 const summaryAuthorizationSchema = z.object({
   model: z.string(),
   maxSpendMicrodollars: z.number().int().positive(),
@@ -209,8 +212,8 @@ export async function briefingPriceBound(
   const inputCost = Math.ceil((inputTokensBound * inputRate + requestCost) * 1_000_000);
   const available = maxSpendMicrodollars - inputCost;
   const maxTokens = Math.min(
-    2048,
-    outputRate > 0 ? Math.floor(available / (outputRate * 1_000_000)) : 2048
+    MAX_OUTPUT_TOKENS,
+    outputRate > 0 ? Math.floor(available / (outputRate * 1_000_000)) : MAX_OUTPUT_TOKENS
   );
   if (available < 0 || maxTokens < 64) throw new Error('spend_limit_too_low');
   const upperBound = Math.ceil(inputCost + maxTokens * outputRate * 1_000_000);

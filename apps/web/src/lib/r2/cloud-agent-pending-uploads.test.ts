@@ -945,11 +945,9 @@ describe('cloud-agent pending-upload ledger', () => {
       status: 'linked',
     });
 
-    const released = await releaseUnadmittedUploads(
-      kiloUserId,
-      unadmittedMessage,
-      [buildObjectKey(kiloUserId, unadmittedMessage, unadmittedAttachment)]
-    );
+    const released = await releaseUnadmittedUploads(kiloUserId, unadmittedMessage, [
+      buildObjectKey(kiloUserId, unadmittedMessage, unadmittedAttachment),
+    ]);
 
     expect(released).toBe(1);
     const rows = await db

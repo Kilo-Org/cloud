@@ -993,7 +993,9 @@ function classifyInboxError(error: unknown): BitbucketReviewError {
  * current page is already fully served). A pull request updated after the
  * first load sits above the ceiling and appears on a fresh inbox load; one
  * that stops being open leaves the collection and shifts the rows after it up,
- * which the provider's page-number paging cannot prevent.
+ * which the provider's page-number paging cannot prevent. A repository or a
+ * page the provider no longer serves ends that repository's walk rather than
+ * failing the whole inbox.
  */
 export async function listInbox(
   owner: BitbucketReviewOwner,
@@ -1036,18 +1038,31 @@ export async function listInbox(
           let page = position?.pages.get(key)?.page ?? 1;
           let served = position?.pages.get(key)?.served ?? 0;
           for (let reads = 1; ; reads += 1) {
-            const payload = await requestBitbucketJson(
-              access,
-              `/2.0/repositories/${encodeURIComponent(access.workspace.slug)}/${encodeURIComponent(repository.slug)}/pullrequests`,
-              {
-                query: {
-                  pagelen: BITBUCKET_PAGE_SIZE,
-                  page,
-                  q: providerQuery,
-                  sort: '-updated_on',
-                },
+            let payload: unknown;
+            try {
+              payload = await requestBitbucketJson(
+                access,
+                `/2.0/repositories/${encodeURIComponent(access.workspace.slug)}/${encodeURIComponent(repository.slug)}/pullrequests`,
+                {
+                  query: {
+                    pagelen: BITBUCKET_PAGE_SIZE,
+                    page,
+                    q: providerQuery,
+                    sort: '-updated_on',
+                  },
+                }
+              );
+            } catch (error) {
+              // A repository the cached set still names but the provider no
+              // longer serves, and a page an earlier load was promised for a
+              // collection that has since shrunk, are both that repository's
+              // end: the rest of the inbox still loads, and the repository
+              // stops appearing in later continuations.
+              if (classifyBitbucketError(error).kind === 'not_found') {
+                return { key, page, rows: [], fromRow: 0, hadNext: false };
               }
-            );
+              throw error;
+            }
             const parsedPage = BitbucketPageSchema.safeParse(payload);
             if (!parsedPage.success) {
               throw new BitbucketReviewError('retryable', 'Bitbucket returned an unexpected page.');

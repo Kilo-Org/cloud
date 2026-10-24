@@ -1371,6 +1371,134 @@ describe('listInbox', () => {
     expect(cursor).toBeUndefined();
   });
 
+  it('serves the rest of the inbox when a cached repository is no longer served', async () => {
+    // The cached set can name a repository the provider has deleted since its
+    // last sync: its collection answers 404, which ends that repository only.
+    const rowsBySlug: Record<string, InboxRow[]> = {
+      'repo-a': minutesFixture(100, 2),
+    };
+    mockReadCachedRepositories.mockResolvedValue({
+      status: 'available',
+      repositories: ['repo-a', 'repo-gone'].map((slug, index) => ({
+        id: `87654321-4321-4321-4321-${String(index).padStart(12, '0')}`,
+        workspaceUuid: WORKSPACE.uuid,
+        name: slug,
+        fullName: `acme/${slug}`,
+        private: true,
+        defaultBranch: 'main',
+      })),
+      syncedAt: '2026-09-06T00:00:00.000Z',
+    });
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      const parsed = new URL(full);
+      const match = parsed.pathname.match(/^\/2\.0\/repositories\/acme\/([^/]+)\/pullrequests$/);
+      const rows = match ? rowsBySlug[match[1]] : undefined;
+      if (!match || !rows) {
+        return jsonResponse({ type: 'error', error: { message: 'Repository not found' } }, 404);
+      }
+      return jsonResponse({
+        pagelen: 50,
+        values: rows.map(row => ({
+          ...row,
+          source: { repository: { full_name: `acme/${match[1]}` } },
+          destination: { repository: { full_name: `acme/${match[1]}` } },
+        })),
+        next: null,
+      });
+    });
+
+    const page = await listInbox(ORG_OWNER);
+
+    expect(page.items.map(item => item.ref && 'prId' in item.ref && item.ref.prId)).toEqual([
+      101, 100,
+    ]);
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it('ends a repository whose continuation page no longer exists', async () => {
+    // Load one is promised a second page of repo-b. Twenty of repo-b's rows
+    // leave the collection before load two, so the page it was promised is now
+    // past the end and answers 404: the remaining repositories must still page,
+    // and repo-b must not be asked again.
+    const rowsBySlug: Record<string, InboxRow[]> = {
+      'repo-a': Array.from({ length: 60 }, (_, index) =>
+        inboxPr(100 + index, `2026-09-02T00:${String(59 - index).padStart(2, '0')}:00+00:00`)
+      ),
+      'repo-b': Array.from({ length: 60 }, (_, index) =>
+        inboxPr(200 + index, `2026-09-02T01:${String(59 - index).padStart(2, '0')}:00+00:00`)
+      ),
+    };
+    const requests: InboxRequest[] = [];
+    mockReadCachedRepositories.mockResolvedValue({
+      status: 'available',
+      repositories: Object.keys(rowsBySlug).map((slug, index) => ({
+        id: `87654321-4321-4321-4321-${String(index).padStart(12, '0')}`,
+        workspaceUuid: WORKSPACE.uuid,
+        name: slug,
+        fullName: `acme/${slug}`,
+        private: true,
+        defaultBranch: 'main',
+      })),
+      syncedAt: '2026-09-06T00:00:00.000Z',
+    });
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      const parsed = new URL(full);
+      const match = parsed.pathname.match(/^\/2\.0\/repositories\/acme\/([^/]+)\/pullrequests$/);
+      const rows = match ? rowsBySlug[match[1]] : undefined;
+      if (!match || !rows) return jsonResponse({ pagelen: 50, values: [], next: null });
+      const page = Number(parsed.searchParams.get('page') ?? '1');
+      requests.push({ slug: match[1], query: parsed.searchParams.get('q'), page: String(page) });
+      const values = rows.slice((page - 1) * 50, page * 50);
+      if (values.length === 0) {
+        return jsonResponse(
+          { type: 'error', error: { message: 'Page number does not exist' } },
+          404
+        );
+      }
+      return jsonResponse({
+        pagelen: 50,
+        values: values.map(row => ({
+          ...row,
+          source: { repository: { full_name: `acme/${match[1]}` } },
+          destination: { repository: { full_name: `acme/${match[1]}` } },
+        })),
+        next: rows.length > page * 50 ? 'https://api.bitbucket.org/2.0/next?page=2' : null,
+      });
+    });
+
+    const served: number[] = [];
+    let cursor: string | undefined;
+    for (let load = 0; load < 5; load += 1) {
+      const page = await listInbox(ORG_OWNER, cursor);
+      served.push(
+        ...page.items.flatMap(item => (item.ref && 'prId' in item.ref ? [item.ref.prId] : []))
+      );
+      cursor = page.nextCursor ?? undefined;
+      if (load === 0) {
+        // Load one served repo-b's newest 50 rows and was promised page two.
+        expect(served).toHaveLength(50);
+        expect(requests.filter(request => request.slug === 'repo-b')).toHaveLength(1);
+        rowsBySlug['repo-b'] = rowsBySlug['repo-b'].slice(0, 40);
+      }
+      if (cursor === undefined) break;
+    }
+
+    expect(cursor).toBeUndefined();
+    expect(served).toHaveLength(110);
+    expect(new Set(served).size).toBe(110);
+    expect(served.slice(0, 50)).toEqual(Array.from({ length: 50 }, (_, index) => 200 + index));
+    expect(served.slice(50)).toEqual(Array.from({ length: 60 }, (_, index) => 100 + index));
+    expect(requests.filter(request => request.slug === 'repo-b')).toHaveLength(2);
+  });
+
   it('reads one provider page per repository that still has rows', async () => {
     // 12 repositories × 5 open PRs: the first load reads one page per
     // repository, and the continuation reads only the two with rows left.

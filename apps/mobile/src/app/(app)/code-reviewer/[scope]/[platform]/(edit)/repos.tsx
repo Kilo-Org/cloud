@@ -111,11 +111,11 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
       description: t('codeReviewer.repos.installGithubAppDescription'),
     },
     gitlab: {
-      title: t('codeReviewer.repos.noRepositoriesFound'),
+      title: t('common.noRepositoriesFound'),
       description: t('codeReviewer.repos.gitlabNoRepositoriesDescription'),
     },
     bitbucket: {
-      title: t('codeReviewer.repos.noRepositoriesFound'),
+      title: t('common.noRepositoriesFound'),
       description: t('codeReviewer.repos.bitbucketNoRepositoriesDescription'),
     },
   } satisfies Record<ReviewerPlatform, { title: string; description: string }>;

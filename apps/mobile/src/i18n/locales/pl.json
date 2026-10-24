@@ -53,6 +53,7 @@
     "connected": "Połączono",
     "couldNotLoadModels": "Nie udało się wczytać modeli.",
     "couldNotLoadRepositories": "Nie udało się wczytać repozytoriów.",
+    "noRepositoriesFound": "Nie znaleziono repozytoriów",
     "critical": "Poziom krytyczny",
     "delete": "Usuń",
     "deleted": "Usunięto",
@@ -87,6 +88,7 @@
     "connect": "Połącz",
     "connectBitbucket": "Połącz konto Bitbucket",
     "connectGitlab": "Połącz konto GitLab",
+    "connectProvider": "Połącz konto dostawcy",
     "contentTruncated": "Skrócono treść",
     "copyLink": "Kopiuj link",
     "couldNotLoadOrganizations": "Nie udało się wczytać organizacji.",
@@ -889,7 +891,6 @@
       "gitlabNoRepositoriesDescription": "Może być konieczne przyznanie dostępu do większej liczby grup lub projektów w serwisie GitLab.",
       "installGithubApp": "Zainstaluj aplikację GitHub dla repozytoriów",
       "installGithubAppDescription": "Przyznaj aplikacji Kilo w serwisie GitHub dostęp do repozytoriów, które chcesz poddać przeglądowi.",
-      "noRepositoriesFound": "Nie znaleziono repozytoriów",
       "repositoryAccess": "dostęp do repozytorium"
     },
     "style": {
@@ -913,7 +914,6 @@
     "followReviewMd": "Postępuj zgodnie z REVIEW.md",
     "followReviewMdSubtitle": "Przestrzegaj instrukcji z pliku REVIEW.md w każdym repozytorium",
     "manualReview": {
-      "connectProvider": "Połącz konto dostawcy",
       "connectProviderDescription": "Połącz konto GitHub, aby rozpocząć ręczny przegląd PR.",
       "couldNotCheckProviderStatus": "Nie udało się sprawdzić statusu dostawcy.",
       "couldNotLoadProviders": "Nie udało się wczytać połączonych dostawców. Spróbuj ponownie.",

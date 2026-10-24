@@ -53,6 +53,7 @@
     "connected": "Povezano",
     "couldNotLoadModels": "Modelov ni bilo mogoče naložiti.",
     "couldNotLoadRepositories": "Repozitorijev ni bilo mogoče naložiti.",
+    "noRepositoriesFound": "Ni najdenih skladišč",
     "critical": "Kritično",
     "delete": "Izbriši",
     "deleted": "Izbrisano",
@@ -87,6 +88,7 @@
     "connect": "Poveži",
     "connectBitbucket": "Poveži Bitbucket",
     "connectGitlab": "Poveži GitLab",
+    "connectProvider": "Poveži ponudnika",
     "contentTruncated": "Vsebina skrajšana",
     "copyLink": "Kopiraj povezavo",
     "couldNotLoadOrganizations": "Organizacij ni bilo mogoče naložiti.",
@@ -1451,7 +1453,6 @@
       "gitlabNoRepositoriesDescription": "Morda moraš odobriti dostop do več skupin ali projektov na platformi GitLab.",
       "installGithubApp": "Namestitev aplikacije GitHub v skladišča",
       "installGithubAppDescription": "Aplikaciji Kilo za GitHub odobri dostop do skladišč, ki jih želiš pregledati.",
-      "noRepositoriesFound": "Ni najdenih skladišč",
       "repositoryAccess": "dostop do skladišč"
     },
     "style": {
@@ -1533,7 +1534,6 @@
       "invalidUrl": "Vnesi veljaven URL zahteve za združitev.",
       "couldNotCheckProviderStatus": "Stanja ponudnika ni bilo mogoče preveriti.",
       "couldNotLoadProviders": "Povezanih ponudnikov ni bilo mogoče naložiti. Poskusi znova.",
-      "connectProvider": "Poveži ponudnika",
       "connectProviderDescription": "Poveži GitHub, da začneš ročni pregled zahteve za združitev.",
       "pullRequestUrl": "URL zahteve za združitev",
       "instructions": "Navodila (neobvezno)",

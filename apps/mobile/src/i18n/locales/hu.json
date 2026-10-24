@@ -53,6 +53,7 @@
     "connected": "Csatlakoztatva",
     "couldNotLoadModels": "Nem sikerült betölteni a modelleket.",
     "couldNotLoadRepositories": "Nem sikerült betölteni az adattárakat.",
+    "noRepositoriesFound": "Nem találhatók kódtárak",
     "critical": "Kritikus",
     "delete": "Törlés",
     "deleted": "Törölve",
@@ -87,6 +88,7 @@
     "connect": "Csatlakoztatás",
     "connectBitbucket": "Bitbucket csatlakoztatása",
     "connectGitlab": "GitLab csatlakoztatása",
+    "connectProvider": "Szolgáltató csatlakoztatása",
     "contentTruncated": "Tartalom csonkolva",
     "copyLink": "Hivatkozás másolása",
     "couldNotLoadOrganizations": "Nem sikerült betölteni a szervezeteket.",
@@ -1407,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "Lehet, hogy több csoporthoz vagy projekthez kell hozzáférést adnod a GitLabon.",
       "installGithubApp": "GitHub-alkalmazás telepítése a kódtárakhoz",
       "installGithubAppDescription": "Adj hozzáférést a Kilo GitHub-alkalmazásnak az ellenőrizni kívánt kódtárakhoz.",
-      "noRepositoriesFound": "Nem találhatók kódtárak",
       "repositoryAccess": "hozzáférés a kódtárakhoz"
     },
     "style": {
@@ -1489,7 +1490,6 @@
       "invalidUrl": "Adj meg egy érvényes URL-t a PR-hez.",
       "couldNotCheckProviderStatus": "Nem sikerült ellenőrizni a szolgáltató állapotát.",
       "couldNotLoadProviders": "Nem sikerült betölteni a csatlakoztatott szolgáltatóidat. Próbáld újra.",
-      "connectProvider": "Szolgáltató csatlakoztatása",
       "connectProviderDescription": "Csatlakoztasd a GitHubot egy PR kézi kódellenőrzésének indításához.",
       "pullRequestUrl": "PR URL-címe",
       "instructions": "Utasítások (nem kötelező)",

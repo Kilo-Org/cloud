@@ -53,6 +53,7 @@
     "connected": "Disambungkan",
     "couldNotLoadModels": "Tidak dapat memuatkan model.",
     "couldNotLoadRepositories": "Tidak dapat memuatkan repositori.",
+    "noRepositoriesFound": "Tiada repositori ditemui",
     "critical": "Kritikal",
     "delete": "Padam",
     "deleted": "Dipadam",
@@ -87,6 +88,7 @@
     "connect": "Sambungkan",
     "connectBitbucket": "Sambungkan Bitbucket",
     "connectGitlab": "Sambungkan GitLab",
+    "connectProvider": "Sambungkan penyedia",
     "contentTruncated": "Kandungan dipotong",
     "copyLink": "Salin pautan",
     "couldNotLoadOrganizations": "Tidak dapat memuatkan organisasi.",
@@ -1407,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "Anda mungkin perlu memberikan akses kepada lebih banyak kumpulan atau projek di GitLab.",
       "installGithubApp": "Pasang apl GitHub pada repositori",
       "installGithubAppDescription": "Benarkan apl GitHub Kilo mengakses repositori yang anda mahu disemak.",
-      "noRepositoriesFound": "Tiada repositori ditemui",
       "repositoryAccess": "akses repositori"
     },
     "style": {
@@ -1489,7 +1490,6 @@
       "invalidUrl": "Masukkan URL permintaan penarikan yang sah.",
       "couldNotCheckProviderStatus": "Tidak dapat menyemak status penyedia.",
       "couldNotLoadProviders": "Kami tidak dapat memuatkan penyedia yang telah anda sambungkan. Sila cuba lagi.",
-      "connectProvider": "Sambungkan penyedia",
       "connectProviderDescription": "Sambungkan GitHub untuk memulakan semakan manual bagi permintaan penarikan.",
       "pullRequestUrl": "URL permintaan penarikan",
       "instructions": "Arahan (pilihan)",

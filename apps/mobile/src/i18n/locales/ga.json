@@ -53,6 +53,7 @@
     "connected": "Nasctha",
     "couldNotLoadModels": "Níorbh fhéidir na samhlacha a lódáil.",
     "couldNotLoadRepositories": "Níorbh fhéidir na stóir a lódáil.",
+    "noRepositoriesFound": "Níor aimsíodh aon stór",
     "critical": "Criticiúil",
     "delete": "Scrios",
     "deleted": "Scriosta",
@@ -87,6 +88,7 @@
     "connect": "Ceangail",
     "connectBitbucket": "Ceangail le Bitbucket",
     "connectGitlab": "Ceangail le GitLab",
+    "connectProvider": "Ceangail soláthraí",
     "contentTruncated": "Ábhar teasctha",
     "copyLink": "Cóipeáil an nasc",
     "couldNotLoadOrganizations": "Níorbh fhéidir na heagraíochtaí a lódáil.",
@@ -1473,7 +1475,6 @@
       "gitlabNoRepositoriesDescription": "Seans go mbeidh ort rochtain ar thuilleadh grúpaí nó tionscadal a thabhairt ar GitLab.",
       "installGithubApp": "Suiteáil an aip GitHub ar stórtha",
       "installGithubAppDescription": "Tabhair rochtain d'aip GitHub Kilo ar na stórtha ar mhaith leat go ndéanfaí athbhreithniú orthu.",
-      "noRepositoriesFound": "Níor aimsíodh aon stór",
       "repositoryAccess": "rochtain ar stórtha"
     },
     "style": {
@@ -1555,7 +1556,6 @@
       "invalidUrl": "Cuir isteach URL bailí d'iarratas tarraingthe.",
       "couldNotCheckProviderStatus": "Níorbh fhéidir stádas an tsoláthraí a sheiceáil.",
       "couldNotLoadProviders": "Níorbh fhéidir linn do sholáthraithe nasctha a lódáil. Bain triail as arís le do thoil.",
-      "connectProvider": "Ceangail soláthraí",
       "connectProviderDescription": "Ceangail GitHub chun athbhreithniú de láimh a thosú ar iarratas tarraingthe.",
       "pullRequestUrl": "URL an iarratais tarraingthe",
       "instructions": "Treoracha (roghnach)",

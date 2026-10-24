@@ -53,6 +53,7 @@
     "connected": "Conectat",
     "couldNotLoadModels": "Nu s-au putut încărca modelele.",
     "couldNotLoadRepositories": "Nu s-au putut încărca depozitele de cod.",
+    "noRepositoriesFound": "Niciun depozit găsit",
     "critical": "Critic",
     "delete": "Șterge",
     "deleted": "Șters",
@@ -87,6 +88,7 @@
     "connect": "Conectează",
     "connectBitbucket": "Conectează Bitbucket",
     "connectGitlab": "Conectează GitLab",
+    "connectProvider": "Conectează un furnizor",
     "contentTruncated": "Conținut trunchiat",
     "copyLink": "Copiază linkul",
     "couldNotLoadOrganizations": "Nu s-au putut încărca organizațiile.",
@@ -1429,7 +1431,6 @@
       "gitlabNoRepositoriesDescription": "S-ar putea să fie nevoie să acorzi acces la mai multe grupuri sau proiecte pe GitLab.",
       "installGithubApp": "Instalează aplicația GitHub pe depozite",
       "installGithubAppDescription": "Acordă aplicației Kilo pentru GitHub acces la depozitele pe care vrei să le revizuiască.",
-      "noRepositoriesFound": "Niciun depozit găsit",
       "repositoryAccess": "acces la depozit"
     },
     "style": {
@@ -1511,7 +1512,6 @@
       "invalidUrl": "Introdu o adresă URL validă pentru un PR.",
       "couldNotCheckProviderStatus": "Nu s-a putut verifica starea furnizorului.",
       "couldNotLoadProviders": "Nu s-au putut încărca furnizorii conectați. Încearcă din nou.",
-      "connectProvider": "Conectează un furnizor",
       "connectProviderDescription": "Conectează GitHub pentru a începe revizuirea manuală a unui PR.",
       "pullRequestUrl": "Adresa URL a PR-ului",
       "instructions": "Instrucțiuni (opțional)",

@@ -53,6 +53,7 @@
     "connected": "සම්බන්ධයි",
     "couldNotLoadModels": "ආකෘති පූරණය කළ නොහැකි විය.",
     "couldNotLoadRepositories": "කේත ගබඩා පූරණය කළ නොහැකි විය.",
+    "noRepositoriesFound": "ගබඩා හමු නොවීය",
     "critical": "බරපතළ",
     "delete": "මකන්න",
     "deleted": "මකා ඇත",
@@ -87,6 +88,7 @@
     "connect": "සම්බන්ධ කරන්න",
     "connectBitbucket": "Bitbucket සම්බන්ධ කරන්න",
     "connectGitlab": "GitLab සම්බන්ධ කරන්න",
+    "connectProvider": "සැපයුම්කරුවෙකු සම්බන්ධ කරන්න",
     "contentTruncated": "අන්තර්ගතය කෙටි කර ඇත",
     "copyLink": "සබැඳිය පිටපත් කරන්න",
     "couldNotLoadOrganizations": "සංවිධාන පූරණය කළ නොහැකි විය.",
@@ -1407,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "GitLab හි තවත් කණ්ඩායම් හෝ ව්‍යාපෘති වෙත ප්‍රවේශ වීමට අවසර දීමට ඔබට සිදු විය හැක.",
       "installGithubApp": "ගබඩා සඳහා GitHub යෙදුම ස්ථාපනය කරන්න",
       "installGithubAppDescription": "සමාලෝචනය කිරීමට අවශ්‍ය ගබඩාවලට ප්‍රවේශ වීමට Kilo GitHub යෙදුමට අවසර දෙන්න.",
-      "noRepositoriesFound": "ගබඩා හමු නොවීය",
       "repositoryAccess": "ගබඩා ප්‍රවේශය"
     },
     "style": {
@@ -1489,7 +1490,6 @@
       "invalidUrl": "වලංගු PR URL එකක් ඇතුළත් කරන්න.",
       "couldNotCheckProviderStatus": "සැපයුම්කරුගේ තත්ත්වය පරීක්ෂා කළ නොහැකි විය.",
       "couldNotLoadProviders": "ඔබේ සම්බන්ධිත සැපයුම්කරුවන් පූරණය කිරීමට අපට නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න.",
-      "connectProvider": "සැපයුම්කරුවෙකු සම්බන්ධ කරන්න",
       "connectProviderDescription": "PR එකක සමාලෝචනයක් ඔබ විසින් ආරම්භ කිරීමට GitHub සම්බන්ධ කරන්න.",
       "pullRequestUrl": "PR සඳහා URL",
       "instructions": "උපදෙස් (අත්‍යවශ්‍ය නොවේ)",

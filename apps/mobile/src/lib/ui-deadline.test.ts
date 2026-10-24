@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { withUiDeadline } from './ui-deadline';
+import { isUiDeadlineError, withUiDeadline } from './ui-deadline';
 
 describe('withUiDeadline', () => {
   it('returns a result that settles before the deadline', async () => {
@@ -15,6 +15,18 @@ describe('withUiDeadline', () => {
     await vi.advanceTimersByTimeAsync(15_000);
 
     await expectation;
+    vi.useRealTimers();
+  });
+
+  it('marks its own rejection so a caller keeps its message', async () => {
+    vi.useFakeTimers();
+    const pending = withUiDeadline(new Promise(() => undefined), 15_000);
+    const rejection = expect(pending).rejects.toSatisfy(isUiDeadlineError);
+
+    await vi.advanceTimersByTimeAsync(15_000);
+    await rejection;
+
+    expect(isUiDeadlineError(new Error('saved'))).toBe(false);
     vi.useRealTimers();
   });
 });

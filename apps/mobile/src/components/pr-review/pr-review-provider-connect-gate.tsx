@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { PlugZap, RefreshCcw, ShieldAlert } from '@/components/ui/icons';
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -60,31 +60,30 @@ export function ProviderConnectGate({
   const { t } = useTranslation();
   const instanceHint = useInstanceHint(platform);
 
-  // The two providers answer with different status shapes, so each arm
-  // subscribes to its own query and only one is enabled per mount — a
-  // union of the two queryOptions types is not assignable to one useQuery.
-  const gitlabOptions = useMemo(
-    () =>
-      organizationId
-        ? trpc.organizations.reviewAgent.getGitLabStatus.queryOptions({ organizationId })
-        : trpc.personalReviewAgent.getGitLabStatus.queryOptions(),
-    [trpc, organizationId]
-  );
-  const bitbucketOptions = useMemo(
-    () =>
-      trpc.organizations.reviewAgent.getBitbucketReadiness.queryOptions({
-        organizationId: organizationId ?? '',
-      }),
-    [trpc, organizationId]
-  );
+  // The providers — and the two GitLab scopes, whose payloads now differ by
+  // the personal reconnect marker — answer with different status shapes, so
+  // each arm subscribes to its own query and only one is enabled per mount: a
+  // union of two queryOptions types is not assignable to one useQuery.
+  const personalGitlabStatus = useQuery({
+    ...trpc.personalReviewAgent.getGitLabStatus.queryOptions(),
+    enabled: platform === 'gitlab' && organizationId === null,
+  });
+  const organizationGitlabStatus = useQuery({
+    ...trpc.organizations.reviewAgent.getGitLabStatus.queryOptions({
+      organizationId: organizationId ?? '',
+    }),
+    enabled: platform === 'gitlab' && organizationId !== null,
+  });
   // Bitbucket Cloud is organization-context only (s4): with no organization
   // selected there is no endpoint to ask, so the query stays disabled and the
   // gate renders the org-only explanation.
-  const gitlabStatus = useQuery({ ...gitlabOptions, enabled: platform === 'gitlab' });
   const bitbucketStatus = useQuery({
-    ...bitbucketOptions,
+    ...trpc.organizations.reviewAgent.getBitbucketReadiness.queryOptions({
+      organizationId: organizationId ?? '',
+    }),
     enabled: platform === 'bitbucket' && organizationId !== null,
   });
+  const gitlabStatus = organizationId ? organizationGitlabStatus : personalGitlabStatus;
   const status = platform === 'gitlab' ? gitlabStatus : bitbucketStatus;
 
   const [connecting, setConnecting] = useState(false);
@@ -134,9 +133,12 @@ export function ProviderConnectGate({
     isError: status.isError,
     isLoading: status.isPending,
     connected: status.data?.connected === true,
-    // `revoked` is the GitHub App's vocabulary; provider statuses only ever
-    // answer connected / not connected.
-    revoked: false,
+    // Only the personal GitLab status distinguishes an existing connection
+    // that needs re-authorizing from a first-time connect.
+    reconnectRequired:
+      platform === 'gitlab' && organizationId === null
+        ? personalGitlabStatus.data?.reconnectRequired === true
+        : false,
     organizationId,
   });
 
@@ -192,21 +194,38 @@ export function ProviderConnectGate({
     );
   }
 
-  if (view === 'connect') {
-    const title = platform === 'gitlab' ? t('common.connectGitlab') : t('common.connectBitbucket');
+  if (view === 'connect' || view === 'reconnect') {
+    const reconnect = view === 'reconnect';
+    // Reused translated copy: the mid-session reconnect notice already names
+    // the expired provider connection and asks the reader to re-check it, so
+    // the gate needs no new catalog keys.
+    const provider =
+      platform === 'gitlab' ? t('common.gitlab') : t('agentChat.repoPicker.platformBitbucket');
+    const connectTitle =
+      platform === 'gitlab' ? t('common.connectGitlab') : t('common.connectBitbucket');
+    const connectDescription =
+      platform === 'gitlab'
+        ? t('prReview.connect.gitlabDescription')
+        : t('prReview.connect.bitbucketDescription');
+    const reconnectTitle =
+      platform === 'gitlab'
+        ? t('prReview.reconnectNotice.gitlabTitle')
+        : t('prReview.reconnectNotice.bitbucketTitle');
+    const title = reconnect ? reconnectTitle : connectTitle;
+    const description = reconnect
+      ? t('prReview.reconnectNotice.providerMessage', { provider })
+      : connectDescription;
     return (
       <View className="flex-1 bg-background">
         <PrReviewGateHeader />
         <EmptyState
-          icon={PlugZap}
+          icon={reconnect ? ShieldAlert : PlugZap}
           title={title}
           description={
             <>
               <PrReviewContextLine instanceHint={instanceHint} />
               <Text variant="muted" className="text-center">
-                {platform === 'gitlab'
-                  ? t('prReview.connect.gitlabDescription')
-                  : t('prReview.connect.bitbucketDescription')}
+                {description}
               </Text>
             </>
           }
@@ -223,7 +242,7 @@ export function ProviderConnectGate({
               ) : (
                 <RefreshCcw size={16} color={colors.primaryForeground} />
               )}
-              <Text>{title}</Text>
+              <Text>{connectTitle}</Text>
             </Button>
           }
         />

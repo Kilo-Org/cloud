@@ -7,13 +7,15 @@ import {
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 
 /**
- * Get a default model that is allowed for an organization.
- * Priority: org default model > global default > preferred models > global default fallback.
+ * Get a default model that is allowed for an organization, or `null` when the
+ * organization's model-access policy allows none of the candidates. Callers must
+ * treat `null` as "no model configured" and store no model for it.
+ * Priority: org default model > global default > preferred models.
  */
 export async function getDefaultAllowedModel(
   organizationId: string,
   globalDefault = PRIMARY_DEFAULT_MODEL
-): Promise<string> {
+): Promise<string | null> {
   const organization = await getOrganizationById(organizationId);
   if (!organization) {
     return globalDefault;
@@ -54,7 +56,10 @@ export async function getDefaultAllowedModel(
     }
   }
 
-  // All models were blocked; fall back to global default
+  // No candidate passed `isAllowed`: the policy allows none of them, so there is
+  // no default model to return. This is the contract's no-model result; the
+  // install paths pass the policy-exempt bot default, so they resolve that model
+  // and this branch is reached through the resolver's own default argument.
   console.warn('[SlackBot] No allowed model found; org policy blocks all preferred models');
-  return globalDefault;
+  return null;
 }

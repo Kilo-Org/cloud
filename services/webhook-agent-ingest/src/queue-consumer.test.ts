@@ -102,7 +102,11 @@ function makeEnv() {
 }
 
 describe('creator Cloud Agent dispatch', () => {
-  function harness(processStatus = 'captured', cloudAgentSessionId: string | null = null) {
+  function harness(
+    processStatus = 'captured',
+    cloudAgentSessionId: string | null = null,
+    profileId: string | null = 'profile-1'
+  ) {
     const config = makeTriggerConfig({
       userId: null,
       orgId: 'org-1',
@@ -111,7 +115,7 @@ describe('creator Cloud Agent dispatch', () => {
       mode: 'code',
       model: 'model-1',
       githubRepo: 'owner/repo',
-      profileId: 'profile-1',
+      profileId,
     });
     const stub = {
       getRequest: vi.fn(async () => ({ ...makeRequest(processStatus), cloudAgentSessionId })),
@@ -169,6 +173,21 @@ describe('creator Cloud Agent dispatch', () => {
     expect(await h.calls[0].json()).toMatchObject({ kilocodeOrganizationId: 'org-1' });
     expect(h.ack).toHaveBeenCalledOnce();
     expect(h.retry).not.toHaveBeenCalled();
+  });
+
+  it('dispatches without an explicit profile so runtime defaults can resolve it', async () => {
+    const h = harness('captured', null, null);
+    await handleWebhookDeliveryBatch(h.batch, h.env);
+    expect(h.calls).toHaveLength(2);
+    const prepared = await h.calls[0].json();
+    expect(prepared).not.toHaveProperty('profileId');
+    expect(prepared).toMatchObject({ githubRepo: 'owner/repo', createdOnPlatform: 'webhook' });
+    expect(h.ack).toHaveBeenCalledOnce();
+    expect(h.retry).not.toHaveBeenCalled();
+    expect(h.stub.updateRequest).not.toHaveBeenCalledWith(
+      'req-1',
+      expect.objectContaining({ process_status: 'failed' })
+    );
   });
 
   it('mints fresh authorization again for an initiate-only retry', async () => {

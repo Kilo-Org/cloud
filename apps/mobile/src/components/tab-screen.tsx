@@ -3,6 +3,7 @@ import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  Platform,
   ScrollView,
   type ScrollViewInstance,
   type ScrollViewProps,
@@ -46,6 +47,32 @@ function useTabBarHeight() {
 // FlatList/FlashList screens use this directly for contentContainerStyle.paddingBottom.
 export function useTabBarBottomPadding() {
   return useTabBarHeight() + TAB_SCREEN_BOTTOM_GAP;
+}
+
+/**
+ * A route formSheet opened from the Profile tab can extend under the absolute
+ * tab bar on Android. Its last controls need a viewport ending at the bar's
+ * top edge, with the 16pt trailing spacer providing breathing room without
+ * stealing viewport space.
+ *
+ * On Android the bar hides with the keyboard, so the frame reserves the IME
+ * occlusion instead of the bar height. On iOS the native formSheet covers the
+ * underlying tab bar; it owns its safe-area and keyboard insets, so no extra
+ * frame margin is needed.
+ */
+export function SheetScrollView({ children, style, ...props }: ScrollViewProps) {
+  const tabBarHeight = useTabBarHeight();
+  const keyboardOcclusion = useKeyboardState(state => state.height);
+  let frameMargin = 0;
+  if (Platform.OS === 'android') {
+    frameMargin = keyboardOcclusion > 0 ? keyboardOcclusion : tabBarHeight;
+  }
+  return (
+    <ScrollView {...props} style={[style, { marginBottom: frameMargin }]}>
+      {children}
+      <View style={{ height: TAB_SCREEN_BOTTOM_GAP }} pointerEvents="none" />
+    </ScrollView>
+  );
 }
 
 export function TabScreenScrollView({

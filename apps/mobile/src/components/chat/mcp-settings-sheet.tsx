@@ -290,7 +290,7 @@ export function McpSettingsSheet({
   );
 
   return (
-    <SessionPageSheet visible={visible} onClose={onClose}>
+    <SessionPageSheet visible={visible} onClose={onClose} dismissible>
       <SheetHeader
         title={t('modelChat.mcp.sheetTitle')}
         onDone={onClose}

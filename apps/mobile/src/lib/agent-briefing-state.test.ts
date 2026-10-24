@@ -269,6 +269,12 @@ describe('parseBriefingSafeguardInput', () => {
       maxDurationSeconds: 600,
       maxSpendMicrodollars: 1_234_500_000,
     });
+    // A fraction long enough to round the integer up must not invalidate the
+    // grouping the person typed.
+    expect(parseBriefingSafeguardInput('10', '9.999,9999', 'de')).toEqual({
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 9_999_999_900,
+    });
   });
 });
 

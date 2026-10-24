@@ -180,7 +180,9 @@ function readSafeguardAmount(text: string, locale: string): number | null {
       .map(part => part.length)
       .join(',') !==
       format
-        .formatToParts(Math.abs(value))
+        // Only the integer part: a fraction long enough to round across a
+        // group boundary would otherwise disagree with the typed integer.
+        .formatToParts(Math.trunc(Math.abs(value)))
         .filter(part => part.type === 'integer')
         .map(part => part.value.length)
         .join(',')

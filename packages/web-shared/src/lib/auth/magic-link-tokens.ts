@@ -153,14 +153,9 @@ export type ReserveSignInCodeResult = 'ok' | 'invalid' | 'too_many_attempts' | '
  * A live reservation blocks concurrent callers, who receive 'in_progress'.
  * A failed settlement must call releaseSignInCode so the code stays usable.
  *
- * When challengeId is supplied, all lookups, the pre-check, and the increment
- * are keyed by challenge_id instead of email. This isolates attempt budgets:
- * guesses against challenge A do not spend challenge B's budget.
- *
- * When challengeId is absent, the legacy email-keyed path is used for
- * shipped clients that do not yet send a challenge. The email-keyed path
- * matches the live sign-in code row for the email whether or not it carries
- * a challenge_id, so old clients can reserve codes minted by new clients.
+ * Challenge verification uses attempts; compatibility verification uses
+ * legacy_attempts. Each mode has its own bounded allowance. Lookups follow
+ * the supplied challenge when present, otherwise the normalized email.
  *
  * Returns 'ok' when the code is reserved, 'invalid' for a wrong/expired/consumed
  * code, 'too_many_attempts' when the attempt budget is exhausted, and
@@ -172,6 +167,8 @@ export async function reserveSignInCode(
   challengeId?: string
 ): Promise<ReserveSignInCodeResult> {
   const normalizedEmail = normalizeEmail(email);
+  const attemptsKey = challengeId ? 'attempts' : 'legacy_attempts';
+  const attemptsColumn = magic_link_tokens[attemptsKey];
 
   const lookupWhere = challengeId
     ? and(
@@ -203,7 +200,7 @@ export async function reserveSignInCode(
       return 'invalid';
     }
 
-    if (row.attempts >= SIGN_IN_CODE_MAX_ATTEMPTS) {
+    if (row[attemptsKey] >= SIGN_IN_CODE_MAX_ATTEMPTS) {
       return 'too_many_attempts';
     }
 
@@ -221,7 +218,7 @@ export async function reserveSignInCode(
             eq(magic_link_tokens.purpose, 'sign_in_code'),
             isNull(magic_link_tokens.consumed_at),
             sql`${magic_link_tokens.expires_at} > NOW()`,
-            sql`${magic_link_tokens.attempts} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`,
+            sql`${attemptsColumn} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`,
             sql`(${magic_link_tokens.reserved_until} IS NULL OR ${magic_link_tokens.reserved_until} < NOW())`
           )
         )
@@ -237,26 +234,23 @@ export async function reserveSignInCode(
       return 'invalid';
     }
 
-    // Count the attempt first, while the row is locked.
-    // Key by challenge_id when available, otherwise by email; the email-keyed
-    // path matches the live row for the email regardless of challenge_id.
     const incrementWhere = challengeId
       ? and(
           eq(magic_link_tokens.challenge_id, challengeId),
           eq(magic_link_tokens.purpose, 'sign_in_code'),
           isNull(magic_link_tokens.consumed_at),
-          sql`${magic_link_tokens.attempts} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`
+          sql`${attemptsColumn} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`
         )
       : and(
           eq(magic_link_tokens.email, normalizedEmail),
           eq(magic_link_tokens.purpose, 'sign_in_code'),
           isNull(magic_link_tokens.consumed_at),
-          sql`${magic_link_tokens.attempts} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`
+          sql`${attemptsColumn} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`
         );
 
     await tx
       .update(magic_link_tokens)
-      .set({ attempts: sql`${magic_link_tokens.attempts} + 1` })
+      .set({ [attemptsKey]: sql`${attemptsColumn} + 1` })
       .where(incrementWhere);
 
     // ponytail: remove legacy counter and no-challenge path when

@@ -172,6 +172,12 @@ describe('parseLocalizedNumber with the device keypad separator', () => {
     expect(parseLocalizedNumber('1,5', 'en-US', '.')).toBeNull();
     expect(parseLocalizedNumber('1.5', 'de-DE', ',')).toBeNull();
   });
+
+  it('returns the ASCII literal of the reading that decides', () => {
+    expect(normalizeLocalizedNumber('2.5', 'de-DE', '.')).toBe('2.5');
+    expect(normalizeLocalizedNumber('1.234,5', 'de-DE', '.')).toBe('1234.5');
+    expect(normalizeLocalizedNumber('1.234', 'de-DE', '.')).toBeNull();
+  });
 });
 
 describe('foldDecimalDigits', () => {

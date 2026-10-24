@@ -314,6 +314,33 @@ describe('useInteractionHandlers attention ack', () => {
     await expect(render().handleRespondToPermission('once')).resolves.toBe('retryable');
   });
 
+  it.each(['once', 'always', 'reject'] as const)(
+    'keeps the %s decision with the failure so a retry re-sends it',
+    async response => {
+      const manager = {
+        answerQuestion: vi.fn(),
+        rejectQuestion: vi.fn(),
+        respondToPermission: vi.fn().mockRejectedValue(new Error('network')),
+      };
+      const { render } = renderInteractionHandlers({
+        manager: manager as never,
+        kiloSessionId: 'kilo-session-1',
+        activeQuestion: null,
+        activePermission: { requestId: 'p1' },
+        surface: 'remote-session',
+      });
+
+      await expect(render().handleRespondToPermission(response)).resolves.toBe('retryable');
+
+      expect(render().permissionSubmissionError).toEqual({
+        kind: 'retryable',
+        message: 'Failed to respond to permission. Please try again.',
+        action: 'respond',
+        permissionResponse: response,
+      });
+    }
+  );
+
   it('reports terminal when the permission is no longer available', async () => {
     const manager = {
       answerQuestion: vi.fn(),

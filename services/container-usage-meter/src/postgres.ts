@@ -166,17 +166,20 @@ function budgetForRemaining(
   warnRemainingMicrodollars: number
 ): ApplyResult['budget'] {
   if (billingMode === 'shadow') return { verdict: 'continue' };
+  // The budget contract reports a nonnegative balance; the stored balance
+  // stays exact even when a settlement overdraws it.
+  const reportedMicrodollars = Math.max(0, remainingMicrodollars);
   if (remainingMicrodollars <= MINIMUM_REMAINING_MICRODOLLARS) {
     return {
       verdict: 'stop',
-      remainingMicrodollars,
+      remainingMicrodollars: reportedMicrodollars,
       minimumRequiredMicrodollars: MINIMUM_REMAINING_MICRODOLLARS,
     };
   }
   if (remainingMicrodollars < warnRemainingMicrodollars) {
     return {
       verdict: 'warn',
-      remainingMicrodollars,
+      remainingMicrodollars: reportedMicrodollars,
       minimumRequiredMicrodollars: MINIMUM_REMAINING_MICRODOLLARS,
     };
   }
@@ -440,7 +443,8 @@ export async function applyStartWithDb(
           kind: 'rejected',
           code: 'insufficient_credits',
           message: 'Container billing requires at least $5.00 in remaining credits',
-          remainingMicrodollars: remaining,
+          // Reported balances are nonnegative even when the stored balance is overdrawn.
+          remainingMicrodollars: Math.max(0, remaining),
           minimumRequiredMicrodollars: MINIMUM_REMAINING_MICRODOLLARS,
         };
       }

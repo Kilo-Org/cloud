@@ -8,6 +8,7 @@ import { Pressable, View } from 'react-native';
 import { fileStatusIcon, fileStatusLabel } from '@/components/pr-review/diff/pr-diff-file-status';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Text } from '@/components/ui/text';
+import { selectableRowA11y } from '@/lib/a11y/selectable-row';
 import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
@@ -45,8 +46,7 @@ export function MarkViewedToggle({
         onToggle();
       }}
       hitSlop={MARK_VIEWED_HIT_SLOP}
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: viewed }}
+      {...selectableRowA11y({ multi: true, selected: viewed })}
       accessibilityLabel={
         viewed
           ? t('prReview.fileRows.unmarkViewed', { path })

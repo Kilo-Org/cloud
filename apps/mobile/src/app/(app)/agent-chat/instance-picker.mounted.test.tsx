@@ -57,6 +57,7 @@ const flashListMock = vi.hoisted(
 
 vi.mock('react-native', () => ({
   FlatList: 'FlatList',
+  Platform: { OS: 'android' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',

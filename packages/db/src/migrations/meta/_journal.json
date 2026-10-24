@@ -2084,8 +2084,15 @@
     {
       "idx": 297,
       "version": "7",
-      "when": 1792780933206,
-      "tag": "0297_device_auth_client_details",
+      "when": 1792780343168,
+      "tag": "0297_white_lenny_balinger",
+      "breakpoints": true
+    },
+    {
+      "idx": 298,
+      "version": "7",
+      "when": 1792829228907,
+      "tag": "0298_device_auth_client_details",
       "breakpoints": true
     }
   ]

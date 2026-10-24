@@ -420,16 +420,14 @@ export async function listActiveSessions({
       });
 
       if (!response.ok) {
+        await response.body?.cancel().catch(() => undefined);
         if (requireCompleteSnapshot) {
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to fetch active sessions',
           });
         }
-        console.warn(
-          `[active-sessions] fetch failed: ${response.status} ${response.statusText}`,
-          await response.text().catch(() => '')
-        );
+        console.warn(`[active-sessions] fetch failed: ${response.status} ${response.statusText}`);
         if (!includeCloudAgentSessions) {
           return { sessions: [] as ActiveSession[] };
         }

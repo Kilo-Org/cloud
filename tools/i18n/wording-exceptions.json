@@ -157,6 +157,7 @@
     "open pull request",
     "pr opened",
     "remediation blocked",
+    "review",
     "{{displaycount}} failed",
     "{{displaycount}} passed",
     "{{displaycount}} skipped",

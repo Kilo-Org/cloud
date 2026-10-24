@@ -18,6 +18,14 @@ current render time. Elapsed grants and non-expiring credits do not contribute t
 its amount or earliest expiry, for both personal and organization accounts.
 The balance continues to come from the balance query.
 
+## Session restoration
+
+The first auth-provider mount uses the credentials preloaded when JavaScript
+starts. Later mounts read secure storage again: Android can recreate the activity
+without restarting JavaScript, so the initial snapshot may predate sign-in.
+Back-exit and force-stop preserve the stored session; explicit sign-out clears it.
+The existing bootstrap loading and retryable-error surfaces cover restoration.
+
 ## Runtime recovery
 
 Retry on the runtime-error screen restores the last focused route for the
@@ -70,6 +78,14 @@ Retry action, including after reopening the session. Retry resends the original
 user prompt as a new turn in the same session; the original prompt remains in
 the transcript.
 
+## Email sign-in
+
+The email form validates syntax and a 254-character maximum after trimming and
+lowercasing. Invalid addresses stay on the email step with localized inline
+feedback. The code-step destination abbreviates addresses longer than 48
+characters with a middle ellipsis; delivery and verification use the full address.
+The code input and Verify action remain available below the destination prompt.
+
 ## Transcript action targets
 
 Standalone transcript continuation and recovery buttons use the shared
@@ -118,8 +134,13 @@ Every build localizes the local-network prompt, because Chat can connect to a lo
 Changes require a new iOS build; an over-the-air update cannot change the native permission prompt.
 
 1. obtain Expo access
-2. `pnpx eas-cli login -b`
+2. `pnpm exec eas login -b`
 3. obtain Apple access (developer)
+
+Run these commands from `apps/mobile` after `pnpm install --frozen-lockfile`.
+When updating EAS CLI, keep the `eas-cli` development dependency and `eas.json`'s
+`cli.version` aligned, regenerate the workspace dependency graph, and verify with
+`pnpm exec eas --version`.
 
 ### Android
 
@@ -127,9 +148,13 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 2. `pnpm start`
 3. open installed app on your phone
 
+Production Android builds use the EAS `large` resource class to give Gradle and
+JavaScript bundling more memory. Development, preview, and iOS builds retain
+their default resource classes. The production builder requires a paid EAS plan.
+
 ### iOS
 
-1. add your device to the list of internal devices using `pnpx eas-cli device:create`
+1. add your device to the list of internal devices using `pnpm exec eas device:create`
 2. install the provisioning profile from step 1 on your device (it may involve a 1hr wait)
 3. create a new dev build using `pnpm build:ios`
 4. `pnpm start`
@@ -166,6 +191,16 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 - Use `--display=1` for the outer display and `--display=3` for the inner display.
 - An inactive display produces a black screenshot.
 - Type a draft, change the appearance in both directions, and verify the draft stays readable.
+
+## Diagram host checks
+
+Mermaid uses a packaged renderer and a shared HTML host document.
+Run `pnpm --filter web exec playwright install chromium`, then
+`pnpm --filter web run test:mobile-mermaid` for its browser regression suite.
+CI runs the same command when the host document, its renderer asset, or the
+suite changes.
+The suite needs no backend or signed-in account and includes flowcharts and
+data-image diagrams.
 
 ## Briefing localization
 

@@ -53,6 +53,7 @@
     "connected": "Conectat",
     "couldNotLoadModels": "Nu s-au putut încărca modelele.",
     "couldNotLoadRepositories": "Nu s-au putut încărca depozitele de cod.",
+    "noRepositoriesFound": "Niciun depozit găsit",
     "critical": "Critic",
     "delete": "Șterge",
     "deleted": "Șters",
@@ -87,6 +88,7 @@
     "connect": "Conectează",
     "connectBitbucket": "Conectează Bitbucket",
     "connectGitlab": "Conectează GitLab",
+    "connectProvider": "Conectează un furnizor",
     "contentTruncated": "Conținut trunchiat",
     "copyLink": "Copiază linkul",
     "couldNotLoadOrganizations": "Nu s-au putut încărca organizațiile.",
@@ -145,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Modificări"
+    "changes": "Modificări",
+    "organizationTrialEnded": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Un proprietar al organizației poate actualiza facturarea pe kilo.ai, apoi poate încerca din nou."
   },
   "language": {
     "restarting": "Se repornește aplicația pentru a schimba limba",
@@ -1429,7 +1432,6 @@
       "gitlabNoRepositoriesDescription": "S-ar putea să fie nevoie să acorzi acces la mai multe grupuri sau proiecte pe GitLab.",
       "installGithubApp": "Instalează aplicația GitHub pe depozite",
       "installGithubAppDescription": "Acordă aplicației Kilo pentru GitHub acces la depozitele pe care vrei să le revizuiască.",
-      "noRepositoriesFound": "Niciun depozit găsit",
       "repositoryAccess": "acces la depozit"
     },
     "style": {
@@ -1511,7 +1513,6 @@
       "invalidUrl": "Introdu o adresă URL validă pentru un PR.",
       "couldNotCheckProviderStatus": "Nu s-a putut verifica starea furnizorului.",
       "couldNotLoadProviders": "Nu s-au putut încărca furnizorii conectați. Încearcă din nou.",
-      "connectProvider": "Conectează un furnizor",
       "connectProviderDescription": "Conectează GitHub pentru a începe revizuirea manuală a unui PR.",
       "pullRequestUrl": "Adresa URL a PR-ului",
       "instructions": "Instrucțiuni (opțional)",
@@ -3212,7 +3213,9 @@
       "sendInvite": "Trimite invitația",
       "title": "Invită un membru",
       "alreadyInvited": "Această persoană este deja invitată sau este deja membru.",
-      "sendError": "Invitația nu a putut fi trimisă."
+      "sendError": "Invitația nu a putut fi trimisă.",
+      "pendingInvitation": "Acest e-mail are deja o invitație în așteptare.",
+      "alreadyMember": "Această persoană este deja membru al acestei organizații."
     },
     "invoices": {
       "downloadA11y": "Descarcă factura {{number}}",
@@ -3282,7 +3285,12 @@
       "pendingInvitations": "Invitații în așteptare",
       "resendInvite": "Retrimite invitația",
       "shareInviteLink": "Partajează linkul de invitație",
-      "resendInviteError": "Invitația nu a putut fi retrimisă."
+      "resendInviteError": "Invitația nu a putut fi retrimisă.",
+      "inviteNotResendable": "Această invitație nu mai poate fi retrimisă.",
+      "ownerAuthority": "Doar un proprietar al organizației poate gestiona proprietarii.",
+      "ownRoleChange": "Nu îți poți schimba propriul rol.",
+      "inviteExpired": "Această invitație a expirat.",
+      "inviteAccepted": "Această invitație a fost deja acceptată."
     },
     "usageStats": {
       "inputTokens": "Tokenuri de intrare",

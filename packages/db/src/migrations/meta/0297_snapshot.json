@@ -1,5 +1,5 @@
 {
-  "id": "f315625c-8f62-4687-83f2-1478e9ca7c42",
+  "id": "f3abc364-273c-444a-824b-7db65a082252",
   "prevId": "2d61ccea-6389-4ab3-a6fd-492cc75f6550",
   "version": "7",
   "dialect": "postgresql",
@@ -6903,7 +6903,7 @@
         },
         "CHK_cloud_agent_webhook_triggers_cloud_agent_fields": {
           "name": "CHK_cloud_agent_webhook_triggers_cloud_agent_fields",
-          "value": "(\n        \"cloud_agent_webhook_triggers\".\"target_type\" != 'cloud_agent' OR\n        (\"cloud_agent_webhook_triggers\".\"github_repo\" IS NOT NULL AND \"cloud_agent_webhook_triggers\".\"profile_id\" IS NOT NULL)\n      )"
+          "value": "(\n        \"cloud_agent_webhook_triggers\".\"target_type\" != 'cloud_agent' OR\n        \"cloud_agent_webhook_triggers\".\"github_repo\" IS NOT NULL\n      )"
         },
         "CHK_cloud_agent_webhook_triggers_kiloclaw_fields": {
           "name": "CHK_cloud_agent_webhook_triggers_kiloclaw_fields",
@@ -10900,30 +10900,6 @@
         "ip_address": {
           "name": "ip_address",
           "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "requesting_client_id": {
-          "name": "requesting_client_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "requesting_client_name": {
-          "name": "requesting_client_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "requesting_redirect_origin": {
-          "name": "requesting_redirect_origin",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "client_confirmed_at": {
-          "name": "client_confirmed_at",
-          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },

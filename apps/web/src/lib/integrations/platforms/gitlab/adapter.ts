@@ -71,10 +71,57 @@ async function fetchGitLab(url: string, init?: RequestInit, redirectCount = 0): 
 async function fetchGitLabOnce(url: string, init?: RequestInit): Promise<Response> {
   const resolvedUrl = await resolveGitLabUrlSafely(url);
   if (!resolvedUrl.address) {
-    return fetch(url, { ...init, redirect: 'manual' });
+    return fetchBounded(url, init);
   }
 
   return fetchGitLabBoundToAddress({ ...resolvedUrl, address: resolvedUrl.address }, init);
+}
+
+async function fetchBounded(url: string, init?: RequestInit): Promise<Response> {
+  const signal = init?.signal ?? AbortSignal.timeout(GITLAB_REQUEST_TIMEOUT_MS);
+  const response = await fetch(url, {
+    ...init,
+    signal,
+    redirect: 'manual',
+  });
+
+  const rawHeaders = response.headers;
+  const contentLength =
+    rawHeaders && typeof rawHeaders.get === 'function' ? rawHeaders.get('content-length') : null;
+  if (contentLength && Number(contentLength) > MAX_GITLAB_RESPONSE_BYTES) {
+    const error = new Error('GitLab response exceeded size limit');
+    await response.body?.cancel();
+    throw error;
+  }
+
+  if (!response.body || typeof response.body.getReader !== 'function') {
+    return response;
+  }
+
+  const chunks: Buffer[] = [];
+  let responseBytes = 0;
+  const reader = response.body.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+    const buffer = Buffer.isBuffer(value) ? value : Buffer.from(value);
+    responseBytes += buffer.byteLength;
+    if (responseBytes > MAX_GITLAB_RESPONSE_BYTES) {
+      const error = new Error('GitLab response exceeded size limit');
+      await reader.cancel(error);
+      throw error;
+    }
+    chunks.push(buffer);
+  }
+
+  const body = responseStatusForbidsBody(response.status) ? null : Buffer.concat(chunks);
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
 }
 
 function isGitLabRedirect(status: number): boolean {
@@ -1778,6 +1825,21 @@ export class GitLabProjectAccessTokenPermissionError extends Error {
 }
 
 /**
+ * Thrown when GitLab does not confirm a Project Access Token revocation.
+ * Carries the response status so callers can record it and choose when to retry.
+ */
+export class GitLabProjectAccessTokenRevocationError extends Error {
+  constructor(
+    public projectId: string | number,
+    public status: number,
+    message: string
+  ) {
+    super(message);
+    this.name = 'GitLabProjectAccessTokenRevocationError';
+  }
+}
+
+/**
  * Creates a Project Access Token for a GitLab project
  *
  * Project Access Tokens allow bot-like access to a project without using a user's credentials.
@@ -2138,7 +2200,11 @@ export async function revokeProjectAccessToken(
       );
     }
 
-    throw new Error(`GitLab revoke Project Access Token failed: ${response.status} - ${error}`);
+    throw new GitLabProjectAccessTokenRevocationError(
+      projectId,
+      response.status,
+      `GitLab revoke Project Access Token failed: ${response.status} - ${error}`
+    );
   }
 
   logExceptInTest('[revokeProjectAccessToken] Revoked token', {

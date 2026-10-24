@@ -88,4 +88,19 @@ describe('web session transcript cache', () => {
     expect(cache.read('ses-5' as KiloSessionId)).not.toBeNull();
     expect(cache.read('ses-0' as KiloSessionId)).toBeNull();
   });
+
+  it('drops one session page on invalidate and keeps the rest of the scope', async () => {
+    const cache = createWebSessionTranscriptCache(queryClient, 'personal');
+    const organization = createWebSessionTranscriptCache(queryClient, 'organization');
+    cache.write(page('ses-1'));
+    cache.write(page('ses-2'));
+    organization.write(page('ses-1'));
+    await Promise.resolve(); // writes land in a microtask
+
+    cache.invalidate('ses-1' as KiloSessionId);
+
+    expect(cache.read('ses-1' as KiloSessionId)).toBeNull();
+    expect(cache.read('ses-2' as KiloSessionId)).not.toBeNull();
+    expect(organization.read('ses-1' as KiloSessionId)).not.toBeNull();
+  });
 });

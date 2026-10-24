@@ -130,30 +130,51 @@ export function parseBriefingSafeguards(
   return valid ? { maxDurationSeconds, maxSpendMicrodollars } : null;
 }
 
+const DIGIT = String.raw`\p{Nd}`;
+
+function escapeLiteral(value: string): string {
+  return value.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+}
+
+/**
+ * One number written in this language's grammar: digits, one optional decimal
+ * separator, and group separators only between three-digit groups after the
+ * decimal separator. A group separator is accepted only when the language's
+ * own decimal separator follows it, because `1.234` alone is a whole number in
+ * one convention and a fraction in another.
+ */
+function localizedNumberPattern(locale: string): RegExp {
+  const parts = numberFormat(locale, { useGrouping: true }).formatToParts(123_456.7);
+  const part = (type: Intl.NumberFormatPartTypes, fallback: string) =>
+    parts.find(item => item.type === type)?.value ?? fallback;
+  const group = parts.find(item => item.type === 'group')?.value;
+  const decimal = escapeLiteral(part('decimal', '.'));
+  const plain = `${DIGIT}+(?:${decimal}${DIGIT}*)?|${decimal}${DIGIT}+`;
+  const grouped = group
+    ? `|(?:${DIGIT}{1,3}(?:${escapeLiteral(group)}${DIGIT}{3})+)${decimal}${DIGIT}*`
+    : '';
+  return new RegExp(`^[+-]?(?:${plain}${grouped})$`, 'u');
+}
+
 /**
  * The two safeguard fields as a person typed them in the active language: a
  * decimal comma in `de` is the decimal separator, not a bad value. Text the
- * language's own number grammar cannot read leaves the fields invalid.
+ * language's number grammar cannot read leaves the fields invalid.
  *
- * A group separator without the language's decimal separator is ambiguous:
- * `parseLocalizedNumber` strips it, so `2.5` typed in German would read as 25
- * and quietly raise the spend ceiling tenfold. Refuse that text instead, and
- * show the existing invalid message, so the value is never silently scaled.
+ * `parseLocalizedNumber` strips every group separator, so a separator the
+ * grammar does not place there is ambiguous: German `2.5` would read as 25,
+ * and a pasted `1,234.50` would read as 1.2345 while the field keeps showing
+ * the text. Validate the whole text against the grammar first, and show the
+ * existing invalid message instead, so a value is never silently rescaled.
  */
 export function parseBriefingSafeguardInput(
   minutes: string,
   dollars: string,
   locale: string
 ): BriefingSafeguards | null {
-  const parts = numberFormat(locale, { useGrouping: true }).formatToParts(12_345.6);
-  const group = parts.find(item => item.type === 'group')?.value;
-  const decimal = parts.find(item => item.type === 'decimal')?.value;
-  const field = (text: string) => {
-    if (group !== undefined && decimal !== undefined && text.includes(group)) {
-      return text.includes(decimal) ? parseLocalizedNumber(text, locale) : null;
-    }
-    return parseLocalizedNumber(text, locale);
-  };
+  const pattern = localizedNumberPattern(locale);
+  const field = (text: string) =>
+    pattern.test(text.trim()) ? parseLocalizedNumber(text, locale) : null;
   const duration = field(minutes);
   const spend = field(dollars);
   if (duration === null || spend === null) {

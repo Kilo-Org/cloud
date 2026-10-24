@@ -225,15 +225,32 @@ describe('parseBriefingSafeguardInput', () => {
   });
 
   it('refuses a separator the active language does not read as a decimal point', () => {
-    // A German "2.5" is not a group separator position, and reading it as one
-    // would save 25 instead of 2.5.
-    expect(parseBriefingSafeguardInput('2.5', '2.5', 'de')).toBeNull();
+    // Each case pairs the refused text with a valid value in the other field, so
+    // the grammar check is the only reason the result is null: without it the
+    // text would still turn into a server-valid limit.
+    expect(parseBriefingSafeguardInput('5', '2.5', 'de')).toBeNull();
     expect(parseBriefingSafeguardInput('0.5', '1', 'de')).toBeNull();
-    expect(parseBriefingSafeguardInput('2,5', '2,5', 'en')).toBeNull();
+    expect(parseBriefingSafeguardInput('5', '2,5', 'en')).toBeNull();
+  });
+
+  it('refuses a group separator on the wrong side of the decimal separator', () => {
+    // Pasted from another convention: German grammar reads the comma as the
+    // decimal separator, so the trailing ".50" cannot be a group.
+    expect(parseBriefingSafeguardInput('10', '1,234.50', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('10', '1.234.5', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('10', '1,23.50', 'en')).toBeNull();
   });
 
   it('accepts the language its own display writes', () => {
     expect(parseBriefingSafeguardInput('10', '1234,5', 'de')).toEqual({
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 1_234_500_000,
+    });
+    expect(parseBriefingSafeguardInput('10', '1.234,5', 'de')).toEqual({
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 1_234_500_000,
+    });
+    expect(parseBriefingSafeguardInput('10', '1,234.5', 'en')).toEqual({
       maxDurationSeconds: 600,
       maxSpendMicrodollars: 1_234_500_000,
     });

@@ -8022,6 +8022,165 @@
     ],
     "searchBlob": "cloudAgentSettings.setRepositorySettings Save Cloud Agent sandbox settings for a specific repository, setting or clearing its assigned profile and allocation. cloudagentsettings setrepositorysettings organizationid repofullname platform profileid allocation organizationId repoFullName platform profileId allocation"
   },
+  "cloudEnvironments.build": {
+    "path": "cloudEnvironments.build",
+    "kind": "mutation",
+    "summary": "Start or trigger a new build of a cloud environment at a specific revision, returning the request result. Use to launch a build for an environment.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "environmentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "expectedRevision": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "environmentId",
+        "expectedRevision",
+        "requestId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "build",
+      "organizationid",
+      "environmentid",
+      "expectedrevision",
+      "requestid"
+    ],
+    "searchBlob": "cloudEnvironments.build Start or trigger a new build of a cloud environment at a specific revision, returning the request result. Use to launch a build for an environment. cloudenvironments build organizationid environmentid expectedrevision requestid organizationId environmentId expectedRevision requestId"
+  },
+  "cloudEnvironments.buildLogs": {
+    "path": "cloudEnvironments.buildLogs",
+    "kind": "query",
+    "summary": "Fetch the log output of a specific cloud environment build, paginated by cursor, for viewing build output and debugging build failures.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "environmentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "buildId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "cursor": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "environmentId",
+        "buildId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "buildlogs",
+      "organizationid",
+      "environmentid",
+      "buildid",
+      "cursor"
+    ],
+    "searchBlob": "cloudEnvironments.buildLogs Fetch the log output of a specific cloud environment build, paginated by cursor, for viewing build output and debugging build failures. cloudenvironments buildlogs organizationid environmentid buildid cursor organizationId environmentId buildId cursor"
+  },
+  "cloudEnvironments.buildStatus": {
+    "path": "cloudEnvironments.buildStatus",
+    "kind": "query",
+    "summary": "Check the current status of a cloud environment's build, such as whether it is queued, running, succeeded, or failed. Use to poll build progress for an environment.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "environmentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "environmentId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "buildstatus",
+      "organizationid",
+      "environmentid"
+    ],
+    "searchBlob": "cloudEnvironments.buildStatus Check the current status of a cloud environment's build, such as whether it is queued, running, succeeded, or failed. Use to poll build progress for an environment. cloudenvironments buildstatus organizationid environmentid organizationId environmentId"
+  },
+  "cloudEnvironments.cancelBuild": {
+    "path": "cloudEnvironments.cancelBuild",
+    "kind": "mutation",
+    "summary": "Cancel a running or queued build of a cloud environment by build ID. Use to stop or abort an in-progress environment build.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "environmentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "buildId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "environmentId",
+        "buildId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "cancelbuild",
+      "organizationid",
+      "environmentid",
+      "buildid"
+    ],
+    "searchBlob": "cloudEnvironments.cancelBuild Cancel a running or queued build of a cloud environment by build ID. Use to stop or abort an in-progress environment build. cloudenvironments cancelbuild organizationid environmentid buildid organizationId environmentId buildId"
+  },
   "cloudEnvironments.create": {
     "path": "cloudEnvironments.create",
     "kind": "mutation",

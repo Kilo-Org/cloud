@@ -60,9 +60,6 @@ jest.mock('./kilo-exclusive-models', () => ({
   findKiloExclusiveModel: () => undefined,
   shouldRedactModelNameInMicrodollarUsage: () => false,
 }));
-jest.mock('./is-free-model', () => ({
-  isFreeModel: async (model: string) => model.endsWith(':free'),
-}));
 jest.mock('./custom-pricing', () => ({ calculateCustomCost_mUsd: () => undefined }));
 jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
   normalizeJa4: () => null,
@@ -169,6 +166,7 @@ const context: MicrodollarUsageContext = {
   editor_name: null,
   machine_id: null,
   user_byok: false,
+  is_free: false,
   has_tools: false,
   feature: null,
   session_id: null,
@@ -251,7 +249,7 @@ beforeEach(() => {
     } else warn(...args);
   });
   jest.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
-    sent.push(JSON.parse(String(init?.body)) as UsageRecordRequest);
+    sent.push(JSON.parse(init?.body as string) as UsageRecordRequest);
     return new Response(null, { status: 202 });
   });
   db.transaction.mockImplementation(
@@ -657,6 +655,7 @@ describe('gateway shadow background integration', () => {
       const ctx = {
         ...context,
         user_byok: byok,
+        is_free: !byok,
         requested_model: byok ? 'synthetic-model' : 'synthetic-model:free',
       };
       const record = await lifecycle.run(() => processTokenData({ ...stats }, ctx));
@@ -667,6 +666,7 @@ describe('gateway shadow background integration', () => {
       expect(sent[0].core.cost).toBe(0);
       expect(sent[0].core.cache_discount).toBe(0);
       expect(sent[0].metadata.market_cost).toBe(1234);
+      expect(sent[0].metadata.is_free).toBe(!byok);
       expect(writer).toHaveBeenCalledWith(sent[0]);
     }
   );
@@ -939,7 +939,7 @@ describe('queued usage accounting', () => {
             .mockRejectedValue(new Error('sensitive-secret-prompt'));
         else
           jest.mocked(fetch).mockImplementation(async (_url, init) => {
-            sent.push(JSON.parse(String(init?.body)) as UsageRecordRequest);
+            sent.push(JSON.parse(init?.body as string) as UsageRecordRequest);
             if (failure === 'timeout') {
               await new Promise((_resolve, reject) =>
                 init?.signal?.addEventListener(
@@ -1059,7 +1059,7 @@ describe('queued usage accounting', () => {
       config.USAGE_QUEUE_ONLY_ENABLED = true;
       process.env.VERCEL_REGION = region;
       jest.mocked(fetch).mockImplementation(async (_url, init) => {
-        sent.push(JSON.parse(String(init?.body)) as UsageRecordRequest);
+        sent.push(JSON.parse(init?.body as string) as UsageRecordRequest);
         return new Response(null, { status });
       });
       const report = jest.requireMock<{ reportUsageEvent: jest.Mock }>(

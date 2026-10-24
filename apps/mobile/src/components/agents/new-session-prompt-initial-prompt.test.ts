@@ -471,7 +471,9 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     ).toMatchObject({
       disabled: paperclipDisabled,
       accessibilityState: { disabled: paperclipDisabled },
-      hitSlop: { top: 8, bottom: 8, left: 8, right: 8 },
+      // 31.5pt frame (h-9 at NativeWind's 14pt rem) + 8.25pt per side = 48dp,
+      // Android's minimum (WCAG 2.5.8 AA).
+      hitSlop: { top: 8.25, bottom: 8.25, left: 8.25, right: 8.25 },
     });
     expect(findElementByType(element, ComposerPasteButton)).toMatchObject({ disabled: isCreating });
     expect(findElementByType(element, VoiceInputButton)).toEqual(

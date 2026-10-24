@@ -13,6 +13,7 @@ import {
   insertCustomLlmForTest,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { countAndStoreEmbeddingUsage } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 
 jest.mock('next/server', () => ({
   ...(jest.requireActual('next/server') as Record<string, unknown>),
@@ -95,7 +96,11 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     globalThis.fetch = mockedFetch;
     setUserAuth();
     mockedResolveModelDecision.mockResolvedValue(allowedModelDecision);
-    mockedGetEmbeddingProvider.mockResolvedValue({ provider: OPENROUTER, userByok: null });
+    mockedGetEmbeddingProvider.mockResolvedValue({
+      provider: OPENROUTER,
+      userByok: null,
+      isFree: false,
+    });
     mockedMapModelIdToVercel.mockResolvedValue(model);
     mockedFetch.mockResolvedValue(
       new Response(JSON.stringify({ object: 'list', data: [] }), {
@@ -131,6 +136,10 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
 
     expect(response.status).toBe(200);
     expect(getUpstreamBody().provider).toEqual(provider);
+    expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1]).toMatchObject({
+      is_free: false,
+      user_byok: false,
+    });
   });
 
   it.each([undefined, { only: ['openai'] }])(
@@ -221,6 +230,7 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     mockedGetEmbeddingProvider.mockResolvedValue({
       provider: VERCEL_AI_GATEWAY,
       userByok: [{ providerId: 'openai', decryptedAPIKey: 'test-byok-key' }],
+      isFree: false,
     });
     const { handleEmbeddingsRequest } = await import('./embeddings');
     const response = await handleEmbeddingsRequest(makeRequest({ provider: testCase.privacy }));
@@ -232,6 +242,10 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
         byok: { openai: [{ apiKey: 'test-byok-key' }] },
         ...testCase.translated,
       },
+    });
+    expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1]).toMatchObject({
+      is_free: false,
+      user_byok: true,
     });
   });
 });

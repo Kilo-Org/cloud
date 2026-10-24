@@ -32,7 +32,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
@@ -255,6 +255,7 @@ export async function handleAudioTranscriptionsRequest(
     kiloUserId: user.id,
     provider: provider.id,
     requested_model: requestedModelLowerCased,
+    is_free: isFreeModelExcludingCustomLlms(requestedModelLowerCased),
     promptInfo,
     max_tokens: null,
     has_middle_out_transform: null,
@@ -297,7 +298,7 @@ export async function handleAudioTranscriptionsRequest(
 
   // Free models are Kilo- or partner-funded: a zero balance never blocks them
   // (the embeddings proxy applies the same exemption).
-  if (!canSpendPaidUsage(balance) && !(await isFreeModel(requestedModelLowerCased)) && !userByok) {
+  if (!canSpendPaidUsage(balance) && !usageContext.is_free && !userByok) {
     return await creditsBlockedResponse({
       user,
       balance,

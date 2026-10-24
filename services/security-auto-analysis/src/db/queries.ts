@@ -364,19 +364,6 @@ export async function updateQueueFromPending(
   };
 }
 
-export async function countOwnerInflightAnalyses(db: WorkerDb, owner: QueueOwner): Promise<number> {
-  const rows = await db
-    .select({ total: count() })
-    .from(security_findings)
-    .where(
-      and(
-        ownerWhereFindings(owner),
-        inArray(security_findings.analysis_status, ['pending', 'running'])
-      )
-    );
-  return rows[0]?.total ?? 0;
-}
-
 export async function ensureManualAnalysisQueueRow(
   db: WorkerDb,
   params: { finding: SecurityFindingRecord; claimToken: string; jobId: string }
@@ -764,8 +751,10 @@ export async function getActiveAnalysisAttemptToken(
   return rows[0]?.claimToken ?? null;
 }
 
+type AnalysisLeaseDb = WorkerDb | Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
+
 export async function tryAcquireAnalysisStartLease(
-  db: WorkerDb,
+  db: AnalysisLeaseDb,
   findingId: string
 ): Promise<boolean> {
   const rows = await db
@@ -829,6 +818,36 @@ export async function clearAnalysisStatus(db: WorkerDb, findingId: string): Prom
       updated_at: sql`now()`.mapWith(String),
     })
     .where(eq(security_findings.id, findingId));
+}
+
+/**
+ * Clears a pending start reservation when a manual launch failed before any
+ * lifecycle transition owns the finding. Guarded like the scheduled-path
+ * cleanup: only a `pending` status is cleared, and only when no queue row is
+ * active, so a Worker that received the command keeps lifecycle control.
+ */
+export async function releaseOrphanedStartReservation(
+  db: WorkerDb,
+  findingId: string
+): Promise<void> {
+  await db
+    .update(security_findings)
+    .set({
+      analysis_status: null,
+      updated_at: sql`now()`.mapWith(String),
+    })
+    .where(
+      and(
+        eq(security_findings.id, findingId),
+        eq(security_findings.analysis_status, 'pending'),
+        sql`NOT EXISTS (
+          SELECT 1
+          FROM ${security_analysis_queue}
+          WHERE ${security_analysis_queue.finding_id} = ${security_findings.id}
+            AND ${security_analysis_queue.queue_status} IN ('pending', 'running')
+        )`
+      )
+    );
 }
 
 export async function reconcileStaleAnalysisQueueRows(db: WorkerDb): Promise<{

@@ -73,7 +73,7 @@ it('writes a call and its result, and reads both back whole', async () => {
 
 it('gives back no tools for a session that named none', async () => {
   const read = await use(database(), store =>
-    Effect.zipRight(store.create(session), store.read(session.id))
+    Effect.andThen(store.create(session), store.read(session.id))
   );
 
   expect(Option.getOrThrow(read).tools).toBeUndefined();

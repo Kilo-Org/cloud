@@ -37,6 +37,16 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     return null;
   }
   if (__DEV__) {
+    const reviewCopyFixture =
+      /(?:^|\/)dev\/pr-review-copy-fixture\/(checks|navigator|files|merge)\/?(?:[?#].*)?$/.exec(
+        path
+      );
+    if (reviewCopyFixture) {
+      return `/(auth)/pr-review-copy-fixture?surface=${reviewCopyFixture[1]}`;
+    }
+    if (/(?:^|\/)dev\/button-label-fixture\/?(?:[?#].*)?$/.test(path)) {
+      return '/button-label-fixture';
+    }
     if (/(?:^|\/)dev\/session-row-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(auth)/session-row-fixture';
     }
@@ -45,6 +55,12 @@ export function redirectSystemPath({ path, initial }: { path: string; initial: b
     }
     if (/(?:^|\/)dev\/question-card-fixture\/?(?:[?#].*)?$/.test(path)) {
       return '/(auth)/question-card-fixture';
+    }
+    const reauthorizeFixtureMatch =
+      /(?:^|\/)dev\/security-agent-reauthorize-fixture\/?(\?.*)?$/.exec(path);
+    if (reauthorizeFixtureMatch) {
+      // Keep the optional `?lang=` that the fixture reads to choose its capture language.
+      return `/(auth)/security-agent-reauthorize-fixture${reauthorizeFixtureMatch[1] ?? ''}`;
     }
     const fixtureRoute = modelPickerFixtureRoute(path);
     if (fixtureRoute) {

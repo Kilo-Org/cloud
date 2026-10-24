@@ -149,6 +149,33 @@ describe('adminCustomLlmRouter', () => {
       expect(decrypted.private_key).toBe('pk-secret');
     });
 
+    it('creates a new custom LLM with Amazon Bedrock IAM credentials', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const publicId = 'kilo-internal/test-model-bedrock';
+      const credentials = {
+        type: 'aws_bedrock' as const,
+        region: 'us-east-1',
+        access_key_id: 'AKIDEXAMPLE',
+        secret_access_key: 'bedrock-secret',
+      };
+
+      await caller.admin.customLlm.upsert({
+        public_id: publicId,
+        definition: {
+          ...validDefinition,
+          base_url: 'https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1',
+        },
+        credentials,
+      });
+
+      const [row] = await db.select().from(custom_llm2).where(eq(custom_llm2.public_id, publicId));
+      expect(row?.encrypted_api_key).toBeDefined();
+      expect(JSON.stringify(row?.definition)).not.toContain('bedrock-secret');
+      expect(JSON.parse(decryptApiKey(row.encrypted_api_key!, BYOK_ENCRYPTION_KEY))).toEqual(
+        credentials
+      );
+    });
+
     it('rejects creating new custom LLM when credentials are completely missing', async () => {
       const caller = await createCallerForUser(admin.id);
       const publicId = 'kilo-internal/test-model-no-key';

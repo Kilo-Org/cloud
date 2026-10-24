@@ -3,7 +3,6 @@ import { selectAutoFreeCandidate } from './models';
 import {
   findKiloExclusiveModel,
   getKiloExclusiveInferenceProviders,
-  isKiloExclusiveRateLimitedModel,
   kiloExclusiveModels,
   shouldRedactErrorResponse,
   shouldRedactModelNameInMicrodollarUsage,
@@ -24,16 +23,6 @@ import {
   reflection_beam_free_model,
 } from './kilo-exclusive-models';
 import { getRandomNumber } from './getRandomNumber';
-
-describe('rate-limited Kilo-exclusive models', () => {
-  test('only includes free Gemma', () => {
-    expect(kiloExclusiveModels.filter(model => model.flags.includes('rate-limited'))).toEqual([
-      gemma_4_26b_a4b_it_free_model,
-    ]);
-    expect(isKiloExclusiveRateLimitedModel(gemma_4_26b_a4b_it_free_model.public_id)).toBe(true);
-    expect(isKiloExclusiveRateLimitedModel('tencent/hy3:free')).toBe(false);
-  });
-});
 
 describe('Glyph Cluster', () => {
   test('is free, stealth, and requires data collection', async () => {
@@ -72,34 +61,34 @@ describe('isFreeModelExcludingCustomLlms', () => {
 
   describe('free models', () => {
     test('should return true for models ending with :free', async () => {
-      expect(await isFreeModelExcludingCustomLlms('gpt-4:free')).toBe(true);
-      expect(await isFreeModelExcludingCustomLlms('claude-3:free')).toBe(true);
-      expect(await isFreeModelExcludingCustomLlms('some-model:free')).toBe(true);
-      expect(await isFreeModelExcludingCustomLlms(':free')).toBe(true);
+      expect(isFreeModelExcludingCustomLlms('gpt-4:free')).toBe(true);
+      expect(isFreeModelExcludingCustomLlms('claude-3:free')).toBe(true);
+      expect(isFreeModelExcludingCustomLlms('some-model:free')).toBe(true);
+      expect(isFreeModelExcludingCustomLlms(':free')).toBe(true);
     });
 
     test('should return true for openrouter/free', async () => {
-      expect(await isFreeModelExcludingCustomLlms('openrouter/free')).toBe(true);
+      expect(isFreeModelExcludingCustomLlms('openrouter/free')).toBe(true);
     });
 
     test('should return true for OpenRouter stealth alpha models', async () => {
-      expect(await isFreeModelExcludingCustomLlms('stealth/ox-alpha')).toBe(true);
-      expect(await isFreeModelExcludingCustomLlms('stealth/other-alpha')).toBe(true);
-      expect(await isFreeModelExcludingCustomLlms('stealth/claude-opus-4.7')).toBe(false);
-      expect(await isFreeModelExcludingCustomLlms('stealth/qwen3.6-plus')).toBe(false);
-      expect(await isFreeModelExcludingCustomLlms('openrouter/model-alpha')).toBe(false);
-      expect(await isFreeModelExcludingCustomLlms('stealth/model-beta')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('stealth/ox-alpha')).toBe(true);
+      expect(isFreeModelExcludingCustomLlms('stealth/other-alpha')).toBe(true);
+      expect(isFreeModelExcludingCustomLlms('stealth/claude-opus-4.7')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('stealth/qwen3.6-plus')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('openrouter/model-alpha')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('stealth/model-beta')).toBe(false);
     });
 
     test('should return true for Kilo exclusive models with no pricing', async () => {
       for (const model of kiloExclusiveModels.filter(m => !m.pricing)) {
-        expect(await isFreeModelExcludingCustomLlms(model.public_id)).toBe(true);
+        expect(isFreeModelExcludingCustomLlms(model.public_id)).toBe(true);
       }
     });
 
     test('should return false for Kilo exclusive models with pricing', async () => {
       for (const model of kiloExclusiveModels.filter(m => !!m.pricing)) {
-        expect(await isFreeModelExcludingCustomLlms(model.public_id)).toBe(false);
+        expect(isFreeModelExcludingCustomLlms(model.public_id)).toBe(false);
       }
     });
 
@@ -194,57 +183,57 @@ describe('isFreeModelExcludingCustomLlms', () => {
 
   describe('non-free models', () => {
     test('should return false for regular model names', async () => {
-      expect(await isFreeModelExcludingCustomLlms('gpt-4')).toBe(false);
-      expect(await isFreeModelExcludingCustomLlms('claude-3.7-sonnet')).toBe(false);
-      expect(await isFreeModelExcludingCustomLlms('anthropic/claude-sonnet-4')).toBe(false);
-      expect(await isFreeModelExcludingCustomLlms('google/gemini-2.5-pro')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('gpt-4')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('claude-3.7-sonnet')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('anthropic/claude-sonnet-4')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('google/gemini-2.5-pro')).toBe(false);
     });
 
     test('should return false for models with "free" in the middle', async () => {
-      expect(await isFreeModelExcludingCustomLlms('free-model')).toBe(false);
-      expect(await isFreeModelExcludingCustomLlms('model-free-version')).toBe(false);
-      expect(await isFreeModelExcludingCustomLlms('freemium')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('free-model')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('model-free-version')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('freemium')).toBe(false);
     });
 
     test('should return false for OpenRouter models including alpha/beta', async () => {
-      expect(await isFreeModelExcludingCustomLlms('openrouter/model')).toBe(false);
-      expect(await isFreeModelExcludingCustomLlms('openrouter/model-gamma')).toBe(false);
-      expect(await isFreeModelExcludingCustomLlms('openrouter/model-stable')).toBe(false);
-      expect(await isFreeModelExcludingCustomLlms('openrouter/model-alpha')).toBe(false);
-      expect(await isFreeModelExcludingCustomLlms('openrouter/model-beta')).toBe(false);
-      expect(await isFreeModelExcludingCustomLlms('openrouter/sonoma-dusk-alpha')).toBe(false);
-      expect(await isFreeModelExcludingCustomLlms('openrouter/sonoma-sky-beta')).toBe(false);
-      expect(await isFreeModelExcludingCustomLlms('openrouter/auto-beta')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('openrouter/model')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('openrouter/model-gamma')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('openrouter/model-stable')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('openrouter/model-alpha')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('openrouter/model-beta')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('openrouter/sonoma-dusk-alpha')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('openrouter/sonoma-sky-beta')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('openrouter/auto-beta')).toBe(false);
     });
 
     test('should return false for non-OpenRouter models ending with -alpha or -beta', async () => {
-      expect(await isFreeModelExcludingCustomLlms('anthropic/model-alpha')).toBe(false);
-      expect(await isFreeModelExcludingCustomLlms('google/model-beta')).toBe(false);
-      expect(await isFreeModelExcludingCustomLlms('model-alpha')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('anthropic/model-alpha')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('google/model-beta')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('model-alpha')).toBe(false);
     });
   });
 
   describe('edge cases', () => {
     test('should return false for empty string', async () => {
-      expect(await isFreeModelExcludingCustomLlms('')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('')).toBe(false);
     });
 
     test('should return false for null/undefined', async () => {
-      expect(await isFreeModelExcludingCustomLlms(null as unknown as string)).toBe(false);
-      expect(await isFreeModelExcludingCustomLlms(undefined as unknown as string)).toBe(false);
+      expect(isFreeModelExcludingCustomLlms(null as unknown as string)).toBe(false);
+      expect(isFreeModelExcludingCustomLlms(undefined as unknown as string)).toBe(false);
     });
 
     test('should be case-sensitive', async () => {
-      expect(await isFreeModelExcludingCustomLlms('model:FREE')).toBe(false);
-      expect(await isFreeModelExcludingCustomLlms('model:Free')).toBe(false);
-      expect(await isFreeModelExcludingCustomLlms('OPENROUTER/FREE')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('model:FREE')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('model:Free')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('OPENROUTER/FREE')).toBe(false);
     });
 
     test('should handle whitespace correctly', async () => {
-      expect(await isFreeModelExcludingCustomLlms('model:free ')).toBe(false);
-      expect(await isFreeModelExcludingCustomLlms(' model:free')).toBe(true);
-      expect(await isFreeModelExcludingCustomLlms(' openrouter/free')).toBe(false);
-      expect(await isFreeModelExcludingCustomLlms('openrouter/free ')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('model:free ')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms(' model:free')).toBe(true);
+      expect(isFreeModelExcludingCustomLlms(' openrouter/free')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('openrouter/free ')).toBe(false);
     });
   });
 });

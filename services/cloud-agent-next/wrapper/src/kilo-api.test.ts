@@ -152,6 +152,84 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
     );
   }
 
+  it('replaces the running CLI MCP connection using the generated directory-scoped SDK API', async () => {
+    const stub = startStub(200, { 'kilo-cloud-agent': { status: 'connected' } });
+    await createClient(stub.url).updateCloudAgentMcp({
+      url: 'https://mcp.kiloapps.io/mcp',
+      token: 'renewed-session-mcp-token',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+    });
+    expect(stub.requests).toEqual([
+      {
+        method: 'POST',
+        pathname: '/mcp',
+        directory: '/workspace',
+        body: {
+          name: 'kilo-cloud-agent',
+          config: {
+            type: 'remote',
+            url: 'https://mcp.kiloapps.io/mcp',
+            oauth: false,
+            headers: { Authorization: 'Bearer renewed-session-mcp-token' },
+          },
+        },
+      },
+    ]);
+  });
+
+  it('does not leak scoped MCP credentials in configuration refresh failures', async () => {
+    const stub = startStub(400, { message: 'private-scoped-mcp-token' });
+    const error: unknown = await createClient(stub.url)
+      .updateCloudAgentMcp({
+        url: 'https://mcp.kiloapps.io/mcp',
+        token: 'private-scoped-mcp-token',
+        expiresAt: 123,
+      })
+      .catch(cause => cause);
+    expect(error).toBeInstanceOf(Error);
+    if (!(error instanceof Error)) throw new Error('Expected credential refresh failure');
+    expect(error.message).toBe('Cloud Agent MCP credential refresh failed');
+    expect(stub.requests).toHaveLength(2);
+  });
+
+  it.each(['failed', 'needs_auth', 'disabled'])(
+    'rejects an HTTP-successful but unavailable MCP status %s after bounded retry',
+    async status => {
+      const stub = startStub(200, {
+        'kilo-cloud-agent': { status, error: 'private-scoped-mcp-token' },
+      });
+      const error: unknown = await createClient(stub.url)
+        .updateCloudAgentMcp({
+          url: 'https://mcp.kiloapps.io/mcp',
+          token: 'private-scoped-mcp-token',
+          expiresAt: 123,
+        })
+        .catch(cause => cause);
+      expect(error).toMatchObject({ message: 'Cloud Agent MCP credential refresh failed' });
+      expect(stub.requests).toHaveLength(2);
+    }
+  );
+
+  it('retries a transient MCP connection failure without changing the issued credential', async () => {
+    let attempts = 0;
+    const server = Bun.serve({
+      port: 0,
+      fetch: () => {
+        attempts++;
+        return Response.json({
+          'kilo-cloud-agent': { status: attempts === 1 ? 'failed' : 'connected' },
+        });
+      },
+    });
+    startedServers.push(server);
+    await createClient(server.url.toString()).updateCloudAgentMcp({
+      url: 'https://mcp.kiloapps.io/mcp',
+      token: 'renewed-session-mcp-token',
+      expiresAt: 123,
+    });
+    expect(attempts).toBe(2);
+  });
+
   it('discovers directory and ancestry across the process without retaining session history', async () => {
     let query: URL | undefined;
     let header: string | null = null;

@@ -9,7 +9,6 @@ export type ProfileDatabase = LedgerDatabase;
 
 export type RepositoryPlatform = 'github' | 'gitlab';
 
-/** Owner type discriminator for UI display. */
 export type ProfileOwnerType = ProfileOwner['type'];
 
 /** Profile variable response type (for API responses). Secret values are masked. */
@@ -21,7 +20,6 @@ export type ProfileVarResponse = {
   updatedAt: string;
 };
 
-/** Profile command response type. */
 export type ProfileCommandResponse = {
   sequence: number;
   command: string;
@@ -78,7 +76,6 @@ export type ProfileSkillResponse = {
   updatedAt: string;
 };
 
-/** Agent response (as returned from the API). Mirrors the kilocode CLI's AgentConfig shape. */
 export type ProfileAgentResponse = {
   id: string;
   slug: string;
@@ -88,7 +85,6 @@ export type ProfileAgentResponse = {
   updatedAt: string;
 };
 
-/** Profile kilo command response type. */
 export type ProfileKiloCommandResponse = {
   id: string;
   name: string;
@@ -116,7 +112,6 @@ export type ProfileInstructionResponse = {
   updatedAt: string;
 };
 
-/** Profile response type for list/get operations. */
 export type ProfileResponse = {
   id: string;
   name: string;
@@ -133,12 +128,10 @@ export type ProfileResponse = {
   instructions: ProfileInstructionResponse[];
 };
 
-/** Profile response with owner type for combined listings. */
 export type ProfileResponseWithOwner = ProfileResponse & {
   ownerType: ProfileOwnerType;
 };
 
-/** Profile summary for list operations (without vars/commands). */
 export type ProfileSummary = {
   id: string;
   name: string;
@@ -155,7 +148,6 @@ export type ProfileSummary = {
   instructionCount: number;
 };
 
-/** Profile summary with owner type for combined listings. */
 export type ProfileSummaryWithOwner = ProfileSummary & {
   ownerType: ProfileOwnerType;
 };

@@ -1,0 +1,3 @@
+# Web app base for Kilo token verification and catalog call forwarding.
+# @url nextjs
+WEB_BASE_URL=http://localhost:3000

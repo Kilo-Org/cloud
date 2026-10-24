@@ -7,10 +7,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { namedSessionTitle } from '@/components/agents/session-detail-rename-state';
 import { formatGitUrlProject } from '@/components/agents/session-list-helpers';
 import { QueryError } from '@/components/query-error';
+import { SheetTitleRow } from '@/components/sheet-title-row';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
-import { buildStoredSessionsQueryOptions } from '@/lib/hooks/use-agent-sessions';
+import { buildStoredSessionsQueryOptions } from '@/lib/agent-session-queries';
+import { todoLinkCandidates } from '@/lib/todos/todo-model';
 import { type TodoItem, type TodoList } from '@/lib/todos/todo-types';
 import { useTRPC } from '@/lib/trpc';
 
@@ -23,8 +25,8 @@ type TodoLinkSessionSheetProps = {
 };
 
 /**
- * Recent sessions to link to a to-do: those in the list's repository when it
- * names one, never the sessions already linked.
+ * Sheet for picking the session to link to a to-do. Filtering lives in
+ * `todoLinkCandidates`.
  */
 export function TodoLinkSessionSheet({
   visible,
@@ -44,15 +46,12 @@ export function TodoLinkSessionSheet({
   );
 
   const candidates = useMemo(() => {
-    const linked = new Set(todo.sessions.map(session => session.sessionId));
-    const repo = list.gitUrl?.toLowerCase();
+    const linkedSessionIds = new Set(todo.sessions.map(session => session.sessionId));
     const page = sessions.data?.pages[0];
-    return (page?.cliSessions ?? []).filter(
-      session =>
-        !linked.has(session.session_id) &&
-        (!repo ||
-          (session.git_url ? formatGitUrlProject(session.git_url).toLowerCase() === repo : false))
-    );
+    return todoLinkCandidates(page?.cliSessions ?? [], {
+      repository: list.gitUrl,
+      linkedSessionIds,
+    });
   }, [list.gitUrl, sessions.data, todo.sessions]);
 
   let body: ReactNode = null;
@@ -106,11 +105,17 @@ export function TodoLinkSessionSheet({
   }
 
   return (
-    <Sheet visible={visible} onClose={onClose} snapPoints={['70%']}>
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      // The body scrolls, so the native sheet's drag would dismiss it on a
+      // scroll and the iOS backdrop tap is gone with it; the title row's close
+      // control and Android Back are this sheet's exits.
+      dismissGestures={false}
+      snapPoints={['70%']}
+    >
       <View className="flex-1 pt-4">
-        <Text accessibilityRole="header" className="px-5 pb-3 text-base font-semibold">
-          {t('todos.linkSession.title')}
-        </Text>
+        <SheetTitleRow title={t('todos.linkSession.title')} onClose={onClose} />
         <ScrollView contentContainerStyle={{ paddingBottom: bottom + 16 }}>{body}</ScrollView>
       </View>
     </Sheet>

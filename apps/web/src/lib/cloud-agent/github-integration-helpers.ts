@@ -1,4 +1,5 @@
 import { TRPCError } from '@trpc/server';
+import type { PlatformIntegration } from '@kilocode/db/schema';
 import {
   getIntegrationsByOrganization,
   getIntegrationForOrganization,
@@ -23,6 +24,18 @@ import {
   type PlatformRepository,
 } from '@/lib/integrations/core/types';
 
+/**
+ * Why a stored GitHub installation cannot serve repositories. Repository
+ * pickers show the reconnect step for these instead of the plain
+ * "not connected" state, because the installation exists but needs an admin
+ * action before it can list anything.
+ */
+export type GitHubRepositoriesUnavailableReason =
+  | 'suspended'
+  | 'disconnected'
+  | 'reauth_required'
+  | 'not_configured';
+
 type GitHubRepositoriesResult = {
   integrationInstalled: boolean;
   repositories: {
@@ -36,6 +49,13 @@ type GitHubRepositoriesResult = {
   }[];
   syncedAt?: string | null;
   errorMessage?: string;
+  /** Set when an installation exists but none can serve repositories. */
+  unavailableReason?: GitHubRepositoriesUnavailableReason;
+  /**
+   * Set when at least one installation answered and at least one did not, so
+   * `repositories` is a partial list rather than the full set.
+   */
+  partial?: boolean;
 };
 
 const mapRepositories = (
@@ -86,6 +106,37 @@ const missingIntegrationResponse = (message: string): GitHubRepositoriesResult =
   repositories: [],
   syncedAt: null,
   errorMessage: message,
+});
+
+const UNAVAILABLE_REASON_MESSAGES: Record<GitHubRepositoriesUnavailableReason, string> = {
+  suspended: 'GitHub integration is suspended',
+  disconnected: 'GitHub integration is disconnected',
+  reauth_required: 'GitHub integration requires reauthorization',
+  not_configured: 'GitHub integration is not properly configured',
+};
+
+/**
+ * Why a stored installation cannot list repositories. A locally disconnected
+ * row is reported before a suspension because disconnecting sets both, and the
+ * person who disconnected needs the reconnect step, not a suspension notice.
+ */
+const unavailableReasonForIntegration = (integration: {
+  integration_status: string | null;
+  suspended_at: string | null;
+  auth_invalid_at: string | null;
+  github_disconnected_at?: string | null;
+}): GitHubRepositoriesUnavailableReason => {
+  if (integration.github_disconnected_at) return 'disconnected';
+  if (isPlatformIntegrationSuspended(integration)) return 'suspended';
+  if (integration.auth_invalid_at) return 'reauth_required';
+  return 'not_configured';
+};
+
+const unavailableIntegrationResponse = (
+  reason: GitHubRepositoriesUnavailableReason
+): GitHubRepositoriesResult => ({
+  ...missingIntegrationResponse(UNAVAILABLE_REASON_MESSAGES[reason]),
+  unavailableReason: reason,
 });
 
 export async function getGitHubTokenForOrganization(
@@ -173,20 +224,16 @@ export async function fetchGitHubRepositoriesForOrganization(
       organizationId,
       PLATFORM.GITHUB
     );
-    if (isPlatformIntegrationSuspended(unavailableIntegration)) {
-      return missingIntegrationResponse('GitHub integration is suspended');
-    }
-    if (unavailableIntegration?.auth_invalid_at) {
-      return missingIntegrationResponse('GitHub integration requires reauthorization');
-    }
     if (unavailableIntegration) {
-      return missingIntegrationResponse('GitHub integration is not properly configured');
+      return unavailableIntegrationResponse(
+        unavailableReasonForIntegration(unavailableIntegration)
+      );
     }
     return missingIntegrationResponse('No GitHub integration found for this organization');
   }
 
   if (!integration.platform_installation_id) {
-    return missingIntegrationResponse('GitHub integration is not properly configured');
+    return unavailableIntegrationResponse('not_configured');
   }
 
   try {
@@ -231,14 +278,64 @@ export async function fetchAllGitHubRepositoriesForOrganization(
   forceRefresh: boolean = false,
   purpose: 'workflow' | 'agent' = 'workflow'
 ): Promise<GitHubRepositoriesResult> {
-  const integrations = (
-    await getIntegrationsByOrganization(organizationId, PLATFORM.GITHUB, purpose)
-  ).filter(isPlatformIntegrationHealthy);
+  // Every stored installation is passed through: an unhealthy one explains why
+  // the list is short, and dropping it before aggregation made a suspended
+  // connection read as "no integration found".
+  const integrations = await getIntegrationsByOrganization(
+    organizationId,
+    PLATFORM.GITHUB,
+    purpose
+  );
   return fetchRepositoriesForIntegrations(integrations, forceRefresh, purpose);
 }
 
+type IntegrationRepositoriesOutcome =
+  | {
+      status: 'repositories';
+      repositories: GitHubRepositoriesResult['repositories'];
+      syncedAt: string | null;
+    }
+  | { status: 'unavailable'; reason: GitHubRepositoriesUnavailableReason }
+  | { status: 'failed' };
+
+async function readIntegrationRepositories(
+  integration: PlatformIntegration,
+  forceRefresh: boolean,
+  purpose: 'workflow' | 'agent'
+): Promise<IntegrationRepositoriesOutcome> {
+  if (!integration.platform_installation_id) {
+    return { status: 'unavailable', reason: 'not_configured' };
+  }
+  const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
+  if (
+    shouldSyncProviderRepositories({
+      forceRefresh,
+      cachedRepositories,
+      repositoriesSyncedAt: integration.repositories_synced_at,
+    })
+  ) {
+    const repositories = await fetchGitHubRepositories(
+      integration.platform_installation_id,
+      integration.github_app_type || 'standard',
+      integration.id,
+      purpose
+    );
+    await updateRepositoriesForIntegration(integration.id, repositories);
+    return {
+      status: 'repositories',
+      repositories: mapRepositories(repositories, integration),
+      syncedAt: new Date().toISOString(),
+    };
+  }
+  return {
+    status: 'repositories',
+    repositories: mapRepositories(cachedRepositories ?? [], integration),
+    syncedAt: integration.repositories_synced_at,
+  };
+}
+
 async function fetchRepositoriesForIntegrations(
-  integrations: Awaited<ReturnType<typeof getIntegrationsByOrganization>>,
+  integrations: PlatformIntegration[],
   forceRefresh: boolean,
   purpose: 'workflow' | 'agent'
 ): Promise<GitHubRepositoriesResult> {
@@ -247,49 +344,44 @@ async function fetchRepositoriesForIntegrations(
   }
 
   try {
-    const settledResults = await Promise.allSettled(
-      integrations.map(async integration => {
-        if (!integration.platform_installation_id) return { repositories: [], syncedAt: null };
-        const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-        if (
-          shouldSyncProviderRepositories({
-            forceRefresh,
-            cachedRepositories,
-            repositoriesSyncedAt: integration.repositories_synced_at,
-          })
-        ) {
-          const repositories = await fetchGitHubRepositories(
-            integration.platform_installation_id,
-            integration.github_app_type || 'standard',
-            integration.id,
-            purpose
-          );
-          await updateRepositoriesForIntegration(integration.id, repositories);
-          return {
-            repositories: mapRepositories(repositories, integration),
-            syncedAt: new Date().toISOString(),
-          };
+    const outcomes = await Promise.all(
+      integrations.map(async (integration): Promise<IntegrationRepositoriesOutcome> => {
+        if (!isPlatformIntegrationHealthy(integration)) {
+          return { status: 'unavailable', reason: unavailableReasonForIntegration(integration) };
         }
-        return {
-          repositories: mapRepositories(cachedRepositories ?? [], integration),
-          syncedAt: integration.repositories_synced_at,
-        };
+        try {
+          return await readIntegrationRepositories(integration, forceRefresh, purpose);
+        } catch {
+          return { status: 'failed' };
+        }
       })
     );
-    const results = settledResults
-      .filter(result => result.status === 'fulfilled')
-      .map(result => result.value);
-    if (results.length === 0) {
-      throw new Error('All GitHub repository fetches failed');
+    const readable = outcomes.filter(outcome => outcome.status === 'repositories');
+    if (readable.length === 0) {
+      const unavailable = outcomes.find(outcome => outcome.status === 'unavailable');
+      if (!unavailable) {
+        // Every installation was configured but the provider rejected the read.
+        // The caller retries, so this stays an error rather than a state.
+        throw new Error('All GitHub repository fetches failed');
+      }
+      return {
+        ...unavailableIntegrationResponse(unavailable.reason),
+        // A rejected read next to an unusable installation may clear on retry,
+        // so the pickers keep the retry control alongside the reason.
+        ...(outcomes.some(outcome => outcome.status === 'failed') ? { partial: true } : {}),
+      };
     }
     return {
       integrationInstalled: true,
-      repositories: dedupeRepositories(results.flatMap(result => result.repositories)),
-      syncedAt: results
-        .map(result => result.syncedAt)
+      repositories: dedupeRepositories(readable.flatMap(outcome => outcome.repositories)),
+      syncedAt: readable
+        .map(outcome => outcome.syncedAt)
         .filter((value): value is string => value !== null)
         .sort()
         .at(0),
+      // A short list is not a complete one: say so instead of reporting an
+      // unqualified success for the installations that answered.
+      ...(readable.length < outcomes.length ? { partial: true } : {}),
     };
   } catch (_error) {
     throw new TRPCError({
@@ -310,24 +402,11 @@ export async function fetchGitHubRepositoriesForUser(
   }
 
   if (!isPlatformIntegrationHealthy(integration)) {
-    if (integration.github_disconnected_at) {
-      return missingIntegrationResponse('GitHub integration is disconnected');
-    }
-
-    if (isPlatformIntegrationSuspended(integration)) {
-      return missingIntegrationResponse('GitHub integration is suspended');
-    }
-    if (integration.github_disconnected_at) {
-      return missingIntegrationResponse('GitHub integration is disconnected');
-    }
-    if (integration.auth_invalid_at) {
-      return missingIntegrationResponse('GitHub integration requires reauthorization');
-    }
-    return missingIntegrationResponse('GitHub integration is not properly configured');
+    return unavailableIntegrationResponse(unavailableReasonForIntegration(integration));
   }
 
   if (!integration.platform_installation_id) {
-    return missingIntegrationResponse('GitHub integration is not properly configured');
+    return unavailableIntegrationResponse('not_configured');
   }
 
   try {
@@ -356,7 +435,6 @@ export async function fetchGitHubRepositoriesForUser(
       };
     }
 
-    // Return cached repos
     return {
       integrationInstalled: true,
       repositories: mapRepositories(cachedRepositories ?? [], integration),

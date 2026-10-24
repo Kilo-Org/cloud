@@ -82,8 +82,12 @@ import {
   withLocalSessions,
   withLocalWorktreeDetails,
   type LocalComposerSettings,
+  type LocalSession,
 } from './local-sessions/local-session';
-import { sendLocalSessionRequest } from './local-sessions/local-session-request';
+import {
+  releaseLocalSessionUploads,
+  sendLocalSessionRequest,
+} from './local-sessions/local-session-request';
 import { localSessionsStorageKey } from './local-sessions/local-session-storage';
 
 // Context for children to toggle the mobile sidebar sheet
@@ -215,12 +219,19 @@ export function CloudSidebarLayout(props: CloudSidebarLayoutProps) {
     },
     [organizationId, router]
   );
+  const releaseDiscardedUploads = useCallback(
+    (session: LocalSession) => {
+      void releaseLocalSessionUploads(trpcClient, session.request, currentUserId).catch(() => {});
+    },
+    [currentUserId, trpcClient]
+  );
   return (
     <LocalSessionsProvider
       key={`${currentUserId}:${organizationId ?? 'personal'}`}
       storageKey={localSessionsStorageKey(currentUserId, organizationId ?? null)}
       send={send}
       onAdopted={followServerSession}
+      onDiscard={releaseDiscardedUploads}
     >
       <CloudSidebarLayoutContent {...props} />
     </LocalSessionsProvider>
@@ -577,21 +588,22 @@ function CloudSidebarLayoutContent({
     [openChatTab, organizationId, pathname, router]
   );
 
+  const focusComposerForSession = useCallback((sessionId: string) => {
+    const request: ComposerFocusRequest = {
+      sessionId,
+      onHandled: () => setComposerFocusRequest(current => (current === request ? null : current)),
+    };
+    setComposerFocusRequest(request);
+  }, []);
+
   const selectSession = useCallback(
     (sessionId: string) => {
       startTransition(() => {
-        if (sessionId !== currentSessionId) {
-          const request: ComposerFocusRequest = {
-            sessionId,
-            onHandled: () =>
-              setComposerFocusRequest(current => (current === request ? null : current)),
-          };
-          setComposerFocusRequest(request);
-        }
+        if (sessionId !== currentSessionId) focusComposerForSession(sessionId);
         openSessionInternal(sessionId);
       });
     },
-    [currentSessionId, openSessionInternal]
+    [currentSessionId, focusComposerForSession, openSessionInternal]
   );
 
   const openWorktree = useCallback(
@@ -696,12 +708,14 @@ function CloudSidebarLayoutContent({
           openWorktreeChats.map(session => session.sessionId)
         );
       }
+      focusComposerForSession(kiloSessionId);
       openSessionInternal(kiloSessionId);
       return true;
     },
     [
       cachedSessions,
       createLocalSession,
+      focusComposerForSession,
       openSessionInternal,
       openWorktreeChats,
       organizationId,

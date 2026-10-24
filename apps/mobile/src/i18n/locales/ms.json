@@ -2954,7 +2954,6 @@
   },
   "voiceInput": {
     "listening": "Mendengar...",
-    "staysOff": "Input suara kekal dinyahdayakan sehingga anda membenarkan transkripsi dalam talian.",
     "onlineTitle": "Pertuturan diproses dalam talian",
     "onlineMessage": "Peranti ini tidak boleh menukar pertuturan kepada teks di luar talian. Rakaman anda dihantar kepada {{provider}} untuk ditukar kepada teks. Kilo tidak menyimpan audio tersebut.",
     "allow": "Benarkan",

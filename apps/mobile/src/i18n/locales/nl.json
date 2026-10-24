@@ -2433,7 +2433,6 @@
     "allow": "Toestaan",
     "onlineMessage": "Dit apparaat kan spraak niet offline omzetten naar tekst. Je opname wordt naar {{provider}} gestuurd om er tekst van te maken. Kilo slaat de audio niet op.",
     "onlineTitle": "Spraak wordt online verwerkt",
-    "staysOff": "Spraakinvoer blijft uitgeschakeld totdat je online omzetting naar tekst toestaat.",
     "start": "Spraakinvoer starten",
     "stop": "Spraakinvoer stoppen",
     "restricted": "Spraakinvoer is beperkt op dit apparaat.",

@@ -2384,7 +2384,6 @@
     "allow": "Autoriser",
     "onlineMessage": "Cet appareil ne peut pas transcrire hors ligne. Votre enregistrement est envoyé à {{provider}} pour le convertir en texte. Kilo ne conserve pas l'audio.",
     "onlineTitle": "Transcription vocale en ligne",
-    "staysOff": "La saisie vocale reste désactivée tant que vous n'autorisez pas la transcription en ligne.",
     "start": "Démarrer la saisie vocale",
     "stop": "Arrêter la saisie vocale",
     "restricted": "La saisie vocale est restreinte sur cet appareil.",

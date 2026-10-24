@@ -2115,6 +2115,13 @@
       "when": 1792876471766,
       "tag": "0301_contributor_credit_window",
       "breakpoints": true
+    },
+    {
+      "idx": 302,
+      "version": "7",
+      "when": 1792878912751,
+      "tag": "0302_flippant_jackpot",
+      "breakpoints": true
     }
   ]
 }

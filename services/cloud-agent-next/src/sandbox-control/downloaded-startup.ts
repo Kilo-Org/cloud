@@ -16,6 +16,7 @@ export async function downloadedStartup(input: {
   sandboxId: string;
   allocationId: string;
   deadlineAt: number;
+  mainProcess?: 'environment-builder';
 }): Promise<ProviderStartupCommand> {
   const release = await loadRuntimeRelease(input.descriptor, input.env.RUNTIME_RELEASE_BUCKET);
   const secret = await resolveSecret(input.env.NEXTAUTH_SECRET);
@@ -40,6 +41,7 @@ export async function downloadedStartup(input: {
       allocationId: input.allocationId,
       grant,
       deadlineAt: input.deadlineAt,
+      mainProcess: input.mainProcess,
     });
   } catch {
     throw new ProviderCreationError('invalid_configuration');

@@ -22,8 +22,10 @@ import {
   getEnvironment,
   listEnvironments,
   listEnvironmentsForOwner,
+  loadEnvironmentBuildInput,
   loadEnvironmentForSession,
   lockActiveOrganization,
+  readEnvironmentReference,
   updateEnvironment,
   ENVIRONMENT_LIMITS,
   MASKED_SECRET_VALUE,
@@ -47,9 +49,10 @@ async function createEnv(input: EnvironmentCreateInput): Promise<string> {
   });
 }
 
-async function updateEnv(input: EnvironmentUpdateInput): Promise<void> {
-  await db.transaction(async tx => {
-    await updateEnvironment(tx, publicKeyBase64, input);
+async function updateEnv(input: EnvironmentUpdateInput): Promise<number> {
+  return db.transaction(async tx => {
+    const { configurationRevision } = await updateEnvironment(tx, publicKeyBase64, input);
+    return configurationRevision;
   });
 }
 
@@ -690,7 +693,7 @@ describe('repository environment service', () => {
   });
 
   describe('sandbox allocation', () => {
-    test('saves, keeps, and clears the size', async () => {
+    test('saves, keeps, and clears the size without advancing the revision', async () => {
       const user = await insertTestUser();
       const owner = userOwner(user.id);
       const id = await createEnv({
@@ -701,15 +704,22 @@ describe('repository environment service', () => {
         repoFullName: 'acme/widgets',
         sandboxAllocation: 'cloudflare-single',
       });
-      expect((await getEnvironment(db, id, owner)).sandboxAllocation).toBe('cloudflare-single');
+      expect(await getEnvironment(db, id, owner)).toMatchObject({
+        sandboxAllocation: 'cloudflare-single',
+        configurationRevision: 1,
+      });
 
-      await updateEnv({ owner, environmentId: id, sandboxAllocation: 'vercel-large' });
-      await updateEnv({ owner, environmentId: id, name: 'Renamed' });
+      await expect(
+        updateEnv({ owner, environmentId: id, sandboxAllocation: 'vercel-large' })
+      ).resolves.toBe(1);
+      await expect(updateEnv({ owner, environmentId: id, name: 'Renamed' })).resolves.toBe(1);
       expect((await getEnvironment(db, id, owner)).sandboxAllocation).toBe('vercel-large');
 
-      await updateEnv({ owner, environmentId: id, sandboxAllocation: null });
+      await expect(updateEnv({ owner, environmentId: id, sandboxAllocation: null })).resolves.toBe(
+        1
+      );
       const [summary] = await listEnvironmentsForOwner(db, owner);
-      expect(summary?.sandboxAllocation).toBeNull();
+      expect(summary).toMatchObject({ sandboxAllocation: null, configurationRevision: 1 });
     });
   });
 
@@ -791,7 +801,7 @@ describe('repository environment service', () => {
     test('matches GitLab by the canonical clone URL and Bitbucket by UUID pair', async () => {
       const user = await insertTestUser();
       const owner = userOwner(user.id);
-      await createEnv({
+      const gitlabId = await createEnv({
         owner,
         createdByUserId: user.id,
         name: 'gitlab',
@@ -800,7 +810,7 @@ describe('repository environment service', () => {
         gitlabCloneUrl: 'https://gitlab.com/group/project.git',
         commands: ['gitlab-setup'],
       });
-      await createEnv({
+      const bitbucketId = await createEnv({
         owner,
         createdByUserId: user.id,
         name: 'bitbucket',
@@ -815,6 +825,7 @@ describe('repository environment service', () => {
         repository: { platform: 'gitlab', cloneUrl: 'https://gitlab.com/group/project.git' },
       });
       expect(gitlab?.layer.setupCommands).toEqual(['gitlab-setup']);
+      expect(gitlab?.reference.environmentId).toBe(gitlabId);
       await expect(
         loadEnvironmentForSession(db, {
           owner,
@@ -831,6 +842,7 @@ describe('repository environment service', () => {
           repositoryUuid: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
         },
       });
+      expect(bitbucket?.reference.environmentId).toBe(bitbucketId);
       expect(bitbucket?.layer.setupCommands).toEqual([]);
       await expect(
         loadEnvironmentForSession(db, {
@@ -842,6 +854,119 @@ describe('repository environment service', () => {
           },
         })
       ).resolves.toBeNull();
+    });
+  });
+
+  describe('configuration revision', () => {
+    async function createRevisionEnv(userId: string): Promise<string> {
+      return createEnv({
+        owner: userOwner(userId),
+        createdByUserId: userId,
+        name: 'CI',
+        platform: 'github',
+        repoFullName: 'acme/widgets',
+        plainVars: { PLAIN: 'one' },
+        secrets: { TOKEN: 'secret-one' },
+        commands: ['install'],
+      });
+    }
+
+    test('starts at 1 and keeps the revision for a rename or identical writes', async () => {
+      const user = await insertTestUser();
+      const id = await createRevisionEnv(user.id);
+      const owner = userOwner(user.id);
+      expect((await getEnvironment(db, id, owner)).configurationRevision).toBe(1);
+
+      await expect(updateEnv({ owner, environmentId: id, name: 'Renamed' })).resolves.toBe(1);
+      await expect(
+        updateEnv({
+          owner,
+          environmentId: id,
+          plainVars: { PLAIN: 'one' },
+          commands: ['install'],
+          secrets: [],
+        })
+      ).resolves.toBe(1);
+      await expect(
+        updateEnv({ owner, environmentId: id, secrets: [{ key: 'ABSENT', delete: true }] })
+      ).resolves.toBe(1);
+      expect((await getEnvironment(db, id, owner)).configurationRevision).toBe(1);
+    });
+
+    test('advances for command, plaintext variable and secret changes', async () => {
+      const user = await insertTestUser();
+      const id = await createRevisionEnv(user.id);
+      const owner = userOwner(user.id);
+
+      await expect(
+        updateEnv({ owner, environmentId: id, commands: ['install\nbuild'] })
+      ).resolves.toBe(2);
+      await expect(
+        updateEnv({ owner, environmentId: id, plainVars: { PLAIN: 'two' } })
+      ).resolves.toBe(3);
+      // A submitted replacement counts even when its value is the same: the
+      // stored value is encrypted and is never compared.
+      await expect(
+        updateEnv({ owner, environmentId: id, secrets: [{ key: 'TOKEN', value: 'secret-one' }] })
+      ).resolves.toBe(4);
+      await expect(
+        updateEnv({ owner, environmentId: id, secrets: [{ key: 'TOKEN', delete: true }] })
+      ).resolves.toBe(5);
+      const summaries = await listEnvironmentsForOwner(db, owner);
+      expect(summaries.find(summary => summary.id === id)?.configurationRevision).toBe(5);
+    });
+
+    test('reports the admitted reference and reads build inputs consistently', async () => {
+      const user = await insertTestUser();
+      const id = await createRevisionEnv(user.id);
+      const owner = userOwner(user.id);
+      await updateEnv({ owner, environmentId: id, commands: ['install\nbuild'] });
+
+      const reference = (
+        await loadEnvironmentForSession(db, {
+          owner,
+          repository: { platform: 'github', repoFullName: 'Acme/Widgets' },
+        })
+      )?.reference;
+      expect(reference).toEqual({
+        environmentId: id,
+        owner,
+        configurationRevision: 2,
+        repository: { platform: 'github', repoFullName: 'acme/widgets' },
+      });
+      await expect(readEnvironmentReference(db, id)).resolves.toEqual(reference);
+
+      const input = await loadEnvironmentBuildInput(db, id);
+      expect(input).toMatchObject({
+        reference,
+        repoFullName: 'acme/widgets',
+        commands: ['install\nbuild'],
+        plainVars: { PLAIN: 'one' },
+      });
+      expect(Object.keys(input?.encryptedSecrets ?? {})).toEqual(['TOKEN']);
+      expect(JSON.stringify(input)).not.toContain('secret-one');
+    });
+
+    test('reads nothing for a deleted environment or a deleted organization', async () => {
+      const user = await insertTestUser();
+      const id = await createRevisionEnv(user.id);
+      await deleteEnvironment(db, id, userOwner(user.id));
+      await expect(readEnvironmentReference(db, id)).resolves.toBeNull();
+      await expect(loadEnvironmentBuildInput(db, id)).resolves.toBeNull();
+
+      const organization = await createTestOrganization('Revision org', user.id, 0);
+      const orgId = await createEnv({
+        owner: { type: 'organization', id: organization.id },
+        createdByUserId: user.id,
+        name: 'org',
+        platform: 'github',
+        repoFullName: 'acme/widgets',
+      });
+      await db
+        .update(organizations)
+        .set({ deleted_at: new Date().toISOString() })
+        .where(eq(organizations.id, organization.id));
+      await expect(readEnvironmentReference(db, orgId)).resolves.toBeNull();
     });
   });
 

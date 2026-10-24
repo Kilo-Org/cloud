@@ -119,11 +119,40 @@ export type EnvironmentSessionLayer = {
   setupCommands?: string[];
 };
 
+/**
+ * The authorized identity of the environment a session admitted: who owns it,
+ * which repository it belongs to, and the configuration revision whose values
+ * the session merged. It travels beside the merged configuration so snapshot
+ * selection can check ownership, repository and revision without re-reading
+ * the environment.
+ */
+export type EnvironmentReference = {
+  environmentId: string;
+  owner: EnvironmentOwner;
+  configurationRevision: number;
+  repository: EnvironmentRepositoryIdentity;
+};
+
 /** What session preflight loads for the environment of a session's repository. */
 export type EnvironmentForSession = {
   layer: EnvironmentSessionLayer;
+  reference: EnvironmentReference;
   /** Saved allocation key, unvalidated; the Worker checks eligibility. */
   sandboxAllocation: string | null;
+};
+
+/**
+ * The immutable inputs of one environment build, read consistently from the
+ * environment row and its variable rows. Secrets stay encrypted envelopes until
+ * the builder needs them. `repoFullName` is the display path the clone URL is
+ * built from for GitHub and Bitbucket.
+ */
+export type EnvironmentBuildInput = {
+  reference: EnvironmentReference;
+  repoFullName: string;
+  commands: string[];
+  plainVars: Record<string, string>;
+  encryptedSecrets: Record<string, EncryptedEnvelope>;
 };
 
 export type EnvironmentPlainVarResponse = {
@@ -145,6 +174,7 @@ export type EnvironmentResponse = {
   updatedAt: string;
   plainVars: EnvironmentPlainVarResponse[];
   commands: string[];
+  configurationRevision: number;
   sandboxAllocation: string | null;
   /** Secret key names only. Values and envelopes are never returned. */
   secretKeys: string[];
@@ -163,6 +193,7 @@ export type EnvironmentSummary = {
   plainVarCount: number;
   secretCount: number;
   commandCount: number;
+  configurationRevision: number;
   sandboxAllocation: string | null;
 };
 

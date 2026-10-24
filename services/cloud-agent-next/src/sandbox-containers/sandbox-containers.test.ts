@@ -21,9 +21,10 @@ vi.mock('@cloudflare/sandbox', () => ({ Sandbox: class {} }));
 import {
   CONTROL_SUPERVISOR_PATH,
   CONTROL_WRAPPER_LOG_PATH,
+  ENVIRONMENT_BUILDER_PATH,
 } from '../sandbox-control/container-paths.js';
+import { RUNTIME_BUN_PATH } from '../shared/runtime-distribution.js';
 import { logger } from '../logger.js';
-import { repoSnapshotIndexKey } from './repo-snapshot-index.js';
 import {
   SandboxContainers,
   type ContainerInstanceSize,
@@ -124,7 +125,11 @@ class FakeContainer {
   // PID 1 as seen through `/proc/1/cmdline`. A manual `running = true` models the
   // deployed `sleep infinity` main process; `start()` with the native entrypoint
   // models the supervisor main process.
-  mainProcess: 'sleep' | 'supervisor' | 'ambiguous' = 'sleep';
+  mainProcess: 'sleep' | 'supervisor' | 'environment-builder' | 'ambiguous' = 'sleep';
+  // A runtime installer start (`/bin/sh -c <launch>`): hand off to the entry point
+  // named in the launch, or exit with this code so `monitor()` rejects.
+  runtimeOutcome: { kind: 'handoff' } | { kind: 'exit'; code: number } = { kind: 'handoff' };
+  private exitError: Error | undefined;
   // What native `start()` leaves as PID 1. A lucky start normally leaves the
   // supervisor; tests override this to model a start whose main process is wrong.
   identityAfterStart: 'sleep' | 'supervisor' | 'ambiguous' = 'supervisor';
@@ -143,8 +148,23 @@ class FakeContainer {
     this.startCalls.push(options as ContainerStartupOptions);
     if (this.startBehavior === 'reject') throw new Error('container start failed');
     this.running = true;
-    if (options?.entrypoint?.includes(CONTROL_SUPERVISOR_PATH)) {
+    this.exitError = undefined;
+    const entrypoint = options?.entrypoint ?? [];
+    if (entrypoint.includes(CONTROL_SUPERVISOR_PATH)) {
       this.mainProcess = this.identityAfterStart;
+    } else if (entrypoint.includes(ENVIRONMENT_BUILDER_PATH)) {
+      this.mainProcess = 'environment-builder';
+    } else if (entrypoint[1] === '-c') {
+      if (this.runtimeOutcome.kind === 'exit') {
+        this.running = false;
+        this.exitError = new Error(
+          `Container exited with unexpected exit code: ${this.runtimeOutcome.code}`
+        );
+      } else {
+        this.mainProcess = entrypoint[2]?.includes('kilocode-environment-builder.js')
+          ? 'environment-builder'
+          : this.identityAfterStart;
+      }
     }
     if (this.stopAfterStart) this.running = false;
     if (this.startBehavior === 'effect-then-reject') {
@@ -164,7 +184,9 @@ class FakeContainer {
         stdout:
           this.mainProcess === 'supervisor'
             ? `/bin/sh\0${CONTROL_SUPERVISOR_PATH}`
-            : 'sleep\0infinity',
+            : this.mainProcess === 'environment-builder'
+              ? `${RUNTIME_BUN_PATH}\0${ENVIRONMENT_BUILDER_PATH}`
+              : 'sleep\0infinity',
       });
     }
     return this.execHandler(cmd);
@@ -222,6 +244,7 @@ class FakeContainer {
 
   async monitor(): Promise<void> {
     this.monitorCalls += 1;
+    if (this.exitError) throw this.exitError;
     if (!this.stopAfterStart) await new Promise<void>(() => {});
   }
 
@@ -252,7 +275,13 @@ function setup(
     async get<T>(key: string): Promise<T | undefined> {
       return storage.map.get(key) as T | undefined;
     },
-    async put(key: string, value: unknown): Promise<void> {
+    async put(key: string | Record<string, unknown>, value?: unknown): Promise<void> {
+      if (typeof key !== 'string') {
+        for (const [entryKey, entryValue] of Object.entries(key)) {
+          await storage.put(entryKey, entryValue);
+        }
+        return;
+      }
       const decision = putGate?.(value) ?? 'pass';
       if (decision === 'fail') {
         putGate = undefined;
@@ -270,7 +299,8 @@ function setup(
       }
       storage.map.set(key, value);
     },
-    async delete(key: string): Promise<boolean> {
+    async delete(key: string | string[]): Promise<boolean | number> {
+      if (Array.isArray(key)) return key.filter(entry => storage.map.delete(entry)).length;
       return storage.map.delete(key);
     },
     async setAlarm(scheduledTime: number): Promise<void> {
@@ -336,18 +366,20 @@ describe('supplied startup command', () => {
   const command = { argv: ['/bin/sh', '-c', 'exec /opt/selected/start "two words"'] };
 
   it.each(['image', 'repository'] as const)('starts the supplied command from %s', async source => {
-    const key = await indexKeyFor();
-    const { kv } = fakeKv(source === 'repository' ? { [key]: { snapshotId: 'snap-repo' } } : {});
-    const { instance, container, readRecord } = setup({ env: { REPO_SNAPSHOTS: kv } });
+    const { instance, container, readRecord } = setup();
     container.cmdlineRaw = `${command.argv.join('\0')}\0`;
 
-    await expect(launchFromRepo(instance, REF_A, { command })).resolves.toEqual({
+    await expect(
+      source === 'repository'
+        ? launchFromSnapshot(instance, REF_A, { command })
+        : instance.launchWrapper({ allocationRef: REF_A, command, env: {}, instance: 'standard-4' })
+    ).resolves.toEqual({
       started: true,
       startSource: source,
     });
     expect(container.startCalls[0]?.entrypoint).toEqual(command.argv);
     if (source === 'repository')
-      expect(container.startCalls[0]?.containerSnapshot).toEqual({ id: 'snap-repo' });
+      expect(container.startCalls[0]?.containerSnapshot).toEqual({ id: 'snap-env' });
     expect(container.execCalls.map(call => call.cmd)).toEqual([['cat', '/proc/1/cmdline']]);
     expect(readRecord().state).toBe('running');
   });
@@ -2074,7 +2106,7 @@ describe('SandboxContainers native start confirmation', () => {
     );
 
     const failed = expect(launch(instance, REF_A)).rejects.toThrow(
-      'stopped before the supervisor main process was confirmed'
+      'stopped before the main process was confirmed'
     );
     await vi.advanceTimersByTimeAsync(100);
     await failed;
@@ -2090,7 +2122,7 @@ describe('SandboxContainers native start confirmation', () => {
     vi.spyOn(container, 'exec').mockRejectedValue(new Error('Container is not running'));
 
     await expect(launch(instance, REF_A)).rejects.toThrow(
-      'stopped before the supervisor main process was confirmed'
+      'stopped before the main process was confirmed'
     );
     expect(diagnostics('supervisor_confirm')).toMatchObject([
       {
@@ -2508,102 +2540,31 @@ describe('SandboxContainers lease and log', () => {
   });
 });
 
-type KvCall = { op: 'get' | 'put' | 'delete'; key: string; options?: unknown };
-
-function fakeKv(initial: Record<string, unknown> = {}) {
-  const data = new Map<string, string>(
-    Object.entries(initial).map(([key, value]) => [key, JSON.stringify(value)])
-  );
-  const calls: KvCall[] = [];
-  const failing = { get: false, put: false };
-  const kv = {
-    async get(key: string) {
-      calls.push({ op: 'get', key });
-      if (failing.get) throw new Error('kv unavailable');
-      const raw = data.get(key);
-      return raw === undefined ? null : JSON.parse(raw);
-    },
-    async put(key: string, value: string, options?: unknown) {
-      calls.push({ op: 'put', key, options });
-      if (failing.put) throw new Error('kv unavailable');
-      data.set(key, value);
-    },
-    async delete(key: string) {
-      calls.push({ op: 'delete', key });
-      data.delete(key);
-    },
-  };
-  return { kv: kv as unknown as KVNamespace, data, calls, failing };
-}
-
 const IMAGE = 'registry.example/kilo/app:test';
-const REPO_KEY = 'repo-key-1';
+const SNAPSHOT = { snapshotId: 'snap-env', baseImage: IMAGE };
 
-async function indexKeyFor(repoKey = REPO_KEY, image = IMAGE) {
-  return repoSnapshotIndexKey(repoKey, image);
-}
-
-function launchFromRepo(instance: SandboxContainers, ref: string, extra = {}) {
+function launchFromSnapshot(instance: SandboxContainers, ref: string, extra = {}) {
   return instance.launchWrapper({
     command: preinstalledStartup(),
     allocationRef: ref,
     env: {},
     instance: 'standard-4',
-    repoKey: REPO_KEY,
+    snapshot: SNAPSHOT,
     ...extra,
   });
 }
 
-async function launchWithImageFallback(instance: SandboxContainers, ref: string) {
-  const result = await launchFromRepo(instance, ref);
-  if (!result.snapshotFailed) return result;
-  expect(result).toEqual({ started: false, startSource: 'repository', snapshotFailed: true });
-  await expect(instance.stop(ref)).resolves.toBe('terminal');
-  return launchFromRepo(instance, ref, { skipRepository: true });
-}
+describe('SandboxContainers environment snapshot starts', () => {
+  it('starts from the offered snapshot captured from the current image', async () => {
+    const { diagnostics } = captureLogs();
+    const { instance, container, readRecord } = setup();
 
-describe('SandboxContainers repository snapshots', () => {
-  it('restricts repository restore and subsequent image fallback with the same policy', async () => {
-    vi.useFakeTimers();
-    const key = await indexKeyFor();
-    const { kv } = fakeKv({ [key]: { snapshotId: 'snap-repo' } });
-    const { instance, container, readRecord } = setup({ env: { REPO_SNAPSHOTS: kv } });
-    const outbound = attachOutbound(instance);
-    container.identityAfterStart = 'ambiguous';
-    const policy = { egressAllowlist: ['example.com'] };
-    const pending = launchFromRepo(instance, REF_A, policy);
-    await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
-    await vi.advanceTimersByTimeAsync(300_000);
-    const first = await pending;
-    expect(first.snapshotFailed).toBe(true);
-    expect(readRecord().egressPolicy?.allowlist).toEqual(['example.com']);
-    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
-    container.identityAfterStart = 'supervisor';
-    await launchFromRepo(instance, REF_A, { ...policy, skipRepository: true });
-
-    expect(container.startCalls.map(options => options.enableInternet)).toEqual([false, false]);
-    expect(container.startCalls[0]).toMatchObject({ containerSnapshot: { id: 'snap-repo' } });
-    expect(container.startCalls[1]).toMatchObject({ image: IMAGE });
-    expect(
-      container.startCalls.every(options => options.env?.SANDBOX_INTERCEPT_HTTPS === '1')
-    ).toBe(true);
-    expect(outbound.mock.calls.map(call => call[0].props.egressAllowlist)).toEqual([
-      ['example.com'],
-      ['example.com'],
-    ]);
-  });
-
-  it('starts from the repository snapshot stored for the repo key and the current image', async () => {
-    const key = await indexKeyFor();
-    const { kv } = fakeKv({ [key]: { snapshotId: 'snap-repo', commit: 'abc123' } });
-    const { instance, container, readRecord } = setup({ env: { REPO_SNAPSHOTS: kv } });
-
-    const result = await launchFromRepo(instance, REF_A);
+    const result = await launchFromSnapshot(instance, REF_A);
 
     expect(result).toEqual({ started: true, startSource: 'repository' });
     const options = container.startCalls[0] as Record<string, unknown>;
     expect(options).toEqual({
-      containerSnapshot: { id: 'snap-repo' },
+      containerSnapshot: { id: 'snap-env' },
       instance: 'standard-4',
       enableInternet: true,
       entrypoint: ['/bin/sh', CONTROL_SUPERVISOR_PATH],
@@ -2611,242 +2572,72 @@ describe('SandboxContainers repository snapshots', () => {
     });
     expect('image' in options).toBe(false);
     expect(readRecord()).toMatchObject({ state: 'running', startSource: 'repository' });
-    await expect(launchFromRepo(instance, REF_A)).resolves.toEqual({
+    expect(diagnostics('snapshot_lookup')[0].fields).toMatchObject({
+      source: 'repository',
+      reason: 'snapshot',
+    });
+    await expect(launchFromSnapshot(instance, REF_A)).resolves.toEqual({
       started: false,
       startSource: 'repository',
     });
   });
 
-  it('captures under the start image after the configured image changes and the DO reconstructs', async () => {
-    const { kv, data } = fakeKv();
-    const initial = setup({ env: { REPO_SNAPSHOTS: kv } });
-    await launchFromRepo(initial.instance, REF_A);
-    const restored = setup({
-      record: initial.readRecord(),
-      running: true,
-      env: { REPO_SNAPSHOTS: kv },
-    });
-    const newImage = 'registry.example/kilo/app:next';
-    restored.container.images.app = newImage;
-
-    await expect(restored.instance.captureRepository(REF_A, REPO_KEY, 'abc123')).resolves.toBe(
-      true
-    );
-
-    expect(data.has(await indexKeyFor(REPO_KEY, newImage))).toBe(false);
-    expect(JSON.parse(data.get(await indexKeyFor()) ?? 'null')).toMatchObject({
-      snapshotId: 'snap-1',
-      commit: 'abc123',
-    });
-  });
-
-  it('starts from the image when the index has no entry, and a different image has none', async () => {
-    const other = await indexKeyFor(REPO_KEY, 'registry.example/kilo/app:previous');
-    const { kv } = fakeKv({ [other]: { snapshotId: 'snap-old-image' } });
-    const { instance, container } = setup({ env: { REPO_SNAPSHOTS: kv } });
-
-    await expect(launchFromRepo(instance, REF_A)).resolves.toEqual({
-      started: true,
-      startSource: 'image',
-    });
-    expect(container.startCalls[0]).toEqual(nativeStartOptions('standard-4'));
-  });
-
-  it('never consults the index without a repo key or a KV binding', async () => {
-    const key = await indexKeyFor();
-    const withoutKey = fakeKv({ [key]: { snapshotId: 'snap-repo' } });
-    const first = setup({ env: { REPO_SNAPSHOTS: withoutKey.kv } });
-    await expect(launch(first.instance, REF_A)).resolves.toMatchObject({ startSource: 'image' });
-    expect(withoutKey.calls).toEqual([]);
+  it('starts from the image when the snapshot belongs to another image or none is offered', async () => {
+    const { diagnostics } = captureLogs();
+    const first = setup();
+    await expect(
+      launchFromSnapshot(first.instance, REF_A, {
+        snapshot: { snapshotId: 'snap-old', baseImage: 'registry.example/kilo/app:previous' },
+      })
+    ).resolves.toEqual({ started: true, startSource: 'image' });
+    expect(first.container.startCalls[0]).toEqual(nativeStartOptions('standard-4'));
 
     const second = setup();
-    await expect(launchFromRepo(second.instance, REF_A)).resolves.toMatchObject({
-      startSource: 'image',
-    });
-  });
-
-  it('treats an unavailable or malformed index entry as a miss', async () => {
-    const key = await indexKeyFor();
-    const broken = fakeKv();
-    broken.failing.get = true;
-    const first = setup({ env: { REPO_SNAPSHOTS: broken.kv } });
-    await expect(launchFromRepo(first.instance, REF_A)).resolves.toMatchObject({
-      startSource: 'image',
-    });
-
-    const malformed = fakeKv({ [key]: { snapshotId: 42 } });
-    const second = setup({ env: { REPO_SNAPSHOTS: malformed.kv } });
-    await expect(launchFromRepo(second.instance, REF_A)).resolves.toMatchObject({
-      startSource: 'image',
-    });
-  });
-
-  it('logs the age and size of the snapshot it starts from, and no age for an older entry', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(10_000_000);
-    const { diagnostics } = captureLogs();
-    const key = await indexKeyFor();
-    const captured = fakeKv({
-      [key]: { snapshotId: 'snap-repo', capturedAt: 10_000_000 - 90_000, size: SNAPSHOT_SIZE },
-    });
-    const first = setup({ env: { REPO_SNAPSHOTS: captured.kv } });
-    await expect(launchFromRepo(first.instance, REF_A)).resolves.toMatchObject({
-      startSource: 'repository',
-    });
-    const older = fakeKv({ [key]: { snapshotId: 'snap-repo' } });
-    const second = setup({ env: { REPO_SNAPSHOTS: older.kv } });
-    await expect(launchFromRepo(second.instance, REF_A)).resolves.toMatchObject({
-      startSource: 'repository',
-    });
-
-    const lookups = diagnostics('snapshot_lookup').map(line => line.fields);
-    expect(lookups).toEqual([
-      expect.objectContaining({
-        source: 'repository',
-        reason: 'index_hit',
-        ageMs: 90_000,
-        size: SNAPSHOT_SIZE,
-      }),
-      expect.objectContaining({ source: 'repository', reason: 'index_hit' }),
-    ]);
-    expect(lookups[1]).not.toHaveProperty('ageMs');
-    expect(lookups[1]).not.toHaveProperty('size');
-    expect(diagnostics('supervisor_confirm').map(line => line.fields.source)).toEqual([
-      'repository',
-      'repository',
-    ]);
-  });
-
-  it.each(['reject', 'effect-then-reject'] as const)(
-    'falls back after a %s snapshot failure and retries the snapshot on ten separate starts',
-    async startBehavior => {
-      vi.useFakeTimers();
-      vi.setSystemTime(10_000_000);
-      const key = await indexKeyFor();
-      const entry = {
-        snapshotId: 'snap-missing',
-        commit: 'abc123',
-        capturedAt: 9_000_000,
-        size: SNAPSHOT_SIZE,
-      };
-      const store = fakeKv({ [key]: entry });
-      const { instance, container, readRecord } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
-      const start = container.start.bind(container);
-      vi.spyOn(container, 'start').mockImplementation(options => {
-        container.startBehavior = options?.containerSnapshot === undefined ? 'ok' : startBehavior;
-        start(options);
-      });
-
-      for (let attempt = 0; attempt < 10; attempt += 1) {
-        await expect(launchWithImageFallback(instance, `ref-${attempt}`)).resolves.toEqual({
-          started: true,
-          startSource: 'image',
-        });
-        expect(container.startCalls[attempt * 2]).toMatchObject({
-          containerSnapshot: { id: 'snap-missing' },
-        });
-        expect(container.startCalls[attempt * 2 + 1]).toEqual(nativeStartOptions('standard-4'));
-        expect(readRecord().repositoryStartFailures).toEqual({
-          snapshotId: 'snap-missing',
-          attempts: attempt + 1,
-        });
-      }
-      expect(JSON.parse(store.data.get(key) ?? 'null')).toEqual(entry);
-      expect(store.calls.filter(call => call.op === 'put' || call.op === 'delete')).toEqual([]);
-
-      await expect(launchFromRepo(instance, REF_B)).resolves.toEqual({
-        started: true,
-        startSource: 'image',
-      });
-      expect(container.startCalls).toHaveLength(21);
-      expect(container.startCalls[20]).toEqual(nativeStartOptions('standard-4'));
-      expect(readRecord()).toMatchObject({
-        allocationRef: REF_B,
-        state: 'running',
-        startSource: 'image',
-      });
-      expect(store.data.has(key)).toBe(true);
-    }
-  );
-
-  it('falls back when the snapshot supervisor cannot start and retries the snapshot on the next start', async () => {
-    vi.useFakeTimers();
-    const key = await indexKeyFor();
-    const store = fakeKv({ [key]: { snapshotId: 'snap-broken' } });
-    const { instance, container, readRecord } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
-    const start = container.start.bind(container);
-    const startSpy = vi.spyOn(container, 'start').mockImplementation(options => {
-      container.identityAfterStart =
-        options?.containerSnapshot === undefined ? 'supervisor' : 'ambiguous';
-      start(options);
-    });
-    const launched = expect(launchWithImageFallback(instance, REF_A)).resolves.toEqual({
+    await expect(launch(second.instance, REF_A)).resolves.toEqual({
       started: true,
       startSource: 'image',
     });
+    expect(diagnostics('snapshot_lookup').map(line => line.fields.reason)).toEqual([
+      'image_mismatch',
+      'no_snapshot',
+    ]);
+  });
+
+  it('applies the same egress policy to a snapshot start and its image retry', async () => {
+    vi.useFakeTimers();
+    const { instance, container, readRecord } = setup();
+    const outbound = attachOutbound(instance);
+    container.identityAfterStart = 'ambiguous';
+    const policy = { egressAllowlist: ['example.com'] };
+    const pending = launchFromSnapshot(instance, REF_A, policy);
     await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
     await vi.advanceTimersByTimeAsync(300_000);
-    await launched;
-    expect(JSON.parse(store.data.get(key) ?? 'null')).toEqual({ snapshotId: 'snap-broken' });
-    expect(readRecord().repositoryStartFailures).toEqual({
-      snapshotId: 'snap-broken',
-      attempts: 1,
-    });
-    expect(store.calls.filter(call => call.op === 'delete')).toEqual([]);
-
-    startSpy.mockRestore();
+    expect((await pending).snapshotFailed).toBe(true);
+    expect(readRecord().egressPolicy?.allowlist).toEqual(['example.com']);
+    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
     container.identityAfterStart = 'supervisor';
-    await expect(launchFromRepo(instance, REF_B)).resolves.toEqual({
-      started: true,
-      startSource: 'repository',
-    });
-    expect(container.startCalls[1]).toEqual(nativeStartOptions('standard-4'));
-    expect(container.startCalls[2]).toMatchObject({ containerSnapshot: { id: 'snap-broken' } });
-    expect(readRecord().repositoryStartFailures).toEqual({
-      snapshotId: 'snap-broken',
-      attempts: 1,
-    });
-  });
-
-  it('marks nothing when an image start fails', async () => {
-    const store = fakeKv();
-    const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
-    container.startBehavior = 'reject';
-
-    await expect(launchWithImageFallback(instance, REF_A)).rejects.toThrow(
-      'container start failed'
-    );
-    expect(store.calls.filter(call => call.op === 'delete')).toEqual([]);
-    expect(store.calls.filter(call => call.op === 'put')).toEqual([]);
-  });
-
-  it('propagates an image fallback failure without retrying either start', async () => {
-    const key = await indexKeyFor();
-    const store = fakeKv({ [key]: { snapshotId: 'snap-bad' } });
-    const { instance, container, readRecord } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
-    container.startBehavior = 'reject';
-
-    await expect(launchWithImageFallback(instance, REF_A)).rejects.toThrow(
-      'container start failed'
-    );
-    expect(container.startCalls).toHaveLength(2);
-    expect(container.startCalls[1]).toEqual(nativeStartOptions('standard-4'));
-    expect(readRecord()).toMatchObject({
-      state: 'launching',
+    await instance.launchWrapper({
+      command: preinstalledStartup(),
       allocationRef: REF_A,
-      startSource: 'image',
-      repositoryStartFailures: { snapshotId: 'snap-bad', attempts: 1 },
+      env: {},
+      instance: 'standard-4',
+      ...policy,
     });
-    expect(store.calls.filter(call => call.op === 'put' || call.op === 'delete')).toEqual([]);
+
+    expect(container.startCalls.map(options => options.enableInternet)).toEqual([false, false]);
+    expect(container.startCalls[0]).toMatchObject({ containerSnapshot: { id: 'snap-env' } });
+    expect(container.startCalls[1]).toMatchObject({ image: IMAGE });
+    expect(outbound.mock.calls.map(call => call[0].props.egressAllowlist)).toEqual([
+      ['example.com'],
+      ['example.com'],
+    ]);
   });
 
-  it('returns snapshot failure without destroying a container or issuing the image start', async () => {
-    const key = await indexKeyFor();
-    const store = fakeKv({ [key]: { snapshotId: 'snap-bad' } });
-    const { instance, container, readRecord } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
+  it('reports a failed snapshot start without destroying the container or counting it', async () => {
+    const { instance, container, readRecord } = setup();
     container.startBehavior = 'effect-then-reject';
 
-    await expect(launchFromRepo(instance, REF_A)).resolves.toEqual({
+    await expect(launchFromSnapshot(instance, REF_A)).resolves.toEqual({
       started: false,
       startSource: 'repository',
       snapshotFailed: true,
@@ -2858,32 +2649,15 @@ describe('SandboxContainers repository snapshots', () => {
       allocationRef: REF_A,
       wrapperAttempt: 'exec_pending',
     });
-    expect(store.data.has(key)).toBe(true);
+    expect(readRecord()).not.toHaveProperty('repositoryStartFailures');
   });
 
-  it.each([undefined, 310_000])(
-    'allows a cold snapshot to become ready after four minutes with deadline %s',
-    async deadlineAt => {
-      vi.useFakeTimers();
-      vi.setSystemTime(10_000);
-      const key = await indexKeyFor();
-      const store = fakeKv({ [key]: { snapshotId: 'snap-cold' } });
-      const { instance, container, readRecord } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
-      container.identityAfterStart = 'ambiguous';
+  it('propagates an image start failure instead of reporting a snapshot failure', async () => {
+    const { instance, container } = setup();
+    container.startBehavior = 'reject';
 
-      const launched = expect(launchFromRepo(instance, REF_A, { deadlineAt })).resolves.toEqual({
-        started: true,
-        startSource: 'repository',
-      });
-      await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
-      await vi.advanceTimersByTimeAsync(240_000);
-      container.mainProcess = 'supervisor';
-      await vi.advanceTimersByTimeAsync(1_000);
-      await launched;
-      expect(container.startCalls).toHaveLength(1);
-      expect(readRecord().repositoryStartFailures).toBeUndefined();
-    }
-  );
+    await expect(launch(instance, REF_A)).rejects.toThrow('container start failed');
+  });
 
   it.each(['repository', 'image'] as const)(
     'bounds %s confirmation by its start-source timeout',
@@ -2891,15 +2665,14 @@ describe('SandboxContainers repository snapshots', () => {
       vi.useFakeTimers();
       vi.setSystemTime(10_000);
       const { diagnostics } = captureLogs();
-      const key = await indexKeyFor();
-      const store = fakeKv(source === 'repository' ? { [key]: { snapshotId: 'snap-cold' } } : {});
-      const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
+      const { instance, container } = setup();
       container.identityAfterStart = 'ambiguous';
-      const launch = launchFromRepo(instance, REF_A);
+      const started =
+        source === 'repository' ? launchFromSnapshot(instance, REF_A) : launch(instance, REF_A);
       const failed =
         source === 'repository'
-          ? expect(launch).resolves.toMatchObject({ snapshotFailed: true })
-          : expect(launch).rejects.toThrow('wrapper exec timed out');
+          ? expect(started).resolves.toMatchObject({ snapshotFailed: true })
+          : expect(started).rejects.toThrow('wrapper exec timed out');
       await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
       const budget = source === 'repository' ? 300_000 : 90_000;
       await vi.advanceTimersByTimeAsync(budget - 1_000);
@@ -2914,13 +2687,11 @@ describe('SandboxContainers repository snapshots', () => {
     vi.useFakeTimers();
     vi.setSystemTime(10_000);
     const { diagnostics } = captureLogs();
-    const key = await indexKeyFor();
-    const store = fakeKv({ [key]: { snapshotId: 'snap-bad' } });
-    const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
+    const { instance, container } = setup();
     container.identityAfterStart = 'ambiguous';
 
     const failed = expect(
-      launchFromRepo(instance, REF_A, { deadlineAt: 15_000 })
+      launchFromSnapshot(instance, REF_A, { deadlineAt: 15_000 })
     ).resolves.toMatchObject({ snapshotFailed: true });
     await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
     await vi.advanceTimersByTimeAsync(5_000);
@@ -2936,125 +2707,19 @@ describe('SandboxContainers repository snapshots', () => {
     const { instance, container } = setup();
 
     await expect(
-      launchFromRepo(instance, REF_A, { deadlineAt: 10_000, skipRepository: true })
+      instance.launchWrapper({
+        command: preinstalledStartup(),
+        allocationRef: REF_A,
+        env: {},
+        instance: 'standard-4',
+        deadlineAt: 10_000,
+      })
     ).rejects.toThrow('wrapper exec timed out');
     expect(container.startCalls).toEqual([]);
   });
 
-  it.each(['index_miss', 'retries_exhausted'] as const)(
-    'keeps the full image readiness budget after %s',
-    async reason => {
-      vi.useFakeTimers();
-      vi.setSystemTime(10_000);
-      const key = await indexKeyFor();
-      const store = fakeKv(reason === 'index_miss' ? {} : { [key]: { snapshotId: 'snap-bad' } });
-      const { instance, container } = setup({
-        env: { REPO_SNAPSHOTS: store.kv },
-        record: {
-          ...idleRecord,
-          repositoryStartFailures: { snapshotId: 'snap-bad', attempts: 10 },
-        },
-      });
-      container.identityAfterStart = 'ambiguous';
-
-      const launched = expect(
-        launchFromRepo(instance, REF_A, { deadlineAt: 130_000 })
-      ).resolves.toEqual({ started: true, startSource: 'image' });
-      await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
-      await vi.advanceTimersByTimeAsync(65_000);
-      container.mainProcess = 'supervisor';
-      await vi.advanceTimersByTimeAsync(1_000);
-      await launched;
-    }
-  );
-
-  it('does not count a snapshot failure when its deadline expires before native issuance', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(10_000);
-    const key = await indexKeyFor();
-    const store = fakeKv({ [key]: { snapshotId: 'snap-good' } });
-    const { instance, container, readRecord, setPutGate, releaseHeldPut } = setup({
-      env: { REPO_SNAPSHOTS: store.kv },
-    });
-    let held = false;
-    setPutGate(value => {
-      if ((value as StoredRecord).state !== 'launching') return 'pass';
-      held = true;
-      return 'hold';
-    });
-
-    const failed = expect(launchFromRepo(instance, REF_A, { deadlineAt: 15_000 })).rejects.toThrow(
-      'wrapper exec timed out'
-    );
-    await vi.waitFor(() => expect(held).toBe(true));
-    await vi.advanceTimersByTimeAsync(6_000);
-    releaseHeldPut();
-    await failed;
-    expect(container.startCalls).toEqual([]);
-    expect(readRecord().repositoryStartFailures).toBeUndefined();
-  });
-
-  it('retains the stored snapshot and starts from the image when asked to skip it', async () => {
-    const key = await indexKeyFor();
-    const store = fakeKv({ [key]: { snapshotId: 'snap-bad' } });
-    const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
-
-    const result = await launchFromRepo(instance, REF_A, { skipRepository: true });
-
-    expect(result).toEqual({ started: true, startSource: 'image' });
-    expect(JSON.parse(store.data.get(key) ?? 'null')).toEqual({ snapshotId: 'snap-bad' });
-    expect(store.calls.filter(call => call.op === 'delete')).toEqual([]);
-    expect(container.startCalls[0]).toMatchObject({ image: IMAGE });
-  });
-
-  it('starts from the image without writing to KV when asked to skip a snapshot', async () => {
-    const key = await indexKeyFor();
-    const store = fakeKv({ [key]: { snapshotId: 'snap-bad' } });
-    store.failing.put = true;
-    const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
-
-    await expect(launchFromRepo(instance, REF_A, { skipRepository: true })).resolves.toEqual({
-      started: true,
-      startSource: 'image',
-    });
-    expect(container.startCalls[0]).toEqual(nativeStartOptions('standard-4'));
-    expect(JSON.parse(store.data.get(key) ?? 'null')).toEqual({ snapshotId: 'snap-bad' });
-    expect(store.calls.filter(call => call.op === 'delete')).toEqual([]);
-    expect(store.calls.filter(call => call.op === 'put')).toEqual([]);
-  });
-
-  it('retains a failed entry across starts until a successful capture replaces it', async () => {
-    const { diagnostics } = captureLogs();
-    const key = await indexKeyFor();
-    const entry = { snapshotId: 'snap-bad' };
-    const store = fakeKv({ [key]: entry });
-    const { instance, container } = setup({
-      env: { REPO_SNAPSHOTS: store.kv },
-      record: { ...idleRecord, repositoryStartFailures: { snapshotId: 'snap-bad', attempts: 10 } },
-    });
-
-    await expect(launchFromRepo(instance, REF_A)).resolves.toMatchObject({ startSource: 'image' });
-    expect(JSON.parse(store.data.get(key) ?? 'null')).toEqual(entry);
-    expect(store.calls.filter(call => call.op === 'put' || call.op === 'delete')).toEqual([]);
-    expect(diagnostics('snapshot_lookup')[0].fields).toMatchObject({
-      source: 'image',
-      reason: 'retries_exhausted',
-      attempts: 10,
-    });
-
-    await expect(instance.captureRepository(REF_A, REPO_KEY)).resolves.toBe(true);
-    expect(JSON.parse(store.data.get(key) ?? 'null')).toMatchObject({ snapshotId: 'snap-1' });
-    await expect(launchFromRepo(instance, REF_B)).resolves.toMatchObject({
-      startSource: 'repository',
-    });
-    expect(container.startCalls[1]).toMatchObject({ containerSnapshot: { id: 'snap-1' } });
-  });
-
   it('uses the recorded source when it resumes a launch that never started the wrapper', async () => {
-    const key = await indexKeyFor();
-    const store = fakeKv({ [key]: { snapshotId: 'snap-repo' } });
     const { instance, container, readRecord } = setup({
-      env: { REPO_SNAPSHOTS: store.kv },
       record: {
         ...idleRecord,
         state: 'launching',
@@ -3064,31 +2729,28 @@ describe('SandboxContainers repository snapshots', () => {
         wrapperAttempt: 'not_started',
       },
     });
-    container.execHandler = cmd => makeExecProcess({ exitCode: cmd[0] === 'pgrep' ? 1 : 0 });
 
-    const result = await launchFromRepo(instance, REF_A);
-
-    expect(result).toEqual({ started: true, startSource: 'repository' });
-    expect(container.startCalls[0]).toMatchObject({ containerSnapshot: { id: 'snap-repo' } });
+    await expect(launchFromSnapshot(instance, REF_A)).resolves.toEqual({
+      started: true,
+      startSource: 'repository',
+    });
+    expect(container.startCalls[0]).toMatchObject({ containerSnapshot: { id: 'snap-env' } });
     expect(readRecord().startSource).toBe('repository');
   });
 
-  it('falls back to the image when the snapshot of an interrupted launch has expired', async () => {
-    const store = fakeKv();
+  it('resumes an interrupted image launch from the image even when a snapshot is offered', async () => {
     const { instance, container, readRecord } = setup({
-      env: { REPO_SNAPSHOTS: store.kv },
       record: {
         ...idleRecord,
         state: 'launching',
         allocationRef: REF_A,
         instance: 'standard-4',
-        startSource: 'repository',
+        startSource: 'image',
         wrapperAttempt: 'not_started',
       },
     });
-    container.execHandler = cmd => makeExecProcess({ exitCode: cmd[0] === 'pgrep' ? 1 : 0 });
 
-    await expect(launchFromRepo(instance, REF_A)).resolves.toEqual({
+    await expect(launchFromSnapshot(instance, REF_A)).resolves.toEqual({
       started: true,
       startSource: 'image',
     });
@@ -3100,148 +2762,340 @@ describe('SandboxContainers repository snapshots', () => {
     const { instance, container, readRecord } = setup({
       record: {
         ...idleRecord,
-        lastSnapshot: { id: 'snap-session', sourceAllocation: REF_A },
-      } as StoredRecord,
+        state: 'running',
+        allocationRef: REF_A,
+        lastSnapshot: { id: 'legacy-snap', sourceAllocation: 'old' },
+      },
+      running: true,
     });
 
-    await launch(instance, REF_B);
-    expect(container.startCalls[0]).toMatchObject({ image: IMAGE });
-
-    await expect(instance.stop(REF_B)).resolves.toBe('terminal');
+    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
     expect(container.snapshotCalls).toBe(0);
-    expect(readRecord().lastSnapshot).toEqual({ id: 'snap-session', sourceAllocation: REF_A });
+    expect(readRecord().lastSnapshot).toEqual({ id: 'legacy-snap', sourceAllocation: 'old' });
   });
 });
 
-describe('SandboxContainers repository capture', () => {
-  async function runningWithIndex() {
-    const store = fakeKv();
-    const harness = setup({ env: { REPO_SNAPSHOTS: store.kv } });
-    await launchFromRepo(harness.instance, REF_A);
-    return { ...harness, store };
-  }
+const RUNTIME_COMMAND = {
+  argv: ['/bin/sh', '-c', 'exec /bin/sh /usr/local/bin/kilocode-control-plane-supervisor.sh'],
+};
 
-  it('publishes the snapshot with its capture time and size under the repo key and image with a 10 day ttl', async () => {
-    const { instance, container, store } = await runningWithIndex();
+describe('SandboxContainers runtime release start', () => {
+  it('runs the installer as PID 1 and confirms the supervisor after its handoff', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    const { instance, container, readRecord } = setup();
+
+    await expect(
+      instance.launchWrapper({
+        allocationRef: REF_A,
+        env: {},
+        instance: 'standard-4',
+        command: RUNTIME_COMMAND,
+      })
+    ).resolves.toEqual({ started: true, startSource: 'image' });
+
+    const options = container.startCalls[0];
+    expect(options?.entrypoint?.slice(0, 2)).toEqual(['/bin/sh', '-c']);
+    expect(options?.entrypoint).toEqual(RUNTIME_COMMAND.argv);
+
+    expect(options?.env).toMatchObject(NATIVE_GATE_ENV);
+    expect(readRecord().state).toBe('running');
+  });
+
+  it('installs the selected runtime on a snapshot start too', async () => {
+    const { instance, container } = setup();
+
+    await expect(
+      launchFromSnapshot(instance, REF_A, { command: RUNTIME_COMMAND })
+    ).resolves.toEqual({
+      started: true,
+      startSource: 'repository',
+    });
+    expect(container.startCalls[0]).toMatchObject({ containerSnapshot: { id: 'snap-env' } });
+    expect(container.startCalls[0]?.entrypoint).toEqual(RUNTIME_COMMAND.argv);
+  });
+
+  it('reports a failed snapshot start when the startup command exits', async () => {
+    const { instance, container } = setup();
+    container.runtimeOutcome = { kind: 'exit', code: 72 };
+
+    await expect(
+      launchFromSnapshot(instance, REF_A, { command: RUNTIME_COMMAND })
+    ).resolves.toEqual({
+      started: false,
+      startSource: 'repository',
+      snapshotFailed: true,
+    });
+  });
+
+  it('throws when the installer exits with a code it does not own', async () => {
+    const { instance, container } = setup();
+    container.runtimeOutcome = { kind: 'exit', code: 1 };
+
+    await expect(
+      instance.launchWrapper({
+        allocationRef: REF_A,
+        env: {},
+        instance: 'standard-4',
+        command: RUNTIME_COMMAND,
+      })
+    ).rejects.toThrow('Container stopped before the main process was confirmed');
+  });
+});
+
+const BUILDER_RUNNER = { url: 'https://worker.example/b', credential: 'builder-credential' };
+
+function launchBuilder(instance: SandboxContainers, ref: string, extra = {}) {
+  return instance.launchBuilder({
+    command: { argv: [RUNTIME_BUN_PATH, ENVIRONMENT_BUILDER_PATH] },
+    allocationRef: ref,
+    runner: BUILDER_RUNNER,
+    instance: 'standard-4',
+    deadlineAt: Date.now() + 600_000,
+    ...extra,
+  });
+}
+
+describe('SandboxContainers environment builder', () => {
+  it('starts the builder bundle as PID 1 from the image with internet egress', async () => {
+    const { instance, container, readRecord } = setup();
+    const outbound = attachOutbound(instance);
+
+    await expect(launchBuilder(instance, REF_A)).resolves.toEqual({
+      started: true,
+      startSource: 'image',
+    });
+    expect(container.startCalls[0]).toEqual({
+      image: IMAGE,
+      instance: 'standard-4',
+      enableInternet: true,
+      entrypoint: [RUNTIME_BUN_PATH, ENVIRONMENT_BUILDER_PATH],
+      // A snapshot keeps the start env, so the runner never travels in it.
+      env: { ...NATIVE_GATE_ENV },
+    });
+    const delivery = container.execCalls.at(-1);
+    expect(delivery?.cmd.slice(0, 2)).toEqual(['/bin/sh', '-c']);
+    expect(delivery?.cmd[2]).toContain('umask 077');
+    expect(delivery?.cmd[2]).toContain('/run/kilocode-environment-build/runner.json');
+    expect(delivery?.cmd[2]).not.toContain(BUILDER_RUNNER.credential);
+    expect(delivery?.options?.env).toEqual({
+      KILO_BUILDER_RUNNER: JSON.stringify(BUILDER_RUNNER),
+    });
+    expect(outbound).not.toHaveBeenCalled();
+    expect(readRecord()).toMatchObject({
+      state: 'running',
+      allocationRef: REF_A,
+      instance: 'standard-4',
+    });
+    const execs = container.execCalls.length;
+    await expect(launchBuilder(instance, REF_A)).resolves.toEqual({
+      started: false,
+      startSource: 'image',
+    });
+    expect(container.startCalls).toHaveLength(1);
+    // A running builder already took its runner; nothing is written again.
+    expect(container.execCalls).toHaveLength(execs);
+  });
+
+  it('fails the launch when the runner cannot be delivered', async () => {
+    const { instance, container } = setup();
+    container.execHandler = cmd => makeExecProcess({ exitCode: cmd[0] === '/bin/sh' ? 1 : 0 });
+
+    await expect(launchBuilder(instance, REF_A)).rejects.toThrow('Builder runner delivery failed');
+  });
+
+  it('runs the builder through the runtime installer when a release is selected', async () => {
+    const { instance, container } = setup();
+
+    await expect(
+      launchBuilder(instance, REF_A, {
+        command: {
+          argv: ['/bin/sh', '-c', `exec ${RUNTIME_BUN_PATH} ${ENVIRONMENT_BUILDER_PATH}`],
+        },
+      })
+    ).resolves.toMatchObject({
+      started: true,
+    });
+    const script = container.startCalls[0]?.entrypoint?.[2] ?? '';
+    expect(script).toContain('kilocode-environment-builder.js');
+    expect(script).toContain(`exec ${RUNTIME_BUN_PATH} ${ENVIRONMENT_BUILDER_PATH}`);
+  });
+
+  it('destroys a previous builder allocation before starting the next', async () => {
+    const { instance, container, readRecord } = setup({
+      record: { ...idleRecord, state: 'running', allocationRef: REF_A, instance: 'standard-4' },
+      running: true,
+    });
+
+    await expect(launchBuilder(instance, REF_B)).resolves.toMatchObject({ started: true });
+    expect(container.destroyCalls).toBe(1);
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_B });
+  });
+
+  it('confirms a builder whose start was in flight when the DO restarted', async () => {
+    const { instance, container, readRecord } = setup({
+      record: {
+        ...idleRecord,
+        state: 'launching',
+        allocationRef: REF_A,
+        instance: 'standard-4',
+        wrapperAttempt: 'exec_pending',
+      },
+      running: true,
+    });
+    container.mainProcess = 'environment-builder';
+
+    await expect(launchBuilder(instance, REF_A)).resolves.toEqual({
+      started: true,
+      startSource: 'image',
+    });
+    expect(container.startCalls).toEqual([]);
+    expect(readRecord().state).toBe('running');
+  });
+
+  it('fails closed when an in-flight builder start shows another main process', async () => {
+    const { instance, container } = setup({
+      record: {
+        ...idleRecord,
+        state: 'launching',
+        allocationRef: REF_A,
+        instance: 'standard-4',
+        wrapperAttempt: 'exec_pending',
+      },
+      running: true,
+    });
+    container.mainProcess = 'supervisor';
+
+    await expect(launchBuilder(instance, REF_A)).rejects.toThrow(
+      'Main process identity is ambiguous'
+    );
+  });
+});
+
+function runningForCapture() {
+  return setup({
+    record: { ...idleRecord, state: 'running', allocationRef: REF_A },
+    running: true,
+  });
+}
+
+describe('SandboxContainers capture by id', () => {
+  it('pins capture compatibility to the running allocation image across a rollout', async () => {
+    const { instance, container } = setup();
+    await launch(instance, REF_A);
+    container.images.app = 'registry.example/kilo/app:next';
+    expect(await instance.captureSnapshot(REF_A, 'image-pin')).toMatchObject({
+      status: 'stored',
+      baseImage: IMAGE,
+    });
+  });
+
+  it('stores the snapshot under its capture id before it replies', async () => {
+    const { instance, container, storage } = runningForCapture();
     container.snapshotBehavior = { kind: 'resolve', id: 'snap-captured' };
-    const before = Date.now();
 
-    await expect(instance.captureRepository(REF_A, REPO_KEY, 'deadbeef')).resolves.toBe(true);
+    const result = await instance.captureSnapshot(REF_A, 'capture-1');
 
-    const key = await indexKeyFor();
-    const entry = JSON.parse(store.data.get(key) as string);
-    expect(entry).toEqual({
+    expect(result).toMatchObject({
+      status: 'stored',
       snapshotId: 'snap-captured',
-      capturedAt: expect.any(Number),
       size: SNAPSHOT_SIZE,
-      commit: 'deadbeef',
+      baseImage: IMAGE,
     });
-    expect(entry.capturedAt).toBeGreaterThanOrEqual(before);
-    expect(entry.capturedAt).toBeLessThanOrEqual(Date.now());
-    expect(store.calls.find(call => call.op === 'put')).toEqual({
-      op: 'put',
-      key,
-      options: { expirationTtl: 864_000 },
+    expect(storage.map.get('containers:capture:v1:capture-1')).toMatchObject({
+      state: 'stored',
+      snapshotId: 'snap-captured',
     });
+    await expect(instance.readCapture('capture-1')).resolves.toEqual(result);
+    await expect(instance.captureSnapshot(REF_A, 'capture-1')).resolves.toEqual(result);
     expect(container.snapshotCalls).toBe(1);
   });
 
-  it('logs one line per capture with its outcome, duration and size, and no key or id', async () => {
-    const { lines } = captureLogs();
+  it('joins a capture that is still running in this isolate', async () => {
+    const { instance, container } = runningForCapture();
+    container.snapshotBehavior = { kind: 'deferred' };
 
-    const stored = await runningWithIndex();
-    await stored.instance.captureRepository(REF_A, REPO_KEY, 'abc123');
-    const rejected = await runningWithIndex();
-    rejected.container.snapshotBehavior = { kind: 'reject' };
-    await rejected.instance.captureRepository(REF_A, REPO_KEY);
-    const unavailable = await runningWithIndex();
-    unavailable.store.failing.put = true;
-    await unavailable.instance.captureRepository(REF_A, REPO_KEY);
+    const first = instance.captureSnapshot(REF_A, 'capture-1');
+    await vi.waitFor(() => expect(container.deferredSnapshots).toHaveLength(1));
+    await expect(instance.readCapture('capture-1')).resolves.toEqual({ status: 'in_progress' });
+    const second = instance.captureSnapshot(REF_A, 'capture-1');
+    container.deferredSnapshots[0]?.resolve('snap-late');
 
-    const captures = lines.filter(line => line.fields.outcome !== undefined);
-    expect(captures.map(line => [line.level, line.fields.outcome, line.message])).toEqual([
-      ['info', 'stored', 'Repository snapshot captured'],
-      ['warn', 'failed', 'Repository snapshot not saved'],
-      ['warn', 'index_unavailable', 'Repository snapshot not saved'],
-    ]);
-    for (const line of captures) expect(line.fields.durationMs).toEqual(expect.any(Number));
-    expect(captures.map(line => line.fields.size)).toEqual([
-      SNAPSHOT_SIZE,
-      undefined,
-      SNAPSHOT_SIZE,
-    ]);
-    expect(JSON.stringify(lines)).not.toContain(REPO_KEY);
-    expect(JSON.stringify(lines)).not.toContain('abc123');
-    expect(JSON.stringify(lines)).not.toContain('snap-1');
+    await expect(first).resolves.toMatchObject({ status: 'stored', snapshotId: 'snap-late' });
+    await expect(second).resolves.toMatchObject({ status: 'stored', snapshotId: 'snap-late' });
+    expect(container.snapshotCalls).toBe(1);
   });
 
-  it('does nothing without a KV binding, a running container or the running allocation', async () => {
-    const noIndex = setup();
-    await launchFromRepo(noIndex.instance, REF_A);
-    await expect(noIndex.instance.captureRepository(REF_A, REPO_KEY)).resolves.toBe(false);
-    expect(noIndex.container.snapshotCalls).toBe(0);
-
-    const { instance, container } = await runningWithIndex();
-    await expect(instance.captureRepository(REF_B, REPO_KEY)).resolves.toBe(false);
-    container.running = false;
-    await expect(instance.captureRepository(REF_A, REPO_KEY)).resolves.toBe(false);
-    expect(container.snapshotCalls).toBe(0);
-  });
-
-  it('skips capture for a legacy running allocation whose start image is unknown', async () => {
-    const store = fakeKv();
-    const { instance, container } = setup({
-      running: true,
-      env: { REPO_SNAPSHOTS: store.kv },
-      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
+  it('reports an issued capture whose call was lost as uncertain and never snapshots again', async () => {
+    const { instance, container, storage } = runningForCapture();
+    storage.map.set('containers:capture:v1:capture-1', {
+      state: 'issued',
+      allocationRef: REF_A,
+      issuedAt: 1,
     });
-    await expect(instance.captureRepository(REF_A, REPO_KEY)).resolves.toBe(false);
+
+    await expect(instance.readCapture('capture-1')).resolves.toEqual({
+      status: 'failed',
+      reason: 'uncertain',
+    });
+    await expect(instance.captureSnapshot(REF_A, 'capture-1')).resolves.toEqual({
+      status: 'failed',
+      reason: 'uncertain',
+    });
     expect(container.snapshotCalls).toBe(0);
-    expect(store.data.size).toBe(0);
   });
 
-  it('reports a failed snapshot or index write as false and publishes nothing', async () => {
-    const failedSnapshot = await runningWithIndex();
-    failedSnapshot.container.snapshotBehavior = { kind: 'reject' };
-    await expect(failedSnapshot.instance.captureRepository(REF_A, REPO_KEY)).resolves.toBe(false);
-    expect(failedSnapshot.store.data.size).toBe(0);
+  it('refuses a capture for an allocation that is not the running one', async () => {
+    const { instance, container } = runningForCapture();
 
-    const failedWrite = await runningWithIndex();
-    failedWrite.store.failing.put = true;
-    await expect(failedWrite.instance.captureRepository(REF_A, REPO_KEY)).resolves.toBe(false);
-    expect(failedWrite.store.data.size).toBe(0);
+    await expect(instance.captureSnapshot(REF_B, 'capture-1')).resolves.toEqual({
+      status: 'failed',
+      reason: 'not_running',
+    });
+    expect(container.snapshotCalls).toBe(0);
+    await expect(instance.readCapture('missing')).resolves.toBeNull();
+  });
+
+  it('stores a failed snapshot call and a capture abandoned by a stop', async () => {
+    const failed = runningForCapture();
+    failed.container.snapshotBehavior = { kind: 'reject' };
+    await expect(failed.instance.captureSnapshot(REF_A, 'capture-1')).resolves.toEqual({
+      status: 'failed',
+      reason: 'snapshot_failed',
+    });
+
+    const abandoned = runningForCapture();
+    abandoned.container.snapshotBehavior = { kind: 'deferred' };
+    const capture = abandoned.instance.captureSnapshot(REF_A, 'capture-2');
+    await vi.waitFor(() => expect(abandoned.container.deferredSnapshots).toHaveLength(1));
+    await expect(abandoned.instance.stop(REF_A)).resolves.toBe('terminal');
+    abandoned.container.deferredSnapshots[0]?.resolve('snap-after-stop');
+    await expect(capture).resolves.toEqual({ status: 'failed', reason: 'abandoned' });
   });
 
   it('gives up on a capture that never finishes and does not block a stop', async () => {
     vi.useFakeTimers();
-    const { instance, container, store, readRecord } = await runningWithIndex();
+    const { instance, container } = runningForCapture();
     container.snapshotBehavior = { kind: 'deferred' };
 
-    const capture = instance.captureRepository(REF_A, REPO_KEY);
-    await vi.advanceTimersByTimeAsync(0);
-    expect(container.snapshotCalls).toBe(1);
-
+    const capture = instance.captureSnapshot(REF_A, 'capture-1');
+    await vi.waitFor(() => expect(container.deferredSnapshots).toHaveLength(1));
     await expect(instance.stop(REF_A)).resolves.toBe('terminal');
-    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null });
-
-    await vi.advanceTimersByTimeAsync(5 * 60_000 + 1_000);
-    await expect(capture).resolves.toBe(false);
-    container.deferredSnapshots[0]?.resolve('late');
-    await vi.advanceTimersByTimeAsync(0);
-    expect(store.data.size).toBe(0);
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    await expect(capture).resolves.toEqual({ status: 'failed', reason: 'snapshot_failed' });
   });
 
-  it('does not publish a snapshot that finishes after the allocation stopped', async () => {
-    const { instance, container, store } = await runningWithIndex();
-    container.snapshotBehavior = { kind: 'deferred' };
-
-    const capture = instance.captureRepository(REF_A, REPO_KEY);
-    await vi.waitFor(() => expect(container.snapshotCalls).toBe(1));
-    await instance.stop(REF_A);
-    container.deferredSnapshots[0]?.resolve('late');
-
-    await expect(capture).resolves.toBe(false);
-    expect(store.data.size).toBe(0);
+  it('retains a bounded number of capture records', async () => {
+    const { instance, storage } = runningForCapture();
+    for (let index = 0; index < 10; index += 1) {
+      await instance.captureSnapshot(REF_A, `capture-${index}`);
+    }
+    const kept = [...storage.map.keys()].filter(key => key.startsWith('containers:capture:v1:'));
+    expect(kept).toHaveLength(8);
+    expect(kept).not.toContain('containers:capture:v1:capture-0');
+    expect(storage.map.get('containers:captures:v1')).toEqual(
+      Array.from({ length: 8 }, (_, index) => `capture-${9 - index}`)
+    );
   });
 });
 

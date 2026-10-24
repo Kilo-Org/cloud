@@ -49,8 +49,10 @@ import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
 import { ProfilePickerPopover } from '@/components/cloud-agent/ProfilePickerPopover';
-import { RepositoryEnvironmentChip } from '@/components/cloud-agent-next/RepositoryEnvironmentChip';
 import { EnvironmentProfileSetupNotice } from '@/components/cloud-agent-next/EnvironmentProfileSetupNotice';
+import { EnvironmentSnapshotNotice } from '@/components/cloud-agent-next/EnvironmentSnapshotNotice';
+import { RepositoryEnvironmentChip } from '@/components/cloud-agent-next/RepositoryEnvironmentChip';
+import { useSessionProfileLayers } from '@/hooks/useSessionProfileLayers';
 import {
   useRepositoryEnvironment,
   type EnvironmentRepository,
@@ -267,6 +269,12 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
 
   const [selectedProfileId, setSelectedProfileId] = useAtom(selectedProfileIdAtom);
   const resetSessionForm = useSetAtom(resetSessionFormAtom);
+  const sessionProfiles = useSessionProfileLayers({
+    organizationId,
+    selectedOverrideProfileId: selectedProfileId,
+    repoFullName: selectedRepo || undefined,
+    platform: profileBindingPlatform,
+  });
 
   useEffect(() => {
     safeLocalStorage.removeItem('cloud-agent:devcontainer-enabled');
@@ -1011,6 +1019,11 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     organizationId,
     repository: environmentRepository,
   });
+  // Profile values are session inputs; a reused snapshot may hold older ones.
+  const showSnapshotNotice =
+    !!repositoryEnvironment &&
+    ((sessionProfiles.baseProfile?.varCount ?? 0) > 0 ||
+      (sessionProfiles.topProfile?.varCount ?? 0) > 0);
 
   const creationInput = useMemo(() => {
     const trimmed = prompt.trim();
@@ -1807,6 +1820,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
             ))}
           </div>
         )}
+        {showSnapshotNotice && <EnvironmentSnapshotNotice />}
 
         {githubIdentityHint && (
           <ContextualTip {...githubIdentityHint} onDismiss={handleDismissGitHubIdentityHint} />

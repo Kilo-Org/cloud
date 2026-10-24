@@ -476,59 +476,68 @@ These keep their current owners and evidence; the rewrite ports them, it does no
 - Worktree deletion reports an incomplete, retryable result when the provider has not confirmed the
   stop or cleanup (Shared Worktrees rule 13).
 
-### Repository snapshots
+### Environment snapshots
 
-Scope: `workspace_*` routes on `cloudflare-containers` whose directory is the constant isolated
-path `/workspace/app`. A snapshot holds one repository at one path, so any other route has no key.
+Scope: `workspace_*` routes on `cloudflare-containers` whose directory is the isolated path
+`/workspace/app` and whose session was admitted with a repository environment. Sessions never
+capture. One `EnvironmentBuild` Durable Object per environment ID builds, publishes and serves the
+snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Environment snapshots".
 
-- **Key.** When a route is first prepared, the Sandbox DO hashes the owner, the repository URL and
-  the setup commands with HMAC-SHA256 under a Worker secret. Env is not part of the key: setup
-  re-runs on every start and rewrites what it derives from the env. The setup commands join the
-  hash so a snapshot is reused only by a route with the same setup; a different setup for one
-  repository gets its own key. It stores the digest on the route (`repo_key`) and keeps it across
-  attempts. No key is computed, and no snapshot used, when the owner is not enrolled
-  (`CONTAINER_REPO_SNAPSHOT_IDS`), the route has no repository, the provider cannot capture, or the
-  secret is missing. Scope is per user; per org is a change to that one field. The Sandbox DO
-  adds the allocation's startup mode to the key for `launch` and capture, so a snapshot captured
-  in one mode is never restored in the other.
-- **Start.** `launch` receives the key of the routes waiting for the allocation: exactly one key,
-  else none. `SandboxContainers` appends the image, and starts from the
-  repository snapshot in the `REPO_SNAPSHOTS` KV index when it has one for that digest, else from
-   the image. `launch` returns `startSource`. A failed repository start retains the index entry
-   and asks the Sandbox DO to clean up the failed container and launch the image for the same
-   allocation. Cleanup and fallback only run while that allocation is still creating; a wrapper
-   that already connected is never destroyed by fallback. Before cleanup, the Sandbox DO rotates
-   the launch credential so a late wrapper from the failed snapshot cannot connect. The snapshot attempt, cleanup and image fallback share the original
-   launch deadline. No separate half-budget reservation exists.
-   Each later sandbox start retries the snapshot once, up to ten failed starts per snapshot ID
-   in that sandbox's durable record. After that it uses the image; a replacement snapshot gets
-   its own failure budget. Failure never deletes or changes the shared snapshot index.
-- **First start only.** The Sandbox DO remembers how the previous allocation started and whether its
-  wrapper connected. When a repository start never connected (for example the first-connect timeout
-   stopped it), the next launch skips the snapshot and starts from the image without deleting
-   the entry. A completed image fallback records `image`, so the next start tries the retained
-   snapshot again unless its failure budget is exhausted.
-- **Capture.** `session.prepare` carries `capture: true` when the route has a key and the provider
-  can capture. The key names the setup commands as well as the user and the repository, because
-  capture runs after setup: a snapshot built with one setup is never adopted by a route with
-  another. The
-  wrapper decides whether to capture (a fresh clone, or an adopted snapshot that is
-  due for a refresh) and then sends `workspace.capture` after setup, with origin bare. The Sandbox DO
-  calls the provider off its serial queue, bounded at 5 min 5 s, and answers `workspace.captured`
-  (`ok: false` at once when nothing can be saved). `SandboxContainers` snapshots the running
-  container (bounded at 5 min), and writes `{ snapshotId, commit }` to the index with a 10-day TTL,
-  which only expires a snapshot nobody uses (the platform keeps one for 30 days).
-  It does not take its operation queue, so a stop or launch is never delayed by a capture. The
-  snapshot is published only while that allocation is still the running one.
-  Each capture logs one line with its `outcome` (`stored`, `index_unavailable`, `abandoned` or
-  `failed`) and the `durationMs` of the platform snapshot, to tune the bound from real durations.
-- **No session snapshots.** A stop destroys the container without a snapshot. A restarted session
-  uses the repository snapshot, then restores its Kilo history from session-ingest.
-- **Image tie.** A deploy that changes the image changes the index key, so the next start per key is
-  cold. The platform keeps an unused snapshot for 30 days; there is no list or delete API. The
-  runtime-free image changes only when its own inputs change, so a runtime-only deploy keeps
-  `downloaded` snapshots. A restored `downloaded` sandbox runs the bootstrap first; the captured
-  runtime never starts.
+- **Reference.** For an origin under the `include-web-defaults` profile policy, session preflight
+  looks up the owner's one environment for the repository and stores
+  `{ environmentId, owner, repository, configurationRevision }` on the session metadata and on the
+  route (`routes.environment`). Its saved sandbox allocation becomes the first saved candidate,
+  ahead of the repository override and the owner default. A client-supplied reference or
+  allocation is dropped. Worktree chats inherit the reference.
+- **Candidate.** At `runCreate` the Sandbox DO uses a snapshot only when every preparing route waits
+  at `/workspace/app` with the same environment, revision and owner, and a route carries the
+  credential user (`environmentLaunchCandidate`). Any other allocation starts from the image.
+- **Progress.** The decision is its own preparation step, `environment_snapshot`, so its detail
+  stays in the completed timeline after `sandbox_start` reports.
+- **Lookup.** The Sandbox DO calls `resolveSnapshot` once, bounded at 15 s and by the launch
+  deadline, outside its serial queue. A timeout, a miss or an unavailable coordinator is an ordinary
+  image start; it never waits for a build. The coordinator answers with the published descriptor
+  when it is eligible (same scope, the current base image and runtime ABI, revision not newer
+  than the session's, under the 29-day lifetime) and with the replacement admission: `admitted`, `active`, `not_needed` or `skipped`
+  (backoff, container limit, another build). An older revision or an age-stale snapshot (4 days)
+  stays usable while its replacement builds. A descriptor for another base image or runtime ABI
+  (after a deploy that changes the image) is not used and admits a replacement; the coordinator
+  reads the current image from the builder's container DO.
+- **Start.** `launch` receives `snapshot: { snapshotId, baseImage }`. `SandboxContainers` refuses a
+  descriptor for another base image (`image_mismatch`) and otherwise restores it. `launch` returns
+  `startSource` (`repository` or `image`). The progress detail names the snapshot capture date and time in UTC, the
+  changed environment settings and the real admission outcome.
+- **Fallback.** A failed snapshot start cleans up that container, rotates the launch credential so a
+  late wrapper cannot connect, and launches the image for the same allocation within the original
+  deadline. When the previous snapshot start never connected or its preparation failed, the next
+  launch uses the image once (`previousSnapshotStartFailed`); a completed image start clears this.
+  A failure never changes the published snapshot.
+- **No session capture.** A wrapper that predates this change may still send `workspace.capture`;
+  the Sandbox DO answers `workspace.captured` with `ok: false` at once. The `REPO_SNAPSHOTS` index,
+  repository keys and route `repo_key` are removed.
+- **Builder.** A build runs in its own `sbx-` container DO named `environment-build:v1:<envId>`
+  (`standard-4` when setup commands exist), billed and capacity-checked like an isolated session.
+  Its main process is `kilocode-environment-builder.js` under the runtime Bun, not the supervisor.
+  The container starts without the runner endpoint or credential in its env, because a snapshot
+  keeps the start configuration; the container DO writes them to
+  `/run/kilocode-environment-build/runner.json` by exec, and the builder deletes the file once
+  read. It reads its input from `/environment-build/:envId/:buildId/input` with that per-build
+  HMAC credential (input only while the build is `preparing`; no route accepts it after the build
+  ends), reports events and its result
+  over the same authenticated routes, clones the default
+  branch into `/workspace/app`, runs setup with the directory HOME, removes credentials and
+  reflogs, and writes the workspace stamp. The coordinator records the capture as issued before it
+  calls the platform, captures, publishes when the build revision is still current, and stops the
+  builder. Heartbeats from reports renew the build lease; a builder silent for 90 s is lost.
+- **Lifetime.** The platform keeps an unused snapshot for 30 days and has no list or delete API in
+  this release, so a superseded snapshot is unreferenced rather than deleted.
+- **Runtime selection.** Builders and sessions use the deployment's explicit startup selection.
+  Downloaded mode uses the current runtime installer and its named builder or supervisor target,
+  including on snapshot restore. The installed control bundle includes the builder. A preinstalled
+  launch rejects snapshots captured with downloaded aliases; a downloaded launch can install a
+  newer compatible runtime over a snapshot. The artifact read grant travels in the installer
+  command and expires at the startup deadline. A restored session supplies a new command and its
+  own credentials. Native snapshot retention of start configuration still needs deployed validation.
 
 ## 7. Wrapper
 
@@ -590,7 +599,6 @@ The wrapper owns the step timeouts and retries:
 | Use a prepared repository (`restore`) | 2 min | Network errors: 3 attempts; any other failure falls back to a clone |
 | Checkout, branch restore | In the clone budget | No |
 | Setup commands | Current per-command limits | No; a failure fails preparation |
-| Save the repository (`snapshot`) | 5 min 10 s wait | No; a failure is logged and preparation continues |
 | Kilo runtime start | 2 min | 1 retry |
 | Kilo session: use the one Kilo has on disk; if missing (new sandbox), restore from the snapshot; else create | 2 min | 1 retry |
 
@@ -611,30 +619,34 @@ options are command arguments, not Git config.
 
 #### Workspace stamp
 
-A prepared workspace carries `.git/kilo-workspace.json` (`{ allocationId, commit, capturedAt,
-generation }`; beside the directory when there is no repository). It replaces the boolean bootstrap marker. At
-`session.prepare` the wrapper decides from the filesystem alone:
+A prepared workspace carries `.git/kilo-workspace.json` (`{ allocationId, commit }`; beside the
+directory when there is no repository). The reader also accepts the older `capturedAt` and
+`generation` fields. At `session.prepare` the wrapper decides from the filesystem alone:
 
 | Found | Meaning | Work |
 |---|---|---|
-| No `.git` | Image start | Clone, checkout, setup, stamp, then capture when asked |
-| `.git`, no stamp | A preparation that did not finish | Reuse the clone: checkout, setup, stamp. Never captured. |
+| No `.git` | Image start | Clone, checkout, setup, stamp |
+| `.git`, no stamp | A preparation that did not finish | Reuse the clone: checkout, setup, stamp |
 | Stamp from this allocation | A sibling session or a wrapper restart | Nothing |
-| Stamp from another allocation | A restored repository snapshot | **Adopt** |
+| Stamp from another allocation | A restored environment snapshot | **Adopt** |
 
 Adopt makes the snapshot equal to a fresh clone, then runs the ordinary steps:
 
 1. Point `origin` at this route's credential.
 2. `fetch --prune`, then refresh the remote default branch.
 3. Detach at the remote default branch, so a new branch starts from its tip.
-4. Delete every local branch. The captured session's branch, or this session's own from an earlier
-   capture, would otherwise shadow a newer `origin/<branch>`.
+4. Delete every local branch. The builder's default branch would otherwise shadow a newer
+   `origin/<branch>`.
 5. Check out this route's branch (working branch, explicit branch or review ref) and set the git
    author, as after a clone.
 6. Run the setup commands, then write the stamp.
 
-Any failure empties the directory and clones. The Kilo session step is unchanged: the snapshot has
-no Kilo home, so nothing stale shadows the restore from session-ingest. `session.ready` reports
+Any failure empties the directory and clones. The Kilo session step is unchanged: the builder
+starts no Kilo runtime, so nothing stale shadows the restore from session-ingest. HOME of a
+`worktree` runtime is `/home/<sha256(directory)>`, the same path the builder uses, so caches that
+setup wrote (`~/.cache`, toolchains) are present after restore. An allocation that keeps
+`runtimeIsolation: per-session` keeps its per-session HOME under `$TMPDIR/kilo-worktrees`; the log
+uploader reads both roots. `session.ready` reports
 `workspace: 'cloned' | 'same' | 'adopted'`.
 
 Before starting Kilo, materialize the session's profile skills (including companion files) into
@@ -645,24 +657,6 @@ profile, so every member materializes the same collections; registration does no
 Preparation replaces stale profile artifacts from restored homes, and credential refresh retains
 the same profile config path. Read-only Bitbucket reviews withhold these collections, matching
 the legacy profile restrictions.
-
-#### Capture
-
-A route captures only when `session.prepare` carries `capture: true`, and then when it cloned
-(generation 0) or when the snapshot it adopted is due for a **refresh**: captured 4 days ago or
-more. A refresh captures the adopted workspace, so it costs the incremental setup rather than a cold
-clone and install. A snapshot that is not due keeps its `capturedAt` and generation in the new
-stamp, so its age keeps counting. Each capture stacks on the last, so after 4 refreshes a due
-snapshot is **rebuilt** instead: the wrapper does not adopt it, empties the directory, clones, and
-captures a new generation 0. That bounds what stacked captures accumulate (deleted files, untracked
-leftovers). Concurrent sessions that adopt a due snapshot each capture, and the last write wins.
-After
-setup the wrapper writes the stamp (before the snapshot, so a restored container sees another
-allocation's stamp), sets `origin` to the bare URL, clears the reflogs and `FETCH_HEAD`, sends
-`workspace.capture` and waits for `workspace.captured`. It then restores the authenticated URL,
-whatever the outcome, and continues to the Kilo runtime. A snapshot therefore holds no agent edits,
-no Kilo home and no git credential. Process env never reaches the disk. Capture runs after setup, so
-the key names the setup commands too: a snapshot is reused only by a route with the same setup.
 
 ### Prompts and turn outcome
 
@@ -880,10 +874,10 @@ them through one development-only override.
 | Sandbox DO | Artifact grant | `createDeadlineAt` plus first connect | Downloads are rejected |
 | Bootstrap | Install | Until the first-connect deadline, rendered by the Worker | Report `deadline_exceeded` and exit |
 | Sandbox DO | Provider stop | Existing ladder | Log unconfirmed stop; routing state `stopped` |
-| Sandbox DO | Repository capture call | 5 min 5 s (container DO: 5 min) | Answer `ok: false`; preparation continues |
+| Sandbox DO | Environment snapshot lookup | 15 s, capped by the launch deadline | Start from the image |
 | Wrapper | Preparation steps | Section 7 | Route `failed` with the step reason |
-| Wrapper | Adopt a repository snapshot | 2 min | Empty the directory and clone |
-| Wrapper | Wait for a capture | 5 min 10 s | Continue without a snapshot |
+| Wrapper | Adopt an environment snapshot | 2 min | Empty the directory and clone |
+| Environment build DO | One build | 30 min including capture | Build `failed` (`deadline`); stop the builder |
 | Wrapper | SSE silence | 30 s | Health request |
 | Wrapper | Kilo health request | 5 s | Restart Kilo |
 | Wrapper | SSE reconnects | 6 in 2 min | Restart Kilo |
@@ -907,8 +901,7 @@ them through one development-only override.
 | Runtime install fails transiently, or the base is incompatible | Bootstrap report | Stop; new allocation within the route deadline, from the image after a restore | Queued fail at the deadline |
 | Startup report lost | Sandbox DO, 5 min | Same as "Wrapper never connects" | Queued fail at the deadline |
 | Clone network error | Wrapper | 3 attempts | Queued fail (`workspace_setup_failed`) |
-| Repository snapshot cannot be used (start, adopt) | Container DO, wrapper | Start from the image, or clone | None; a cold start |
-| Repository capture fails or times out | Sandbox DO, wrapper | Continue without a snapshot | None |
+| Environment snapshot cannot be used (lookup, start, adopt) | Sandbox DO, container DO, wrapper | Start from the image, or clone | None; a cold start |
 | Setup command fails | Wrapper | None | Queued fail with the command output visible |
 | Socket drops, wrapper returns | Sandbox DO | Wrapper reconnects | None |
 | Socket down 90 s | Sandbox DO | Stop the sandbox | Accepted fail (`connection_lost`); queued re-prepare |
@@ -1039,8 +1032,8 @@ The Sandbox DO stores one runtime contract per allocation in `allocation_runtime
 
 Registration retains `runtimeIsolation` for compatibility. The Sandbox removes it only from frames
 for a negotiated shared allocation. Updated wrappers still honor it for legacy allocations.
-This preserves old runtime and HOME identities. Shared HOME uses
-`sha256(scopeId + "\0" + directory)` under the wrapper home root.
+This preserves old runtime and HOME identities. A `worktree` runtime HOME is
+`/home/<sha256(directory)>`, shared with the environment builder.
 
 Deploy in this order:
 
@@ -1081,8 +1074,8 @@ differs from the warm runtime's fails with `Kilo worktree MCP configuration mism
 running with another session's servers.
 
 Sandbox DO ↔ wrapper (WebSocket frames): `hello`, `welcome`, `shutdown`, `heartbeat`, `heartbeat_ack`,
-`session.prepare`, `session.progress`, `session.ready`, `session.failed`, `workspace.capture`,
-`workspace.captured`, `session.credentials`, `session.prompt`, `session.abort`, `session.answer`, `session.release`, `session.events`,
+`session.prepare`, `session.progress`, `session.ready`, `session.failed`, `workspace.capture` and
+`workspace.captured` (legacy wrappers only; always answered `ok: false`), `session.credentials`, `session.prompt`, `session.abort`, `session.answer`, `session.release`, `session.events`,
 `session.outcome`, `events_dropped`, terminal control requests, worktree-change requests,
 worktree-deletion requests (`worktree.prepareDeletion`, `worktree.delete`; both answer with
 `worktree.result`). Terminal bytes use the existing wrapper-to-Session-DO terminal socket.

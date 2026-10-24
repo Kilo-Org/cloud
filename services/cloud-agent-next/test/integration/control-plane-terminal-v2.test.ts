@@ -494,3 +494,136 @@ describe('control-plane terminal bridge routing on the Session DO (B10)', () => 
     wrapper.close();
   });
 });
+
+type ChannelClose = { code: number; reason: string };
+
+function closedWith(socket: WebSocket): Promise<ChannelClose> {
+  const { promise, resolve } = Promise.withResolvers<ChannelClose>();
+  socket.addEventListener('close', event => {
+    resolve({ code: event.code, reason: event.reason });
+  });
+  return promise;
+}
+
+async function openBrowserTerminal(
+  sessionStub: DurableObjectStub<SandboxSessionV2>,
+  wrapper: FakeWrapper
+): Promise<{
+  socket: WebSocket;
+  closed: Promise<ChannelClose>;
+  peerClosed: Promise<ChannelClose>;
+}> {
+  const created = sessionStub.terminalCreate({ operationId: crypto.randomUUID() });
+  const createFrame = await awaitFrame(wrapper, 'terminal.create');
+  wrapper.send({
+    type: 'terminal.result',
+    requestId: createFrame.requestId,
+    ok: true,
+    result: { pty: pty('pty_1', createFrame.session.directory) },
+  });
+  await created;
+
+  const browserUpgrade = sessionStub.fetch(
+    new Request('https://control.test/terminal/browser?ptyId=pty_1', {
+      headers: { Upgrade: 'websocket' },
+    })
+  );
+  const connectFrame = await awaitFrame(wrapper, 'terminal.connect');
+  const wrapperUpgrade = await sessionStub.fetch(
+    new Request('https://control.test/terminal/wrapper?ptyId=pty_1', {
+      headers: {
+        Upgrade: 'websocket',
+        Authorization: `Bearer ${connectFrame.payload.capability}`,
+      },
+    })
+  );
+  expect(wrapperUpgrade.status).toBe(101);
+  const peer = wrapperUpgrade.webSocket;
+  if (!peer) throw new Error('Missing terminal wrapper socket');
+  peer.accept();
+  const peerClosed = closedWith(peer);
+  wrapper.send({
+    type: 'terminal.result',
+    requestId: connectFrame.requestId,
+    ok: true,
+    result: { connected: true },
+  });
+
+  const browser = await browserUpgrade;
+  expect(browser.status).toBe(101);
+  const socket = browser.webSocket;
+  if (!socket) throw new Error('Missing terminal browser socket');
+  socket.accept();
+  return { socket, closed: closedWith(socket), peerClosed };
+}
+
+async function openStreamSocket(
+  sessionStub: DurableObjectStub<SandboxSessionV2>
+): Promise<{ socket: WebSocket; closed: Promise<ChannelClose> }> {
+  const response = await sessionStub.fetch(
+    new Request('https://control.test/stream?replay=false', {
+      headers: { Upgrade: 'websocket' },
+    })
+  );
+  expect(response.status).toBe(101);
+  const socket = response.webSocket;
+  if (!socket) throw new Error('Missing stream socket');
+  socket.accept();
+  return { socket, closed: closedWith(socket) };
+}
+
+describe('control-plane session organization close on the Session DO', () => {
+  it('closes terminal browser and stream sockets for the session organization', async () => {
+    const { sessionStub, wrapper } = await startTerminalSession();
+    const terminal = await openBrowserTerminal(sessionStub, wrapper);
+    const stream = await openStreamSocket(sessionStub);
+
+    await expect(sessionStub.closeOrgStreams(ORG_ID)).resolves.toBe(2);
+
+    await expect(terminal.closed).resolves.toEqual({
+      code: 1000,
+      reason: 'session access revoked',
+    });
+    await expect(stream.closed).resolves.toEqual({
+      code: 1000,
+      reason: 'session access revoked',
+    });
+    // The bridge ends the wrapper side through the browser-disconnect path.
+    await expect(terminal.peerClosed).resolves.toEqual({
+      code: 1000,
+      reason: 'Browser disconnected',
+    });
+
+    // The terminal record stays running.
+    const record = await runInDurableObject(sessionStub, (_instance, state) =>
+      state.storage.get<{ state: string }>('control_terminal:pty_1')
+    );
+    expect(record).toMatchObject({ state: 'running' });
+    wrapper.close();
+  });
+
+  it('leaves terminal browser and stream sockets open for an unrelated organization', async () => {
+    const { sessionStub, wrapper } = await startTerminalSession();
+    const terminal = await openBrowserTerminal(sessionStub, wrapper);
+    const stream = await openStreamSocket(sessionStub);
+
+    await expect(sessionStub.closeOrgStreams('org_elsewhere')).resolves.toBe(0);
+    expect(terminal.socket.readyState).toBe(WebSocket.OPEN);
+    expect(stream.socket.readyState).toBe(WebSocket.OPEN);
+
+    await expect(sessionStub.closeOrgStreams(ORG_ID)).resolves.toBe(2);
+    await expect(terminal.closed).resolves.toEqual({
+      code: 1000,
+      reason: 'session access revoked',
+    });
+    await expect(stream.closed).resolves.toEqual({
+      code: 1000,
+      reason: 'session access revoked',
+    });
+    await expect(terminal.peerClosed).resolves.toEqual({
+      code: 1000,
+      reason: 'Browser disconnected',
+    });
+    wrapper.close();
+  });
+});

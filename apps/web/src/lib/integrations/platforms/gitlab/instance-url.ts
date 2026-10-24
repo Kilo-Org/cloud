@@ -3,6 +3,16 @@ import { isIP } from 'net';
 
 export const DEFAULT_GITLAB_INSTANCE_URL = 'https://gitlab.com';
 
+/**
+ * Name-resolution failures that mean the hostname does not exist rather than
+ * that resolution is temporarily unavailable.
+ */
+const PERMANENT_RESOLUTION_ERROR_CODES: Record<string, true> = {
+  ENOTFOUND: true,
+  EAI_NONAME: true,
+  EAI_FAIL: true,
+};
+
 export class GitLabInstanceUrlError extends Error {
   /**
    * True when the same URL may resolve on a later attempt because name
@@ -199,9 +209,11 @@ async function resolveHostnameSafely(
   let addresses: Array<{ address: string; family: number }>;
   try {
     addresses = await lookup(hostname, { all: true, verbatim: true });
-  } catch {
+  } catch (error) {
+    const code = (error as { code?: unknown } | null)?.code;
+    const permanent = typeof code === 'string' && PERMANENT_RESOLUTION_ERROR_CODES[code] === true;
     throw new GitLabInstanceUrlError('GitLab instance URL host could not be resolved.', {
-      transient: true,
+      transient: !permanent,
     });
   }
 

@@ -1087,6 +1087,21 @@ describe('validateProjectAccessToken', () => {
 
     expect(result).toEqual({ status: 'unverified', reason: 'transport' });
   });
+
+  it('reports a nonexistent host as an instance URL problem', async () => {
+    mockLookup.mockRejectedValue(
+      Object.assign(new Error('getaddrinfo ENOTFOUND'), {
+        code: 'ENOTFOUND',
+      })
+    );
+
+    const result = await validateProjectAccessToken(
+      'glpat-project-token',
+      'https://gitlab.example.com'
+    );
+
+    expect(result).toEqual({ status: 'unverified', reason: 'instance-url' });
+  });
 });
 
 describe('fetchMRInlineComments authorship', () => {

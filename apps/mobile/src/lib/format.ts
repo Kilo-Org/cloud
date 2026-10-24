@@ -122,6 +122,12 @@ export function firstGrapheme(value: string, locale: string): string {
   );
 }
 
+/** Characters with no bearing on a number's value but present in locale output. */
+const BIDI_MARK = /[\u061C\u200E\u200F]/g;
+/** The space characters a locale or a keyboard may use for a space-sized group separator. */
+const SPACE_VARIANTS = /[ \u00A0\u202F]/gu;
+/** Characters a locale's separator could contain that mean something in a RegExp body. */
+const REGEXP_SPECIAL_CHARACTERS = /[.*+?^${}()|[\]\\]/g;
 const DECIMAL_DIGIT = /\p{Nd}/u;
 
 /**
@@ -148,25 +154,52 @@ function foldDecimalDigits(value: string): string {
  * `null` when the input is not one. Callers that compare magnitudes use this
  * form: a literal too large for a JS number stays a digit string instead of
  * collapsing into the same `null` a non-number produces.
+ *
+ * The language's own separators, digit shapes and group sizes decide what a
+ * valid input is: at most one decimal separator, group separators only in the
+ * positions that language writes, and none inside the fraction. A value that
+ * does not match returns null.
+ *
+ * Ungrouped integers of any length are accepted, and grouping is optional: a
+ * typed `1.234` has valid group positions even where the formatter leaves
+ * four-digit numbers ungrouped.
  */
 export function normalizeLocalizedNumber(value: string, locale: string): string | null {
-  const parts = numberFormat(locale, { useGrouping: true }).formatToParts(-12_345.6);
+  const format = numberFormat(locale, { useGrouping: true });
+  const parts = format.formatToParts(-12_345.6);
   const part = (type: Intl.NumberFormatPartTypes, fallback: string) =>
-    parts.find(item => item.type === type)?.value ?? fallback;
+    parts.find(item => item.type === type)?.value.replaceAll(BIDI_MARK, '') ?? fallback;
   const group = part('group', ',');
   const decimal = part('decimal', '.');
   const minus = part('minusSign', '-');
-  let normalized = foldDecimalDigits(value.trim().replaceAll(/[\u061C\u200E\u200F]/g, ''));
+  // The integer group sizes this locale writes: `[3]` for most, `[3, 2]` for
+  // the Indian numbering system (hi, bn, gu, …), read from the formatter so the
+  // grammar follows the same data that writes the numbers.
+  const groupSizes = format
+    .formatToParts(1_234_567_890)
+    .filter(item => item.type === 'integer')
+    .map(item => item.value.replaceAll(BIDI_MARK, '').length);
+  const lastSize = groupSizes.at(-1) ?? 1;
+  const firstSize = groupSizes.at(-2) ?? lastSize;
+  let normalized = foldDecimalDigits(value.trim().replaceAll(BIDI_MARK, ''));
   if (/^[\s\u00A0\u202F]+$/u.test(group)) {
-    normalized = normalized.replaceAll(/[ \u00A0\u202F]/gu, group);
+    normalized = normalized.replaceAll(SPACE_VARIANTS, group);
   }
-  normalized = normalized.split(group).join('').split(decimal).join('.').split(minus).join('-');
-  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalized)) {
+  if (minus !== '-') {
+    normalized = normalized.split(minus).join('-');
+  }
+  const groupChar = group.replaceAll(REGEXP_SPECIAL_CHARACTERS, String.raw`\$&`);
+  const grouped = `\\d{1,${firstSize}}(?:${groupChar}\\d{${firstSize}})*${groupChar}\\d{${lastSize}}`;
+  const integerPart = `(?:\\d+|${grouped})`;
+  const decimalChar = decimal.replaceAll(REGEXP_SPECIAL_CHARACTERS, String.raw`\$&`);
+  const shape = new RegExp(`^[+-]?(?:${integerPart}(?:${decimalChar}\\d*)?|${decimalChar}\\d+)$`);
+  if (!shape.test(normalized)) {
     return null;
   }
-  return normalized;
+  return normalized.split(group).join('').split(decimal).join('.');
 }
 
+/** The literal `normalizeLocalizedNumber` accepts, read as a finite number. */
 export function parseLocalizedNumber(value: string, locale: string): number | null {
   const normalized = normalizeLocalizedNumber(value, locale);
   if (normalized === null) {

@@ -99,3 +99,40 @@ describe('localized format helpers', () => {
     expect(formatCalendarDate('2026-08-03', 'en-US')).toBe('8/3/2026');
   });
 });
+
+describe('parseLocalizedNumber', () => {
+  it('parses the forms the active language writes', () => {
+    expect(parseLocalizedNumber('1.234,5', 'de-DE')).toBe(1234.5);
+    expect(parseLocalizedNumber('1,5', 'de-DE')).toBe(1.5);
+    expect(parseLocalizedNumber('1 234,5', 'ru')).toBe(1234.5);
+    expect(parseLocalizedNumber('1,234.5', 'en-US')).toBe(1234.5);
+    expect(parseLocalizedNumber('1.5', 'en-US')).toBe(1.5);
+    expect(parseLocalizedNumber('1234', 'en-US')).toBe(1234);
+    expect(parseLocalizedNumber('-2,5', 'de-DE')).toBe(-2.5);
+    // The Indian numbering system groups the last three digits, then twos.
+    expect(parseLocalizedNumber('1,23,456', 'hi')).toBe(123_456);
+  });
+
+  it('round-trips the digits and separators of a non-Latin locale', () => {
+    expect(parseLocalizedNumber(formatNumber(1234.5, 'fa'), 'fa')).toBe(1234.5);
+    expect(parseLocalizedNumber(formatNumber(1.5, 'bn'), 'bn')).toBe(1.5);
+  });
+
+  it('rejects input whose separators do not fit the locale', () => {
+    // The field validates against the active language's separators and group
+    // positions, so a value shaped for another language is not accepted.
+    expect(parseLocalizedNumber('1.5', 'de-DE')).toBeNull();
+    expect(parseLocalizedNumber('1,5', 'en-US')).toBeNull();
+    expect(parseLocalizedNumber('1,23,456', 'en-US')).toBeNull();
+    expect(parseLocalizedNumber('1,234.5', 'de-DE')).toBeNull();
+    expect(parseLocalizedNumber('1,234,5', 'en-US')).toBeNull();
+    expect(parseLocalizedNumber('1 5', 'en-US')).toBeNull();
+    expect(parseLocalizedNumber('18,5', 'ar')).toBeNull();
+    expect(parseLocalizedNumber('twelve', 'en')).toBeNull();
+  });
+
+  it('keeps accepting a partial decimal the way the field is typed', () => {
+    expect(parseLocalizedNumber('1,', 'de-DE')).toBe(1);
+    expect(parseLocalizedNumber(',5', 'de-DE')).toBe(0.5);
+  });
+});

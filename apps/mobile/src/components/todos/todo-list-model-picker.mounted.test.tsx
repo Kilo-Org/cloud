@@ -242,6 +242,9 @@ describe('To-do list settings model picker return', () => {
 
       const nameLabel = i18n.t('todos.listSettings.name');
       const emojiLabel = i18n.t('todos.listSettings.emoji');
+      // A saved name starts as the start-visible preview; tapping it swaps in
+      // the input.
+      press(button(renderedTree(), nameLabel));
       enter(nameLabel, 'Unsaved edited name');
       enter(emojiLabel, 'X');
       press(pressableWithText(i18n.t('todos.lists.noRepository')));

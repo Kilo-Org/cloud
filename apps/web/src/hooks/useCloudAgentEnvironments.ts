@@ -161,7 +161,7 @@ export function useEnvironmentBuildStatus(
   );
 }
 
-/** One page of redacted build output, refreshed while the build is running. */
+/** The latest retained build output, refreshed while the build is running. */
 export function useEnvironmentBuildLogs(
   environmentId: string | null,
   buildId: string | null,
@@ -171,7 +171,7 @@ export function useEnvironmentBuildLogs(
   const trpc = useTRPC();
   return useQuery(
     trpc.cloudEnvironments.buildLogs.queryOptions(
-      { organizationId, environmentId: environmentId ?? '', buildId: buildId ?? '', cursor: 0 },
+      { organizationId, environmentId: environmentId ?? '', buildId: buildId ?? '' },
       {
         enabled: enabled && !!environmentId && !!buildId,
         refetchInterval: live ? BUILD_POLL_MS : false,

@@ -25,7 +25,7 @@ type EnvironmentBuildProcedures = {
   };
   getEnvironmentBuildStatus: { query(input: Scope): Promise<unknown> };
   getEnvironmentBuildLogs: {
-    query(input: Scope & { buildId: string; cursor: number; limit: number }): Promise<unknown>;
+    query(input: Scope & { buildId: string; cursor?: number; limit: number }): Promise<unknown>;
   };
   cancelEnvironmentBuild: { mutate(input: Scope & { buildId: string }): Promise<unknown> };
   notifyEnvironmentDeleted: { mutate(input: { environmentId: string }): Promise<unknown> };
@@ -37,7 +37,7 @@ export type EnvironmentBuildClient = {
   ): Promise<EnvironmentBuildRequestResult>;
   status(input: Scope): Promise<EnvironmentBuildStatus>;
   logs(
-    input: Scope & { buildId: string; cursor: number; limit: number }
+    input: Scope & { buildId: string; cursor?: number; limit: number }
   ): Promise<EnvironmentBuildLogs>;
   cancel(input: Scope & { buildId: string }): Promise<EnvironmentBuildCancelResult>;
   environmentDeleted(environmentId: string): Promise<void>;

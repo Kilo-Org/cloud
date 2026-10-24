@@ -72,7 +72,7 @@ export function EnvironmentBuildPanel({
       </div>
       {statusQuery.isLoading ? (
         <Loader2 className="text-muted-foreground size-4 animate-spin" aria-label="Loading" />
-      ) : statusQuery.isError || !status ? (
+      ) : !status ? (
         <div className="flex items-center gap-2">
           <p className="text-destructive text-xs">Could not load the snapshot status.</p>
           <Button variant="outline" size="sm" onClick={() => void statusQuery.refetch()}>
@@ -400,7 +400,7 @@ function BuildLog({
         </DialogHeader>
         {logs.isLoading ? (
           <Loader2 className="text-muted-foreground size-4 animate-spin" aria-label="Loading log" />
-        ) : logs.isError ? (
+        ) : logs.isError && !logs.data ? (
           <div className="flex items-center gap-2 text-xs">
             <p className="text-destructive">Could not load the build log.</p>
             <Button variant="outline" size="sm" onClick={() => void logs.refetch()}>
@@ -409,8 +409,13 @@ function BuildLog({
           </div>
         ) : (
           <>
+            {(logs.data?.lines[0]?.seq ?? 0) > 1 && (
+              <p className="text-muted-foreground text-xs">
+                Showing the latest 500 retained log lines.
+              </p>
+            )}
             {logs.data?.truncated && (
-              <p className="text-muted-foreground text-xs">Earlier output was truncated.</p>
+              <p className="text-muted-foreground text-xs">Later output was truncated.</p>
             )}
             <pre
               className="bg-muted max-h-[60vh] min-h-40 overflow-auto rounded-md p-3 font-mono text-xs leading-snug whitespace-pre-wrap"

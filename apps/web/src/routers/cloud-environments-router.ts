@@ -481,7 +481,7 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
     .input(
       environmentBuildScopeSchema.extend({
         buildId: z.uuid(),
-        cursor: z.number().int().nonnegative().default(0),
+        cursor: z.number().int().nonnegative().optional(),
       })
     )
     .output(environmentBuildLogsSchema)

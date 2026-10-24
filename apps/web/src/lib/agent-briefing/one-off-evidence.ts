@@ -1,14 +1,15 @@
 import { TRPCError } from '@trpc/server';
 import { redactBriefingExcerpt, type BriefingReport } from '@kilocode/app-shared/agent-briefing';
 
-type Facts = Pick<BriefingReport, 'scorecard' | 'sessions' | 'sources' | 'coverage'>;
+type Facts = Pick<BriefingReport, 'scorecard' | 'sessions' | 'sources' | 'coverage'> & {
+  omittedCollectedSessions: number;
+  omittedCollectedSources: number;
+};
 type FrozenFacts = Facts & {
   evidenceEventIds: string[];
   evidenceSessionIds: string[];
   evidenceUsage: { id: string; sessionId: string }[];
   collectionTruncated: boolean;
-  omittedCollectedSessions: number;
-  omittedCollectedSources: number;
 };
 
 export const ONE_OFF_BUCKETS = 16;
@@ -62,14 +63,9 @@ export function freezeBriefingEvidence(
     ...source,
     title: redactBriefingExcerpt(source.title, 160),
   }));
-  // Omitted actors can hide input needs, so sampled trees cannot claim non-blocked status.
   const allSessions = facts.sessions.map(session => ({
     ...session,
     title: redactBriefingExcerpt(session.title, 160),
-    status:
-      provenance.partial && session.status !== 'question' && session.status !== 'permission'
-        ? null
-        : session.status,
   }));
   const evidenceUsage =
     provenance.usage ??
@@ -81,7 +77,6 @@ export function freezeBriefingEvidence(
       }));
   let sourceLimit = allSources.length;
   let sessionLimit = allSessions.length;
-  let truncated = provenance.partial;
   for (;;) {
     const selectedSessions = sampleBriefingItems(allSessions, sessionLimit);
     const allowedSources = new Set(
@@ -92,30 +87,25 @@ export function freezeBriefingEvidence(
       sourceLimit
     );
     const byId = new Map(sources.map(source => [source.id, source]));
-    const omittedCollectedSessions = allSessions.length - selectedSessions.length;
-    const omittedCollectedSources = allSources.length - sources.length;
-    truncated ||= omittedCollectedSessions > 0 || omittedCollectedSources > 0;
+    // The snapshot budget trims only what the report shows; counts and coverage stay whole-window.
     const display = {
       ...facts,
-      sessions: selectedSessions.map(session => ({
-        ...session,
-        sources: session.sources.flatMap(source => {
+      sessions: selectedSessions.map(session => {
+        const shown = session.sources.flatMap(source => {
           const selected = byId.get(source.id);
           return selected ? [selected] : [];
-        }),
-      })),
+        });
+        return {
+          ...session,
+          sources: shown,
+          omittedSources: (session.omittedSources ?? 0) + session.sources.length - shown.length,
+        };
+      }),
       sources,
-      coverage: truncated
-        ? {
-            activity: 'partial' as const,
-            spend: facts.coverage.spend === 'unavailable' ? 'unavailable' : 'partial',
-            blockers: 'partial' as const,
-            pullRequests: 'partial' as const,
-          }
-        : facts.coverage,
-      collectionTruncated: truncated,
-      omittedCollectedSessions,
-      omittedCollectedSources,
+      collectionTruncated: provenance.partial,
+      omittedCollectedSessions:
+        facts.omittedCollectedSessions + allSessions.length - selectedSessions.length,
+      omittedCollectedSources: facts.omittedCollectedSources + allSources.length - sources.length,
     } satisfies Omit<FrozenFacts, 'evidenceEventIds' | 'evidenceSessionIds' | 'evidenceUsage'>;
     // Provenance is count-bounded by the collection caps and must stay complete for access invalidation.
     const bytes = Buffer.byteLength(JSON.stringify(display), 'utf8');
@@ -127,7 +117,6 @@ export function freezeBriefingEvidence(
         evidenceUsage,
       };
     }
-    truncated = true;
     if (sourceLimit > 0) {
       sourceLimit = Math.floor((sourceLimit * ONE_OFF_SNAPSHOT_BYTES) / bytes);
     } else if (sessionLimit > 0) {

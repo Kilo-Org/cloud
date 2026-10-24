@@ -255,6 +255,21 @@ describe('parseBriefingSafeguardInput', () => {
       maxSpendMicrodollars: 1_234_500_000,
     });
   });
+
+  it('follows the grouping and separator the active language formats', () => {
+    // Pairing groups of two then three is correct in these languages and wrong
+    // in English, where the same text must be refused.
+    expect(parseBriefingSafeguardInput('10', '1,23,456.7', 'hi')).toEqual({
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 123_456_700_000,
+    });
+    expect(parseBriefingSafeguardInput('10', '123,456.7', 'hi')).toBeNull();
+    // French formats a narrow no-break space; a typed plain space reads the same.
+    expect(parseBriefingSafeguardInput('10', '1 234,5', 'fr')).toEqual({
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 1_234_500_000,
+    });
+  });
 });
 
 describe('briefingSyncDelayMs', () => {

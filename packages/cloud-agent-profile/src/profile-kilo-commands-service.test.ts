@@ -4,7 +4,18 @@ import {
   kiloCommandCreateInputSchema,
   kiloCommandUpdateInputSchema,
   BUILTIN_COMMAND_NAMES,
+  MAX_PROFILE_KILO_COMMANDS,
+  createKiloCommand,
+  type KiloCommandCreateInput,
 } from './profile-kilo-commands-service';
+import { createLimitTestDb, TEST_PROFILE_ID } from './profile-limit-test-db';
+import type { ProfileOwner } from './types';
+
+const OWNER: ProfileOwner = { type: 'user', id: 'user_test' };
+
+function commandInput(name: string): KiloCommandCreateInput {
+  return { name, template: `Run ${name}` };
+}
 
 describe('kiloCommandNameSchema', () => {
   test('accepts valid slug', () => {
@@ -143,5 +154,40 @@ describe('kiloCommandUpdateInputSchema', () => {
       name: 'INVALID',
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('createKiloCommand cap enforcement', () => {
+  test('stores a command while the profile is below the cap', async () => {
+    const { db, state } = createLimitTestDb(MAX_PROFILE_KILO_COMMANDS - 1);
+
+    await expect(
+      createKiloCommand(db, TEST_PROFILE_ID, commandInput('deploy'), OWNER)
+    ).resolves.toEqual({ id: expect.any(String) });
+    expect(state.rowCount).toBe(MAX_PROFILE_KILO_COMMANDS);
+    expect(state.lockCalls).toBe(1);
+  });
+
+  test('rejects a create at the cap without inserting', async () => {
+    const { db, state } = createLimitTestDb(MAX_PROFILE_KILO_COMMANDS);
+
+    await expect(
+      createKiloCommand(db, TEST_PROFILE_ID, commandInput('deploy'), OWNER)
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+    expect(state.rowCount).toBe(MAX_PROFILE_KILO_COMMANDS);
+    expect(state.lockCalls).toBe(1);
+  });
+
+  test('keeps concurrent creates within the per-profile cap', async () => {
+    const { db, state } = createLimitTestDb(MAX_PROFILE_KILO_COMMANDS - 1);
+
+    const results = await Promise.allSettled([
+      createKiloCommand(db, TEST_PROFILE_ID, commandInput('first'), OWNER),
+      createKiloCommand(db, TEST_PROFILE_ID, commandInput('second'), OWNER),
+    ]);
+
+    expect(results.map(result => result.status)).toEqual(['fulfilled', 'rejected']);
+    expect(state.rowCount).toBe(MAX_PROFILE_KILO_COMMANDS);
+    expect(state.lockCalls).toBe(2);
   });
 });

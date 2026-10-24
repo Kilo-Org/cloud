@@ -44,6 +44,18 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
     },
   }),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/providers/openrouter'),
+  getRawOpenRouterModels: jest.fn().mockResolvedValue({
+    data: [
+      {
+        id: 'test/bounded',
+        name: 'Bounded test model',
+        pricing: { prompt: '0.000001', completion: '0.000002', request: '0' },
+      },
+    ],
+  }),
+}));
 
 let user: User;
 let other: User;

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type RefObject } from 'react';
 import { type HostInstance } from 'react-native';
 
-import { announceForA11y, moveA11yFocus } from './announce';
+import { announceForA11y, requestA11yFocus } from './announce';
 
 const accessibilityMock = vi.hoisted(() => ({
   announceForAccessibility: vi.fn(),
@@ -48,7 +48,7 @@ describe('announceForA11y', () => {
   });
 });
 
-describe('moveA11yFocus', () => {
+describe('requestA11yFocus', () => {
   beforeEach(() => {
     accessibilityMock.sendAccessibilityEvent.mockClear();
   });
@@ -60,31 +60,32 @@ describe('moveA11yFocus', () => {
   it('returns false when the ref has no mounted node', () => {
     const ref: RefObject<HostInstance | null> = { current: null };
 
-    const moved = moveA11yFocus(ref);
+    const requested = requestA11yFocus(ref);
 
-    expect(moved).toBe(false);
+    expect(requested).toBe(false);
     expect(accessibilityMock.sendAccessibilityEvent).not.toHaveBeenCalled();
   });
 
-  it('dispatches focus to the mounted node and reports success', () => {
+  it('reports dispatch without requiring native focus confirmation', () => {
     const node: Partial<HostInstance> = {};
     const ref: RefObject<HostInstance | null> = { current: node as HostInstance };
 
-    const moved = moveA11yFocus(ref);
+    const requested = requestA11yFocus(ref);
 
-    expect(moved).toBe(true);
+    expect(requested).toBe(true);
     expect(accessibilityMock.sendAccessibilityEvent).toHaveBeenCalledWith(node, 'focus');
   });
 
-  it('returns false and does not throw when the native focus move fails', () => {
+  it('returns false when the native request throws', () => {
     accessibilityMock.sendAccessibilityEvent.mockImplementationOnce(() => {
-      throw new Error('native focus move failed');
+      throw new Error('native focus request failed');
     });
     const node: Partial<HostInstance> = {};
     const ref: RefObject<HostInstance | null> = { current: node as HostInstance };
 
-    const moved = moveA11yFocus(ref);
+    const requested = requestA11yFocus(ref);
 
-    expect(moved).toBe(false);
+    expect(requested).toBe(false);
+    expect(accessibilityMock.sendAccessibilityEvent).toHaveBeenCalledWith(node, 'focus');
   });
 });

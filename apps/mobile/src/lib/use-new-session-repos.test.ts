@@ -435,6 +435,16 @@ describe('useRepositoryBranches', () => {
     expect(getSelectedBranchOverride(githubRepo)).toBeNull();
   });
 
+  it('carries the partial-listing flag so the selector can say the list is incomplete', () => {
+    mocks.branchQueryResult = {
+      data: { defaultBranch: 'main', branches: ['main', 'release'], truncated: true },
+    };
+    expect(mountBranches(githubRepo).truncated).toBe(true);
+
+    mocks.branchQueryResult = { data: { defaultBranch: 'main', branches: ['main'] } };
+    expect(mountBranches(githubRepo).truncated).toBe(false);
+  });
+
   it('fetches through the organization procedure when the query runs', async () => {
     mountBranches(githubRepo, 'org-1');
     const queryFn = (branchQueryOptions() as { queryFn?: () => Promise<unknown> }).queryFn;
@@ -446,6 +456,113 @@ describe('useRepositoryBranches', () => {
       platform: 'github',
       repository: { fullName: 'owner/repo' },
     });
+  });
+});
+
+// A request that never answers must not present as progress forever: after the
+// settle bound the row offers the retry while the query keeps running.
+describe('useRepositoryBranches settle bound', () => {
+  const SETTLE_BOUND_MS = 15_000;
+
+  function mountBound(repository: NewSessionRepository) {
+    const resultRef: { current: BranchesResult | null } = { current: null };
+    const renderer: { current: TestRenderer.ReactTestRenderer | null } = { current: null };
+    act(() => {
+      renderer.current = TestRenderer.create(
+        React.createElement(BranchHarness, {
+          repository,
+          organizationId: undefined,
+          resultRef,
+        })
+      );
+    });
+    function rerender(next: NewSessionRepository) {
+      act(() => {
+        renderer.current?.update(
+          React.createElement(BranchHarness, {
+            repository: next,
+            organizationId: undefined,
+            resultRef,
+          })
+        );
+      });
+      return resultRef.current;
+    }
+    return { result: resultRef.current, rerender, resultRef };
+  }
+
+  it('replaces a request that outlives the bound with the retry', () => {
+    vi.useFakeTimers();
+    try {
+      mocks.branchQueryResult = { isPending: true, isFetching: true };
+      const mounted = mountBound(githubRepo);
+
+      expect(mounted.result?.isLoading).toBe(true);
+      expect(mounted.result?.isRetryableError).toBe(false);
+
+      act(() => {
+        vi.advanceTimersByTime(SETTLE_BOUND_MS);
+      });
+
+      const settled = mounted.resultRef.current;
+      expect(settled?.isLoading).toBe(false);
+      expect(settled?.isRetryableError).toBe(true);
+      expect(settled?.isPermanentError).toBe(false);
+      // The stuck request is still in flight, so the retry stays pressable
+      // rather than reporting progress it cannot make; a refetch cancels it.
+      expect(settled?.isRetrying).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reports retry progress only for a retry after a real failure', () => {
+    mocks.branchQueryResult = { isError: true, isFetching: true, error: { data: {} } };
+    const result = mountBound(githubRepo).result;
+
+    expect(result?.isRetryableError).toBe(true);
+    expect(result?.isRetrying).toBe(true);
+  });
+
+  it('re-arms the bound for a different repository', () => {
+    vi.useFakeTimers();
+    try {
+      mocks.branchQueryResult = { isPending: true, isFetching: true };
+      const mounted = mountBound(githubRepo);
+
+      act(() => {
+        vi.advanceTimersByTime(SETTLE_BOUND_MS);
+      });
+      expect(mounted.resultRef.current?.isRetryableError).toBe(true);
+
+      const next = mounted.rerender({ ...githubRepo, fullName: 'owner/other' });
+
+      expect(next?.isLoading).toBe(true);
+      expect(next?.isRetryableError).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows the branches, not the bound, once the request lands', () => {
+    vi.useFakeTimers();
+    try {
+      mocks.branchQueryResult = { isPending: true, isFetching: true };
+      const mounted = mountBound(githubRepo);
+      act(() => {
+        vi.advanceTimersByTime(SETTLE_BOUND_MS);
+      });
+      expect(mounted.resultRef.current?.isRetryableError).toBe(true);
+
+      mocks.branchQueryResult = { data: { defaultBranch: 'main', branches: ['main'] } };
+      const landed = mounted.rerender(githubRepo);
+
+      expect(landed?.isLoading).toBe(false);
+      expect(landed?.isRetryableError).toBe(false);
+      expect(landed?.branches).toEqual(['main']);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

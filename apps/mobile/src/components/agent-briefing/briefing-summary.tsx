@@ -4,18 +4,20 @@ import { useTranslation } from 'react-i18next';
 import { Alert, View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { briefingMoney } from './briefing-card';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { type BriefingReport, useBriefingPreferences } from '@/lib/agent-briefing';
+import { briefingMoney } from '@/lib/agent-briefing-format';
 import {
   briefingEstimateUnavailableKey,
   briefingSummaryStatusKey,
 } from '@/lib/agent-briefing-state';
+import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import {
   getCommittedConnectivityStatus,
   useOfflineBannerState,
 } from '@/lib/hooks/use-offline-banner-state';
+import { resolveCatalogModelName } from '@/lib/model-display-name';
 import { useTRPC } from '@/lib/trpc';
 
 export function BriefingSummary({ report }: { readonly report: BriefingReport }) {
@@ -24,6 +26,7 @@ export function BriefingSummary({ report }: { readonly report: BriefingReport })
   const client = useQueryClient();
   const offline = useOfflineBannerState();
   const preferences = useBriefingPreferences(report.kind === 'one_off');
+  const catalog = useAvailableModels(report.context.organizationId ?? undefined);
   const context = preferences.data?.contexts.find(item => item.context.id === report.context.id);
   const canRequest =
     Boolean(context && (report.kind === 'one_off' || context.aiEnabled)) &&
@@ -56,8 +59,10 @@ export function BriefingSummary({ report }: { readonly report: BriefingReport })
   const onSuccess = () => {
     void client.invalidateQueries({ queryKey: trpc.agentBriefing.pathKey() });
   };
-  const onError = (error: { message: string }) => {
-    toast.error(error.message);
+  // The server writes its failure sentence in English; the toast says what
+  // happened in the reader's language and the detail stays in the log.
+  const onError = () => {
+    toast.error(t('common.somethingWentWrong'));
   };
   const generate = useMutation(
     trpc.agentBriefing.generateSummary.mutationOptions({
@@ -137,12 +142,14 @@ export function BriefingSummary({ report }: { readonly report: BriefingReport })
         </Text>
       ) : null}
       {report.summary.text ? (
-        <Text className="text-sm leading-6" selectable>
+        <Text className="text-sm leading-[1.5rem]" selectable>
           {report.summary.text}
         </Text>
       ) : null}
       {report.summary.model ? (
-        <Text className="text-xs text-muted-foreground">{report.summary.model}</Text>
+        <Text className="text-xs text-muted-foreground">
+          {t('common.model')}: {resolveCatalogModelName(report.summary.model, catalog.models)}
+        </Text>
       ) : null}
       {report.summary.costMicrodollars > 0 ||
       (report.summary.chargeStatus === 'pending' && report.summary.startedAt !== null) ? (

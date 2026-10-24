@@ -17,9 +17,16 @@ export type OpenRouterProviderConfig = {
   sort?: 'price' | 'throughput' | 'latency';
   only?: string[];
   ignore?: string[];
+  /**
+   * `deny` excludes providers that store prompts for feedback or training. Providers may still
+   * store prompts for compliance; only `zdr` excludes all retention.
+   */
   data_collection?: 'allow' | 'deny';
+  /** `true` excludes providers that store prompts at all, so it also excludes training. */
   zdr?: boolean;
   require_parameters?: boolean;
+  allow_fallbacks?: boolean;
+  max_price?: { prompt?: number; completion?: number; request?: number; image?: number };
 };
 
 export function isOpenRouterProviderConfig(value: unknown): value is OpenRouterProviderConfig {
@@ -42,6 +49,7 @@ export type VercelProviderConfig = {
   anthropic?: AnthropicProviderOptions;
 };
 
+/** True when prompts must not be used for training. Does not mean prompts are not retained. */
 export function isDataCollectionExplicitlyDisallowed(
   provider: OpenRouterProviderConfig | undefined
 ) {

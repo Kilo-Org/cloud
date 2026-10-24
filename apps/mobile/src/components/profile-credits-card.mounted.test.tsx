@@ -8,7 +8,7 @@
 import { createElement, type ElementType, type ReactNode } from 'react';
 import type * as ReactModule from 'react';
 import { Platform, Pressable } from 'react-native';
-import { act, type ReactTestRenderer } from '@/test/renderer';
+import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { onlineManager, type QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -44,8 +44,14 @@ vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     user: {
       getContextBalance: {
-        queryOptions: () => ({
-          queryKey: ['user', 'getContextBalance'] as const,
+        // tRPC builds `[path, { input, type }]`, so the account selection lives
+        // in the key: a context switch is a different query, which is what
+        // `keepPreviousData` then bridges while the new context's read runs.
+        queryOptions: (input?: { organizationId?: string }) => ({
+          queryKey: [
+            ['user', 'getContextBalance'],
+            { ...(input !== undefined && { input }), type: 'query' },
+          ] as const,
           queryFn: getContextBalanceQueryFn,
         }),
       },
@@ -128,6 +134,8 @@ vi.mock('react-native-reanimated', () => ({
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   ActivityIndicator: 'ActivityIndicator',
   // The account picker's sheet is a native modal; honored like the real one so
   // the closed sheet renders nothing.
@@ -204,7 +212,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-const BALANCE_KEY = ['user', 'getContextBalance'] as const;
+const BALANCE_KEY = [['user', 'getContextBalance'], { input: {}, type: 'query' }] as const;
 const organizationName = 'A very long organization name that must leave the credits label visible';
 const savedMetadata = new Map<string, string>();
 let saveCompletion: Promise<undefined> | undefined = undefined;
@@ -235,21 +243,37 @@ async function openSheet(renderer: ReactTestRenderer) {
   });
 }
 
-/** The sheet's account rows, in option order. */
-function accountLabels(renderer: ReactTestRenderer) {
-  return renderer.root
-    .findAll(node => node.type === Pressable && node.props.accessibilityRole === 'radio')
-    .map(node => node.props.accessibilityLabel as string);
+/** The selected state an account action button carries, if it carries one. */
+function selectedState(node: ReactTestInstance): boolean | undefined {
+  const state: unknown = node.props.accessibilityState;
+  if (typeof state !== 'object' || state === null || !('selected' in state)) {
+    return undefined;
+  }
+  return typeof state.selected === 'boolean' ? state.selected : undefined;
 }
 
-/** Presses one row of the open sheet: an account (radio) or Cancel (button). */
+/** An account action button: the picker marks every row's selection. */
+function accountRow(node: ReactTestInstance) {
+  return (
+    node.type === Pressable &&
+    node.props.accessibilityRole === 'button' &&
+    selectedState(node) !== undefined
+  );
+}
+
+/** The sheet's account rows, in option order. */
+function accountLabels(renderer: ReactTestRenderer) {
+  return renderer.root.findAll(accountRow).map(node => node.props.accessibilityLabel as string);
+}
+
+/** Presses one row of the open sheet: an account row or Cancel (button). */
 async function choose(renderer: ReactTestRenderer, label: string) {
   const target = renderer.root.find(
     node =>
       node.type === Pressable &&
       node.props.accessibilityLabel === label &&
       node.props.onPress !== undefined &&
-      (node.props.accessibilityRole === 'radio' ? true : node.props.accessibilityHint === undefined)
+      (accountRow(node) ? true : node.props.accessibilityHint === undefined)
   );
   await act(() => {
     (target.props.onPress as () => void)();
@@ -300,6 +324,67 @@ beforeEach(() => {
 });
 
 describe('CreditsCard balance state', () => {
+  it('shows no in-progress indicator while a cached balance refreshes', async () => {
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 10 });
+
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(BALANCE_KEY, { balance: 10 });
+
+    const { renderer, texts, unmount } = await mountCard(queryClient);
+    await waitFor(() => texts().includes('$10.00'));
+
+    // A refresh that never answers: the indicator used to ride every in-flight
+    // refresh, so this one spun until the read finally settled -- or forever.
+    const stalledRefresh = Promise.withResolvers<undefined>();
+    getContextBalanceQueryFn.mockReturnValue(stalledRefresh.promise);
+    act(() => {
+      // The refetch never answers, so this promise stays pending by design.
+      void queryClient.invalidateQueries({ queryKey: BALANCE_KEY });
+    });
+    await waitFor(() => queryClient.getQueryState(BALANCE_KEY)?.fetchStatus === 'fetching');
+    // Flush the observer notification the refetch schedules, so the card is
+    // judged on a render that knows the refresh is in flight.
+    await act(async () => {
+      const tick = Promise.withResolvers<undefined>();
+      setTimeout(() => {
+        tick.resolve(undefined);
+      }, 0);
+      await tick.promise;
+    });
+
+    expect(renderer.root.findAllByType('ActivityIndicator' as ElementType)).toHaveLength(0);
+    expect(texts()).toContain('$10.00');
+
+    unmount();
+  });
+
+  it('shows the skeleton instead of the previous account balance while a switch settles', async () => {
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 10 });
+    const orgs = [
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+      { organizationId: 'org-b', organizationName: 'Beta', role: 'owner' },
+    ] as OrgListEntry[];
+    listState.payload = orgs;
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+
+    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+    await waitFor(() => texts().includes('$10.00'));
+
+    // The newly selected account's read never answers: the previous account's
+    // amount must not stay on the row under the new account's name.
+    const stalled = Promise.withResolvers<undefined>();
+    getContextBalanceQueryFn.mockReturnValue(stalled.promise);
+    await openSheet(renderer);
+    await choose(renderer, 'Beta');
+
+    await waitFor(() => texts().includes('SKELETON'));
+    expect(texts()).not.toContain('$10.00');
+
+    unmount();
+  });
+
   it.each([
     { name: 'expired grants', future: false },
     { name: 'mixed grants', future: true },
@@ -363,6 +448,24 @@ describe('CreditsCard balance state', () => {
       }
     } finally {
       clock.mockRestore();
+    }
+  });
+
+  it('renders without the block list when a credits payload settles without one', async () => {
+    currentUser.userId = 'user-a';
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 0 });
+    orgCreditBlocksQueryFn.mockResolvedValue({});
+    const orgs = [
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+    ] as OrgListEntry[];
+    listState.payload = orgs;
+    const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+    try {
+      await waitFor(() => texts().includes('$0.00') && !texts().includes('SKELETON'));
+      expect(texts().filter(text => text.includes('in credits expiring'))).toEqual([]);
+    } finally {
+      unmount();
     }
   });
 

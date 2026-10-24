@@ -1289,3 +1289,233 @@ describe('TriggerDO', () => {
     });
   });
 });
+
+describe('webhook body validation', () => {
+  const bodySchema = {
+    type: 'object' as const,
+    properties: { event: { type: 'string' as const, enum: ['issue.opened', 'issue.closed'] } },
+    required: ['event'],
+    additionalProperties: false,
+  };
+  const captured = (body: string, headers: Record<string, string> = {}) => ({
+    method: 'POST',
+    path: '/',
+    queryString: null,
+    headers,
+    body,
+    contentType: 'application/json',
+    sourceIp: null,
+  });
+
+  it('rejects invalid input before request persistence and queue dispatch, then captures exact valid bytes', async () => {
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/schema/capture'));
+    await stub.configure('user/schema', 'capture', { promptTemplate: '{{body}}', bodySchema });
+    for (const body of [
+      '{',
+      '{}',
+      '{"event":"private-value"}',
+      '{"event":"issue.opened","extra":true}',
+    ]) {
+      const result = await stub.captureRequest(captured(body));
+      expect(result).toMatchObject({ success: false, error: 'Body validation failed' });
+      expect(JSON.stringify(result)).not.toContain('private-value');
+      expect((await stub.listRequests()).requests).toEqual([]);
+    }
+    // A failing queue proves that invalid payloads never reach enqueue.
+    await runInDurableObject(stub, async instance => {
+      const queue = (instance as unknown as { env: Env }).env.WEBHOOK_DELIVERY_QUEUE;
+      const send = vi.spyOn(queue, 'send').mockRejectedValue(new Error('queue unavailable'));
+      const rejected = await instance.captureRequest(captured('{}'));
+      expect(rejected.success).toBe(false);
+      expect(send).not.toHaveBeenCalled();
+      send.mockRestore();
+    });
+    const raw = ' { "event" : "issue.opened" }\n';
+    const accepted = await stub.captureRequest(captured(raw));
+    expect(accepted.success).toBe(true);
+    if (accepted.success) expect((await stub.getRequest(accepted.requestId))?.body).toBe(raw);
+    expect((await stub.listRequests()).requests).toHaveLength(1);
+  });
+
+  it('authenticates before schema validation', async () => {
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/schema/auth'));
+    await stub.configure('user/schema', 'auth', {
+      promptTemplate: '{{body}}',
+      bodySchema,
+      webhookAuth: { header: 'x-secret', secret: 'test-secret' },
+    });
+    expect(await stub.captureRequest(captured('{'))).toEqual({
+      success: false,
+      error: 'Unauthorized',
+    });
+    expect(await stub.captureRequest(captured('{', { 'x-secret': 'test-secret' }))).toMatchObject({
+      success: false,
+      error: 'Body validation failed',
+    });
+    expect((await stub.listRequests()).requests).toEqual([]);
+  });
+
+  it('persists schema/profile updates in SQLite and KV, preserves omission and clears null', async () => {
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/schema/persistence'));
+    await stub.configure('user/schema', 'persistence', {
+      promptTemplate: '{{body}}',
+      profileId: 'saved-profile',
+      bodySchema,
+    });
+    await stub.updateConfig({ promptTemplate: 'Changed' });
+    expect(await stub.getConfig()).toMatchObject({ bodySchema, profileId: 'saved-profile' });
+    await runInDurableObject(stub, async (instance, state) => {
+      expect(await state.storage.get('config')).toMatchObject({
+        bodySchema,
+        profileId: 'saved-profile',
+      });
+      await state.storage.delete('config');
+      expect(await instance.getConfig()).toMatchObject({ bodySchema, profileId: 'saved-profile' });
+      expect(drizzle(state.storage).select().from(triggerConfig).get()).toMatchObject({
+        body_schema: bodySchema,
+        profile_id: 'saved-profile',
+      });
+    });
+    await stub.updateConfig({ bodySchema: null, profileId: null });
+    expect(await stub.getConfigForResponse()).toMatchObject({ bodySchema: null, profileId: null });
+    await runInDurableObject(stub, async (_instance, state) => {
+      expect(await state.storage.get('config')).toMatchObject({
+        bodySchema: null,
+        profileId: null,
+      });
+      expect(drizzle(state.storage).select().from(triggerConfig).get()).toMatchObject({
+        body_schema: null,
+        profile_id: null,
+      });
+    });
+    expect((await stub.captureRequest(captured('plain text'))).success).toBe(true);
+    await stub.updateConfig({ bodySchema });
+    expect((await stub.captureRequest(captured('plain text'))).success).toBe(false);
+  });
+
+  it('rejects body schemas for scheduled and KiloClaw targets on direct RPC', async () => {
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/schema/unsupported'));
+    for (const options of [
+      { activationMode: 'scheduled' as const, cronExpression: '* * * * *' },
+      { targetType: 'kiloclaw_chat' as const },
+    ]) {
+      await runInDurableObject(stub, async instance => {
+        await expect(
+          instance.configure('user/schema', 'unsupported', {
+            promptTemplate: 'test',
+            bodySchema,
+            ...options,
+          })
+        ).rejects.toThrow('only available');
+      });
+      await stub.configure('user/schema', 'unsupported', { promptTemplate: 'test', ...options });
+      await runInDurableObject(stub, async instance => {
+        await expect(instance.updateConfig({ bodySchema })).rejects.toThrow('only available');
+      });
+    }
+  });
+});
+
+describe('JSON own-property capture', () => {
+  it.each(['constructor', 'toString', '__proto__'])(
+    'validates %s without changing accepted raw bodies',
+    async key => {
+      for (const nested of [false, true]) {
+        const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName(`user/special/${key}-${nested}`));
+        const objectSchema = {
+          type: 'object',
+          properties: { [key]: { type: 'string' } },
+          additionalProperties: false,
+        };
+        const wrapSchema = (schema: object) =>
+          nested
+            ? {
+                type: 'object',
+                properties: { outer: schema },
+                required: ['outer'],
+                additionalProperties: false,
+              }
+            : schema;
+        const wrapBody = (value: object) => JSON.stringify(nested ? { outer: value } : value);
+        const capture = (body: string) =>
+          stub.captureRequest({
+            method: 'POST',
+            path: '/',
+            queryString: null,
+            headers: {},
+            body,
+            contentType: 'application/json',
+            sourceIp: null,
+          });
+        await stub.configure('user/special', `${key}-${nested}`, {
+          promptTemplate: '{{body}}',
+          bodySchema: wrapSchema(objectSchema),
+        });
+        expect((await capture(wrapBody({}))).success).toBe(true);
+        const raw = ` \n${wrapBody({ [key]: 'value' })} \n`;
+        const accepted = await capture(raw);
+        expect(accepted.success).toBe(true);
+        if (accepted.success) expect((await stub.getRequest(accepted.requestId))?.body).toBe(raw);
+        await stub.updateConfig({ bodySchema: wrapSchema({ ...objectSchema, required: [key] }) });
+        expect(await capture(wrapBody({}))).toMatchObject({
+          success: false,
+          error: 'Body validation failed',
+        });
+        expect(await capture(wrapBody({ [key]: 42 }))).toMatchObject({
+          success: false,
+          error: 'Body validation failed',
+        });
+        expect((await stub.listRequests()).requests).toHaveLength(2);
+        expect((await capture(raw)).success).toBe(true);
+        expect((await stub.listRequests()).requests).toHaveLength(3);
+      }
+    }
+  );
+});
+
+describe('standard JSON Schema patterns', () => {
+  it('persists a grouped unanchored pattern and captures matching raw bytes', async () => {
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/pattern/standard'));
+    const bodySchema = {
+      type: 'object',
+      properties: { event: { type: 'string', pattern: 'issue\\.(opened|closed)' } },
+      required: ['event'],
+      additionalProperties: false,
+    };
+    await stub.configure('user/pattern', 'standard', { promptTemplate: '{{body}}', bodySchema });
+    expect((await stub.getConfig())?.bodySchema).toEqual(bodySchema);
+    const capture = (body: string) =>
+      stub.captureRequest({
+        method: 'POST',
+        path: '/',
+        queryString: null,
+        headers: {},
+        body,
+        contentType: 'application/json',
+        sourceIp: null,
+      });
+    const raw = ' {"event":"prefix issue.opened suffix"}\n';
+    const result = await capture(raw);
+    expect(result.success).toBe(true);
+    if (result.success) expect((await stub.getRequest(result.requestId))?.body).toBe(raw);
+    expect(await capture('{"event":"issue.changed"}')).toMatchObject({
+      success: false,
+      error: 'Body validation failed',
+    });
+    expect((await stub.listRequests()).requests).toHaveLength(1);
+  });
+
+  it('rejects malformed patterns before configuration persistence', async () => {
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/pattern/malformed'));
+    await runInDurableObject(stub, async instance => {
+      await expect(
+        instance.configure('user/pattern', 'malformed', {
+          promptTemplate: '{{body}}',
+          bodySchema: { type: 'string', pattern: '[' },
+        })
+      ).rejects.toThrow('Pattern must be a valid regular expression');
+    });
+    expect(await stub.getConfig()).toBeNull();
+    expect((await stub.listRequests()).requests).toEqual([]);
+  });
+});

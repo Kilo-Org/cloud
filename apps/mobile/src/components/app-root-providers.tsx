@@ -2,10 +2,8 @@ import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 import { PortalHost } from '@rn-primitives/portal';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { usePathname, useSegments } from 'expo-router';
-import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { CheckCircle2, Info, Loader, TriangleAlert, XCircle } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
-import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider, useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,7 +20,8 @@ import { OrganizationProvider } from '@/lib/organization-context';
 import { queryClient } from '@/lib/query-client';
 import { QueryClientNativeLifecycle } from '@/lib/query-client-lifecycle';
 import { ToolSummaryTranslationRuntimeBootstrap } from '@/lib/tool-summary-translation/tool-summary-translation-preference';
-import { getEffectiveTabBarHeight, shouldHideTabBar } from '@/lib/tab-bar-layout';
+import { shouldHideTabBar } from '@/lib/tab-bar-layout';
+import { useRenderedTabBarHeight } from '@/lib/tab-bar-clearance';
 import { getToastBottomOffset } from '@/lib/toast-offset';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
 
@@ -128,7 +127,6 @@ export function AppRootProviders({
 function AppToaster() {
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
-  const fontScale = useLiveFontScale();
   // The provider reports the whole strip the IME hides, anchored to the screen
   // bottom: on Android edge-to-edge its height is the full IME inset (the
   // navigation bar is translucent there, so nothing is subtracted), and on iOS
@@ -145,13 +143,14 @@ function AppToaster() {
   // `shouldHideTabBar` does not hide it — the same predicate the bar's own
   // layout uses — so the toast clears it only while it is actually on screen;
   // a screen pushed over the tabs (agent-chat, pr-review) or the auth flow
-  // keeps the toast at its resting offset. `getEffectiveTabBarHeight` is the
-  // bar's own measurement (it carries the bar's small Android-only extra
-  // padding), so the toast cannot disagree with what the bar renders. See
-  // `lib/toast-offset.ts`.
+  // keeps the toast at its resting offset. The bar publishes the height it
+  // renders (it carries the bar's small Android-only extra padding and the
+  // lines its labels reserve), so the toast cannot disagree with what is on
+  // screen. See `lib/toast-offset.ts`.
+  const renderedTabBarHeight = useRenderedTabBarHeight();
   const tabBarHeight =
     (segments as readonly string[]).includes('(tabs)') && !shouldHideTabBar(pathname, segments)
-      ? getEffectiveTabBarHeight({ bottomInset: bottom, platform: Platform.OS, fontScale })
+      ? (renderedTabBarHeight ?? 0)
       : 0;
 
   return (

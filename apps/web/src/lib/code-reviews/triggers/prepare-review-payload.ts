@@ -50,6 +50,7 @@ import {
 import { isGitLabReconnectRequiredError } from '@/lib/integrations/platforms/gitlab/credential-errors';
 import type {
   ExistingReviewState,
+  InlineComment,
   PreviousReviewStatus,
   GitLabDiffContext,
 } from '../prompts/generate-prompt';
@@ -644,6 +645,7 @@ export async function prepareReviewPayload(
             line: c.line,
             body: c.body,
             isOutdated: c.isOutdated,
+            authoredByKilo: c.authoredByKilo,
           }));
 
           existingReviewState = buildReviewState(
@@ -1057,13 +1059,7 @@ function getReviewInstructionsFetchErrorMetadata(error: unknown): {
  */
 function buildReviewState(
   summaryComment: { commentId: number; body: string } | null,
-  inlineComments: Array<{
-    id: number;
-    path: string;
-    line: number | null;
-    body: string;
-    isOutdated: boolean;
-  }>,
+  inlineComments: InlineComment[],
   headCommitSha: string
 ): ExistingReviewState {
   // Determine previous status from summary body

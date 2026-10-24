@@ -1568,6 +1568,50 @@ describe('listInbox', () => {
     expect(cursor).toBeUndefined();
   });
 
+  it('starts each repository window with its own ceiling', async () => {
+    // The repository in the second window carries the newest row of the
+    // workspace. Its rows were never read under the first window's ceiling, so
+    // that ceiling must not filter them out.
+    const slugs = Array.from(
+      { length: 301 },
+      (_, index) => `repo-${String(index).padStart(3, '0')}`
+    );
+    const rowsBySlug: Record<string, InboxRow[]> = {};
+    for (const slug of slugs) {
+      rowsBySlug[slug] = [
+        inboxPr(
+          slugs.indexOf(slug) + 1,
+          slug === 'repo-300' ? '2026-09-03T00:00:00+00:00' : '2026-09-02T00:00:00+00:00',
+          `acme/${slug}`
+        ),
+      ];
+    }
+    const requests: InboxRequest[] = [];
+    serveInbox(rowsBySlug, requests);
+
+    const served: number[] = [];
+    let cursor: string | undefined;
+    for (let load = 0; load < 12; load += 1) {
+      const page = await listInbox(ORG_OWNER, cursor);
+      served.push(
+        ...page.items.flatMap(item => (item.ref && 'prId' in item.ref ? [item.ref.prId] : []))
+      );
+      cursor = page.nextCursor ?? undefined;
+      if (cursor === undefined) break;
+    }
+
+    expect(cursor).toBeUndefined();
+    expect(new Set(served)).toEqual(new Set(Array.from({ length: 301 }, (_, index) => index + 1)));
+    expect(served).toHaveLength(301);
+    // The second window is read without the first window's ceiling.
+    const secondWindowRequest = requests.at(-1);
+    expect(secondWindowRequest).toMatchObject({
+      slug: 'repo-300',
+      query: 'state="OPEN"',
+      page: '1',
+    });
+  });
+
   it('reads one provider page per repository that still has rows', async () => {
     // 12 repositories × 5 open PRs: the first load reads one page per
     // repository, and the continuation reads only the two with rows left.

@@ -980,10 +980,11 @@ function classifyInboxError(error: unknown): BitbucketReviewError {
  * PRs of the integration's repositories, newest first.
  *
  * The fan-out sorts across repositories, so one inbox page cannot map onto a
- * single provider page. A signed continuation carries a fixed provider ceiling
- * — the newest `updated_on` the first load saw, so every row that existed then
- * stays inside the collection — and, per repository, the provider page it is
- * on and how many leading rows of that page are already served.
+ * single provider page. A signed continuation carries the provider ceiling of
+ * the window it is walking — the newest `updated_on` that window's first load
+ * saw, so every row of the window that existed then stays inside the
+ * collection — and, per repository, the provider page it is on and how many
+ * leading rows of that page are already served.
  *
  * Rows are emitted in the merged order, so a repository's served rows are
  * always the leading rows of its current page: the next load re-reads that
@@ -993,12 +994,13 @@ function classifyInboxError(error: unknown): BitbucketReviewError {
  * current page is already fully served). A workspace with more cached
  * repositories than one cursor can carry is walked one window of repositories
  * at a time, so every cached repository is covered instead of the walk stopping
- * at the first window. A pull request updated after the
- * first load sits above the ceiling and appears on a fresh inbox load; one
- * that stops being open leaves the collection and shifts the rows after it up,
- * which the provider's page-number paging cannot prevent. A repository or a
- * page the provider no longer serves ends that repository's walk rather than
- * failing the whole inbox.
+ * at the first window; each window starts its own ceiling, because its rows
+ * were never read under the previous window's. A pull request updated after
+ * the window's first load sits above the ceiling and appears on a fresh inbox
+ * load; one that stops being open leaves the collection and shifts the rows
+ * after it up, which the provider's page-number paging cannot prevent. A
+ * repository or a page the provider no longer serves ends that repository's
+ * walk rather than failing the whole inbox.
  */
 export async function listInbox(
   owner: BitbucketReviewOwner,
@@ -1026,7 +1028,7 @@ export async function listInbox(
     const repositoryNames = new Set(
       repositories.map(repository => repository.fullName.toLowerCase())
     );
-    const providerQuery = position
+    const providerQuery = position?.ceiling
       ? `state="OPEN" AND updated_on <= ${position.ceiling}`
       : 'state="OPEN"';
     let window: InboxCandidate[] = [];
@@ -1127,13 +1129,15 @@ export async function listInbox(
       if (hasMore) {
         nextCursor = encodeInboxCursor(identity, windowIndex, ceiling, pages, repositories);
       } else if (carriesNextWindow) {
-        // This window is served in full: the walk moves to the next slice of
-        // the cached repositories, so a workspace larger than one window is
-        // still covered instead of stopping at the first slice.
+        // This window is served in full: the walk moves to the next slice of the
+        // cached repositories, so a workspace larger than one window is still
+        // covered. The next window sets its own ceiling from its first load:
+        // its rows were never read under this window's ceiling, and one newer
+        // than it would otherwise stay outside the collection for the whole walk.
         nextCursor = encodeInboxCursor(
           identity,
           nextWindow,
-          ceiling,
+          null,
           new Map<string, InboxPageState>(),
           inboxRepositoryWindow(cachedRepositories, nextWindow)
         );
@@ -1231,7 +1235,8 @@ const INBOX_PAGE_READS_PER_LOAD = 2;
 const inboxCursorPayloadSchema = z.object({
   kind: z.literal(INBOX_CURSOR_KIND),
   identity: z.string().min(1),
-  ceiling: z.string().min(1),
+  /** The current window's ceiling; null starts a window whose walk begins now. */
+  ceiling: z.string().min(1).nullable(),
   window: z.number().int().min(0),
   pages: z.string().max(800),
 });
@@ -1263,7 +1268,7 @@ type InboxPageState = { page: number; served: number };
 const DONE: InboxPageState = { page: 0, served: 0 };
 
 type InboxCursorPosition = {
-  ceiling: string;
+  ceiling: string | null;
   window: number;
   pages: ReadonlyMap<string, InboxPageState>;
 };
@@ -1292,7 +1297,7 @@ function inboxRepositoryWindow(
 function encodeInboxCursor(
   identity: string,
   window: number,
-  ceiling: string,
+  ceiling: string | null,
   pages: ReadonlyMap<string, InboxPageState>,
   repositories: BitbucketWorkspaceRepositoryAccess['repositories']
 ): string {

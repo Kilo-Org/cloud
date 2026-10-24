@@ -53,6 +53,7 @@
     "connected": "Připojeno",
     "couldNotLoadModels": "Modely se nepodařilo načíst.",
     "couldNotLoadRepositories": "Repozitáře se nepodařilo načíst.",
+    "noRepositoriesFound": "Žádné repozitáře nebyly nalezeny",
     "critical": "Kritické",
     "delete": "Smazat",
     "deleted": "Smazáno",
@@ -87,6 +88,7 @@
     "connect": "Připojit",
     "connectBitbucket": "Připojit Bitbucket",
     "connectGitlab": "Připojit GitLab",
+    "connectProvider": "Připojení poskytovatele",
     "contentTruncated": "Obsah zkrácen",
     "copyLink": "Kopírovat odkaz",
     "couldNotLoadOrganizations": "Organizace se nepodařilo načíst.",
@@ -1451,7 +1453,6 @@
       "gitlabNoRepositoriesDescription": "Možná bude nutné udělit přístup k dalším skupinám nebo projektům na GitLabu.",
       "installGithubApp": "Instalace aplikace GitHub pro repozitáře",
       "installGithubAppDescription": "Udělte aplikaci Kilo na GitHubu přístup k repozitářům, které chcete nechat zkontrolovat.",
-      "noRepositoriesFound": "Žádné repozitáře nebyly nalezeny",
       "repositoryAccess": "přístup k repozitářům"
     },
     "style": {
@@ -1533,7 +1534,6 @@
       "invalidUrl": "Zadejte platnou URL adresu PR.",
       "couldNotCheckProviderStatus": "Stav poskytovatele se nepodařilo ověřit.",
       "couldNotLoadProviders": "Připojené poskytovatele se nepodařilo načíst. Zkuste to znovu.",
-      "connectProvider": "Připojení poskytovatele",
       "connectProviderDescription": "Připojte GitHub, abyste mohli ručně spustit kontrolu PR.",
       "pullRequestUrl": "URL adresa PR",
       "instructions": "Pokyny (nepovinné)",

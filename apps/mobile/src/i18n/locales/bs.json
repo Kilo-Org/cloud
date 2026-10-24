@@ -53,6 +53,7 @@
     "connected": "Povezano",
     "couldNotLoadModels": "Nije moguće učitati modele.",
     "couldNotLoadRepositories": "Nije moguće učitati repozitorije.",
+    "noRepositoriesFound": "Nisu pronađeni repozitoriji",
     "critical": "Kritično",
     "delete": "Obriši",
     "deleted": "Obrisano",
@@ -87,6 +88,7 @@
     "connect": "Poveži",
     "connectBitbucket": "Poveži Bitbucket",
     "connectGitlab": "Poveži GitLab",
+    "connectProvider": "Poveži platformu",
     "contentTruncated": "Sadržaj skraćen",
     "copyLink": "Kopiraj vezu",
     "couldNotLoadOrganizations": "Nije moguće učitati organizacije.",
@@ -1429,7 +1431,6 @@
       "gitlabNoRepositoriesDescription": "Možda trebaš odobriti pristup dodatnim grupama ili projektima na GitLabu.",
       "installGithubApp": "Instaliraj GitHub aplikaciju na repozitorije",
       "installGithubAppDescription": "Dodijeli Kilo GitHub aplikaciji pristup repozitorijima koje želiš pregledati.",
-      "noRepositoriesFound": "Nisu pronađeni repozitoriji",
       "repositoryAccess": "pristup repozitoriju"
     },
     "style": {
@@ -1511,7 +1512,6 @@
       "invalidUrl": "Unesi važeći URL zahtjeva za spajanje.",
       "couldNotCheckProviderStatus": "Nije moguće provjeriti status platforme.",
       "couldNotLoadProviders": "Nije moguće učitati povezane platforme. Pokušaj ponovo.",
-      "connectProvider": "Poveži platformu",
       "connectProviderDescription": "Poveži GitHub da započneš ručni pregled zahtjeva za spajanje.",
       "pullRequestUrl": "URL zahtjeva za spajanje",
       "instructions": "Upute (nisu obavezne)",

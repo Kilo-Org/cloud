@@ -53,6 +53,7 @@
     "connected": "Ulangan",
     "couldNotLoadModels": "Modellarni yuklab bo‘lmadi.",
     "couldNotLoadRepositories": "Repozitoriylarni yuklab bo‘lmadi.",
+    "noRepositoriesFound": "Repozitoriyalar topilmadi",
     "critical": "O‘ta yuqori",
     "delete": "O‘chirish",
     "deleted": "O‘chirilgan",
@@ -87,6 +88,7 @@
     "connect": "Ulash",
     "connectBitbucket": "Bitbucketni ulash",
     "connectGitlab": "GitLabni ulash",
+    "connectProvider": "Provayderni ulash",
     "contentTruncated": "Matnning bir qismi ko‘rsatilmagan",
     "copyLink": "Havolani nusxalash",
     "couldNotLoadOrganizations": "Tashkilotlarni yuklab bo‘lmadi.",
@@ -1407,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "GitLabda qo'shimcha guruh yoki loyihalarga kirish huquqini berishingiz kerak bo'lishi mumkin.",
       "installGithubApp": "GitHub ilovasini repozitoriyalarga o'rnating",
       "installGithubAppDescription": "Kilo GitHub ilovasiga ko'rib chiqilishini xohlagan repozitoriyalaringizga kirish huquqini bering.",
-      "noRepositoriesFound": "Repozitoriyalar topilmadi",
       "repositoryAccess": "repozitoriyaga kirish huquqi"
     },
     "style": {
@@ -1489,7 +1490,6 @@
       "invalidUrl": "PR uchun to'g'ri URL manzilini kiriting.",
       "couldNotCheckProviderStatus": "Provayder holatini tekshirib bo'lmadi.",
       "couldNotLoadProviders": "Ulangan provayderlaringizni yuklay olmadik. Iltimos, qayta urinib ko'ring.",
-      "connectProvider": "Provayderni ulash",
       "connectProviderDescription": "PRni qo'lda ko'rib chiqishni boshlash uchun GitHubni ulang.",
       "pullRequestUrl": "PR manzili (URL)",
       "instructions": "Ko'rsatmalar (ixtiyoriy)",

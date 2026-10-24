@@ -53,6 +53,7 @@
     "connected": "Ligado",
     "couldNotLoadModels": "Não foi possível carregar os modelos.",
     "couldNotLoadRepositories": "Não foi possível carregar os repositórios.",
+    "noRepositoriesFound": "Nenhum repositório encontrado",
     "critical": "Crítico",
     "delete": "Eliminar",
     "deleted": "Eliminado",
@@ -87,6 +88,7 @@
     "connect": "Ligar",
     "connectBitbucket": "Ligar ao Bitbucket",
     "connectGitlab": "Ligar ao GitLab",
+    "connectProvider": "Ligar um fornecedor",
     "contentTruncated": "Conteúdo truncado",
     "copyLink": "Copiar ligação",
     "couldNotLoadOrganizations": "Não foi possível carregar as organizações.",
@@ -1429,7 +1431,6 @@
       "gitlabNoRepositoriesDescription": "Podes precisar de conceder acesso a mais grupos ou projetos no GitLab.",
       "installGithubApp": "Instalar a aplicação do GitHub nos repositórios",
       "installGithubAppDescription": "Dá à aplicação do Kilo no GitHub acesso aos repositórios que queres rever.",
-      "noRepositoriesFound": "Nenhum repositório encontrado",
       "repositoryAccess": "acesso ao repositório"
     },
     "style": {
@@ -1511,7 +1512,6 @@
       "invalidUrl": "Introduz um URL válido de um pedido de integração.",
       "couldNotCheckProviderStatus": "Não foi possível verificar o estado do fornecedor.",
       "couldNotLoadProviders": "Não foi possível carregar os teus fornecedores ligados. Tenta novamente.",
-      "connectProvider": "Ligar um fornecedor",
       "connectProviderDescription": "Liga o GitHub para iniciar a revisão manual de um pedido de integração.",
       "pullRequestUrl": "URL do pedido de integração",
       "instructions": "Instruções (opcionais)",

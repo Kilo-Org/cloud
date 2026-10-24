@@ -107,23 +107,25 @@ test('every workflow install job restores a pnpm dependency cache', () => {
   const directory = new URL('../.github/workflows/', import.meta.url);
   const uncached = [];
   for (const file of readdirSync(directory)
-    .filter(name => name.endsWith('.yml'))
+    .filter(name => /\.ya?ml$/.test(name))
     .sort()) {
     const workflow = load(readFileSync(new URL(file, directory), 'utf8'));
     for (const [jobName, job] of Object.entries(workflow.jobs ?? {})) {
       const steps = (job.steps ?? []).filter(step => step !== null && typeof step === 'object');
-      const installs = steps.some(step =>
+      const installIndex = steps.findIndex(step =>
         (step.run ?? '').split('\n').some(line => /\bpnpm\b.*\binstall\b/.test(line))
       );
-      if (!installs) continue;
-      const mounts = steps.some(step => step.uses === './.github/actions/pnpm-store');
-      const caches = steps.some(
-        step => step.with?.cache === 'pnpm' && String(step.uses).startsWith('actions/setup-node@')
+      if (installIndex < 0) continue;
+      const warmIndex = steps.findIndex(
+        step =>
+          step.uses === './.github/actions/pnpm-store' ||
+          (String(step.uses).startsWith('actions/setup-node@') && step.with?.cache === 'pnpm')
       );
-      if (!mounts && !caches) uncached.push(`${file}:${jobName}`);
+      // A mount or cache step after the install warms nothing.
+      if (warmIndex < 0 || warmIndex > installIndex) uncached.push(`${file}:${jobName}`);
     }
   }
-  assert.deepEqual(uncached, [], 'an install job must mount the pnpm store or cache it');
+  assert.deepEqual(uncached, [], 'an install job must restore a pnpm cache before it installs');
 });
 
 for (const [file, name, command, condition] of [

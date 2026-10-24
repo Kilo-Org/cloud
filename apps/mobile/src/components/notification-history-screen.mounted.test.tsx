@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- one mounted harness: the paged list, its states, the chip filter, the row tap and the push banner share one fake tRPC surface */
 import { createElement, type ReactElement } from 'react';
+import { onlineManager } from '@tanstack/react-query';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -41,6 +42,7 @@ const state = vi.hoisted(() => {
   return {
     rows: [] as Row[],
     historyError: undefined as Error | undefined,
+    preferencesError: undefined as Error | undefined,
     preferences,
     gate,
     /** The inputs `infiniteQueryOptions` was built with, newest last. */
@@ -162,7 +164,12 @@ vi.mock('@/lib/trpc', () => ({
       getNotificationPreferences: {
         queryOptions: () => ({
           queryKey: ['user', 'getNotificationPreferences'],
-          queryFn: () => state.preferences,
+          queryFn: () => {
+            if (state.preferencesError) {
+              throw state.preferencesError;
+            }
+            return state.preferences;
+          },
         }),
       },
     },
@@ -240,6 +247,7 @@ beforeEach(() => {
   vi.stubGlobal('__DEV__', false);
   state.rows = [];
   state.historyError = undefined;
+  state.preferencesError = undefined;
   state.preferences = { capabilities: {} };
   state.gate = { loading: false, settled: true, permissionGranted: true, pushEnabled: true };
   state.historyInputs = [];
@@ -251,6 +259,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  onlineManager.setOnline(true);
   view?.unmount();
   view = undefined;
   vi.unstubAllGlobals();
@@ -423,6 +432,17 @@ describe('NotificationHistoryScreen', () => {
     // 24dp of tab bar plus the footer's own 32dp.
     const footer = byType('View').find(node => footerPadding(node) === 56);
     expect(footer).toBeDefined();
+  });
+
+  it('settles the chip row offline instead of holding its skeletons', async () => {
+    // The online manager reports offline, so a read that keeps the default
+    // `networkMode: 'online'` pauses in `pending` and never renders a chip.
+    onlineManager.setOnline(false);
+    state.preferencesError = new Error('offline');
+    await mount();
+
+    expect(withText(byType('Button'), 'All')).toBeDefined();
+    expect(withText(byType('Button'), 'Chat messages')).toBeDefined();
   });
 
   it('turns off the network gate so an offline first load can fail into its retry', async () => {

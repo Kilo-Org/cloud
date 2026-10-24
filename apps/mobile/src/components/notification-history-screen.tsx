@@ -94,6 +94,13 @@ export function NotificationHistoryScreen() {
   const preferences = useQuery({
     ...trpc.user.getNotificationPreferences.queryOptions(),
     enabled: authToken != null,
+    // Same reason as the list: a read started offline must settle into its
+    // answer or its error instead of pausing in `pending`, which would hold the
+    // chip skeletons on screen for as long as the device stays offline. A
+    // settled failure falls back to every chip.
+    networkMode: 'always',
+    // `networkMode: 'always'` also drops the derived reconnect refetch.
+    refetchOnReconnect: true,
   });
 
   const query = useInfiniteQuery(

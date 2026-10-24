@@ -64,7 +64,13 @@ import {
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   encodeCloudAgentRootSessionsCursor,
   encodeKiloSdkMessagesCursor,
+  getCloudAgentRootSessionMessagesSchema,
+  getSessionMessagesSchema,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES,
+  MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH,
+  fitsKiloSdkMessagesCursorId,
+  tryEncodeKiloSdkMessagesCursor,
   cloudAgentWorktreeIdSchema,
   messageIdSchema,
   partIdSchema,
@@ -1975,6 +1981,133 @@ describe('Kilo SDK message cursor codec', () => {
     expect(() =>
       decodeKiloSdkMessagesCursor(encodeUnchecked({ id: 'other_01', time: 1 }))
     ).toThrow();
+  });
+
+  it('round-trips the longest cursor the schemas accept', () => {
+    const cursor = {
+      id: `msg${'a'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES - 3)}`,
+      time: 1761000000100,
+    };
+    const encoded = encodeKiloSdkMessagesCursor(cursor);
+
+    expect(encoded.length).toBeLessThanOrEqual(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH);
+    expect(decodeKiloSdkMessagesCursor(encoded)).toEqual(cursor);
+    expect(validateKiloSdkMessagesCursor(encoded)).toBe(true);
+  });
+
+  it('round-trips a multi-byte id at the cursor id byte limit', () => {
+    const id = `msg${'😀'.repeat(15)}a`;
+    const cursor = { id, time: 1761000000100 };
+    const encoded = encodeKiloSdkMessagesCursor(cursor);
+
+    expect(new TextEncoder().encode(id).length).toBe(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES);
+    expect(encoded.length).toBeLessThanOrEqual(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH);
+    expect(decodeKiloSdkMessagesCursor(encoded)).toEqual(cursor);
+  });
+
+  it('rejects an encoded cursor longer than the wire cap without decoding it', () => {
+    const oversized = 'A'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH + 1);
+
+    expect(validateKiloSdkMessagesCursor(oversized)).toBe(false);
+    expect(() => decodeKiloSdkMessagesCursor(oversized)).toThrow();
+    expect(validateKiloSdkMessagesCursor(btoa('x'.repeat(65536)))).toBe(false);
+  });
+
+  it('rejects a cursor whose decoded message id is longer than the id cap', () => {
+    const oversized = btoa(
+      JSON.stringify({
+        id: `msg${'a'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES - 2)}`,
+        time: 1,
+      })
+    )
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+
+    expect(oversized.length).toBeLessThanOrEqual(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH);
+    expect(validateKiloSdkMessagesCursor(oversized)).toBe(false);
+    expect(() => decodeKiloSdkMessagesCursor(oversized)).toThrow();
+  });
+
+  it('counts UTF-8 bytes rather than UTF-16 code units for the id cap', () => {
+    const overByteCap = `msg${'😀'.repeat(16)}`;
+    const payload = btoa(
+      String.fromCharCode(...new TextEncoder().encode(JSON.stringify({ id: overByteCap, time: 1 })))
+    )
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+
+    expect(overByteCap.length).toBeLessThan(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES);
+    expect(validateKiloSdkMessagesCursor(payload)).toBe(false);
+    expect(() => encodeKiloSdkMessagesCursor({ id: overByteCap, time: 1 })).toThrow();
+  });
+
+  it('counts JSON-escaped bytes in the id cap', () => {
+    const escapesAtLimit = Math.floor((MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES - 3) / 2);
+    const escapedAtLimit = `msg${'"'.repeat(escapesAtLimit)}`;
+    const escapedOverLimit = `msg${'"'.repeat(escapesAtLimit + 1)}`;
+
+    expect(escapedAtLimit.length).toBeLessThan(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES);
+    expect(fitsKiloSdkMessagesCursorId(escapedAtLimit)).toBe(true);
+    expect(fitsKiloSdkMessagesCursorId(escapedOverLimit)).toBe(false);
+    expect(encodeKiloSdkMessagesCursor({ id: escapedAtLimit, time: 1 }).length).toBeLessThanOrEqual(
+      MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH
+    );
+    expect(tryEncodeKiloSdkMessagesCursor({ id: escapedOverLimit, time: 1 })).toBeNull();
+  });
+
+  it('reports the wire form of a cursor that satisfies the contract', () => {
+    const cursor = { id: 'msg_user_01', time: 1761000000100 };
+
+    expect(tryEncodeKiloSdkMessagesCursor(cursor)).toBe(encodeKiloSdkMessagesCursor(cursor));
+  });
+
+  it('rejects characters outside the base64 cursor alphabet', () => {
+    expect(validateKiloSdkMessagesCursor('not-valid')).toBe(false);
+    expect(validateKiloSdkMessagesCursor('cursor with spaces')).toBe(false);
+    expect(validateKiloSdkMessagesCursor('eyJpZCI6Im1zZ191c2VyXzAxIiwidGltZSI6MX0=')).toBe(true);
+  });
+
+  it('rejects an over-length before cursor at the history request schemas', () => {
+    const oversized = 'A'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH + 1);
+    const generic = getSessionMessagesSchema.safeParse({
+      kiloUserId: 'usr_owner',
+      kiloSessionId: sdkSessionInfoFixture.id,
+      before: oversized,
+    });
+
+    expect(generic.success).toBe(false);
+    if (generic.success) throw new Error('expected the oversized cursor to be rejected');
+    expect(generic.error.issues.map(issue => issue.path[0])).toContain('before');
+    expect(
+      getCloudAgentRootSessionMessagesSchema.safeParse({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        limit: 10,
+        before: oversized,
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts an encoded cursor at the history request schemas', () => {
+    const before = encodeKiloSdkMessagesCursor({ id: 'msg_user_01', time: 1761000000100 });
+
+    expect(
+      getSessionMessagesSchema.safeParse({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        before,
+      }).success
+    ).toBe(true);
+    expect(
+      getCloudAgentRootSessionMessagesSchema.safeParse({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        limit: 10,
+        before,
+      }).success
+    ).toBe(true);
   });
 });
 

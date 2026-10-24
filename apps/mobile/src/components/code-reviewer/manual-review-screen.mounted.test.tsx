@@ -188,11 +188,38 @@ async function renderScreen() {
 
 const PR_URL_PLACEHOLDER = 'https://github.com/owner/repo/pull/123';
 const GITHUB_PR_URL = 'https://github.com/drain-e2e-labs/notes/pull/42';
-const START_FAILURE = 'GitHub could not find that pull request.';
+const SERVER_NOT_FOUND = 'GitHub could not find that pull request.';
+
+/**
+ * The sentence the screen renders for a NOT_FOUND start failure. Read from the
+ * catalog at call time, because this suite asserts where and for how long the
+ * failure stays on screen; the code-to-copy mapping has its own suite
+ * (`manual-review-start-failure.mounted.test.tsx`).
+ */
+function startFailureText(): string {
+  return i18n.t('codeReviewer.manualReview.startNotFound', {
+    provider: 'GitHub',
+    requestNoun: i18n.t('common.pullRequest'),
+  });
+}
+
+/** A failed call as the tRPC client reports it: a code plus the server's message. */
+function startFailure() {
+  return Object.assign(new Error(SERVER_NOT_FOUND), {
+    data: { code: 'NOT_FOUND', message: SERVER_NOT_FOUND },
+  });
+}
 
 function propOf(node: TestRenderer.ReactTestInstance, key: string): unknown {
   /* eslint-disable-next-line typescript-eslint/no-unsafe-member-access -- renderer props are an index signature */
   return node.props[key];
+}
+
+/** Every string rendered through the shared `Text` mock. */
+function renderedTexts(root: TestRenderer.ReactTestInstance): string[] {
+  return findAllOfType(root, 'Text')
+    .map(node => propOf(node, 'children'))
+    .filter(child => typeof child === 'string');
 }
 
 /** The pull request URL box, told apart from the instructions box by its placeholder. */
@@ -382,7 +409,7 @@ describe('ManualReviewScreen failed start', () => {
   it('keeps the form and withdraws the failure when the URL is cleared', async () => {
     status.mutate.mockImplementationOnce(
       (_vars: unknown, callbacks: { onError: (error: Error) => void }) => {
-        callbacks.onError(new Error(START_FAILURE));
+        callbacks.onError(startFailure());
       }
     );
     const { renderer, unmount } = await renderScreen();
@@ -400,11 +427,8 @@ describe('ManualReviewScreen failed start', () => {
     expect(findAllOfType(renderer.root, 'ScrollView')).toHaveLength(1);
     expect(findAllOfType(renderer.root, 'TextInput')).toHaveLength(2);
     expect(findAllOfType(renderer.root, 'ModelSelector')).toHaveLength(1);
-    expect(
-      findAllOfType(renderer.root, 'Text')
-        .map(node => propOf(node, 'children'))
-        .filter(child => typeof child === 'string')
-    ).toContain(START_FAILURE);
+    expect(renderedTexts(renderer.root)).toContain(startFailureText());
+    expect(renderedTexts(renderer.root)).not.toContain(SERVER_NOT_FOUND);
     expect(findAllOfType(renderer.root, 'Button').map(node => propOf(node, 'variant'))).toContain(
       'outline'
     );
@@ -415,11 +439,7 @@ describe('ManualReviewScreen failed start', () => {
 
     // Clearing the box withdraws the failure it produced and its retry, and
     // leaves the form in place.
-    expect(
-      findAllOfType(renderer.root, 'Text')
-        .map(node => propOf(node, 'children'))
-        .filter(child => typeof child === 'string')
-    ).not.toContain(START_FAILURE);
+    expect(renderedTexts(renderer.root)).not.toContain(startFailureText());
     expect(
       findAllOfType(renderer.root, 'Button').map(node => propOf(node, 'variant'))
     ).not.toContain('outline');
@@ -452,13 +472,9 @@ describe('ManualReviewScreen failed start', () => {
         `${GITHUB_PR_URL}/files`
       );
     });
-    act(() => finish?.(new Error(START_FAILURE)));
+    act(() => finish?.(startFailure()));
 
-    expect(
-      findAllOfType(renderer.root, 'Text')
-        .map(node => propOf(node, 'children'))
-        .filter(child => typeof child === 'string')
-    ).not.toContain(START_FAILURE);
+    expect(renderedTexts(renderer.root)).not.toContain(startFailureText());
     expect(
       findAllOfType(renderer.root, 'Button').map(node => propOf(node, 'variant'))
     ).not.toContain('outline');
@@ -504,11 +520,7 @@ describe('ManualReviewScreen failed start', () => {
       // The wait is still real, so the action comes back and the stall copy
       // explains it, even though the request was raised for older input.
       expect(propOf(primaryAction(), 'loading')).toBe(false);
-      expect(
-        findAllOfType(renderer.root, 'Text')
-          .map(node => propOf(node, 'children'))
-          .filter(child => typeof child === 'string')
-      ).toContain(i18n.t('common.takingLonger'));
+      expect(renderedTexts(renderer.root)).toContain(i18n.t('common.takingLonger'));
 
       unmount();
     } finally {

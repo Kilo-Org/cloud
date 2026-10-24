@@ -153,9 +153,10 @@ export type ReserveSignInCodeResult = 'ok' | 'invalid' | 'too_many_attempts' | '
  * A live reservation blocks concurrent callers, who receive 'in_progress'.
  * A failed settlement must call releaseSignInCode so the code stays usable.
  *
- * Challenge verification uses attempts; compatibility verification uses
- * legacy_attempts. Each mode has its own bounded allowance. Lookups follow
- * the supplied challenge when present, otherwise the normalized email.
+ * Challenge verification counts in attempts; compatibility verification counts
+ * in legacy_attempts. Wrong guesses draw on one allowance shared by both modes,
+ * so alternating them cannot buy a second allowance. Lookups follow the
+ * supplied challenge when present, otherwise the normalized email.
  *
  * Returns 'ok' when the code is reserved, 'invalid' for a wrong/expired/consumed
  * code, 'too_many_attempts' when the attempt budget is exhausted, and
@@ -200,12 +201,21 @@ export async function reserveSignInCode(
       return 'invalid';
     }
 
+    const token_hash = hashSignInCode(normalizedEmail, code);
+    const isCandidateCode = row.token_hash === token_hash;
+
+    // A wrong guess is refused once the allowance is spent, whichever mode
+    // spent it. The correct code is still accepted below unless the budget of
+    // the mode it arrives in is spent, so neither mode can deny the holder.
+    if (!isCandidateCode && row.attempts + row.legacy_attempts >= SIGN_IN_CODE_MAX_ATTEMPTS) {
+      return 'too_many_attempts';
+    }
+
     if (row[attemptsKey] >= SIGN_IN_CODE_MAX_ATTEMPTS) {
       return 'too_many_attempts';
     }
 
-    const token_hash = hashSignInCode(normalizedEmail, code);
-    if (row.token_hash === token_hash) {
+    if (isCandidateCode) {
       const reserved = await tx
         .update(magic_link_tokens)
         .set({
@@ -234,18 +244,20 @@ export async function reserveSignInCode(
       return 'invalid';
     }
 
+    const attemptGuard = sql`${magic_link_tokens.attempts} + ${magic_link_tokens.legacy_attempts} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`;
+
     const incrementWhere = challengeId
       ? and(
           eq(magic_link_tokens.challenge_id, challengeId),
           eq(magic_link_tokens.purpose, 'sign_in_code'),
           isNull(magic_link_tokens.consumed_at),
-          sql`${attemptsColumn} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`
+          attemptGuard
         )
       : and(
           eq(magic_link_tokens.email, normalizedEmail),
           eq(magic_link_tokens.purpose, 'sign_in_code'),
           isNull(magic_link_tokens.consumed_at),
-          sql`${attemptsColumn} < ${SIGN_IN_CODE_MAX_ATTEMPTS}`
+          attemptGuard
         );
 
     await tx

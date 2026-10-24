@@ -2091,8 +2091,15 @@
     {
       "idx": 298,
       "version": "7",
-      "when": 1792829379131,
-      "tag": "0298_numerous_dazzler",
+      "when": 1792829491526,
+      "tag": "0298_youthful_vin_gonzales",
+      "breakpoints": true
+    },
+    {
+      "idx": 299,
+      "version": "7",
+      "when": 1792834614370,
+      "tag": "0299_contributor_credit_window",
       "breakpoints": true
     }
   ]

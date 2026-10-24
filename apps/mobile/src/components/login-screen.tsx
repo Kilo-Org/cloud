@@ -25,7 +25,6 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
-  clearLoginDrafts,
   clearPersistedLoginDrafts,
   persistLoginDrafts,
   restoreLoginDrafts,

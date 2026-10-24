@@ -39,7 +39,6 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: mockCaptureException,
 }));
 
-
 jest.mock('@/lib/security-agent/db/security-config', () => ({
   getSecurityAgentConfig: mockGetSecurityAgentConfig,
 }));

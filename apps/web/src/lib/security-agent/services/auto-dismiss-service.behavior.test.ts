@@ -5,7 +5,8 @@ import type { NewSecurityFinding } from '@kilocode/db/schema';
 import type { SecurityFindingAnalysis } from '@kilocode/db/schema-types';
 import { SecurityAuditLogActorType } from '@kilocode/db/schema-types';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import { eq } from 'drizzle-orm';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { eq, inArray } from 'drizzle-orm';
 import { autoDismissEligibleFindings, countEligibleForAutoDismiss } from './auto-dismiss-service';
 
 const mockDismissDependabotAlert = jest.fn();
@@ -175,6 +176,65 @@ describe('auto-dismiss eligibility', () => {
     await expect(countEligibleForAutoDismiss({ userId: user.id }, user.id)).resolves.toEqual({
       eligible: 1,
       byConfidence: { high: 1, medium: 0, low: 0 },
+    });
+  });
+
+  it('applies organization policy with owner-scoped accounting', async () => {
+    const user = await insertTestUser();
+    const organization = await createTestOrganization('Security fixture', user.id, 0);
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: organization.id,
+      agent_type: 'security_scan',
+      platform: 'github',
+      config: { auto_dismiss_enabled: true, auto_dismiss_confidence_threshold: 'medium' },
+      is_enabled: true,
+      created_by: user.id,
+    });
+    const rows = await db
+      .insert(security_findings)
+      .values([
+        ...(['high', 'medium', 'low'] as const).map(confidence =>
+          finding(user.id, `org-${confidence}`, {
+            owned_by_user_id: null,
+            owned_by_organization_id: organization.id,
+            analysis: triageAnalysis({ confidence }),
+          })
+        ),
+        finding(user.id, 'personal-high', { analysis: triageAnalysis() }),
+      ])
+      .returning({ id: security_findings.id });
+    const owner = { organizationId: organization.id };
+
+    await expect(countEligibleForAutoDismiss(owner, user.id)).resolves.toEqual({
+      eligible: 3,
+      byConfidence: { high: 1, medium: 1, low: 1 },
+    });
+    await expect(
+      autoDismissEligibleFindings(owner, {
+        type: SecurityAuditLogActorType.CustomerUser,
+        id: user.id,
+        email: user.google_user_email,
+        name: user.google_user_name,
+      })
+    ).resolves.toEqual({ dismissed: 2, skipped: 1, errors: 0 });
+    await expect(countEligibleForAutoDismiss(owner, user.id)).resolves.toEqual({
+      eligible: 1,
+      byConfidence: { high: 0, medium: 0, low: 1 },
+    });
+    const stored = await db
+      .select({ sourceId: security_findings.source_id, status: security_findings.status })
+      .from(security_findings)
+      .where(
+        inArray(
+          security_findings.id,
+          rows.map(row => row.id)
+        )
+      );
+    expect(Object.fromEntries(stored.map(row => [row.sourceId, row.status]))).toEqual({
+      'org-high': 'ignored',
+      'org-medium': 'ignored',
+      'org-low': 'open',
+      'personal-high': 'open',
     });
   });
 });

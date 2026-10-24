@@ -67,6 +67,62 @@ describe('upsertLinearInstallation', () => {
     );
   });
 
+  test('uses the supplied transaction for installation ownership and updates', async () => {
+    const rollback = new Error('Rollback test transaction');
+    await expect(
+      db.transaction(async tx => {
+        const result = await upsertLinearInstallation(
+          {
+            owner: { type: 'user', id: user.id },
+            organizationId: 'workspace-transaction',
+            organizationName: 'Transaction Workspace',
+            botUserId: 'bot-1',
+          },
+          { defaultModel: 'test/default-model' },
+          tx
+        );
+        const updated = await upsertLinearInstallation(
+          {
+            owner: { type: 'user', id: user.id },
+            organizationId: 'workspace-transaction',
+            organizationName: 'Updated Transaction Workspace',
+            botUserId: 'bot-2',
+          },
+          { defaultModel: 'test/replacement-model' },
+          tx
+        );
+        expect(updated.id).toBe(result.id);
+        expect(updated.metadata).toEqual(
+          expect.objectContaining({ model_slug: 'test/default-model', bot_user_id: 'bot-2' })
+        );
+        await expect(
+          upsertLinearInstallation(
+            {
+              owner: { type: 'user', id: otherUser.id },
+              organizationId: 'workspace-transaction',
+              organizationName: 'Transaction Workspace',
+              botUserId: 'bot-3',
+            },
+            {},
+            tx
+          )
+        ).rejects.toBeInstanceOf(LinearWorkspaceAlreadyConnectedError);
+        throw rollback;
+      })
+    ).rejects.toBe(rollback);
+
+    const integrations = await db
+      .select()
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.platform, PLATFORM.LINEAR),
+          eq(platform_integrations.owned_by_user_id, user.id)
+        )
+      );
+    expect(integrations).toEqual([]);
+  });
+
   test('rejects when another owner already holds the same Linear workspace', async () => {
     await upsertLinearInstallation({
       owner: { type: 'user', id: user.id },

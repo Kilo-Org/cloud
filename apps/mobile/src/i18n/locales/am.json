@@ -53,6 +53,7 @@
     "connected": "ተገናኝቷል",
     "couldNotLoadModels": "ሞዴሎችን መጫን አልተቻለም።",
     "couldNotLoadRepositories": "ማከማቻዎችን መጫን አልተቻለም።",
+    "noRepositoriesFound": "ምንም ማከማቻዎች አልተገኙም",
     "critical": "እጅግ ከፍተኛ",
     "delete": "ሰርዝ",
     "deleted": "ተሰርዟል",
@@ -87,6 +88,7 @@
     "connect": "አገናኝ",
     "connectBitbucket": "Bitbucketን አገናኝ",
     "connectGitlab": "GitLabን አገናኝ",
+    "connectProvider": "አቅራቢን ያገናኙ",
     "contentTruncated": "ይዘቱ ተቆርጧል",
     "copyLink": "አገናኙን ቅዳ",
     "couldNotLoadOrganizations": "ድርጅቶችን መጫን አልተቻለም።",
@@ -1407,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "በGitLab ላይ ወደ ተጨማሪ ቡድኖች ወይም ፕሮጀክቶች የመድረስ ፈቃድ መስጠት ሊያስፈልግዎ ይችላል።",
       "installGithubApp": "የGitHub መተግበሪያን በማከማቻዎች ላይ ይጫኑ",
       "installGithubAppDescription": "ለKilo የGitHub መተግበሪያ እንዲገመገሙ ወደሚፈልጓቸው ማከማቻዎች የመድረስ ፈቃድ ይስጡ።",
-      "noRepositoriesFound": "ምንም ማከማቻዎች አልተገኙም",
       "repositoryAccess": "የማከማቻ መዳረሻ"
     },
     "style": {
@@ -1489,7 +1490,6 @@
       "invalidUrl": "ትክክለኛ የኮድ ውህደት ጥያቄ URL ያስገቡ።",
       "couldNotCheckProviderStatus": "የአቅራቢውን ሁኔታ መፈተሽ አልተቻለም።",
       "couldNotLoadProviders": "የተገናኙትን አቅራቢዎች መጫን አልቻልንም። እባክዎ እንደገና ይሞክሩ።",
-      "connectProvider": "አቅራቢን ያገናኙ",
       "connectProviderDescription": "የኮድ ውህደት ጥያቄ ግምገማን ራስዎ ለማስጀመር GitHubን ያገናኙ።",
       "pullRequestUrl": "የኮድ ውህደት ጥያቄ URL",
       "instructions": "መመሪያዎች (አማራጭ)",

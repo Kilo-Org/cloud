@@ -53,6 +53,7 @@
     "connected": "Tilknyttet",
     "couldNotLoadModels": "Modellerne kunne ikke indlæses.",
     "couldNotLoadRepositories": "Kodelagrene kunne ikke indlæses.",
+    "noRepositoriesFound": "Ingen kodelagre fundet",
     "critical": "Kritisk",
     "delete": "Slet",
     "deleted": "Slettet",
@@ -87,6 +88,7 @@
     "connect": "Tilknyt",
     "connectBitbucket": "Tilknyt Bitbucket",
     "connectGitlab": "Tilknyt GitLab",
+    "connectProvider": "Tilslut en udbyder",
     "contentTruncated": "Indhold afkortet",
     "copyLink": "Kopiér link",
     "couldNotLoadOrganizations": "Organisationerne kunne ikke indlæses.",
@@ -1407,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "Du skal muligvis give adgang til flere grupper eller projekter på GitLab.",
       "installGithubApp": "Installér GitHub-appen på kodelagre",
       "installGithubAppDescription": "Giv Kilos GitHub-app adgang til de kodelagre, du vil have gennemgået.",
-      "noRepositoriesFound": "Ingen kodelagre fundet",
       "repositoryAccess": "adgang til kodelagre"
     },
     "style": {
@@ -1489,7 +1490,6 @@
       "invalidUrl": "Indtast en gyldig URL til en pull request.",
       "couldNotCheckProviderStatus": "Udbyderens status kunne ikke kontrolleres.",
       "couldNotLoadProviders": "Dine tilsluttede udbydere kunne ikke indlæses. Prøv igen.",
-      "connectProvider": "Tilslut en udbyder",
       "connectProviderDescription": "Tilslut GitHub for at starte en manuel gennemgang af en pull request.",
       "pullRequestUrl": "URL til pull request",
       "instructions": "Instruktioner (valgfrie)",

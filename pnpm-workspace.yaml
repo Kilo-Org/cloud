@@ -384,5 +384,6 @@ allowBuilds:
   # WebDriver binary for the extension's Firefox e2e suite; the postinstall
   # downloads the driver for the current platform from its GitHub release.
   geckodriver: true
+  dtrace-provider: false
   '@scarf/scarf': false
   '@parcel/watcher': false

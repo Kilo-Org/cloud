@@ -53,6 +53,7 @@
     "connected": "مرتبط",
     "couldNotLoadModels": "تعذّر تحميل النماذج.",
     "couldNotLoadRepositories": "تعذّر تحميل المستودعات.",
+    "noRepositoriesFound": "لم يتم العثور على مستودعات",
     "critical": "حرج",
     "delete": "حذف",
     "deleted": "محذوف",
@@ -87,6 +88,7 @@
     "connect": "ربط",
     "connectBitbucket": "ربط Bitbucket",
     "connectGitlab": "ربط GitLab",
+    "connectProvider": "اربط مزوّدًا",
     "contentTruncated": "تم اقتطاع المحتوى",
     "copyLink": "نسخ الرابط",
     "couldNotLoadOrganizations": "تعذّر تحميل المؤسسات.",
@@ -895,7 +897,6 @@
       "gitlabNoRepositoriesDescription": "قد تحتاج إلى منح صلاحية الوصول إلى مزيد من المجموعات أو المشاريع على GitLab.",
       "installGithubApp": "ثبّت تطبيق GitHub على المستودعات",
       "installGithubAppDescription": "امنح تطبيق Kilo على GitHub صلاحية الوصول إلى المستودعات التي تريد مراجعتها.",
-      "noRepositoriesFound": "لم يتم العثور على مستودعات",
       "repositoryAccess": "الوصول إلى المستودع"
     },
     "style": {
@@ -919,7 +920,6 @@
     "followReviewMd": "اتباع تعليمات REVIEW.md",
     "followReviewMdSubtitle": "الالتزام بملفات تعليمات REVIEW.md لكل مستودع",
     "manualReview": {
-      "connectProvider": "اربط مزوّدًا",
       "connectProviderDescription": "اربط GitHub لبدء مراجعة يدوية لطلب سحب.",
       "couldNotCheckProviderStatus": "تعذّر التحقق من حالة المزوّد.",
       "couldNotLoadProviders": "تعذّر تحميل المزوّدين الذين ربطتهم بحسابك. حاول مرة أخرى.",

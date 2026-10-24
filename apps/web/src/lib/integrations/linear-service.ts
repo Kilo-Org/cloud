@@ -1,7 +1,7 @@
 import 'server-only';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { LinearClient } from '@linear/sdk';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
@@ -241,8 +241,11 @@ export async function fetchLinearOAuthIdentity(accessToken: string): Promise<Lin
   };
 }
 
-export async function getInstallation(owner: Owner): Promise<PlatformIntegration | null> {
-  const [integration] = await db
+export async function getInstallation(
+  owner: Owner,
+  database: typeof db | DrizzleTransaction = db
+): Promise<PlatformIntegration | null> {
+  const [integration] = await database
     .select()
     .from(platform_integrations)
     .where(
@@ -284,9 +287,10 @@ function isOwnedBy(integration: PlatformIntegration, owner: Owner): boolean {
  */
 export async function getConflictingLinearInstallation(
   owner: Owner,
-  organizationId: string
+  organizationId: string,
+  database: typeof db | DrizzleTransaction = db
 ): Promise<PlatformIntegration | null> {
-  const integrations = await db
+  const integrations = await database
     .select()
     .from(platform_integrations)
     .where(
@@ -320,6 +324,7 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
 }
 
 type LinearUpsertOptions = {
+  defaultModel?: string;
   getChatSdkAccessToken?: (organizationId: string) => Promise<string | null>;
   deleteChatSdkInstallation?: (organizationId: string) => Promise<void>;
   deleteChatSdkIdentityCache?: (organizationId: string) => Promise<void>;
@@ -352,11 +357,12 @@ export async function upsertLinearInstallation(
     organizationName: string;
     botUserId: string | null;
   },
-  options: LinearUpsertOptions = {}
+  options: LinearUpsertOptions = {},
+  database: typeof db | DrizzleTransaction = db
 ): Promise<PlatformIntegration> {
-  const existing = await getInstallation(owner);
+  const existing = await getInstallation(owner, database);
 
-  const conflicting = await getConflictingLinearInstallation(owner, organizationId);
+  const conflicting = await getConflictingLinearInstallation(owner, organizationId, database);
   if (conflicting) {
     throw new LinearWorkspaceAlreadyConnectedError(organizationName);
   }
@@ -376,9 +382,10 @@ export async function upsertLinearInstallation(
   }
 
   const defaultModel =
-    owner.type === 'org'
+    options.defaultModel ??
+    (owner.type === 'org'
       ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
-      : DEFAULT_BOT_MODEL;
+      : DEFAULT_BOT_MODEL);
 
   const existingMetadata =
     existing?.metadata && typeof existing.metadata === 'object' ? existing.metadata : {};
@@ -397,7 +404,7 @@ export async function upsertLinearInstallation(
 
   if (existing) {
     try {
-      const [updated] = await db
+      const [updated] = await database
         .update(platform_integrations)
         .set({
           platform_installation_id: organizationId,
@@ -421,7 +428,7 @@ export async function upsertLinearInstallation(
   }
 
   try {
-    const [created] = await db
+    const [created] = await database
       .insert(platform_integrations)
       .values({
         owned_by_user_id: owner.type === 'user' ? owner.id : null,

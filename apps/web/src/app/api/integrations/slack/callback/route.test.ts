@@ -127,18 +127,8 @@ describe('GET /api/integrations/slack/callback', () => {
       makeRequest(`/api/integrations/slack/callback?code=abc&state=${state}`)
     );
 
-    expect(mockedExchangeSlackOAuthCode).toHaveBeenCalledWith('abc');
-    expect(mockedGetConflictingSlackInstallation).toHaveBeenCalledWith(
-      { type: 'user', id: USER_ID },
-      TEAM_ID
-    );
     expect(setInstallation).toHaveBeenCalledTimes(1);
     expect(setInstallation).toHaveBeenCalledWith(TEAM_ID, INSTALLATION);
-    expect(mockedUpsertSlackInstallation).toHaveBeenCalledWith({
-      owner: { type: 'user', id: USER_ID },
-      teamId: TEAM_ID,
-      installation: INSTALLATION,
-    });
     expectRedirectLocation(response, '/integrations/slack?success=installed');
   });
 

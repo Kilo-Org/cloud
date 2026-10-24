@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
-import { and, eq } from 'drizzle-orm';
+import { setImmediate } from 'node:timers/promises';
+import { and, eq, sql } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { platform_integrations, type User } from '@kilocode/db/schema';
@@ -328,3 +329,65 @@ describe('Slack install callback against the real integration row', () => {
     });
   });
 });
+
+test.each(['slack', 'linear'] as const)(
+  '%s workspace installation serialization',
+  async platform => {
+    const installationId = platform === 'slack' ? 'T0TEAM' : 'linear-workspace';
+    const firstWrite = Promise.withResolvers<void>();
+    const releaseFirst = Promise.withResolvers<void>();
+    mockSetInstallation.mockImplementationOnce(async (id, installation) => {
+      mockInstallations.set(id, installation);
+      firstWrite.resolve();
+      await releaseFirst.promise;
+    });
+    mockedGetUserFromAuth
+      .mockResolvedValueOnce({ user: { id: owner.id }, authFailedResponse: null } as never)
+      .mockResolvedValueOnce({ user: { id: otherOwner.id }, authFailedResponse: null } as never);
+
+    const winner = callCallback(platform, `?code=first&state=${createProviderState(owner.id)}`);
+    await firstWrite.promise;
+    const storedInstallation = mockInstallations.get(installationId);
+    const contender = callCallback(
+      platform,
+      `?code=second&state=${createProviderState(otherOwner.id)}`
+    );
+
+    const abort = new AbortController();
+    const waitingForLock = (async () => {
+      const deadline = Date.now() + 2000;
+      while (!abort.signal.aborted && Date.now() < deadline) {
+        const waiting = await db.execute(sql`
+        SELECT 1 FROM pg_locks
+        WHERE locktype = 'advisory' AND NOT granted
+          AND database = (SELECT oid FROM pg_database WHERE datname = current_database())
+      `);
+        if (waiting.rows.length > 0) return 'waiting';
+        await setImmediate();
+      }
+      return 'timeout';
+    })();
+    let progress;
+    try {
+      progress = await Promise.race([waitingForLock, contender.then(() => 'completed')]);
+    } finally {
+      abort.abort();
+      await waitingForLock;
+      releaseFirst.resolve();
+    }
+
+    const [winnerResponse, contenderResponse] = await Promise.all([winner, contender]);
+    expect(progress).toBe('waiting');
+    expect(redirectPath(winnerResponse)).toBe(`/integrations/${platform}?success=installed`);
+    expect(redirectPath(contenderResponse)).toBe(
+      `/integrations/${platform}?error=workspace_already_connected`
+    );
+    expect(mockInstallations.get(installationId)).toBe(storedInstallation);
+    expect(mockDeleteInstallation).not.toHaveBeenCalled();
+    expect(await findIntegration(owner.id, platform)).toMatchObject({
+      platform_installation_id: installationId,
+      integration_status: INTEGRATION_STATUS.ACTIVE,
+    });
+    expect(await findIntegration(otherOwner.id, platform)).toBeNull();
+  }
+);

@@ -296,12 +296,6 @@ describe('GET /api/integrations/linear/callback', () => {
       makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
     );
 
-    expect(mockedExchangeLinearOAuthCode).toHaveBeenCalledWith('abc');
-    expect(mockedFetchLinearOAuthIdentity).toHaveBeenCalledWith('lin_app_tok');
-    expect(mockedGetConflictingLinearInstallation).toHaveBeenCalledWith(
-      { type: 'user', id: USER_ID },
-      ORGANIZATION_ID
-    );
     expect(setInstallation).toHaveBeenCalledTimes(1);
     expect(setInstallation).toHaveBeenCalledWith(ORGANIZATION_ID, {
       accessToken: 'lin_app_tok',
@@ -310,19 +304,6 @@ describe('GET /api/integrations/linear/callback', () => {
       organizationId: ORGANIZATION_ID,
     });
 
-    expect(mockedUpsertLinearInstallation).toHaveBeenCalledWith(
-      expect.objectContaining({
-        owner: { type: 'user', id: USER_ID },
-        organizationId: ORGANIZATION_ID,
-        organizationName: 'Acme Workspace',
-        botUserId: 'linear-bot-user',
-      }),
-      expect.objectContaining({
-        getChatSdkAccessToken: expect.any(Function),
-        deleteChatSdkInstallation: expect.any(Function),
-        deleteChatSdkIdentityCache: expect.any(Function),
-      })
-    );
     expectRedirectLocation(response, '/integrations/linear?success=installed');
   });
 

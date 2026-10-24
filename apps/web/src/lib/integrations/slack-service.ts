@@ -1,5 +1,5 @@
 import 'server-only';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
@@ -22,6 +22,15 @@ export class SlackWorkspaceAlreadyConnectedError extends Error {
       `${teamName} is already connected to another Kilo account or organization. Disconnect it there before connecting it here.`
     );
     this.name = 'SlackWorkspaceAlreadyConnectedError';
+  }
+}
+
+export class SlackWorkspaceRebindNotAllowedError extends Error {
+  constructor() {
+    super(
+      'This organization is already connected to a different Slack workspace. Disconnect it before connecting another workspace.'
+    );
+    this.name = 'SlackWorkspaceRebindNotAllowedError';
   }
 }
 
@@ -161,8 +170,11 @@ export async function revokeSlackToken(accessToken: string): Promise<boolean> {
  * For user-owned integrations, we explicitly check that owned_by_organization_id is null
  * to avoid returning organization-owned integrations
  */
-export async function getInstallation(owner: Owner): Promise<PlatformIntegration | null> {
-  const [integration] = await db
+export async function getInstallation(
+  owner: Owner,
+  database: typeof db | DrizzleTransaction = db
+): Promise<PlatformIntegration | null> {
+  const [integration] = await database
     .select()
     .from(platform_integrations)
     .where(
@@ -206,9 +218,10 @@ function isOwnedBy(integration: PlatformIntegration, owner: Owner): boolean {
  */
 export async function getConflictingSlackInstallation(
   owner: Owner,
-  teamId: string
+  teamId: string,
+  database: typeof db | DrizzleTransaction = db
 ): Promise<PlatformIntegration | null> {
-  const integrations = await db
+  const integrations = await database
     .select()
     .from(platform_integrations)
     .where(
@@ -255,30 +268,35 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
 /**
  * Dual-write the bot token into the encrypted `slack_oauth_credentials` store.
  *
- * Deliberately best-effort for now: nothing reads that store yet, so an unconfigured
- * or failing encryption keyset must not break Slack installs. Step 3 moves the read
- * paths onto the store, at which point this write becomes required and must move
- * inside the same transaction as the `platform_integrations` write.
+ * Deliberately best-effort while readers still use installation metadata. A
+ * supplied installation transaction also contains this write, with a savepoint
+ * keeping a credential failure from aborting the installation.
  */
-async function mirrorSlackCredential({
-  integration,
-  owner,
-  teamId,
-  installation,
-}: {
-  integration: PlatformIntegration;
-  owner: Owner;
-  teamId: string;
-  installation: SlackInstallation;
-}): Promise<void> {
+async function mirrorSlackCredential(
+  {
+    integration,
+    owner,
+    teamId,
+    installation,
+  }: {
+    integration: PlatformIntegration;
+    owner: Owner;
+    teamId: string;
+    installation: SlackInstallation;
+  },
+  database: typeof db | DrizzleTransaction
+): Promise<void> {
   try {
-    await writeSlackCredential({
-      integrationId: integration.id,
-      slackTeamId: teamId,
-      owner,
-      botToken: installation.botToken,
-      botUserId: installation.botUserId ?? null,
-    });
+    await writeSlackCredential(
+      {
+        integrationId: integration.id,
+        slackTeamId: teamId,
+        owner,
+        botToken: installation.botToken,
+        botUserId: installation.botUserId ?? null,
+      },
+      database
+    );
   } catch (error) {
     captureException(error, {
       level: 'error',
@@ -290,30 +308,54 @@ async function mirrorSlackCredential({
 
 /**
  * Create or update Slack installation from the Chat SDK OAuth callback result.
+ *
+ * An organization connection holds a shared bot token and model policy, so moving
+ * it to another Slack workspace is refused unless the caller passes
+ * `allowWorkspaceRebind` after verifying organization-management authority.
  */
-export async function upsertSlackInstallation({
-  owner,
-  teamId,
-  installation,
-}: {
-  owner: Owner;
-  teamId: string;
-  installation: SlackInstallation;
-}): Promise<PlatformIntegration> {
-  const existing = await getInstallation(owner);
+export async function upsertSlackInstallation(
+  {
+    owner,
+    teamId,
+    installation,
+    allowWorkspaceRebind = false,
+    defaultModel: suppliedDefaultModel,
+  }: {
+    owner: Owner;
+    teamId: string;
+    installation: SlackInstallation;
+    allowWorkspaceRebind?: boolean;
+    defaultModel?: string;
+  },
+  database: typeof db | DrizzleTransaction = db
+): Promise<PlatformIntegration> {
+  const existing = await getInstallation(owner, database);
   const teamName = installation.teamName || 'Unknown Team';
+  // Legacy rows can carry the workspace id only in `platform_account_id`.
+  const boundTeamId = existing?.platform_installation_id ?? existing?.platform_account_id ?? null;
 
-  const conflicting = await getConflictingSlackInstallation(owner, teamId);
+  const conflicting = await getConflictingSlackInstallation(owner, teamId, database);
   if (conflicting) {
     throw new SlackWorkspaceAlreadyConnectedError(teamName);
+  }
+
+  if (
+    existing &&
+    !allowWorkspaceRebind &&
+    owner.type === 'org' &&
+    boundTeamId &&
+    boundTeamId !== teamId
+  ) {
+    throw new SlackWorkspaceRebindNotAllowedError();
   }
 
   // For org integrations, get a model that respects org access policy.
   // For user integrations, use the shared bot default model.
   const defaultModel =
-    owner.type === 'org'
+    suppliedDefaultModel ??
+    (owner.type === 'org'
       ? await getDefaultAllowedModel(owner.id, DEFAULT_BOT_MODEL)
-      : DEFAULT_BOT_MODEL;
+      : DEFAULT_BOT_MODEL);
 
   const metadata = {
     ...(existing?.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}),
@@ -330,7 +372,7 @@ export async function upsertSlackInstallation({
 
   if (existing) {
     try {
-      const [updated] = await db
+      const [updated] = await database
         .update(platform_integrations)
         .set({
           platform_installation_id: teamId,
@@ -344,7 +386,7 @@ export async function upsertSlackInstallation({
         .where(eq(platform_integrations.id, existing.id))
         .returning();
 
-      await mirrorSlackCredential({ integration: updated, owner, teamId, installation });
+      await mirrorSlackCredential({ integration: updated, owner, teamId, installation }, database);
 
       return updated;
     } catch (error) {
@@ -356,7 +398,7 @@ export async function upsertSlackInstallation({
   }
 
   try {
-    const [created] = await db
+    const [created] = await database
       .insert(platform_integrations)
       .values({
         owned_by_user_id: owner.type === 'user' ? owner.id : null,
@@ -373,7 +415,7 @@ export async function upsertSlackInstallation({
       })
       .returning();
 
-    await mirrorSlackCredential({ integration: created, owner, teamId, installation });
+    await mirrorSlackCredential({ integration: created, owner, teamId, installation }, database);
 
     return created;
   } catch (error) {

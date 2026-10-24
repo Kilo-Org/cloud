@@ -1,5 +1,4 @@
 import type { NextRequest } from 'next/server';
-import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
@@ -8,6 +7,7 @@ import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   appendIntegrationOAuthRedirectQuery,
   parseOAuthStateOwner,
+  safeCallbackContext,
 } from '@/lib/integrations/oauth/common';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import {
@@ -48,16 +48,6 @@ function redirectWithStatus(
     ? appendIntegrationOAuthRedirectQuery(state.returnTo, `${key}=${encodeURIComponent(value)}`)
     : `${defaultPath}?${key}=${encodeURIComponent(value)}`;
   return NextResponse.redirect(new URL(path, APP_URL));
-}
-
-function safeCallbackContext(searchParams: URLSearchParams) {
-  const state = searchParams.get('state');
-  return {
-    hasCode: Boolean(searchParams.get('code')),
-    hasState: Boolean(state),
-    stateHash: state ? createHash('sha256').update(state).digest('hex').slice(0, 8) : null,
-    hasProviderError: Boolean(searchParams.get('error')),
-  };
 }
 
 function validOAuthCode(code: string | null): string | null {

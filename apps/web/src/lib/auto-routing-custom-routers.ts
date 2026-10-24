@@ -27,6 +27,7 @@ import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { auto_routing_custom_routers, type User } from '@kilocode/db/schema';
 import {
   getCustomRouterStatus,
+  getPlatformMeasurements,
   registerOwnerBenchmarkProfiles,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client';
 import {
@@ -206,7 +207,12 @@ export function needsClientEval(
   clientEval: boolean,
   variants: readonly CustomRouterVariantStatus[]
 ): boolean {
-  return clientEval && !(variants.length > 0 && variants.every(v => v.status === 'ready'));
+  return (
+    clientEval &&
+    !(
+      variants.length > 0 && variants.every(variant => variant.linked || variant.status === 'ready')
+    )
+  );
 }
 
 async function fetchVariantStatuses(
@@ -286,6 +292,14 @@ async function gatewayEntryRejections(params: {
   entries: CustomRouterEntry[];
 }): Promise<ReadonlyMap<string, string>> {
   const rejections = new Map<string, string>();
+  for (const entry of params.entries) {
+    if (entry.kind === 'gateway' && !requiresClientEval(entry) && entry.measuredAs) {
+      throw new CustomRouterApiError(
+        'invalid_request',
+        'measuredAs is only for entries the platform cannot serve'
+      );
+    }
+  }
   if (!params.entries.some(entry => entry.kind === 'gateway')) return rejections;
   const catalog = await buildEligibleCatalog({
     userId: params.userId,
@@ -309,6 +323,46 @@ function validateNewGatewayEntries(params: {
     const rejection = params.rejections.get(key);
     if (rejection && !params.existingKeys.has(key)) {
       throw new CustomRouterApiError('invalid_request', `entries.${index}: ${rejection}`);
+    }
+  });
+}
+
+export async function platformMeasurements(baseRouter: AutoRouter) {
+  try {
+    const result = await getPlatformMeasurements(baseRouter);
+    if (result.status !== 200 || !('models' in result.body)) {
+      throw new Error(`Platform measurements request failed: ${result.status}`);
+    }
+    return result.body;
+  } catch (error) {
+    captureException(error, { tags: { source: 'auto_routing_platform_measurements' } });
+    throw new CustomRouterApiError(
+      'internal_error',
+      'Could not load platform measurements. Try again.'
+    );
+  }
+}
+
+async function validateLinkedEntries(
+  entries: CustomRouterEntry[],
+  baseRouter: AutoRouter,
+  existingEntries: readonly CustomRouterEntry[] = []
+): Promise<void> {
+  const existingLinks = new Map(
+    existingEntries.map(entry => [customRouterEntryKey(entry), entry.measuredAs])
+  );
+  const needsValidation = (entry: CustomRouterEntry) =>
+    entry.measuredAs !== undefined &&
+    entry.measuredAs !== existingLinks.get(customRouterEntryKey(entry));
+  if (!entries.some(needsValidation)) return;
+  const measurements = await platformMeasurements(baseRouter);
+  const models = new Set(measurements.models.map(model => model.model));
+  entries.forEach((entry, index) => {
+    if (needsValidation(entry) && entry.measuredAs && !models.has(entry.measuredAs)) {
+      throw new CustomRouterApiError(
+        'invalid_request',
+        `entries.${index}.measuredAs: ${entry.measuredAs} has no ready platform measurement for the ${baseRouter} base router`
+      );
     }
   });
 }
@@ -491,6 +545,7 @@ export async function createCustomRouterResponse(
     await lockOwner(tx, owner);
     assertCanCreate(await ownerRouterSlugs(tx, owner), input.slug);
     validateNewGatewayEntries({ entries: input.entries, existingKeys: new Set(), rejections });
+    await validateLinkedEntries(input.entries, input.baseRouter);
     await requestPlatformBenchmarks({
       owner,
       baseRouter: input.baseRouter,
@@ -575,6 +630,11 @@ export async function updateCustomRouterResponse(
       rejections,
     });
     if (input.entries !== undefined || input.baseRouter !== undefined) {
+      await validateLinkedEntries(
+        next.entries,
+        next.baseRouter,
+        next.baseRouter === current.baseRouter ? current.entries : []
+      );
       await requestPlatformBenchmarks({
         owner,
         baseRouter: next.baseRouter,
@@ -617,8 +677,8 @@ export async function registerClientEntryResponse(
   const { scope, slug } = parseRouterParams(params);
   const parsed = RegisterClientEntryRequestSchema.safeParse(await readJsonBody(request));
   if (!parsed.success) throw invalidRequest(parsed.error);
-  const entry = parsed.data.entry;
-  const key = customRouterEntryKey(entry);
+  const incoming = parsed.data.entry;
+  const key = customRouterEntryKey(incoming);
   const owner = await resolveEditableOwner(context, scope);
 
   const router = await db.transaction(async tx => {
@@ -631,10 +691,18 @@ export async function registerClientEntryResponse(
         `A custom router can include at most ${MAX_CUSTOM_ROUTER_ENTRIES} models`
       );
     }
+    // Re-registering refreshes capabilities and pricing; a stored link stays unless the CLI sends
+    // a new one. The web editor clears links.
+    const storedLink = index === -1 ? undefined : current.entries[index]?.measuredAs;
+    const entry =
+      incoming.measuredAs === undefined && storedLink !== undefined
+        ? { ...incoming, measuredAs: storedLink }
+        : incoming;
     const entries =
       index === -1
         ? [...current.entries, entry]
         : current.entries.map((existing, i) => (i === index ? entry : existing));
+    await validateLinkedEntries([entry], current.baseRouter, current.entries);
     return saveRouter(tx, { ...current, entries });
   });
 

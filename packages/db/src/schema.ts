@@ -11177,11 +11177,12 @@ export const agent_briefing_reports = pgTable(
 // typed by @kilocode/auto-routing-contracts, so a shape change here fails to
 // compile at those call sites.
 export type AutoRoutingCustomRouterEntry =
-  | { kind: 'gateway'; model: string }
+  | { kind: 'gateway'; model: string; measuredAs?: string }
   | {
       kind: 'client';
       provider: string;
       model: string;
+      measuredAs?: string;
       variants: string[];
       capabilities: {
         contextLength: number | null;

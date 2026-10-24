@@ -9,13 +9,15 @@ import {
   customRouterEntryKey,
   customRouterModelId,
   isVirtualAutoModelId,
+  suggestMeasuredAs,
   type AutoRouter,
   type AutoRoutingMode,
   type CustomRouterEntry,
   type OwnerType,
   type CustomRouterSummary,
 } from '@kilocode/auto-routing-contracts';
-import { useMutation } from '@tanstack/react-query';
+import { isDirectByokModelId } from '@kilocode/worker-utils/direct-byok-model';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { Trash2 } from 'lucide-react';
 import React, { useId, useMemo, useState } from 'react';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
@@ -46,6 +48,7 @@ import {
   customRouterItemEndpoint,
   customRoutersEndpoint,
   entryLabel,
+  fetchPlatformMeasurements,
   readCustomRouterResponse,
 } from './custom-router-display';
 
@@ -103,6 +106,19 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
   const [addModelId, setAddModelId] = useState<string | undefined>();
   const [submitted, setSubmitted] = useState(false);
   const modelsQuery = useModelSelectorList(organizationId);
+  const measurementsQuery = useQuery({
+    queryKey: [
+      'auto-routing-platform-measurements',
+      draft.baseRouter,
+      organizationId ?? 'personal',
+    ],
+    queryFn: () => fetchPlatformMeasurements(draft.baseRouter, organizationId),
+  });
+  const measuredModels = measurementsQuery.data?.models.map(item => item.model) ?? [];
+  const measurementOptions: ModelOption[] = measuredModels.map(model => ({
+    id: model,
+    name: model,
+  }));
 
   const entryKeys = useMemo(() => new Set(draft.entries.map(customRouterEntryKey)), [draft]);
   const modelOptions = useMemo<ModelOption[]>(
@@ -133,20 +149,24 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
         entries: draft.entries,
         defaultEntryKey: draft.defaultEntryKey,
       };
+      const entriesChanged =
+        draft.entries.length !== router?.entries.length ||
+        draft.entries.some(
+          (entry, index) =>
+            customRouterEntryKey(entry) !== router?.entries[index]?.key ||
+            entry.measuredAs !== router?.entries[index]?.entry.measuredAs
+        );
+      // The API moves entries and the default together, so an entries update always carries it.
       const patch = router
         ? {
             name: fields.name,
             ...(draft.baseRouter !== router.baseRouter ? { baseRouter: draft.baseRouter } : {}),
             ...(draft.mode !== router.mode ? { mode: draft.mode } : {}),
-            ...(draft.entries.length !== router.entries.length ||
-            draft.entries.some(
-              (entry, index) => customRouterEntryKey(entry) !== router.entries[index]?.key
-            )
-              ? { entries: draft.entries }
-              : {}),
-            ...(draft.defaultEntryKey !== router.defaultEntryKey
-              ? { defaultEntryKey: draft.defaultEntryKey }
-              : {}),
+            ...(entriesChanged
+              ? { entries: draft.entries, defaultEntryKey: draft.defaultEntryKey }
+              : draft.defaultEntryKey !== router.defaultEntryKey
+                ? { defaultEntryKey: draft.defaultEntryKey }
+                : {}),
           }
         : fields;
       const response = router
@@ -198,6 +218,19 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
             : current.defaultEntryKey,
       };
     });
+  };
+
+  const setMeasuredAs = (key: string, measuredAs: string | undefined) => {
+    setDraft(current => ({
+      ...current,
+      entries: current.entries.map(entry => {
+        if (customRouterEntryKey(entry) !== key) return entry;
+        const updatedEntry = { ...entry };
+        if (measuredAs) updatedEntry.measuredAs = measuredAs;
+        else delete updatedEntry.measuredAs;
+        return updatedEntry;
+      }),
+    }));
   };
 
   const handleSubmit = (event: React.FormEvent) => {
@@ -323,26 +356,111 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
               <ul className="space-y-2">
                 {draft.entries.map(entry => {
                   const key = customRouterEntryKey(entry);
+                  const canLink =
+                    entry.kind === 'client' ||
+                    entry.measuredAs !== undefined ||
+                    isDirectByokModelId(entry.model);
+                  const suggestion = canLink
+                    ? suggestMeasuredAs(
+                        {
+                          provider: entry.kind === 'client' ? entry.provider : null,
+                          model: entry.model,
+                        },
+                        measuredModels
+                      )
+                    : null;
+                  const linkOptions =
+                    entry.measuredAs && !measuredModels.includes(entry.measuredAs)
+                      ? [{ id: entry.measuredAs, name: entry.measuredAs }, ...measurementOptions]
+                      : measurementOptions;
                   return (
-                    <li
-                      key={key}
-                      className="bg-card flex items-center justify-between gap-2 rounded-md border px-3 py-2"
-                    >
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="truncate font-mono text-sm">{entryLabel(entry)}</span>
-                        {entry.kind === 'client' ? <Badge variant="secondary">Client</Badge> : null}
+                    <li key={key} className="bg-card space-y-3 rounded-md border px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <span className="truncate font-mono text-sm">{entryLabel(entry)}</span>
+                          {entry.kind === 'client' ? (
+                            <Badge variant="secondary">Client</Badge>
+                          ) : null}
+                          {entry.measuredAs ? (
+                            <Badge
+                              variant="outline"
+                              className="max-w-full whitespace-normal break-all"
+                            >
+                              Linked to {entry.measuredAs}
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="size-8 shrink-0"
+                          disabled={pending}
+                          aria-label={`Remove ${entryLabel(entry)} from pool`}
+                          onClick={() => removeEntry(key)}
+                        >
+                          <Trash2 className="size-4" aria-hidden />
+                        </Button>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="size-8 shrink-0"
-                        disabled={pending}
-                        aria-label={`Remove ${entryLabel(entry)} from pool`}
-                        onClick={() => removeEntry(key)}
-                      >
-                        <Trash2 className="size-4" aria-hidden />
-                      </Button>
+                      {canLink ? (
+                        <div className="space-y-2">
+                          <p className="text-muted-foreground text-xs">
+                            Link this entry to a platform model to reuse its benchmark measurements.
+                            Linking does not change which model handles requests.
+                          </p>
+                          {!entry.measuredAs && suggestion ? (
+                            <div className="flex flex-wrap items-center gap-2 text-sm">
+                              <span className="break-all">Suggested: {suggestion}</span>
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                disabled={pending}
+                                onClick={() => setMeasuredAs(key, suggestion)}
+                              >
+                                Confirm link
+                              </Button>
+                            </div>
+                          ) : null}
+                          <ModelCombobox
+                            id={fieldId(`measurement-${key}`)}
+                            label={`Platform measurement for ${entryLabel(entry)}`}
+                            models={linkOptions}
+                            value={entry.measuredAs}
+                            onValueChange={value => setMeasuredAs(key, value)}
+                            isLoading={measurementsQuery.isLoading}
+                            loadingText="Loading platform measurements..."
+                            emptyStateText="No platform measurements available"
+                            placeholder="Choose a platform model"
+                            disabled={pending || measurementsQuery.isError}
+                            modal
+                          />
+                          {entry.measuredAs ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              disabled={pending}
+                              onClick={() => setMeasuredAs(key, undefined)}
+                            >
+                              Clear link
+                            </Button>
+                          ) : null}
+                          {measurementsQuery.isError ? (
+                            <div role="alert" className="text-destructive text-sm">
+                              Could not load platform measurements. Existing links are unchanged.
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => void measurementsQuery.refetch()}
+                              >
+                                Retry measurements
+                              </Button>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </li>
                   );
                 })}

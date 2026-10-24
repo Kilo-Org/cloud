@@ -10,9 +10,17 @@ import { z } from 'zod';
 
 import { PrReviewFileList } from '@/components/pr-review/diff/pr-diff-file-list';
 import { PrDiffFileNavigator } from '@/components/pr-review/diff/pr-diff-file-navigator';
-import { PrMergeSheet, providerPrNounKey } from '@/components/pr-review/merge/pr-merge-sheet';
+import { PrMergeSheet } from '@/components/pr-review/merge/pr-merge-sheet';
+import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
 import { PrReviewChecksSection } from '@/components/pr-review/pr-review-checks-section';
+import {
+  PrReviewOverviewCopyFixture,
+  type PrReviewOverviewFixtureSurface,
+  reviewOverviewFixture,
+} from '@/components/pr-review/pr-review-overview-copy-fixture';
+import { PrReviewReviewSubmitScreen } from '@/components/pr-review/pr-review-review-submit-screen';
 import { ScreenHeader } from '@/components/screen-header';
+import { FeedbackPromptProvider } from '@/components/use-feedback-prompt';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 import {
   pendingReviewDraftKey,
@@ -31,6 +39,12 @@ import { TRPCProvider } from '@/lib/trpc';
 // searching fetches the final page through the usual pagination hook.
 const triple = { owner: 'sample', repo: 'review-copy', number: 1 };
 const headSha = '0123456789abcdef0123456789abcdef01234567';
+const OVERVIEW_SURFACES = ['overview', 'merge-request-missing', 'merge-request-error'] as const;
+
+function isOverviewSurface(surface: string | undefined): surface is PrReviewOverviewFixtureSurface {
+  return OVERVIEW_SURFACES.some(candidate => candidate === surface);
+}
+
 const scope: ProviderPrScope = {
   ref: { platform: 'gitlab', projectPath: 'sample/review-copy', mrIid: 1 },
   organizationId: null,
@@ -86,6 +100,7 @@ const checks = {
 
 type RouterOutputs = inferRouterOutputs<MobileRouter>;
 type FixtureReadData =
+  | RouterOutputs['githubPrReview']['getPullRequest']
   | RouterOutputs['githubPrReview']['listChecks']
   | RouterOutputs['githubPrReview']['listFiles']
   | RouterOutputs['user']['getMe'];
@@ -110,6 +125,9 @@ function createFixtureClient() {
           const url = input instanceof Request ? input.url : input.toString();
           if (init?.method !== 'GET') {
             throw new Error('Review copy fixture does not allow writes');
+          }
+          if (url.includes('/githubPrReview.getPullRequest')) {
+            return fixtureResponse(reviewOverviewFixture);
           }
           if (url.includes('/githubPrReview.listChecks')) {
             return fixtureResponse(checks);
@@ -220,6 +238,19 @@ export function PrReviewCopyFixture() {
         {header}
         <PrReviewFileList {...triple} headSha={headSha} changedFiles={files.length} />
       </PendingReviewProvider>
+    );
+  } else if (isOverviewSurface(surface)) {
+    content = <PrReviewOverviewCopyFixture surface={surface} />;
+  } else if (surface === 'submit') {
+    content = (
+      <FeedbackPromptProvider>
+        <PendingReviewProvider
+          userId="review-copy-fixture"
+          draftEntityKey={pendingReviewDraftKey(triple.owner, triple.repo, triple.number)}
+        >
+          <PrReviewReviewSubmitScreen />
+        </PendingReviewProvider>
+      </FeedbackPromptProvider>
     );
   } else {
     content = (

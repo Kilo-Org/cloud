@@ -77,6 +77,7 @@ import {
 } from '@/lib/hooks/remote-instance-spawn-classifier';
 import {
   resolveContinueStartDisabled,
+  resolveNewSessionConnectProvider,
   resolveNewSessionStartBlockedReason,
   resolveNewSessionStartDisabled,
   resolveRemoteStartMissingContent,
@@ -259,19 +260,23 @@ export function NewSessionScreenBody() {
     },
     [stackSafeRouter, searchParams, userId, isCloneEntry]
   );
+  // One line, label left and control right: the organization is a value the
+  // user changes in place, not a section with a control under its title.
   const organizationSection = (
-    <View className="mt-5">
-      <Text className="mb-2 text-sm font-medium text-muted-foreground">
+    <View className="mt-5 min-h-11 flex-row items-center justify-between gap-3">
+      <Text className="shrink-0 text-sm font-medium text-muted-foreground">
         {t('common.organization')}
       </Text>
-      {isCloneEntry ? (
-        <ContextControl scope={{ organizationId: organizationId ?? null, isResolved: true }} />
-      ) : (
-        <ContextControl
-          value={organizationId ?? null}
-          onSelectionChange={handleOrganizationSwitch}
-        />
-      )}
+      <View className="min-w-0 shrink flex-row items-center justify-end">
+        {isCloneEntry ? (
+          <ContextControl scope={{ organizationId: organizationId ?? null, isResolved: true }} />
+        ) : (
+          <ContextControl
+            value={organizationId ?? null}
+            onSelectionChange={handleOrganizationSwitch}
+          />
+        )}
+      </View>
     </View>
   );
 
@@ -1020,7 +1025,11 @@ export function NewSessionScreenBody() {
   // The repository section's own settle state, separated from the repository
   // count exactly as the extension separates provider connect from repo count.
   const hasRepositories = repositories.length > 0;
-  const hasConnectableProvider = groups.some(group => group.status === 'connect');
+  // One source of truth for "a provider can still be connected" and which one
+  // the footer's connect action opens: the first group in the `connect` state,
+  // in the section's fixed github/gitlab/bitbucket order.
+  const connectProviderPlatform = resolveNewSessionConnectProvider(groups);
+  const hasConnectableProvider = connectProviderPlatform !== null;
   const isLoadingRepositories = groups.some(group => group.status === 'loading');
 
   const startBlockedReasonKey = resolveNewSessionStartBlockedReason(
@@ -1069,14 +1078,31 @@ export function NewSessionScreenBody() {
   );
 
   let startBlockedReason: string | null = null;
+  let startBlockedAction: { label: string; onPress: () => void; isBusy?: boolean } | null = null;
   if (runOnInstance === null && computerTargetSelected) {
     startBlockedReason = stripInlineCodeMarkers(
       t('agentChat.instancePicker.noCliInstancesDescription')
     );
   } else if (startBlockedReasonKey === 'connect-provider') {
     startBlockedReason = t('agentChat.newSession.connectProviderToStart');
+    // `connect-provider` requires at least one connectable group, so a target
+    // exists exactly when this branch runs; fall back to no action if it ever
+    // does not, rather than opening a broken connect flow.
+    if (connectProviderPlatform !== null) {
+      startBlockedAction = {
+        label: t('common.connectProvider'),
+        onPress: () => {
+          openIntegration(connectProviderPlatform);
+        },
+      };
+    }
   } else if (startBlockedReasonKey === 'refresh-repositories') {
-    startBlockedReason = t('agentChat.newSession.refreshRepositories');
+    startBlockedReason = t('common.noRepositoriesFound');
+    startBlockedAction = {
+      label: t('agentChat.newSession.refreshRepositories'),
+      onPress: () => void refreshReposForceFresh(),
+      isBusy: isRetrying,
+    };
   } else if (startBlockedReasonKey === 'select-repository') {
     startBlockedReason = t('agentChat.newSession.selectRepositoryToStart');
   } else if (startBlockedReasonKey === 'enter-prompt') {
@@ -1251,6 +1277,7 @@ export function NewSessionScreenBody() {
         isStartDisabled={isStartDisabled}
         isSpawningRemote={remoteSpawn.isSpawningRemote}
         startBlockedReason={startBlockedReason}
+        startBlockedAction={startBlockedAction}
         onStartSession={handleStartSession}
         cloudCreateError={cloudCreateError}
         onRetryCloudCreate={handleStartSession}

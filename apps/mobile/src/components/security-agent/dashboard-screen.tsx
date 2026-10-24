@@ -256,6 +256,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        className="px-6"
         title={t('common.securityAgent')}
         // Size-11 (44dp) icon buttons: findings and settings, plus the audit
         // overflow when the viewer can manage the agent. Declaring exactly the
@@ -263,7 +264,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         // before the one-line CJK title loses its readable minimum.
         headerRightWidth={canManage ? 3 * 44 : 2 * 44}
         headerRight={
-          <View className="flex-row items-center">
+          <View className="flex-row items-center gap-2">
             <IconButton
               onPress={() => {
                 router.push(getSecurityAgentPath(scope, 'findings'));

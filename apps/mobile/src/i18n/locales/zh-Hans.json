@@ -53,6 +53,7 @@
     "connected": "已连接",
     "couldNotLoadModels": "无法加载模型",
     "couldNotLoadRepositories": "无法加载仓库",
+    "noRepositoriesFound": "未找到仓库",
     "critical": "严重",
     "delete": "删除",
     "deleted": "已删除",
@@ -87,6 +88,7 @@
     "connect": "连接",
     "connectBitbucket": "连接 Bitbucket",
     "connectGitlab": "连接 GitLab",
+    "connectProvider": "连接代码托管平台",
     "contentTruncated": "内容已截断",
     "copyLink": "复制链接",
     "couldNotLoadOrganizations": "无法加载组织",
@@ -145,7 +147,8 @@
     "agent": "智能体",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "更改"
+    "changes": "更改",
+    "organizationTrialEnded": "组织的试用期已结束，且没有生效的套餐。组织所有者可以在 kilo.ai 更新账单信息，然后重试。"
   },
   "language": {
     "restarting": "正在重启以应用语言设置",
@@ -269,7 +272,6 @@
     "voiceInput": "语音输入",
     "autoExpandThinking": "自动展开思考过程",
     "autoExpandThinkingSubtitle": "智能体思考结束后，自动展开思考过程。",
-    "autoExpandThinkingInactiveSubtitle": "思考详情处于隐藏状态时不产生任何效果。",
     "hideThinking": "隐藏思考详情",
     "hideThinkingSubtitle": "不在会话页面显示智能体的思考过程。",
     "keepScreenOn": "在会话页面保持屏幕常亮",
@@ -294,7 +296,8 @@
     "condenseToolCallsSubtitle": "将连续的工具调用合并为一行，点击即可打开。",
     "toolSummaryTranslation": "翻译工具摘要",
     "toolSummaryTranslationSubtitle": "将每个工具摘要发送给模型，翻译成你的应用语言。翻译失败时将显示原文。",
-    "toolSummaryTranslationModelUnavailableNotice": "此模型已不再提供。点按$t(common.model)选择其他模型。"
+    "toolSummaryTranslationModelUnavailableNotice": "此模型已不再提供。点按$t(common.model)选择其他模型。",
+    "autoExpandThinkingInactiveSubtitle": "思考详情处于隐藏状态时不产生任何效果。"
   },
   "notifications": {
     "liveActivities": "实时活动",
@@ -883,7 +886,6 @@
       "gitlabNoRepositoriesDescription": "你可能需要授予对 GitLab 上更多群组或项目的访问权限。",
       "installGithubApp": "为仓库安装 GitHub 应用",
       "installGithubAppDescription": "请授予 Kilo GitHub 应用访问待审查仓库的权限。",
-      "noRepositoriesFound": "未找到仓库",
       "repositoryAccess": "仓库访问权限"
     },
     "style": {
@@ -907,7 +909,6 @@
     "followReviewMd": "遵循 REVIEW.md",
     "followReviewMdSubtitle": "遵循各仓库 REVIEW.md 文件中的说明",
     "manualReview": {
-      "connectProvider": "连接代码托管平台",
       "connectProviderDescription": "连接 GitHub，即可手动发起拉取请求审查。",
       "couldNotCheckProviderStatus": "无法检查代码托管平台的状态",
       "couldNotLoadProviders": "无法加载已连接的代码托管平台。请重试。",
@@ -916,6 +917,8 @@
       "invalidUrl": "请输入有效的拉取请求 URL。",
       "pullRequestUrl": "拉取请求 URL",
       "start": "开始审查",
+      "starting": "正在启动审查…",
+      "title": "手动审查",
       "startNotFound": "无法从 {{provider}} 读取该 {{requestNoun}}。请检查 URL 是否正确，以及仓库是否可访问。",
       "startRateLimited": "{{provider}}目前限制了请求频率。请几分钟后再试。",
       "startNotAllowed": "您没有权限对该 {{requestNoun}} 发起审查。请检查您的权限以及您所在组织的套餐。",
@@ -923,9 +926,7 @@
       "startAlreadyRunning": "该{{requestNoun}}的审查已在进行中。",
       "startRejected": "该{{requestNoun}}无法审查。请确认其处于开启状态、不是草稿，且 URL 正确。",
       "startProviderUnavailable": "无法连接{{provider}}以读取该{{requestNoun}}。请重试。",
-      "startFailed": "无法启动审查。请检查网络连接后重试。",
-      "starting": "正在启动审查…",
-      "title": "手动审查"
+      "startFailed": "无法启动审查。请检查网络连接后重试。"
     },
     "notConnectedReadOnly": "尚未连接 {{platform}}。只有组织所有者和管理员可以完成连接。",
     "gitlab": {
@@ -963,12 +964,6 @@
       "findingsUnavailable": "由于本次审查失败，结果不可用。",
       "serviceUnavailable": "无法连接到代码审查服务。请在服务可用时重试审查。",
       "reviewFailed": "审查失败。请重试。",
-      "cancelReasonSuperseded": "推送了更新的提交，因此此审查已被替换。",
-      "cancelReasonIntegrationDisconnected": "{{platform}} 已断开连接，因此此审查已被取消。请重新连接，然后重新运行审查。",
-      "cancelReasonBitbucketReviewerDisabled": "Bitbucket 的 Code Reviewer 已被关闭，因此此审查已被取消。请重新启用，然后重新运行审查。",
-      "cancelReasonBitbucketPullRequestChanged": "Bitbucket 拉取请求已更改，因此此审查已被替换。",
-      "cancelReasonCancelled": "此审查已被取消。",
-      "cancelReasonInterrupted": "此审查已被中断。",
       "retryMessage": "这将重新执行代码审查。",
       "retryReview": "重试审查",
       "retryNeedsSettings": "代码审查器已关闭，或其设置需要处理。请修复设置，然后重试此审查。",
@@ -976,6 +971,8 @@
       "retryTitle": "重试审查？",
       "showMore": "显示更多",
       "started": "开始时间",
+      "reviewEnded": "结束时间",
+      "severityNitpick": "吹毛求疵",
       "threshold": "阈值",
       "title": "审查",
       "tokens": "词元",
@@ -994,7 +991,13 @@
       "sessionError": "会话出错：{{error}}。",
       "statusWithValue": "状态：{{status}}",
       "toolName": "工具：{{name}}",
-      "toolNameError": "工具 {{name}} 出错。"
+      "toolNameError": "工具 {{name}} 出错。",
+      "cancelReasonSuperseded": "推送了更新的提交，因此此审查已被替换。",
+      "cancelReasonIntegrationDisconnected": "{{platform}} 已断开连接，因此此审查已被取消。请重新连接，然后重新运行审查。",
+      "cancelReasonBitbucketReviewerDisabled": "Bitbucket 的 Code Reviewer 已被关闭，因此此审查已被取消。请重新启用，然后重新运行审查。",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket 拉取请求已更改，因此此审查已被替换。",
+      "cancelReasonCancelled": "此审查已被取消。",
+      "cancelReasonInterrupted": "此审查已被中断。"
     },
     "reviewList": {
       "configureProvider": "配置代码托管平台",
@@ -1158,12 +1161,18 @@
       "actorSystem": "Kilo 系统",
       "couldNotLoad": "无法加载审计报告",
       "events": "事件",
+      "eventConfidence": "置信度：{{confidence}}",
+      "eventReason": "原因：{{reason}}",
+      "eventsCount_one": "{{displayCount}} 个事件",
+      "eventsCount_other": "{{displayCount}} 个事件",
       "generated": "已于 {{generatedAt}} 生成",
       "noActivity": "暂无活动记录",
       "noActivityDescription": "从 {{start}} 到 {{end}}，Kilo 没有可纳入报告的安全问题活动记录。",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "报告查询未完成。请重试。",
       "repositoryNotRecorded": "未记录仓库",
+      "reasonUnknown": "未识别的原因",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "报告摘要",
       "title": "审计报告",
       "unavailable": "审计报告不可用",
@@ -1274,7 +1283,7 @@
       "deadlinePassed": "截止时间已过",
       "deadlinePassedDetail": "严重：{{critical}} 个，高危：{{high}} 个",
       "dueThisWeek": "本周到期",
-      "dueThisWeekDetail": "{{exploitable}} 个已确认可利用",
+      "dueThisWeekDetail": "其中 {{exploitable}} 个已确认可利用",
       "noDeadline": "无截止时间",
       "reviewSlaAssignment": "检查 SLA 设置",
       "allOpenFindingsTracked": "所有未解决的安全问题均已纳入跟踪"
@@ -1405,6 +1414,7 @@
       "reauthorizeButton": "重新授权 GitHub 应用",
       "reauthorizeDescription": "安全智能体需要读取 Dependabot 警报的权限。请重新授权 GitHub 应用以授予此权限。",
       "reauthorizeTitle": "需要额外权限",
+      "retryFailed": "仍然无法加载安全智能体。请检查网络连接，然后重试。",
       "setupFailed": "无法启动 GitHub 配置流程。请重试。"
     },
     "settingsOverview": {
@@ -1610,8 +1620,8 @@
       "dollar_other": "美元",
       "costSpoken": "费用 {{cost}}",
       "costSpokenWithTime": "费用 {{cost}}，{{time}}",
-      "spokenJoiner": "和",
-      "pullRequest": "拉取请求 {{number}}"
+      "pullRequest": "拉取请求 {{number}}",
+      "spokenJoiner": "和"
     },
     "githubInstall": {
       "couldNotOpenMessage": "无法开始设置 GitHub 应用。请重试。",
@@ -2041,7 +2051,10 @@
       "allowOnceAccessibility": "仅允许一次",
       "alwaysAllow": "始终允许",
       "alwaysAllowAccessibility": "始终允许",
-      "retrying": "正在重试……"
+      "retrying": "正在重试……",
+      "retryDeny": "再次尝试拒绝",
+      "retryAllowOnce": "再次尝试仅允许一次",
+      "retryAlwaysAllow": "再次尝试始终允许"
     },
     "questionCard": {
       "title": "智能体需要你的输入",
@@ -3109,22 +3122,16 @@
     "boundary": {
       "backToProfile": "返回个人资料",
       "loadErrorMessage": "请检查网络连接后重试。",
-
       "chooseAccount": "选择账户",
       "loadErrorTitle": "无法加载你的组织列表",
       "membershipLostNotice": "你已无法访问此组织。已切换至 {{target}}。",
       "noOrganization": "无组织",
-
       "noOrganizationDescription": "此账户不属于任何组织。请在网页版创建或加入组织，以使用成员邀请和低余额提醒等组织功能。",
-
       "openWebOrganizations": "在网页版打开组织",
-
       "organizationUnavailable": "此组织不可用",
       "selectDescriptionWithOrganizations": "你属于一个或多个组织。请选择此屏幕应使用的账户。",
-
       "selectOrganization": "选择组织",
       "unavailableDescription": "此组织已不可用。请从账户选择器中选择其他账户后继续。",
-
       "unavailableSessionsDescription": "此组织已不可用。无法加载其会话。",
       "accessDeniedDescription": "你无权访问此组织。"
     },
@@ -3154,14 +3161,16 @@
       "renameTitle": "重命名组织"
     },
     "inviteMember": {
-      "alreadyInvited": "该邮箱已被邀请或已是成员。",
       "emailError": "请输入有效的邮箱地址。",
       "emailPlaceholder": "邮箱地址，如 name@company.com",
       "permissionDenied": "你没有邀请成员的权限。",
       "roleMember": "角色：成员",
-      "sendError": "无法发送邀请。",
       "sendInvite": "发送邀请",
-      "title": "邀请成员"
+      "title": "邀请成员",
+      "alreadyInvited": "该邮箱已被邀请或已是成员。",
+      "sendError": "无法发送邀请。",
+      "pendingInvitation": "该邮箱已有待处理的邀请。",
+      "alreadyMember": "此人已是该组织的成员。"
     },
     "invoices": {
       "downloadA11y": "下载发票 {{number}}",
@@ -3230,8 +3239,13 @@
       "inviteCreated": "邀请已创建",
       "pendingInvitations": "待接受的邀请",
       "resendInvite": "重新发送邀请",
+      "shareInviteLink": "分享邀请链接",
       "resendInviteError": "无法重新发送邀请。",
-      "shareInviteLink": "分享邀请链接"
+      "inviteNotResendable": "该邀请无法重新发送。",
+      "ownerAuthority": "只有组织所有者才能管理所有者。",
+      "ownRoleChange": "您无法更改自己的角色。",
+      "inviteExpired": "该邀请已过期。",
+      "inviteAccepted": "该邀请已被接受。"
     },
     "usageStats": {
       "inputTokens": "输入词元",
@@ -3377,11 +3391,11 @@
   },
   "transcriptionModel": {
     "title": "转写模型",
-    "choose": "选择模型",
     "noneChosen": "未选择",
     "emptyTitle": "没有转写模型",
     "emptyDescription": "Kilo Gateway 当前没有提供转写模型。",
-    "loadFailed": "无法加载转写模型。"
+    "loadFailed": "无法加载转写模型。",
+    "choose": "选择模型"
   },
   "voiceLanguage": {
     "title": "语音输入语言",
@@ -3403,7 +3417,6 @@
   },
   "modelChat": {
     "offlineFailure": "此模型需要联网。请连接网络后重试，或切换到此设备上的模型。",
-    "creditsRequired": "额度不足，无法发送此消息。请充值额度后重试。",
     "empty": {
       "title": "开始聊天",
       "description": "发送消息以与模型聊天。"
@@ -3597,6 +3610,7 @@
       "fromHuggingFace": "来自 Hugging Face",
       "loading": "正在加载模型",
       "noResults": "未找到模型",
+      "noResultsForQuery": "未找到与\"{{query}}\"相关的模型",
       "noFits": "没有适配此设备的模型",
       "noFitsDescription": "更大的模型位于“$t(common.all)”标签页中。",
       "fit": {
@@ -3671,13 +3685,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "此模型支持思考强度"
-    }
+    },
+    "creditsRequired": "额度不足，无法发送此消息。请充值额度后重试。"
   },
   "settingsTools": {
     "confirmTitle": "确认此更改？"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "您最近的仓库",
+      "confirmMessage": "仓库：{{repository}}。请求：{{prompt}}。",
+      "confirmTitle": "启动此智能体？",
       "promptRequired": "启动智能体需要提示词。请添加提示词后重新运行。",
       "repositoryRequired": "启动智能体需要一个仓库。请打开 Kilo，选择一个仓库，然后重新运行。",
       "repositoryUnknown": "Kilo 无法将 {{repository}} 识别为 GitHub 或 GitLab 仓库。请在 Kilo 中选择其他仓库。",
@@ -3706,10 +3724,10 @@
     "noSpend": "尚无支出记录",
     "spend24h": "过去 24 小时的支出",
     "multiplierError": "请输入 1 或更大的倍数",
-    "multiplierMaxError": "请输入 {{max}} 或更小的倍数",
-    "thresholdMaxError": "请输入不大于 {{max}} 的金额。",
     "permissionDenied": "你没有管理支出提醒的权限。",
-    "pushOffByCategory": "已在通知中关闭"
+    "pushOffByCategory": "已在通知中关闭",
+    "multiplierMaxError": "请输入 {{max}} 或更小的倍数",
+    "thresholdMaxError": "请输入不大于 {{max}} 的金额。"
   },
   "profiles": {
     "title": "配置文件",
@@ -3768,7 +3786,6 @@
     },
     "variablesEmpty": "还没有变量",
     "variablesSaveFailed": "无法保存变量",
-    "variablesDeleteFailed": "无法删除变量",
     "commandsTitle": "设置命令",
     "addCommand": "添加命令",
     "commandLabel": "命令",
@@ -3779,7 +3796,6 @@
     "moveDown": "下移",
     "moveCommandUp": "上移命令 {{position}}",
     "moveCommandDown": "下移命令 {{position}}",
-    "deleteCommand": "删除命令 {{position}}",
     "skillsTitle": "技能",
     "addSkill": "添加技能",
     "skillNameLabel": "技能名称",
@@ -3863,7 +3879,7 @@
     "slashCommands": {
       "title": "斜杠命令",
       "add": "添加斜杠命令",
-      "empty": "还没有斜线命令",
+      "empty": "还没有斜杠命令",
       "name": "命令名称",
       "description": "命令说明",
       "template": "模板",
@@ -3901,7 +3917,9 @@
       "pinFailed": "无法固定仓库",
       "unboundToast": "仓库已解除绑定",
       "unbindFailed": "无法解除仓库绑定"
-    }
+    },
+    "variablesDeleteFailed": "无法删除变量",
+    "deleteCommand": "删除命令 {{position}}"
   },
   "credits": {
     "title": "购买额度",
@@ -3928,7 +3946,6 @@
       "newList": "新建列表",
       "empty": "暂无列表",
       "couldNotLoad": "无法加载列表",
-      "createFailed": "无法创建列表",
       "noRepository": "无仓库",
       "rowA11y": "{{name}}，{{openCount}}",
       "openCount_one": "{{count}} 个未完成",
@@ -3938,7 +3955,8 @@
       "archive": "归档",
       "unarchive": "取消归档",
       "deleteTitle": "删除 {{name}}？",
-      "deleteMessage": "其中的待办事项也会被删除，关联的会话会保留。"
+      "deleteMessage": "其中的待办事项也会被删除，关联的会话会保留。",
+      "createFailed": "无法创建列表"
     },
     "listSettings": {
       "title": "列表设置",
@@ -4006,21 +4024,20 @@
     }
   },
   "agentBriefing": {
-    "title": "晨间简报",
+    "title": "智能体简报",
     "atLeast": "≥{{value}}",
     "coverageHint": "部分历史活动可能缺失。≥ 表示至少为该值；未知不等于零。",
     "available": "可用简报",
     "history": "简报历史",
-    "historyHint": "报告保留 30 天，包括已关闭的报告。",
+    "historyHint": "简报保留 30 天，包括已关闭的简报。",
     "settings": "简报设置",
-    "saved": "简报设置已保存",
-    "empty": "夜间无活动",
-    "emptyHint": "夜间有活动后，你的云端和 CLI 编码会话将显示在这里。",
+    "empty": "此简报时段内无活动",
+    "emptyHint": "定时简报有活动时，你的云端和 CLI 编码会话将显示在这里。",
     "loadError": "无法加载简报",
-    "sessions": "夜间活跃",
+    "sessions": "时段内活跃",
     "pullRequests": "已创建的 PRs",
     "blockers": "新增阻塞项",
-    "spend": "夜间花费",
+    "spend": "时段内花费",
     "view": "阅读简报",
     "viewWithPreview": "$t(agentBriefing.view)。{{preview}}",
     "scheduleTimeLabel": "{{label}}，{{time}}",
@@ -4042,13 +4059,13 @@
     "sources": "证据与产物",
     "timezone": "简报时区",
     "deviceTimezone": "使用设备时区",
-    "timezoneHint": "IANA 时区，例如 Europe/Berlin。日程更改将从之后的夜间生效。",
-    "nightStart": "夜间开始",
-    "morningStart": "夜间结束/早晨开始",
-    "morningEnd": "早晨结束",
-    "timeHint": "早晨结束时，首页卡片将恢复显示实时状态，离线时也是如此。",
-    "invalidSchedule": "请选择有效时区，并设置不重叠且不为空的夜间和早晨时段。",
-    "notificationsHint": "每天早晨首份报告就绪时发送一条通用通知。与付费 AI 摘要无关。",
+    "timezoneHint": "IANA 时区，例如 Europe/Berlin。日程更改将从之后的简报生效。",
+    "nightStart": "简报时段开始",
+    "morningStart": "简报就绪时间",
+    "morningEnd": "简报可用至",
+    "timeHint": "简报时段结束时，首页卡片将恢复显示实时状态，离线时也是如此。",
+    "invalidSchedule": "请选择有效时区，并设置不为空的简报时段。",
+    "notificationsHint": "每个定时简报发送一条通用通知。与付费 AI 摘要无关。",
     "notificationPermission": "请在$t(common.notifications)中启用设备通知以接收简报。",
     "aiOptIn": "付费 AI 摘要",
     "aiHint": "仅对此上下文可选。经选择和脱敏的摘录及结构化信息将以你的应用语言发送给模型。费用从此上下文的余额中扣除。",
@@ -4066,7 +4083,7 @@
     "contextSettings": "AI 设置 · {{context}}",
     "allContexts": "个人和组织简报相互独立。",
     "create": "创建简报",
-    "oneOff": "单次",
+    "oneOff": "按需",
     "createdAt": "创建于 {{time}}",
     "chooseContext": "选择一个使用情境",
     "period": "简报时段",
@@ -4088,13 +4105,16 @@
     "emptyPeriod": "此时段内没有活动。不会生成 AI 摘要，也不会收费。",
     "emptyHistory": "没有已保存的简报",
     "historicalStateHint": "会话状态反映所选时段结束时的状态，而非当前实时状态。",
-    "oneOffHint": "AI 会以你的应用语言接收经过筛选且已隐去敏感信息的资料。此单次报告不会更改你的晨间日程或 AI 偏好设置。",
+    "oneOffHint": "AI 会以你的应用语言接收经过筛选且已隐去敏感信息的资料。此按需简报不会更改你的定时简报或 AI 偏好设置。",
     "createOffline": "请连接网络以查看或创建简报。离线时，付费请求绝不会加入队列。",
     "estimateInputTooLarge": "此时段的资料量超出所选模型可处理的范围。",
     "estimatePermissionUnavailable": "你没有使用此使用情境余额的权限。",
+    "createFailed": "无法创建此简报。",
+    "reviewFailed": "无法查看此简报。",
     "estimatePricingUnavailable": "该模型的价格信息不可用。",
     "estimateBalanceUnavailable": "余额不足，无法生成付费摘要。",
     "estimateModelNotAllowed": "此处不允许使用该模型。",
-    "estimateSpendLimitTooLow": "请提高消费保护限额以允许此摘要。"
+    "estimateSpendLimitTooLow": "请提高消费保护限额以允许此摘要。",
+    "saved": "简报设置已保存"
   }
 }

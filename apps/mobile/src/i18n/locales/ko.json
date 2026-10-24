@@ -53,6 +53,7 @@
     "connected": "연결됨",
     "couldNotLoadModels": "모델을 불러오지 못했습니다.",
     "couldNotLoadRepositories": "저장소를 불러오지 못했습니다.",
+    "noRepositoriesFound": "저장소를 찾을 수 없습니다",
     "critical": "치명적",
     "delete": "삭제",
     "deleted": "삭제됨",
@@ -87,6 +88,7 @@
     "connect": "연결",
     "connectBitbucket": "Bitbucket 연결",
     "connectGitlab": "GitLab 연결",
+    "connectProvider": "서비스 연결",
     "contentTruncated": "내용 일부 생략됨",
     "copyLink": "링크 복사",
     "couldNotLoadOrganizations": "조직을 불러오지 못했습니다.",
@@ -145,7 +147,8 @@
     "agent": "대리인",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "변경 사항"
+    "changes": "변경 사항",
+    "organizationTrialEnded": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. 조직 소유자는 kilo.ai에서 결제 정보를 업데이트한 후 다시 시도하세요."
   },
   "language": {
     "restarting": "언어 적용을 위해 다시 시작 중",
@@ -269,7 +272,6 @@
     "voiceInput": "음성 입력",
     "autoExpandThinking": "추론 내용 자동 펼치기",
     "autoExpandThinkingSubtitle": "에이전트의 추론이 끝나면 추론 내용을 펼쳐서 표시합니다.",
-    "autoExpandThinkingInactiveSubtitle": "추론 내용이 숨겨진 동안에는 효과가 없습니다.",
     "hideThinking": "추론 내용 숨기기",
     "hideThinkingSubtitle": "세션 화면에서 에이전트의 추론을 표시하지 않습니다.",
     "keepScreenOn": "세션 화면에서 화면 켜짐 유지",
@@ -294,7 +296,8 @@
     "condenseToolCallsSubtitle": "연속된 도구 호출을 열 수 있는 하나의 행으로 그룹화합니다.",
     "toolSummaryTranslation": "도구 요약 번역",
     "toolSummaryTranslationSubtitle": "각 도구 요약을 모델로 보내 앱 언어로 번역합니다. 번역에 실패하면 원본이 표시됩니다.",
-    "toolSummaryTranslationModelUnavailableNotice": "이 모델은 더 이상 제공되지 않습니다. 다른 모델을 선택하려면 $t(common.model)을 탭하세요."
+    "toolSummaryTranslationModelUnavailableNotice": "이 모델은 더 이상 제공되지 않습니다. 다른 모델을 선택하려면 $t(common.model)을 탭하세요.",
+    "autoExpandThinkingInactiveSubtitle": "추론 내용이 숨겨진 동안에는 효과가 없습니다."
   },
   "notifications": {
     "liveActivities": "실시간 활동",
@@ -883,7 +886,6 @@
       "gitlabNoRepositoriesDescription": "GitLab에서 더 많은 그룹이나 프로젝트에 대한 접근 권한을 부여해야 할 수 있습니다.",
       "installGithubApp": "저장소에 GitHub 앱 설치",
       "installGithubAppDescription": "Kilo GitHub 앱에 리뷰할 저장소의 접근 권한을 부여하세요.",
-      "noRepositoriesFound": "저장소를 찾을 수 없습니다",
       "repositoryAccess": "저장소 접근 권한"
     },
     "style": {
@@ -907,7 +909,6 @@
     "followReviewMd": "REVIEW.md 따르기",
     "followReviewMdSubtitle": "저장소별 REVIEW.md 파일의 지침을 따릅니다.",
     "manualReview": {
-      "connectProvider": "서비스 연결",
       "connectProviderDescription": "풀 리퀘스트 수동 리뷰를 시작하려면 GitHub를 연결하세요.",
       "couldNotCheckProviderStatus": "연결 서비스 상태를 확인할 수 없습니다.",
       "couldNotLoadProviders": "연결된 서비스를 불러올 수 없습니다. 다시 시도하세요.",
@@ -916,6 +917,8 @@
       "invalidUrl": "올바른 풀 리퀘스트 URL을 입력하세요.",
       "pullRequestUrl": "풀 리퀘스트 URL",
       "start": "리뷰 시작",
+      "starting": "리뷰 시작 중…",
+      "title": "수동 리뷰",
       "startNotFound": "해당 {{requestNoun}}을 {{provider}}에서 불러올 수 없습니다. URL과 저장소에 접근할 수 있는지 확인하세요.",
       "startRateLimited": "{{provider}}에서 현재 요청을 제한하고 있습니다. 몇 분 후에 다시 시도하세요.",
       "startNotAllowed": "해당 {{requestNoun}}에 대한 리뷰를 시작할 권한이 없습니다. 사용자의 권한과 조직의 플랜을 확인하세요.",
@@ -923,9 +926,7 @@
       "startAlreadyRunning": "해당 {{requestNoun}}에 대한 리뷰가 이미 실행 중입니다.",
       "startRejected": "해당 {{requestNoun}}을 리뷰할 수 없습니다. 열려 있는지, 초안이 아닌지, URL이 올바른지 확인하세요.",
       "startProviderUnavailable": "해당 {{requestNoun}}을 읽기 위해 {{provider}}에 연결할 수 없습니다. 다시 시도하세요.",
-      "startFailed": "리뷰를 시작할 수 없습니다. 연결 상태를 확인하고 다시 시도하세요.",
-      "starting": "리뷰 시작 중…",
-      "title": "수동 리뷰"
+      "startFailed": "리뷰를 시작할 수 없습니다. 연결 상태를 확인하고 다시 시도하세요."
     },
     "notConnectedReadOnly": "{{platform}} 연결이 설정되지 않았습니다. 조직 소유자와 관리자만 연결할 수 있습니다.",
     "gitlab": {
@@ -963,12 +964,6 @@
       "findingsUnavailable": "이 리뷰가 실패하여 결과를 확인할 수 없습니다.",
       "serviceUnavailable": "코드 리뷰 서비스에 연결할 수 없습니다. 서비스를 사용할 수 있게 되면 리뷰를 다시 시도해 주세요.",
       "reviewFailed": "리뷰에 실패했습니다. 다시 시도해 주세요.",
-      "cancelReasonSuperseded": "최신 커밋이 푸시되어 이 리뷰가 대체되었습니다.",
-      "cancelReasonIntegrationDisconnected": "{{platform}} 연결이 끊어져 이 리뷰가 취소되었습니다. 다시 연결한 후 리뷰를 다시 실행해 주세요.",
-      "cancelReasonBitbucketReviewerDisabled": "Bitbucket에서 Code Reviewer가 꺼져 있어 이 리뷰가 취소되었습니다. 다시 켠 후 리뷰를 다시 실행해 주세요.",
-      "cancelReasonBitbucketPullRequestChanged": "Bitbucket 풀 리퀘스트가 변경되어 이 리뷰가 대체되었습니다.",
-      "cancelReasonCancelled": "이 리뷰가 취소되었습니다.",
-      "cancelReasonInterrupted": "이 리뷰가 중단되었습니다.",
       "retryMessage": "코드 리뷰가 다시 실행됩니다.",
       "retryReview": "리뷰 다시 시도",
       "retryNeedsSettings": "코드 리뷰어가 꺼져 있거나 설정을 확인해야 합니다. 설정을 수정한 다음 이 리뷰를 다시 시도하세요.",
@@ -976,6 +971,8 @@
       "retryTitle": "리뷰를 다시 시도할까요?",
       "showMore": "더 보기",
       "started": "시작 일시",
+      "reviewEnded": "종료 일시",
+      "severityNitpick": "사소함",
       "threshold": "판정 기준",
       "title": "리뷰",
       "tokens": "토큰",
@@ -994,7 +991,13 @@
       "sessionError": "세션에서 오류가 발생했습니다: {{error}}",
       "statusWithValue": "상태: {{status}}",
       "toolName": "도구: {{name}}",
-      "toolNameError": "도구 {{name}}에서 오류가 발생했습니다."
+      "toolNameError": "도구 {{name}}에서 오류가 발생했습니다.",
+      "cancelReasonSuperseded": "최신 커밋이 푸시되어 이 리뷰가 대체되었습니다.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} 연결이 끊어져 이 리뷰가 취소되었습니다. 다시 연결한 후 리뷰를 다시 실행해 주세요.",
+      "cancelReasonBitbucketReviewerDisabled": "Bitbucket에서 Code Reviewer가 꺼져 있어 이 리뷰가 취소되었습니다. 다시 켠 후 리뷰를 다시 실행해 주세요.",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket 풀 리퀘스트가 변경되어 이 리뷰가 대체되었습니다.",
+      "cancelReasonCancelled": "이 리뷰가 취소되었습니다.",
+      "cancelReasonInterrupted": "이 리뷰가 중단되었습니다."
     },
     "reviewList": {
       "configureProvider": "연결 서비스 설정",
@@ -1158,12 +1161,18 @@
       "actorSystem": "Kilo 시스템",
       "couldNotLoad": "감사 보고서를 불러올 수 없습니다.",
       "events": "이벤트",
+      "eventConfidence": "신뢰도: {{confidence}}",
+      "eventReason": "사유: {{reason}}",
+      "eventsCount_one": "{{displayCount}}개 이벤트",
+      "eventsCount_other": "{{displayCount}}개 이벤트",
       "generated": "{{generatedAt}}에 생성되었습니다.",
       "noActivity": "기록된 활동 없음",
       "noActivityDescription": "{{start}}부터 {{end}}까지 Kilo에 보고할 보안 문제 관련 활동이 없습니다.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "보고서 조회를 완료하지 못했습니다. 다시 시도하세요.",
       "repositoryNotRecorded": "저장소가 기록되지 않음",
+      "reasonUnknown": "알 수 없는 사유",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "보고서 요약",
       "title": "감사 보고서",
       "unavailable": "감사 보고서 열람 불가",
@@ -1274,7 +1283,7 @@
       "deadlinePassed": "마감일 지남",
       "deadlinePassedDetail": "치명적 {{critical}}건, 높음 {{high}}건",
       "dueThisWeek": "이번 주 마감",
-      "dueThisWeekDetail": "악용 가능성이 확인된 문제 {{exploitable}}건",
+      "dueThisWeekDetail": "이 중 악용 가능성이 확인된 문제 {{exploitable}}건",
       "noDeadline": "마감일 없음",
       "reviewSlaAssignment": "SLA 지정 내역 검토",
       "allOpenFindingsTracked": "모든 미해결 문제 추적 중"
@@ -1405,6 +1414,7 @@
       "reauthorizeButton": "GitHub 앱 재승인",
       "reauthorizeDescription": "보안 에이전트가 Dependabot 알림을 읽으려면 권한이 필요합니다. 이 권한을 부여하려면 GitHub 앱을 다시 승인하세요.",
       "reauthorizeTitle": "추가 권한 필요",
+      "retryFailed": "보안 에이전트를 계속 불러올 수 없습니다. 연결을 확인한 후 다시 시도하세요.",
       "setupFailed": "GitHub 설정을 시작할 수 없습니다. 다시 시도하세요."
     },
     "settingsOverview": {
@@ -1610,8 +1620,8 @@
       "dollar_other": "달러",
       "costSpoken": "비용 {{cost}}",
       "costSpokenWithTime": "비용 {{cost}}, {{time}}",
-      "spokenJoiner": "및",
-      "pullRequest": "풀 리퀘스트 {{number}}"
+      "pullRequest": "풀 리퀘스트 {{number}}",
+      "spokenJoiner": "및"
     },
     "githubInstall": {
       "couldNotOpenMessage": "GitHub 앱 설정을 시작하지 못했습니다. 다시 시도하세요.",
@@ -2041,7 +2051,10 @@
       "allowOnceAccessibility": "이번만 허용",
       "alwaysAllow": "항상 허용",
       "alwaysAllowAccessibility": "항상 허용",
-      "retrying": "다시 시도 중…"
+      "retrying": "다시 시도 중…",
+      "retryDeny": "거부 다시 시도",
+      "retryAllowOnce": "이번만 허용 다시 시도",
+      "retryAlwaysAllow": "항상 허용 다시 시도"
     },
     "questionCard": {
       "title": "에이전트의 질문",
@@ -3109,22 +3122,16 @@
     "boundary": {
       "backToProfile": "프로필로 돌아가기",
       "loadErrorMessage": "인터넷 연결을 확인하고 다시 시도하세요.",
-
       "chooseAccount": "계정 선택",
       "loadErrorTitle": "조직 목록을 불러올 수 없습니다.",
       "membershipLostNotice": "이 조직에 더 이상 접근할 수 없습니다. {{target}}(으)로 전환되었습니다.",
       "noOrganization": "조직 없음",
-
       "noOrganizationDescription": "이 계정은 조직에 속해 있지 않습니다. 멤버 초대 및 잔액 부족 알림과 같은 조직 기능을 사용하려면 웹에서 조직을 만들거나 참여하세요.",
-
       "openWebOrganizations": "웹에서 조직 열기",
-
       "organizationUnavailable": "조직을 사용할 수 없습니다.",
       "selectDescriptionWithOrganizations": "귀하는 하나 이상의 조직에 속해 있습니다. 이 화면에서 사용할 계정을 선택하세요.",
-
       "selectOrganization": "조직 선택",
       "unavailableDescription": "이 조직은 더 이상 사용할 수 없습니다. 계속하려면 프로필에서 다른 조직을 선택하세요.",
-
       "unavailableSessionsDescription": "이 조직은 더 이상 사용할 수 없습니다. 세션을 불러올 수 없습니다.",
       "accessDeniedDescription": "이 조직에 접근할 권한이 없습니다."
     },
@@ -3154,14 +3161,16 @@
       "renameTitle": "조직 이름 변경"
     },
     "inviteMember": {
-      "alreadyInvited": "이미 초대되었거나 이미 멤버입니다.",
       "emailError": "올바른 이메일 주소를 입력하세요.",
       "emailPlaceholder": "이름@회사.com",
       "permissionDenied": "멤버를 초대할 권한이 없습니다.",
       "roleMember": "멤버 역할로 초대합니다.",
-      "sendError": "초대를 보내지 못했습니다.",
       "sendInvite": "초대 보내기",
-      "title": "멤버 초대"
+      "title": "멤버 초대",
+      "alreadyInvited": "이미 초대되었거나 이미 멤버입니다.",
+      "sendError": "초대를 보내지 못했습니다.",
+      "pendingInvitation": "이 이메일에는 이미 보류 중인 초대가 있습니다.",
+      "alreadyMember": "이 사용자는 이미 이 조직의 멤버입니다."
     },
     "invoices": {
       "downloadA11y": "청구서 {{number}} 다운로드",
@@ -3230,8 +3239,13 @@
       "inviteCreated": "초대를 만들었습니다.",
       "pendingInvitations": "수락 대기 중인 초대",
       "resendInvite": "초대 다시 보내기",
+      "shareInviteLink": "초대 링크 공유",
       "resendInviteError": "초대를 다시 보내지 못했습니다.",
-      "shareInviteLink": "초대 링크 공유"
+      "inviteNotResendable": "이 초대는 더 이상 다시 보낼 수 없습니다.",
+      "ownerAuthority": "조직 소유자만 소유자를 관리할 수 있습니다.",
+      "ownRoleChange": "자신의 역할은 변경할 수 없습니다.",
+      "inviteExpired": "이 초대는 만료되었습니다.",
+      "inviteAccepted": "이 초대는 이미 수락되었습니다."
     },
     "usageStats": {
       "inputTokens": "입력 토큰",
@@ -3377,11 +3391,11 @@
   },
   "transcriptionModel": {
     "title": "음성 텍스트 변환 모델",
-    "choose": "모델 선택",
     "noneChosen": "선택 안 됨",
     "emptyTitle": "음성 텍스트 변환 모델 없음",
     "emptyDescription": "지금 Kilo Gateway에서 제공하는 음성 텍스트 변환 모델이 없습니다.",
-    "loadFailed": "음성 텍스트 변환 모델을 불러오지 못했습니다."
+    "loadFailed": "음성 텍스트 변환 모델을 불러오지 못했습니다.",
+    "choose": "모델 선택"
   },
   "voiceLanguage": {
     "title": "음성 입력 언어",
@@ -3403,7 +3417,6 @@
   },
   "modelChat": {
     "offlineFailure": "이 모델은 인터넷 연결이 필요합니다. 연결한 후 다시 시도하거나 이 기기의 모델로 전환하세요.",
-    "creditsRequired": "이 메시지를 보낼 크레딧이 부족합니다. 크레딧을 충전한 후 다시 시도하세요.",
     "empty": {
       "title": "채팅 시작하기",
       "description": "모델과 대화하려면 메시지를 보내세요."
@@ -3597,6 +3610,7 @@
       "fromHuggingFace": "Hugging Face 제공",
       "loading": "모델을 불러오는 중",
       "noResults": "모델을 찾을 수 없습니다",
+      "noResultsForQuery": "\"{{query}}\"에 대한 모델을 찾을 수 없습니다",
       "noFits": "이 기기에 적합한 모델이 없습니다",
       "noFitsDescription": "더 큰 모델은 $t(common.all) 탭에 있습니다.",
       "fit": {
@@ -3671,13 +3685,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "이 모델은 추론 강도를 지원합니다"
-    }
+    },
+    "creditsRequired": "이 메시지를 보낼 크레딧이 부족합니다. 크레딧을 충전한 후 다시 시도하세요."
   },
   "settingsTools": {
     "confirmTitle": "이 변경 사항을 확인할까요?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "가장 최근 저장소",
+      "confirmMessage": "저장소: {{repository}}. 요청: {{prompt}}",
+      "confirmTitle": "이 에이전트를 시작할까요?",
       "promptRequired": "에이전트를 시작하려면 프롬프트가 필요합니다. 프롬프트를 추가하고 다시 실행하세요.",
       "repositoryRequired": "에이전트를 시작하려면 저장소가 필요합니다. Kilo를 열고 저장소를 선택한 다음 다시 실행하세요.",
       "repositoryUnknown": "Kilo는 {{repository}}을(를) GitHub 또는 GitLab 저장소로 인식하지 않습니다. Kilo에서 다른 저장소를 선택하세요.",
@@ -3706,10 +3724,10 @@
     "noSpend": "아직 기록된 지출이 없습니다",
     "spend24h": "최근 24시간 지출",
     "multiplierError": "1 이상의 배수를 입력하세요",
-    "multiplierMaxError": "{{max}} 이하의 배수를 입력하세요",
-    "thresholdMaxError": "{{max}} 이하의 금액을 입력하세요.",
     "permissionDenied": "지출 알림을 관리할 권한이 없습니다.",
-    "pushOffByCategory": "알림에서 꺼짐"
+    "pushOffByCategory": "알림에서 꺼짐",
+    "multiplierMaxError": "{{max}} 이하의 배수를 입력하세요",
+    "thresholdMaxError": "{{max}} 이하의 금액을 입력하세요."
   },
   "profiles": {
     "title": "프로필",
@@ -3768,7 +3786,6 @@
     },
     "variablesEmpty": "아직 변수가 없습니다.",
     "variablesSaveFailed": "변수를 저장할 수 없습니다.",
-    "variablesDeleteFailed": "변수를 삭제할 수 없습니다",
     "commandsTitle": "설정 명령",
     "addCommand": "명령 추가",
     "commandLabel": "명령",
@@ -3779,7 +3796,6 @@
     "moveDown": "아래로 이동",
     "moveCommandUp": "명령 {{position}}을(를) 위로 이동",
     "moveCommandDown": "명령 {{position}}을(를) 아래로 이동",
-    "deleteCommand": "명령 {{position}}을(를) 삭제",
     "skillsTitle": "기술",
     "addSkill": "스킬 추가",
     "skillNameLabel": "스킬명",
@@ -3901,7 +3917,9 @@
       "pinFailed": "저장소를 고정할 수 없습니다.",
       "unboundToast": "레포 언바운드",
       "unbindFailed": "저장소를 바인딩 해제할 수 없습니다."
-    }
+    },
+    "variablesDeleteFailed": "변수를 삭제할 수 없습니다",
+    "deleteCommand": "명령 {{position}}을(를) 삭제"
   },
   "credits": {
     "title": "크레딧 구매",
@@ -3928,7 +3946,6 @@
       "newList": "새 목록",
       "empty": "아직 목록이 없습니다",
       "couldNotLoad": "목록을 불러올 수 없습니다",
-      "createFailed": "목록을 만들 수 없습니다",
       "noRepository": "저장소 없음",
       "rowA11y": "{{name}} — {{openCount}}",
       "openCount_one": "{{count}}개 열림",
@@ -3938,7 +3955,8 @@
       "archive": "보관",
       "unarchive": "보관 해제",
       "deleteTitle": "{{name}} 삭제할까요?",
-      "deleteMessage": "할 일도 함께 삭제됩니다. 세션은 유지됩니다."
+      "deleteMessage": "할 일도 함께 삭제됩니다. 세션은 유지됩니다.",
+      "createFailed": "목록을 만들 수 없습니다"
     },
     "listSettings": {
       "title": "목록 설정",
@@ -4006,21 +4024,20 @@
     }
   },
   "agentBriefing": {
-    "title": "아침 브리핑",
+    "title": "에이전트 브리핑",
     "atLeast": "≥{{value}}",
     "coverageHint": "일부 과거 활동이 누락되었을 수 있습니다. ≥는 최소값을 의미하며, 알 수 없음은 0이 아닙니다.",
     "available": "사용 가능한 브리핑",
     "history": "브리핑 기록",
-    "historyHint": "닫은 보고서를 포함해 보고서는 30일간 보관됩니다.",
+    "historyHint": "브리핑은 닫은 브리핑을 포함해 30일간 보관됩니다.",
     "settings": "브리핑 설정",
-    "saved": "브리핑 설정이 저장되었습니다",
-    "empty": "야간 활동 없음",
-    "emptyHint": "활동이 있었던 밤이 지나면 클라우드 및 CLI 코딩 세션이 여기에 표시됩니다.",
+    "empty": "이 브리핑 기간 동안 활동 없음",
+    "emptyHint": "예약된 브리핑에 활동이 있으면 클라우드 및 CLI 코딩 세션이 여기에 표시됩니다.",
     "loadError": "브리핑을 불러올 수 없습니다",
-    "sessions": "야간 활동",
+    "sessions": "기간 내 활동",
     "pullRequests": "생성된 PRs",
     "blockers": "새 차단 요소",
-    "spend": "야간 지출",
+    "spend": "기간 내 지출",
     "view": "브리핑 읽기",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4042,13 +4059,13 @@
     "sources": "근거 및 아티팩트",
     "timezone": "브리핑 시간대",
     "deviceTimezone": "기기 시간대 사용",
-    "timezoneHint": "IANA 시간대(예: Europe/Berlin). 일정 변경은 다음 밤부터 적용됩니다.",
-    "nightStart": "밤 시작",
-    "morningStart": "밤 종료 / 아침 시작",
-    "morningEnd": "아침 종료",
-    "timeHint": "아침이 끝나면 오프라인 상태에서도 홈 카드가 실시간 상태로 돌아갑니다.",
-    "invalidSchedule": "유효한 시간대를 선택하고, 겹치지 않으며 비어 있지 않은 밤과 아침 시간을 설정하세요.",
-    "notificationsHint": "첫 보고서가 준비되면 아침마다 일반 알림을 한 번 보냅니다. 유료 AI 요약과는 별개입니다.",
+    "timezoneHint": "IANA 시간대(예: Europe/Berlin). 일정 변경은 향후 브리핑에 적용됩니다.",
+    "nightStart": "브리핑 기간 시작",
+    "morningStart": "브리핑 준비 완료 시각",
+    "morningEnd": "브리핑 제공 종료 시각",
+    "timeHint": "브리핑 기간이 끝나면 오프라인 상태에서도 홈 카드가 실시간 상태로 돌아갑니다.",
+    "invalidSchedule": "유효한 시간대와 비어 있지 않은 브리핑 기간을 선택하세요.",
+    "notificationsHint": "예약된 브리핑마다 일반 알림을 한 번 보냅니다. 유료 AI 요약과는 별개입니다.",
     "notificationPermission": "브리핑을 받으려면 $t(common.notifications)에서 기기 알림을 켜세요.",
     "aiOptIn": "유료 AI 요약",
     "aiHint": "이 컨텍스트에만 적용되는 선택 사항입니다. 선택 및 비식별 처리된 발췌문과 구조화된 정보가 앱 언어로 모델에 전송됩니다. 요금은 이 컨텍스트의 잔액에서 차감됩니다.",
@@ -4064,12 +4081,12 @@
     "paidDisclosure": "예상 {{estimate}}, 최대 {{maximum}}, 제한 시간 {{minutes}}분. 생성에 실패해도 요금이 부과됩니다.",
     "enable": "유료 요약 사용",
     "contextSettings": "AI 설정 · {{context}}",
-    "allContexts": "개인 및 조직 브리핑은 별도로 관리됩니다.",
+    "allContexts": "개인 및 조직 브리핑은 별도로 유지됩니다.",
     "create": "브리핑 만들기",
-    "oneOff": "일회성",
+    "oneOff": "온디맨드",
     "createdAt": "{{time}} 생성",
     "chooseContext": "컨텍스트 하나 선택",
-    "period": "브리핑 대상 기간",
+    "period": "브리핑 기간",
     "last24Hours": "지난 24시간",
     "last7Days": "지난 7일",
     "customPeriod": "사용자 지정 기간",
@@ -4088,13 +4105,16 @@
     "emptyPeriod": "이 기간에 활동이 없습니다. AI 요약이 생성되지 않으며 요금도 부과되지 않습니다.",
     "emptyHistory": "저장된 브리핑 없음",
     "historicalStateHint": "세션 상태는 현재 실시간 상태가 아니라 선택한 기간의 종료 시점 상태를 반영합니다.",
-    "oneOffHint": "AI는 선택된 근거 자료에서 민감한 정보를 가린 후 앱 언어로 전달받습니다. 이 일회성 보고서는 아침 일정이나 AI 환경설정을 변경하지 않습니다.",
+    "oneOffHint": "AI는 선택된 근거 자료에서 민감한 정보를 가린 후 앱 언어로 전달받습니다. 이 온디맨드 브리핑은 예약된 브리핑이나 AI 환경설정을 변경하지 않습니다.",
     "createOffline": "브리핑을 검토하거나 만들려면 인터넷에 연결하세요. 유료 요청은 오프라인 상태에서 대기열에 추가되지 않습니다.",
     "estimateInputTooLarge": "이 기간의 근거 자료가 선택한 모델이 처리하기에 너무 많습니다.",
     "estimatePermissionUnavailable": "이 컨텍스트의 잔액을 사용할 권한이 없습니다.",
+    "createFailed": "이 브리핑을 만들 수 없습니다.",
+    "reviewFailed": "이 브리핑을 검토할 수 없습니다.",
     "estimatePricingUnavailable": "이 모델의 가격 정보를 사용할 수 없습니다.",
     "estimateBalanceUnavailable": "유료 요약을 위한 잔액이 부족합니다.",
     "estimateModelNotAllowed": "이 모델은 여기서 사용할 수 없습니다.",
-    "estimateSpendLimitTooLow": "이 요약을 허용하려면 지출 안전장치를 높이세요."
+    "estimateSpendLimitTooLow": "이 요약을 허용하려면 지출 안전장치를 높이세요.",
+    "saved": "브리핑 설정이 저장되었습니다"
   }
 }

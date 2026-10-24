@@ -53,6 +53,7 @@
     "connected": "সংযুক্ত",
     "couldNotLoadModels": "মডেল লোড করা যায়নি।",
     "couldNotLoadRepositories": "রিপোজিটরি লোড করা যায়নি।",
+    "noRepositoriesFound": "কোনো রিপোজিটরি পাওয়া যায়নি",
     "critical": "অতি গুরুতর",
     "delete": "মুছুন",
     "deleted": "মোছা হয়েছে",
@@ -87,6 +88,7 @@
     "connect": "সংযুক্ত করুন",
     "connectBitbucket": "Bitbucket সংযুক্ত করুন",
     "connectGitlab": "GitLab সংযুক্ত করুন",
+    "connectProvider": "একটি প্রোভাইডার সংযুক্ত করুন",
     "contentTruncated": "বিষয়বস্তু আংশিক দেখানো হয়েছে",
     "copyLink": "লিঙ্ক কপি করুন",
     "couldNotLoadOrganizations": "সংস্থাগুলো লোড করা যায়নি।",
@@ -145,7 +147,8 @@
     "agent": "এজেন্ট",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "পরিবর্তন"
+    "changes": "পরিবর্তন",
+    "organizationTrialEnded": "সংস্থার ট্রায়াল শেষ হয়েছে এবং এর কোনো সক্রিয় প্ল্যান নেই। একজন সংস্থা মালিক kilo.ai-এ বিলিং আপডেট করতে পারেন, তারপর আবার চেষ্টা করুন।"
   },
   "language": {
     "restarting": "নির্বাচিত ভাষা চালু করতে অ্যাপ আবার চালু হচ্ছে",
@@ -269,7 +272,6 @@
     "voiceInput": "ভয়েস ইনপুট",
     "autoExpandThinking": "চিন্তাভাবনার বিস্তারিত নিজে থেকে দেখান",
     "autoExpandThinkingSubtitle": "এজেন্টের চিন্তাভাবনা শেষ হলে তার বিস্তারিত দেখান।",
-    "autoExpandThinkingInactiveSubtitle": "চিন্তাভাবনার বিস্তারিত লুকানো থাকলে এর কোনো প্রভাব থাকবে না।",
     "hideThinking": "চিন্তাভাবনার বিস্তারিত লুকান",
     "hideThinkingSubtitle": "সেশনের পৃষ্ঠায় এজেন্টের চিন্তাভাবনা দেখাবেন না।",
     "keepScreenOn": "সেশনের পৃষ্ঠায় থাকাকালীন স্ক্রিন চালু রাখুন",
@@ -294,7 +296,8 @@
     "condenseToolCallsSubtitle": "পরপর টুল কলগুলিকে একটি সারিতে গোষ্ঠীবদ্ধ করুন যা আপনি খুলতে পারেন।",
     "toolSummaryTranslation": "টুলের সারসংক্ষেপ অনুবাদ করুন",
     "toolSummaryTranslationSubtitle": "প্রতিটি টুলের সারসংক্ষেপ আপনার অ্যাপের ভাষায় অনুবাদ করতে একটি মডেলে পাঠান। অনুবাদ ব্যর্থ হলে মূলটি দেখানো হয়।",
-    "toolSummaryTranslationModelUnavailableNotice": "এই মডেলটি আর দেওয়া হয় না। অন্য একটি বেছে নিতে $t(common.model) স্পর্শ করুন।"
+    "toolSummaryTranslationModelUnavailableNotice": "এই মডেলটি আর দেওয়া হয় না। অন্য একটি বেছে নিতে $t(common.model) স্পর্শ করুন।",
+    "autoExpandThinkingInactiveSubtitle": "চিন্তাভাবনার বিস্তারিত লুকানো থাকলে এর কোনো প্রভাব থাকবে না।"
   },
   "prReview": {
     "pullRequestUnavailable": "পুল রিকোয়েস্ট পাওয়া যাচ্ছে না",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "GitLab-এ আরও গ্রুপ বা প্রকল্পে অ্যাক্সেস দিতে হতে পারে।",
       "installGithubApp": "রিপোজিটরিতে GitHub অ্যাপ ইনস্টল করুন",
       "installGithubAppDescription": "যেসব রিপোজিটরি পর্যালোচনা করাতে চান, সেগুলোতে Kilo GitHub অ্যাপকে অ্যাক্সেস দিন।",
-      "noRepositoriesFound": "কোনো রিপোজিটরি পাওয়া যায়নি",
       "repositoryAccess": "রিপোজিটরির অ্যাক্সেস"
     },
     "style": {
@@ -1434,15 +1436,11 @@
       "findingsUnavailable": "এই পর্যালোচনা ব্যর্থ হওয়ায় ফলাফল পাওয়া যাচ্ছে না।",
       "serviceUnavailable": "কোড পর্যালোচনা পরিষেবার সঙ্গে সংযোগ করা যায়নি। পরিষেবা উপলভ্য হলে আবার পর্যালোচনার চেষ্টা করুন।",
       "reviewFailed": "পর্যালোচনা ব্যর্থ হয়েছে। অনুগ্রহ করে আবার চেষ্টা করুন।",
-      "cancelReasonSuperseded": "একটি নতুন কমিট পুশ করা হয়েছে, তাই এই পর্যালোচনাটি প্রতিস্থাপিত হয়েছে।",
-      "cancelReasonIntegrationDisconnected": "{{platform}} সংযোগ বিচ্ছিন্ন, তাই এই পর্যালোচনাটি বাতিল করা হয়েছে। এটি পুনরায় সংযুক্ত করে পর্যালোচনাটি আবার চালান।",
-      "cancelReasonBitbucketReviewerDisabled": "Bitbucket-এর জন্য Code Reviewer বন্ধ করা হয়েছিল, তাই এই পর্যালোচনাটি বাতিল করা হয়েছে। এটি আবার চালু করে পর্যালোচনাটি আবার চালান।",
-      "cancelReasonBitbucketPullRequestChanged": "Bitbucket পুল রিকোয়েস্ট পরিবর্তিত হয়েছে, তাই এই পর্যালোচনাটি প্রতিস্থাপিত হয়েছে।",
-      "cancelReasonCancelled": "এই পর্যালোচনাটি বাতিল করা হয়েছে।",
-      "cancelReasonInterrupted": "এই পর্যালোচনাটি বিঘ্নিত হয়েছে।",
       "showMore": "আরও দেখুন",
       "created": "তৈরি হয়েছে",
       "started": "শুরু হয়েছে",
+      "reviewEnded": "সমাপ্ত হয়েছে",
+      "severityNitpick": "সামান্য",
       "tokens": "টোকেন",
       "tokensInOut": "{{input}} ইনপুট / {{output}} আউটপুট",
       "council": "পর্যালোচক দল",
@@ -1466,7 +1464,13 @@
       "sessionError": "সেশনে ত্রুটি: {{error}}।",
       "statusWithValue": "অবস্থা: {{status}}",
       "toolName": "টুল: {{name}}",
-      "toolNameError": "টুল {{name}}-এ ত্রুটি হয়েছে।"
+      "toolNameError": "টুল {{name}}-এ ত্রুটি হয়েছে।",
+      "cancelReasonSuperseded": "একটি নতুন কমিট পুশ করা হয়েছে, তাই এই পর্যালোচনাটি প্রতিস্থাপিত হয়েছে।",
+      "cancelReasonIntegrationDisconnected": "{{platform}} সংযোগ বিচ্ছিন্ন, তাই এই পর্যালোচনাটি বাতিল করা হয়েছে। এটি পুনরায় সংযুক্ত করে পর্যালোচনাটি আবার চালান।",
+      "cancelReasonBitbucketReviewerDisabled": "Bitbucket-এর জন্য Code Reviewer বন্ধ করা হয়েছিল, তাই এই পর্যালোচনাটি বাতিল করা হয়েছে। এটি আবার চালু করে পর্যালোচনাটি আবার চালান।",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket পুল রিকোয়েস্ট পরিবর্তিত হয়েছে, তাই এই পর্যালোচনাটি প্রতিস্থাপিত হয়েছে।",
+      "cancelReasonCancelled": "এই পর্যালোচনাটি বাতিল করা হয়েছে।",
+      "cancelReasonInterrupted": "এই পর্যালোচনাটি বিঘ্নিত হয়েছে।"
     },
     "reviewMemory": {
       "title": "পর্যালোচনার মেমরি",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "পুল রিকোয়েস্টের একটি সঠিক URL লিখুন।",
       "couldNotCheckProviderStatus": "প্রোভাইডারের অবস্থা পরীক্ষা করা যায়নি।",
       "couldNotLoadProviders": "আপনার সংযুক্ত প্রোভাইডার লোড করা যায়নি। আবার চেষ্টা করুন।",
-      "connectProvider": "একটি প্রোভাইডার সংযুক্ত করুন",
       "connectProviderDescription": "একটি পুল রিকোয়েস্টের ম্যানুয়াল পর্যালোচনা শুরু করতে GitHub সংযুক্ত করুন।",
       "pullRequestUrl": "পুল রিকোয়েস্টের URL",
       "instructions": "নির্দেশনা (ঐচ্ছিক)",
@@ -1753,7 +1756,7 @@
       "deadlinePassed": "সময়সীমা পেরিয়ে গেছে",
       "deadlinePassedDetail": "{{critical}}টি অতি গুরুতর, {{high}}টি উচ্চ",
       "dueThisWeek": "এই সপ্তাহে সময়সীমা শেষ",
-      "dueThisWeekDetail": "{{exploitable}}টি আক্রমণে কাজে লাগানো যায় বলে নিশ্চিত হয়েছে",
+      "dueThisWeekDetail": "এগুলোর মধ্যে {{exploitable}}টি আক্রমণে কাজে লাগানো যায় বলে নিশ্চিত হয়েছে",
       "noDeadline": "কোনো সময়সীমা নেই",
       "reviewSlaAssignment": "নির্ধারিত SLA পর্যালোচনা করুন",
       "allOpenFindingsTracked": "সব অমীমাংসিত ত্রুটি নজরদারিতে আছে"
@@ -1913,11 +1916,17 @@
       "actorSystem": "Kilo সিস্টেম",
       "couldNotLoad": "অডিট রিপোর্ট লোড করা যায়নি।",
       "events": "ইভেন্ট",
+      "eventConfidence": "আত্মবিশ্বাস: {{confidence}}",
+      "eventReason": "কারণ: {{reason}}",
+      "eventsCount_one": "{{displayCount}}টি ইভেন্ট",
+      "eventsCount_other": "{{displayCount}}টি ইভেন্ট",
       "generated": "তৈরির সময়: {{generatedAt}}।",
       "noActivity": "কোনো কার্যকলাপ রেকর্ড করা হয়নি",
       "noActivityDescription": "{{start}} থেকে {{end}} পর্যন্ত নিরাপত্তা ত্রুটি নিয়ে রিপোর্টে দেখানোর মতো কোনো কার্যকলাপ Kilo-তে নেই।",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "রিপোজিটরি রেকর্ড করা হয়নি",
+      "reasonUnknown": "অপরিচিত কারণ",
+      "severityCount": "{{displayCount}}টি {{label}}",
       "summary": "রিপোর্টের সারাংশ",
       "title": "অডিট রিপোর্ট",
       "unavailable": "অডিট রিপোর্ট পাওয়া যাচ্ছে না",
@@ -1972,6 +1981,7 @@
       "reauthorizeButton": "GitHub অ্যাপ পুনরায় অনুমোদন করুন",
       "reauthorizeDescription": "Dependabot-এর সতর্কতা পড়তে সিকিউরিটি এজেন্টের অনুমতি প্রয়োজন। এই অনুমতি দিতে GitHub অ্যাপটি পুনরায় অনুমোদন করুন।",
       "reauthorizeTitle": "অতিরিক্ত অনুমতি প্রয়োজন",
+      "retryFailed": "এখনও সিকিউরিটি এজেন্ট লোড করা যায়নি। আপনার সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।",
       "setupFailed": "GitHub সেটআপ শুরু করা যায়নি। আবার চেষ্টা করুন।"
     },
     "queuedActionUntracked": "সারিতে থাকা একটি কাজের অগ্রগতি আর জানা যাচ্ছে না। সর্বশেষ অবস্থা দেখতে রিফ্রেশ করুন।",
@@ -2134,8 +2144,8 @@
       "dollar_other": "ডলার",
       "costSpoken": "খরচ {{cost}}",
       "costSpokenWithTime": "খরচ {{cost}}, {{time}}",
-      "spokenJoiner": "এবং",
-      "pullRequest": "পুল রিকোয়েস্ট {{number}}"
+      "pullRequest": "পুল রিকোয়েস্ট {{number}}",
+      "spokenJoiner": "এবং"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub খোলা যায়নি",
@@ -2565,7 +2575,10 @@
       "allowOnceAccessibility": "একবার অনুমতি দিন",
       "alwaysAllow": "সবসময় অনুমতি দিন",
       "alwaysAllowAccessibility": "সবসময় অনুমতি দিন",
-      "retrying": "আবার চেষ্টা করা হচ্ছে…"
+      "retrying": "আবার চেষ্টা করা হচ্ছে…",
+      "retryDeny": "অনুমতি না দেওয়ার জন্য আবার চেষ্টা করুন",
+      "retryAllowOnce": "একবার অনুমতি দেওয়ার জন্য আবার চেষ্টা করুন",
+      "retryAlwaysAllow": "সবসময় অনুমতি দেওয়ার জন্য আবার চেষ্টা করুন"
     },
     "questionCard": {
       "title": "এজেন্টের আপনার উত্তর প্রয়োজন",
@@ -3117,22 +3130,16 @@
     "boundary": {
       "backToProfile": "প্রোফাইলে ফিরে যান",
       "loadErrorMessage": "আপনার সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।",
-
       "chooseAccount": "একটি অ্যাকাউন্ট নির্বাচন করুন",
       "loadErrorTitle": "আপনার সংস্থাগুলো লোড করা যায়নি।",
       "membershipLostNotice": "এই সংস্থায় আপনার আর অ্যাক্সেস নেই। স্যুইচ করা হয়েছে {{target}}-এ।",
       "noOrganization": "কোনো সংস্থা নেই",
-
       "noOrganizationDescription": "এই অ্যাকাউন্টটি কোনো সংস্থার অংশ নয়। সদস্য আমন্ত্রণ এবং কম ব্যালেন্স সতর্কতার মতো সংস্থার বৈশিষ্ট্য ব্যবহার করতে ওয়েবে একটি সংস্থা তৈরি করুন বা যোগ দিন।",
-
       "openWebOrganizations": "ওয়েবে সংস্থাগুলি খুলুন",
-
       "organizationUnavailable": "সংস্থাটি পাওয়া যাচ্ছে না।",
       "selectDescriptionWithOrganizations": "আপনি এক বা একাধিক সংস্থার সদস্য। এই স্ক্রিনটি যে অ্যাকাউন্ট ব্যবহার করবে সেটি বেছে নিন।",
-
       "selectOrganization": "একটি সংস্থা নির্বাচন করুন",
       "unavailableDescription": "এই সংস্থাটি আর পাওয়া যাচ্ছে না। চালিয়ে যেতে আপনার প্রোফাইল থেকে অন্য একটি সংস্থা বেছে নিন।",
-
       "unavailableSessionsDescription": "এই সংস্থাটি আর পাওয়া যাচ্ছে না। এর সেশনগুলো লোড করা যাবে না।",
       "accessDeniedDescription": "এই সংস্থায় আপনার অ্যাক্সেস নেই।"
     },
@@ -3155,14 +3162,16 @@
       "truncated": "ক্রেডিটের আরও পুরোনো লেনদেন দেখা যাবে।"
     },
     "inviteMember": {
-      "alreadyInvited": "এই ব্যক্তি ইতোমধ্যে আমন্ত্রিত অথবা সদস্য।",
       "emailError": "একটি সঠিক ইমেইল ঠিকানা লিখুন।",
       "emailPlaceholder": "ইমেইল ঠিকানা",
       "permissionDenied": "সদস্যদের আমন্ত্রণ জানানোর অনুমতি আপনার নেই।",
       "roleMember": "ভূমিকা: সদস্য",
-      "sendError": "আমন্ত্রণ পাঠানো যায়নি।",
       "sendInvite": "আমন্ত্রণ পাঠান",
-      "title": "সদস্যকে আমন্ত্রণ জানান"
+      "title": "সদস্যকে আমন্ত্রণ জানান",
+      "alreadyInvited": "এই ব্যক্তি ইতোমধ্যে আমন্ত্রিত অথবা সদস্য।",
+      "sendError": "আমন্ত্রণ পাঠানো যায়নি।",
+      "pendingInvitation": "এই ইমেইলে ইতিমধ্যে একটি অপেক্ষমাণ আমন্ত্রণ রয়েছে।",
+      "alreadyMember": "এই ব্যক্তি ইতিমধ্যে এই সংস্থার একজন সদস্য।"
     },
     "invoices": {
       "downloadA11y": "ইনভয়েস {{number}} ডাউনলোড করুন",
@@ -3231,8 +3240,13 @@
       "inviteCreated": "আমন্ত্রণ তৈরি হয়েছে",
       "pendingInvitations": "অপেক্ষমাণ আমন্ত্রণ",
       "resendInvite": "আমন্ত্রণ পুনরায় পাঠান",
+      "shareInviteLink": "আমন্ত্রণের লিঙ্ক শেয়ার করুন",
       "resendInviteError": "আমন্ত্রণ পুনরায় পাঠানো যায়নি।",
-      "shareInviteLink": "আমন্ত্রণের লিঙ্ক শেয়ার করুন"
+      "inviteNotResendable": "এই আমন্ত্রণটি আর পুনরায় পাঠানো যাবে না।",
+      "ownerAuthority": "কেবল একজন সংগঠনের মালিকই মালিকদের পরিচালনা করতে পারবেন।",
+      "ownRoleChange": "আপনি নিজের ভূমিকা পরিবর্তন করতে পারবেন না।",
+      "inviteExpired": "এই আমন্ত্রণটির মেয়াদ শেষ হয়ে গেছে।",
+      "inviteAccepted": "এই আমন্ত্রণটি ইতিমধ্যেই গ্রহণ করা হয়েছে।"
     },
     "usageStats": {
       "inputTokens": "ইনপুট টোকেন",
@@ -3377,11 +3391,11 @@
   },
   "transcriptionModel": {
     "title": "কথা থেকে লেখার মডেল",
-    "choose": "একটি মডেল বেছে নিন",
     "noneChosen": "কোনোটিই নির্বাচন করা হয়নি",
     "emptyTitle": "কথা থেকে লেখার কোনো মডেল নেই",
     "emptyDescription": "Kilo Gateway এই মুহূর্তে কথা থেকে লেখার কোনো মডেল দিচ্ছে না।",
-    "loadFailed": "কথা থেকে লেখার মডেল লোড করা যায়নি।"
+    "loadFailed": "কথা থেকে লেখার মডেল লোড করা যায়নি।",
+    "choose": "একটি মডেল বেছে নিন"
   },
   "voiceLanguage": {
     "title": "ভয়েস ইনপুটের ভাষা",
@@ -3403,7 +3417,6 @@
   },
   "modelChat": {
     "offlineFailure": "এই মডেলের জন্য ইন্টারনেট সংযোগ প্রয়োজন। সংযোগ করে আবার চেষ্টা করুন, অথবা এই ডিভাইসের কোনো মডেলে স্যুইচ করুন।",
-    "creditsRequired": "এই বার্তা পাঠানোর জন্য পর্যাপ্ত ক্রেডিট নেই। ক্রেডিট যোগ করে আবার চেষ্টা করুন।",
     "empty": {
       "title": "চ্যাট শুরু করুন",
       "description": "মডেলের সাথে কথা বলতে একটি বার্তা পাঠান।"
@@ -3597,6 +3610,7 @@
       "fromHuggingFace": "Hugging Face থেকে",
       "loading": "মডেল লোড হচ্ছে",
       "noResults": "কোনো মডেল পাওয়া যায়নি",
+      "noResultsForQuery": "\"{{query}}\" এর জন্য কোনো মডেল পাওয়া যায়নি",
       "noFits": "এই ডিভাইসে চলবে এমন কোনো মডেল নেই",
       "noFitsDescription": "বড় মডেলগুলো $t(common.all) ট্যাবে আছে।",
       "fit": {
@@ -3671,13 +3685,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "এই মডেল চিন্তার মাত্রা সমর্থন করে"
-    }
+    },
+    "creditsRequired": "এই বার্তা পাঠানোর জন্য পর্যাপ্ত ক্রেডিট নেই। ক্রেডিট যোগ করে আবার চেষ্টা করুন।"
   },
   "settingsTools": {
     "confirmTitle": "এই পরিবর্তন নিশ্চিত করবেন?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "আপনার সবচেয়ে সাম্প্রতিক রিপোজিটরি",
+      "confirmMessage": "রিপোজিটরি: {{repository}}। অনুরোধ: {{prompt}}",
+      "confirmTitle": "এই এজেন্টটি চালু করবেন?",
       "promptRequired": "এজেন্ট চালু করতে একটি প্রম্পট প্রয়োজন। একটি প্রম্পট যোগ করুন এবং আবার চালান।",
       "repositoryRequired": "এজেন্ট চালু করতে একটি রিপোজিটরি প্রয়োজন। Kilo খুলুন এবং একটি রিপোজিটরি বেছে নিন, তারপর আবার চালান।",
       "repositoryUnknown": "Kilo {{repository}}-কে GitHub বা GitLab রিপোজিটরি হিসেবে চেনে না। Kilo-তে অন্য একটি রিপোজিটরি বেছে নিন।",
@@ -3706,10 +3724,10 @@
     "noSpend": "এখনও কোনো খরচ নথিভুক্ত হয়নি",
     "spend24h": "গত 24 ঘণ্টার খরচ",
     "multiplierError": "1 বা তার বেশি গুণক লিখুন",
-    "multiplierMaxError": "{{max}} বা তার কম গুণক লিখুন",
-    "thresholdMaxError": "{{max}} বা তার কম একটি পরিমাণ লিখুন।",
     "permissionDenied": "খরচের সতর্কতা পরিচালনার অনুমতি আপনার নেই।",
-    "pushOffByCategory": "বিজ্ঞপ্তিতে বন্ধ"
+    "pushOffByCategory": "বিজ্ঞপ্তিতে বন্ধ",
+    "multiplierMaxError": "{{max}} বা তার কম গুণক লিখুন",
+    "thresholdMaxError": "{{max}} বা তার কম একটি পরিমাণ লিখুন।"
   },
   "profiles": {
     "title": "প্রোফাইল",
@@ -3768,7 +3786,6 @@
     },
     "variablesEmpty": "এখনও কোন পরিবর্তনশীল",
     "variablesSaveFailed": "ভেরিয়েবল সংরক্ষণ করা যায়নি",
-    "variablesDeleteFailed": "ভেরিয়েবল মুছে ফেলা যায়নি",
     "commandsTitle": "সেটআপ কমান্ড",
     "addCommand": "কমান্ড যোগ করুন",
     "commandLabel": "আদেশ",
@@ -3779,7 +3796,6 @@
     "moveDown": "নিচে সরান",
     "moveCommandUp": "কমান্ড {{position}} উপরে সরান",
     "moveCommandDown": "কমান্ড {{position}} নিচে সরান",
-    "deleteCommand": "কমান্ড {{position}} মুছুন",
     "skillsTitle": "দক্ষতা",
     "addSkill": "দক্ষতা যোগ করুন",
     "skillNameLabel": "দক্ষতার নাম",
@@ -3901,7 +3917,9 @@
       "pinFailed": "রেপো পিন করা যায়নি",
       "unboundToast": "রেপো আনবাউন্ড",
       "unbindFailed": "রেপো আনবাইন্ড করা যায়নি"
-    }
+    },
+    "variablesDeleteFailed": "ভেরিয়েবল মুছে ফেলা যায়নি",
+    "deleteCommand": "কমান্ড {{position}} মুছুন"
   },
   "credits": {
     "title": "ক্রেডিট কিনুন",
@@ -3928,7 +3946,6 @@
       "newList": "নতুন তালিকা",
       "empty": "এখনও কোনো তালিকা নেই",
       "couldNotLoad": "তালিকা লোড করা যায়নি।",
-      "createFailed": "তালিকা তৈরি করা যায়নি।",
       "noRepository": "কোনো রিপোজিটরি নেই",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} খোলা",
@@ -3938,7 +3955,8 @@
       "archive": "আর্কাইভ করুন",
       "unarchive": "আর্কাইভ থেকে ফিরিয়ে আনুন",
       "deleteTitle": "{{name}} মুছে ফেলবেন?",
-      "deleteMessage": "এর করণীয়গুলোও মুছে যাবে। সেশনগুলো থেকে যাবে।"
+      "deleteMessage": "এর করণীয়গুলোও মুছে যাবে। সেশনগুলো থেকে যাবে।",
+      "createFailed": "তালিকা তৈরি করা যায়নি।"
     },
     "listSettings": {
       "title": "তালিকার সেটিংস",
@@ -4006,21 +4024,20 @@
     }
   },
   "agentBriefing": {
-    "title": "সকালের ব্রিফিং",
+    "title": "এজেন্ট ব্রিফিং",
     "atLeast": "≥{{value}}",
     "coverageHint": "কিছু পুরোনো কার্যকলাপ অনুপস্থিত থাকতে পারে। ≥ মানে অন্তত এতটুকু; অজানা মানে শূন্য নয়।",
     "available": "উপলব্ধ ব্রিফিং",
     "history": "ব্রিফিংয়ের ইতিহাস",
-    "historyHint": "বাতিল করা রিপোর্টসহ সব রিপোর্ট ৩০ দিন রাখা হয়।",
+    "historyHint": "বাতিল করা ব্রিফিংসহ সব ব্রিফিং ৩০ দিন রাখা হয়।",
     "settings": "ব্রিফিং সেটিংস",
-    "saved": "ব্রিফিং সেটিংস সংরক্ষণ করা হয়েছে",
-    "empty": "রাতে কোনো কার্যকলাপ নেই",
-    "emptyHint": "সক্রিয় রাতের পরে আপনার ক্লাউড ও CLI কোডিং সেশন এখানে দেখা যাবে।",
+    "empty": "এই ব্রিফিং উইন্ডোতে কোনো কার্যকলাপ নেই",
+    "emptyHint": "নির্ধারিত ব্রিফিংয়ে কার্যকলাপ থাকলে আপনার ক্লাউড ও CLI কোডিং সেশন এখানে দেখা যাবে।",
     "loadError": "ব্রিফিং লোড করা যায়নি",
-    "sessions": "রাতে সক্রিয়",
+    "sessions": "উইন্ডোতে সক্রিয়",
     "pullRequests": "খোলা PRs",
     "blockers": "নতুন বাধা",
-    "spend": "রাতের খরচ",
+    "spend": "উইন্ডোতে খরচ",
     "view": "ব্রিফিং পড়ুন",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4042,14 +4059,14 @@
     "sources": "প্রমাণ ও আর্টিফ্যাক্ট",
     "timezone": "ব্রিফিংয়ের টাইম জোন",
     "deviceTimezone": "ডিভাইসের টাইম জোন ব্যবহার করুন",
-    "timezoneHint": "IANA টাইম জোন, যেমন Europe/Berlin। সময়সূচির পরিবর্তন পরবর্তী রাতগুলোতে প্রযোজ্য হবে।",
-    "nightStart": "রাত শুরু",
-    "morningStart": "রাত শেষ / সকাল শুরু",
-    "morningEnd": "সকাল শেষ",
-    "timeHint": "সকাল শেষ হলে হোম কার্ড লাইভ স্ট্যাটাসে ফিরে যায়, অফলাইনেও।",
-    "invalidSchedule": "একটি বৈধ টাইম জোন এবং পরস্পর অনাবৃত, খালি নয় এমন রাত ও সকালের সময় বেছে নিন।",
-    "notificationsHint": "প্রথম রিপোর্ট প্রস্তুত হলে প্রতি সকালে একটি সাধারণ বিজ্ঞপ্তি। পেইড AI সারাংশ থেকে স্বতন্ত্র।",
-    "notificationPermission": "ব্রিফিং পেতে $t(common.notifications)-এ ডিভাইসের বিজ্ঞপ্তি চালু করুন।",
+    "timezoneHint": "IANA টাইম জোন, যেমন Europe/Berlin। সময়সূচির পরিবর্তন পরবর্তী ব্রিফিংগুলোতে প্রযোজ্য হবে।",
+    "nightStart": "ব্রিফিং উইন্ডো শুরু",
+    "morningStart": "ব্রিফিং প্রস্তুত হয়",
+    "morningEnd": "ব্রিফিং পাওয়া যায়",
+    "timeHint": "ব্রিফিং উইন্ডো শেষ হলে হোম কার্ড লাইভ স্ট্যাটাসে ফিরে যায়, অফলাইনেও।",
+    "invalidSchedule": "একটি বৈধ টাইম জোন এবং খালি নয় এমন একটি ব্রিফিং উইন্ডো বেছে নিন।",
+    "notificationsHint": "প্রতিটি নির্ধারিত ব্রিফিংয়ের জন্য একটি সাধারণ বিজ্ঞপ্তি। পেইড AI সারাংশ থেকে স্বতন্ত্র।",
+    "notificationPermission": "আপনার ব্রিফিং পেতে $t(common.notifications)-এ ডিভাইসের বিজ্ঞপ্তি চালু করুন।",
     "aiOptIn": "পেইড AI সারাংশ",
     "aiHint": "শুধু এই কনটেক্সটের জন্য ঐচ্ছিক। নির্বাচিত, সংশোধিত অংশ ও কাঠামোবদ্ধ তথ্য আপনার অ্যাপের ভাষায় আপনার মডেলে পাঠানো হয়। চার্জ এই কনটেক্সটের ব্যালান্স থেকে কাটা হয়।",
     "defaultModel": "Kilo-র ডিফল্ট মডেল ব্যবহার করুন",
@@ -4066,7 +4083,7 @@
     "contextSettings": "AI সেটিংস · {{context}}",
     "allContexts": "ব্যক্তিগত ও প্রতিষ্ঠানের ব্রিফিং আলাদা থাকে।",
     "create": "ব্রিফিং তৈরি করুন",
-    "oneOff": "এককালীন",
+    "oneOff": "চাহিদা অনুযায়ী",
     "createdAt": "তৈরি হয়েছে {{time}}",
     "chooseContext": "একটি প্রসঙ্গ বেছে নিন",
     "period": "ব্রিফিংয়ের সময়কাল",
@@ -4088,13 +4105,16 @@
     "emptyPeriod": "এই সময়কালে কোনো কার্যকলাপ পাওয়া যায়নি। কোনো AI সারাংশ তৈরি হবে না বা চার্জ কাটা হবে না।",
     "emptyHistory": "কোনো সংরক্ষিত ব্রিফিং নেই",
     "historicalStateHint": "সেশনের অবস্থা নির্বাচিত সময়কালের শেষের অবস্থা দেখায়, বর্তমান সরাসরি অবস্থা নয়।",
-    "oneOffHint": "AI আপনার অ্যাপের ভাষায় নির্বাচিত প্রমাণ পায়, যেগুলো থেকে সংবেদনশীল তথ্য সরানো হয়েছে। এই এককালীন প্রতিবেদন আপনার সকালের সময়সূচি বা AI পছন্দ পরিবর্তন করে না।",
+    "oneOffHint": "AI আপনার অ্যাপের ভাষায় নির্বাচিত প্রমাণ পায়, যেগুলো থেকে সংবেদনশীল তথ্য সরানো হয়েছে। এই চাহিদা অনুযায়ী ব্রিফিং আপনার নির্ধারিত ব্রিফিং বা AI পছন্দ পরিবর্তন করে না।",
     "createOffline": "ব্রিফিং পর্যালোচনা বা তৈরি করতে ইন্টারনেটে সংযুক্ত হোন। ইন্টারনেট সংযোগ না থাকলে অর্থপ্রদত্ত অনুরোধ কখনো অপেক্ষার তালিকায় রাখা হয় না।",
     "estimateInputTooLarge": "এই সময়কালে নির্বাচিত মডেলের জন্য অতিরিক্ত পরিমাণে প্রমাণ রয়েছে।",
     "estimatePermissionUnavailable": "এই প্রসঙ্গের ব্যালেন্স ব্যবহার করার অনুমতি আপনার নেই।",
+    "createFailed": "এই ব্রিফিং তৈরি করা যায়নি।",
+    "reviewFailed": "এই ব্রিফিং পর্যালোচনা করা যায়নি।",
     "estimatePricingUnavailable": "এই মডেলের মূল্য পাওয়া যাচ্ছে না।",
     "estimateBalanceUnavailable": "পেইড সারাংশের জন্য পর্যাপ্ত ব্যালেন্স নেই।",
     "estimateModelNotAllowed": "এই মডেলটি এখানে অনুমোদিত নয়।",
-    "estimateSpendLimitTooLow": "এই সারাংশের অনুমতি দিতে খরচের সুরক্ষা সীমা বাড়ান।"
+    "estimateSpendLimitTooLow": "এই সারাংশের অনুমতি দিতে খরচের সুরক্ষা সীমা বাড়ান।",
+    "saved": "ব্রিফিং সেটিংস সংরক্ষণ করা হয়েছে"
   }
 }

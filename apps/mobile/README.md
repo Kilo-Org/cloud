@@ -18,6 +18,22 @@ current render time. Elapsed grants and non-expiring credits do not contribute t
 its amount or earliest expiry, for both personal and organization accounts.
 The balance continues to come from the balance query.
 
+## Session restoration
+
+The first auth-provider mount uses the credentials preloaded when JavaScript
+starts. Later mounts read secure storage again: Android can recreate the activity
+without restarting JavaScript, so the initial snapshot may predate sign-in.
+Back-exit and force-stop preserve the stored session; explicit sign-out clears it.
+The existing bootstrap loading and retryable-error surfaces cover restoration.
+
+## Runtime recovery
+
+Retry on the runtime-error screen restores the last focused route for the
+current account. Route recording pauses while the root layout remounts, so its
+temporary Home route cannot replace the recovery destination. Credential
+preloads are used only for the first auth-provider mount; recovery reads the
+current stored credentials through the normal bounded retry path.
+
 ## New-session model choice
 
 Model resolution waits for stored preferences to load. An explicit model and
@@ -33,12 +49,42 @@ Unavailable usage and low-balance settings expose Retry. The low-balance row
 retries its settings read until data is available, then opens configuration.
 Cached settings remain visible during offline pauses and refresh failures.
 
+## Selectable row accessibility
+
+Use `selectableRowA11y` from `@/lib/a11y/selectable-row` for custom checkbox and
+radio rows. It exposes button/selected traits on iOS and checkbox or radio roles
+with checked state on Android. `ChoiceRow` and `radioItemA11y` use this mapping.
+Verify both the native role and state transitions in device accessibility trees;
+a rendered checkmark alone does not verify accessibility.
+
+## PR merge sheet
+
+The merge sheet composes the form and provider-specific bodies. `usePrMergeDraft`
+owns identity-scoped loading, seeding, saving, background flushing, and clearing;
+`usePrMergeSubmit` owns confirmation, mutation inputs, errors, and success effects.
+Header back retains the draft. Footer Cancel and a successful submission clear it.
+
+The mounted suites keep React, form sections, and draft persistence real, with
+native controls, encrypted storage, identity, and mutations replaced at their boundaries:
+
+```bash
+pnpm --filter kilo-app exec vitest run src/components/pr-review/merge
+```
+
 ## Remote session recovery
 
 A response that fails before producing any content still shows its failure and
 Retry action, including after reopening the session. Retry resends the original
 user prompt as a new turn in the same session; the original prompt remains in
 the transcript.
+
+## Email sign-in
+
+The email form validates syntax and a 254-character maximum after trimming and
+lowercasing. Invalid addresses stay on the email step with localized inline
+feedback. The code-step destination abbreviates addresses longer than 48
+characters with a middle ellipsis; delivery and verification use the full address.
+The code input and Verify action remain available below the destination prompt.
 
 ## Transcript action targets
 
@@ -88,8 +134,13 @@ Every build localizes the local-network prompt, because Chat can connect to a lo
 Changes require a new iOS build; an over-the-air update cannot change the native permission prompt.
 
 1. obtain Expo access
-2. `pnpx eas-cli login -b`
+2. `pnpm exec eas login -b`
 3. obtain Apple access (developer)
+
+Run these commands from `apps/mobile` after `pnpm install --frozen-lockfile`.
+When updating EAS CLI, keep the `eas-cli` development dependency and `eas.json`'s
+`cli.version` aligned, regenerate the workspace dependency graph, and verify with
+`pnpm exec eas --version`.
 
 ### Android
 
@@ -97,9 +148,13 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 2. `pnpm start`
 3. open installed app on your phone
 
+Production Android builds use the EAS `large` resource class to give Gradle and
+JavaScript bundling more memory. Development, preview, and iOS builds retain
+their default resource classes. The production builder requires a paid EAS plan.
+
 ### iOS
 
-1. add your device to the list of internal devices using `pnpx eas-cli device:create`
+1. add your device to the list of internal devices using `pnpm exec eas device:create`
 2. install the provisioning profile from step 1 on your device (it may involve a 1hr wait)
 3. create a new dev build using `pnpm build:ios`
 4. `pnpm start`
@@ -136,6 +191,16 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 - Use `--display=1` for the outer display and `--display=3` for the inner display.
 - An inactive display produces a black screenshot.
 - Type a draft, change the appearance in both directions, and verify the draft stays readable.
+
+## Diagram host checks
+
+Mermaid uses a packaged renderer and a shared HTML host document.
+Run `pnpm --filter web exec playwright install chromium`, then
+`pnpm --filter web run test:mobile-mermaid` for its browser regression suite.
+CI runs the same command when the host document, its renderer asset, or the
+suite changes.
+The suite needs no backend or signed-in account and includes flowcharts and
+data-image diagrams.
 
 ## Briefing localization
 

@@ -3,7 +3,7 @@ import {
   isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
 import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { type SecurityAgentConfig } from '@/lib/security-agent';
 import {
@@ -75,11 +75,17 @@ export function useRetrySecurityAgentSettings(scope: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [isRetrying, setIsRetrying] = useState(false);
+  // Whether the last deliberate attempt still ended in a failed fetch. The
+  // entry screen turns that into a distinguishable "still failing" state: an
+  // identical error screen after a retry is indistinguishable from a retry
+  // that never ran.
+  const [lastAttemptFailed, setLastAttemptFailed] = useState(false);
   const retry = async () => {
     if (isRetrying) {
       return;
     }
     setIsRetrying(true);
+    setLastAttemptFailed(false);
     const keys = isPersonalSecurityScope(scope)
       ? [
           trpc.securityAgent.getPermissionStatus.queryKey(),
@@ -92,7 +98,7 @@ export function useRetrySecurityAgentSettings(scope: string) {
           trpc.organizations.securityAgent.getRepositories.queryKey({ organizationId: scope }),
           trpc.organizations.list.queryKey(),
         ];
-    await Promise.allSettled(
+    const attempts = await Promise.allSettled(
       keys.map(async queryKey => {
         const query = queryClient.getQueryCache().find({ queryKey, exact: true });
         if (!query) {
@@ -117,9 +123,13 @@ export function useRetrySecurityAgentSettings(scope: string) {
     );
     // Each query retains its own error; wait for every request to settle before
     // allowing another attempt. The existing tRPC transport bounds request time.
+    setLastAttemptFailed(attempts.some(attempt => attempt.status === 'rejected'));
     setIsRetrying(false);
   };
-  return { retry, isRetrying };
+  const clearLastAttemptFailed = useCallback(() => {
+    setLastAttemptFailed(false);
+  }, []);
+  return { retry, isRetrying, lastAttemptFailed, clearLastAttemptFailed };
 }
 
 export function useSecurityAgentDashboardStats(scope: string, repoFullName?: string) {

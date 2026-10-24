@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { appSceneLayout } from '@/components/app-screen-layout';
 
 import { ProfileStackErrorBoundary } from '@/components/profile-stack-error-boundary';
 import { TabSwitchInputSettle } from '@/components/tab-screen-input-gate';
@@ -27,6 +28,7 @@ export default function ProfileLayout() {
           the app and resetting navigation to Home. */}
       <ProfileStackErrorBoundary>
         <Stack
+          screenLayout={appSceneLayout}
           screenOptions={{ headerShown: false }}
           // A push or a pop moves a screen that is still the touch target until
           // the transition ends, so that is where the input window can close for

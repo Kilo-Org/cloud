@@ -194,7 +194,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
         />
         <EmptyState
           icon={GitPullRequest}
-          title={t('codeReviewer.manualReview.connectProvider')}
+          title={t('common.connectProvider')}
           description={t('codeReviewer.manualReview.connectProviderDescription')}
           action={
             // `mt-3 w-full` matches the near-identical PR-review connect gate
@@ -279,7 +279,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               {t('codeReviewer.manualReview.instructions')}
             </Text>
             <TextInput
-              className="h-24 rounded-lg bg-secondary p-3 text-sm leading-5 text-foreground"
+              className="h-24 rounded-lg bg-secondary p-3 text-sm leading-[1.25rem] text-foreground"
               multiline
               textAlignVertical="top"
               placeholder={t('codeReviewer.manualReview.instructionsPlaceholder')}

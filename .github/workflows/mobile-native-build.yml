@@ -205,10 +205,11 @@ jobs:
     timeout-minutes: 90
     # A pull_request run takes one slot per ref, so pull requests with the same
     # native inputs never cancel each other's pending build; the artifact
-    # re-check below still turns a duplicate into a no-op. A push or
-    # workflow_dispatch run keeps one slot per nativeHash, keyed on the event so
-    # a push build is never the pending job a later pull_request job cancels:
-    # main would then keep no durable artifact for that hash.
+    # re-check below still turns a duplicate that arrives after a build
+    # published into a no-op. A push or workflow_dispatch run keeps one slot per
+    # nativeHash, keyed on the event so a push build is never the pending job a
+    # later pull_request job cancels: main would then keep no durable artifact
+    # for that hash.
     concurrency:
       group: ${{ github.workflow }}-${{ github.event_name }}-ios-${{ github.event_name == 'pull_request' && github.ref || needs.gate.outputs.ios_hash }}
       cancel-in-progress: false
@@ -229,8 +230,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # The concurrency group above serializes this hash, so the build that
-      # held the slot may have published the artifact while this job queued.
+      # The slot above only serializes some of the duplicates: a push or
+      # workflow_dispatch run is serialized per hash, a pull_request run per
+      # ref, so a sibling pull request may have published this hash while this
+      # job queued. A duplicate that arrives after a build published exits here
+      # instead of spending a second macOS runner.
       - name: Check whether another run published this artifact
         id: published
         env:
@@ -343,8 +347,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # The concurrency group above serializes this hash, so the build that
-      # held the slot may have published the artifact while this job queued.
+      # The slot above only serializes some of the duplicates: a push or
+      # workflow_dispatch run is serialized per hash, a pull_request run per
+      # ref, so a sibling pull request may have published this hash while this
+      # job queued. A duplicate that arrives after a build published exits here
+      # instead of spending a second runner.
       - name: Check whether another run published this artifact
         id: published
         env:

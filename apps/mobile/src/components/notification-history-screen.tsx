@@ -164,15 +164,23 @@ export function NotificationHistoryScreen() {
         // arrived since would move page one's tail past the older pages'
         // cursors, so a refresh collapses the list and reloads from the newest
         // row instead of re-requesting every retained window.
-        const prefix = trpc.user.getNotificationHistory.queryKey();
-        reconcileFirstPage(queryClient, prefix);
+        //
+        // Three different keys: the path resets every variant of this read, the
+        // infinite key is the entry the list observes, and `getQueryState` only
+        // answers an exact key.
+        const path = trpc.user.getNotificationHistory.pathKey();
+        const key = trpc.user.getNotificationHistory.infiniteQueryKey({
+          category: category ?? undefined,
+          limit: PAGE_SIZE,
+        });
+        reconcileFirstPage(queryClient, path);
         await queryClient.refetchQueries(
-          { queryKey: prefix, type: 'active' },
+          { queryKey: key, type: 'active' },
           // `cancelRefetch: false` awaits the page-one fetch the invalidate
           // started instead of cancelling it and issuing a second one.
           { cancelRefetch: false }
         );
-        if (queryClient.getQueryState(prefix)?.status === 'error') {
+        if (queryClient.getQueryState(key)?.status === 'error') {
           toast.error(t('common.couldNotRefresh'));
         }
       } finally {

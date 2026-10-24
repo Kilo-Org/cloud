@@ -18,6 +18,8 @@ type Row = {
   createdAt: string;
 };
 
+const HISTORY_PATH = ['user', 'getNotificationHistory'];
+
 const NOW = Date.parse('2026-10-24T10:00:00.000Z');
 
 type PreferencesFixture = { capabilities: Record<string, { available: boolean }> };
@@ -119,12 +121,18 @@ vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     user: {
       getNotificationHistory: {
-        queryKey: () => ['user', 'getNotificationHistory'],
+        // tRPC's real shapes: the path is the first element, and only the path
+        // prefix matches every variant of the read.
+        pathKey: () => [HISTORY_PATH],
+        infiniteQueryKey: (input: { category?: string }) => [
+          HISTORY_PATH,
+          { input, type: 'infinite' },
+        ],
         infiniteQueryOptions: (input: { category?: string }, options: Record<string, unknown>) => {
           state.historyInputs.push(input);
           state.historyOptions.push(options);
           return {
-            queryKey: ['user', 'getNotificationHistory', input],
+            queryKey: [HISTORY_PATH, { input, type: 'infinite' }],
             initialPageParam: undefined,
             queryFn: ({ pageParam }: { pageParam: string | undefined }) => {
               if (pageParam !== undefined && state.pageError) {
@@ -386,6 +394,19 @@ describe('NotificationHistoryScreen', () => {
       state.listProps?.onRefresh?.();
     });
     await waitFor(() => byType('Cell').length === 3);
+  });
+
+  it('reports a refresh that fails instead of leaving the list silent', async () => {
+    state.rows = [row()];
+    await mount();
+
+    state.historyError = new Error('offline');
+    act(() => {
+      state.listProps?.onRefresh?.();
+    });
+
+    await waitFor(() => mocks.toastError.mock.calls.length > 0);
+    expect(mocks.toastError).toHaveBeenCalledWith("Couldn't refresh. Pull down to try again.");
   });
 
   it('keeps the tab-bar clearance under the next-page retry', async () => {

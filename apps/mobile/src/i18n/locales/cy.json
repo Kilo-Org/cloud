@@ -1706,8 +1706,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Dim hidlwyr ar gael",
-      "noFiltersDescription": "Ewch yn ôl ac agorwch yr hidlwyr eto o'r rhestr canfyddiadau.",
       "title": "Hidlo canfyddiadau",
       "reset": "Ailosod",
       "severity": "Difrifoldeb",

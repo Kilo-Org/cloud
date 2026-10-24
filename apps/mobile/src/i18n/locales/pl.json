@@ -1100,8 +1100,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Brak dostępnych filtrów",
-      "noFiltersDescription": "Wróć do listy problemów i ponownie otwórz filtry.",
       "title": "Filtrowanie problemów",
       "fixed": "Naprawione",
       "outcome": "Wynik",

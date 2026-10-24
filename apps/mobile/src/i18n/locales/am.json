@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "ምንም ማጣሪያዎች የሉም",
-      "noFiltersDescription": "ተመልሰው ከግኝቶች ዝርዝር ማጣሪያዎቹን እንደገና ይክፈቱ።",
       "title": "የግኝቶች ማጣሪያ",
       "reset": "ወደ መጀመሪያው ይመልሱ",
       "severity": "ክብደት",

@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "هېڅ فلټر نشته",
-      "noFiltersDescription": "بېرته لاړ شئ او د موندنو له لړلیک څخه فلټرونه بیا پرانیزئ.",
       "title": "د موندنو فلټر کول",
       "reset": "بېرته تنظیم کړئ",
       "severity": "شدت",

@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Azikho izihlungi ezitholakalayo",
-      "noFiltersDescription": "Buyela emuva bese uphinde uvule izihlungi ohlwini lokutholakele.",
       "title": "Izihlungi zokutholakele",
       "reset": "Setha kabusha",
       "severity": "Ubucayi",

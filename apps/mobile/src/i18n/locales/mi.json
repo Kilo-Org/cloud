@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Kāore he tātari e wātea ana",
-      "noFiltersDescription": "Hoki atu, ka whakatuwhera anō i ngā tātari mai i te rārangi kitenga.",
       "title": "Ngā tātari kitenga",
       "reset": "Tautuhia anō",
       "severity": "Taumata kino",

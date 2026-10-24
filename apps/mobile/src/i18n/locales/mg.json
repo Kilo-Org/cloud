@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Tsy misy sivana azo ampiasaina",
-      "noFiltersDescription": "Miverena ary sokafy indray ny sivana avy amin'ny lisitry ny olana hita.",
       "title": "Sivana ho an'ny olana hita",
       "reset": "Avereno amin'ny voalohany",
       "severity": "Hamafin'ny olana",

@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Babu matatun da za a zaɓa",
-      "noFiltersDescription": "Koma ka sake buɗe matatun daga jerin matsalolin da aka gano.",
       "title": "Tace matsalolin da aka gano",
       "reset": "Mayar da saitunan farko",
       "severity": "Tsanani",

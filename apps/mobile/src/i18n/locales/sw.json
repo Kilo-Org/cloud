@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Hakuna vichujio vinavyopatikana",
-      "noFiltersDescription": "Rudi nyuma kisha ufungue tena vichujio kutoka kwenye orodha ya matatizo.",
       "title": "Chuja matatizo",
       "reset": "Weka upya",
       "severity": "Ukali",

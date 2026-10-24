@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Kò sí àlẹ̀ tó wà",
-      "noFiltersDescription": "Padà sẹ́yìn kí o sì tún ṣí àwọn àlẹ̀ láti inú àkójọ àwọn àbùkù.",
       "title": "Àlẹ̀ àwọn àbùkù",
       "reset": "Dá padà sí ìpilẹ̀",
       "severity": "Ìwọ̀n ewu",

@@ -1094,8 +1094,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Tidak ada filter yang tersedia",
-      "noFiltersDescription": "Kembali dan buka ulang filter dari daftar temuan.",
       "title": "Filter temuan",
       "fixed": "Diperbaiki",
       "outcome": "Hasil",

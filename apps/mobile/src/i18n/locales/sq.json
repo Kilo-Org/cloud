@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Nuk ka filtra të disponueshëm",
-      "noFiltersDescription": "Kthehu dhe rihapi filtrat nga lista e gjetjeve.",
       "title": "Filtrimi i gjetjeve",
       "reset": "Rivendos",
       "severity": "Niveli i rrezikut",

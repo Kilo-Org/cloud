@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "فیلتری در دسترس نیست",
-      "noFiltersDescription": "برگردید و فیلترها را از فهرست یافته‌ها دوباره باز کنید.",
       "title": "فیلتر یافته‌ها",
       "reset": "بازنشانی",
       "severity": "شدت",

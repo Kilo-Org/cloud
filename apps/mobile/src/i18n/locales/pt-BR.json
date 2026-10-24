@@ -1065,8 +1065,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Nenhum filtro disponível",
-      "noFiltersDescription": "Volte à lista de ocorrências e abra os filtros novamente.",
       "title": "Filtrar ocorrências",
       "fixed": "Corrigido",
       "outcome": "Resultado",

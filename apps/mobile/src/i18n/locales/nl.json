@@ -1094,8 +1094,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Geen filters beschikbaar",
-      "noFiltersDescription": "Ga terug en open de filters opnieuw vanuit de lijst met bevindingen.",
       "title": "Bevindingen filteren",
       "fixed": "Opgelost",
       "outcome": "Uitkomst",

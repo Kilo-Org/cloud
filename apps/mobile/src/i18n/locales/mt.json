@@ -1684,8 +1684,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "L-ebda filtru disponibbli",
-      "noFiltersDescription": "Mur lura u erġa' iftaħ il-filtri mil-lista tas-sejbiet.",
       "title": "Filtri tas-sejbiet",
       "reset": "Irrisettja l-filtri",
       "severity": "Severità",

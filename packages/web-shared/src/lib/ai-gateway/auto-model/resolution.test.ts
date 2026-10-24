@@ -26,6 +26,7 @@ import {
   KILO_AUTO_EFFICIENT_MODEL,
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_FRONTIER_MODEL,
+  KILO_AUTO_SMALL_MODEL,
   ORG_AUTO_MODEL,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
@@ -642,6 +643,34 @@ describe('resolveAutoModel — kilo-auto/free branch', () => {
     expect(result).toEqual({
       kind: 'ok',
       resolved: { model: 'poolside/laguna-s-2.1:free', reasoning: { enabled: false } },
+    });
+  });
+});
+
+describe('resolveAutoModel — kilo-auto/small branch', () => {
+  it('routes users with balance to Mercury 3 with reasoning disabled', async () => {
+    const result = await resolveAutoModel(
+      { ...baseParams, model: KILO_AUTO_SMALL_MODEL.id, apiKind: 'chat_completions' },
+      nullUserPromise,
+      Promise.resolve(5)
+    );
+
+    expect(result).toEqual({
+      kind: 'ok',
+      resolved: { model: 'inception/mercury-3', reasoning: { enabled: false } },
+    });
+  });
+
+  it('routes users without balance to free Mercury 3 with reasoning disabled', async () => {
+    const result = await resolveAutoModel(
+      { ...baseParams, model: KILO_AUTO_SMALL_MODEL.id, apiKind: 'chat_completions' },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({
+      kind: 'ok',
+      resolved: { model: 'inception/mercury-3:free', reasoning: { enabled: false } },
     });
   });
 });

@@ -361,6 +361,9 @@ export async function resolveAutoModel(
           (await balancePromise) > 0
             ? AUTO_SMALL_TARGET_MODELS.paid
             : AUTO_SMALL_TARGET_MODELS.free,
+        // Mercury 3 reasons by default, which adds hundreds of hidden tokens and doubles latency
+        // for short utility replies such as session titles.
+        reasoning: { enabled: false },
       },
     };
   }

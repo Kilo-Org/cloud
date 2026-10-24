@@ -11,7 +11,7 @@ import {
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
   qwen36_plus_stealth_model,
-  gemma_4_26b_a4b_it_free_model,
+  mercury_3_free_model,
   glyph_cluster_stealth_free_model,
   reflection_beam_free_model,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
@@ -38,7 +38,7 @@ describe('Kilo-exclusive model providers', () => {
     expect(isKiloStealthModel(model.public_id)).toBe(true);
   });
 
-  test.each([gemma_4_26b_a4b_it_free_model])('serves $public_id through OpenRouter', model => {
+  test.each([mercury_3_free_model])('serves $public_id through OpenRouter', model => {
     expect(findKiloExclusiveModel(model.public_id)?.provider).toBe(OPENROUTER);
   });
 

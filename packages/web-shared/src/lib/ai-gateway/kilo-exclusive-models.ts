@@ -7,9 +7,9 @@ import {
   CLAUDE_OPUS_4_6_STEALTH_MODEL_ID,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
 import {
-  GEMMA_4_26B_A4B_IT_ID,
-  GEMMA_4_26B_A4B_IT_FREE_ID,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+  MERCURY_3_FREE_ID,
+  MERCURY_3_ID,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/inception';
 import {
   isStealthModel,
   type KiloExclusiveModel,
@@ -101,16 +101,16 @@ export const claude_opus_4_6_stealth_model: KiloExclusiveModel = {
   inference_providers: ['stealth'],
 };
 
-export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
-  public_id: GEMMA_4_26B_A4B_IT_FREE_ID,
-  display_name: 'Google: Gemma 4 26B A4B (free)',
+export const mercury_3_free_model: KiloExclusiveModel = {
+  public_id: MERCURY_3_FREE_ID,
+  display_name: 'Inception: Mercury 3 (free)',
   description:
-    'Gemma 4 26B A4B IT is an instruction-tuned Mixture-of-Experts (MoE) model from Google DeepMind. Despite 25.2B total parameters, only 3.8B activate per token during inference — delivering near-31B quality at a fraction of the compute cost.',
+    "Mercury 3 is Inception's most capable model for agentic workflows and real-time applications. It is one of the world's fastest models, powered by diffusion.",
   context_length: 262144,
   max_completion_tokens: 32768,
-  flags: ['vision', 'vercel-routing'],
+  flags: ['vercel-routing'],
   provider: OPENROUTER,
-  internal_id: GEMMA_4_26B_A4B_IT_ID,
+  internal_id: MERCURY_3_ID,
   pricing: null,
   inference_providers: [],
 };
@@ -223,7 +223,7 @@ export const reflection_beam_free_model: KiloExclusiveModel = {
 };
 
 export const kiloExclusiveModels = [
-  gemma_4_26b_a4b_it_free_model,
+  mercury_3_free_model,
   qwen36_plus_stealth_model,
   claude_opus_4_8_stealth_model,
   claude_opus_4_7_stealth_model,

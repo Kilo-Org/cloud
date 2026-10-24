@@ -5,9 +5,11 @@ import { eq } from 'drizzle-orm';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { GEMMA_4_26B_A4B_IT_FREE_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import { MERCURY_3_FREE_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/inception';
 
-// Direct requests are rejected, but kilo-auto still routes to it.
-const HARDCODED_UNAVAILABLE_MODEL_IDS = [GEMMA_4_26B_A4B_IT_FREE_ID];
+// Direct requests are rejected, but kilo-auto/small still routes to Mercury 3 (free).
+// Gemma 4 26B (free) was the previous kilo-auto/small free target and stays blocked.
+const HARDCODED_UNAVAILABLE_MODEL_IDS = [MERCURY_3_FREE_ID, GEMMA_4_26B_A4B_IT_FREE_ID];
 
 /** Throws on an invalid stored list, so the cached getter keeps its last valid value. */
 export async function readUnavailableModelIds(): Promise<string[]> {

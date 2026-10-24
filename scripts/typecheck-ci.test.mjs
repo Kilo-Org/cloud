@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   symlinkSync,
@@ -97,6 +98,32 @@ test('dependency cache keeps only the content store on the mounted filesystem', 
     env: { ...process.env, GITHUB_WORKSPACE: missingMountWorkspace },
   });
   assert.equal(missingMountResult.status, 0, missingMountResult.stderr);
+});
+
+// A frozen-lockfile install without a warm dependency source refetches every
+// package on each run. Jobs on a Blacksmith runner mount the shared store; jobs
+// on another runner use setup-node's pnpm cache instead.
+test('every workflow install job restores a pnpm dependency cache', () => {
+  const directory = new URL('../.github/workflows/', import.meta.url);
+  const uncached = [];
+  for (const file of readdirSync(directory)
+    .filter(name => name.endsWith('.yml'))
+    .sort()) {
+    const workflow = load(readFileSync(new URL(file, directory), 'utf8'));
+    for (const [jobName, job] of Object.entries(workflow.jobs ?? {})) {
+      const steps = (job.steps ?? []).filter(step => step !== null && typeof step === 'object');
+      const installs = steps.some(step =>
+        (step.run ?? '').split('\n').some(line => /\bpnpm\b.*\binstall\b/.test(line))
+      );
+      if (!installs) continue;
+      const mounts = steps.some(step => step.uses === './.github/actions/pnpm-store');
+      const caches = steps.some(
+        step => step.with?.cache === 'pnpm' && String(step.uses).startsWith('actions/setup-node@')
+      );
+      if (!mounts && !caches) uncached.push(`${file}:${jobName}`);
+    }
+  }
+  assert.deepEqual(uncached, [], 'an install job must mount the pnpm store or cache it');
 });
 
 for (const [file, name, command, condition] of [

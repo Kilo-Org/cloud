@@ -109,25 +109,12 @@ async function checkExistingProviderAccount(
 }
 
 /**
- * Mint the long-lived credential returned to a sign-in that does not receive a
  * refresh pair. The response shape stays the same, and the credential carries
- * the device session created for this sign-in.
+ * the device session resolved by the caller.
  */
-async function legacyTokenResponse(params: {
-  user: User;
-  sessionId?: string;
-  userAgent?: string;
-  created: boolean;
-}) {
-  const deviceSessionId =
-    params.sessionId ??
-    (await createDeviceSession({
-      userId: params.user.id,
-      userAgent: params.userAgent,
-    }));
-
+function legacyTokenResponse(params: { user: User; deviceSessionId: string; created: boolean }) {
   captureMessage('native_token_legacy_long_lived_count: 1');
-  const token = generateApiToken(params.user, { deviceSessionId });
+  const token = generateApiToken(params.user, { deviceSessionId: params.deviceSessionId });
   return NextResponse.json({ token, created: params.created }, { status: 200 });
 }
 
@@ -286,7 +273,10 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
 
     return legacyTokenResponse({
       user,
-      userAgent: request.headers.get('user-agent') ?? undefined,
+      deviceSessionId: await createDeviceSession({
+        userId: user.id,
+        userAgent: request.headers.get('user-agent') ?? undefined,
+      }),
       created: false,
     });
   }
@@ -473,7 +463,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
             phase = 'release';
             return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
           }
-          // Bookkeeping failure — log and fall through to the legacy token.
+          // Bookkeeping failure — log and fall through to a plain session.
           captureMessage('native_attested_key_persist_failed_after_settlement');
         }
       } else {
@@ -489,7 +479,18 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         }
       }
 
-      // ── Step 6: Consume the sign-in code AFTER key persistence ─────────
+      // ── Step 5.5: Resolve the device session and credential pair ───────
+      // Prepare session-bound credentials before finalizing the sign-in code.
+      sessionId ??= await createDeviceSession({
+        userId: result.user.id,
+        userAgent: request.headers.get('user-agent') ?? undefined,
+      });
+
+      if (data.supportsRefresh && !refreshCredentials) {
+        refreshCredentials = await issueSessionCredentials(result.user, sessionId);
+      }
+
+      // ── Step 6: Consume the sign-in code AFTER key and session persistence ─
       // The code is only committed once all pre-credential gates pass, so
       // a refusal never burns a code without issuing a credential.
       const committed = await commitSignInCode(data.email, data.code, data.challengeId);
@@ -519,29 +520,9 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         );
       }
 
-      if (data.supportsRefresh) {
-        const sid =
-          sessionId ??
-          (await createDeviceSession({
-            userId: result.user.id,
-            userAgent: request.headers.get('user-agent') ?? undefined,
-          }));
-        const pair = await issueSessionCredentials(result.user, sid);
-        return NextResponse.json(
-          {
-            token: pair.token,
-            refreshToken: pair.refreshToken,
-            expiresIn: pair.expiresIn,
-            created: result.isNew,
-          },
-          { status: 200 }
-        );
-      }
-
       return legacyTokenResponse({
         user: result.user,
-        sessionId,
-        userAgent: request.headers.get('user-agent') ?? undefined,
+        deviceSessionId: sessionId,
         created: result.isNew,
       });
     } catch (error) {
@@ -670,8 +651,12 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
 
   return legacyTokenResponse({
     user: result.user,
-    sessionId,
-    userAgent: request.headers.get('user-agent') ?? undefined,
+    deviceSessionId:
+      sessionId ??
+      (await createDeviceSession({
+        userId: result.user.id,
+        userAgent: request.headers.get('user-agent') ?? undefined,
+      })),
     created: result.isNew,
   });
 });

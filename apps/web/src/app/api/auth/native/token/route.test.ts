@@ -822,6 +822,34 @@ describe('POST /api/auth/native/token', () => {
       expect(mockReleaseSignInCode).toHaveBeenCalledTimes(1);
     });
 
+    it('uses the same email sign-in after a subsequent attempt', async () => {
+      mockCreateDeviceSession
+        .mockRejectedValueOnce(new Error('temporary'))
+        .mockResolvedValueOnce('session-retry');
+
+      const email = 'session-retry@example.com';
+      const code = '246810';
+
+      await expect(POST(createRequest({ provider: 'email', email, code }))).rejects.toThrow(
+        'temporary'
+      );
+
+      // Retry the same sign-in after session-bound credential preparation.
+      expect(mockCommitSignInCode).not.toHaveBeenCalled();
+      expect(mockConsumeSignInCode).not.toHaveBeenCalled();
+      expect(mockReleaseSignInCode).toHaveBeenCalledWith(email, code, undefined);
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+
+      const retry = await POST(createRequest({ provider: 'email', email, code }));
+
+      expect(retry.status).toBe(200);
+      expect(await retry.json()).toEqual({ token: 'minted-jwt', created: false });
+      expect(mockCommitSignInCode).toHaveBeenCalledWith(email, code, undefined);
+      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser, {
+        deviceSessionId: 'session-retry',
+      });
+    });
+
     it('releases the reservation on an unexpected error', async () => {
       mockCreateOrUpdateUser.mockRejectedValue(new Error('DB crash'));
 
@@ -857,9 +885,8 @@ describe('POST /api/auth/native/token', () => {
 
       expect(response.status).toBe(401);
       expect(await response.json()).toEqual({ error: 'INVALID_CODE' });
-      // No credentials must be issued when consumeSignInCode fails.
       expect(mockGenerateApiToken).not.toHaveBeenCalled();
-      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
       expect(mockReleaseSignInCode).not.toHaveBeenCalled();
     });
 

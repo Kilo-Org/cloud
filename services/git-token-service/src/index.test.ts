@@ -2039,8 +2039,63 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
       source: 'installation',
       appType: 'standard',
     });
-    expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+    expect(serviceMocks.selectUserAuthorization).toHaveBeenCalledOnce();
     expect(serviceMocks.getTokenForRepo).toHaveBeenCalledOnce();
+  });
+
+  it('refuses GraphQL for a selected-user capability whose pin no longer resolves', async () => {
+    const service = createService();
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId,
+      allowUserAuthorization: true,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+    serviceMocks.selectUserAuthorization.mockClear();
+    serviceMocks.selectUserAuthorization.mockResolvedValueOnce({
+      selected: false,
+      reason: 'no_user_authorization',
+    });
+    serviceMocks.getTokenForRepo.mockClear();
+
+    await expect(
+      service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestMethod: 'POST',
+        requestUrl: 'https://api.github.com/graphql',
+      })
+    ).resolves.toEqual({ success: false, reason: 'source_unavailable' });
+    expect(serviceMocks.selectUserAuthorization).toHaveBeenCalledOnce();
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+  });
+
+  it('refuses GraphQL for a selected-user capability when the installation integration no longer matches', async () => {
+    const service = createService();
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId,
+      allowUserAuthorization: true,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+    serviceMocks.findManagedInstallationForRepo.mockResolvedValueOnce({
+      success: false,
+      reason: 'integration_mismatch',
+    });
+    serviceMocks.findRefreshCandidates.mockResolvedValueOnce({ success: true, candidates: [] });
+    serviceMocks.getTokenForRepo.mockClear();
+
+    await expect(
+      service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestMethod: 'POST',
+        requestUrl: 'https://api.github.com/graphql',
+      })
+    ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
   });
 
   it('forwards a Git request for another repository anonymously', async () => {

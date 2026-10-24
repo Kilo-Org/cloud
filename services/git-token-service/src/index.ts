@@ -1217,7 +1217,30 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
         appType: auth.appType,
       };
     };
-    if (upstream.credential === 'installation') return installationAuth();
+    if (upstream.credential === 'installation') {
+      // GraphQL is not addressed by repository path, so it is answered with the
+      // repository-scoped installation credential. A capability pinned to a user
+      // still requires that pin to resolve, so the session cannot outlive it.
+      if (claims.source === 'user') {
+        const pinned = await this.redeemPinnedUserAuthorization(authParams);
+        if (pinned && !pinned.success) {
+          return {
+            success: false,
+            reason:
+              pinned.reason === 'integration_mismatch'
+                ? 'integration_mismatch'
+                : 'source_unavailable',
+          };
+        }
+        if (!pinned || pinned.source !== claims.source) {
+          return { success: false, reason: 'source_unavailable' };
+        }
+        if (!this.matchesSessionIdentity(claims.identity, pinned)) {
+          return { success: false, reason: 'identity_mismatch' };
+        }
+      }
+      return installationAuth();
+    }
 
     let auth: GetCloudAgentAuthForRepoResult | null;
     if (claims.source === 'user') {

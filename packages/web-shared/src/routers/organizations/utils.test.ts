@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import {
   ensureOrganizationAccess,
   ensureOrganizationAccessAndFetchOrg,
+  ensureOrganizationsAccess,
   getOrganizationsAccessRoles,
 } from './utils';
 import {
@@ -52,6 +53,79 @@ describe('organization access kilo_admin_elevation telemetry', () => {
     const owner = await insertTestUser({ is_admin: false });
     return createTestOrganization(`elevation-test-${crypto.randomUUID()}`, owner.id, 0);
   }
+
+  async function softDeleteOrganization(organizationId: string) {
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, organizationId));
+  }
+
+  describe('admin access to organizations marked deleted', () => {
+    test('an admin elevation never applies to a deleted organization', async () => {
+      const admin = await insertTestUser({ is_admin: true });
+      const organization = await orgOwnedByAnotherUser();
+      await softDeleteOrganization(organization.id);
+
+      await expect(ensureOrganizationAccess(ctxFor(admin), organization.id)).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+      });
+      await expect(
+        ensureOrganizationAccessAndFetchOrg(ctxFor(admin), organization.id)
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+
+      // The fetch helper attributes the attempt before resolving it; the
+      // access helper records nothing because no elevation was granted.
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({ reason: 'organization_fetch' });
+    });
+
+    test('a batched admin resolution elevates only live organizations', async () => {
+      const admin = await insertTestUser({ is_admin: true });
+      const active = await orgOwnedByAnotherUser();
+      const alsoActive = await orgOwnedByAnotherUser();
+      const deleted = await orgOwnedByAnotherUser();
+      await softDeleteOrganization(deleted.id);
+
+      const roles = await getOrganizationsAccessRoles(ctxFor(admin), [
+        active.id,
+        alsoActive.id,
+        deleted.id,
+      ]);
+
+      expect(roles.get(active.id)).toBe('owner');
+      expect(roles.get(alsoActive.id)).toBe('owner');
+      expect(roles.has(deleted.id)).toBe(false);
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        reason: 'organization_access_batch',
+        target: 'organizations:2',
+      });
+    });
+
+    test('a batched admin resolution records no elevation when every organization is deleted', async () => {
+      const admin = await insertTestUser({ is_admin: true });
+      const deleted = await orgOwnedByAnotherUser();
+      await softDeleteOrganization(deleted.id);
+
+      const roles = await getOrganizationsAccessRoles(ctxFor(admin), [deleted.id]);
+
+      expect(roles.size).toBe(0);
+      expect(events).toHaveLength(0);
+    });
+
+    test('the batched guard rejects a request that names a deleted organization', async () => {
+      const admin = await insertTestUser({ is_admin: true });
+      const active = await orgOwnedByAnotherUser();
+      const deleted = await orgOwnedByAnotherUser();
+      await softDeleteOrganization(deleted.id);
+
+      await expect(
+        ensureOrganizationsAccess(ctxFor(admin), [active.id, deleted.id])
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+      await expect(ensureOrganizationsAccess(ctxFor(admin), [active.id])).resolves.toBeUndefined();
+    });
+  });
 
   test('ensureOrganizationAccess records the org an admin reached without membership', async () => {
     const admin = await insertTestUser({ is_admin: true, is_super_admin: true });

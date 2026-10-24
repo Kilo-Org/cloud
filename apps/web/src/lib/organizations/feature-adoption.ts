@@ -9,7 +9,6 @@ export const FEATURE_ADOPTION_KEYS = [
   'security-agent',
   'team-integration',
   'cloud-agent-used',
-  'project-deployed',
 ] as const;
 
 export type FeatureAdoptionKey = (typeof FEATURE_ADOPTION_KEYS)[number];
@@ -31,7 +30,6 @@ export type FeatureAdoptionState = {
   securityAgentEnabled: boolean;
   teamIntegrationConnected: boolean;
   cloudAgentUsed: boolean;
-  projectDeployed: boolean;
 };
 
 type FeatureAdoptionStateRow = {
@@ -40,7 +38,6 @@ type FeatureAdoptionStateRow = {
   security_agent_enabled: boolean;
   team_integration_connected: boolean;
   cloud_agent_used: boolean;
-  project_deployed: boolean;
 };
 
 export function buildFeatureAdoptionChecks(
@@ -101,16 +98,6 @@ export function buildFeatureAdoptionChecks(
       actionLabel: state.cloudAgentUsed ? 'View Cloud Agent' : 'Start with Cloud Agent',
       actionUrl: `/organizations/${organizationId}/cloud`,
     },
-    {
-      key: 'project-deployed',
-      title: 'Deploy',
-      description: 'Deploy a project from a connected repository.',
-      adopted: state.projectDeployed,
-      adoptedLabel: 'Deployed',
-      notAdoptedLabel: 'Not deployed',
-      actionLabel: state.projectDeployed ? 'View deployments' : 'Deploy a project',
-      actionUrl: `/organizations/${organizationId}/deploy`,
-    },
   ];
 }
 
@@ -162,13 +149,7 @@ export async function getFeatureAdoptionState(
           WHERE organization_id = ${organizationId}
             AND cloud_agent_session_id IS NOT NULL
         )
-      ) AS cloud_agent_used,
-      EXISTS (
-        SELECT 1 FROM deployments
-        WHERE owned_by_organization_id = ${organizationId}
-          AND created_from = 'deploy'
-          AND last_deployed_at IS NOT NULL
-      ) AS project_deployed
+      ) AS cloud_agent_used
   `);
   const row = result.rows[0] as FeatureAdoptionStateRow | undefined;
   return {
@@ -177,7 +158,6 @@ export async function getFeatureAdoptionState(
     securityAgentEnabled: row?.security_agent_enabled ?? false,
     teamIntegrationConnected: row?.team_integration_connected ?? false,
     cloudAgentUsed: row?.cloud_agent_used ?? false,
-    projectDeployed: row?.project_deployed ?? false,
   };
 }
 

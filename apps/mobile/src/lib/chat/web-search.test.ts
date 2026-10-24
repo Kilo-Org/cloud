@@ -1,5 +1,5 @@
 import { onlineManager } from '@tanstack/react-query';
-import { Effect, Either } from 'effect';
+import { Effect, Result } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -66,7 +66,7 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
 
 async function searched(organizationId?: string) {
   const answer = await Effect.runPromise(
-    Effect.either(
+    Effect.result(
       webSearchTool(organizationId).run({
         id: 'call-1',
         name: 'web_search',
@@ -111,7 +111,7 @@ describe('a web search', () => {
       numResults: 5,
       contents: { text: { maxCharacters: 1200 } },
     });
-    const body = JSON.parse(Either.getOrThrow(answer)) as {
+    const body = JSON.parse(Result.getOrThrow(answer)) as {
       readonly results: readonly { readonly url: string; readonly text: string }[];
     };
     expect(body.results).toHaveLength(5);
@@ -123,7 +123,7 @@ describe('a web search', () => {
 
     const answer = await searched();
 
-    expect(Either.isLeft(answer)).toBe(true);
+    expect(Result.isFailure(answer)).toBe(true);
     expect(world.requests).toEqual([]);
   });
 
@@ -135,7 +135,7 @@ describe('a web search', () => {
 
     const answer = await searched();
 
-    expect(Either.isLeft(answer)).toBe(true);
+    expect(Result.isFailure(answer)).toBe(true);
     expect(world.toastError).toHaveBeenCalledExactlyOnceWith(
       i18n.t('modelChat.webSearch.allowanceExhausted')
     );
@@ -145,13 +145,13 @@ describe('a web search', () => {
     const tool = webSearchTool();
     const call = { id: 'c', name: 'web_search', arguments: '{"query":"news"}' };
     const question = () =>
-      Effect.forEach(Array.from({ length: 6 }), () => Effect.either(tool.run(call))).pipe(
-        Effect.locally(questionSearches, { used: 0 })
+      Effect.forEach(Array.from({ length: 6 }), () => Effect.result(tool.run(call))).pipe(
+        Effect.provideService(questionSearches, { used: 0 })
       );
 
     const first = await Effect.runPromise(question());
 
-    expect(first.map(answer => Either.isRight(answer))).toEqual([
+    expect(first.map(answer => Result.isSuccess(answer))).toEqual([
       true,
       true,
       true,
@@ -163,14 +163,14 @@ describe('a web search', () => {
 
     const second = await Effect.runPromise(question());
 
-    expect(Either.isRight(second[0] ?? Either.left(undefined))).toBe(true);
+    expect(Result.isSuccess(second[0] ?? Result.fail(undefined))).toBe(true);
     expect(world.requests).toHaveLength(10);
   });
 
   it('never reaches the proxy without a signed-in token', async () => {
     world.token = null;
 
-    expect(Either.isLeft(await searched())).toBe(true);
+    expect(Result.isFailure(await searched())).toBe(true);
     expect(world.requests).toEqual([]);
   });
 });

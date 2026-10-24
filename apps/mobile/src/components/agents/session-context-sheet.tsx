@@ -223,7 +223,7 @@ export function SessionContextSheet({
   );
 
   return (
-    <SessionPageSheet visible={visible} onClose={onClose}>
+    <SessionPageSheet visible={visible} onClose={onClose} dismissible>
       <SheetHeader
         title={t('agentChat.contextUsage.title')}
         onDone={onClose}

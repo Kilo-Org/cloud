@@ -141,18 +141,18 @@ describe('local fake deterministic model', () => {
   });
 
   test('isFreeModelExcludingCustomLlms is true only when the local fake LLM is enabled', async () => {
-    expect(await isFreeModelExcludingCustomLlms(LOCAL_FAKE_DETERMINISTIC_MODEL_ID)).toBe(false);
-    expect(await isFreeModelExcludingCustomLlms('kilo/fake-deterministic')).toBe(false);
-    expect(await isFreeModelExcludingCustomLlms('fake-transcribe')).toBe(false);
-    expect(await isFreeModelExcludingCustomLlms('fake-transcribe-broken')).toBe(false);
+    expect(isFreeModelExcludingCustomLlms(LOCAL_FAKE_DETERMINISTIC_MODEL_ID)).toBe(false);
+    expect(isFreeModelExcludingCustomLlms('kilo/fake-deterministic')).toBe(false);
+    expect(isFreeModelExcludingCustomLlms('fake-transcribe')).toBe(false);
+    expect(isFreeModelExcludingCustomLlms('fake-transcribe-broken')).toBe(false);
 
     const env = replaceEnv({ NODE_ENV: 'development', FAKE_LLM_URL: 'http://localhost:8811' });
-    expect(await isFreeModelExcludingCustomLlms(LOCAL_FAKE_DETERMINISTIC_MODEL_ID)).toBe(true);
-    expect(await isFreeModelExcludingCustomLlms('kilo/fake-deterministic')).toBe(true);
-    expect(await isFreeModelExcludingCustomLlms('fake-transcribe')).toBe(true);
-    expect(await isFreeModelExcludingCustomLlms('fake-transcribe-broken')).toBe(true);
-    expect(await isFreeModelExcludingCustomLlms('openai/whisper-1')).toBe(false);
-    expect(await isFreeModelExcludingCustomLlms('anthropic/claude-sonnet-4')).toBe(false);
+    expect(isFreeModelExcludingCustomLlms(LOCAL_FAKE_DETERMINISTIC_MODEL_ID)).toBe(true);
+    expect(isFreeModelExcludingCustomLlms('kilo/fake-deterministic')).toBe(true);
+    expect(isFreeModelExcludingCustomLlms('fake-transcribe')).toBe(true);
+    expect(isFreeModelExcludingCustomLlms('fake-transcribe-broken')).toBe(true);
+    expect(isFreeModelExcludingCustomLlms('openai/whisper-1')).toBe(false);
+    expect(isFreeModelExcludingCustomLlms('anthropic/claude-sonnet-4')).toBe(false);
     env.restore();
   });
 });

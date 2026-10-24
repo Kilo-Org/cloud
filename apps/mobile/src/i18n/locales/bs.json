@@ -25,6 +25,7 @@
     "error": "greška: {{error}}",
     "back": "Nazad",
     "somethingWentWrong": "Došlo je do greške.",
+    "actionNotRecorded": "Nismo mogli zabilježiti ovu radnju. Pokušaj ponovo kasnije.",
     "couldNotOpen": "Nije moguće otvoriti {{label}}.",
     "link": "poveznica",
     "takingLonger": "Ovo traje duže nego što se očekivalo. Možeš zatvoriti ovaj ekran i ponovo provjeriti.",
@@ -52,6 +53,7 @@
     "connected": "Povezano",
     "couldNotLoadModels": "Nije moguće učitati modele.",
     "couldNotLoadRepositories": "Nije moguće učitati repozitorije.",
+    "noRepositoriesFound": "Nisu pronađeni repozitoriji",
     "critical": "Kritično",
     "delete": "Obriši",
     "deleted": "Obrisano",
@@ -86,6 +88,7 @@
     "connect": "Poveži",
     "connectBitbucket": "Poveži Bitbucket",
     "connectGitlab": "Poveži GitLab",
+    "connectProvider": "Poveži platformu",
     "contentTruncated": "Sadržaj skraćen",
     "copyLink": "Kopiraj vezu",
     "couldNotLoadOrganizations": "Nije moguće učitati organizacije.",
@@ -144,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Izmjene"
+    "changes": "Izmjene",
+    "organizationTrialEnded": "Probni period organizacije je završen i ona nema aktivan plan. Vlasnik organizacije može ažurirati naplatu na kilo.ai, a zatim pokušati ponovo."
   },
   "language": {
     "restarting": "Ponovno pokretanje radi primjene jezika",
@@ -181,7 +185,7 @@
     "codeArrivalHint": "Ako ova adresa ispunjava uslove, kod stiže u roku od jedne minute.",
     "verifyCode": "Potvrdi kod",
     "resendCode": "Pošalji kod ponovo",
-    "termsPrefix": "Nastavkom prihvataš naše",
+    "termsPrefix": "Nastavkom prihvataš naše ",
     "terms": "Uslove",
     "termsConnector": " i ",
     "termsSuffix": ".",
@@ -223,7 +227,7 @@
     "hideBalance": "Sakrij saldo",
     "showBalance": "Prikaži saldo",
     "balanceHidden": "Saldo je sakriven",
-    "bonusCreditsExpiring": "Bonus krediti u iznosu od {{amount}} istječu {{date}}.",
+    "bonusCreditsExpiring": "Krediti u iznosu od {{amount}} istječu {{date}}.",
     "signOutTitle": "Odjaviti se?",
     "signOutMessage": "Za pristup svom radnom prostoru morat ćeš se ponovo prijaviti.",
     "deleteAccountTitle": "Obrisati nalog?",
@@ -292,7 +296,8 @@
     "condenseToolCallsSubtitle": "Grupiši uzastopne pozive alata u jedan red koji možeš otvoriti.",
     "toolSummaryTranslation": "Prevedi sažetke alata",
     "toolSummaryTranslationSubtitle": "Pošalji svaki sažetak alata modelu da ga prevede na jezik tvoje aplikacije. Ako prijevod ne uspije, prikazuje se original.",
-    "toolSummaryTranslationModelUnavailableNotice": "Ovaj model se više ne nudi. Dodirni $t(common.model) da odabereš drugi."
+    "toolSummaryTranslationModelUnavailableNotice": "Ovaj model se više ne nudi. Dodirni $t(common.model) da odabereš drugi.",
+    "autoExpandThinkingInactiveSubtitle": "Nema efekta dok su detalji razmišljanja sakriveni."
   },
   "prReview": {
     "pullRequestUnavailable": "Zahtjev za spajanje nije dostupan",
@@ -500,7 +505,7 @@
       "unresolveThread": "Označi nit kao neriješenu",
       "resolved": "Riješeno",
       "outdated": "Zastarjelo",
-      "comment_one": "1 komentar",
+      "comment_one": "{{displayCount}} komentar",
       "comment": "{{displayCount}} komentara",
       "comment_other": "{{displayCount}} komentara",
       "startedRelative": " · započeto {{relative}}",
@@ -601,6 +606,8 @@
     "installKiloGitHubApp": "Instaliraj aplikaciju Kilo za GitHub",
     "checkConnection": "Provjeri vezu",
     "couldNotLoadPullRequest": "Učitavanje zahtjeva za spajanje nije uspjelo.",
+    "reviewServiceUnavailable": "Usluga je privremeno nedostupna",
+    "reviewServiceUnavailableDescription": "Usluga je privremeno nedostupna. Pokušajte ponovo uskoro.",
     "description": "Opis",
     "noDescriptionProvided": "Opis nije naveden.",
     "review": "Pregled",
@@ -630,9 +637,18 @@
       "viewOnGitHub": "Pogledaj PR na GitHubu",
       "noChecksReported": "Nema prijavljenih provjera",
       "passed": "uspješno: {{displayCount}}",
+      "passed_one": "uspješno: {{displayCount}}",
+      "passed_other": "uspješno: {{displayCount}}",
+      "passed_few": "uspješno: {{displayCount}}",
       "failed": "neuspješno: {{displayCount}}",
+      "failed_one": "neuspješno: {{displayCount}}",
+      "failed_other": "neuspješno: {{displayCount}}",
+      "failed_few": "neuspješno: {{displayCount}}",
       "pending": "na čekanju: {{displayCount}}",
       "skipped": "preskočeno: {{displayCount}}",
+      "skipped_one": "preskočeno: {{displayCount}}",
+      "skipped_other": "preskočeno: {{displayCount}}",
+      "skipped_few": "preskočeno: {{displayCount}}",
       "checksCount": "provjera: {{displayCount}}",
       "checksCount_one": "provjera: {{displayCount}}",
       "checksCount_few": "provjere: {{displayCount}}",
@@ -678,7 +694,8 @@
       "gitlabDescription": "Poveži svoj GitLab račun da pregledaš merge requeste na mobitelu.",
       "bitbucketDescription": "Poveži Bitbucket s ovom organizacijom da pregledaš zahtjeve za spajanje na mobitelu.",
       "bitbucketOrgOnlyDescription": "Prebaci račun iznad na organizaciju da pregledaš njene zahtjeve za spajanje na Bitbucketu.",
-      "contextLine": "Za {{organization}}"
+      "contextLine": "Za {{organization}}",
+      "contextLinePersonal": "Za lični nalog"
     },
     "screen": {
       "title": "#{{number}}",
@@ -777,6 +794,7 @@
       "truncationBanner_few": "Prikazuje se prvih {{limit}} od {{total}} promijenjenih datoteka zbog ograničenja GitHub API-ja."
     },
     "linkPasteClipboardEmpty": "Međuspremnik je prazan.",
+    "linkPasteDenied": "Pristanak za lijepljenje je odbijen. Dozvolite lijepljenje i pokušajte ponovo.",
     "linkPasteNotAPullRequest": "Ovo nije povezanica na zahtjev za spajanje niti merge request",
     "announce": {
       "commentPosted": "Komentar objavljen",
@@ -800,7 +818,6 @@
       "mergeResultDefaultError": "GitHub nije dovršio spajanje.",
       "mergeResultNotCompleted": "{{term}} nije spojen. Provjeri njegovo stanje i pokušaj ponovo.",
       "ambiguous": "Nije moguće potvrditi ishod radnje — provjeri PR prije ponovnog pokušaja.",
-      "persistenceFailed": "Nismo mogli zabilježiti ovu radnju. Pokušaj ponovo kasnije.",
       "forbidden": "Radnja nije dozvoljena."
     },
     "capabilities": {
@@ -1415,7 +1432,6 @@
       "gitlabNoRepositoriesDescription": "Možda trebaš odobriti pristup dodatnim grupama ili projektima na GitLabu.",
       "installGithubApp": "Instaliraj GitHub aplikaciju na repozitorije",
       "installGithubAppDescription": "Dodijeli Kilo GitHub aplikaciji pristup repozitorijima koje želiš pregledati.",
-      "noRepositoriesFound": "Nisu pronađeni repozitoriji",
       "repositoryAccess": "pristup repozitoriju"
     },
     "style": {
@@ -1445,6 +1461,8 @@
       "showMore": "Prikaži više",
       "created": "Kreirano",
       "started": "Započeto",
+      "reviewEnded": "Okončano",
+      "severityNitpick": "Sitnica",
       "tokens": "Tokeni",
       "tokensInOut": "Ulaz: {{input}} / Izlaz: {{output}}",
       "council": "Vijeće",
@@ -1468,15 +1486,22 @@
       "sessionError": "Došlo je do greške u sesiji: {{error}}.",
       "statusWithValue": "Stanje: {{status}}",
       "toolName": "Alat: {{name}}",
-      "toolNameError": "Došlo je do greške u alatu: {{name}}."
+      "toolNameError": "Došlo je do greške u alatu: {{name}}.",
+      "cancelReasonSuperseded": "Poslan je novi commit, pa je ovaj pregled zamijenjen.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} je odspojen, pa je ovaj pregled otkazan. Ponovo ga poveži, a zatim ponovi pregled.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer je isključen za Bitbucket, pa je ovaj pregled otkazan. Ponovo ga uključi, a zatim ponovi pregled.",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket pull request je promijenjen, pa je ovaj pregled zamijenjen.",
+      "cancelReasonCancelled": "Ovaj pregled je otkazan.",
+      "cancelReasonInterrupted": "Ovaj pregled je prekinut."
     },
     "reviewMemory": {
       "title": "Memorija pregleda",
       "loading": "Učitavanje memorije pregleda",
       "couldNotLoad": "Nije moguće učitati memoriju pregleda.",
       "off": "Memorija pregleda je isključena.",
+      "on": "Memorija pregleda je uključena.",
       "offDescription": "Uključi je da Kilo uči iz odgovora održavatelja i predlaže smjernice za REVIEW.md.",
-      "readOnlyDescription": "Samo vlasnici organizacije i upravitelji naplate mogu omogućiti memoriju pregleda.",
+      "readOnlyDescription": "Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu promijeniti memoriju pregleda.",
       "enable": "Omogući memoriju pregleda",
       "loadingProposals": "Učitavanje prijedloga",
       "couldNotLoadProposals": "Nije moguće učitati prijedloge.",
@@ -1488,15 +1513,25 @@
       "invalidUrl": "Unesi važeći URL zahtjeva za spajanje.",
       "couldNotCheckProviderStatus": "Nije moguće provjeriti status platforme.",
       "couldNotLoadProviders": "Nije moguće učitati povezane platforme. Pokušaj ponovo.",
-      "connectProvider": "Poveži platformu",
       "connectProviderDescription": "Poveži GitHub da započneš ručni pregled zahtjeva za spajanje.",
       "pullRequestUrl": "URL zahtjeva za spajanje",
       "instructions": "Upute (nisu obavezne)",
       "instructionsPlaceholder": "Na šta posebno treba obratiti pažnju pri pregledu…",
       "starting": "Pokretanje pregleda…",
-      "start": "Započni pregled"
+      "start": "Započni pregled",
+      "startNotFound": "Nije moguće pročitati taj {{requestNoun}} sa {{provider}}. Provjeri URL i je li repozitorij dostupan.",
+      "startRateLimited": "{{provider}} trenutno ograničava broj zahtjeva. Pokušaj ponovo za nekoliko minuta.",
+      "startNotAllowed": "Nemaš dozvolu za pokretanje pregleda za taj {{requestNoun}}. Provjeri svoje dozvole i plan svoje organizacije.",
+      "startProviderNeedsAttention": "Ručni pregledi zahtijevaju standardnu vezu s platformom {{provider}}. Poveži je i pokušaj ponovo.",
+      "startAlreadyRunning": "Pregled za taj {{requestNoun}} je već u toku.",
+      "startRejected": "Taj {{requestNoun}} se ne može pregledati. Provjeri da je otvoren, da nije nacrt i da je URL ispravan.",
+      "startProviderUnavailable": "Nije moguće kontaktirati {{provider}} da bi se pročitao taj {{requestNoun}}. Pokušaj ponovo.",
+      "startFailed": "Nije moguće započeti pregled. Provjeri internetsku vezu i pokušaj ponovo."
     },
-    "notConnectedReadOnly": "Platforma {{platform}} nije povezana. Samo vlasnici organizacije i upravitelji naplate mogu je povezati.",
+    "notConnectedReadOnly": "Platforma {{platform}} nije povezana. Samo vlasnici organizacije i administratori mogu je povezati.",
+    "gitlab": {
+      "notConnectedReadOnly": "Platforma {{platform}} nije povezana. Zamolite vlasnika organizacije, administratora ili menadžera za naplatu da je poveže."
+    },
     "webhookSetup": "Podešavanje webhooka nije završeno.",
     "webhookSetupDescription": "Neki repozitoriji možda neće imati automatske preglede.",
     "autoReviews": "Automatski pregledi",
@@ -1504,7 +1539,7 @@
     "followReviewMd": "Slijedi upute iz REVIEW.md",
     "followReviewMdSubtitle": "Poštuj upute iz datoteke REVIEW.md u svakom repozitoriju",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije i upravitelji naplate mogu ga povezati.",
+      "notConnectedReadOnly": "Bitbucket nije povezan. Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu ga povezati.",
       "setupIncomplete": "Podešavanje nije završeno. Završi ga na kilo.ai.",
       "setup": "Podešavanje Bitbucketa"
     },
@@ -1746,7 +1781,7 @@
       "deadlinePassed": "Rok je prošao",
       "deadlinePassedDetail": "Kritično: {{critical}}, visoko: {{high}}",
       "dueThisWeek": "Rok istječe ove sedmice",
-      "dueThisWeekDetail": "Potvrđeno iskoristivi: {{exploitable}}",
+      "dueThisWeekDetail": "{{exploitable}} od njih potvrđeno iskoristivi",
       "noDeadline": "Nema roka",
       "reviewSlaAssignment": "Provjeri dodjelu rokova prema SLA-u",
       "allOpenFindingsTracked": "Svi otvoreni nalazi se prate"
@@ -1767,7 +1802,7 @@
       "couldNotLoad": "Nije moguće učitati ovaj nalaz.",
       "couldNotCheckPermissions": "Nije moguće provjeriti dozvole za odbacivanje.",
       "cannotDismissTitle": "Ovaj nalaz nije moguće odbaciti",
-      "cannotDismissDescription": "Samo vlasnici organizacije i upravitelji naplate mogu odbaciti nalaze.",
+      "cannotDismissDescription": "Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu odbaciti nalaze.",
       "alreadyResolvedDescription": "Ovaj nalaz je već riješen i više ga nije moguće odbaciti."
     },
     "findingDetails": {
@@ -1809,7 +1844,7 @@
       "automationAllOff": "Sve isključeno",
       "automationCount": "{{displayCount}} od 3 omogućeno",
       "notificationsCount": "{{displayCount}} od 2 omogućeno",
-      "disabledNoManage": "Sigurnosni agent je isključen. Samo vlasnici organizacije i upravitelji naplate mogu ga uključiti.",
+      "disabledNoManage": "Sigurnosni agent je isključen. Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu ga uključiti.",
       "disabledNoRepo": "Odaberi barem jedan repozitorij prije uključivanja sigurnosnog agenta.",
       "disabledPrompt": "Uključi sigurnosnog agenta za sinhronizaciju upozorenja iz Dependabota, odabir repozitorija i podešavanje automatizacije.",
       "repositoriesCount_few": "Odabrana {{displayCount}} repozitorija"
@@ -1859,7 +1894,7 @@
       "invalidDayCount": "unesi cijeli broj dana od 1 do 365.",
       "remediationDeadlineA11y": "Rok za otklanjanje u danima: {{label}}",
       "enterWholeNumber": "Unesi cijeli broj od 1 do 365",
-      "permissionNote": "Samo vlasnici organizacije i upravitelji naplate mogu mijenjati ove postavke.",
+      "permissionNote": "Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu mijenjati ove postavke.",
       "enableTracking": "Omogući praćenje SLA-a",
       "enableTrackingSubtitle": "Postavi rokove za otklanjanje na osnovu ozbiljnosti nalaza.",
       "deadlinesHeading": "Rokovi za otklanjanje (dani)"
@@ -1902,17 +1937,27 @@
       "viewA11y": "Pogledaj revizijski izvještaj"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo administrator",
+      "actorMaskedUser": "Maskirani korisnik",
+      "actorSystem": "Kilo sistem",
       "couldNotLoad": "Nije moguće učitati revizijski izvještaj.",
       "events": "Događaji",
+      "eventConfidence": "Pouzdanost: {{confidence}}",
+      "eventReason": "Razlog: {{reason}}",
+      "eventsCount_one": "{{displayCount}} događaj",
+      "eventsCount_few": "{{displayCount}} događaja",
+      "eventsCount_other": "{{displayCount}} događaja",
       "generated": "Izvještaj je generiran {{generatedAt}}.",
       "noActivity": "Nema zabilježene aktivnosti",
       "noActivityDescription": "Kilo nema aktivnosti vezanih za sigurnosne nalaze koje treba prikazati u izvještaju za period od {{start}} do {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repozitorij nije zabilježen",
+      "reasonUnknown": "Neprepoznat razlog",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Sažetak izvještaja",
       "title": "Revizijski izvještaj",
       "unavailable": "Revizijski izvještaj nije dostupan",
-      "unavailableDescription": "Samo vlasnici organizacije i upravitelji naplate mogu pregledavati revizijske izvještaje. Zatraži pristup od vlasnika ili upravitelja naplate.",
+      "unavailableDescription": "Samo vlasnici organizacije, administratori i menadžeri za naplatu mogu pregledavati revizijske izvještaje. Zatraži pristup od vlasnika, administratora ili menadžera za naplatu.",
       "queryFailed": "Upit za izvještaj nije završen. Pokušaj ponovo.",
       "eventActions": {
         "findingAnalysisCompleted": "Analiza dovršena",
@@ -1961,8 +2006,9 @@
       "couldNotLoad": "Nije moguće učitati sigurnosnog agenta.",
       "installApp": "Instaliraj GitHub aplikaciju",
       "reauthorizeButton": "Ponovo autoriziraj GitHub aplikaciju",
-      "reauthorizeDescription": "Sigurnosni agent zahtijeva dozvolu vulnerability_alerts za pristup upozorenjima iz Dependabota. Ponovo autoriziraj GitHub aplikaciju da dodijeliš ovu dozvolu.",
+      "reauthorizeDescription": "Sigurnosni agent zahtijeva dozvolu da čita upozorenja iz Dependabota. Ponovo autoriziraj GitHub aplikaciju da dodijeliš ovu dozvolu.",
       "reauthorizeTitle": "Potrebne dodatne dozvole",
+      "retryFailed": "I dalje nije moguće učitati sigurnosnog agenta. Provjeri vezu i pokušaj ponovo.",
       "setupFailed": "Nije moguće započeti podešavanje GitHuba. Pokušaj ponovo."
     },
     "queuedActionUntracked": "Više nije moguće pratiti radnju dodanu u red. Osvježi prikaz da vidiš najnovije stanje.",
@@ -1980,7 +2026,12 @@
       "syncMayNotHaveCompleted": "Sinhronizacija možda nije završena. Pokušaj ponovo da uskladiš stanje ili odbaci radnju.",
       "syncInProgress": "Sinhronizacija sigurnosnih nalaza je već u toku. Pokušaj ponovo.",
       "dismissalInProgress": "Odbacivanje ovog nalaza je već u toku. Pokušaj ponovo.",
-      "couldNotReadPendingSyncs": "Nije moguće pročitati sinhronizacije na čekanju. Pokušaj ponovo."
+      "couldNotReadPendingSyncs": "Nije moguće pročitati sinhronizacije na čekanju. Pokušaj ponovo.",
+      "ambiguous": "Nije moguće potvrditi ishod radnje — provjeri pregled sigurnosti prije ponovnog pokušaja.",
+      "settleFailed": "Radnja je izvršena, ali nismo mogli zabilježiti rezultat. Pokušaj ponovo.",
+      "replayFailed": "Ova radnja nije dovršena. Pokušaj ponovo.",
+      "actionFailed": "Nije moguće dovršiti ovu radnju. Pokušaj ponovo.",
+      "actionBlocked": "Nije moguće dovršiti ovu radnju. Problem se mora riješiti prije ponovnog pokušaja."
     },
     "analysisState": {
       "queued": "Analiza u redu čekanja",
@@ -2124,7 +2175,8 @@
       "dollar_few": "dolara",
       "costSpoken": "trošak {{cost}}",
       "costSpokenWithTime": "trošak {{cost}}, {{time}}",
-      "pullRequest": "zahtjev za spajanje {{number}}"
+      "pullRequest": "zahtjev za spajanje {{number}}",
+      "spokenJoiner": "i"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Nije moguće otvoriti GitHub",
@@ -2244,6 +2296,9 @@
       "noRepositoriesVisibleGitlab": "Nema vidljivih repozitorija. Provjeri pristup GitLab repozitorijima, zatim osvježi spisak.",
       "noRepositoriesVisibleBitbucket": "Nema vidljivih repozitorija. Provjeri pristup Bitbucket repozitorijima, zatim osvježi spisak.",
       "bitbucketOrganizationsOnly": "Bitbucket je dostupan samo za organizacije.",
+      "githubNeedsAttention": "GitHub je potrebno ponovo povezati",
+      "githubNeedsAttentionDescription": "Ponovo poveži aplikaciju Kilo GitHub, a zatim osvježi da učitaš njene repozitorije.",
+      "partialRepositories": "Neki GitHub repozitoriji se nisu učitali.",
       "branchPickerTitle": "Odaberi granu",
       "branchDefault": "Zadano",
       "branchAccessibility": "Grana: {{label}}",
@@ -2251,17 +2306,19 @@
       "branchLoadError": "Učitavanje grana nije uspjelo",
       "branchUnavailable": "Grane nisu dostupne za ovaj repozitorij. Provjeri svoj pristup kod pružatelja usluga, pa odaberi drugi repozitorij.",
       "branchEmpty": "Nema dostupnih grana",
+      "branchListIncomplete": "Prikazane su samo neke grane. Ovaj repozitorij ima više grana nego što ova lista može obuhvatiti.",
       "branchPlaceholder": "Odaberi granu",
       "runOnWithTarget": "Pokreni na: {{target}}",
       "environment": "Okruženje",
       "couldNotLoadEnvironment": "Nije moguće učitati tvoje okruženje.",
       "retryLoadingEnvironment": "Pokušaj ponovo učitati okruženje",
       "defaultEnvironment": "Zadano okruženje",
-      "environmentSummary": "{{commands}} naredbi · {{mcp}} MCP · {{skills}} vještina · {{agents}} agenata",
       "leaveChanges": "Ostavi izmjene",
       "commitAndPush": "Potvrdi i pošalji",
       "startSession": "Započni sesiju",
       "selectRepositoryToStart": "Odaberi repozitorij za početak.",
+      "enterPromptToStart": "Dodaj upit za početak.",
+      "enterPromptOrFileToStart": "Dodaj upit ili datoteku za početak.",
       "connectProviderToStart": "Poveži platformu za početak.",
       "promptPlaceholder": "Na čemu želiš raditi?",
       "couldNotLoadModels": "Nije moguće učitati modele.",
@@ -2478,7 +2535,71 @@
       "preparationComplete": "Priprema završena",
       "preparationFailed": "Priprema nije uspjela",
       "setupCommand": "Naredba za podešavanje {{index}}",
-      "setupCommandOf": "Naredba za podešavanje {{index}} od {{displayCount}}"
+      "setupCommandOf": "Naredba za podešavanje {{index}} od {{displayCount}}",
+      "stepWorkspaceSetup": "Podešavanje radnog prostora",
+      "stepDiskCheck": "Provjera diska",
+      "stepCloning": "Kloniranje repozitorija",
+      "stepBranch": "Podešavanje grane",
+      "stepDevcontainerSetup": "Podešavanje dev kontejnera",
+      "stepWorkspaceRestore": "Vraćanje radnog prostora",
+      "stepWorkspaceBackup": "Spremanje radnog prostora",
+      "stepSandboxProvision": "Osiguravanje sandboxa",
+      "stepSandboxBoot": "Pokretanje sandboxa",
+      "stepSnapshotFallback": "Ponovni pokušaj bez snimke",
+      "stepKiloServer": "Pokretanje Kilo",
+      "stepKiloSession": "Priprema sesije",
+      "stepRestoreIncomplete": "Vraćanje sesije nije dovršeno",
+      "stepReady": "Okruženje spremno",
+      "stepFailed": "Podešavanje okruženja nije uspjelo",
+      "stepUnknown": "Podešavanje okruženja",
+      "detailCreatingSandbox": "Stvaranje sandboxa",
+      "detailUpdatingRepository": "Ažuriranje repozitorija",
+      "detailCheckingOutBranch": "Prebacivanje na granu",
+      "detailRunningSetupCommands": "Izvršavanje naredbi za podešavanje",
+      "detailSavingRepository": "Spremanje repozitorija za brža pokretanja",
+      "detailStartingKiloRuntime": "Pokretanje Kilo runtime-a",
+      "detailPreparingKiloSession": "Priprema Kilo sesije",
+      "detailWaitingForPreviousSandbox": "Čekanje da se prethodni sandbox zaustavi",
+      "detailRetryingSandboxCreation": "Ponovni pokušaj stvaranja sandboxa",
+      "detailPreviousSnapshotFailed": "Pokretanje iz prethodne snimke nije uspjelo. Ponovni pokušaj bez snimke.",
+      "detailSnapshotStartupFailed": "Pokretanje iz snimke nije uspjelo. Ponovni pokušaj bez snimke.",
+      "detailStartingSandboxWithoutSnapshot": "Pokretanje sandboxa bez snimke",
+      "detailSettingUpWorkspace": "Podešavanje radnog prostora",
+      "detailRestoringSession": "Vraćanje sesije",
+      "detailWarmWorkspaceReused": "Topli radni prostor je ponovo korišten",
+      "detailRetryingClone": "Ponovni pokušaj kloniranja (pokušaj {{attempt}} od {{total}})",
+      "detailSetupCommandFailed": "Naredba za podešavanje {{index}} nije uspjela",
+      "detailSetupCommandTimedOut": "Naredbi za podešavanje {{index}} je isteklo vrijeme",
+      "detailColdRestore": "Hladno vraćanje, snimka primijenjena, vraćeno {{applied}} od {{total}} datoteka",
+      "detailProgressPercent": "{{percent}}% dovršeno",
+      "detailRestoreIncompleteReport": "Vraćanje sesije nije dovršeno: {{skipped}} od {{total}} datoteka nije vraćeno ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Nedostaje: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} i još {{omitted}}",
+      "detailReasonPatchFailed": "zakrpa nije primijenjena",
+      "detailReasonOutsideWorkspace": "putanja je izvan radnog prostora",
+      "detailReasonMissingContent": "u snimci nije bilo sadržaja datoteke",
+      "detailReasonIndexResetFailed": "indeks nije moguće resetirati nakon neuspjele primjene",
+      "detailReasonUnlinkFailed": "datoteku nije bilo moguće ukloniti",
+      "detailReasonWriteFailed": "datoteku nije bilo moguće zapisati",
+      "detailReasonUnknown": "nepoznat razlog",
+      "detailUnknown": "Još se priprema",
+      "errorPreparationTimeout": "Vrijeme za pripremu okruženja je isteklo",
+      "errorWorkspaceSetupFailed": "Podešavanje radnog prostora nije uspjelo",
+      "errorCredentialUpgradeRequired": "Ovoj sesiji nedostaje potrebna nadogradnja vjerodajnica. Pokrenite novu sesiju za nastavak.",
+      "errorAgentUnavailable": "Agent više nije dostupan",
+      "errorBillingBlocked": "Naplata sandboxa zahtijeva dodatne kredite",
+      "errorBillingUnavailable": "Provjera naplate ili kapaciteta sandboxa nije dostupna. Pokušajte ponovo uskoro.",
+      "errorContainerLimitReached": "Dostignut limit kontejnera. Zaustavite postojeći kontejner prije pokretanja novog.",
+      "errorInvalidConfiguration": "Konfiguracija sandboxa nije važeća ili nije podržana",
+      "errorRuntimeArtifactUnauthorized": "Preuzimanje runtime-a nije odobreno",
+      "errorRuntimeArtifactInvalid": "Provjera runtime artefakta nije uspjela",
+      "errorRuntimeCliProbeFailed": "Provjera runtime CLI-ja nije uspjela",
+      "errorRuntimeSupervisorMissing": "Nedostaje runtime supervizor",
+      "errorConnectionLost": "Veza sa sandboxom je izgubljena",
+      "errorSandboxLost": "Sandbox je izgubljen",
+      "errorAgentRestarted": "Agent se ponovo pokrenuo",
+      "errorSandboxOutOfMemory": "Sandboxu je ponestalo memorije",
+      "errorPreparationDidNotComplete": "Priprema se nije dovršila"
     },
     "permissionCard": {
       "title": "Potrebna dozvola",
@@ -2490,7 +2611,10 @@
       "allowOnceAccessibility": "Dozvoli jednom",
       "alwaysAllow": "Uvijek dozvoli",
       "alwaysAllowAccessibility": "Uvijek dozvoli",
-      "retrying": "Ponovni pokušaj…"
+      "retrying": "Ponovni pokušaj…",
+      "retryDeny": "Pokušaj ponovo odbiti",
+      "retryAllowOnce": "Pokušaj ponovo dozvoliti jednom",
+      "retryAlwaysAllow": "Pokušaj ponovo uvijek dozvoliti"
     },
     "questionCard": {
       "title": "Agent traži odgovor",
@@ -2812,7 +2936,7 @@
     "webBrowser": "Web preglednik",
     "viewProfile": "Pogledaj profil",
     "signOutThisDevice": "Odjavi ovaj uređaj",
-    "signOutThisSession": "Odjavi ovu sesiju",
+    "signOutSessionLabel": "Odjavi uređaj {{device}}, prijava: {{signedIn}}",
     "sessionSignedOut": "Sesija odjavljena.",
     "signOutThisDeviceTitle": "Odjaviti ovaj uređaj?",
     "signOutThisSessionTitle": "Odjaviti ovu sesiju?",
@@ -3050,21 +3174,16 @@
     "boundary": {
       "backToProfile": "Nazad na profil",
       "loadErrorMessage": "Provjeri vezu i pokušaj ponovo.",
-
       "chooseAccount": "Odaberi račun",
       "loadErrorTitle": "Nije moguće učitati tvoje organizacije.",
+      "membershipLostNotice": "Više nemaš pristup ovoj organizaciji. Prebačeno na {{target}}.",
       "noOrganization": "Nema organizacije",
-
       "noOrganizationDescription": "Ovaj račun nije dio organizacije. Kreiraj ili se pridruži organizaciji na webu da bi koristio funkcije organizacije kao što su pozivnice za članove i upozorenja o niskom saldu.",
-
       "openWebOrganizations": "Otvori organizacije na webu",
-
       "organizationUnavailable": "Organizacija nije dostupna.",
       "selectDescriptionWithOrganizations": "Pripadaš jednoj ili više organizacija. Odaberi račun koji ovaj ekran treba koristiti.",
-
       "selectOrganization": "Odaberi organizaciju",
       "unavailableDescription": "Ova organizacija više nije dostupna. Odaberi drugu na svom profilu za nastavak.",
-
       "unavailableSessionsDescription": "Ova organizacija više nije dostupna. Njezine sesije nije moguće učitati.",
       "accessDeniedDescription": "Nemaš pristup ovoj organizaciji."
     },
@@ -3092,7 +3211,11 @@
       "permissionDenied": "Nemaš dozvolu za pozivanje članova.",
       "roleMember": "Uloga: član",
       "sendInvite": "Pošalji pozivnicu",
-      "title": "Pozovi člana"
+      "title": "Pozovi člana",
+      "alreadyInvited": "Osoba je već pozvana ili je već član.",
+      "sendError": "Slanje pozivnice nije uspjelo.",
+      "pendingInvitation": "Ova e-pošta već ima pozivnicu na čekanju.",
+      "alreadyMember": "Ova osoba je već član ove organizacije."
     },
     "invoices": {
       "downloadA11y": "Preuzmi fakturu {{number}}",
@@ -3117,7 +3240,11 @@
       "separateEmailsHint": "Odvoji adrese e-pošte zarezima.",
       "thresholdLabel": "Upozori ispod (USD)",
       "title": "Upozorenje o niskom saldu",
-      "emailsError": "Unesi barem jednu ispravnu adresu e-pošte. Ako ih unosiš više, odvoji ih zarezima.",
+      "emailsInvalid": "Jedna ili više adresa e-pošte nisu ispravne.",
+      "emailsRequired": "Unesi barem jednu adresu e-pošte.",
+      "saveEmailsError": "Neke adrese e-pošte nisu prihvaćene. Provjeri ih i pokušaj ponovo.",
+      "saveError": "Nije bilo moguće spremiti upozorenje o niskom saldu.",
+      "thresholdPlaceholder": "Unesi iznos",
       "thresholdError": "Unesi iznos veći od 0."
     },
     "memberLimit": {
@@ -3128,12 +3255,13 @@
       "removeLimit": "Ukloni ograničenje",
       "title": "Dnevno ograničenje potrošnje",
       "blankError": "Unesi iznos ili dodirni „Ukloni ograničenje“ u nastavku.",
+      "blankWithoutLimitError": "Unesi dnevno ograničenje između 0 i {{max}}.",
       "rangeError": "Unesi iznos između 0 i {{max}}."
     },
     "members": {
       "changeRole": "Promijeni ulogu",
       "emptyDescriptionCanInvite": "Pozovi kolege iz tima da počnete sarađivati u ovoj organizaciji.",
-      "emptyDescriptionCannotInvite": "Zamoli vlasnika ili menadžera za naplatu da pozove kolege iz tima.",
+      "emptyDescriptionCannotInvite": "Zamoli vlasnika, administratora ili menadžera za naplatu da pozove kolege iz tima.",
       "emptyTitle": "Još nema članova",
       "invitedDate": "Pozvan {{date}}",
       "limitPerDay": "{{amount}}/dan",
@@ -3156,7 +3284,13 @@
       "inviteCreated": "Pozivnica kreirana",
       "pendingInvitations": "Pozivnice na čekanju",
       "resendInvite": "Ponovo pošalji pozivnicu",
-      "shareInviteLink": "Podijeli link pozivnice"
+      "shareInviteLink": "Podijeli link pozivnice",
+      "resendInviteError": "Ponovno slanje pozivnice nije uspjelo.",
+      "inviteNotResendable": "Ova pozivnica se više ne može ponovo poslati.",
+      "ownerAuthority": "Samo vlasnik organizacije može upravljati vlasnicima.",
+      "ownRoleChange": "Ne možeš promijeniti svoju ulogu.",
+      "inviteExpired": "Ova pozivnica je istekla.",
+      "inviteAccepted": "Ova pozivnica je već prihvaćena."
     },
     "usageStats": {
       "inputTokens": "Ulazni tokeni",
@@ -3305,7 +3439,8 @@
     "noneChosen": "Nije odabran",
     "emptyTitle": "Nema modela za transkripciju",
     "emptyDescription": "Kilo Gateway trenutno ne nudi modele za transkripciju.",
-    "loadFailed": "Nije moguće učitati modele za transkripciju."
+    "loadFailed": "Nije moguće učitati modele za transkripciju.",
+    "choose": "Odaberi model"
   },
   "voiceLanguage": {
     "title": "Jezik glasovnog unosa",
@@ -3398,9 +3533,16 @@
       "settingsToolsOn": "Uključeno — alati za postavke šalju se modelu",
       "settingsToolsOff": "Isključeno — nijedan alat za postavke ne šalje se modelu",
       "serverChecking": "Provjera ovog servera…",
-      "serverToolCount": "{{count}} alata",
+      "serverToolCount_few": "{{count}} alata",
+      "serverToolCount_one": "{{count}} alat",
+      "serverToolCount_other": "{{count}} alata",
       "serverUnreachable": "Nije bilo moguće doći do ovog servera",
-      "serverOff": "Ovaj server je isključen"
+      "serverOff": "Ovaj server je isključen",
+      "app": {
+        "label": "Sučelje alata",
+        "failed": "Sučelje ovog alata nije se moglo učitati.",
+        "empty": "Sučelje ovog alata nema ništa za prikaz."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Autentifikacija",
@@ -3514,6 +3656,7 @@
       "fromHuggingFace": "Sa Hugging Face",
       "loading": "Učitavanje modela",
       "noResults": "Nema pronađenih modela",
+      "noResultsForQuery": "Nema pronađenih modela za \"{{query}}\"",
       "noFits": "Nijedan model ne odgovara ovom uređaju",
       "noFitsDescription": "Veći modeli su na kartici $t(common.all).",
       "fit": {
@@ -3544,7 +3687,7 @@
       "quantizations": "Kvantizacije",
       "quantizationsHelp": "Manje datoteke koriste manje memorije i prostora. Veće datoteke obično daju bolje odgovore.",
       "quantDetail": "Preuzimanje {{size}} · oko {{memory}} memorije",
-      "downloadQuant": "Preuzmi {{quant}}",
+      "detailsA11y": "Detalji: {{name}}",
       "loadingModel": "Učitavanje detalja modela",
       "couldNotLoadModel": "Nije moguće učitati ovaj model",
       "noFiles": "Nema datoteka koje ova aplikacija može pokrenuti",
@@ -3588,14 +3731,19 @@
     },
     "reasoningEffort": {
       "modelFlag": "Ovaj model podržava intenzitet razmišljanja"
-    }
+    },
+    "creditsRequired": "Nema dovoljno kredita za slanje ove poruke. Dodaj kredite i pokušaj ponovo."
   },
   "settingsTools": {
     "confirmTitle": "Potvrditi ovu promjenu?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "tvoj najnoviji repozitorij",
+      "confirmMessage": "Repozitorij: {{repository}}. Upit: {{prompt}}",
+      "confirmTitle": "Pokrenuti ovog agenta?",
       "promptRequired": "Za pokretanje agenta potreban je upit. Dodaj upit i pokreni ga ponovo.",
+      "repositoryRequired": "Za pokretanje agenta potreban je repozitorij. Otvori Kilo i odaberi jedan, a zatim ga pokreni ponovo.",
       "repositoryUnknown": "Kilo ne prepoznaje {{repository}} kao GitHub ili GitLab repozitorij. Odaberi drugi repozitorij u Kilo.",
       "repositoryUnsupported": "{{repository}} je Bitbucket repozitorij — Pokreni agenta ga još ne može koristiti. Odaberi drugi repozitorij u Kilo."
     }
@@ -3623,7 +3771,9 @@
     "spend24h": "Potrošnja u posljednja 24 sata",
     "multiplierError": "Unesi množilac 1 ili veći",
     "permissionDenied": "Nemaš dozvolu za upravljanje upozorenjima o potrošnji.",
-    "pushOffByCategory": "Isključeno u Obavijestima"
+    "pushOffByCategory": "Isključeno u Obavijestima",
+    "multiplierMaxError": "Unesi množilac {{max}} ili manji",
+    "thresholdMaxError": "Unesi iznos {{max}} ili manji."
   },
   "profiles": {
     "title": "Profili",
@@ -3633,13 +3783,22 @@
     "emptyDescription": "Kreirajte profil za ponovno korištenje varijabli okruženja, naredbi za postavljanje i vještina u svim sesijama.",
     "loadFailed": "Učitavanje profila nije uspjelo",
     "counts": {
-      "vars": "{{count}} varijabli",
+      "vars_one": "{{count}} varijabla",
+      "vars_few": "{{count}} varijable",
+      "vars_other": "{{count}} varijabli",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} vještina",
-      "commands": "{{count}} komandi",
-      "varsShort": "{{count}}var",
-      "skillsShort": "{{count}}vje",
-      "commandsShort": "{{count}}kom"
+      "skills_one": "{{count}} vještina",
+      "skills_few": "{{count}} vještine",
+      "skills_other": "{{count}} vještina",
+      "commands_one": "{{count}} komanda",
+      "commands_few": "{{count}} komande",
+      "commands_other": "{{count}} komandi",
+      "setupCommands_one": "{{count}} komanda za podešavanje",
+      "setupCommands_few": "{{count}} komande za podešavanje",
+      "setupCommands_other": "{{count}} komandi za podešavanje",
+      "agents_one": "{{count}} agent",
+      "agents_few": "{{count}} agenta",
+      "agents_other": "{{count}} agenata"
     },
     "nameLabel": "Ime profila",
     "namePlaceholder": "npr. Backend debugging",
@@ -3667,7 +3826,8 @@
     "keyTooLong": "Ključ može imati najviše 256 znakova",
     "keyDuplicate": "Ovaj ključ već postoji u profilu",
     "valueLabel": "Vrijednost",
-    "secretLabel": "Tajna",
+    "valueRequired": "Unesite vrijednost",
+    "tooLong": "Možete koristiti najviše {{max}} znakova",
     "secrets": {
       "markSecret": "Označi kao tajnu",
       "masked": "Skrivena vrijednost",
@@ -3696,6 +3856,8 @@
     "skillNameInvalid": "Ime vještine mora početi slovom ili cifrom i koristiti samo mala slova, cifre i crtice",
     "skillContentRequired": "Sadržaj vještina je obavezan",
     "skillSaveFailed": "Nije moguće sačuvati vještinu",
+    "skillSourceCustom": "Prilagođeno",
+    "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Zalijepite SKILL.md i njegovo ime se popunjava; dodajte vještinu sa svog telefona bez povlačenja i ispuštanja.",
     "skillEditTitle": "Uredi vještinu",
     "mcp": {
@@ -3711,12 +3873,12 @@
       "environment": "Okruženje (JSON)",
       "headers": "Zaglavlja (JSON)",
       "timeout": "Timeout",
-      "secretCount": "Tajni broj",
+      "secretCount": "Tajni broj: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Unesite ime servera",
-      "nameInvalid": "Ime može koristiti samo slova, brojeve, donje crte i crtice",
+      "nameInvalid": "Ime može koristiti samo ASCII slova, brojeve, donje crte i crtice, najviše 100 znakova",
       "commandRequired": "Unesite komandu",
       "commandTooLong": "Koristite najviše 50 argumenata od po 500 znakova",
       "urlRequired": "Unesite URL",
@@ -3744,7 +3906,7 @@
       "stepsPlaceholder": "npr. 50",
       "temperature": "Temperatura",
       "temperaturePlaceholder": "npr. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "npr. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Moj agent",
@@ -3754,11 +3916,14 @@
       "visibilityPrimary": "Primarni — prikazano u biraču",
       "visibilitySubagent": "Subagent — može se pozvati samo od drugih",
       "visibilityAll": "Sve — oboje",
+      "modePrimary": "Samo primarni",
+      "modeSubagent": "Samo subagent",
+      "modeAll": "Sve",
       "saveFailed": "Nije moguće sačuvati agenta",
       "deleteFailed": "Nije moguće izbrisati agenta",
       "nameRequired": "Unesite ime agenta",
       "slugRequired": "Unesite puž agenta",
-      "slugInvalid": "Slug mora početi slovom i koristiti samo mala slova, cifre i crtice",
+      "slugInvalid": "Slug mora početi malim ASCII slovom i koristiti samo mala ASCII slova, cifre i crtice, najviše 50 znakova",
       "slugConflict": "Taj slug već koristi ugrađeni agent ili drugi agent u ovom profilu",
       "edit": "Uredi agenta"
     },
@@ -3803,7 +3968,9 @@
       "pinFailed": "Nije moguće zakačiti repo",
       "unboundToast": "Repo nevezan",
       "unbindFailed": "Nije moguće poništiti vezivanje repo"
-    }
+    },
+    "variablesDeleteFailed": "Nije moguće izbrisati varijablu",
+    "deleteCommand": "Obriši naredbu {{position}}"
   },
   "credits": {
     "title": "Kupi kredite",
@@ -3814,6 +3981,8 @@
     "empty": "Paketi kredita trenutno nisu dostupni.",
     "noMatchingProducts": "App Store nije vratio odgovarajuće pakete kredita.",
     "noMatchingProductsPlay": "Google Play nije vratio odgovarajuće pakete kredita.",
+    "storeTimedOut": "App Store nije odgovorio na vrijeme. Pokušaj ponovo.",
+    "storeTimedOutPlay": "Google Play nije odgovorio na vrijeme. Pokušaj ponovo.",
     "purchaseOwnedByAnotherAccount": "Krediti na ovom računu Apple Account pripadaju drugom Kilo računu. Prijavi se na taj Kilo račun da ih koristiš.",
     "purchaseOwnedByAnotherAccountPlay": "Krediti na ovom Google Play nalogu pripadaju drugom Kilo nalogu. Prijavite se na taj Kilo nalog da biste ih koristili."
   },
@@ -3839,7 +4008,8 @@
       "archive": "Arhiviraj",
       "unarchive": "Vrati iz arhive",
       "deleteTitle": "Obrisati {{name}}?",
-      "deleteMessage": "Njegovi zadaci se također brišu. Njihove sesije ostaju."
+      "deleteMessage": "Njegovi zadaci se također brišu. Njihove sesije ostaju.",
+      "createFailed": "Kreiranje liste nije uspjelo"
     },
     "listSettings": {
       "title": "Postavke liste",
@@ -3909,20 +4079,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Jutarnji pregled",
+    "title": "Agentski pregled",
     "atLeast": "≥{{value}}",
     "coverageHint": "Dio ranije aktivnosti možda nedostaje. ≥ znači najmanje ovoliko; nepoznato nije nula.",
     "available": "Dostupni pregledi",
     "history": "Historija pregleda",
-    "historyHint": "Izvještaji se čuvaju 30 dana, uključujući odbačene.",
+    "historyHint": "Pregledi se čuvaju 30 dana, uključujući odbačene.",
     "settings": "Postavke pregleda",
-    "empty": "Nema noćne aktivnosti",
-    "emptyHint": "Vaše cloud i CLI sesije kodiranja pojavit će se ovdje nakon aktivne noći.",
+    "empty": "Nema aktivnosti u ovom periodu pregleda",
+    "emptyHint": "Vaše cloud i CLI sesije kodiranja pojavljuju se ovdje kada zakazani pregled ima aktivnost.",
     "loadError": "Nije moguće učitati preglede",
-    "sessions": "Aktivno tokom noći",
+    "sessions": "Aktivno u periodu",
     "pullRequests": "Otvoreni PRs",
     "blockers": "Nove prepreke",
-    "spend": "Noćna potrošnja",
+    "spend": "Potrošnja u periodu",
     "view": "Pročitaj pregled",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -3944,13 +4114,13 @@
     "sources": "Dokazi i artefakti",
     "timezone": "Vremenska zona pregleda",
     "deviceTimezone": "Koristi vremensku zonu uređaja",
-    "timezoneHint": "IANA vremenska zona, npr. Europe/Berlin. Promjene rasporeda važe za buduće noći.",
-    "nightStart": "Početak noći",
-    "morningStart": "Kraj noći / početak jutra",
-    "morningEnd": "Kraj jutra",
-    "timeHint": "Kartica na početnoj vraća trenutni status kada jutro završi, čak i van mreže.",
-    "invalidSchedule": "Odaberite važeću vremensku zonu i neprazne periode noći i jutra koji se ne preklapaju.",
-    "notificationsHint": "Jedna opća obavijest svakog jutra kada vaš prvi izvještaj bude spreman. Neovisno o plaćenim AI sažecima.",
+    "timezoneHint": "IANA vremenska zona, npr. Europe/Berlin. Promjene rasporeda važe za buduće preglede.",
+    "nightStart": "Početak perioda pregleda",
+    "morningStart": "Pregled spreman u",
+    "morningEnd": "Pregled dostupan do",
+    "timeHint": "Kartica na početnoj vraća trenutni status kada period pregleda završi, čak i van mreže.",
+    "invalidSchedule": "Odaberite važeću vremensku zonu i neprazan period pregleda.",
+    "notificationsHint": "Jedna opća obavijest po zakazanom pregledu. Neovisno o plaćenim AI sažecima.",
     "notificationPermission": "Omogućite obavijesti uređaja u $t(common.notifications) da biste primali pregled.",
     "aiOptIn": "Plaćeni AI sažeci",
     "aiHint": "Opcionalno samo za ovaj kontekst. Odabrani, redigovani isječci i strukturirane činjenice šalju se vašem modelu na jeziku aplikacije. Naplata se vrši sa stanja ovog konteksta.",
@@ -3967,9 +4137,39 @@
     "enable": "Omogući plaćene sažetke",
     "contextSettings": "AI postavke · {{context}}",
     "allContexts": "Lični i organizacijski pregledi ostaju odvojeni.",
+    "create": "Kreiraj pregled",
+    "oneOff": "Na zahtjev",
+    "createdAt": "Kreirano {{time}}",
+    "chooseContext": "Odaberi jedan kontekst",
+    "period": "Period pregleda",
+    "last24Hours": "Posljednja 24 sata",
+    "last7Days": "Posljednjih 7 dana",
+    "customPeriod": "Prilagođeni period",
+    "periodStart": "Početak perioda",
+    "periodEnd": "Kraj perioda",
+    "periodHint": "Odaberi najviše 31 dan. Historijski podaci mogu biti nepotpuni.",
+    "periodSessions": "Aktivne u periodu",
+    "periodSpend": "Potrošnja u periodu",
+    "invalidPeriod": "Odaberi početak prije kraja.",
+    "futurePeriod": "Period ne može završiti u budućnosti.",
+    "periodTooLong": "Odaberi period od najviše 31 dan.",
+    "invalidLocalTime": "Ovo lokalno vrijeme ne postoji u vremenskoj zoni pregleda. Odaberi drugo vrijeme.",
+    "reviewBriefing": "Pregledaj pregled",
+    "reviewAgain": "Pripremi novi pregled",
+    "payer": "Naplata na teret konteksta {{context}}",
+    "emptyPeriod": "Nema aktivnosti u ovom periodu. Nema AI sažetka ni naplate.",
+    "emptyHistory": "Nema sačuvanih pregleda",
+    "historicalStateHint": "Stanje sesije odražava kraj odabranog perioda, a ne trenutno stanje uživo.",
+    "oneOffHint": "AI prima odabrane podatke s uklonjenim osjetljivim informacijama na jeziku tvoje aplikacije. Ovaj pregled na zahtjev ne mijenja tvoj zakazani pregled ni AI postavke.",
+    "createOffline": "Poveži se na internet za provjeru ili kreiranje pregleda. Plaćeni zahtjevi se nikada ne stavljaju u red čekanja bez internetske veze.",
+    "estimateInputTooLarge": "Ovaj period sadrži previše podataka za odabrani model.",
+    "estimatePermissionUnavailable": "Nemaš dozvolu za korištenje salda ovog konteksta.",
+    "createFailed": "Nije moguće kreirati ovaj pregled.",
+    "reviewFailed": "Nije moguće pregledati ovaj pregled.",
     "estimatePricingUnavailable": "Cijene za ovaj model nisu dostupne.",
     "estimateBalanceUnavailable": "Nema dovoljno sredstava za plaćeni sažetak.",
     "estimateModelNotAllowed": "Ovaj model ovdje nije dozvoljen.",
-    "estimateSpendLimitTooLow": "Povećajte ograničenje potrošnje da biste omogućili ovaj sažetak."
+    "estimateSpendLimitTooLow": "Povećajte ograničenje potrošnje da biste omogućili ovaj sažetak.",
+    "saved": "Postavke pregleda su sačuvane"
   }
 }

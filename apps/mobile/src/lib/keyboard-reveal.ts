@@ -1,4 +1,8 @@
-import { type MeasureInWindowOnSuccessCallback, type ScrollView, TextInput } from 'react-native';
+import {
+  type MeasureInWindowOnSuccessCallback,
+  type ScrollViewInstance,
+  TextInput,
+} from 'react-native';
 
 /**
  * Scrolls the scrollable so the focused input clears the keyboard — the same
@@ -8,7 +12,7 @@ import { type MeasureInWindowOnSuccessCallback, type ScrollView, TextInput } fro
  * and a no-op when the focused field already clears the keyboard.
  */
 export function scrollFocusedInputAboveKeyboard(scrollable: {
-  current: ScrollView | null;
+  current: ScrollViewInstance | null;
   /** The scroll offset the scroll view reports through its own onScroll. */
   offsetRef: { current: number };
   /** The keyboard's occlusion height, `0` when it is down. */

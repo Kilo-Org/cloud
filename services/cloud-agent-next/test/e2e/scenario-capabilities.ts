@@ -131,18 +131,8 @@ export type CallbackObservation = { open(signal?: AbortSignal): Promise<Callback
 export type GatesObservation = { parkedStreamsSupported: true };
 
 /**
- * The control-plane V2 (`workspace_*` new plane) is routed and launched. Plan
- * B11 writes scenarios against it before the C1 cutover, so the local profile
- * advertises this capability only when the operator opts in with
- * `E2E_CONTROL_PLANE_V2=1`. Without it every V2 scenario reports `unsupported`
- * with the missing-capability reason instead of failing against the legacy
- * plane.
- *
- * The flag alone is not proof: a `workspace_*` id prefix is produced by the
- * legacy plane too. Every V2 scenario additionally declares `controlPlaneRuntime`
- * and proves the owned container runs the new-plane wrapper before asserting
- * anything, so an opted-in run against a still-legacy plane fails loudly instead
- * of false-passing.
+ * The local profile supports control-plane sessions without enrollment.
+ * Scenarios also require `controlPlaneRuntime` to verify the owned wrapper.
  */
 export type ControlPlaneV2Observation = { ready: true };
 
@@ -280,10 +270,8 @@ export type SandboxFaultTarget = {
    */
   expectedWrapperInstanceId: string;
   /**
-   * Which control-wrapper basename to capture and guard. Absent means the
-   * legacy `kilocode-control-wrapper.js`; the new-plane scenarios set
-   * `kilocode-control-plane-wrapper.js`, because a new-plane container has no
-   * legacy wrapper process (and vice versa).
+   * Optional explicit wrapper basename. Only
+   * `kilocode-control-plane-wrapper.js` is accepted.
    */
   wrapperProcessBasename?: string;
 };
@@ -413,7 +401,7 @@ export type SandboxFaultObservation = {
      * exists, before a separate capture would lose the attach window.
      */
     expectedWrapperInstanceId?: string;
-    /** Absent means the legacy wrapper basename. */
+    /** Optional explicit control-plane wrapper basename. */
     wrapperProcessBasename?: string;
     waitForAttachMs: number;
   }): Promise<{

@@ -59,7 +59,6 @@ function collectDeclarations(rule) {
   return declarations;
 }
 
-/** Reads the light and dark `:root` blocks from global.css. */
 export function readThemeColors() {
   const css = readFileSync(CSS_PATH, 'utf8');
   const root = postcss.parse(css);

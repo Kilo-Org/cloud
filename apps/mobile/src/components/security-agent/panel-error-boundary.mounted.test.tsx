@@ -23,6 +23,7 @@ let events: TelemetryEvent[] = [];
 const capacity = vi.hoisted(() => ({
   runningCount: 0 as number | undefined,
   concurrencyLimit: 3,
+  state: 'available' as 'loading' | 'error' | 'available' | 'full',
   isLoading: false,
   isError: false,
   refetch: vi.fn(),

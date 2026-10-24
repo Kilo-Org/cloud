@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Keyboard, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { type Href, useLocalSearchParams, useNavigation, useRouter } from 'expo-router';
+import { type Href, useLocalSearchParams, usePreventRemove, useRouter } from 'expo-router';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
@@ -77,10 +77,11 @@ import {
 } from '@/lib/hooks/remote-instance-spawn-classifier';
 import {
   resolveContinueStartDisabled,
+  resolveNewSessionConnectProvider,
   resolveNewSessionStartBlockedReason,
   resolveNewSessionStartDisabled,
+  resolveRemoteStartMissingContent,
 } from '@/lib/new-session-submit';
-import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import { getRepoBindingsPath } from '@/lib/profile-agent-navigation';
 import {
   clearDraft,
@@ -259,19 +260,23 @@ export function NewSessionScreenBody() {
     },
     [stackSafeRouter, searchParams, userId, isCloneEntry]
   );
+  // One line, label left and control right: the organization is a value the
+  // user changes in place, not a section with a control under its title.
   const organizationSection = (
-    <View className="mt-5">
-      <Text className="mb-2 text-sm font-medium text-muted-foreground">
+    <View className="mt-5 min-h-11 flex-row items-center justify-between gap-3">
+      <Text className="shrink-0 text-sm font-medium text-muted-foreground">
         {t('common.organization')}
       </Text>
-      {isCloneEntry ? (
-        <ContextControl scope={{ organizationId: organizationId ?? null, isResolved: true }} />
-      ) : (
-        <ContextControl
-          value={organizationId ?? null}
-          onSelectionChange={handleOrganizationSwitch}
-        />
-      )}
+      <View className="min-w-0 shrink flex-row items-center justify-end">
+        {isCloneEntry ? (
+          <ContextControl scope={{ organizationId: organizationId ?? null, isResolved: true }} />
+        ) : (
+          <ContextControl
+            value={organizationId ?? null}
+            onSelectionChange={handleOrganizationSwitch}
+          />
+        )}
+      </View>
     </View>
   );
 
@@ -486,7 +491,9 @@ export function NewSessionScreenBody() {
   }, [organizationId, overrideProfileId, router]);
 
   const handleOpenRepoDefaults = useCallback(() => {
-    router.push(getRepoBindingsPath(organizationId));
+    // The composer's own Stack, so Back returns here with the draft instead of
+    // landing on the Profile tab root.
+    router.push(getRepoBindingsPath(organizationId, 'app'));
   }, [organizationId, router]);
 
   // Keep the inline selector and picker list in sync.
@@ -874,12 +881,13 @@ export function NewSessionScreenBody() {
   // swipe are blocked with no discard alert. The one-shot bypass, armed by the
   // success callbacks right before the replace, lets the success navigation
   // through so back from the new session returns to the source session.
-  const navigation = useNavigation();
+  const [cloneLeaveAllowed, setCloneLeaveAllowed] = useState(false);
   const isStarting = runOnInstance !== null ? remoteSpawn.isSpawningRemote : isCreating;
-  usePreventRemove(isCloneEntry && isStarting, ({ data }) => {
+  usePreventRemove(isCloneEntry && isStarting && !cloneLeaveAllowed, ({ repeat }) => {
     if (cloneNavigateBypassRef.current) {
       cloneNavigateBypassRef.current = false;
-      navigation.dispatch(data.action);
+      setCloneLeaveAllowed(true);
+      repeat();
     }
   });
 
@@ -981,7 +989,15 @@ export function NewSessionScreenBody() {
       if (runOnInstance === null) {
         return true;
       }
+      // An empty composer hands the spawn nothing: `buildComposerSharePayload`
+      // returns null, the spawn carries no prompt and no file, and Start would
+      // stay busy until the SDK timeout with nothing to show for it. A file
+      // alone is content (the destination keeps it for the user to send).
       return (
+        resolveRemoteStartMissingContent({
+          hasPrompt,
+          hasAttachments: attachments.attachments.length > 0,
+        }) ||
         remoteSpawn.isSpawningRemote ||
         isSubmitting ||
         attachments.hasFailedAttachments ||
@@ -1009,7 +1025,11 @@ export function NewSessionScreenBody() {
   // The repository section's own settle state, separated from the repository
   // count exactly as the extension separates provider connect from repo count.
   const hasRepositories = repositories.length > 0;
-  const hasConnectableProvider = groups.some(group => group.status === 'connect');
+  // One source of truth for "a provider can still be connected" and which one
+  // the footer's connect action opens: the first group in the `connect` state,
+  // in the section's fixed github/gitlab/bitbucket order.
+  const connectProviderPlatform = resolveNewSessionConnectProvider(groups);
+  const hasConnectableProvider = connectProviderPlatform !== null;
   const isLoadingRepositories = groups.some(group => group.status === 'loading');
 
   const startBlockedReasonKey = resolveNewSessionStartBlockedReason(
@@ -1021,6 +1041,8 @@ export function NewSessionScreenBody() {
           isLoadingRepositories,
           isRemoteTargetSelected,
           selectedRepo,
+          hasAttachments: attachments.attachments.length > 0,
+          selectedRepositoryResolved: selectedRepository !== null,
           gate: {
             isCreating,
             isSubmitting,
@@ -1040,6 +1062,8 @@ export function NewSessionScreenBody() {
           isLoadingRepositories,
           isRemoteTargetSelected,
           selectedRepo,
+          hasAttachments: attachments.attachments.length > 0,
+          selectedRepositoryResolved: selectedRepository !== null,
           gate: {
             attachmentsHasFailed: attachments.hasFailedAttachments,
             attachmentsIsUploading: attachments.isUploading,
@@ -1054,16 +1078,37 @@ export function NewSessionScreenBody() {
   );
 
   let startBlockedReason: string | null = null;
+  let startBlockedAction: { label: string; onPress: () => void; isBusy?: boolean } | null = null;
   if (runOnInstance === null && computerTargetSelected) {
     startBlockedReason = stripInlineCodeMarkers(
       t('agentChat.instancePicker.noCliInstancesDescription')
     );
   } else if (startBlockedReasonKey === 'connect-provider') {
     startBlockedReason = t('agentChat.newSession.connectProviderToStart');
+    // `connect-provider` requires at least one connectable group, so a target
+    // exists exactly when this branch runs; fall back to no action if it ever
+    // does not, rather than opening a broken connect flow.
+    if (connectProviderPlatform !== null) {
+      startBlockedAction = {
+        label: t('common.connectProvider'),
+        onPress: () => {
+          openIntegration(connectProviderPlatform);
+        },
+      };
+    }
   } else if (startBlockedReasonKey === 'refresh-repositories') {
-    startBlockedReason = t('agentChat.newSession.refreshRepositories');
+    startBlockedReason = t('common.noRepositoriesFound');
+    startBlockedAction = {
+      label: t('agentChat.newSession.refreshRepositories'),
+      onPress: () => void refreshReposForceFresh(),
+      isBusy: isRetrying,
+    };
   } else if (startBlockedReasonKey === 'select-repository') {
     startBlockedReason = t('agentChat.newSession.selectRepositoryToStart');
+  } else if (startBlockedReasonKey === 'enter-prompt') {
+    startBlockedReason = t('agentChat.newSession.enterPromptToStart');
+  } else if (startBlockedReasonKey === 'enter-prompt-or-file') {
+    startBlockedReason = t('agentChat.newSession.enterPromptOrFileToStart');
   }
 
   const handleStartSession = useCallback(() => {
@@ -1232,6 +1277,7 @@ export function NewSessionScreenBody() {
         isStartDisabled={isStartDisabled}
         isSpawningRemote={remoteSpawn.isSpawningRemote}
         startBlockedReason={startBlockedReason}
+        startBlockedAction={startBlockedAction}
         onStartSession={handleStartSession}
         cloudCreateError={cloudCreateError}
         onRetryCloudCreate={handleStartSession}

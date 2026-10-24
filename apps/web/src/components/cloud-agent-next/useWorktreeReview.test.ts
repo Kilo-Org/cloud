@@ -99,7 +99,7 @@ jest.mock('@/lib/trpc/utils', () => ({ useTRPC: () => mockTrpc }));
 jest.mock('@tanstack/react-query', () => ({
   skipToken: Symbol('skipToken'),
   useQueryClient: () => ({
-    fetchQuery: () => mockFetchQuery(),
+    query: () => mockFetchQuery(),
   }),
   useQuery: () => ({
     data: { cliSessions: mockSessionRows },

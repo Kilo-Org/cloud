@@ -114,7 +114,7 @@ export async function handleEmbeddingsRequest(
   debugSaveProxyRequest(requestBodyText);
   let requestBodyParsed: EmbeddingProxyRequest;
   try {
-    requestBodyParsed = JSON.parse(requestBodyText);
+    requestBodyParsed = JSON.parse(requestBodyText) as EmbeddingProxyRequest;
   } catch (e) {
     captureException(e, {
       extra: { requestBodyText },

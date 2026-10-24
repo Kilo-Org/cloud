@@ -143,15 +143,15 @@ try {
       .get();
     if (!lock?.token || lock.lease_until <= Date.now() || live.n !== 0 || count('migrations') !== 1)
       event('unguarded_deploy');
-    event('deploy_started');
-    process.stdout.write('untrusted-stdout-canary');
-    process.stderr.write('untrusted-stderr-canary');
     const onSignal = () => {
       event('deploy_aborted');
       db.close();
       process.exit(1);
     };
     process.on('SIGTERM', onSignal);
+    event('deploy_started');
+    process.stdout.write('untrusted-stdout-canary');
+    process.stderr.write('untrusted-stderr-canary');
     await sleep(Number(process.env.BENCHMARK_DEPLOY_FIXTURE_DEPLOY_MS ?? 0));
     process.off('SIGTERM', onSignal);
     if (process.env.BENCHMARK_DEPLOY_FIXTURE_DEPLOY_FAIL === '1') {

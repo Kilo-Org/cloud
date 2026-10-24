@@ -3,14 +3,13 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
-import { sessionDoName } from '../../src/session-plane.js';
+import { sessionDoName } from '../../src/session-identity.js';
 import { createMessageId } from '../../src/session/message-id.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
   type ControlPlaneEvent,
   type ControlPlanePromptPayload,
-  type ControlPlaneWrapperFrame,
 } from '../../src/shared/control-plane-protocol.js';
 import type {
   ProviderAdapter,
@@ -19,9 +18,11 @@ import type {
 } from '../../src/sandbox-control/provider.js';
 import {
   createFakeCredentialBroker,
+  FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
+import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
 import { createSseDataReader, readSseUntil } from './helpers/sse-reader.js';
 import {
@@ -39,7 +40,7 @@ const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDB
 
 const USER_ID = 'user_native_fence';
 const ORG_ID = 'org_native_fence';
-const KILO_TOKEN = 'native-fence-kilo-token';
+const KILO_TOKEN = FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN;
 
 const userId = USER_ID;
 // `containedKiloSessionIdSchema` requires exactly 26 alphanumerics after the prefix.
@@ -125,6 +126,7 @@ async function installSandbox(
       }
     );
     Object.assign(instance, { createProviderAdapter: () => provider, provider });
+    installFakeRuntimeProxyPeer(instance);
   });
   return sandboxStub;
 }
@@ -453,6 +455,90 @@ describe('hosted native history/live fence', { timeout: 30_000 }, () => {
         expectSingleLivePartUpdate(live.observed, 'prt_native_2');
       } finally {
         await reader.cancel();
+      }
+    } finally {
+      session.stopPump();
+      session.wrapper.close();
+    }
+  });
+
+  it('delivers shared public failure messages live and on reconnect', async () => {
+    const session = await startReadySession();
+    try {
+      await seedFacadeRoots({
+        kiloSessionId: qualifiedKiloSessionId,
+        cloudAgentSessionId,
+        title: 'public failure fixture',
+      });
+      const attached = await readAttach(await attach());
+      try {
+        const error = {
+          name: 'APIError',
+          data: {
+            message: 'fixture failure',
+            statusCode: 429,
+            isRetryable: true,
+            responseHeaders: { authorization: 'fixture-header' },
+            responseBody: 'fixture-body',
+            metadata: { request: 'fixture-request' },
+          },
+        };
+        const withError = (error: unknown): ControlPlaneEvent[] => [
+          {
+            type: 'message.updated',
+            properties: {
+              sessionID: qualifiedKiloSessionId,
+              info: {
+                id: 'msg_failure',
+                role: 'assistant',
+                sessionID: qualifiedKiloSessionId,
+                error,
+              },
+            },
+          },
+          {
+            type: 'message.part.updated',
+            properties: {
+              sessionID: qualifiedKiloSessionId,
+              part: {
+                id: 'prt_failure',
+                messageID: 'msg_failure',
+                sessionID: qualifiedKiloSessionId,
+                type: 'retry',
+                attempt: 2,
+                time: { created: 1 },
+                error,
+              },
+            },
+          },
+          {
+            type: 'session.error',
+            properties: { sessionID: qualifiedKiloSessionId, error },
+          },
+        ];
+        await pushEvents(session, [
+          ...withError(error),
+          partUpdated('msg_failure', 'prt_failure_marker', 'delivery marker'),
+        ]);
+        const live = await readSseUntil(attached.reader, frame =>
+          isPartUpdate(frame, 'prt_failure_marker')
+        );
+        const replay = await readAttach(await attach());
+        await replay.reader.cancel();
+        const expected = withError('Assistant request was rate limited').map(event => ({
+          ...event,
+          properties: expect.objectContaining(event.properties),
+        }));
+        expect(live.observed).toEqual(expect.arrayContaining(expected));
+        expect(replay.events).toEqual(expect.arrayContaining(expected));
+        for (const events of [live.observed, replay.events]) {
+          const serialized = JSON.stringify(events);
+          expect(serialized).not.toContain('fixture-header');
+          expect(serialized).not.toContain('fixture-body');
+          expect(serialized).not.toContain('fixture-request');
+        }
+      } finally {
+        await attached.reader.cancel();
       }
     } finally {
       session.stopPump();

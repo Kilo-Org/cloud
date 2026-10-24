@@ -26,10 +26,6 @@ const TUNNEL_URL_SOURCES: Record<string, TunnelUrlSource> = {
     file: 'services/kiloclaw/.dev.vars',
     key: 'BACKEND_API_URL',
   },
-  'app-builder-tunnel': {
-    file: 'apps/web/.env.development.local',
-    key: 'APP_BUILDER_URL',
-  },
   'bitbucket-webhook-tunnel': {
     file: 'apps/web/.env.development.local',
     key: 'BITBUCKET_CODE_REVIEW_WEBHOOK_BASE_URL',

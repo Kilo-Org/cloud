@@ -29,7 +29,7 @@
  */
 
 import * as Notifications from 'expo-notifications';
-import { type AppStateStatus } from 'react-native';
+import { type AppState } from 'react-native';
 
 import {
   androidChannelIdForPushData,
@@ -98,7 +98,7 @@ export type NeedsInputPlanInput = {
   /** Route from `usePathname()`; null when the router is not mounted. */
   pathname: string | null;
   /** `AppState.currentState` at plan time. */
-  appState: AppStateStatus;
+  appState: typeof AppState.currentState;
   /**
    * The user's `agentAttention` preference, from the same server-resolved row
    * the Notifications screen edits. The server withholds the attention push
@@ -176,7 +176,7 @@ export function shouldPublishForSession({
   pathname,
   sessionId,
 }: {
-  appState: AppStateStatus;
+  appState: typeof AppState.currentState;
   pathname: string | null;
   sessionId: string;
 }): boolean {

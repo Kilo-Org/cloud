@@ -120,9 +120,9 @@ export function makeFakeQueryClient(
   const seed = qc.setQueryData.bind(qc);
   seed(QUERY_KEY, initial);
   let pendingFetch: Deferred<CachedActiveSessionsData> | null = null;
-  const fetch = qc.fetchQuery.bind(qc);
+  const fetch = qc.query.bind(qc);
   const cancel = qc.cancelQueries.bind(qc);
-  const fetchSpy = vi.spyOn(qc, 'fetchQuery').mockImplementation(async options => {
+  const fetchSpy = vi.spyOn(qc, 'query').mockImplementation(async options => {
     const queryFn = options.queryFn;
     if (typeof queryFn !== 'function') {
       throw new TypeError('Expected a query function');

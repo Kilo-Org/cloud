@@ -5,6 +5,7 @@ import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/pro
 
 export default {
   id: 'nvidia-byok',
+  models_dev_id: 'nvidia',
   base_url: 'https://integrate.api.nvidia.com/v1',
   base_url_overrides: {},
   supported_chat_apis: ['chat_completions'],

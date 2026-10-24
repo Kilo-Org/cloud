@@ -990,7 +990,10 @@ function classifyInboxError(error: unknown): BitbucketReviewError {
  * page, skips them, and moves to the next page once the page is fully served.
  * The continuation advances monotonically, never moves back to the first page,
  * and reads at most one provider page per repository per load (two when the
- * current page is already fully served). A pull request updated after the
+ * current page is already fully served). A workspace with more cached
+ * repositories than one cursor can carry is walked one window of repositories
+ * at a time, so every cached repository is covered instead of the walk stopping
+ * at the first window. A pull request updated after the
  * first load sits above the ceiling and appears on a fresh inbox load; one
  * that stops being open leaves the collection and shifts the rows after it up,
  * which the provider's page-number paging cannot prevent. A repository or a
@@ -1003,26 +1006,26 @@ export async function listInbox(
 ): Promise<ProviderPrInboxPage> {
   try {
     const access = await authorizeWorkspace(owner);
-    const repositories = [...access.repositories]
-      .sort((left, right) =>
-        left.fullName.toLowerCase() < right.fullName.toLowerCase()
-          ? -1
-          : left.fullName.toLowerCase() > right.fullName.toLowerCase()
-            ? 1
-            : 0
-      )
-      .slice(0, MAX_INBOX_REPOSITORIES);
+    const cachedRepositories = [...access.repositories].sort((left, right) =>
+      left.fullName.toLowerCase() < right.fullName.toLowerCase()
+        ? -1
+        : left.fullName.toLowerCase() > right.fullName.toLowerCase()
+          ? 1
+          : 0
+    );
     const repositoryFingerprint = createHash('sha256')
-      .update(repositories.map(repository => repository.fullName.toLowerCase()).join('\0'))
+      .update(cachedRepositories.map(repository => repository.fullName.toLowerCase()).join('\0'))
       .digest('base64url');
     const identity =
       owner.type === 'organization'
         ? `bitbucket-inbox:${access.workspace.slug}:${owner.organizationId}:${owner.userId}:${repositoryFingerprint}`
         : `bitbucket-inbox:${access.workspace.slug}:user:${owner.userId}:${repositoryFingerprint}`;
+    const position = decodeInboxCursor(cursor, identity, cachedRepositories);
+    const windowIndex = position?.window ?? 0;
+    const repositories = inboxRepositoryWindow(cachedRepositories, windowIndex);
     const repositoryNames = new Set(
       repositories.map(repository => repository.fullName.toLowerCase())
     );
-    const position = decodeInboxCursor(cursor, identity, repositories);
     const providerQuery = position
       ? `state="OPEN" AND updated_on <= ${position.ceiling}`
       : 'state="OPEN"';
@@ -1116,12 +1119,29 @@ export async function listInbox(
       );
     }
     const hasMore = [...pages.values()].some(state => state.page !== 0);
+    const nextWindow = windowIndex + 1;
+    const carriesNextWindow =
+      !hasMore && inboxRepositoryWindow(cachedRepositories, nextWindow).length > 0;
+    let nextCursor: string | null = null;
+    if (ceiling !== null) {
+      if (hasMore) {
+        nextCursor = encodeInboxCursor(identity, windowIndex, ceiling, pages, repositories);
+      } else if (carriesNextWindow) {
+        // This window is served in full: the walk moves to the next slice of
+        // the cached repositories, so a workspace larger than one window is
+        // still covered instead of stopping at the first slice.
+        nextCursor = encodeInboxCursor(
+          identity,
+          nextWindow,
+          ceiling,
+          new Map<string, InboxPageState>(),
+          inboxRepositoryWindow(cachedRepositories, nextWindow)
+        );
+      }
+    }
     return {
       items: window.map(candidate => candidate.item),
-      nextCursor:
-        hasMore && ceiling !== null
-          ? encodeInboxCursor(identity, ceiling, pages, repositories)
-          : null,
+      nextCursor,
     };
   } catch (error) {
     throw classifyInboxError(error);
@@ -1157,7 +1177,12 @@ function inboxCeiling(reads: InboxPageRead[]): string | null {
   return ceiling;
 }
 
-/** The inbox rows of one provider page, in provider order. */
+/**
+ * The inbox rows of one provider page, in provider order. A row the provider
+ * gives without a parseable `updated_on` has no place in the merged newest-first
+ * order and no comparable position for a continuation, so it is left out
+ * instead of sorting as the oldest row.
+ */
 function inboxItemsFrom(
   values: unknown[],
   allowedFullNames: ReadonlySet<string>
@@ -1168,13 +1193,15 @@ function inboxItemsFrom(
     if (!parsed.success) continue;
     const ref = inboxRefFrom(parsed.data, allowedFullNames);
     if (ref?.platform !== 'bitbucket') continue;
+    const updatedAt = parsed.data.updated_on ?? '';
+    if (Number.isNaN(Date.parse(updatedAt))) continue;
     items.push({
       ref,
       title: parsed.data.title,
       author: mapUser(parsed.data.author ?? null),
       state: mapPullRequestState(parsed.data.state),
       draft: parsed.data.draft === true,
-      updatedAt: parsed.data.updated_on ?? '',
+      updatedAt,
     });
   }
   return items;
@@ -1205,6 +1232,7 @@ const inboxCursorPayloadSchema = z.object({
   kind: z.literal(INBOX_CURSOR_KIND),
   identity: z.string().min(1),
   ceiling: z.string().min(1),
+  window: z.number().int().min(0),
   pages: z.string().max(800),
 });
 
@@ -1236,17 +1264,34 @@ const DONE: InboxPageState = { page: 0, served: 0 };
 
 type InboxCursorPosition = {
   ceiling: string;
+  window: number;
   pages: ReadonlyMap<string, InboxPageState>;
 };
 
 /**
+ * The slice of the sorted cached repositories one walk covers: the cursor's
+ * window index times the per-window bound. A workspace with more cached
+ * repositories than one window is walked window by window, so every cached
+ * repository is served within the cursor's wire limit.
+ */
+function inboxRepositoryWindow(
+  repositories: BitbucketWorkspaceRepositoryAccess['repositories'],
+  window: number
+): BitbucketWorkspaceRepositoryAccess['repositories'] {
+  const start = window * MAX_INBOX_REPOSITORIES;
+  return repositories.slice(start, start + MAX_INBOX_REPOSITORIES);
+}
+
+/**
  * The inbox cursor is a signed continuation token carrying the caller and
  * repository-set identity, the provider timestamp ceiling the collection was
- * read at, and two packed bytes per repository: its page number and how many
- * leading rows of that page are served.
+ * read at, the repository window the walk is on, and two packed bytes per
+ * repository of that window: its page number and how many leading rows of that
+ * page are served.
  */
 function encodeInboxCursor(
   identity: string,
+  window: number,
   ceiling: string,
   pages: ReadonlyMap<string, InboxPageState>,
   repositories: BitbucketWorkspaceRepositoryAccess['repositories']
@@ -1261,6 +1306,7 @@ function encodeInboxCursor(
     kind: INBOX_CURSOR_KIND,
     identity,
     ceiling,
+    window,
     pages: pageState.toString('base64url'),
   });
 }
@@ -1268,7 +1314,7 @@ function encodeInboxCursor(
 function decodeInboxCursor(
   cursor: string | undefined,
   identity: string,
-  repositories: BitbucketWorkspaceRepositoryAccess['repositories']
+  cachedRepositories: BitbucketWorkspaceRepositoryAccess['repositories']
 ): InboxCursorPosition | null {
   if (!cursor) return null;
   const payload = verifySignedToken(cursor, {
@@ -1276,6 +1322,8 @@ function decodeInboxCursor(
     parse: value => {
       const parsed = inboxCursorPayloadSchema.safeParse(value);
       if (!parsed.success || parsed.data.identity !== identity) return null;
+      const repositories = inboxRepositoryWindow(cachedRepositories, parsed.data.window);
+      if (repositories.length === 0) return null;
       const pageState = Buffer.from(parsed.data.pages, 'base64url');
       if (pageState.length !== repositories.length * 2) return null;
       const pages = new Map<string, InboxPageState>();
@@ -1288,7 +1336,7 @@ function decodeInboxCursor(
           served,
         });
       }
-      return { ceiling: parsed.data.ceiling, pages };
+      return { ceiling: parsed.data.ceiling, window: parsed.data.window, pages };
     },
   });
   return payload;

@@ -1026,11 +1026,12 @@ describe('listInbox', () => {
       .digest('base64url')}`;
 
   /** A continuation token in the shape the read layer issues. */
-  const inboxCursor = (identity: string, ceiling: string, pages = Buffer.alloc(2)) =>
+  const inboxCursor = (identity: string, ceiling: string, pages = Buffer.alloc(2), window = 0) =>
     createSignedToken({
       kind: 'bitbucket-inbox-cursor',
       identity,
       ceiling,
+      window,
       pages: pages.toString('base64url'),
     });
 
@@ -1330,6 +1331,7 @@ describe('listInbox', () => {
       })),
       syncedAt: '2026-09-06T00:00:00.000Z',
     });
+    const requests: InboxRequest[] = [];
     fetchMock.mockImplementation(async (url: string | URL) => {
       const full = url.toString();
       if (full.includes('token-service.example.com')) {
@@ -1340,6 +1342,7 @@ describe('listInbox', () => {
       const rows = match ? rowsBySlug[match[1]] : undefined;
       if (!match || !rows) return jsonResponse({ pagelen: 50, values: [] });
       const page = Number(parsed.searchParams.get('page') ?? '1');
+      requests.push({ slug: match[1], query: parsed.searchParams.get('q'), page: String(page) });
       const values = rows.slice((page - 1) * 50, page * 50);
       if (values.length === 0) {
         // What Bitbucket answers for a page past the collection.
@@ -1369,6 +1372,13 @@ describe('listInbox', () => {
     expect(new Set(served).size).toBe(151);
     expect(served).toHaveLength(151);
     expect(cursor).toBeUndefined();
+    // A page past either repository's last page answers 404: the walk must
+    // never ask for one, so the omitted `next` link — not the provider error —
+    // is what ends a repository.
+    for (const slug of ['repo-a', 'repo-b']) {
+      const pages = requests.filter(request => request.slug === slug).map(request => request.page);
+      expect(new Set(pages)).toEqual(new Set(['1', '2']));
+    }
   });
 
   it('serves the rest of the inbox when a cached repository is no longer served', async () => {
@@ -1499,6 +1509,65 @@ describe('listInbox', () => {
     expect(requests.filter(request => request.slug === 'repo-b')).toHaveLength(2);
   });
 
+  it('leaves a row without a comparable timestamp out of the walk', async () => {
+    // The provider can answer a row with no `updated_on`. It has no place in
+    // the merged newest-first order and no comparable position for a
+    // continuation, so it is left out while every orderable row is served.
+    const rows = Array.from({ length: 60 }, (_, index) =>
+      inboxPr(100 + index, `2026-09-02T00:${String(59 - index).padStart(2, '0')}:00+00:00`)
+    );
+    const values = [
+      ...rows.slice(0, 50),
+      { ...inboxPr(900, ''), updated_on: null },
+      ...rows.slice(50),
+    ];
+    mockReadCachedRepositories.mockResolvedValue({
+      status: 'available',
+      repositories: [
+        {
+          id: '87654321-4321-4321-4321-000000000000',
+          workspaceUuid: WORKSPACE.uuid,
+          name: 'repo',
+          fullName: 'acme/repo',
+          private: true,
+          defaultBranch: 'main',
+        },
+      ],
+      syncedAt: '2026-09-06T00:00:00.000Z',
+    });
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      const parsed = new URL(full);
+      const page = Number(parsed.searchParams.get('page') ?? '1');
+      return jsonResponse(
+        values.length > page * 50
+          ? {
+              pagelen: 50,
+              values: values.slice((page - 1) * 50, page * 50),
+              next: 'https://api.bitbucket.org/2.0/next?page=2',
+            }
+          : { pagelen: 50, values: values.slice((page - 1) * 50, page * 50) }
+      );
+    });
+
+    const served: number[] = [];
+    let cursor: string | undefined;
+    for (let load = 0; load < 4; load += 1) {
+      const page = await listInbox(ORG_OWNER, cursor);
+      served.push(
+        ...page.items.flatMap(item => (item.ref && 'prId' in item.ref ? [item.ref.prId] : []))
+      );
+      cursor = page.nextCursor ?? undefined;
+      if (cursor === undefined) break;
+    }
+
+    expect(served).toEqual(Array.from({ length: 60 }, (_, index) => 100 + index));
+    expect(cursor).toBeUndefined();
+  });
+
   it('reads one provider page per repository that still has rows', async () => {
     // 12 repositories × 5 open PRs: the first load reads one page per
     // repository, and the continuation reads only the two with rows left.
@@ -1527,7 +1596,10 @@ describe('listInbox', () => {
     expect(requests.filter(request => request.query === 'state="OPEN"')).toHaveLength(12);
   });
 
-  it('caps the workspace fan-out at the enumerated repository set', async () => {
+  it('walks every cached repository across repository windows', async () => {
+    // One more repository than a cursor carries: the first window reads the
+    // first 300, and the continuation moves to the next window instead of the
+    // inbox stopping at the first slice.
     const slugs = Array.from({ length: 301 }, (_, repo) => `repo-${repo}`);
     const rowsBySlug: Record<string, InboxRow[]> = {};
     for (const slug of slugs) {
@@ -1536,11 +1608,33 @@ describe('listInbox', () => {
     const requests: InboxRequest[] = [];
     serveInbox(rowsBySlug, requests);
 
-    const page = await listInbox(ORG_OWNER);
-    const expected = [...slugs].sort().slice(0, 300);
-    expect(requests.map(request => request.slug).sort()).toEqual(expected);
-    expect(page.items).toHaveLength(50);
-    expect(page.nextCursor).toBeTruthy();
+    const first = await listInbox(ORG_OWNER);
+    const sorted = [...slugs].sort();
+    expect([...new Set(requests.map(request => request.slug))].sort()).toEqual(
+      sorted.slice(0, 300)
+    );
+    expect(first.items).toHaveLength(50);
+    expect(first.nextCursor).toBeTruthy();
+
+    const served = first.items.flatMap(item =>
+      item.ref && 'prId' in item.ref ? [item.ref.prId] : []
+    );
+    let cursor: string | undefined = first.nextCursor!;
+    for (let load = 0; load < 12 && cursor; load += 1) {
+      const page = await listInbox(ORG_OWNER, cursor);
+      served.push(
+        ...page.items.flatMap(item => (item.ref && 'prId' in item.ref ? [item.ref.prId] : []))
+      );
+      cursor = page.nextCursor ?? undefined;
+    }
+
+    // Every repository is served, including the one past the first window.
+    expect(new Set(served)).toEqual(new Set(Array.from({ length: 301 }, (_, index) => index + 1)));
+    expect(served).toHaveLength(301);
+    expect(new Set(requests.map(request => request.slug))).toEqual(new Set(sorted));
+    // One row per repository: every load re-reads page one of the repositories
+    // in its window, and no repository is read past its first page.
+    expect(requests.every(request => request.page === '1')).toBe(true);
   });
 
   it('keeps a maximum-size continuation within the receiving wire limit', async () => {
@@ -1592,6 +1686,7 @@ describe('listInbox', () => {
       kind: 'bitbucket-inbox-cursor',
       identity: 'bitbucket-inbox:evil',
       ceiling: '2026-09-02T00:10:00.000+00:00',
+      window: 0,
       pages: Buffer.alloc(2).toString('base64url'),
     });
     const page = await listInbox(ORG_OWNER, foreign);
@@ -1624,6 +1719,7 @@ describe('listInbox', () => {
         kind: 'bitbucket-inbox-cursor',
         identity: inboxIdentity(['repo']),
         ceiling: '2026-09-02T00:10:00.000+00:00',
+        window: 0,
         pages: Buffer.alloc(2).toString('base64url'),
         iat: Math.floor(Date.now() / 1000) - 2 * 60 * 60,
         nonce: 'expired-nonce',

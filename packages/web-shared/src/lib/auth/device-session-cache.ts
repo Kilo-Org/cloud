@@ -28,7 +28,15 @@ type CacheEntry = {
 };
 
 const entries = new Map<string, CacheEntry>();
-const inFlight = new Map<string, Promise<boolean>>();
+
+type PendingLoad = {
+  /** The load answers for this user only; another user's id starts its own load. */
+  userId: string;
+  /** Assigned before the record is published, so a reader always finds it. */
+  load?: Promise<boolean>;
+};
+
+const inFlight = new Map<string, PendingLoad>();
 
 function prune(now: number): void {
   for (const [sessionId, entry] of entries) {
@@ -60,17 +68,18 @@ export async function isDeviceSessionActive(
     return entry.active;
   }
 
-  // Concurrent requests for one session share a load. The key includes the
-  // user, so a request naming another user's session never receives that
-  // user's answer.
-  const inFlightKey = `${kiloUserId}:${deviceSessionId}`;
-  const pending = inFlight.get(inFlightKey);
-  if (pending !== undefined) {
-    return await pending;
+  const pending = inFlight.get(deviceSessionId);
+  if (pending?.load !== undefined && pending.userId === kiloUserId) {
+    return await pending.load;
   }
 
+  const pendingLoad: PendingLoad = { userId: kiloUserId };
   const load = (async () => {
     const active = await loadActive();
+    // A revocation during the read removes this load, so its answer may
+    // predate the revocation. Return it to the caller that started before the
+    // revocation, but never store it.
+    if (inFlight.get(deviceSessionId) !== pendingLoad) return active;
     if (entries.size >= MAX_ENTRIES) prune(Date.now());
     entries.set(deviceSessionId, {
       userId: kiloUserId,
@@ -79,21 +88,25 @@ export async function isDeviceSessionActive(
     });
     return active;
   })();
+  pendingLoad.load = load;
+  inFlight.set(deviceSessionId, pendingLoad);
 
-  inFlight.set(inFlightKey, load);
   try {
     return await load;
   } finally {
-    inFlight.delete(inFlightKey);
+    if (inFlight.get(deviceSessionId) === pendingLoad) inFlight.delete(deviceSessionId);
   }
 }
 
 /**
  * Drop the cached answer for a session that was just revoked on this instance,
  * so the next request here sees the revocation without waiting for the TTL.
+ * A load already running for that session is dropped too, so it cannot store
+ * an answer computed before the revocation.
  */
 export function invalidateDeviceSession(deviceSessionId: string): void {
   entries.delete(deviceSessionId);
+  inFlight.delete(deviceSessionId);
 }
 
 export function resetDeviceSessionCacheForTest(): void {

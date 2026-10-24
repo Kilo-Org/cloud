@@ -101,4 +101,18 @@ describe('isDeviceSessionActive', () => {
     expect(await Promise.all([first, second])).toEqual([true, true]);
     expect(load).toHaveBeenCalledTimes(1);
   });
+
+  test('does not cache a load that a revocation overtook', async () => {
+    const { promise, resolve } = Promise.withResolvers<boolean>();
+    const overtaken = jest.fn(() => promise);
+
+    const inFlight = isDeviceSessionActive(SESSION_ID, USER_ID, overtaken);
+    invalidateDeviceSession(SESSION_ID);
+    resolve(true);
+    expect(await inFlight).toBe(true);
+
+    const reload = jest.fn(async () => false);
+    expect(await isDeviceSessionActive(SESSION_ID, USER_ID, reload)).toBe(false);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
 });

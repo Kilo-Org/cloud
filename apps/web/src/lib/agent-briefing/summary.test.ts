@@ -187,6 +187,28 @@ describe('briefing model pricing', () => {
     ).rejects.toThrow('invalid_model_pricing');
   });
 
+  it('quotes a free picker model at zero and admits it without a route price cap', async () => {
+    const freeModel = 'stealth/glyph-cluster';
+    const quote = await briefingPriceBound(freeModel, 'Overnight activity', 2_000_000);
+
+    expect(quote.inputRate).toBe(0);
+    expect(quote.outputRate).toBe(0);
+    expect(quote.upperBound).toBe(0);
+    await expect(
+      enforceRequestCostLimit(
+        '2000000',
+        freeModel,
+        {
+          messages: [{ role: 'user', content: 'Overnight activity' }],
+          max_tokens: quote.maxTokens,
+          stream: false,
+        },
+        2_000_000,
+        { id: 'vercel', userFunded: false }
+      )
+    ).resolves.toMatchObject({ refusal: null });
+  });
+
   it('bounds a latest alias by the price of the target it resolves to', async () => {
     const alias = catalogModel('~deepseek/deepseek-flash-latest', {
       prompt: '0.000000049',

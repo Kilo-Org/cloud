@@ -147,7 +147,7 @@ describe('request cost admission', () => {
   });
   it('refuses a managed provider that cannot enforce the quoted route price', async () => {
     const decision = await enforceRequestCostLimitDecision(
-      '500',
+      '2000000',
       model.id,
       { ...body, provider: { only: ['second-route'] } },
       2_000_000,
@@ -166,6 +166,17 @@ describe('request cost admission', () => {
       { ...body, provider: { only: ['second-route'] } },
       2_000_000,
       { id: 'vercel', userFunded: true }
+    );
+
+    expect(decision).toEqual({ refusal: null, providerConfig: null });
+  });
+  it('admits a free model on a managed provider without a route price cap', async () => {
+    const decision = await enforceRequestCostLimitDecision(
+      '2000000',
+      'stealth/glyph-cluster',
+      body,
+      2_000_000,
+      { id: 'vercel', userFunded: false }
     );
 
     expect(decision).toEqual({ refusal: null, providerConfig: null });

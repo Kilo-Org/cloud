@@ -287,8 +287,6 @@ export async function enforceRequestCostLimit(
     return refused('Invalid request spend safeguard');
   const parsed = boundedRequestSchema.safeParse(body);
   if (!parsed.success) return refused(boundedRefusal(parsed.error));
-  if (provider.id === 'vercel' && !provider.userFunded)
-    return refused('Bounded spending requires a provider that can enforce it');
   try {
     const [models, rawCatalog, preferredProviderOrderConfig] = await Promise.all([
       getOpenRouterModelsMetadataFromDatabase(),
@@ -358,6 +356,10 @@ export async function enforceRequestCostLimit(
     if (bound > maximum) return refused('Request exceeds its spend safeguard before generation');
     if (bound > availableBalanceMicrodollars)
       return refused('Request exceeds the available context balance or allowance');
+    // A provider that cannot cap a per-route price may serve this request only when
+    // there is nothing to cap: a model quoted at zero costs the caller nothing.
+    if (provider.id === 'vercel' && !provider.userFunded && bound > 0)
+      return refused('Bounded spending requires a provider that can enforce it');
 
     const requestedMaxPrice = parsed.data.provider?.max_price;
     const providerConfig: OpenRouterProviderConfig | null =

@@ -22,12 +22,28 @@ export type RepositoryProviderStatus =
   | 'error'
   | 'connect'
   | 'connected-empty'
+  | 'unavailable'
   | 'repos';
+
+/**
+ * Why a provider's stored installation cannot list repositories. The provider
+ * is connected in principle, so the card asks for the reconnect step instead of
+ * offering to connect it for the first time.
+ */
+export type RepositoryUnavailableReason =
+  | 'suspended'
+  | 'disconnected'
+  | 'reauth_required'
+  | 'not_configured';
+
+export type RepositoryGroupNotice = 'partial';
 
 export type RepositoryGroup = {
   key: RepositoryPlatform;
   status: RepositoryProviderStatus;
   repositories: NewSessionRepository[];
+  /** Set when the provider answered with only some of its installations' repositories. */
+  notice?: RepositoryGroupNotice;
 };
 
 export type RepositoryGroups = {
@@ -48,11 +64,13 @@ export function resolveProviderStatus({
   isError,
   integrationInstalled,
   repositoryCount,
+  unavailableReason,
 }: {
   isLoading: boolean;
   isError: boolean;
   integrationInstalled: boolean | undefined;
   repositoryCount: number;
+  unavailableReason?: RepositoryUnavailableReason;
 }): RepositoryProviderStatus {
   if (isLoading) {
     return 'loading';
@@ -69,7 +87,9 @@ export function resolveProviderStatus({
     return 'loading';
   }
   if (!integrationInstalled) {
-    return 'connect';
+    // An installation exists but cannot list anything: the person fixes it by
+    // reconnecting, not by connecting the provider for the first time.
+    return unavailableReason ? 'unavailable' : 'connect';
   }
   if (repositoryCount === 0) {
     return 'connected-empty';
@@ -146,14 +166,25 @@ export function resolveRepositoryGroups(input: {
   recents: NewSessionRepository[];
 }): RepositoryGroups {
   const groups: RepositoryGroup[] = [
-    { key: 'github', status: input.github.status, repositories: input.github.repositories },
-    { key: 'gitlab', status: input.gitlab.status, repositories: input.gitlab.repositories },
+    {
+      key: 'github',
+      status: input.github.status,
+      repositories: input.github.repositories,
+      notice: input.github.notice,
+    },
+    {
+      key: 'gitlab',
+      status: input.gitlab.status,
+      repositories: input.gitlab.repositories,
+      notice: input.gitlab.notice,
+    },
   ];
   if (input.organizationId) {
     groups.push({
       key: 'bitbucket',
       status: input.bitbucket.status,
       repositories: input.bitbucket.repositories,
+      notice: input.bitbucket.notice,
     });
   }
   return { recents: input.recents, groups };
@@ -170,6 +201,9 @@ export function detectRepositoryPlatform(
   if (!gitUrl) {
     return undefined;
   }
+  // An scp-style value keeps its host exactly as written, and the URL parser
+  // preserves it for non-special schemes (`ssh://`), so both forms meet here
+  // and are compared in one case.
   let hostname: string | undefined = /^git@([^:]+):/.exec(gitUrl)?.[1];
   if (hostname === undefined) {
     try {
@@ -178,13 +212,14 @@ export function detectRepositoryPlatform(
       return undefined;
     }
   }
-  if (hostname === 'github.com') {
+  const host = hostname.toLowerCase();
+  if (host === 'github.com') {
     return 'github';
   }
-  if (hostname === 'gitlab.com') {
+  if (host === 'gitlab.com') {
     return 'gitlab';
   }
-  if (hostname === 'bitbucket.org') {
+  if (host === 'bitbucket.org') {
     return 'bitbucket';
   }
   return undefined;

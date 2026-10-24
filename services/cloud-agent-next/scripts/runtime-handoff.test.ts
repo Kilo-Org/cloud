@@ -10,6 +10,7 @@ import { parse } from 'jsonc-parser';
 import { URL } from 'node:url';
 import { prepareRuntimeDeployment } from './prepare-runtime-deploy.js';
 import { RUNTIME_BASE_ABI } from '../src/sandbox-control/runtime-release.js';
+import { KILO_CLI_VERSION } from '../src/shared/kilo-cli-version.js';
 import {
   runtimeArtifactObjectKey,
   runtimeArtifactReleaseKey,
@@ -125,7 +126,7 @@ describe('deployment preparation', () => {
         ?.app
     ).toMatchObject({
       dockerfile: './Dockerfile.containers',
-      build_vars: { KILOCODE_CLI_VERSION: '7.8.1' },
+      build_vars: { KILOCODE_CLI_VERSION: KILO_CLI_VERSION },
     });
   });
   it('rejects mixed all-in-one image fields before base verification', async () => {

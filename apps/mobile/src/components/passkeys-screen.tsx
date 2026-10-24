@@ -1,7 +1,7 @@
 import { hashKey, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, View } from 'react-native';
+import { ScrollView, useWindowDimensions, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -21,6 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
 import { passkeysSupported, registerPasskey } from '@/lib/auth/passkey-client';
+import { isShortViewport } from '@/lib/centered-state-layout';
 import {
   isLatestMutationGeneration,
   nextMutationGeneration,
@@ -95,6 +96,11 @@ export function PasskeysScreen() {
   const colors = useThemeColors();
   const { token } = useAuth();
   const tabBarBottomPadding = useTabBarBottomPadding();
+  // The body sits between the header and a footer that already reserves the
+  // tab bar, so in a phone held sideways its band is only a few dozen points
+  // tall and the full stack starts below the fold. Centered states learn this
+  // from their measured band; this plain body asks the window instead.
+  const windowSize = useWindowDimensions();
 
   const listKey = trpc.user.getPasskeys.queryKey();
   // Stable per-cache key for the removal generations: overlapping removals must
@@ -353,6 +359,7 @@ export function PasskeysScreen() {
         {failureNotice}
         <EmptyState
           placement="top"
+          compact={isShortViewport(windowSize.width, windowSize.height)}
           icon={KeyRound}
           title={t('profile.passkeysEmpty')}
           description={canCreatePasskeys ? t('profile.passkeysEmptyHint') : addFailureNotice}

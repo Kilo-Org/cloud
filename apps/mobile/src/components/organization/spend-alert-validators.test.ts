@@ -12,6 +12,8 @@ import {
   thresholdError,
   toWindowHours,
 } from '@/components/organization/spend-alert-validators';
+import { i18n } from '@/i18n';
+import { formatCurrency, formatNumber } from '@/lib/format';
 
 // `pnpm check:i18n` owns the copy; these assert the bounds, not the wording.
 const THRESHOLD_CASES: [string, number | null][] = [
@@ -29,6 +31,10 @@ const THRESHOLD_CASES: [string, number | null][] = [
   // threshold, which fires on any spend and never clears.
   ['0.000001', 0.000_001],
   ['0.0000001', null],
+  // A pasted literal longer than a JS number can hold is still a number, and it
+  // is far above the cap; it must not read as "enter an amount greater than 0".
+  ['9'.repeat(950), null],
+  ['1,000,000.01', null],
 ];
 
 const MULTIPLIER_CASES: [string, number | null][] = [
@@ -53,6 +59,23 @@ describe('parseThreshold', () => {
     expect(thresholdError('0')).not.toBeNull();
     expect(thresholdError('1000000.01')).not.toBeNull();
   });
+
+  it('names the maximum for a value above the cap instead of calling it too small', () => {
+    const maximum = i18n.t('spendAlerts.thresholdMaxError', {
+      max: formatCurrency(1_000_000, i18n.language, 0),
+    });
+    // A 950-digit paste overflows a JS number; it is a number, and it is too big.
+    for (const value of ['1000000.01', '9'.repeat(950)]) {
+      expect(thresholdError(value)).toBe(maximum);
+      expect(thresholdError(value)).not.toBe(i18n.t('organization.lowBalanceAlert.thresholdError'));
+    }
+  });
+
+  it('keeps the "greater than 0" copy for empty, unparsable, and too-small values', () => {
+    for (const value of ['', '   ', '0', '-5', 'not a number']) {
+      expect(thresholdError(value)).toBe(i18n.t('organization.lowBalanceAlert.thresholdError'));
+    }
+  });
 });
 
 describe('parseMultiplier', () => {
@@ -64,6 +87,15 @@ describe('parseMultiplier', () => {
     expect(multiplierError('2')).toBeNull();
     expect(multiplierError('0.5')).not.toBeNull();
     expect(multiplierError('51')).not.toBeNull();
+  });
+
+  it('names the cap above 50x and the minimum below 1x', () => {
+    const maximum = i18n.t('spendAlerts.multiplierMaxError', {
+      max: formatNumber(50, i18n.language),
+    });
+    expect(multiplierError('50.01')).toBe(maximum);
+    expect(multiplierError('51')).toBe(maximum);
+    expect(multiplierError('0.5')).toBe(i18n.t('spendAlerts.multiplierError'));
   });
 });
 

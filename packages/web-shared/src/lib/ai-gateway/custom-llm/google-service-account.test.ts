@@ -75,6 +75,27 @@ describe('CustomLlmCredentialsSchema and CustomLlmDefinitionSchema', () => {
     ).toBe(false);
   });
 
+  it('accepts Amazon Bedrock IAM access key credentials', () => {
+    expect(
+      CustomLlmCredentialsSchema.safeParse({
+        type: 'aws_bedrock',
+        region: 'us-east-1',
+        access_key_id: 'AKIDEXAMPLE',
+        secret_access_key: 'secret-access-key',
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects Amazon Bedrock credentials without a region', () => {
+    expect(
+      CustomLlmCredentialsSchema.safeParse({
+        type: 'aws_bedrock',
+        access_key_id: 'AKIDEXAMPLE',
+        secret_access_key: 'secret-access-key',
+      }).success
+    ).toBe(false);
+  });
+
   it('validates custom LLM definition without credentials', () => {
     expect(CustomLlmDefinitionSchema.safeParse(baseDefinition).success).toBe(true);
   });

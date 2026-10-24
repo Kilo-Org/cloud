@@ -16,22 +16,21 @@ const named = (name: string): Tool => ({
 const registry = (...tools: readonly Tool[]) => Layer.succeed(ToolRegistry, { tools });
 
 const resolve = (names: readonly string[], ...tools: readonly Tool[]) =>
-  Effect.runPromise(Effect.either(Effect.provide(resolveTools(names), registry(...tools))));
+  Effect.runPromise(Effect.result(Effect.provide(resolveTools(names), registry(...tools))));
 
 it('resolves the names in the order the session asked for them', async () => {
   const resolved = await resolve(['b', 'a'], named('a'), named('b'));
 
   /* The order is the order of the prefix, not the order of the registry. */
-  expect(resolved._tag === 'Right' && resolved.right.map(tool => tool.definition.name)).toEqual([
-    'b',
-    'a',
-  ]);
+  expect(resolved._tag === 'Success' && resolved.success.map(tool => tool.definition.name)).toEqual(
+    ['b', 'a']
+  );
 });
 
 it('refuses to open a session naming a tool nothing holds', async () => {
   const resolved = await resolve(['a', 'missing'], named('a'));
 
-  expect(resolved._tag === 'Left' && resolved.left).toBeInstanceOf(ToolMissingError);
+  expect(resolved._tag === 'Failure' && resolved.failure).toBeInstanceOf(ToolMissingError);
 });
 
 it('asks for no registry when the session names no tool', async () => {

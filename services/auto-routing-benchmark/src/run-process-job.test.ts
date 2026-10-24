@@ -66,6 +66,7 @@ vi.mock('./db', async importOriginal => {
     syncPlatformRegistryRows: vi.fn(),
     getLatestRoutingTable: vi.fn(),
     countCurrentProfilesByStatus: vi.fn(),
+    listCurrentPlatformProfileStatuses: vi.fn(),
     getSummariesForRuns: vi.fn(),
     getRoutingCaseResultsForEntries: vi.fn().mockResolvedValue([]),
     listReadyCurrentProfilesForEntries: vi.fn(),
@@ -125,6 +126,7 @@ import {
   syncPlatformRegistryRows,
   getLatestRoutingTable,
   countCurrentProfilesByStatus,
+  listCurrentPlatformProfileStatuses,
   getSummariesForRuns,
   listReadyCurrentProfilesForEntries,
   listLaneFailures,
@@ -336,6 +338,9 @@ beforeEach(() => {
   ];
   vi.mocked(syncSubscriptionSnapshot).mockResolvedValue(snapshot);
   vi.mocked(servingSubscriptionSnapshot).mockResolvedValue(snapshot);
+  vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue([
+    { model, variant: 'max', status: 'ready' },
+  ]);
   vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([]);
   vi.mocked(getSummariesForRuns).mockResolvedValue([]);
   vi.mocked(countCurrentProfilesByStatus).mockResolvedValue([]);
@@ -794,6 +799,40 @@ describe('processJob — scheduler waits and paid-call safety', () => {
       );
     }
   );
+
+  it('defers an unbilled gateway model rejection instead of scoring it', async () => {
+    const claim = mockClaim({ variant: 'high', rep: 0 });
+    mockRunSnapshot([{ model, variant: 'high' }]);
+    vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce({
+      ...successfulCliResult,
+      text: '',
+      exitCode: 1,
+      costUsd: 0,
+      stderrTail: `\u001b[91mError: \u001b[0mUnsupported model ${model}\n`,
+    });
+
+    await processJob(env, deciderMessage());
+
+    expect(clearUnbilledCase).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({ runId, model, variant: 'high', rep: 0, caseId: benchCase.id })
+    );
+    expect(upsertCaseResult).not.toHaveBeenCalled();
+    expect(markProfilesFailedForEntries).not.toHaveBeenCalled();
+    expect(failScheduledEntry).not.toHaveBeenCalled();
+    expect(recordLaneFailure).not.toHaveBeenCalled();
+    expect(finishChunk).not.toHaveBeenCalled();
+    expect(deferChunk).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      claim.id,
+      claim.token,
+      expect.any(Number)
+    );
+    expect(queueSend).toHaveBeenCalledWith(
+      { runId, kind: 'decider', model, schedulerWake: true },
+      { delaySeconds: 15 }
+    );
+  });
 
   it.each([
     { text: 'A partial measured answer', costUsd: null, timedOut: false },

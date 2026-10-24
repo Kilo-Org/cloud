@@ -3,9 +3,11 @@ import { createElement, type ReactElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
-import ReposRoute from '@/app/(app)/(tabs)/(3_profile)/code-reviewer/[scope]/[platform]/(edit)/repos';
+import ReposRoute from '@/app/(app)/code-reviewer/[scope]/[platform]/(edit)/repos';
+import { type ReviewerPlatform, type ReviewerScopePlatform } from '@/lib/code-reviewer-config';
+import { ReviewerRouteParamsProvider } from '@/lib/hooks/use-reviewer-route-params';
 import { ReviewListScreen } from './review-list-screen';
-import { renderWithProviders } from '@/test/render-with-providers';
+import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 
 type ReviewStub = {
   id: string;
@@ -28,8 +30,10 @@ function review(id: string, prTitle = `Review ${id}`): ReviewStub {
 }
 
 const state = vi.hoisted(() => ({
+  insets: { left: 0, right: 0 },
   platform: 'gitlab',
   connected: false,
+  scope: 'personal',
   repositories: {
     data: { repositories: [] } as unknown,
     isLoading: false,
@@ -57,21 +61,33 @@ const state = vi.hoisted(() => ({
     refetch: vi.fn(),
   },
   push: vi.fn(),
+  mintInstallState: vi.fn(),
+  openExternalUrl: vi.fn(),
+  toastError: vi.fn(),
 }));
 
 vi.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({ scope: 'personal', platform: state.platform }),
+  useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: state.push }),
 }));
 vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable' }));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({
+    top: 0,
+    bottom: 0,
+    left: state.insets.left,
+    right: state.insets.right,
+  }),
+}));
 vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeOut: { duration: vi.fn() },
 }));
-vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
+vi.mock('sonner-native', () => ({ toast: { error: state.toastError } }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/tab-screen', () => ({
@@ -89,8 +105,14 @@ vi.mock('@/components/ui/icons', () => ({
   GitPullRequest: 'GitPullRequest',
 }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.test' }));
-vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
-vi.mock('@/lib/trpc', () => ({ trpcClient: {} }));
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: state.openExternalUrl }));
+vi.mock('@/lib/trpc', () => ({
+  trpcClient: {
+    githubApps: {
+      mintInstallState: { mutate: state.mintInstallState },
+    },
+  },
+}));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   PERSONAL_SCOPE: 'personal',
   useGitHubStatus: () => ({ data: { connected: state.connected } }),
@@ -110,8 +132,11 @@ vi.mock('@/lib/hooks/use-code-reviews', () => ({ useReviewList: () => state.revi
 vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({ useRouteForegroundRefresh: vi.fn() }));
 
 beforeEach(() => {
+  state.insets.left = 0;
+  state.insets.right = 0;
   state.platform = 'gitlab';
   state.connected = false;
+  state.scope = 'personal';
   state.repositories.data = { repositories: [] };
   state.repositories.isError = false;
   state.bitbucket.data = { repositoryCache: { status: 'available', repositories: [] } };
@@ -122,11 +147,43 @@ beforeEach(() => {
   state.reviews.isFetchNextPageError = false;
   state.reviews.hasNextPage = false;
   state.reviews.error.data.code = 'INTERNAL_SERVER_ERROR';
+  state.mintInstallState.mockReset();
+  state.openExternalUrl.mockReset();
+  state.openExternalUrl.mockResolvedValue(undefined);
+  state.toastError.mockReset();
   vi.clearAllMocks();
 });
 
+/** The `[platform]` layout validates the pair and publishes it to the screen. */
+function reposRoute() {
+  // Bitbucket is org-only, so a personal+bitbucket pair is not one the layout
+  // could accept; those cases run under an organization scope instead.
+  const platform = state.platform as ReviewerPlatform;
+  const personal = state.scope === 'personal' && platform !== 'bitbucket';
+  const params: ReviewerScopePlatform = personal
+    ? { kind: 'personal', platform: platform as 'github' | 'gitlab' }
+    : {
+        kind: 'org',
+        organizationId: state.scope === 'personal' ? 'org-1' : state.scope,
+        platform,
+      };
+  return (
+    <ReviewerRouteParamsProvider params={params}>
+      <ReposRoute />
+    </ReviewerRouteParamsProvider>
+  );
+}
+
 function firstList(renderer: Awaited<ReturnType<typeof renderWithProviders>>['renderer']) {
   return renderer.root.find(node => String(node.type) === 'FlashList');
+}
+
+/** The GitHub empty state's action button, typed enough for oxlint. */
+function pressManageAccess(renderer: RenderWithProvidersResult['renderer']) {
+  const scroll = renderer.root.find(node => String(node.type) === 'ScrollView');
+  const empty = scroll.find(node => String(node.type) === 'EmptyState');
+  const action = empty.props.action as { props: { onPress: () => void } };
+  action.props.onPress();
 }
 
 describe('Reviewer repository bodies', () => {
@@ -134,7 +191,7 @@ describe('Reviewer repository bodies', () => {
     'centers the %s empty body outside its scroller',
     async platform => {
       state.platform = platform;
-      const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+      const { renderer, unmount } = await renderWithProviders(reposRoute());
       expect(renderer.root.findAll(node => String(node.type) === 'ScrollView')).toHaveLength(0);
       expect(renderer.root.find(node => String(node.type) === 'EmptyState').props.placement).toBe(
         'center'
@@ -145,17 +202,66 @@ describe('Reviewer repository bodies', () => {
 
   it('keeps the GitHub empty state beside its selection controls', async () => {
     state.platform = 'github';
-    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+    const { renderer, unmount } = await renderWithProviders(reposRoute());
     const scroll = renderer.root.find(node => String(node.type) === 'ScrollView');
     expect(scroll.find(node => String(node.type) === 'RadioGroup')).toBeDefined();
     expect(scroll.find(node => String(node.type) === 'EmptyState').props.placement).toBe('top');
     unmount();
   });
 
+  it('opens the install page with a minted token', async () => {
+    state.platform = 'github';
+    state.mintInstallState.mockResolvedValue({ token: 'token-1' });
+    const { renderer, unmount } = await renderWithProviders(reposRoute());
+    pressManageAccess(renderer);
+    await vi.waitFor(() => {
+      expect(state.openExternalUrl).toHaveBeenCalledWith(
+        'https://example.test/github-app?installState=token-1&fromApp=1',
+        { label: 'repository access' }
+      );
+    });
+    expect(state.toastError).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('falls back to the tokenless settings page when the org rejects the mint', async () => {
+    state.platform = 'github';
+    state.scope = 'org-1';
+    state.mintInstallState.mockRejectedValue(
+      Object.assign(new Error('This organization already has a GitHub installation'), {
+        data: { code: 'FORBIDDEN', httpStatus: 403 },
+      })
+    );
+    const { renderer, unmount } = await renderWithProviders(reposRoute());
+    pressManageAccess(renderer);
+    await vi.waitFor(() => {
+      expect(state.openExternalUrl).toHaveBeenCalledWith(
+        'https://example.test/github-app?organizationId=org-1',
+        { label: 'repository access' }
+      );
+    });
+    expect(state.toastError).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('toasts without opening anything on a non-FORBIDDEN mint failure', async () => {
+    state.platform = 'github';
+    state.mintInstallState.mockRejectedValue(
+      Object.assign(new Error('offline'), { data: { code: 'INTERNAL_SERVER_ERROR' } })
+    );
+    const { renderer, unmount } = await renderWithProviders(reposRoute());
+    pressManageAccess(renderer);
+    await vi.waitFor(() => {
+      expect(state.toastError).toHaveBeenCalledWith('Could not open GitHub App settings');
+    });
+    expect(state.openExternalUrl).not.toHaveBeenCalled();
+    unmount();
+  });
+
   it('centers missing Bitbucket setup', async () => {
     state.platform = 'bitbucket';
     state.bitbucket.data = { repositoryCache: { status: 'unavailable' } };
-    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+    const { renderer, unmount } = await renderWithProviders(reposRoute());
     expect(renderer.root.findAll(node => String(node.type) === 'ScrollView')).toHaveLength(0);
     expect(renderer.root.find(node => String(node.type) === 'CenteredState')).toBeDefined();
     unmount();
@@ -164,7 +270,7 @@ describe('Reviewer repository bodies', () => {
   it('keeps cached repositories beside a partial error', async () => {
     state.repositories.isError = true;
     state.repositories.data = { repositories: [{ id: 1, fullName: 'org/repo', private: false }] };
-    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+    const { renderer, unmount } = await renderWithProviders(reposRoute());
     const scroll = renderer.root.find(node => String(node.type) === 'ScrollView');
     expect(scroll.find(node => String(node.type) === 'RepoToggleRow')).toBeDefined();
     expect(scroll.find(node => String(node.type) === 'QueryError').props.placement).toBe('top');
@@ -173,6 +279,30 @@ describe('Reviewer repository bodies', () => {
 });
 
 describe('Recent review bodies', () => {
+  it.each([
+    { orientation: 'portrait', left: 0, right: 0, paddingLeft: 24, paddingRight: 24 },
+    { orientation: 'landscape', left: 47, right: 59, paddingLeft: 71, paddingRight: 83 },
+  ])(
+    'keeps the $orientation rows inside the side insets on top of the gutter',
+    async ({ left, right, paddingLeft, paddingRight }) => {
+      state.insets.left = left;
+      state.insets.right = right;
+      state.reviews.data = {
+        pages: [{ success: true, reviews: [review('r1'), review('r2')] }],
+        pageParams: [0],
+      };
+      const { renderer, unmount } = await renderWithProviders(
+        createElement(ReviewListScreen, { scope: 'personal' })
+      );
+      expect(firstList(renderer).props.contentContainerStyle).toEqual({
+        paddingTop: 16,
+        paddingLeft,
+        paddingRight,
+      });
+      unmount();
+    }
+  );
+
   it.each([false, true])(
     'keeps the correct empty action with provider connection %s',
     async connected => {
@@ -186,7 +316,7 @@ describe('Recent review bodies', () => {
       const action = empty.props.action as ReactElement<{ onPress: () => void }>;
       action.props.onPress();
       expect(state.push).toHaveBeenCalledWith(
-        `/(app)/(tabs)/(3_profile)/code-reviewer/personal${connected ? '/manual-review' : ''}`
+        `/(app)/code-reviewer/personal${connected ? '/manual-review' : ''}`
       );
       unmount();
     }

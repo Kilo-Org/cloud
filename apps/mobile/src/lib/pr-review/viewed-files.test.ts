@@ -87,7 +87,7 @@ describe('viewed-files', () => {
   it('caps the map at 20 PRs, evicting the least-recently-touched', async () => {
     const seed: Record<string, { headSha: string; viewedPaths: string[] }> = {};
     for (let index = 0; index < 20; index += 1) {
-      seed[`octocat/repo-${index}#1`] = { headSha: SHA1, viewedPaths: [] };
+      seed[`octocat/repo-${index}#1`] = { headSha: SHA1, viewedPaths: [`kept-${index}.ts`] };
     }
     setStored(seed);
     await toggleViewedFile({
@@ -102,14 +102,21 @@ describe('viewed-files', () => {
     await expect(
       getViewedFiles({ owner: 'octocat', repo: 'brand-new-repo', number: 1 }, SHA1)
     ).resolves.toEqual(['a.ts']);
-    // The oldest (repo-0) was evicted; reading it yields an empty list.
+    // The oldest (repo-0) was evicted; its set is gone, not just emptied.
     await expect(
       getViewedFiles({ owner: 'octocat', repo: 'repo-0', number: 1 }, SHA1)
     ).resolves.toEqual([]);
-    // The most-recently-touched original (repo-19) is still present.
+    // The most-recently-touched original survives WITH its own set — an
+    // empty-seed eviction would make this assertion pass vacuously.
     await expect(
       getViewedFiles({ owner: 'octocat', repo: 'repo-19', number: 1 }, SHA1)
-    ).resolves.toEqual([]);
+    ).resolves.toEqual(['kept-19.ts']);
+    // The stored map itself holds exactly the cap: 20 entries after the
+    // 21st toggle, not 19 survivors plus the newcomer.
+    const stored = JSON.parse(store.get('pr-review-viewed') ?? '{}') as Record<string, unknown>;
+    expect(Object.keys(stored)).toHaveLength(20);
+    expect(stored['octocat/repo-0#1']).toBeUndefined();
+    expect(stored['octocat/repo-19#1']).toEqual({ headSha: SHA1, viewedPaths: ['kept-19.ts'] });
   });
 
   it('treats corrupt stored data as an empty map', async () => {

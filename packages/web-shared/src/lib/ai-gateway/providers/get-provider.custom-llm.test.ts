@@ -67,6 +67,7 @@ describe('getProvider custom LLM credentials', () => {
     expect(result).toMatchObject({
       kind: 'provider',
       bypassAccessCheck: true,
+      isFree: true,
       provider: {
         id: 'custom',
         apiUrl: 'https://llm.example.com/v1/chat/completions',
@@ -87,10 +88,36 @@ describe('getProvider custom LLM credentials', () => {
 
     expect(result).toMatchObject({
       kind: 'provider',
+      isFree: true,
       provider: {
         apiUrl: 'https://secure-proxy.example.com/api/proxy',
         apiKey: 'upstream-key',
         apiKeyHeader: 'x-api-key',
+      },
+    });
+    if (result.kind !== 'provider') throw new Error('expected a provider');
+    expect(result.provider.secureProxy).toBeUndefined();
+  });
+
+  it('signs aws_bedrock credentials with SigV4 instead of sending an API key', async () => {
+    const credentials = {
+      type: 'aws_bedrock',
+      region: 'us-east-1',
+      access_key_id: 'AKIDEXAMPLE',
+      secret_access_key: 'secret-access-key',
+    } as const;
+    await insertCustomLlm(credentials);
+
+    const result = await resolveProvider();
+
+    expect(result).toMatchObject({
+      kind: 'provider',
+      bypassAccessCheck: true,
+      provider: {
+        apiUrl: 'https://secure-proxy.example.com/api/proxy',
+        apiKey: '',
+        apiKeyHeader: null,
+        awsBedrock: credentials,
       },
     });
     if (result.kind !== 'provider') throw new Error('expected a provider');

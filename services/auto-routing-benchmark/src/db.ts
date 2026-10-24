@@ -1679,7 +1679,7 @@ export function claimPlatformRequestedStatement(
         // reaper only touches rows untouched for hours. This reconcile runs
         // every 15 minutes, so bumping it would hold every platform row
         // permanently below the reaper's age guard and an orphaned claim
-        // would keep the queue unsettled forever.
+        // would leave that pair unmeasured, never reaching the routing table.
         set: { platform_requested: true },
       })
   );
@@ -1789,8 +1789,8 @@ export async function getSummariesForRuns(
  * threw), or the claim landed and the run row was never written at all. Neither
  * is reachable otherwise — the drain wants `pending`, requeue wants `failed`,
  * and the stale sweep only looks at runs that are still `running`. Left alone
- * they stay claimed forever, and because a claimed platform row keeps the queue
- * unsettled, the platform routing table would never publish again.
+ * they stay claimed forever, so the pair is neither served nor re-measured and
+ * the routing table would never gain it.
  *
  * The age guard is what makes this safe to run from every sweep: a run marks
  * itself completed just before settling its rows, so without it this would fail

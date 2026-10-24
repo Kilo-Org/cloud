@@ -2,7 +2,7 @@ import { GLANCEABLE_STALE_MS } from '@kilocode/app-shared/glanceable-agents-snap
 import { sessionLiveActivityRelevance } from '@kilocode/notifications';
 import { type LiveActivity } from 'expo-widgets';
 
-import { SessionLiveActivity, type SessionLiveActivityProps } from './session-live-activity';
+import { getSessionLiveActivity, type SessionLiveActivityProps } from './session-live-activity';
 
 /**
  * The native reads every session card writer shares, and the Approve press
@@ -25,7 +25,7 @@ const presses = new Map<string, PressState>();
 /** Every native session card, or null when ActivityKit cannot be read. */
 export function readSessionCards(includeEnded: boolean): SessionActivity[] | null {
   try {
-    return SessionLiveActivity.getInstances(includeEnded);
+    return getSessionLiveActivity().getInstances(includeEnded);
   } catch {
     return null;
   }

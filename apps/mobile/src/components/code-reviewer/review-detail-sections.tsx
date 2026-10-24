@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 import {
   councilDecisionLabel,
   councilVoteLabel,
+  gateThresholdLabel,
+  severityLabelKey,
 } from '@/components/code-reviewer/review-detail-helpers';
 import { Text } from '@/components/ui/text';
 import { type useReviewDetail } from '@/lib/hooks/use-code-reviews';
@@ -39,6 +41,7 @@ export function MetaRow({
 }
 
 export function FindingCard({ finding }: Readonly<{ finding: CouncilFinding }>) {
+  const { t } = useTranslation();
   return (
     <View className="gap-1 rounded-lg bg-secondary p-3">
       <View className="flex-row items-center justify-between">
@@ -50,7 +53,7 @@ export function FindingCard({ finding }: Readonly<{ finding: CouncilFinding }>) 
               : 'text-muted-foreground'
           )}
         >
-          {finding.severity}
+          {t(severityLabelKey(finding.severity))}
         </Text>
         <Text variant="muted" className="text-xs">
           {finding.path}
@@ -109,7 +112,10 @@ export function GateSection({
         <MetaRow label={t('codeReviewer.reviewDetail.checkRun')} value={checkRunLabel} />
         <MetaRow label={t('common.status')} value={statusLabel} />
         {gateThreshold ? (
-          <MetaRow label={t('codeReviewer.reviewDetail.threshold')} value={gateThreshold} />
+          <MetaRow
+            label={t('codeReviewer.reviewDetail.threshold')}
+            value={gateThresholdLabel(gateThreshold)}
+          />
         ) : null}
       </View>
     </View>

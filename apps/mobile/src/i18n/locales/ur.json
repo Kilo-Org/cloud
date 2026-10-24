@@ -147,7 +147,8 @@
     "agent": "ایجنٹ",
     "durationMinuteShort": "منٹ",
     "durationHourShort": "گھنٹہ",
-    "changes": "تبدیلیاں"
+    "changes": "تبدیلیاں",
+    "organizationTrialEnded": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ تنظیم کا مالک kilo.ai پر بلنگ اپ ڈیٹ کر سکتا ہے، پھر دوبارہ کوشش کریں۔"
   },
   "language": {
     "restarting": "منتخب زبان لاگو کرنے کے لیے ایپ دوبارہ شروع ہو رہی ہے",
@@ -3168,7 +3169,9 @@
       "sendInvite": "دعوت بھیجیں",
       "title": "رکن کو دعوت دیں",
       "alreadyInvited": "انہیں پہلے ہی دعوت دے دی گئی ہے یا وہ پہلے سے ہی رکن ہیں۔",
-      "sendError": "دعوت نہیں بھیجی جا سکی۔"
+      "sendError": "دعوت نہیں بھیجی جا سکی۔",
+      "pendingInvitation": "اس ای میل کے لیے پہلے ہی ایک زیرِ التوا دعوت موجود ہے۔",
+      "alreadyMember": "یہ شخص پہلے ہی اس تنظیم کا رکن ہے۔"
     },
     "invoices": {
       "downloadA11y": "انوائس {{number}} ڈاؤن لوڈ کریں",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "زیر التواء دعوتیں",
       "resendInvite": "دعوت دوبارہ بھیجیں",
       "shareInviteLink": "دعوت کا لنک شیئر کریں",
-      "resendInviteError": "دعوت دوبارہ نہیں بھیجی جا سکی۔"
+      "resendInviteError": "دعوت دوبارہ نہیں بھیجی جا سکی۔",
+      "inviteNotResendable": "یہ دعوت اب دوبارہ نہیں بھیجی جا سکتی۔",
+      "ownerAuthority": "صرف تنظیم کا مالک ہی مالکان کا انتظام کر سکتا ہے۔",
+      "ownRoleChange": "آپ اپنا کردار تبدیل نہیں کر سکتے۔",
+      "inviteExpired": "یہ دعوت کی میعاد ختم ہو گئی ہے۔",
+      "inviteAccepted": "یہ دعوت پہلے ہی قبول کی جا چکی ہے۔"
     },
     "usageStats": {
       "inputTokens": "ان پٹ ٹوکن",

@@ -147,7 +147,8 @@
     "agent": "Wakili",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Canje-canje"
+    "changes": "Canje-canje",
+    "organizationTrialEnded": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Mai mallakar ƙungiyar zai iya sabunta lissafin kuɗi a kilo.ai, sannan ya sake gwadawa."
   },
   "language": {
     "restarting": "Ana sake kunnawa don amfani da harshen da aka zaɓa",
@@ -3168,7 +3169,9 @@
       "sendInvite": "Aika gayyata",
       "title": "Gayyaci memba",
       "alreadyInvited": "An riga an aika musu gayyata ko kuma sun riga zama memba.",
-      "sendError": "Ba a iya aika gayyata ba."
+      "sendError": "Ba a iya aika gayyata ba.",
+      "pendingInvitation": "Wannan adireshin imel ɗin ya riga yana da gayyata da ke jiran amsa.",
+      "alreadyMember": "Wannan mutumin ya riga ya zama memba na wannan ƙungiyar."
     },
     "invoices": {
       "downloadA11y": "Sauke takardar biyan kuɗi {{number}}",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "Gayyatar da ke jiran amsa",
       "resendInvite": "Sake aika gayyata",
       "shareInviteLink": "Raba mahaɗin gayyata",
-      "resendInviteError": "Ba a iya sake aika gayyata ba."
+      "resendInviteError": "Ba a iya sake aika gayyata ba.",
+      "inviteNotResendable": "Ba za a iya sake aika wannan gayyatar ba.",
+      "ownerAuthority": "Mai mulkin ƙungiya ne kaɗai zai iya sarrafa masu mulki.",
+      "ownRoleChange": "Ba za ka iya canza matsayin kanka ba.",
+      "inviteExpired": "Wannan gayyatar ta ƙare.",
+      "inviteAccepted": "An riga an karɓi wannan gayyatar."
     },
     "usageStats": {
       "inputTokens": "Guntayen rubutun shigarwa",

@@ -147,7 +147,8 @@
     "agent": "Agentti",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Muutokset"
+    "changes": "Muutokset",
+    "organizationTrialEnded": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Organisaation omistaja voi päivittää laskutuksen osoitteessa kilo.ai ja yrittää sitten uudelleen."
   },
   "language": {
     "restarting": "Käynnistetään uudelleen kielen vaihtamiseksi",
@@ -3168,7 +3169,9 @@
       "sendInvite": "Lähetä kutsu",
       "title": "Kutsu jäsen",
       "alreadyInvited": "Tämä sähköpostiosoite on jo kutsuttu tai kuuluu jo jäsenelle.",
-      "sendError": "Kutsun lähettäminen epäonnistui."
+      "sendError": "Kutsun lähettäminen epäonnistui.",
+      "pendingInvitation": "Tällä sähköpostiosoitteella on jo odottava kutsu.",
+      "alreadyMember": "Tämä henkilö on jo tämän organisaation jäsen."
     },
     "invoices": {
       "downloadA11y": "Lataa lasku {{number}}",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "Odottavat kutsut",
       "resendInvite": "Lähetä kutsu uudelleen",
       "shareInviteLink": "Jaa kutsulinkki",
-      "resendInviteError": "Kutsun lähettäminen uudelleen epäonnistui."
+      "resendInviteError": "Kutsun lähettäminen uudelleen epäonnistui.",
+      "inviteNotResendable": "Tätä kutsua ei voi enää lähettää uudelleen.",
+      "ownerAuthority": "Vain organisaation omistaja voi hallita omistajia.",
+      "ownRoleChange": "Et voi vaihtaa omaa rooliasi.",
+      "inviteExpired": "Tämä kutsu on vanhentunut.",
+      "inviteAccepted": "Tämä kutsu on jo hyväksytty."
     },
     "usageStats": {
       "inputTokens": "Syötetokenit",

@@ -147,7 +147,8 @@
     "agent": "Ajan",
     "durationMinuteShort": "dk",
     "durationHourShort": "sa",
-    "changes": "Değişiklikler"
+    "changes": "Değişiklikler",
+    "organizationTrialEnded": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. Kuruluş sahibi kilo.ai adresinden faturalandırmayı güncelleyip ardından tekrar deneyebilir."
   },
   "language": {
     "restarting": "Dil değişikliğini uygulamak için yeniden başlatılıyor",
@@ -3167,7 +3168,9 @@
       "sendInvite": "Davet gönder",
       "title": "Üye davet et",
       "alreadyInvited": "Bu kişi zaten davet edilmiş veya zaten üye.",
-      "sendError": "Davet gönderilemedi."
+      "sendError": "Davet gönderilemedi.",
+      "pendingInvitation": "Bu e-posta adresinin zaten bekleyen bir daveti var.",
+      "alreadyMember": "Bu kişi zaten bu kuruluşun bir üyesi."
     },
     "invoices": {
       "downloadA11y": "{{number}} numaralı faturayı indir",
@@ -3237,7 +3240,12 @@
       "pendingInvitations": "Bekleyen davetler",
       "resendInvite": "Daveti yeniden gönder",
       "shareInviteLink": "Davet bağlantısını paylaş",
-      "resendInviteError": "Davet yeniden gönderilemedi."
+      "resendInviteError": "Davet yeniden gönderilemedi.",
+      "inviteNotResendable": "Bu davet artık yeniden gönderilemez.",
+      "ownerAuthority": "Yalnızca bir organizasyon sahibi sahipleri yönetebilir.",
+      "ownRoleChange": "Kendi rolünüzü değiştiremezsiniz.",
+      "inviteExpired": "Bu davetin süresi dolmuş.",
+      "inviteAccepted": "Bu davet zaten kabul edilmiş."
     },
     "usageStats": {
       "inputTokens": "Girdi tokenları",

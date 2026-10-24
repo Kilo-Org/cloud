@@ -147,7 +147,8 @@
     "agent": "Agentas",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Pakeitimai"
+    "changes": "Pakeitimai",
+    "organizationTrialEnded": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Organizacijos savininkas gali atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą."
   },
   "language": {
     "restarting": "Paleidžiama iš naujo, kad būtų pakeista kalba",
@@ -3256,7 +3257,9 @@
       "sendInvite": "Siųsti kvietimą",
       "title": "Pakviesti narį",
       "alreadyInvited": "Vartotojas jau pakviestas arba jau yra narys.",
-      "sendError": "Nepavyko išsiųsti kvietimo."
+      "sendError": "Nepavyko išsiųsti kvietimo.",
+      "pendingInvitation": "Šiam el. pašto adresui jau išsiųstas laukiantis kvietimas.",
+      "alreadyMember": "Šis asmuo jau yra šios organizacijos narys."
     },
     "invoices": {
       "downloadA11y": "Atsisiųsti sąskaitą {{number}}",
@@ -3326,7 +3329,12 @@
       "pendingInvitations": "Nepriimti kvietimai",
       "resendInvite": "Išsiųsti kvietimą dar kartą",
       "shareInviteLink": "Bendrinti kvietimo nuorodą",
-      "resendInviteError": "Nepavyko išsiųsti kvietimo dar kartą."
+      "resendInviteError": "Nepavyko išsiųsti kvietimo dar kartą.",
+      "inviteNotResendable": "Šio kvietimo nebegalima išsiųsti dar kartą.",
+      "ownerAuthority": "Tik organizacijos savininkas gali valdyti savininkus.",
+      "ownRoleChange": "Negalite pakeisti savo paties vaidmens.",
+      "inviteExpired": "Šio kvietimo galiojimas baigėsi.",
+      "inviteAccepted": "Šis kvietimas jau buvo priimtas."
     },
     "usageStats": {
       "inputTokens": "Įvesties žetonai",

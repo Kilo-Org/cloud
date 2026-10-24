@@ -147,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Änderungen"
+    "changes": "Änderungen",
+    "organizationTrialEnded": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Ein Inhaber der Organisation kann die Abrechnung unter kilo.ai aktualisieren und es dann erneut versuchen."
   },
   "language": {
     "restarting": "Neustart zum Übernehmen der Sprache",
@@ -3167,7 +3168,9 @@
       "sendInvite": "Einladung senden",
       "title": "Mitglied einladen",
       "alreadyInvited": "Diese Person ist bereits eingeladen oder bereits Mitglied.",
-      "sendError": "Die Einladung konnte nicht gesendet werden."
+      "sendError": "Die Einladung konnte nicht gesendet werden.",
+      "pendingInvitation": "Für diese E-Mail-Adresse liegt bereits eine ausstehende Einladung vor.",
+      "alreadyMember": "Diese Person ist bereits Mitglied dieser Organisation."
     },
     "invoices": {
       "downloadA11y": "Rechnung {{number}} herunterladen",
@@ -3237,7 +3240,12 @@
       "pendingInvitations": "Ausstehende Einladungen",
       "resendInvite": "Einladung erneut senden",
       "shareInviteLink": "Einladungslink teilen",
-      "resendInviteError": "Die Einladung konnte nicht erneut gesendet werden."
+      "resendInviteError": "Die Einladung konnte nicht erneut gesendet werden.",
+      "inviteNotResendable": "Diese Einladung kann nicht mehr erneut gesendet werden.",
+      "ownerAuthority": "Nur ein Organisationsinhaber kann Inhaber verwalten.",
+      "ownRoleChange": "Sie können Ihre eigene Rolle nicht ändern.",
+      "inviteExpired": "Diese Einladung ist abgelaufen.",
+      "inviteAccepted": "Diese Einladung wurde bereits angenommen."
     },
     "usageStats": {
       "inputTokens": "Eingabe-Tokens",

@@ -147,7 +147,8 @@
     "agent": "Wakiil",
     "durationMinuteShort": "daq",
     "durationHourShort": "saac",
-    "changes": "Isbeddellada"
+    "changes": "Isbeddellada",
+    "organizationTrialEnded": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Milkiilaha ururku wuxuu cusboonaysiin karaa biilasha kilo.ai, ka dibna isku day mar kale."
   },
   "language": {
     "restarting": "Dib ayaa loo bilaabayaa si luqadda loo adeegsado",
@@ -3168,7 +3169,9 @@
       "sendInvite": "Dir casuumaad",
       "title": "Casuum xubin",
       "alreadyInvited": "Isaga ama iyadu horeba waa la casuumay ama horeba waa xubin.",
-      "sendError": "Casuumaadda lama diri karin."
+      "sendError": "Casuumaadda lama diri karin.",
+      "pendingInvitation": "Iimaylkani horeyba wuxuu leeyahay casuumaad sugaysa.",
+      "alreadyMember": "Qofkani horeyba waa xubin ka mid ah ururkan."
     },
     "invoices": {
       "downloadA11y": "Soo deji qaansheegta {{number}}",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "Casuumaadaha sugaya",
       "resendInvite": "Dib u dir casuumaadda",
       "shareInviteLink": "Wadaag xiriiriyaha casuumaadda",
-      "resendInviteError": "Casuumaadda dib lama diri karin."
+      "resendInviteError": "Casuumaadda dib lama diri karin.",
+      "inviteNotResendable": "Casuumaaddan mar dambe dib looma diri karo.",
+      "ownerAuthority": "Kaliya milkiilaha ururka ayaa maamuli kara milkiilayaasha.",
+      "ownRoleChange": "Ma beddeli kartid doorkaaga.",
+      "inviteExpired": "Casuumaaddan waqtigeedii wuu dhammaaday.",
+      "inviteAccepted": "Casuumaaddan mar hore ayaa la aqbalay."
     },
     "usageStats": {
       "inputTokens": "Halbeegyada qoraalka la geliyay",

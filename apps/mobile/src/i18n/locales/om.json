@@ -147,7 +147,8 @@
     "agent": "Bakka bu'aa",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Jijjiiramoota"
+    "changes": "Jijjiiramoota",
+    "organizationTrialEnded": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu. Abbaan dhaabbataa kaffaltii kilo.ai irratti haaromsuu danda'a, sana booda irra deebi'ii yaali."
   },
   "language": {
     "restarting": "Afaan filatame fayyadamuuf irra deebi'ee jalqabaa jira",
@@ -3168,7 +3169,9 @@
       "sendInvite": "Affeerraa ergi",
       "title": "Miseensa afeeri",
       "alreadyInvited": "Duraan ni affeeramaniiru ykn miseensa dha.",
-      "sendError": "Affeerraa erguun hin danda'amne."
+      "sendError": "Affeerraa erguun hin danda'amne.",
+      "pendingInvitation": "Teessoon imeelii kun duraanuu affeerraa eeggachaa jiru qaba.",
+      "alreadyMember": "Namni kun duraanuu miseensa dhaabbata kanaati."
     },
     "invoices": {
       "downloadA11y": "Gaaffii kaffaltii {{number}} buufadhu",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "Affeerraawwan deebii eegaa jiran",
       "resendInvite": "Affeerraa deebi'ii ergi",
       "shareInviteLink": "Geessituu affeerraa qoodi",
-      "resendInviteError": "Affeerraa deebi'ii erguun hin danda'amne."
+      "resendInviteError": "Affeerraa deebi'ii erguun hin danda'amne.",
+      "inviteNotResendable": "Affeerraan kun ammas deebi'ii ergamuu hin danda'u.",
+      "ownerAuthority": "Abbaa dhaabbataa qofatu abbootii bulchuu danda'a.",
+      "ownRoleChange": "Gahee mataa kee jijjiiruu hin dandeessu.",
+      "inviteExpired": "Affeerraan kun yeroon isaa darbe.",
+      "inviteAccepted": "Affeerraan kun duraan fudhatameera."
     },
     "usageStats": {
       "inputTokens": "Tookanoota galtee",

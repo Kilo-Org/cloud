@@ -44,19 +44,26 @@ describe('inviteErrorCopy', () => {
   });
 
   it('names a taken address on the form rather than blaming the field', () => {
-    // CONFLICT covers both an invitation that is already pending and an
-    // address that already belongs to a member.
-    for (const message of [
-      'This email already has a pending invitation',
-      'This user is already a member of this organization',
-    ]) {
+    // Both sentences the invite procedure raises as CONFLICT, each with the
+    // reason it actually gives.
+    const cases: [string, string][] = [
+      ['This email already has a pending invitation', 'pendingInvitation'],
+      ['This user is already a member of this organization', 'alreadyMember'],
+    ];
+    for (const [message, key] of cases) {
       expect(
         inviteErrorCopy(Object.assign(new Error(message), { data: { code: 'CONFLICT' } }))
       ).toEqual({
         field: 'form',
-        message: i18n.t('organization.inviteMember.alreadyInvited'),
+        message: i18n.t(`organization.inviteMember.${key}`),
       });
     }
+  });
+
+  it('keeps the shared already-invited line for a conflict the app does not name', () => {
+    expect(
+      inviteErrorCopy(Object.assign(new Error('Invite conflict'), { data: { code: 'CONFLICT' } }))
+    ).toEqual({ field: 'form', message: i18n.t('organization.inviteMember.alreadyInvited') });
   });
 
   it('falls back to the generic line for every other failure', () => {

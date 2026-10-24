@@ -147,7 +147,8 @@
     "agent": "عامل",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "التغييرات"
+    "changes": "التغييرات",
+    "organizationTrialEnded": "انتهت الفترة التجريبية للمؤسسة ولم تعد لديها خطة نشطة. يمكن لمالك المؤسسة تحديث الفوترة على kilo.ai، ثم المحاولة مرة أخرى."
   },
   "language": {
     "restarting": "جارٍ إعادة التشغيل لتطبيق اللغة",
@@ -3343,7 +3344,9 @@
       "sendInvite": "إرسال الدعوة",
       "title": "دعوة عضو",
       "alreadyInvited": "سبق إرسال دعوة لهذا البريد الإلكتروني أو أنه يعود إلى عضو بالفعل.",
-      "sendError": "تعذّر إرسال الدعوة."
+      "sendError": "تعذّر إرسال الدعوة.",
+      "pendingInvitation": "توجد بالفعل دعوة معلّقة لهذا البريد الإلكتروني.",
+      "alreadyMember": "هذا الشخص عضو بالفعل في هذه المؤسسة."
     },
     "invoices": {
       "downloadA11y": "تنزيل الفاتورة {{number}}",
@@ -3413,7 +3416,12 @@
       "pendingInvitations": "الدعوات المعلّقة",
       "resendInvite": "إعادة إرسال الدعوة",
       "shareInviteLink": "مشاركة رابط الدعوة",
-      "resendInviteError": "تعذّر إعادة إرسال الدعوة."
+      "resendInviteError": "تعذّر إعادة إرسال الدعوة.",
+      "inviteNotResendable": "لم يعد من الممكن إعادة إرسال هذه الدعوة.",
+      "ownerAuthority": "لا يمكن إلا لمالك المؤسسة إدارة المالكين.",
+      "ownRoleChange": "لا يمكنك تغيير دورك.",
+      "inviteExpired": "انتهت صلاحية هذه الدعوة.",
+      "inviteAccepted": "تم قبول هذه الدعوة بالفعل."
     },
     "usageStats": {
       "inputTokens": "رموز الإدخال",

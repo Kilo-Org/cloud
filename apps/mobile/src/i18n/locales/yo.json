@@ -147,7 +147,8 @@
     "agent": "Aṣoju",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Àwọn àyípadà"
+    "changes": "Àwọn àyípadà",
+    "organizationTrialEnded": "Àkókò ìdánwò àjọ náà ti parí, kò sì ní ètò tó ń ṣiṣẹ́. Ẹnìkan tí ó ni àjọ lè ṣe àtúnṣe ìsanwó ní kilo.ai, kí ó sì tún gbìyànjú."
   },
   "language": {
     "restarting": "A ń tún bẹ̀rẹ̀ láti lo èdè tí o yàn",
@@ -3168,7 +3169,9 @@
       "sendInvite": "Fi ìkésíni ránṣẹ́",
       "title": "Pe ọmọ ẹgbẹ́",
       "alreadyInvited": "A ti pe wọ́n tẹ́lẹ̀ tàbí wọ́n ti jẹ́ ọmọ ẹgbẹ́ tẹ́lẹ̀.",
-      "sendError": "A kò lè fi ìkésíni ránṣẹ́."
+      "sendError": "A kò lè fi ìkésíni ránṣẹ́.",
+      "pendingInvitation": "Àdírẹ́sì ímeèlì yìí ti ní ìkésíni tí ń dúró.",
+      "alreadyMember": "Ẹnìkan yìí ti jẹ́ ọmọ ẹgbẹ́ àjọ yìí tẹ́lẹ̀."
     },
     "invoices": {
       "downloadA11y": "Ṣe ìgbàsílẹ̀ ìwé ìbéèrè owó {{number}}",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "Àwọn ìkésíni tó ń dúró",
       "resendInvite": "Tún ìkésíni fi ránṣẹ́",
       "shareInviteLink": "Pín ọ̀nà àsopọ̀ ìkésíni",
-      "resendInviteError": "A kò lè tún ìkésíni fi ránṣẹ́."
+      "resendInviteError": "A kò lè tún ìkésíni fi ránṣẹ́.",
+      "inviteNotResendable": "A kò lè tún ìkésíni yìí fi ránṣẹ́ mọ́.",
+      "ownerAuthority": "Olówó àjọ nìkan ni ó lè ṣàkóso àwọn olówó.",
+      "ownRoleChange": "O kò lè yí ipò tirẹ padà.",
+      "inviteExpired": "Ìkésíni yìí ti parí.",
+      "inviteAccepted": "A ti gba ìkésíni yìí."
     },
     "usageStats": {
       "inputTokens": "Àwọn ìpín ọ̀rọ̀ ìgbéwọlé",

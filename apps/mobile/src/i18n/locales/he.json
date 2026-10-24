@@ -147,7 +147,8 @@
     "agent": "סוֹכֵן",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "שינויים"
+    "changes": "שינויים",
+    "organizationTrialEnded": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. בעל הארגון יכול לעדכן את החיוב ב-kilo.ai, ואז לנסות שוב."
   },
   "language": {
     "restarting": "האפליקציה מופעלת מחדש לשינוי השפה",
@@ -3211,7 +3212,9 @@
       "sendInvite": "שליחת הזמנה",
       "title": "הזמנת חבר לארגון",
       "alreadyInvited": "כתובת זו כבר הוזמנה או שהיא שייכת לחבר קיים בארגון.",
-      "sendError": "שליחת ההזמנה נכשלה."
+      "sendError": "שליחת ההזמנה נכשלה.",
+      "pendingInvitation": "לכתובת דוא״ל זו כבר יש הזמנה ממתינה.",
+      "alreadyMember": "אדם זה כבר חבר בארגון הזה."
     },
     "invoices": {
       "downloadA11y": "הורדת חשבונית {{number}}",
@@ -3281,7 +3284,12 @@
       "pendingInvitations": "הזמנות ממתינות",
       "resendInvite": "שליחת ההזמנה מחדש",
       "shareInviteLink": "שיתוף הקישור להזמנה",
-      "resendInviteError": "שליחת ההזמנה מחדש נכשלה."
+      "resendInviteError": "שליחת ההזמנה מחדש נכשלה.",
+      "inviteNotResendable": "לא ניתן עוד לשלוח את ההזמנה הזו מחדש.",
+      "ownerAuthority": "רק בעל ארגון יכול לנהל בעלים.",
+      "ownRoleChange": "אינך יכול לשנות את התפקיד שלך.",
+      "inviteExpired": "ההזמנה הזו פגה.",
+      "inviteAccepted": "ההזמנה הזו כבר התקבלה."
     },
     "usageStats": {
       "inputTokens": "טוקני קלט",

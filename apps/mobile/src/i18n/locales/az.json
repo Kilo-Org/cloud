@@ -147,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Dəyişikliklər"
+    "changes": "Dəyişikliklər",
+    "organizationTrialEnded": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Təşkilat sahibi kilo.ai ünvanında billinqi yeniləyə və sonra yenidən cəhd edə bilər."
   },
   "language": {
     "restarting": "Dil dəyişikliyini tətbiq etmək üçün yenidən başladılır",
@@ -3168,7 +3169,9 @@
       "sendInvite": "Dəvət göndər",
       "title": "Üzv dəvət et",
       "alreadyInvited": "Bu e-poçt ünvanı artıq dəvət olunub və ya artıq üzvdür.",
-      "sendError": "Dəvət göndərilmədi."
+      "sendError": "Dəvət göndərilmədi.",
+      "pendingInvitation": "Bu e-poçt ünvanının artıq gözləyən dəvəti var.",
+      "alreadyMember": "Bu şəxs artıq bu təşkilatın üzvüdür."
     },
     "invoices": {
       "downloadA11y": "{{number}} nömrəli hesab-fakturanı endir",
@@ -3238,7 +3241,12 @@
       "pendingInvitations": "Gözləyən dəvətlər",
       "resendInvite": "Dəvəti yenidən göndər",
       "shareInviteLink": "Dəvət keçidini paylaş",
-      "resendInviteError": "Dəvət yenidən göndərilmədi."
+      "resendInviteError": "Dəvət yenidən göndərilmədi.",
+      "inviteNotResendable": "Bu dəvət artıq yenidən göndərilə bilməz.",
+      "ownerAuthority": "Yalnız təşkilat sahibi sahibləri idarə edə bilər.",
+      "ownRoleChange": "Öz rolunu dəyişə bilməzsən.",
+      "inviteExpired": "Bu dəvətin müddəti bitib.",
+      "inviteAccepted": "Bu dəvət artıq qəbul edilib."
     },
     "usageStats": {
       "inputTokens": "Giriş tokenləri",

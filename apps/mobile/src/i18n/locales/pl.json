@@ -147,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Zmiany"
+    "changes": "Zmiany",
+    "organizationTrialEnded": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Właściciel organizacji może zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie."
   },
   "language": {
     "restarting": "Ponowne uruchamianie po zmianie języka",
@@ -3255,7 +3256,9 @@
       "sendInvite": "Wyślij zaproszenie",
       "title": "Zaproś członka",
       "alreadyInvited": "Ten adres e-mail ma już oczekujące zaproszenie lub należy już do członka tej organizacji.",
-      "sendError": "Nie udało się wysłać zaproszenia."
+      "sendError": "Nie udało się wysłać zaproszenia.",
+      "pendingInvitation": "Ten adres e-mail ma już oczekujące zaproszenie.",
+      "alreadyMember": "Ta osoba jest już członkiem tej organizacji."
     },
     "invoices": {
       "downloadA11y": "Pobierz fakturę {{number}}",
@@ -3325,7 +3328,12 @@
       "pendingInvitations": "Oczekujące zaproszenia",
       "resendInvite": "Wyślij zaproszenie ponownie",
       "shareInviteLink": "Udostępnij link do zaproszenia",
-      "resendInviteError": "Nie udało się wysłać zaproszenia ponownie."
+      "resendInviteError": "Nie udało się wysłać zaproszenia ponownie.",
+      "inviteNotResendable": "Tego zaproszenia nie można już wysłać ponownie.",
+      "ownerAuthority": "Tylko właściciel organizacji może zarządzać właścicielami.",
+      "ownRoleChange": "Nie możesz zmienić własnej roli.",
+      "inviteExpired": "To zaproszenie wygasło.",
+      "inviteAccepted": "To zaproszenie zostało już przyjęte."
     },
     "usageStats": {
       "inputTokens": "Tokeny wejściowe",

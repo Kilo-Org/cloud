@@ -147,7 +147,8 @@
     "agent": "Agen",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Perubahan"
+    "changes": "Perubahan",
+    "organizationTrialEnded": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Pemilik organisasi dapat memperbarui penagihan di kilo.ai, lalu coba lagi."
   },
   "language": {
     "restarting": "Memulai ulang untuk menerapkan bahasa",
@@ -3167,7 +3168,9 @@
       "sendInvite": "Kirim undangan",
       "title": "Undang anggota",
       "alreadyInvited": "Alamat email tersebut sudah diundang atau sudah menjadi anggota.",
-      "sendError": "Tidak dapat mengirim undangan."
+      "sendError": "Tidak dapat mengirim undangan.",
+      "pendingInvitation": "Email ini sudah memiliki undangan yang tertunda.",
+      "alreadyMember": "Orang ini sudah menjadi anggota organisasi ini."
     },
     "invoices": {
       "downloadA11y": "Unduh faktur {{number}}",
@@ -3237,7 +3240,12 @@
       "pendingInvitations": "Undangan yang belum diterima",
       "resendInvite": "Kirim ulang undangan",
       "shareInviteLink": "Bagikan tautan undangan",
-      "resendInviteError": "Tidak dapat mengirim ulang undangan."
+      "resendInviteError": "Tidak dapat mengirim ulang undangan.",
+      "inviteNotResendable": "Undangan ini tidak dapat dikirim ulang lagi.",
+      "ownerAuthority": "Hanya pemilik organisasi yang dapat mengelola pemilik.",
+      "ownRoleChange": "Anda tidak dapat mengubah peran Anda sendiri.",
+      "inviteExpired": "Undangan ini telah kedaluwarsa.",
+      "inviteAccepted": "Undangan ini sudah diterima."
     },
     "usageStats": {
       "inputTokens": "Token masukan",

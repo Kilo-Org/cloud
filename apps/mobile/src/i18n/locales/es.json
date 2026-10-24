@@ -147,7 +147,8 @@
     "agent": "Agente",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Cambios"
+    "changes": "Cambios",
+    "organizationTrialEnded": "La prueba de la organización ha finalizado y no tiene ningún plan activo. El propietario de la organización puede actualizar la facturación en kilo.ai y, después, volver a intentarlo."
   },
   "language": {
     "restarting": "Reiniciando para aplicar el idioma",
@@ -3211,7 +3212,9 @@
       "sendInvite": "Enviar invitación",
       "title": "Invitar a un miembro",
       "alreadyInvited": "Ya está invitado o ya es miembro.",
-      "sendError": "No se pudo enviar la invitación."
+      "sendError": "No se pudo enviar la invitación.",
+      "pendingInvitation": "Este correo electrónico ya tiene una invitación pendiente.",
+      "alreadyMember": "Esta persona ya es miembro de esta organización."
     },
     "invoices": {
       "downloadA11y": "Descargar factura {{number}}",
@@ -3281,7 +3284,12 @@
       "pendingInvitations": "Invitaciones pendientes",
       "resendInvite": "Reenviar invitación",
       "shareInviteLink": "Compartir enlace de invitación",
-      "resendInviteError": "No se pudo reenviar la invitación."
+      "resendInviteError": "No se pudo reenviar la invitación.",
+      "inviteNotResendable": "Esta invitación ya no se puede reenviar.",
+      "ownerAuthority": "Solo el propietario de una organización puede gestionar a los propietarios.",
+      "ownRoleChange": "No puedes cambiar tu propio rol.",
+      "inviteExpired": "Esta invitación ha caducado.",
+      "inviteAccepted": "Esta invitación ya ha sido aceptada."
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",

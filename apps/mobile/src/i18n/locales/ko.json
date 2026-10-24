@@ -353,6 +353,18 @@
       "spendAlertsSubtitle": "임계값 초과 및 시간당 급증",
       "spendAlertsToggle": "지출 알림 카테고리"
     },
+    "history": {
+      "title": "알림 기록",
+      "subtitle": "이 계정이 받은 알림",
+      "bannerBody": "이 기기에서 푸시 알림이 꺼져 있어 새 알림이 여기에 도착하지 않습니다.",
+      "bannerAction": "알림 설정",
+      "emptyTitle": "아직 알림이 없습니다",
+      "emptyCategoryTitle": "이 카테고리에 알림이 없습니다",
+      "emptyBody": "이 계정이 받은 알림이 여기에 표시됩니다. {{days}}일 동안 보관됩니다.",
+      "capped": "최근 알림을 표시합니다.",
+      "loadError": "알림 기록을 불러오지 못했습니다.",
+      "openFailed": "이 알림은 더 이상 어디에서도 열 수 없습니다."
+    },
     "action": {
       "openSession": "세션 열기"
     },

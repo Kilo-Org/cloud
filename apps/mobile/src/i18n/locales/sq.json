@@ -877,6 +877,18 @@
       "spendAlertsSubtitle": "tejkalime pragjesh dhe rritje për orë",
       "spendAlertsToggle": "Kategoria e njoftimeve për shpenzimet"
     },
+    "history": {
+      "title": "Historiku i njoftimeve",
+      "subtitle": "Njoftimet që ka marrë kjo llogari",
+      "bannerBody": "Njoftimet push janë të çaktivizuara për këtë pajisje, kështu që të rejat nuk do të mbërrijnë këtu.",
+      "bannerAction": "Cilësimet e njoftimeve",
+      "emptyTitle": "Nuk ka ende njoftime",
+      "emptyCategoryTitle": "Nuk ka njoftime në këtë kategori",
+      "emptyBody": "Njoftimet që merr kjo llogari shfaqen këtu. Ato ruhen për {{days}} ditë.",
+      "capped": "Po shfaqen njoftimet më të fundit.",
+      "loadError": "Nuk u arrit të ngarkohej historiku i njoftimeve.",
+      "openFailed": "Ky njoftim nuk hapet më askund."
+    },
     "action": {
       "openSession": "Hap seancën"
     },

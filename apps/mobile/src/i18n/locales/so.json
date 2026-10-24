@@ -877,6 +877,18 @@
       "spendAlertsSubtitle": "dhaafitaanka xadka iyo kor u kaca saacadlaha",
       "spendAlertsToggle": "Qaybta digniinaha kharashka"
     },
+    "history": {
+      "title": "Taariikhda ogeysiisyada",
+      "subtitle": "Ogeysiisyada ay heshay akoonkan",
+      "bannerBody": "Ogeysiisyada push waa dansan yihiin qalabkan, sidaas darteed kuwa cusub halkan kuma soo gaari doonaan.",
+      "bannerAction": "Dejinta ogeysiisyada",
+      "emptyTitle": "Weli ogeysiisyo ma jiraan",
+      "emptyCategoryTitle": "Qaybtaan ogeysiisyo ma jiraan",
+      "emptyBody": "Ogeysiisyada ay hesho akoonkan ayaa halkan ka muuqda. Waxaa la hayaa {{days}} maalmood.",
+      "capped": "Waxaa la muujinayaa ogeysiisyada ugu dambeeyay.",
+      "loadError": "Taariikhda ogeysiisyada lama soo dejin karin.",
+      "openFailed": "Ogeysiiskan mar dambe meelna lagama furi karo."
+    },
     "action": {
       "openSession": "Fur kalfadhi"
     },

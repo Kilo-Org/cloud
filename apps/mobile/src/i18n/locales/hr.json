@@ -896,6 +896,18 @@
       "spendAlertsSubtitle": "prekoračenja pragova i skokovi po satu",
       "spendAlertsToggle": "Kategorija upozorenja o potrošnji"
     },
+    "history": {
+      "title": "Povijest obavijesti",
+      "subtitle": "Obavijesti koje je ovaj račun primio",
+      "bannerBody": "Push obavijesti su isključene za ovaj uređaj pa nove neće stizati ovdje.",
+      "bannerAction": "Postavke obavijesti",
+      "emptyTitle": "Još nema obavijesti",
+      "emptyCategoryTitle": "Nema obavijesti u ovoj kategoriji",
+      "emptyBody": "Obavijesti koje ovaj račun prima pojavljuju se ovdje. Čuvaju se {{days}} dana.",
+      "capped": "Prikazuju se najnovije obavijesti.",
+      "loadError": "Nije moguće učitati povijest obavijesti.",
+      "openFailed": "Ova se obavijest više ne otvara nigdje."
+    },
     "action": {
       "openSession": "Otvori sesiju"
     },

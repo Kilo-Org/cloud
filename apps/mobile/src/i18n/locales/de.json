@@ -353,6 +353,18 @@
       "spendAlertsSubtitle": "Schwellenwertüberschreitungen und stündliche Spitzen",
       "spendAlertsToggle": "Kategorie „Ausgaben-Warnungen“"
     },
+    "history": {
+      "title": "Benachrichtigungsverlauf",
+      "subtitle": "Benachrichtigungen, die dieses Konto erhalten hat",
+      "bannerBody": "Push-Benachrichtigungen sind für dieses Gerät deaktiviert, daher werden hier keine neuen eintreffen.",
+      "bannerAction": "Benachrichtigungseinstellungen",
+      "emptyTitle": "Noch keine Benachrichtigungen",
+      "emptyCategoryTitle": "Noch keine Benachrichtigungen in dieser Kategorie",
+      "emptyBody": "Benachrichtigungen, die dieses Konto erhält, erscheinen hier. Sie werden {{days}} Tage lang aufbewahrt.",
+      "capped": "Es werden die neuesten Benachrichtigungen angezeigt.",
+      "loadError": "Der Benachrichtigungsverlauf konnte nicht geladen werden.",
+      "openFailed": "Diese Benachrichtigung lässt sich nirgendwo mehr öffnen."
+    },
     "action": {
       "openSession": "Sitzung öffnen"
     },

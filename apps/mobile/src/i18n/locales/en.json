@@ -971,6 +971,18 @@
       "spendAlertsSubtitle": "threshold crossings and hourly spikes",
       "spendAlertsToggle": "Spend alerts category"
     },
+    "history": {
+      "title": "Notification history",
+      "subtitle": "Notifications this account received",
+      "bannerBody": "Push notifications are off for this device, so new ones will not arrive here.",
+      "bannerAction": "Notification settings",
+      "emptyTitle": "No notifications yet",
+      "emptyCategoryTitle": "No notifications in this category",
+      "emptyBody": "Notifications this account receives appear here. They are kept for {{days}} days.",
+      "capped": "Showing the most recent notifications.",
+      "loadError": "Could not load notification history.",
+      "openFailed": "This notification no longer opens anywhere."
+    },
     "action": {
       "openSession": "Open session"
     },

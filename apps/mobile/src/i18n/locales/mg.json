@@ -877,6 +877,18 @@
       "spendAlertsSubtitle": "fihoaram-bidy sy fitsambikinana isan'ora",
       "spendAlertsToggle": "Sokajin'ny fampitandremana momba ny fandaniana"
     },
+    "history": {
+      "title": "Tantaran'ny fampandrenesana",
+      "subtitle": "Fampandrenesana voarain'ity kaonty ity",
+      "bannerBody": "Tsy mandeha ny fampandrenesana push amin'ity fitaovana ity, ka tsy hisy vaovao tonga eto.",
+      "bannerAction": "Fandrindran'ny fampandrenesana",
+      "emptyTitle": "Mbola tsy misy fampandrenesana",
+      "emptyCategoryTitle": "Tsy misy fampandrenesana ao amin'ity sokajy ity",
+      "emptyBody": "Miseho eto ny fampandrenesana azon'ity kaonty ity. Tehirizina mandritra ny {{days}} andro izy ireo.",
+      "capped": "Aseho ny fampandrenesana farany indrindra.",
+      "loadError": "Tsy nahomby ny fampakarana ny tantaran'ny fampandrenesana.",
+      "openFailed": "Tsy misokatra na aiza na aiza intsony io fampandrenesana io."
+    },
     "action": {
       "openSession": "Sokafy ny fotoam-piasana"
     },

@@ -353,6 +353,18 @@
       "spendAlertsSubtitle": "しきい値の超過と毎時の急増",
       "spendAlertsToggle": "支出アラートのカテゴリ"
     },
+    "history": {
+      "title": "通知履歴",
+      "subtitle": "このアカウントが受け取った通知",
+      "bannerBody": "このデバイスではプッシュ通知がオフになっているため、新しい通知はここに届きません。",
+      "bannerAction": "通知設定",
+      "emptyTitle": "通知はまだありません",
+      "emptyCategoryTitle": "このカテゴリの通知はありません",
+      "emptyBody": "このアカウントが受け取った通知はここに表示されます。{{days}}日間保存されます。",
+      "capped": "最新の通知を表示しています。",
+      "loadError": "通知履歴を読み込めませんでした。",
+      "openFailed": "この通知はもうどこからも開けません。"
+    },
     "action": {
       "openSession": "セッションを開く"
     },

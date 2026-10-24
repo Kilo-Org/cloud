@@ -877,6 +877,18 @@
       "spendAlertsSubtitle": "chegaradan oshish va soatlik ko'tarilishlar",
       "spendAlertsToggle": "Xarajat bildirishnomalari toifasi"
     },
+    "history": {
+      "title": "Bildirishnomalar tarixi",
+      "subtitle": "Ushbu hisob olgan bildirishnomalar",
+      "bannerBody": "Ushbu qurilmada push-bildirishnomalar o'chirilgan, shuning uchun yangilari bu yerga kelmaydi.",
+      "bannerAction": "Bildirishnoma sozlamalari",
+      "emptyTitle": "Hozircha bildirishnomalar yo'q",
+      "emptyCategoryTitle": "Bu toifada bildirishnomalar yo'q",
+      "emptyBody": "Ushbu hisob oladigan bildirishnomalar shu yerda ko'rinadi. Ular {{days}} kun saqlanadi.",
+      "capped": "Eng so'nggi bildirishnomalar ko'rsatilmoqda.",
+      "loadError": "Bildirishnomalar tarixini yuklab bo'lmadi.",
+      "openFailed": "Bu bildirishnoma endi hech qayerda ochilmaydi."
+    },
     "action": {
       "openSession": "Sessiyani ochish"
     },

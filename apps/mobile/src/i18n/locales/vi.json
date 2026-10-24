@@ -353,6 +353,18 @@
       "spendAlertsSubtitle": "vượt ngưỡng và tăng vọt theo giờ",
       "spendAlertsToggle": "Danh mục cảnh báo chi tiêu"
     },
+    "history": {
+      "title": "Lịch sử thông báo",
+      "subtitle": "Các thông báo mà tài khoản này đã nhận",
+      "bannerBody": "Thông báo đẩy đã tắt trên thiết bị này, vì vậy thông báo mới sẽ không đến đây.",
+      "bannerAction": "Cài đặt thông báo",
+      "emptyTitle": "Chưa có thông báo nào",
+      "emptyCategoryTitle": "Không có thông báo nào trong danh mục này",
+      "emptyBody": "Các thông báo mà tài khoản này nhận được sẽ xuất hiện ở đây. Chúng được lưu trong {{days}} ngày.",
+      "capped": "Đang hiển thị các thông báo gần đây nhất.",
+      "loadError": "Không thể tải lịch sử thông báo.",
+      "openFailed": "Thông báo này không còn mở được ở đâu nữa."
+    },
     "action": {
       "openSession": "Mở phiên"
     },

@@ -877,6 +877,18 @@
       "spendAlertsSubtitle": "wucewar iyaka da hauhawar sa'a",
       "spendAlertsToggle": "Rukunin faɗakarwar kashe kuɗi"
     },
+    "history": {
+      "title": "Tarihin sanarwa",
+      "subtitle": "Sanarwar da wannan asusu ya karɓa",
+      "bannerBody": "An kashe sanarwar turawa a wannan na'urar, don haka sabbin ba za su isa nan ba.",
+      "bannerAction": "Saitunan sanarwa",
+      "emptyTitle": "Babu sanarwa tukuna",
+      "emptyCategoryTitle": "Babu sanarwa a wannan rukunin",
+      "emptyBody": "Sanarwar da wannan asusu ke karɓa suna bayyana a nan. Ana ajiye su na kwanaki {{days}}.",
+      "capped": "Ana nuna sanarwar baya-bayan nan.",
+      "loadError": "An kasa loda tarihin sanarwa.",
+      "openFailed": "Wannan sanarwa ba ta ƙara buɗewa a ko'ina ba."
+    },
     "action": {
       "openSession": "Buɗe zaman"
     },

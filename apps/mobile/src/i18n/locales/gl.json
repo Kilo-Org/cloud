@@ -877,6 +877,18 @@
       "spendAlertsSubtitle": "superacións de limiares e picos por hora",
       "spendAlertsToggle": "Categoría de alertas de gasto"
     },
+    "history": {
+      "title": "Historial de notificacións",
+      "subtitle": "Notificacións recibidas por esta conta",
+      "bannerBody": "As notificacións push están desactivadas neste dispositivo, polo que non chegarán novas aquí.",
+      "bannerAction": "Configuración de notificacións",
+      "emptyTitle": "Aínda non hai notificacións",
+      "emptyCategoryTitle": "Non hai notificacións nesta categoría",
+      "emptyBody": "As notificacións que recibe esta conta aparecen aquí. Consérvanse durante {{days}} días.",
+      "capped": "Mostrando as notificacións máis recentes.",
+      "loadError": "Non se puido cargar o historial de notificacións.",
+      "openFailed": "Esta notificación xa non se abre desde ningún sitio."
+    },
     "action": {
       "openSession": "Abrir a sesión"
     },

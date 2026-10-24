@@ -896,6 +896,18 @@
       "spendAlertsSubtitle": "depășiri de praguri și vârfuri orare",
       "spendAlertsToggle": "Categoria alerte de cheltuieli"
     },
+    "history": {
+      "title": "Istoric notificări",
+      "subtitle": "Notificările primite de acest cont",
+      "bannerBody": "Notificările push sunt dezactivate pentru acest dispozitiv, așa că cele noi nu vor ajunge aici.",
+      "bannerAction": "Setări notificări",
+      "emptyTitle": "Nicio notificare încă",
+      "emptyCategoryTitle": "Nicio notificare în această categorie",
+      "emptyBody": "Notificările primite de acest cont apar aici. Acestea se păstrează pentru {{days}} zile.",
+      "capped": "Se afișează cele mai recente notificări.",
+      "loadError": "Nu s-a putut încărca istoricul notificărilor.",
+      "openFailed": "Această notificare nu se mai deschide nicăieri."
+    },
     "action": {
       "openSession": "Deschide sesiunea"
     },

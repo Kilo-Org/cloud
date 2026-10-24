@@ -20,6 +20,7 @@
     "@kilocode/kilo-chat": "workspace:*",
     "@kilocode/kiloclaw-instance-tiers": "workspace:*",
     "@kilocode/kiloclaw-secret-catalog": "workspace:*",
+    "@kilocode/notifications": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@trpc/server": "catalog:",
     "@workos-inc/node": "catalog:",

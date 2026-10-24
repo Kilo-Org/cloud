@@ -201,6 +201,13 @@ describe.each([{ type: 'integration' }, claims.source] as const)(
         source.type === 'project' ? null : 'repository_mismatch',
         'api',
       ],
+      [
+        `${prefix}%34%32/merge_requests/7`,
+        source.type === 'project' ? null : 'repository_mismatch',
+        'api',
+      ],
+      [`${prefix}042/merge_requests/7`, 'repository_mismatch', 'api'],
+      [`${prefix}420/merge_requests/7`, 'repository_mismatch', 'api'],
       [`${prefix}43/merge_requests/7`, 'repository_mismatch', 'api'],
       [`${prefix}Acme%2Fplatform%2Fother/issues`, 'repository_mismatch', 'api'],
       [`${prefix}Acme%2Fplatform%2Fwidgets-extra/issues`, 'repository_mismatch', 'api'],

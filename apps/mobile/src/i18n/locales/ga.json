@@ -3083,7 +3083,6 @@
   },
   "voiceInput": {
     "listening": "Ag éisteacht...",
-    "staysOff": "Fanfaidh ionchur gutha díchumasaithe go dtí go gceadóidh tú tras-scríobh ar líne.",
     "onlineTitle": "Déantar an chaint a phróiseáil ar líne",
     "onlineMessage": "Ní féidir leis an ngléas seo tras-scríobh a dhéanamh as líne. Seoltar do thaifeadadh chuig {{provider}} chun é a thiontú ina théacs. Ní stórálann Kilo an fhuaim.",
     "allow": "Ceadaigh",

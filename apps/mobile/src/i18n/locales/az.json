@@ -2954,7 +2954,6 @@
   },
   "voiceInput": {
     "listening": "Dinlənilir...",
-    "staysOff": "Səsin onlayn mətnə çevrilməsinə icazə verənədək səslə daxiletmə deaktiv qalacaq.",
     "onlineTitle": "Nitq onlayn emal olunur",
     "onlineMessage": "Bu cihaz səsi oflayn mətnə çevirə bilmir. Səs yazın mətnə çevrilməsi üçün {{provider}} xidmətinə göndərilir. Kilo səs yazısını saxlamır.",
     "allow": "İcazə ver",

@@ -2954,7 +2954,6 @@
   },
   "voiceInput": {
     "listening": "A ń fetí sílẹ̀...",
-    "staysOff": "Ìfọwọ́sí rẹ fún yíyí ohùn sí ọ̀rọ̀ lórí ayélujára nílò kí o tó lè lo ohùn láti tẹ ọ̀rọ̀.",
     "onlineTitle": "A ń ṣe ìṣètò ohùn lórí ayélujára",
     "onlineMessage": "Ẹ̀rọ yìí kò lè yí ohùn sí ọ̀rọ̀ láìsí ìsopọ̀ ayélujára. A ń fi ohùn tí o gbasilẹ ránṣẹ́ sí {{provider}} láti yí i sí ọ̀rọ̀. Kilo kò fi ohùn náà pamọ́.",
     "allow": "Yọ̀ǹda",

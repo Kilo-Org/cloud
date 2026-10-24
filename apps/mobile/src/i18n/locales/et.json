@@ -2954,7 +2954,6 @@
   },
   "voiceInput": {
     "listening": "Kuulamine...",
-    "staysOff": "Häälsisestus jääb välja lülitatuks, kuni lubad kõne veebis tekstiks teisendada.",
     "onlineTitle": "Kõnet töödeldakse veebis",
     "onlineMessage": "See seade ei saa kõnet ilma võrguühenduseta tekstiks teisendada. Sinu salvestus saadetakse teenusepakkujale {{provider}}, kes teisendab selle tekstiks. Kilo ei säilita helisalvestist.",
     "allow": "Luba",

@@ -2954,7 +2954,6 @@
   },
   "voiceInput": {
     "listening": "E whakarongo ana...",
-    "staysOff": "Ka noho monoa te tāuru reo kia whakaae koe ki te tuhi ā-ipurangi i te reo kōrero.",
     "onlineTitle": "Ka tukatukahia te reo kōrero i te ipurangi",
     "onlineMessage": "Kāore e taea e tēnei pūrere te huri i te reo kōrero hei kuputuhi ina tuimotu. Ka tukuna tō hopunga reo ki {{provider}} hei huri hei kuputuhi. Kāore a Kilo e rokiroki i te ororongo.",
     "allow": "Tukua",

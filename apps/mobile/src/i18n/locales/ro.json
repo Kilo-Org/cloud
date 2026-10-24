@@ -2997,7 +2997,6 @@
   },
   "voiceInput": {
     "listening": "Se ascultă…",
-    "staysOff": "Dictarea rămâne dezactivată până când permiți transcrierea online.",
     "onlineTitle": "Vocea este procesată online",
     "onlineMessage": "Acest dispozitiv nu poate transcrie fără conexiune la internet. Înregistrarea ta este trimisă la {{provider}} pentru a fi transformată în text. Kilo nu stochează înregistrarea audio.",
     "allow": "Permite",

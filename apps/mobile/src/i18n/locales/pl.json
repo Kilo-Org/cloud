@@ -2481,7 +2481,6 @@
     "allow": "Zezwól",
     "onlineMessage": "To urządzenie nie obsługuje transkrypcji bez połączenia z internetem. Nagranie jest wysyłane do {{provider}} w celu zamiany na tekst. Kilo nie przechowuje nagrania.",
     "onlineTitle": "Mowa jest przetwarzana przez internet",
-    "staysOff": "Dyktowanie pozostanie wyłączone, dopóki nie zezwolisz na transkrypcję przez internet.",
     "start": "Rozpocznij dyktowanie",
     "stop": "Zatrzymaj dyktowanie",
     "restricted": "Na tym urządzeniu obowiązują ograniczenia dyktowania.",

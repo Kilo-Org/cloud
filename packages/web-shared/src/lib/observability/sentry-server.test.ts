@@ -87,6 +87,36 @@ describe('sanitizeSentryRequestData', () => {
     }
   });
 
+  test.each(SHARED_QUERY_KEYS)('normalizes %s keys in structured query metadata', key => {
+    const upperCase = key.toUpperCase();
+    const percentEncoded = `%${key.charCodeAt(0).toString(16)}${key.slice(1)}`;
+    const objectForm: Event = {
+      request: {
+        query_string: {
+          installation_id: '12345',
+          [upperCase]: 'sensitive',
+          [percentEncoded]: 'sensitive',
+        },
+      },
+    };
+    const arrayForm: Event = {
+      request: {
+        query_string: [
+          ['installation_id', '12345'],
+          [upperCase, 'sensitive'],
+          [percentEncoded, 'sensitive'],
+        ],
+      },
+    };
+
+    expect(sanitizeSentryRequestData(objectForm).request?.query_string).toEqual({
+      installation_id: '12345',
+    });
+    expect(sanitizeSentryRequestData(arrayForm).request?.query_string).toEqual([
+      ['installation_id', '12345'],
+    ]);
+  });
+
   test.each(SHARED_PATHS)('applies the %s path policy to absolute URL metadata', path => {
     const event: Event = {
       request: {

@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- mounted route outcomes and Settings recovery share the native boundary harness. */
-import { createElement } from 'react';
+import { createElement, type ReactElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -36,10 +36,18 @@ const activityKit = vi.hoisted(() => ({ denied: false, available: false, setting
 // that native boundary runs under the mounted renderer, so the sweep is mocked
 // at its module boundary like `@/glanceable-ios/ios-sink` above.
 const widgetActionsMock = vi.hoisted(() => ({ runPendingWidgetActions: vi.fn() }));
+// The account scope line and the Sessions | To-dos switch are built once by the
+// route and handed to whichever view renders, so capture both deliveries.
+const tabHeader = vi.hoisted(() => ({
+  sessions: undefined as ReactNode,
+  todos: undefined as ReactNode,
+  onChange: undefined as ((view: 'sessions' | 'todos') => void) | undefined,
+}));
 
 vi.mock('react-native', () => ({
   Alert: { alert: alertMock },
   Platform: platformMock,
+  View: 'View',
   AppState: {
     addEventListener: (_event: string, listener: (state: string) => void) => {
       appStateListeners.add(listener);
@@ -117,16 +125,27 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 vi.mock('@/components/agents/session-list-screen', () => ({
-  AgentSessionListScreen: () => null,
+  AgentSessionListScreen: (props: { tabHeader?: ReactNode }) => {
+    tabHeader.sessions = props.tabHeader;
+    return props.tabHeader === undefined ? null : (props.tabHeader as ReactElement);
+  },
 }));
 
 vi.mock('@/components/todos/agents-view-segment', () => ({
-  AgentsViewSegment: () => null,
+  AgentsViewSegment: (props: { onChange?: (view: string) => void }) => {
+    tabHeader.onChange = props.onChange;
+    return null;
+  },
 }));
 
 vi.mock('@/components/todos/todo-lists-screen', () => ({
-  TodoListsScreen: () => null,
+  TodoListsScreen: (props: { tabHeader?: ReactNode }) => {
+    tabHeader.todos = props.tabHeader;
+    return props.tabHeader === undefined ? null : (props.tabHeader as ReactElement);
+  },
 }));
+
+vi.mock('@/components/context-control', () => ({ ContextControl: 'ContextControl' }));
 
 type AlertButton = { text: string; onPress?: () => void };
 
@@ -241,7 +260,8 @@ describe('Agents tab return-outcome rendering', () => {
     expect(alertMock).toHaveBeenCalledWith(
       'GitHub App installed',
       'Your repositories are now connected.',
-      [{ text: 'Continue' }]
+      [{ text: 'Continue' }],
+      { cancelable: true }
     );
     expect(getGitHubInstallReturnOutcome()).toBeNull();
     act(() => {
@@ -336,7 +356,8 @@ describe('Agents tab return-outcome rendering', () => {
     expect(alertMock).toHaveBeenCalledWith(
       'Awaiting admin approval',
       'An organization admin must approve the installation request.',
-      [{ text: 'Done' }]
+      [{ text: 'Done' }],
+      { cancelable: true }
     );
     expect(getGitHubInstallReturnOutcome()).toBeNull();
     act(() => {
@@ -352,7 +373,8 @@ describe('Agents tab return-outcome rendering', () => {
     expect(alertMock).toHaveBeenCalledWith(
       'Cannot complete installation',
       'Only a GitHub admin of that account can connect it. Ask an organization admin to install Kilo.',
-      [{ text: 'Back' }]
+      [{ text: 'Back' }],
+      { cancelable: true }
     );
     const backButton = lastAlertButtons()?.[0];
     expect(backButton?.text).toBe('Back');
@@ -379,6 +401,42 @@ describe('Agents tab return-outcome rendering', () => {
       'https://web.test/github-app?installState=fresh-token&fromApp=1'
     );
     expect(openAuthSessionMock).not.toHaveBeenCalled();
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('Agents tab header', () => {
+  beforeEach(() => {
+    tabHeader.sessions = undefined;
+    tabHeader.todos = undefined;
+    tabHeader.onChange = undefined;
+  });
+
+  it('gives both views the account scope line and the view switch', () => {
+    const renderer = mountRoute();
+    const scopeRow = (header: ReactNode) => {
+      const children = (header as ReactElement<{ children: ReactElement[] }>).props.children;
+      expect(children).toHaveLength(2);
+      const row = children[0] as ReactElement<{
+        className: string;
+        children: ReactElement;
+      }>;
+      expect(row.type).toBe('View');
+      expect(row.props.className).toBe('px-[22px] pb-1');
+      expect(row.props.children.type).toBe('ContextControl');
+    };
+
+    expect(tabHeader.sessions).toBeDefined();
+    scopeRow(tabHeader.sessions);
+
+    act(() => {
+      tabHeader.onChange?.('todos');
+    });
+    expect(tabHeader.todos).toBeDefined();
+    scopeRow(tabHeader.todos);
+
     act(() => {
       renderer.unmount();
     });

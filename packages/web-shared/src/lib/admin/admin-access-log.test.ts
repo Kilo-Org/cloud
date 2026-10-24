@@ -167,7 +167,7 @@ describe('kilo admin elevation telemetry', () => {
     // and must derive `authVia` from the request rather than assuming a session.
     await recordKiloAdminElevation(
       { user: defineTestUser({ is_admin: true }) },
-      { reason: 'organization_fetch', target: null }
+      { reason: 'organization_fetch', target: UNSCOPED_TARGET }
     );
 
     expect(events[0]).toMatchObject({
@@ -175,7 +175,7 @@ describe('kilo admin elevation telemetry', () => {
       route: null,
       method: null,
       ip: null,
-      target: null,
+      target: UNSCOPED_TARGET,
     });
   });
 
@@ -236,6 +236,24 @@ describe('kilo admin elevation telemetry', () => {
       ip: null,
       reason: 'service_token_mint',
       target: 'service:wasteland',
+    });
+  });
+
+  test('a server-component caller is labelled as such, not as a route handler', async () => {
+    await recordKiloAdminElevationForRequest({
+      user: defineTestUser({ is_admin: true }),
+      reason: 'organization_access_rest',
+      target: organizationTarget('org-1'),
+      surface: 'server-component',
+    });
+
+    expect(events[0]).toMatchObject({
+      surface: 'server-component',
+      kind: 'kilo_admin_elevation',
+      // Still no fabricated HTTP method: a render carries no trustworthy one.
+      method: null,
+      reason: 'organization_access_rest',
+      target: 'organization:org-1',
     });
   });
 });

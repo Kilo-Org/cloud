@@ -56,7 +56,8 @@
     "./github-authorization": "./src/github-authorization.ts",
     "./bounded-stream-reader": "./src/bounded-stream-reader.ts",
     "./usage-writer-client": "./src/usage-writer-client.ts",
-    "./organization-membership": "./src/organization-membership.ts"
+    "./organization-membership": "./src/organization-membership.ts",
+    "./webhook-body-validation": "./src/webhook-body-validation.ts"
   },
   "scripts": {
     "test": "vitest run",
@@ -74,7 +75,8 @@
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "jose": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@cfworker/json-schema": "catalog:"
   },
   "devDependencies": {
     "@typescript/native-preview": "catalog:",

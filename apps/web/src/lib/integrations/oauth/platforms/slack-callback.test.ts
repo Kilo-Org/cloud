@@ -66,7 +66,10 @@ async function callCallback(
   owner: string,
   statePurpose: 'provider_install' | null = 'provider_install'
 ) {
-  const state = createOAuthState(owner, USER_ID, undefined, statePurpose ?? undefined);
+  const state = createOAuthState(owner, USER_ID, undefined, {
+    provider: 'slack',
+    ...(statePurpose ? { purpose: statePurpose } : {}),
+  });
   const request = new NextRequest(
     `http://localhost:3000/api/integrations/slack/callback?code=code-1&state=${encodeURIComponent(state)}`
   );

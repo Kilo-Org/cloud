@@ -53,6 +53,7 @@
     "connected": "Terhubung",
     "couldNotLoadModels": "Tidak dapat memuat model.",
     "couldNotLoadRepositories": "Tidak dapat memuat repositori.",
+    "noRepositoriesFound": "Tidak ada repositori yang ditemukan",
     "critical": "Kritis",
     "delete": "Hapus",
     "deleted": "Dihapus",
@@ -87,6 +88,7 @@
     "connect": "Hubungkan",
     "connectBitbucket": "Hubungkan Bitbucket",
     "connectGitlab": "Hubungkan GitLab",
+    "connectProvider": "Hubungkan penyedia",
     "contentTruncated": "Konten dipotong",
     "copyLink": "Salin tautan",
     "couldNotLoadOrganizations": "Tidak dapat memuat organisasi.",
@@ -145,7 +147,8 @@
     "agent": "Agen",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Perubahan"
+    "changes": "Perubahan",
+    "organizationTrialEnded": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Pemilik organisasi dapat memperbarui penagihan di kilo.ai, lalu coba lagi."
   },
   "language": {
     "restarting": "Memulai ulang untuk menerapkan bahasa",
@@ -182,7 +185,7 @@
     "codeArrivalHint": "Jika alamat email ini memenuhi syarat, kode akan diterima dalam satu menit.",
     "verifyCode": "Verifikasi kode",
     "resendCode": "Kirim ulang kode",
-    "termsPrefix": "Dengan melanjutkan, kamu menyetujui",
+    "termsPrefix": "Dengan melanjutkan, kamu menyetujui ",
     "terms": "Ketentuan",
     "termsConnector": " dan ",
     "termsSuffix": ".",
@@ -293,7 +296,8 @@
     "condenseToolCallsSubtitle": "Kelompokkan panggilan alat yang berurutan ke dalam satu baris yang dapat Anda buka.",
     "toolSummaryTranslation": "Terjemahkan ringkasan alat",
     "toolSummaryTranslationSubtitle": "Kirim setiap ringkasan alat ke model untuk diterjemahkan ke bahasa aplikasi Anda. Teks asli ditampilkan jika terjemahan gagal.",
-    "toolSummaryTranslationModelUnavailableNotice": "Model ini tidak lagi ditawarkan. Ketuk $t(common.model) untuk memilih yang lain."
+    "toolSummaryTranslationModelUnavailableNotice": "Model ini tidak lagi ditawarkan. Ketuk $t(common.model) untuk memilih yang lain.",
+    "autoExpandThinkingInactiveSubtitle": "Tidak berpengaruh saat detail pemikiran disembunyikan."
   },
   "notifications": {
     "liveActivities": "Aktivitas langsung",
@@ -882,7 +886,6 @@
       "gitlabNoRepositoriesDescription": "Kamu mungkin perlu memberikan akses ke lebih banyak grup atau proyek di GitLab.",
       "installGithubApp": "Pasang aplikasi GitHub di repositori",
       "installGithubAppDescription": "Izinkan aplikasi GitHub Kilo mengakses repositori yang ingin kamu tinjau.",
-      "noRepositoriesFound": "Tidak ada repositori yang ditemukan",
       "repositoryAccess": "akses repositori"
     },
     "style": {
@@ -906,7 +909,6 @@
     "followReviewMd": "Ikuti REVIEW.md",
     "followReviewMdSubtitle": "Ikuti instruksi dalam berkas REVIEW.md di setiap repositori",
     "manualReview": {
-      "connectProvider": "Hubungkan penyedia",
       "connectProviderDescription": "Hubungkan GitHub untuk memulai tinjauan manual terhadap PR.",
       "couldNotCheckProviderStatus": "Tidak dapat memeriksa status penyedia.",
       "couldNotLoadProviders": "Kami tidak dapat memuat penyedia yang terhubung. Coba lagi.",
@@ -916,7 +918,15 @@
       "pullRequestUrl": "URL PR",
       "start": "Mulai tinjauan",
       "starting": "Memulai tinjauan…",
-      "title": "Tinjauan manual"
+      "title": "Tinjauan manual",
+      "startNotFound": "Tidak dapat membaca {{requestNoun}} tersebut dari {{provider}}. Periksa URL dan pastikan repositori dapat diakses.",
+      "startRateLimited": "{{provider}} sedang membatasi permintaan saat ini. Coba lagi dalam beberapa menit.",
+      "startNotAllowed": "Anda tidak memiliki akses untuk memulai tinjauan atas {{requestNoun}} tersebut. Periksa izin Anda, dan paket organisasi Anda.",
+      "startProviderNeedsAttention": "Tinjauan manual memerlukan koneksi {{provider}} standar. Hubungkan dan coba lagi.",
+      "startAlreadyRunning": "Tinjauan atas {{requestNoun}} tersebut sudah berjalan.",
+      "startRejected": "{{requestNoun}} tersebut tidak dapat ditinjau. Pastikan statusnya terbuka, bukan draf, dan URL-nya benar.",
+      "startProviderUnavailable": "Tidak dapat menghubungi {{provider}} untuk membaca {{requestNoun}} tersebut. Coba lagi.",
+      "startFailed": "Tidak dapat memulai tinjauan. Periksa koneksi Anda dan coba lagi."
     },
     "notConnectedReadOnly": "{{platform}} tidak terhubung. Hanya pemilik organisasi dan admin yang dapat menghubungkannya.",
     "gitlab": {
@@ -961,6 +971,8 @@
       "retryTitle": "Coba tinjauan lagi?",
       "showMore": "Tampilkan lebih banyak",
       "started": "Dimulai",
+      "reviewEnded": "Berakhir",
+      "severityNitpick": "Catatan kecil",
       "threshold": "Ambang batas",
       "title": "Tinjauan",
       "tokens": "Token",
@@ -979,7 +991,13 @@
       "sessionError": "Kesalahan sesi: {{error}}.",
       "statusWithValue": "Status saat ini: {{status}}",
       "toolName": "Alat: {{name}}",
-      "toolNameError": "Terjadi kesalahan pada alat {{name}}."
+      "toolNameError": "Terjadi kesalahan pada alat {{name}}.",
+      "cancelReasonSuperseded": "Commit yang lebih baru telah di-push, sehingga tinjauan ini digantikan.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} terputus, sehingga tinjauan ini dibatalkan. Hubungkan kembali, lalu jalankan tinjauan lagi.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer dimatikan untuk Bitbucket, sehingga tinjauan ini dibatalkan. Aktifkan kembali, lalu jalankan tinjauan lagi.",
+      "cancelReasonBitbucketPullRequestChanged": "Pull request Bitbucket berubah, sehingga tinjauan ini digantikan.",
+      "cancelReasonCancelled": "Tinjauan ini dibatalkan.",
+      "cancelReasonInterrupted": "Tinjauan ini terputus."
     },
     "reviewList": {
       "configureProvider": "Atur penyedia",
@@ -1076,8 +1094,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Tidak ada filter yang tersedia",
-      "noFiltersDescription": "Kembali dan buka ulang filter dari daftar temuan.",
       "title": "Filter temuan",
       "fixed": "Diperbaiki",
       "outcome": "Hasil",
@@ -1143,12 +1159,18 @@
       "actorSystem": "Sistem Kilo",
       "couldNotLoad": "Tidak dapat memuat laporan audit.",
       "events": "Peristiwa",
+      "eventConfidence": "Keyakinan: {{confidence}}",
+      "eventReason": "Alasan: {{reason}}",
+      "eventsCount_one": "{{displayCount}} peristiwa",
+      "eventsCount_other": "{{displayCount}} peristiwa",
       "generated": "Laporan dibuat pada {{generatedAt}}.",
       "noActivity": "Tidak ada aktivitas yang tercatat",
       "noActivityDescription": "Tidak ada aktivitas temuan keamanan di Kilo yang dapat dilaporkan dari {{start}} hingga {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "Kueri laporan tidak selesai. Coba lagi.",
       "repositoryNotRecorded": "Repositori tidak tercatat",
+      "reasonUnknown": "Alasan tidak dikenali",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Ringkasan laporan",
       "title": "Laporan audit",
       "unavailable": "Laporan audit tidak tersedia",
@@ -1259,7 +1281,7 @@
       "deadlinePassed": "Tenggat terlewati",
       "deadlinePassedDetail": "{{critical}} kritis, {{high}} tinggi",
       "dueThisWeek": "Jatuh tempo minggu ini",
-      "dueThisWeekDetail": "{{exploitable}} terkonfirmasi dapat dieksploitasi",
+      "dueThisWeekDetail": "{{exploitable}} di antaranya terkonfirmasi dapat dieksploitasi",
       "noDeadline": "Tanpa tenggat",
       "reviewSlaAssignment": "Tinjau penetapan SLA",
       "allOpenFindingsTracked": "Semua temuan terbuka sudah dilacak"
@@ -1388,8 +1410,9 @@
       "couldNotLoad": "Tidak dapat memuat Agen keamanan.",
       "installApp": "Pasang aplikasi GitHub",
       "reauthorizeButton": "Otorisasi ulang aplikasi GitHub",
-      "reauthorizeDescription": "Agen keamanan memerlukan izin vulnerability_alerts untuk mengakses peringatan Dependabot. Otorisasi ulang aplikasi GitHub untuk memberikan izin ini.",
+      "reauthorizeDescription": "Agen keamanan memerlukan izin untuk membaca peringatan Dependabot. Otorisasi ulang aplikasi GitHub untuk memberikan izin ini.",
       "reauthorizeTitle": "Perlu izin tambahan",
+      "retryFailed": "Masih tidak dapat memuat Agen keamanan. Periksa koneksi Anda dan coba lagi.",
       "setupFailed": "Tidak dapat memulai penyiapan GitHub. Coba lagi."
     },
     "settingsOverview": {
@@ -1595,7 +1618,8 @@
       "dollar_other": "dolar",
       "costSpoken": "biaya {{cost}}",
       "costSpokenWithTime": "biaya {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}"
+      "pullRequest": "pR {{number}}",
+      "spokenJoiner": ", dan"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Kami tidak dapat memulai penyiapan aplikasi GitHub. Coba lagi.",
@@ -1731,7 +1755,6 @@
       "couldNotLoadEnvironment": "Tidak dapat memuat lingkunganmu.",
       "retryLoadingEnvironment": "Coba muat ulang lingkungan",
       "defaultEnvironment": "Lingkungan bawaan",
-      "environmentSummary": "{{commands}} perintah · {{mcp}} MCP · {{skills}} keterampilan · {{agents}} agen",
       "leaveChanges": "Biarkan perubahan",
       "commitAndPush": "Commit dan kirim",
       "startSession": "Mulai sesi",
@@ -1950,7 +1973,71 @@
       "preparationComplete": "Persiapan selesai",
       "preparationFailed": "Persiapan gagal",
       "setupCommand": "Perintah penyiapan {{index}}",
-      "setupCommandOf": "Perintah penyiapan {{index}} dari {{displayCount}}"
+      "setupCommandOf": "Perintah penyiapan {{index}} dari {{displayCount}}",
+      "stepWorkspaceSetup": "Penyiapan workspace",
+      "stepDiskCheck": "Pemeriksaan disk",
+      "stepCloning": "Meng-clone repositori",
+      "stepBranch": "Menyiapkan cabang",
+      "stepDevcontainerSetup": "Penyiapan dev container",
+      "stepWorkspaceRestore": "Memulihkan workspace",
+      "stepWorkspaceBackup": "Menyimpan workspace",
+      "stepSandboxProvision": "Menyiapkan sandbox",
+      "stepSandboxBoot": "Memulai sandbox",
+      "stepSnapshotFallback": "Mencoba lagi tanpa snapshot",
+      "stepKiloServer": "Memulai Kilo",
+      "stepKiloSession": "Menyiapkan sesi",
+      "stepRestoreIncomplete": "Pemulihan sesi tidak lengkap",
+      "stepReady": "Lingkungan siap",
+      "stepFailed": "Penyiapan lingkungan gagal",
+      "stepUnknown": "Penyiapan lingkungan",
+      "detailCreatingSandbox": "Membuat sandbox",
+      "detailUpdatingRepository": "Memperbarui repositori",
+      "detailCheckingOutBranch": "Melakukan checkout cabang",
+      "detailRunningSetupCommands": "Menjalankan perintah penyiapan",
+      "detailSavingRepository": "Menyimpan repositori agar lebih cepat dimulai",
+      "detailStartingKiloRuntime": "Memulai runtime Kilo",
+      "detailPreparingKiloSession": "Menyiapkan sesi Kilo",
+      "detailWaitingForPreviousSandbox": "Menunggu sandbox sebelumnya berhenti",
+      "detailRetryingSandboxCreation": "Mencoba membuat sandbox kembali",
+      "detailPreviousSnapshotFailed": "Startup snapshot sebelumnya gagal. Mencoba lagi tanpa snapshot.",
+      "detailSnapshotStartupFailed": "Startup snapshot gagal. Mencoba lagi tanpa snapshot.",
+      "detailStartingSandboxWithoutSnapshot": "Memulai sandbox tanpa snapshot",
+      "detailSettingUpWorkspace": "Menyiapkan workspace",
+      "detailRestoringSession": "Memulihkan sesi",
+      "detailWarmWorkspaceReused": "Workspace hangat digunakan kembali",
+      "detailRetryingClone": "Mencoba clone kembali (percobaan {{attempt}} dari {{total}})",
+      "detailSetupCommandFailed": "Perintah penyiapan {{index}} gagal",
+      "detailSetupCommandTimedOut": "Perintah penyiapan {{index}} habis waktu",
+      "detailColdRestore": "Pemulihan dingin, snapshot diterapkan, {{applied}} dari {{total}} berkas dipulihkan",
+      "detailProgressPercent": "{{percent}}% selesai",
+      "detailRestoreIncompleteReport": "Pemulihan sesi tidak lengkap: {{skipped}} dari {{total}} berkas tidak dipulihkan ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Tidak ditemukan: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} dan {{omitted}} lainnya",
+      "detailReasonPatchFailed": "patch tidak dapat diterapkan",
+      "detailReasonOutsideWorkspace": "path berada di luar workspace",
+      "detailReasonMissingContent": "snapshot tidak membawa konten untuk berkas tersebut",
+      "detailReasonIndexResetFailed": "indeks tidak dapat diatur ulang setelah penerapan gagal",
+      "detailReasonUnlinkFailed": "berkas tidak dapat dihapus",
+      "detailReasonWriteFailed": "berkas tidak dapat ditulis",
+      "detailReasonUnknown": "alasan tidak diketahui",
+      "detailUnknown": "Masih menyiapkan",
+      "errorPreparationTimeout": "Persiapan lingkungan habis waktu",
+      "errorWorkspaceSetupFailed": "Penyiapan workspace gagal",
+      "errorCredentialUpgradeRequired": "Sesi ini memerlukan peningkatan kredensial. Mulai sesi baru untuk melanjutkan.",
+      "errorAgentUnavailable": "Agen tidak lagi tersedia",
+      "errorBillingBlocked": "Penagihan sandbox memerlukan kredit tambahan",
+      "errorBillingUnavailable": "Verifikasi penagihan atau kapasitas sandbox tidak tersedia. Coba lagi sebentar lagi.",
+      "errorContainerLimitReached": "Batas kontainer tercapai. Hentikan kontainer yang ada sebelum memulai yang lain.",
+      "errorInvalidConfiguration": "Konfigurasi sandbox tidak valid atau tidak didukung",
+      "errorRuntimeArtifactUnauthorized": "Unduhan runtime tidak diizinkan",
+      "errorRuntimeArtifactInvalid": "Verifikasi artefak runtime gagal",
+      "errorRuntimeCliProbeFailed": "Validasi CLI runtime gagal",
+      "errorRuntimeSupervisorMissing": "Supervisor runtime tidak ditemukan",
+      "errorConnectionLost": "Koneksi sandbox terputus",
+      "errorSandboxLost": "Sandbox hilang",
+      "errorAgentRestarted": "Agen dimulai ulang",
+      "errorSandboxOutOfMemory": "Sandbox kehabisan memori",
+      "errorPreparationDidNotComplete": "Persiapan tidak selesai"
     },
     "permissionCard": {
       "title": "Perlu izin",
@@ -1962,7 +2049,10 @@
       "allowOnceAccessibility": "Izinkan sekali",
       "alwaysAllow": "Selalu izinkan",
       "alwaysAllowAccessibility": "Selalu izinkan",
-      "retrying": "Mencoba lagi…"
+      "retrying": "Mencoba lagi…",
+      "retryDeny": "Coba tolak lagi",
+      "retryAllowOnce": "Coba izinkan sekali lagi",
+      "retryAlwaysAllow": "Coba selalu izinkan lagi"
     },
     "questionCard": {
       "title": "Agen membutuhkan masukan",
@@ -2341,7 +2431,6 @@
     "allow": "Izinkan",
     "onlineMessage": "Perangkat ini tidak dapat mengubah ucapan menjadi teks secara luring. Rekamanmu dikirim ke {{provider}} untuk diubah menjadi teks. Kilo tidak menyimpan audio.",
     "onlineTitle": "Ucapan diproses secara daring",
-    "staysOff": "Masukan suara tetap nonaktif hingga kamu mengizinkan transkripsi daring.",
     "start": "Mulai masukan suara",
     "stop": "Hentikan masukan suara",
     "restricted": "Masukan suara dibatasi di perangkat ini.",
@@ -2511,14 +2600,20 @@
       "checksCount_other": "{{displayCount}} pemeriksaan",
       "couldNotLoad": "Tidak dapat memuat pemeriksaan.",
       "failed": "{{displayCount}} gagal",
+      "failed_one": "{{displayCount}} gagal",
+      "failed_other": "{{displayCount}} gagal",
       "noAccess": "Kamu tidak memiliki akses ke pemeriksaan repositori ini.",
       "noChecksReported": "Belum ada hasil pemeriksaan",
       "notAvailable": "Pemeriksaan belum tersedia. Commit terkini mungkin belum diproses, atau aplikasi Kilo untuk GitHub belum dipasang di repositori sumber.",
       "openDetails": "Buka detail {{name}}",
       "passed": "{{displayCount}} lulus",
+      "passed_one": "{{displayCount}} lulus",
+      "passed_other": "{{displayCount}} lulus",
       "pending": "{{displayCount}} menunggu",
       "retryChecks": "Coba pemeriksaan lagi",
       "skipped": "{{displayCount}} dilewati",
+      "skipped_one": "{{displayCount}} dilewati",
+      "skipped_other": "{{displayCount}} dilewati",
       "title": "Pemeriksaan",
       "viewOnGitHub": "Lihat PR di GitHub",
       "checkDetails": "detail pemeriksaan"
@@ -2555,7 +2650,8 @@
       "gitlabDescription": "Hubungkan akun GitLab kamu untuk meninjau merge request di ponsel.",
       "bitbucketDescription": "Hubungkan Bitbucket ke organisasi ini untuk meninjau PR di ponsel.",
       "bitbucketOrgOnlyDescription": "Ganti akun di atas ke sebuah organisasi untuk meninjau PR Bitbucket-nya.",
-      "contextLine": "Untuk {{organization}}"
+      "contextLine": "Untuk {{organization}}",
+      "contextLinePersonal": "Untuk akun pribadi Anda"
     },
     "connectionExpired": "Koneksi GitHub kedaluwarsa.",
     "couldNotLoadPullRequest": "Tidak dapat memuat PR.",
@@ -3023,22 +3119,16 @@
     "boundary": {
       "backToProfile": "Kembali ke profil",
       "loadErrorMessage": "Periksa koneksimu dan coba lagi.",
-
       "chooseAccount": "Pilih akun",
       "loadErrorTitle": "Tidak dapat memuat daftar organisasimu.",
       "membershipLostNotice": "Kamu tidak lagi memiliki akses ke organisasi ini. Beralih ke {{target}}.",
       "noOrganization": "Tidak ada organisasi",
-
       "noOrganizationDescription": "Akun ini bukan bagian dari organisasi. Buat atau gabung ke organisasi di web untuk menggunakan fitur organisasi seperti undangan anggota dan peringatan saldo rendah.",
-
       "openWebOrganizations": "Buka organisasi di web",
-
       "organizationUnavailable": "Organisasi tidak tersedia.",
       "selectDescriptionWithOrganizations": "Kamu termasuk dalam satu atau beberapa organisasi. Pilih akun yang harus digunakan layar ini.",
-
       "selectOrganization": "Pilih organisasi",
       "unavailableDescription": "Organisasi ini tidak lagi tersedia. Pilih organisasi lain dari profilmu untuk melanjutkan.",
-
       "unavailableSessionsDescription": "Organisasi ini tidak lagi tersedia. Sesi untuk organisasi ini tidak dapat dimuat.",
       "accessDeniedDescription": "Kamu tidak memiliki akses ke organisasi ini."
     },
@@ -3073,7 +3163,11 @@
       "permissionDenied": "Kamu tidak memiliki izin untuk mengundang anggota.",
       "roleMember": "Peran yang diberikan adalah anggota.",
       "sendInvite": "Kirim undangan",
-      "title": "Undang anggota"
+      "title": "Undang anggota",
+      "alreadyInvited": "Alamat email tersebut sudah diundang atau sudah menjadi anggota.",
+      "sendError": "Tidak dapat mengirim undangan.",
+      "pendingInvitation": "Email ini sudah memiliki undangan yang tertunda.",
+      "alreadyMember": "Orang ini sudah menjadi anggota organisasi ini."
     },
     "invoices": {
       "downloadA11y": "Unduh faktur {{number}}",
@@ -3142,7 +3236,13 @@
       "inviteCreated": "Undangan dibuat",
       "pendingInvitations": "Undangan yang belum diterima",
       "resendInvite": "Kirim ulang undangan",
-      "shareInviteLink": "Bagikan tautan undangan"
+      "shareInviteLink": "Bagikan tautan undangan",
+      "resendInviteError": "Tidak dapat mengirim ulang undangan.",
+      "inviteNotResendable": "Undangan ini tidak dapat dikirim ulang lagi.",
+      "ownerAuthority": "Hanya pemilik organisasi yang dapat mengelola pemilik.",
+      "ownRoleChange": "Anda tidak dapat mengubah peran Anda sendiri.",
+      "inviteExpired": "Undangan ini telah kedaluwarsa.",
+      "inviteAccepted": "Undangan ini sudah diterima."
     },
     "usageStats": {
       "inputTokens": "Token masukan",
@@ -3291,7 +3391,8 @@
     "noneChosen": "Belum ada yang dipilih",
     "emptyTitle": "Tidak ada model transkripsi",
     "emptyDescription": "Kilo Gateway tidak menawarkan model transkripsi saat ini.",
-    "loadFailed": "Tidak dapat memuat model transkripsi."
+    "loadFailed": "Tidak dapat memuat model transkripsi.",
+    "choose": "Pilih model"
   },
   "voiceLanguage": {
     "title": "Bahasa masukan suara",
@@ -3506,6 +3607,7 @@
       "fromHuggingFace": "Dari Hugging Face",
       "loading": "Memuat model",
       "noResults": "Model tidak ditemukan",
+      "noResultsForQuery": "Tidak ada model yang ditemukan untuk \"{{query}}\"",
       "noFits": "Tidak ada model yang cocok untuk perangkat ini",
       "noFitsDescription": "Model yang lebih besar ada di tab $t(common.all).",
       "fit": {
@@ -3536,8 +3638,6 @@
       "quantizations": "Kuantisasi",
       "quantizationsHelp": "File yang lebih kecil menggunakan lebih sedikit memori dan penyimpanan. File yang lebih besar biasanya memberikan jawaban yang lebih baik.",
       "quantDetail": "Unduhan {{size}} · sekitar {{memory}} memori",
-      "downloadQuant": "Unduh {{quant}}",
-      "downloadModelA11y": "Unduh {{name}}",
       "detailsA11y": "Detail: {{name}}",
       "loadingModel": "Memuat detail model",
       "couldNotLoadModel": "Tidak dapat memuat model ini",
@@ -3582,13 +3682,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "Model ini mendukung tingkat penalaran"
-    }
+    },
+    "creditsRequired": "Kredit tidak cukup untuk mengirim pesan ini. Tambah kredit dan coba lagi."
   },
   "settingsTools": {
     "confirmTitle": "Konfirmasi perubahan ini?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "repositori terbaru Anda",
+      "confirmMessage": "Repositori: {{repository}}. Permintaan: {{prompt}}.",
+      "confirmTitle": "Mulai agen ini?",
       "promptRequired": "Mulai agen memerlukan instruksi. Tambahkan instruksi lalu jalankan lagi.",
       "repositoryRequired": "Mulai agen memerlukan repositori. Buka Kilo dan pilih satu, lalu jalankan lagi.",
       "repositoryUnknown": "Kilo tidak mengenali {{repository}} sebagai repositori GitHub atau GitLab. Pilih repositori lain di Kilo.",
@@ -3618,7 +3722,9 @@
     "spend24h": "Pengeluaran dalam 24 jam terakhir",
     "multiplierError": "Masukkan pengali 1 atau lebih",
     "permissionDenied": "Kamu tidak memiliki izin untuk mengelola peringatan pengeluaran.",
-    "pushOffByCategory": "Nonaktif di Notifikasi"
+    "pushOffByCategory": "Nonaktif di Notifikasi",
+    "multiplierMaxError": "Masukkan pengali {{max}} atau kurang",
+    "thresholdMaxError": "Masukkan jumlah {{max}} atau kurang."
   },
   "profiles": {
     "title": "Profil",
@@ -3635,9 +3741,10 @@
       "skills_other": "{{count}} keterampilan",
       "commands_one": "{{count}} perintah",
       "commands_other": "{{count}} perintah",
-      "varsShort": "{{count}}v",
-      "skillsShort": "{{count}}k",
-      "commandsShort": "{{count}}p"
+      "setupCommands_one": "{{count}} perintah pengaturan",
+      "setupCommands_other": "{{count}} perintah pengaturan",
+      "agents_one": "{{count}} agen",
+      "agents_other": "{{count}} agen"
     },
     "nameLabel": "Nama profil",
     "namePlaceholder": "misalnya Backend debugging",
@@ -3665,6 +3772,8 @@
     "keyTooLong": "Kunci harus 256 karakter atau kurang",
     "keyDuplicate": "Kunci ini sudah ada di profil",
     "valueLabel": "Nilai",
+    "valueRequired": "Masukkan nilai",
+    "tooLong": "Gunakan maksimal {{max}} karakter",
     "secrets": {
       "markSecret": "Tandai sebagai rahasia",
       "masked": "Nilai tersembunyi",
@@ -3715,7 +3824,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Masukkan nama server",
-      "nameInvalid": "Nama hanya boleh menggunakan huruf, angka, garis bawah, dan tanda hubung",
+      "nameInvalid": "Nama hanya boleh menggunakan huruf ASCII, angka, garis bawah, dan tanda hubung, maksimal 100 karakter",
       "commandRequired": "Masukkan perintah",
       "commandTooLong": "Gunakan maksimal 50 argumen yang masing-masing 500 karakter",
       "urlRequired": "Masukkan URL",
@@ -3743,7 +3852,7 @@
       "stepsPlaceholder": "mis. 50",
       "temperature": "Suhu",
       "temperaturePlaceholder": "mis. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "mis. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Agen saya",
@@ -3752,7 +3861,7 @@
       "visibility": "Visibilitas",
       "visibilityPrimary": "Utama — ditampilkan di alat pilih",
       "visibilitySubagent": "Subagen — hanya dapat dihubungi dari orang lain",
-      "visibilityAll": "Semua—keduanya",
+      "visibilityAll": "Semua — keduanya",
       "modePrimary": "Hanya utama",
       "modeSubagent": "Hanya subagen",
       "modeAll": "Semua mode",
@@ -3760,7 +3869,7 @@
       "deleteFailed": "Tidak dapat menghapus agen",
       "nameRequired": "Masukkan nama agen",
       "slugRequired": "Masukkan siput agen",
-      "slugInvalid": "Siput harus dimulai dengan huruf dan hanya menggunakan huruf kecil, angka, dan tanda hubung",
+      "slugInvalid": "Siput harus dimulai dengan huruf ASCII kecil dan hanya menggunakan huruf kecil ASCII, angka, dan tanda hubung, maksimal 50 karakter",
       "slugConflict": "Slug tersebut sudah digunakan oleh agen bawaan atau agen lain di profil ini",
       "edit": "Sunting agen"
     },
@@ -3805,7 +3914,9 @@
       "pinFailed": "Tidak dapat menyematkan repo",
       "unboundToast": "Repo tidak terikat",
       "unbindFailed": "Tidak dapat melepaskan ikatan repo"
-    }
+    },
+    "variablesDeleteFailed": "Tidak dapat menghapus variabel",
+    "deleteCommand": "Hapus perintah {{position}}"
   },
   "credits": {
     "title": "Beli kredit",
@@ -3841,7 +3952,8 @@
       "archive": "Arsipkan",
       "unarchive": "Batalkan arsip",
       "deleteTitle": "Hapus {{name}}?",
-      "deleteMessage": "Tugas di dalamnya juga dihapus. Sesi tetap tersimpan."
+      "deleteMessage": "Tugas di dalamnya juga dihapus. Sesi tetap tersimpan.",
+      "createFailed": "Tidak dapat membuat daftar"
     },
     "listSettings": {
       "title": "Pengaturan daftar",
@@ -3909,20 +4021,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Ringkasan pagi",
+    "title": "Ringkasan agen",
     "atLeast": "≥{{value}}",
     "coverageHint": "Sebagian aktivitas sebelumnya mungkin tidak tercatat. ≥ berarti setidaknya sebanyak ini; tidak diketahui bukan berarti nol.",
     "available": "Ringkasan tersedia",
     "history": "Riwayat ringkasan",
-    "historyHint": "Laporan disimpan selama 30 hari, termasuk laporan yang ditutup.",
+    "historyHint": "Ringkasan disimpan selama 30 hari, termasuk yang diabaikan.",
     "settings": "Pengaturan ringkasan",
-    "empty": "Tidak ada aktivitas semalam",
-    "emptyHint": "Sesi coding cloud dan CLI Anda akan muncul di sini setelah malam yang aktif.",
+    "empty": "Tidak ada aktivitas dalam periode ringkasan ini",
+    "emptyHint": "Sesi coding cloud dan CLI Anda muncul di sini saat ringkasan terjadwal memiliki aktivitas.",
     "loadError": "Tidak dapat memuat ringkasan",
-    "sessions": "Aktif semalam",
+    "sessions": "Aktif dalam periode",
     "pullRequests": "PRs dibuka",
     "blockers": "Hambatan baru",
-    "spend": "Biaya semalam",
+    "spend": "Biaya dalam periode",
     "view": "Baca ringkasan",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -3944,13 +4056,13 @@
     "sources": "Bukti dan artefak",
     "timezone": "Zona waktu ringkasan",
     "deviceTimezone": "Gunakan zona waktu perangkat",
-    "timezoneHint": "Zona waktu IANA, misalnya Europe/Berlin. Perubahan jadwal berlaku untuk malam berikutnya.",
-    "nightStart": "Malam dimulai",
-    "morningStart": "Malam berakhir / pagi dimulai",
-    "morningEnd": "Pagi berakhir",
-    "timeHint": "Kartu Beranda kembali menampilkan status langsung saat pagi berakhir, bahkan saat offline.",
-    "invalidSchedule": "Pilih zona waktu yang valid serta periode malam dan pagi yang tidak kosong dan tidak tumpang tindih.",
-    "notificationsHint": "Satu notifikasi umum setiap pagi saat laporan pertama Anda siap. Terpisah dari ringkasan AI berbayar.",
+    "timezoneHint": "Zona waktu IANA, misalnya Europe/Berlin. Perubahan jadwal berlaku untuk ringkasan berikutnya.",
+    "nightStart": "Periode ringkasan dimulai",
+    "morningStart": "Ringkasan siap pada",
+    "morningEnd": "Ringkasan tersedia hingga",
+    "timeHint": "Kartu Beranda kembali menampilkan status langsung saat periode ringkasan berakhir, bahkan saat offline.",
+    "invalidSchedule": "Pilih zona waktu yang valid dan periode ringkasan yang tidak kosong.",
+    "notificationsHint": "Satu notifikasi umum per ringkasan terjadwal. Terpisah dari ringkasan AI berbayar.",
     "notificationPermission": "Aktifkan notifikasi perangkat di $t(common.notifications) untuk menerima ringkasan Anda.",
     "aiOptIn": "Ringkasan AI berbayar",
     "aiHint": "Opsional hanya untuk konteks ini. Kutipan terpilih yang telah disensor dan fakta terstruktur dikirim ke model Anda dalam bahasa aplikasi Anda. Biaya menggunakan saldo konteks ini.",
@@ -3968,7 +4080,7 @@
     "contextSettings": "Pengaturan AI · {{context}}",
     "allContexts": "Ringkasan pribadi dan organisasi tetap terpisah.",
     "create": "Buat ringkasan",
-    "oneOff": "Sekali saja",
+    "oneOff": "Sesuai permintaan",
     "createdAt": "Dibuat {{time}}",
     "chooseContext": "Pilih satu konteks",
     "period": "Periode ringkasan",
@@ -3990,13 +4102,16 @@
     "emptyPeriod": "Tidak ada aktivitas dalam periode ini. Tidak ada ringkasan AI atau biaya yang dikenakan.",
     "emptyHistory": "Belum ada ringkasan tersimpan",
     "historicalStateHint": "Status sesi mencerminkan kondisi pada akhir periode yang dipilih, bukan status langsung saat ini.",
-    "oneOffHint": "AI menerima bukti terpilih yang informasi sensitifnya telah disamarkan, dalam bahasa aplikasi Anda. Laporan sekali pakai ini tidak mengubah jadwal pagi atau preferensi AI Anda.",
+    "oneOffHint": "AI menerima bukti terpilih yang informasi sensitifnya telah disamarkan, dalam bahasa aplikasi Anda. Ringkasan sesuai permintaan ini tidak mengubah ringkasan terjadwal atau preferensi AI Anda.",
     "createOffline": "Hubungkan ke internet untuk meninjau atau membuat ringkasan. Permintaan berbayar tidak pernah dimasukkan ke antrean saat luring.",
     "estimateInputTooLarge": "Periode ini berisi terlalu banyak bukti untuk model yang dipilih.",
     "estimatePermissionUnavailable": "Anda tidak memiliki izin untuk menggunakan saldo konteks ini.",
+    "createFailed": "Tidak dapat membuat ringkasan ini.",
+    "reviewFailed": "Tidak dapat meninjau ringkasan ini.",
     "estimatePricingUnavailable": "Harga untuk model ini tidak tersedia.",
     "estimateBalanceUnavailable": "Saldo tidak cukup untuk ringkasan berbayar.",
     "estimateModelNotAllowed": "Model ini tidak diizinkan di sini.",
-    "estimateSpendLimitTooLow": "Naikkan batas pengeluaran untuk mengizinkan ringkasan ini."
+    "estimateSpendLimitTooLow": "Naikkan batas pengeluaran untuk mengizinkan ringkasan ini.",
+    "saved": "Pengaturan ringkasan tersimpan."
   }
 }

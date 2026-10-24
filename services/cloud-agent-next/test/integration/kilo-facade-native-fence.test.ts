@@ -462,6 +462,90 @@ describe('hosted native history/live fence', { timeout: 30_000 }, () => {
     }
   });
 
+  it('delivers shared public failure messages live and on reconnect', async () => {
+    const session = await startReadySession();
+    try {
+      await seedFacadeRoots({
+        kiloSessionId: qualifiedKiloSessionId,
+        cloudAgentSessionId,
+        title: 'public failure fixture',
+      });
+      const attached = await readAttach(await attach());
+      try {
+        const error = {
+          name: 'APIError',
+          data: {
+            message: 'fixture failure',
+            statusCode: 429,
+            isRetryable: true,
+            responseHeaders: { authorization: 'fixture-header' },
+            responseBody: 'fixture-body',
+            metadata: { request: 'fixture-request' },
+          },
+        };
+        const withError = (error: unknown): ControlPlaneEvent[] => [
+          {
+            type: 'message.updated',
+            properties: {
+              sessionID: qualifiedKiloSessionId,
+              info: {
+                id: 'msg_failure',
+                role: 'assistant',
+                sessionID: qualifiedKiloSessionId,
+                error,
+              },
+            },
+          },
+          {
+            type: 'message.part.updated',
+            properties: {
+              sessionID: qualifiedKiloSessionId,
+              part: {
+                id: 'prt_failure',
+                messageID: 'msg_failure',
+                sessionID: qualifiedKiloSessionId,
+                type: 'retry',
+                attempt: 2,
+                time: { created: 1 },
+                error,
+              },
+            },
+          },
+          {
+            type: 'session.error',
+            properties: { sessionID: qualifiedKiloSessionId, error },
+          },
+        ];
+        await pushEvents(session, [
+          ...withError(error),
+          partUpdated('msg_failure', 'prt_failure_marker', 'delivery marker'),
+        ]);
+        const live = await readSseUntil(attached.reader, frame =>
+          isPartUpdate(frame, 'prt_failure_marker')
+        );
+        const replay = await readAttach(await attach());
+        await replay.reader.cancel();
+        const expected = withError('Assistant request was rate limited').map(event => ({
+          ...event,
+          properties: expect.objectContaining(event.properties),
+        }));
+        expect(live.observed).toEqual(expect.arrayContaining(expected));
+        expect(replay.events).toEqual(expect.arrayContaining(expected));
+        for (const events of [live.observed, replay.events]) {
+          const serialized = JSON.stringify(events);
+          expect(serialized).not.toContain('fixture-header');
+          expect(serialized).not.toContain('fixture-body');
+          expect(serialized).not.toContain('fixture-request');
+        }
+      } finally {
+        await attached.reader.cancel();
+      }
+    } finally {
+      session.stopPump();
+      session.wrapper.close();
+    }
+  });
+
   it('replays the same durable transcript on reconnect with no missing or duplicate parts', async () => {
     const session = await startReadySession();
     try {

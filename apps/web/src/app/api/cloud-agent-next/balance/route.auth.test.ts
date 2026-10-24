@@ -60,7 +60,14 @@ jest.mock('@/lib/organizations/organization-seats', () => ({}));
 jest.mock('@/lib/organizations/sales-demo', () => ({}));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-sso-policy', () => ({}));
 jest.mock('@/lib/account-linking-session', () => ({}));
-jest.mock('@kilocode/web-shared/lib/admin/admin-access-log', () => ({}));
+jest.mock('@kilocode/web-shared/lib/admin/admin-access-log', () => ({
+  // `getUserFromAuth`'s resolver calls this predicate to pick the bearer path,
+  // so the stub has to answer the same way the real header check does.
+  authViaTokenFromHeaders: (headers: Headers) => Boolean(headers.get('Authorization')),
+  clientIpFromHeaders: () => null,
+  routeFromHeaders: () => null,
+  emitAdminAccessEvent: jest.fn(),
+}));
 jest.mock('@/lib/user/sso', () => ({}));
 jest.mock('@kilocode/web-shared/lib/web-session-revocation', () => ({}));
 

@@ -5937,43 +5937,6 @@
     ],
     "searchBlob": "cloudAgentNext.interruptSession Stop a running cloud agent session and cancel its active work. cloudagentnext interruptsession sessionid sessionId"
   },
-  "cloudAgentNext.linkPendingUploads": {
-    "path": "cloudAgentNext.linkPendingUploads",
-    "kind": "mutation",
-    "summary": "Mark uploaded files as attached so they are kept and sent with the message.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "messageUuid": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "objectKeys": {
-          "minItems": 1,
-          "maxItems": 5,
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 1024
-          }
-        }
-      },
-      "required": [
-        "messageUuid",
-        "objectKeys"
-      ]
-    },
-    "tags": [
-      "cloudagentnext",
-      "linkpendinguploads",
-      "messageuuid",
-      "objectkeys"
-    ],
-    "searchBlob": "cloudAgentNext.linkPendingUploads Mark uploaded files as attached so they are kept and sent with the message. cloudagentnext linkpendinguploads messageuuid objectkeys messageUuid objectKeys"
-  },
   "cloudAgentNext.listGitHubRepositories": {
     "path": "cloudAgentNext.listGitHubRepositories",
     "kind": "query",
@@ -6236,7 +6199,8 @@
                     },
                     "prompt": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "maxLength": 100000
                     },
                     "mode": {
                       "type": "string",
@@ -6274,7 +6238,8 @@
                     },
                     "arguments": {
                       "default": "",
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 100000
                     }
                   },
                   "required": [
@@ -6394,7 +6359,7 @@
               "type": "array",
               "items": {
                 "type": "string",
-                "maxLength": 500
+                "maxLength": 16000
               }
             },
             "mcpServers": {
@@ -7050,7 +7015,7 @@
               "type": "array",
               "items": {
                 "type": "string",
-                "maxLength": 500
+                "maxLength": 16000
               }
             },
             "mcpServers": {
@@ -7669,7 +7634,8 @@
                 },
                 "arguments": {
                   "default": "",
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 100000
                 }
               },
               "required": [
@@ -7774,8 +7740,7 @@
           "pattern": "^(agent|workspace)_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
         },
         "kilo_session_id": {
-          "type": "string",
-          "pattern": "^ses_[A-Za-z0-9]{26}$"
+          "type": "string"
         },
         "session_type": {
           "type": "string",
@@ -8057,6 +8022,461 @@
     ],
     "searchBlob": "cloudAgentSettings.setRepositorySettings Save Cloud Agent sandbox settings for a specific repository, setting or clearing its assigned profile and allocation. cloudagentsettings setrepositorysettings organizationid repofullname platform profileid allocation organizationId repoFullName platform profileId allocation"
   },
+  "cloudEnvironments.create": {
+    "path": "cloudEnvironments.create",
+    "kind": "mutation",
+    "summary": "Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can have only one.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "repository": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string",
+                  "const": "github"
+                },
+                "fullName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "platform",
+                "fullName"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string",
+                  "const": "gitlab"
+                },
+                "projectPath": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "platform",
+                "projectPath"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string",
+                  "const": "bitbucket"
+                },
+                "fullName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "workspaceUuid": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "repositoryUuid": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "platform",
+                "fullName",
+                "workspaceUuid",
+                "repositoryUuid"
+              ]
+            }
+          ]
+        },
+        "plainVars": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 128,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "secrets": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 128,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 8192
+          }
+        },
+        "commands": {
+          "maxItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000
+          }
+        },
+        "sandboxAllocation": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "cloudflare-single",
+                "cloudflare-shared",
+                "cloudflare-containers-standard-3",
+                "cloudflare-containers-standard-4",
+                "vercel-small",
+                "vercel-large"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "repository"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "create",
+      "organizationid",
+      "name",
+      "repository",
+      "plainvars",
+      "secrets",
+      "commands",
+      "sandboxallocation"
+    ],
+    "searchBlob": "cloudEnvironments.create Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can have only one. cloudenvironments create organizationid name repository plainvars secrets commands sandboxallocation organizationId name repository plainVars secrets commands sandboxAllocation"
+  },
+  "cloudEnvironments.delete": {
+    "path": "cloudEnvironments.delete",
+    "kind": "mutation",
+    "summary": "Delete a Cloud Agent repository environment. New sessions in the repository then start without it.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "environmentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "environmentId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "delete",
+      "organizationid",
+      "environmentid"
+    ],
+    "searchBlob": "cloudEnvironments.delete Delete a Cloud Agent repository environment. New sessions in the repository then start without it. cloudenvironments delete organizationid environmentid organizationId environmentId"
+  },
+  "cloudEnvironments.get": {
+    "path": "cloudEnvironments.get",
+    "kind": "query",
+    "summary": "Get one Cloud Agent repository environment with its setup commands, plain variables, secret names, and sandbox size.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "environmentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "environmentId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "get",
+      "organizationid",
+      "environmentid"
+    ],
+    "searchBlob": "cloudEnvironments.get Get one Cloud Agent repository environment with its setup commands, plain variables, secret names, and sandbox size. cloudenvironments get organizationid environmentid organizationId environmentId"
+  },
+  "cloudEnvironments.list": {
+    "path": "cloudEnvironments.list",
+    "kind": "query",
+    "summary": "List the Cloud Agent repository environment for one repository, with setup command, variable, secret, and sandbox size details.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "repository": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string",
+                  "const": "github"
+                },
+                "fullName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "platform",
+                "fullName"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string",
+                  "const": "gitlab"
+                },
+                "projectPath": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "platform",
+                "projectPath"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string",
+                  "const": "bitbucket"
+                },
+                "workspaceUuid": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "repositoryUuid": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "platform",
+                "workspaceUuid",
+                "repositoryUuid"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "repository"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "list",
+      "organizationid",
+      "repository"
+    ],
+    "searchBlob": "cloudEnvironments.list List the Cloud Agent repository environment for one repository, with setup command, variable, secret, and sandbox size details. cloudenvironments list organizationid repository organizationId repository"
+  },
+  "cloudEnvironments.listAll": {
+    "path": "cloudEnvironments.listAll",
+    "kind": "query",
+    "summary": "List every Cloud Agent repository environment for the user or organization, across all repositories.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "cloudenvironments",
+      "listall",
+      "organizationid"
+    ],
+    "searchBlob": "cloudEnvironments.listAll List every Cloud Agent repository environment for the user or organization, across all repositories. cloudenvironments listall organizationid organizationId"
+  },
+  "cloudEnvironments.update": {
+    "path": "cloudEnvironments.update",
+    "kind": "mutation",
+    "summary": "Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "environmentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "plainVars": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 128,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "secrets": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "value": {
+                    "type": "string",
+                    "maxLength": 8192
+                  }
+                },
+                "required": [
+                  "key",
+                  "value"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "delete": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "key",
+                  "delete"
+                ]
+              }
+            ]
+          }
+        },
+        "commands": {
+          "maxItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000
+          }
+        },
+        "sandboxAllocation": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "cloudflare-single",
+                "cloudflare-shared",
+                "cloudflare-containers-standard-3",
+                "cloudflare-containers-standard-4",
+                "vercel-small",
+                "vercel-large"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "environmentId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "update",
+      "organizationid",
+      "environmentid",
+      "name",
+      "plainvars",
+      "secrets",
+      "commands",
+      "sandboxallocation"
+    ],
+    "searchBlob": "cloudEnvironments.update Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size. cloudenvironments update organizationid environmentid name plainvars secrets commands sandboxallocation organizationId environmentId name plainVars secrets commands sandboxAllocation"
+  },
   "codeIndexing.delete": {
     "path": "codeIndexing.delete",
     "kind": "mutation",
@@ -8272,31 +8692,6 @@
       "overrideuser"
     ],
     "searchBlob": "codeIndexing.getProjectFiles List indexed files within a project with pagination, search, and branch filtering, showing per-file chunk count, size, branches, line counts, and percentage of AI-generated lines. codeindexing getprojectfiles organizationid projectid gitbranch filesearch page pagesize overrideuser organizationId projectId gitBranch fileSearch page pageSize overrideUser"
-  },
-  "codeIndexing.getRecentSearches": {
-    "path": "codeIndexing.getRecentSearches",
-    "kind": "query",
-    "summary": "List the most recent code-indexing search queries made by members of an organization, with timestamps, project, and result counts.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId"
-      ]
-    },
-    "tags": [
-      "codeindexing",
-      "getrecentsearches",
-      "organizationid"
-    ],
-    "searchBlob": "codeIndexing.getRecentSearches List the most recent code-indexing search queries made by members of an organization, with timestamps, project, and result counts. codeindexing getrecentsearches organizationid organizationId"
   },
   "codeIndexing.search": {
     "path": "codeIndexing.search",
@@ -16388,51 +16783,6 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.interruptSession Stop a running cloud agent session. Use to cancel the agent's current work. organizations cloudagentnext interruptsession organizationid sessionid organizationId sessionId"
   },
-  "organizations.cloudAgentNext.linkPendingUploads": {
-    "path": "organizations.cloudAgentNext.linkPendingUploads",
-    "kind": "mutation",
-    "summary": "Link previously uploaded files to a cloud agent message so they are kept. Use to attach uploaded files.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "messageUuid": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "objectKeys": {
-          "minItems": 1,
-          "maxItems": 5,
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 1024
-          }
-        }
-      },
-      "required": [
-        "organizationId",
-        "messageUuid",
-        "objectKeys"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "cloudagentnext",
-      "linkpendinguploads",
-      "organizationid",
-      "messageuuid",
-      "objectkeys"
-    ],
-    "searchBlob": "organizations.cloudAgentNext.linkPendingUploads Link previously uploaded files to a cloud agent message so they are kept. Use to attach uploaded files. organizations cloudagentnext linkpendinguploads organizationid messageuuid objectkeys organizationId messageUuid objectKeys"
-  },
   "organizations.cloudAgentNext.listBitbucketRepositories": {
     "path": "organizations.cloudAgentNext.listBitbucketRepositories",
     "kind": "query",
@@ -16791,7 +17141,8 @@
                         },
                         "prompt": {
                           "type": "string",
-                          "minLength": 1
+                          "minLength": 1,
+                          "maxLength": 100000
                         },
                         "mode": {
                           "type": "string",
@@ -16829,7 +17180,8 @@
                         },
                         "arguments": {
                           "default": "",
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 100000
                         }
                       },
                       "required": [
@@ -16949,7 +17301,7 @@
                   "type": "array",
                   "items": {
                     "type": "string",
-                    "maxLength": 500
+                    "maxLength": 16000
                   }
                 },
                 "mcpServers": {
@@ -17611,7 +17963,7 @@
                   "type": "array",
                   "items": {
                     "type": "string",
-                    "maxLength": 500
+                    "maxLength": 16000
                   }
                 },
                 "mcpServers": {
@@ -18297,7 +18649,8 @@
                 },
                 "arguments": {
                   "default": "",
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 100000
                 }
               },
               "required": [
@@ -32417,75 +32770,99 @@
           ]
         },
         "features": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "models": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "modes": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "userIds": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "providers": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "projects": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedFeatures": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedModels": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedModes": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedUserIds": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedProviders": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedProjects": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "dimension": {
@@ -32643,75 +33020,99 @@
           ]
         },
         "features": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "models": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "modes": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "userIds": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "providers": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "projects": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedFeatures": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedModels": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedModes": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedUserIds": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedProviders": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedProjects": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         }
       },
@@ -32813,75 +33214,99 @@
           ]
         },
         "features": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "models": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "modes": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "userIds": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "providers": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "projects": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedFeatures": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedModels": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedModes": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedUserIds": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedProviders": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedProjects": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "groupBy": {
@@ -33007,75 +33432,99 @@
           ]
         },
         "features": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "models": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "modes": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "userIds": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "providers": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "projects": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedFeatures": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedModels": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedModes": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedUserIds": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedProviders": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedProjects": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "metric": {
@@ -33447,6 +33896,40 @@
       "getmypushtokens"
     ],
     "searchBlob": "user.getMyPushTokens List all push notification tokens registered for the current user across platforms, with their locale. user getmypushtokens"
+  },
+  "user.getNotificationHistory": {
+    "path": "user.getNotificationHistory",
+    "kind": "query",
+    "summary": "List the signed-in user's past notifications, optionally filtered by category, with pagination for older entries.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "category": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "cursor": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    },
+    "tags": [
+      "user",
+      "getnotificationhistory",
+      "category",
+      "cursor",
+      "limit"
+    ],
+    "searchBlob": "user.getNotificationHistory List the signed-in user's past notifications, optionally filtered by category, with pagination for older entries. user getnotificationhistory category cursor limit category cursor limit"
   },
   "user.getNotificationPreferences": {
     "path": "user.getNotificationPreferences",
@@ -34403,9 +34886,24 @@
           ]
         },
         "profileId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "bodySchema": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
         },
         "promptTemplate": {
           "type": "string",
@@ -34472,6 +34970,7 @@
       "variant",
       "sandboxallocation",
       "profileid",
+      "bodyschema",
       "prompttemplate",
       "autocommit",
       "condenseoncomplete",
@@ -34480,7 +34979,7 @@
       "cronexpression",
       "crontimezone"
     ],
-    "searchBlob": "webhookTriggers.create Create a new webhook or scheduled trigger that runs a Cloud Agent or KiloClaw Chat on an incoming request or cron schedule. Use this to set up an automation that fires when a GitHub event or webhook arrives. webhooktriggers create triggerid organizationid runascreator targettype kiloclawinstanceid githubrepo mode model variant sandboxallocation profileid prompttemplate autocommit condenseoncomplete webhookauth activationmode cronexpression crontimezone triggerId organizationId runAsCreator targetType kiloclawInstanceId githubRepo mode model variant sandboxAllocation profileId promptTemplate autoCommit condenseOnComplete webhookAuth activationMode cronExpression cronTimezone"
+    "searchBlob": "webhookTriggers.create Create a new webhook or scheduled trigger that runs a Cloud Agent or KiloClaw Chat on an incoming request or cron schedule. Use this to set up an automation that fires when a GitHub event or webhook arrives. webhooktriggers create triggerid organizationid runascreator targettype kiloclawinstanceid githubrepo mode model variant sandboxallocation profileid bodyschema prompttemplate autocommit condenseoncomplete webhookauth activationmode cronexpression crontimezone triggerId organizationId runAsCreator targetType kiloclawInstanceId githubRepo mode model variant sandboxAllocation profileId bodySchema promptTemplate autoCommit condenseOnComplete webhookAuth activationMode cronExpression cronTimezone"
   },
   "webhookTriggers.delete": {
     "path": "webhookTriggers.delete",
@@ -34766,9 +35265,24 @@
           "maxLength": 10000
         },
         "profileId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "bodySchema": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
         },
         "autoCommit": {
           "type": [
@@ -34836,6 +35350,7 @@
       "sandboxallocation",
       "prompttemplate",
       "profileid",
+      "bodyschema",
       "autocommit",
       "condenseoncomplete",
       "isactive",
@@ -34843,7 +35358,7 @@
       "cronexpression",
       "crontimezone"
     ],
-    "searchBlob": "webhookTriggers.update Update an existing trigger's settings, such as its model, prompt template, profile, active state, webhook authentication, or cron schedule. Use this to change or disable a trigger. webhooktriggers update triggerid organizationid mode model variant sandboxallocation prompttemplate profileid autocommit condenseoncomplete isactive webhookauth cronexpression crontimezone triggerId organizationId mode model variant sandboxAllocation promptTemplate profileId autoCommit condenseOnComplete isActive webhookAuth cronExpression cronTimezone"
+    "searchBlob": "webhookTriggers.update Update an existing trigger's settings, such as its model, prompt template, profile, active state, webhook authentication, or cron schedule. Use this to change or disable a trigger. webhooktriggers update triggerid organizationid mode model variant sandboxallocation prompttemplate profileid bodyschema autocommit condenseoncomplete isactive webhookauth cronexpression crontimezone triggerId organizationId mode model variant sandboxAllocation promptTemplate profileId bodySchema autoCommit condenseOnComplete isActive webhookAuth cronExpression cronTimezone"
   },
   "workspaceFolders.create": {
     "path": "workspaceFolders.create",

@@ -94,7 +94,7 @@ const idleTimeoutMillis = 5_000;
 
 const sharedPoolConfig: Partial<pg.PoolConfig> = {
   max,
-  connectionTimeoutMillis: Number.parseInt(POSTGRES_CONNECT_TIMEOUT || '30000'),
+  connectionTimeoutMillis: Number.parseInt(POSTGRES_CONNECT_TIMEOUT),
   idleTimeoutMillis,
 };
 

@@ -5,6 +5,7 @@ import {
   verifyNativeGoogleIdToken,
   exchangeNativeGoogleAuthCode,
   NativeIdTokenError,
+  NonceStoreUnavailableError,
 } from '@/lib/auth/native-id-tokens';
 import { AppleJwtClientError } from '@/lib/auth/apple-jwks';
 import {
@@ -179,6 +180,7 @@ const requestSchema = z.discriminatedUnion('provider', [
  *   401 { error: 'INVALID_TICKET' }
  *   425 { error: 'CODE_IN_PROGRESS' }
  *   429 { error: 'TOO_MANY_ATTEMPTS' }
+ *   503 { error: 'NONCE_STORE_UNAVAILABLE' }
  *   403/503 { error: 'BLOCKED' | 'SSO_ERROR', ssoOrganizationId? }
  *   403 { error: AuthErrorType }
  *   403 { error: 'ADMISSION_REQUIRED' }
@@ -288,6 +290,9 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     try {
       verified = await verifyNativeAppleIdToken(data.idToken, data.nonce);
     } catch (error) {
+      if (error instanceof NonceStoreUnavailableError) {
+        return NextResponse.json({ error: 'NONCE_STORE_UNAVAILABLE' }, { status: 503 });
+      }
       if (!isInvalidNativeTokenError(error)) {
         throw error;
       }

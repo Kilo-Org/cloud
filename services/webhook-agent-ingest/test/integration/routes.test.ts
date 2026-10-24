@@ -1,6 +1,33 @@
 import { SELF, env, runInDurableObject } from 'cloudflare:test';
 import { describe, it, expect } from 'vitest';
 import { encodeUserIdForPath } from '@kilocode/worker-utils/user-id-encoding';
+import { MAX_PAYLOAD_SIZE } from '../../src/util/constants';
+
+const STREAM_CHUNK_BYTES = 16 * 1024;
+
+function streamedBody(bytes: Uint8Array): ReadableStream<Uint8Array> {
+  let offset = 0;
+  return new ReadableStream<Uint8Array>({
+    pull(controller) {
+      if (offset >= bytes.byteLength) {
+        controller.close();
+        return;
+      }
+      const end = Math.min(offset + STREAM_CHUNK_BYTES, bytes.byteLength);
+      controller.enqueue(bytes.slice(offset, end));
+      offset = end;
+    },
+  });
+}
+
+function chunkedRequest(path: string, bytes: Uint8Array): Request {
+  return new Request(`http://localhost${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: streamedBody(bytes),
+    duplex: 'half',
+  } as RequestInit);
+}
 
 describe('Hono Routes', () => {
   describe('Webhook Ingestion - Personal Triggers', () => {
@@ -78,6 +105,105 @@ describe('Hono Routes', () => {
       const body = await response.json();
       expect(body.success).toBe(false);
       expect(body.error).toBe('Payload too large');
+    });
+
+    it('captures a streamed body of exactly the limit', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${namespace}/${testTriggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+      await stub.configure(namespace, testTriggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process this webhook:\n\n{{body}}',
+      });
+
+      const payload = new TextEncoder().encode('x'.repeat(MAX_PAYLOAD_SIZE));
+      expect(payload.byteLength).toBe(MAX_PAYLOAD_SIZE);
+
+      const response = await SELF.fetch(
+        chunkedRequest(`/inbound/user/${testUserId}/${testTriggerId}`, payload)
+      );
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.success).toBe(true);
+
+      const listed = await stub.listRequests();
+      expect(listed.requests).toHaveLength(1);
+      expect(listed.requests[0].body).toHaveLength(MAX_PAYLOAD_SIZE);
+    });
+
+    it('rejects a streamed body one byte over the limit without capturing it', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${namespace}/${testTriggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+      await stub.configure(namespace, testTriggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process this webhook:\n\n{{body}}',
+      });
+
+      const payload = new TextEncoder().encode('x'.repeat(MAX_PAYLOAD_SIZE + 1));
+
+      const response = await SELF.fetch(
+        chunkedRequest(`/inbound/user/${testUserId}/${testTriggerId}`, payload)
+      );
+
+      expect(response.status).toBe(413);
+      const body = await response.json();
+      expect(body.success).toBe(false);
+      expect(body.error).toBe('Payload too large');
+
+      const listed = await stub.listRequests();
+      expect(listed.requests).toHaveLength(0);
+    });
+
+    it('captures a multibyte body whose encoded size is within the limit', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${namespace}/${testTriggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+      await stub.configure(namespace, testTriggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process this webhook:\n\n{{body}}',
+      });
+
+      const text = JSON.stringify({ note: 'é'.repeat(100_000) });
+      const payload = new TextEncoder().encode(text);
+      expect(payload.byteLength).toBeGreaterThan(text.length);
+      expect(payload.byteLength).toBeLessThanOrEqual(MAX_PAYLOAD_SIZE);
+
+      const response = await SELF.fetch(
+        chunkedRequest(`/inbound/user/${testUserId}/${testTriggerId}`, payload)
+      );
+
+      expect(response.status).toBe(200);
+
+      const listed = await stub.listRequests();
+      expect(listed.requests).toHaveLength(1);
+      expect(listed.requests[0].body).toBe(text);
+    });
+
+    it('captures a request that carries no body', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${namespace}/${testTriggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+      await stub.configure(namespace, testTriggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process this webhook:\n\n{{body}}',
+      });
+
+      const response = await SELF.fetch(
+        `http://localhost/inbound/user/${testUserId}/${testTriggerId}`
+      );
+
+      expect(response.status).toBe(200);
+
+      const listed = await stub.listRequests();
+      expect(listed.requests).toHaveLength(1);
+      expect(listed.requests[0].method).toBe('GET');
+      expect(listed.requests[0].body).toBe('');
     });
 
     it('should return 415 for unsupported content type', async () => {

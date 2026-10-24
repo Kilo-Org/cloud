@@ -479,7 +479,10 @@ describe('CloudAgentTransport event routing', () => {
     ['question.asked', { id: 'request-1' }],
     ['question.replied', { requestID: 'request-1' }],
     ['question.rejected', { requestID: 'request-1' }],
-    ['permission.asked', { id: 'request-1', permission: 'bash', patterns: [], metadata: {}, always: [] }],
+    [
+      'permission.asked',
+      { id: 'request-1', permission: 'bash', patterns: [], metadata: {}, always: [] },
+    ],
     ['permission.replied', { requestID: 'request-1' }],
   ])(
     'suppresses historical %s until connected, then delivers current interactions',

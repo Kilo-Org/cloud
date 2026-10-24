@@ -6,8 +6,20 @@ const mockInsert = jest.fn(() => ({
   values: () => ({ returning: async () => [{ id: 'feedback-id' }] }),
 }));
 
+const mockTx = {
+  execute: async () => undefined,
+  insert: () => mockInsert(),
+  select: () => ({
+    from: () => ({
+      where: () => ({
+        orderBy: () => ({ limit: async () => [] as { created_at: string }[] }),
+      }),
+    }),
+  }),
+};
+
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
-  db: { insert: () => mockInsert() },
+  db: { transaction: (run: (tx: typeof mockTx) => unknown) => run(mockTx) },
 }));
 
 jest.mock('@kilocode/web-shared/lib/trpc/init', () => {
@@ -40,7 +52,7 @@ describe('Cloud Agent feedback Slack notification', () => {
   });
 
   it.each([
-    ['ses_35fc6b339ffeaf91IozzdnLtJ7', 'ses_35fc6b339ffeaf91IozzdnLtJ7'],
+    ['ses_00000000000000000000000001', 'ses_00000000000000000000000001'],
     [undefined, 'unknown'],
   ])('renders session %s and feedback only as plain text', async (sessionId, expectedSession) => {
     const feedback = '``` <https://attacker.invalid|admin> <!channel> :smile:';
@@ -99,7 +111,7 @@ describe('Cloud Agent feedback Slack notification', () => {
     async sessionType => {
       await expect(
         caller.create({
-          kilo_session_id: 'ses_35fc6b339ffeaf91IozzdnLtJ7',
+          kilo_session_id: 'ses_00000000000000000000000001',
           session_type: sessionType,
           feedback_text: 'feedback',
         })

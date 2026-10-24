@@ -6,6 +6,7 @@ const mockReturning: jest.Mock = jest.fn();
 const mockWhere: jest.Mock = jest.fn(() => ({ returning: mockReturning }));
 const mockSet: jest.Mock = jest.fn(() => ({ where: mockWhere }));
 const mockUpdate: jest.Mock = jest.fn(() => ({ set: mockSet }));
+const mockCaptureException: jest.Mock = jest.fn();
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
@@ -13,13 +14,15 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   },
 }));
 
-jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
+jest.mock('@sentry/nextjs', () => ({ captureException: mockCaptureException }));
 
 let cleanupStaleAnalyses: typeof analysisDbModule.cleanupStaleAnalyses;
 let enqueueBacklogFindings: typeof analysisDbModule.enqueueBacklogFindings;
+let updateAnalysisStatus: typeof analysisDbModule.updateAnalysisStatus;
 
 beforeAll(async () => {
-  ({ cleanupStaleAnalyses, enqueueBacklogFindings } = await import('./security-analysis'));
+  ({ cleanupStaleAnalyses, enqueueBacklogFindings, updateAnalysisStatus } =
+    await import('./security-analysis'));
 });
 
 beforeEach(() => {
@@ -48,6 +51,39 @@ describe('retired web sync queue policy surface', () => {
     expect('isFindingEligibleForAutoAnalysis' in analysisDb).toBe(false);
     expect('syncAutoAnalysisQueueForFinding' in analysisDb).toBe(false);
     expect('dequeueSupersededFindings' in analysisDb).toBe(false);
+  });
+});
+
+describe('updateAnalysisStatus telemetry', () => {
+  it('captures the update field names without their values', async () => {
+    mockReturning.mockImplementationOnce(async () => {
+      throw new Error('update failed');
+    });
+
+    await expect(
+      updateAnalysisStatus('finding-1', 'running', {
+        sessionId: 'session-1',
+        error: 'analysis error sentinel',
+        analysis: {
+          sandboxAnalysis: { rawMarkdown: 'analysis content sentinel' },
+        } as never,
+      })
+    ).rejects.toThrow('update failed');
+
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    const [, context] = mockCaptureException.mock.calls[0] as [
+      unknown,
+      { tags: Record<string, string>; extra: Record<string, unknown> },
+    ];
+    expect(context).toEqual({
+      tags: { operation: 'updateAnalysisStatus' },
+      extra: {
+        findingId: 'finding-1',
+        status: 'running',
+        updatedFields: ['sessionId', 'error', 'analysis'],
+      },
+    });
+    expect(JSON.stringify(context)).not.toContain('sentinel');
   });
 });
 

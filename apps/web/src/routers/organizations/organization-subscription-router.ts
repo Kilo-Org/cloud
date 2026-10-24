@@ -41,6 +41,7 @@ import {
   ipCountryFromHeaders,
   ja4FromHeaders,
 } from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { assertChargeAllowed } from '@kilocode/web-shared/lib/bouncer/charge-gate';
 import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { client } from '@kilocode/web-shared/lib/stripe-client';
 import { isSeatLineItem } from '@kilocode/web-shared/lib/organizations/stripe-seat-line-items';
@@ -292,6 +293,14 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
         });
       }
 
+      await assertChargeAllowed({
+        userId: user.id,
+        organizationId,
+        flow: 'seats',
+        ip: ctx.ip,
+        ja4: ja4FromHeaders(ctx.headersList),
+      });
+
       const result = await getStripeSeatsCheckoutUrl({
         kiloUserId: user.id,
         stripeCustomerId: customerId,
@@ -383,6 +392,17 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       }
 
       const purchase = latestPurchase;
+      if (newSeatCount > total) {
+        // An increase invoices a prorated charge; a decrease or an unchanged count does not.
+        await assertChargeAllowed({
+          userId: ctx.user.id,
+          organizationId,
+          flow: 'seats',
+          ip: ctx.ip,
+          ja4: ja4FromHeaders(ctx.headersList),
+        });
+      }
+
       let result: Awaited<ReturnType<typeof handleUpdateSeatCount>>;
       try {
         result = await handleUpdateSeatCount(

@@ -3,10 +3,11 @@
 // persistence boundary) has no enum row of its own; it renders as a toggleable
 // row with the localized fallback label so the user can see and unselect it.
 
-import { createElement, type ReactElement } from 'react';
+import { type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
+import { ReviewerRouteParamsProvider } from '@/lib/hooks/use-reviewer-route-params';
 import FocusAreasRoute from './focus-areas';
 import {
   renderWithProviders,
@@ -20,7 +21,7 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({ scope: 'personal', platform: 'github' }),
+  useLocalSearchParams: () => ({}),
 }));
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('react-native-reanimated', () => ({
@@ -28,6 +29,7 @@ vi.mock('react-native-reanimated', () => ({
   FadeIn: { duration: vi.fn() },
   FadeOut: { duration: vi.fn() },
 }));
+vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
@@ -60,10 +62,19 @@ function choiceRows(renderer: Mounted['renderer']): ChoiceRowProps[] {
     .map(node => node.props as unknown as ChoiceRowProps);
 }
 
+/** The `[platform]` layout validates the pair and publishes it to the screen. */
+function focusAreasRoute() {
+  return (
+    <ReviewerRouteParamsProvider params={{ kind: 'personal', platform: 'github' }}>
+      <FocusAreasRoute />
+    </ReviewerRouteParamsProvider>
+  );
+}
+
 describe('FocusAreasRoute stored unknown areas', () => {
   it('shows only the enum rows when no unknown areas are stored', async () => {
     state.config = { focusAreas: ['security', 'bugs'] };
-    const { renderer, unmount } = await renderWithProviders(createElement(FocusAreasRoute));
+    const { renderer, unmount } = await renderWithProviders(focusAreasRoute());
     await waitFor(() => choiceRows(renderer).length === 6);
     expect(choiceRows(renderer).map(row => row.label)).toEqual([
       'Security',
@@ -78,7 +89,7 @@ describe('FocusAreasRoute stored unknown areas', () => {
 
   it('appends a selected fallback row per stored unknown area', async () => {
     state.config = { focusAreas: ['security', 'correctness'] };
-    const { renderer, unmount } = await renderWithProviders(createElement(FocusAreasRoute));
+    const { renderer, unmount } = await renderWithProviders(focusAreasRoute());
     await waitFor(() => choiceRows(renderer).length === 7);
     const rows = choiceRows(renderer);
     expect(rows.at(-1)).toMatchObject({ label: 'Other (correctness)', selected: true });
@@ -88,7 +99,7 @@ describe('FocusAreasRoute stored unknown areas', () => {
   it('toggling an unknown row saves the selection without it', async () => {
     state.config = { focusAreas: ['correctness'] };
     state.cache = { focusAreas: ['correctness'] };
-    const { renderer, unmount } = await renderWithProviders(createElement(FocusAreasRoute));
+    const { renderer, unmount } = await renderWithProviders(focusAreasRoute());
     await waitFor(() => choiceRows(renderer).length === 7);
     choiceRows(renderer).at(-1)?.onPress?.();
     expect(state.mutate).toHaveBeenCalledWith({ focusAreas: [] });

@@ -36,6 +36,7 @@ import {
   ipCountryFromHeaders,
   ja4FromHeaders,
 } from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { assertChargeAllowed } from '@kilocode/web-shared/lib/bouncer/charge-gate';
 import { KILO_PASS_REFERRER_REWARD_CAP } from '@/lib/impact/kilo-pass-referrals';
 import { TRPCError } from '@trpc/server';
 import {
@@ -2788,6 +2789,13 @@ export const kiloPassRouter = createTRPCRouter({
         cadence,
         affiliateTrackingId: attribution?.tracking_id ?? '',
       };
+
+      await assertChargeAllowed({
+        userId: ctx.user.id,
+        flow: 'kilo_pass',
+        ip: ctx.ip,
+        ja4: ja4FromHeaders(ctx.headersList),
+      });
 
       return createOrReuseKiloPassCheckoutSession({
         userId: ctx.user.id,

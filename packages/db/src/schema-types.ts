@@ -896,6 +896,9 @@ export const AdminActionAuditAction = z.enum([
   'organization.gitlab_webhook_secret.rotate',
   'organization.bitbucket.update',
   'organization.webhook_session.share',
+  'credit_campaign.create',
+  'credit_campaign.update',
+  'credit_campaign.set_active',
 ]);
 
 export type AdminActionAuditAction = z.infer<typeof AdminActionAuditAction>;
@@ -2183,10 +2186,13 @@ export type DirectByokModelFlag = z.infer<typeof DirectByokModelFlagSchema>;
 export const DirectByokModelSchema = z.object({
   id: z.string(),
   name: z.string(),
+  description: z.string().optional(),
   flags: z.array(DirectByokModelFlagSchema).readonly().optional(),
   context_length: z.number(),
   max_completion_tokens: z.number(),
   reasoning_options: z.array(ReasoningOptionSchema).optional(),
+  /** The OpenRouter catalog model ID that models.dev identifies as the same model. */
+  catalog_model_id: z.string().optional(),
 });
 
 export const DirectByokModelArraySchema = z.array(DirectByokModelSchema);

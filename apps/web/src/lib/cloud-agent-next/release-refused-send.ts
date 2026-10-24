@@ -9,20 +9,29 @@ import {
  *
  * `client.sendMessage` rewrites several worker answers before this sees them: a
  * credits refusal becomes `InsufficientCreditsError`, a billing refusal becomes
- * `CloudAgentBillingError`, and those carry `httpStatus` themselves instead of
- * the tRPC shape.
+ * `CloudAgentBillingError`, and a non-JSON answer becomes a plain error whose
+ * cause is the original. Those carry the status themselves or keep it on the
+ * cause, so the status is read along that chain as well as from the tRPC shape.
  */
 export function workerRefusalStatus(error: unknown): number | undefined {
-  const direct = (error as { httpStatus?: unknown } | null | undefined)?.httpStatus;
-  if (typeof direct === 'number') return direct;
+  // The client wraps some answers and keeps the original as the cause, so the
+  // status may sit one or two links down the chain.
+  let current: unknown = error;
+  for (let depth = 0; depth < 4; depth += 1) {
+    if (current === null || typeof current !== 'object') return undefined;
 
-  if (error instanceof TRPCClientError) {
-    const data = error.data as { httpStatus?: unknown } | undefined;
-    const shapeData = error.shape?.data as { httpStatus?: unknown } | undefined;
-    const status = data?.httpStatus ?? shapeData?.httpStatus;
-    return typeof status === 'number' ? status : undefined;
+    const direct = (current as { httpStatus?: unknown }).httpStatus;
+    if (typeof direct === 'number') return direct;
+
+    if (current instanceof TRPCClientError) {
+      const data = current.data as { httpStatus?: unknown } | undefined;
+      const shapeData = current.shape?.data as { httpStatus?: unknown } | undefined;
+      const status = data?.httpStatus ?? shapeData?.httpStatus;
+      if (typeof status === 'number') return status;
+    }
+
+    current = (current as { cause?: unknown }).cause;
   }
-
   return undefined;
 }
 

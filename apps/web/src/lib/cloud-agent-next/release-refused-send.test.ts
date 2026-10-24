@@ -89,6 +89,19 @@ describe('releaseRefusedSend', () => {
     expect(mockRelease).toHaveBeenCalledTimes(1);
   });
 
+  it('returns the rows for a status the client kept only on the cause', async () => {
+    const normalized = new Error('Cloud agent returned a non-JSON error response', {
+      cause: refusal(413),
+    });
+
+    await releaseRefusedSend(
+      { attachments, error: normalized, kiloUserId: 'user-1', linkedObjectKeys },
+      dependencies
+    );
+
+    expect(mockRelease).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps the rows when the send failed without a worker answer', async () => {
     await releaseRefusedSend(
       {
@@ -148,6 +161,10 @@ describe('workerRefusalStatus', () => {
     expect(workerRefusalStatus(new CloudAgentBillingError({ kind: 'billing' } as never, 409))).toBe(
       409
     );
+    expect(workerRefusalStatus(new Error('non-JSON', { cause: refusal(429) }))).toBe(429);
+    expect(
+      workerRefusalStatus(new Error('non-JSON', { cause: new TRPCClientError('fetch failed') }))
+    ).toBeUndefined();
     expect(workerRefusalStatus(new TRPCClientError('fetch failed'))).toBeUndefined();
     expect(workerRefusalStatus(new Error('boom'))).toBeUndefined();
     expect(workerRefusalStatus(undefined)).toBeUndefined();

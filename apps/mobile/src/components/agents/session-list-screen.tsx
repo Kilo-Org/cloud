@@ -14,10 +14,15 @@ import { EmptyState } from '@/components/empty-state';
 import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
 import { liveSessionContent, useLiveSessionContext } from '@/components/home/live-session-state';
 import { LiveSessionListEmptyState } from '@/components/agents/live-session-list-empty-state';
+import {
+  filterSessionsByStatusKind,
+  parseStatusFilterKind,
+} from '@/components/agents/live-session-status-filter';
 import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { RowsRefreshControl } from '@/components/agents/rows-refresh-control';
 import { SessionFilterButton } from '@/components/agents/session-filter-button';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
+import { SessionStatusFilterBar } from '@/components/agents/session-status-filter-bar';
 import { SessionListSkeletonRows } from '@/components/agents/session-list-skeleton-rows';
 import { estimateSessionListHeaderActionsWidth } from '@/components/agents/session-list-header-actions-width';
 import { useLiveSessionQuery } from '@/components/agents/use-live-session-query';
@@ -41,7 +46,14 @@ import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { cn } from '@/lib/utils';
 
-import { type Href, useFocusEffect, useNavigation, useRouter, useScrollToTop } from 'expo-router';
+import {
+  type Href,
+  useFocusEffect,
+  useLocalSearchParams,
+  useNavigation,
+  useRouter,
+  useScrollToTop,
+} from 'expo-router';
 
 /** `tabHeader` renders under the header: the account scope line and the Agents tab's Sessions | To-dos switch. */
 export function AgentSessionListScreen({ tabHeader }: Readonly<{ tabHeader?: ReactNode }> = {}) {
@@ -63,6 +75,16 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<{ tabHeader?: Rea
   const { activeSessions, refetch } = sessions;
   const content = liveSessionContent(context, sessions);
   const hasLiveRows = content === 'rows';
+  // A status link from the Home `Live now` card narrows the live list to one
+  // state. The parameter is transient: it is not stored, so it cannot silently
+  // narrow a later visit. The active filter is drawn by
+  // `SessionStatusFilterBar`, which clears it through `clearStatusFilter`.
+  const params = useLocalSearchParams<{ status?: string }>();
+  const statusKind = parseStatusFilterKind(params.status);
+  const statusSessions = useMemo(
+    () => filterSessionsByStatusKind(activeSessions, statusKind),
+    [activeSessions, statusKind]
+  );
   // A failed foreground refresh keeps the cached rows on screen. That failure
   // must speak through the reserved status line (one inline "Couldn't refresh"
   // with Retry) instead of the load-failure block, which would push the kept
@@ -70,7 +92,14 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<{ tabHeader?: Rea
   const retryableRowsFailure = hasLiveRows && sessions.terminalError?.kind === 'retryable';
 
   const query = useLiveSessionQuery(activeSessions);
-  const { visibleSessions, isSearching } = query;
+  const { visibleSessions: filteredSessions, isSearching } = query;
+  // The status narrowing applies after the search and persisted filters, so the
+  // filter picker still offers every option the live set contains and
+  // `canFilter` cannot shrink to the selected status and hide its own control.
+  const visibleSessions = useMemo(
+    () => filterSessionsByStatusKind(filteredSessions, statusKind),
+    [filteredSessions, statusKind]
+  );
   // The no-match body is the state the tab bar's band was reopened for, and its
   // compact form fills that band down to the corner the FAB floats in. Since
   // reserving the FAB's band here is what parked the state's second line and
@@ -195,6 +224,12 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<{ tabHeader?: Rea
   }, [navigation, runForegroundRefresh]);
 
   const navigateToSession = useAgentSessionNavigator();
+
+  // Clear the transient status filter the Home card set. It stays separate from
+  // the persisted platform and project filters, which the filter picker owns.
+  const clearStatusFilter = useCallback(() => {
+    router.setParams({ status: undefined });
+  }, [router]);
 
   // The header link opens the stored-session list, so it names that surface: a
   // bare `home.seeAll` here claimed a longer live list that is not on screen
@@ -361,6 +396,18 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<{ tabHeader?: Rea
   const keyboardRowsInsets = useSessionListInsets({ bottomBand: rowsFrameBand, left, right });
   const rowsInsets = keyboardUp ? keyboardRowsInsets : listInsets;
 
+  // The no-match body's Clear action retires the filter that emptied the list:
+  // the transient status filter when the Home card set one, else the search,
+  // else the persisted filters. A status filter always reads as a filter, so
+  // the copy and the action agree even when a search is also active.
+  const emptyCopyIsSearch = isSearching && statusKind === null;
+  let clearNoMatch = query.handleClearFilters;
+  if (statusKind !== null) {
+    clearNoMatch = clearStatusFilter;
+  } else if (isSearching) {
+    clearNoMatch = query.handleClearSearch;
+  }
+
   let body: ReactNode = null;
   if (!query.hasLoaded || content === 'pending') {
     body = <SessionListSkeletonRows insets={{ left, right }} />;
@@ -385,7 +432,7 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<{ tabHeader?: Rea
         compact={compactEmptyState}
         refreshControl={rowsControl}
         description={
-          isSearching
+          emptyCopyIsSearch
             ? t('agents.sessionList.tryDifferentSearch')
             : t('agents.sessionList.tryAdjustFilters')
         }
@@ -393,10 +440,10 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<{ tabHeader?: Rea
           <Button
             variant="outline"
             size={compactEmptyState ? 'sm' : 'default'}
-            onPress={isSearching ? query.handleClearSearch : query.handleClearFilters}
+            onPress={clearNoMatch}
             className={STATE_ACTION_CLASS}
           >
-            <Text>{isSearching ? t('common.clearSearch') : t('common.clearFilters')}</Text>
+            <Text>{emptyCopyIsSearch ? t('common.clearSearch') : t('common.clearFilters')}</Text>
           </Button>
         }
       />
@@ -520,6 +567,15 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<{ tabHeader?: Rea
             showSearchBusy={false}
             onChangeText={query.handleSearchChange}
             onClearSearch={query.handleClearSearch}
+          />
+        ) : null}
+        {/* The Home card's status link shows the list narrowed to one state.
+            The bar names the state and the count and clears the parameter. */}
+        {hasLiveRows && statusKind !== null ? (
+          <SessionStatusFilterBar
+            kind={statusKind}
+            count={statusSessions.length}
+            onClear={clearStatusFilter}
           />
         ) : null}
         {/* Android runs edge-to-edge and never resizes the window for the IME,

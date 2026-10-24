@@ -799,6 +799,56 @@ describe('parseEmbeddingUsageFromResponse', () => {
   });
 });
 
+describe('parseEmbeddingUsageFromResponse upstream cost shapes', () => {
+  it('bills the upstream inference cost of a BYOK-served OpenRouter embedding', () => {
+    const response = JSON.stringify({
+      id: 'gen-emb-123',
+      object: 'list',
+      model: 'codestral-embed-2505',
+      usage: {
+        prompt_tokens: 3000,
+        total_tokens: 3000,
+        cost: 0.0000225,
+        is_byok: true,
+        cost_details: { upstream_inference_cost: 0.00045 },
+      },
+      provider: 'Mistral',
+    });
+
+    const result = parseEmbeddingUsageFromResponse(response, 200);
+
+    expect(result.cost_mUsd).toBe(450);
+    expect(result.is_byok).toBe(true);
+  });
+
+  it('reads Vercel AI Gateway cost and credential type from providerMetadata', () => {
+    const response = JSON.stringify({
+      object: 'list',
+      model: 'mistral/codestral-embed',
+      usage: { prompt_tokens: 3000, total_tokens: 3000 },
+      providerMetadata: {
+        gateway: {
+          routing: {
+            modelAttempts: [
+              {
+                success: true,
+                providerAttempts: [{ provider: 'mistral', credentialType: 'byok', success: true }],
+              },
+            ],
+          },
+          cost: '0',
+          marketCost: '0.00045',
+        },
+      },
+    });
+
+    const result = parseEmbeddingUsageFromResponse(response, 200);
+
+    expect(result.cost_mUsd).toBe(450);
+    expect(result.is_byok).toBe(true);
+  });
+});
+
 describe('parseTranscriptionUsageFromResponse', () => {
   function makeResponse(overrides: Record<string, unknown> = {}) {
     return JSON.stringify({

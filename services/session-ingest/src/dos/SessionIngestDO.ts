@@ -1840,6 +1840,23 @@ export class SessionIngestDO extends DurableObject<Env> {
     params: { kiloUserId: string; sessionId: string; key: string },
     body: ReadableStream<unknown> | Uint8Array
   ): Promise<boolean> {
+    const result = await this.stageR2ObjectInternal(params, body);
+    if (result === 'too_large') throw new Error('Unbounded staging returned a byte-limit result');
+    return result;
+  }
+  async stageBoundedR2Object(
+    params: { kiloUserId: string; sessionId: string; key: string },
+    body: ReadableStream<unknown> | Uint8Array,
+    maxBytes: number
+  ): Promise<boolean | 'too_large'> {
+    return this.stageR2ObjectInternal(params, body, maxBytes);
+  }
+
+  private async stageR2ObjectInternal(
+    params: { kiloUserId: string; sessionId: string; key: string },
+    body: ReadableStream<unknown> | Uint8Array,
+    maxBytes?: number
+  ): Promise<boolean | 'too_large'> {
     const cancelBody = async (): Promise<void> => {
       if (body instanceof ReadableStream) await body.cancel();
     };
@@ -1851,19 +1868,22 @@ export class SessionIngestDO extends DurableObject<Env> {
     ) {
       throw new Error('Session R2 identity conflict');
     }
+    if (maxBytes !== undefined && body instanceof Uint8Array && body.byteLength > maxBytes) {
+      return 'too_large';
+    }
     if (this.isDeleted()) {
       await cancelBody();
       return false;
     }
     writeIngestMetaIfChanged(this.db, { key: 'kiloUserId', incomingValue: params.kiloUserId });
     writeIngestMetaIfChanged(this.db, { key: 'sessionId', incomingValue: params.sessionId });
-    const key = `pendingR2/${params.key}`;
+    const pendingKey = `pendingR2/${params.key}`;
     this.db
       .insert(ingestMeta)
-      .values({ key, value: params.key })
+      .values({ key: pendingKey, value: params.key })
       .onConflictDoUpdate({ target: ingestMeta.key, set: { value: params.key } })
       .run();
-    const operation = (async () => {
+    const operation = (async (): Promise<boolean | 'too_large'> => {
       const reservation = await this.env.SESSION_INGEST_R2.put(params.key, crypto.randomUUID(), {
         onlyIf: new Headers({ 'If-None-Match': '*' }),
       });
@@ -1871,21 +1891,106 @@ export class SessionIngestDO extends DurableObject<Env> {
       if (this.isDeleted()) {
         await cancelBody();
         await this.env.SESSION_INGEST_R2.delete(params.key);
-        this.db.delete(ingestMeta).where(eq(ingestMeta.key, key)).run();
+        this.db.delete(ingestMeta).where(eq(ingestMeta.key, pendingKey)).run();
         return false;
       }
       if (!etag) throw new Error('Session R2 reservation disappeared');
-      const written = await this.env.SESSION_INGEST_R2.put(params.key, body, {
-        onlyIf: { etagMatches: etag },
-      });
+
+      let written: R2Object | null;
+      if (maxBytes === undefined) {
+        written = await this.env.SESSION_INGEST_R2.put(params.key, body, {
+          onlyIf: { etagMatches: etag },
+        });
+      } else if (body instanceof Uint8Array) {
+        written = await this.env.SESSION_INGEST_R2.put(params.key, body, {
+          onlyIf: { etagMatches: etag },
+        });
+      } else {
+        const result = await this.writeBoundedMultipart(params.key, body, maxBytes, etag);
+        if (result === 'too_large') {
+          await this.env.SESSION_INGEST_R2.delete(params.key);
+          this.db.delete(ingestMeta).where(eq(ingestMeta.key, pendingKey)).run();
+          return result;
+        }
+        written = result;
+      }
       const deleted = this.isDeleted();
       if (!written && !deleted) throw new Error('Session R2 reservation changed');
       if (deleted) await this.env.SESSION_INGEST_R2.delete(params.key);
-      this.db.delete(ingestMeta).where(eq(ingestMeta.key, key)).run();
+      this.db.delete(ingestMeta).where(eq(ingestMeta.key, pendingKey)).run();
       return !deleted;
     })();
     this.activeR2Writes.add(operation);
     return operation.finally(() => this.activeR2Writes.delete(operation));
+  }
+
+  private async writeBoundedMultipart(
+    key: string,
+    body: ReadableStream<unknown>,
+    maxBytes: number,
+    reservationEtag: string
+  ): Promise<R2Object | null | 'too_large'> {
+    const partSize = 5 * 1024 * 1024;
+    const reader = body.getReader();
+    let buffer = new Uint8Array(partSize);
+    let buffered = 0;
+    let total = 0;
+    let upload: R2MultipartUpload | undefined;
+    const uploadedParts: R2UploadedPart[] = [];
+    try {
+      while (true) {
+        const result = await reader.read();
+        if (result.done) break;
+        if (!(result.value instanceof Uint8Array)) {
+          throw new TypeError('Staging stream yielded a non-byte chunk');
+        }
+        total += result.value.byteLength;
+        if (total > maxBytes) {
+          await reader.cancel('ingest body exceeded the staging byte budget').catch(() => {});
+          await upload?.abort().catch(() => {});
+          return 'too_large';
+        }
+        let offset = 0;
+        while (offset < result.value.byteLength) {
+          const count = Math.min(partSize - buffered, result.value.byteLength - offset);
+          buffer.set(result.value.subarray(offset, offset + count), buffered);
+          buffered += count;
+          offset += count;
+          if (buffered === partSize) {
+            upload ??= await this.env.SESSION_INGEST_R2.createMultipartUpload(key);
+            uploadedParts.push(await upload.uploadPart(uploadedParts.length + 1, buffer));
+            buffer = new Uint8Array(partSize);
+            buffered = 0;
+          }
+        }
+      }
+
+      if (!upload) {
+        return this.env.SESSION_INGEST_R2.put(key, buffer.subarray(0, buffered), {
+          onlyIf: { etagMatches: reservationEtag },
+        });
+      }
+      if (buffered > 0) {
+        uploadedParts.push(
+          await upload.uploadPart(uploadedParts.length + 1, buffer.subarray(0, buffered))
+        );
+      }
+      if (this.isDeleted()) {
+        await upload.abort();
+        return null;
+      }
+      const current = await this.env.SESSION_INGEST_R2.head(key);
+      if (current?.etag !== reservationEtag) {
+        await upload.abort();
+        return null;
+      }
+      return await upload.complete(uploadedParts);
+    } catch (error) {
+      await upload?.abort().catch(() => {});
+      throw error;
+    } finally {
+      reader.releaseLock();
+    }
   }
 
   async clearForWorktree(kiloUserId: string, sessionId: string): Promise<void> {

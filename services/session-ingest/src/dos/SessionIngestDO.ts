@@ -643,17 +643,36 @@ export class SessionIngestDO extends DurableObject<Env> {
           .from(ingestItems)
           .where(eq(ingestItems.item_id, item_id))
           .get();
-        if (
+        const previousItem =
+          item.type === 'part'
+            ? this.db
+                .select({ ingested_at: ingestItems.ingested_at })
+                .from(ingestItems)
+                .where(
+                  and(
+                    eq(
+                      ingestItems.item_id,
+                      getPreviousPartItemIdentity(item.data.messageID, item.data.id)
+                    ),
+                    eq(ingestItems.item_type, 'part')
+                  )
+                )
+                .get()
+            : undefined;
+        const existingIsNewer =
           existing?.ingested_at !== null &&
           existing?.ingested_at !== undefined &&
-          existing.ingested_at > ingestedAt
-        ) {
+          existing.ingested_at > ingestedAt;
+        const previousIsNewer =
+          previousItem?.ingested_at !== null &&
+          previousItem?.ingested_at !== undefined &&
+          previousItem.ingested_at > ingestedAt;
+        if (existingIsNewer || previousIsNewer) {
           // Item is stale — if the caller wrote an R2 blob for it, that blob is orphaned
           const newR2Key = r2References?.[item_id];
           if (newR2Key) orphanedR2Keys.push(newR2Key);
           continue;
         }
-
         // If the existing row pointed to a different R2 blob, it will be orphaned after upsert
         const newR2Key = r2References?.[item_id] ?? null;
         if (existing?.item_data_r2_key && existing.item_data_r2_key !== newR2Key) {

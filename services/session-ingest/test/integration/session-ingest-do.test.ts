@@ -1,5 +1,5 @@
 import { env, runInDurableObject } from 'cloudflare:test';
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   decodeKiloSdkMessagesCursor,
@@ -885,6 +885,65 @@ describe('SessionIngestDO integration', () => {
         nextCursor: null,
         omittedItemCount: 0,
       });
+    });
+
+    it('preserves the most recent part value across persisted layouts', async () => {
+      const sessionId = 'ses_part_layout_delayed_0000001';
+      const stub = getStub(kiloUserId, sessionId);
+      const stagedKey = `items/${kiloUserId}/${sessionId}/part/prt_1/delayed`;
+      await stub.ingest([{ type: 'message', data: message(sessionId) }], kiloUserId, sessionId, 1);
+      try {
+        await runInDurableObject(stub, async (_instance, state) => {
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+            'msg_a/prt_1',
+            'part',
+            JSON.stringify(part(sessionId, 'stored later')),
+            2000
+          );
+        });
+        await env.SESSION_INGEST_R2.put(stagedKey, '{}');
+
+        await stub.ingest(
+          [{ type: 'part', data: part(sessionId, 'delivered late') }],
+          kiloUserId,
+          sessionId,
+          1,
+          1000,
+          { 'part/msg_a/prt_1': stagedKey }
+        );
+
+        const rows = await runInDurableObject(stub, async (_instance, state) =>
+          state.storage.sql
+            .exec<{ item_id: string }>(
+              'SELECT item_id FROM ingest_items WHERE item_type = ? ORDER BY item_id',
+              'part'
+            )
+            .toArray()
+        );
+        expect(rows).toEqual([{ item_id: 'msg_a/prt_1' }]);
+
+        await expect(stub.readKiloSdkMessages({ limit: 1 })).resolves.toEqual({
+          messages: [{ info: message(sessionId), parts: [part(sessionId, 'stored later')] }],
+          nextCursor: null,
+          omittedItemCount: 0,
+        });
+
+        const exported = JSON.parse(
+          await stub.getAllStream().then(s => new Response(s).text())
+        ) as {
+          messages: Array<{ info: { id: string }; parts: Array<{ text: string }> }>;
+        };
+        expect(
+          exported.messages.map(entry => [entry.info.id, entry.parts.map(row => row.text)])
+        ).toEqual([['msg_a', ['stored later']]]);
+
+        await vi.waitFor(async () => {
+          await expect(env.SESSION_INGEST_R2.head(stagedKey)).resolves.toBeNull();
+        });
+      } finally {
+        await env.SESSION_INGEST_R2.delete(stagedKey);
+      }
     });
 
     it('stores a part under the part root for every message id', async () => {

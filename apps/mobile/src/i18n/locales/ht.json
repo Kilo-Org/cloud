@@ -2578,7 +2578,9 @@
       "retrying": "Ap eseye ankò…",
       "retryDeny": "Eseye refize ankò",
       "retryAllowOnce": "Eseye pèmèt yon sèl fwa ankò",
-      "retryAlwaysAllow": "Eseye toujou pèmèt ankò"
+      "retryAlwaysAllow": "Eseye toujou pèmèt ankò",
+      "unreadableTitle": "Demann pèmisyon an pa t ka li",
+      "unreadableBody": "Ajan an ap tann yon desizyon pèmisyon a, men aplikasyon sa a pa ka montre demann lan. Mete aplikasyon an oswa CLI a ajou, oswa reponn demann lan nan CLI a pou w ka kontinye."
     },
     "questionCard": {
       "title": "Ajan an bezwen yon repons",

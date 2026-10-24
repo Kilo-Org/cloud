@@ -43,6 +43,7 @@ import { MessageErrorBoundary } from '@/components/agents/message-error-boundary
 import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
 import { nextHeldQueuedIds } from '@/components/agents/queued-badge-hold';
 import { PermissionCard } from '@/components/agents/permission-card';
+import { PermissionUnreadableNotice } from '@/components/agents/permission-unreadable-notice';
 import { QuestionCard } from '@/components/agents/question-card';
 import {
   type ContextSheetIdentity,
@@ -327,6 +328,7 @@ export function SessionDetailContent({
   const activeSuggestion = useAtomValue(manager.atoms.activeSuggestion);
   const pendingQuestions = useAtomValue(manager.atoms.pendingQuestions);
   const pendingPermissions = useAtomValue(manager.atoms.pendingPermissions);
+  const unreadablePermissions = useAtomValue(manager.atoms.unreadablePermissions);
   const totalCost = useAtomValue(manager.atoms.totalCost);
   const { totalMicrodollars, breakdownCostUsd } = selectSessionCostInputs(
     fetchedData?.kiloSessionId === sessionId ? fetchedData.totalCostMicrodollars : null,
@@ -2562,6 +2564,8 @@ export function SessionDetailContent({
             ) : null}
           </Animated.View>
         ) : null}
+
+        {unreadablePermissions.length > 0 ? <PermissionUnreadableNotice /> : null}
 
         {blockingInteraction === 'question' && activeQuestion ? (
           <QuestionCard

@@ -2578,7 +2578,9 @@
       "retrying": "Probeer weer…",
       "retryDeny": "Probeer weer weier",
       "retryAllowOnce": "Probeer weer laat een keer toe",
-      "retryAlwaysAllow": "Probeer weer laat altyd toe"
+      "retryAlwaysAllow": "Probeer weer laat altyd toe",
+      "unreadableTitle": "Toestemmingsversoek kon nie gelees word nie",
+      "unreadableBody": "Die agent wag op 'n toestemmingsbeslissing wat hierdie app nie kan wys nie. Dateer die app of die CLI op, of beantwoord die versoek in die CLI om voort te gaan."
     },
     "questionCard": {
       "title": "Agent benodig insette",

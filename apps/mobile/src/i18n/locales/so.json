@@ -2578,7 +2578,9 @@
       "retrying": "Mar kale ayaa la isku dayayaa…",
       "retryDeny": "Mar kale isku day inaad diiddo",
       "retryAllowOnce": "Mar kale isku day inaad oggolaato hal mar",
-      "retryAlwaysAllow": "Mar kale isku day inaad had iyo jeer oggolaato"
+      "retryAlwaysAllow": "Mar kale isku day inaad had iyo jeer oggolaato",
+      "unreadableTitle": "Codsi oggolaansho lama akhriyi karin",
+      "unreadableBody": "Wakiilka ayaa sugaya go'aan oggolaansho oo abkani ma muujin karo. Cusboonaysii abka ama CLI, ama ka jawaab codsiga CLI si aad u sii socoto."
     },
     "questionCard": {
       "title": "Wakiilku wuxuu u baahan yahay jawaab",

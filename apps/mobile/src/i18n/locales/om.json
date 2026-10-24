@@ -2578,7 +2578,9 @@
       "retrying": "Deebi'ee yaalaa jira…",
       "retryDeny": "Diduuf deebi'ii yaali",
       "retryAllowOnce": "Al tokko hayyamuuf deebi'ii yaali",
-      "retryAlwaysAllow": "Yeroo hunda hayyamuuf deebi'ii yaali"
+      "retryAlwaysAllow": "Yeroo hunda hayyamuuf deebi'ii yaali",
+      "unreadableTitle": "Gaaffiin hayyamaa dubbifamuu hin dandeenye",
+      "unreadableBody": "Ajentiin murtii hayyamaa eeggachaa jira; appiin kun sana agarsiisuu hin danda'u. Appii ykn CLI haaromsi, ykn itti fufuuf gaaffii CLI keessatti deebisi."
     },
     "questionCard": {
       "title": "Ergamaan deebii barbaada",

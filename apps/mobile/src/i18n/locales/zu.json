@@ -2578,7 +2578,9 @@
       "retrying": "Kuzanywa futhi…",
       "retryDeny": "Zama ukwenqaba futhi",
       "retryAllowOnce": "Zama ukuvumela kanye futhi",
-      "retryAlwaysAllow": "Zama ukuvumela njalo futhi"
+      "retryAlwaysAllow": "Zama ukuvumela njalo futhi",
+      "unreadableTitle": "Isicelo semvume asikwazile ukufundwa",
+      "unreadableBody": "I-agent ilinde isinqumo semvume esingakwazi ukusibonisa kule app. Buyekeza i-app noma i-CLI, noma uphendule isicelo ku-CLI ukuze uqhubeke."
     },
     "questionCard": {
       "title": "Umenzeli udinga impendulo",

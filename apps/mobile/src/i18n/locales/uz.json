@@ -2578,7 +2578,9 @@
       "retrying": "Qayta urinilmoqda…",
       "retryDeny": "Qayta rad etish",
       "retryAllowOnce": "Qayta bir marta ruxsat berish",
-      "retryAlwaysAllow": "Qayta doim ruxsat berish"
+      "retryAlwaysAllow": "Qayta doim ruxsat berish",
+      "unreadableTitle": "Ruxsat so'rovini o'qib bo'lmadi",
+      "unreadableBody": "Agent ruxsat qarorini kutmoqda, lekin bu ilova bu so'rovni ko'rsata olmaydi. Davom etish uchun ilovani yoki CLI'ni yangilang yoki so'rovga CLI'da javob bering."
     },
     "questionCard": {
       "title": "Agentga javob kerak",

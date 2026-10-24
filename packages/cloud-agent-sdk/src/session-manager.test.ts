@@ -48,6 +48,7 @@ import type {
   SessionInfo,
   SessionSnapshotPage,
   SessionSnapshotPageOutcome,
+  UnreadablePermissionState,
 } from './types';
 import type { RemoteModelState } from './remote-model-catalog';
 import type { RemoteCommandState } from './remote-command-catalog';
@@ -129,6 +130,7 @@ const mockSession = {
     getQuestion: jest.fn(() => null),
     getSessionInfo: jest.fn(() => null),
     getPermission: jest.fn(() => null),
+    getUnreadablePermissions: jest.fn<readonly UnreadablePermissionState[], []>(() => []),
     getSuggestion: jest.fn(() => null),
     getPendingMessages: jest.fn<ReadonlyMap<string, MessageDeliveryState>, []>(() => new Map()),
     clearFailedMessage: jest.fn(),
@@ -6658,6 +6660,43 @@ describe('createSessionManager', () => {
 
       mockSessionCallbacks.onQuestionResolved?.('req-1');
       expect(atomValue(config.store, mgr.atoms.activeQuestion)).toBeNull();
+    });
+
+    it('tracks unreadable permission notices from the service state', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      const unreadable = jest.fn<readonly { requestId: string }[], []>(() => []);
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+      mockSession.state.getUnreadablePermissions.mockImplementation(unreadable);
+      try {
+        const config = createMockConfig();
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        expect(atomValue(config.store, mgr.atoms.unreadablePermissions)).toEqual([]);
+
+        unreadable.mockReturnValue([{ requestId: 'perm-1' }, { requestId: 'perm-2' }]);
+        notifyStateChange?.();
+        expect(atomValue(config.store, mgr.atoms.unreadablePermissions)).toEqual([
+          { requestId: 'perm-1' },
+          { requestId: 'perm-2' },
+        ]);
+
+        // The same ids in the same order keep the atom identity, so unrelated
+        // state notifications do not repaint the notice.
+        const stable = atomValue(config.store, mgr.atoms.unreadablePermissions);
+        notifyStateChange?.();
+        expect(atomValue(config.store, mgr.atoms.unreadablePermissions)).toBe(stable);
+
+        unreadable.mockReturnValue([]);
+        notifyStateChange?.();
+        expect(atomValue(config.store, mgr.atoms.unreadablePermissions)).toEqual([]);
+        mgr.destroy();
+      } finally {
+        mockSession.state.getUnreadablePermissions.mockImplementation(() => []);
+      }
     });
 
     it('onPermissionAsked queues asks and keeps the oldest active', async () => {

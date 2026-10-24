@@ -930,6 +930,19 @@ export const permissionAskedDataSchema = z.object({
 });
 export type PermissionAskedData = z.infer<typeof permissionAskedDataSchema>;
 
+/**
+ * The part of a permission request that still identifies it when its scope does
+ * not parse. The consent surface cannot offer a decision for such a request,
+ * but the user must learn that one is waiting, so the event boundary forwards
+ * this identity instead of dropping the request silently. A payload with no
+ * readable `id` has nothing to key the notice to and no `permission.replied`
+ * that could clear it, so it is still dropped.
+ */
+export const permissionAskedIdentitySchema = z.object({
+  id: z.string().min(1),
+});
+export type PermissionAskedIdentity = z.infer<typeof permissionAskedIdentitySchema>;
+
 export const permissionRepliedDataSchema = z.object({
   requestID: z.string(),
 });

@@ -2691,7 +2691,9 @@
       "retrying": "Retrying…",
       "retryDeny": "Retry deny",
       "retryAllowOnce": "Retry allow once",
-      "retryAlwaysAllow": "Retry always allow"
+      "retryAlwaysAllow": "Retry always allow",
+      "unreadableTitle": "Permission request could not be read",
+      "unreadableBody": "The agent is waiting for a permission decision this app cannot show. Update the app or the CLI, or answer the request in the CLI to continue."
     },
     "questionCard": {
       "title": "Agent needs input",

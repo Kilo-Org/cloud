@@ -1250,7 +1250,7 @@ describe('normalize', () => {
       });
     });
 
-    it('skips permission.asked whose scope fields are not the declared shapes', () => {
+    it('reports a permission.asked whose scope fields are not the declared shapes', () => {
       const malformed: Array<Record<string, unknown>> = [
         { patterns: 'src/**' },
         { patterns: [1] },
@@ -1261,11 +1261,12 @@ describe('normalize', () => {
 
       for (const scope of malformed) {
         const data = { id: 'perm-2', permission: 'write', ...scope };
-        expect(normalize(createRaw('permission.asked', data))).toBeNull();
+        const result = normalize(createRaw('permission.asked', data));
+        expect(result).toEqual({ type: 'permission.unreadable', requestId: 'perm-2' });
       }
     });
 
-    it('skips permission.asked that omits a scope field', () => {
+    it('reports a permission.asked that omits a scope field', () => {
       const complete: Record<string, unknown> = {
         id: 'perm-2',
         permission: 'write',
@@ -1276,8 +1277,19 @@ describe('normalize', () => {
 
       for (const field of ['patterns', 'metadata', 'always']) {
         const { [field]: _omitted, ...data } = complete;
-        expect(normalize(createRaw('permission.asked', data))).toBeNull();
+        expect(normalize(createRaw('permission.asked', data))).toEqual({
+          type: 'permission.unreadable',
+          requestId: 'perm-2',
+        });
       }
+    });
+
+    it('reports a malformed scope without the permission name', () => {
+      const data = { id: 'perm-4', patterns: ['**/*'], metadata: {}, always: [] };
+      expect(normalize(createRaw('permission.asked', data))).toEqual({
+        type: 'permission.unreadable',
+        requestId: 'perm-4',
+      });
     });
 
     it('skips permission.asked without id', () => {

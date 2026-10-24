@@ -2578,7 +2578,9 @@
       "retrying": "Na-anwa ọzọ…",
       "retryDeny": "Nwaa ịjụ ọzọ",
       "retryAllowOnce": "Nwaa ikwe naanị otu ugboro ọzọ",
-      "retryAlwaysAllow": "Nwaa ikwe mgbe niile ọzọ"
+      "retryAlwaysAllow": "Nwaa ikwe mgbe niile ọzọ",
+      "unreadableTitle": "Enweghị ike ịgụ arịrịọ ikike",
+      "unreadableBody": "Onye nnọchite na-eche mkpebi ikike nke ngwa a enweghị ike igosi. Melite ngwa ma ọ bụ CLI ahụ, ma ọ bụ zaa arịrịọ ahụ na CLI ka ị gaa n'ihu."
     },
     "questionCard": {
       "title": "Onye nnọchi anya chọrọ azịza",

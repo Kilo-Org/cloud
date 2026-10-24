@@ -52,6 +52,7 @@ import type {
   CloudStatus,
   QuestionState,
   PermissionState,
+  UnreadablePermissionState,
   SlashCommandInfo,
   SlashCommandCatalogStatus,
   SuggestionState,
@@ -493,6 +494,12 @@ type SessionManagerAtoms = {
   pendingQuestions: W<readonly StandaloneQuestion[]>;
   /** Every pending permission, oldest first. `activePermission` is the head. */
   pendingPermissions: W<readonly StandalonePermission[]>;
+  /**
+   * Pending permission requests whose scope this app could not read, oldest
+   * first. No card can answer them; the surfaces show a notice that points the
+   * user at the CLI.
+   */
+  unreadablePermissions: W<readonly UnreadablePermissionState[]>;
   activeSuggestion: W<StandaloneSuggestion | null>;
   sessionInfo: W<SessionInfo | null>;
   sessionId: W<CloudAgentSessionId | null>;
@@ -918,6 +925,16 @@ function upsertPendingRequest<T extends { requestId: string }>(
   return copy;
 }
 
+/** True when two request lists name the same requests in the same order. */
+function sameRequestIds(
+  a: readonly { requestId: string }[],
+  b: readonly { requestId: string }[]
+): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  return a.every((entry, index) => entry.requestId === b[index]?.requestId);
+}
+
 function removePendingRequest<T extends { requestId: string }>(
   list: readonly T[],
   requestId: string
@@ -1037,6 +1054,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   const activePermissionAtom = atom<StandalonePermission | null>(null);
   const pendingQuestionsAtom = atom<readonly StandaloneQuestion[]>([]);
   const pendingPermissionsAtom = atom<readonly StandalonePermission[]>([]);
+  const unreadablePermissionsAtom = atom<readonly UnreadablePermissionState[]>([]);
   const suggestionAtom = atom<SuggestionState | null>(null);
   const activeSuggestionAtom = atom<StandaloneSuggestion | null>(null);
   const pendingMessagesAtom = atom<ReadonlyMap<string, MessageDeliveryState>>(new Map());
@@ -1555,6 +1573,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(activePermissionAtom, null);
     store.set(pendingQuestionsAtom, []);
     store.set(pendingPermissionsAtom, []);
+    store.set(unreadablePermissionsAtom, []);
     store.set(suggestionAtom, null);
     store.set(activeSuggestionAtom, null);
     store.set(pendingMessagesAtom, new Map());
@@ -2041,6 +2060,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       store.set(isStreamingAtom, act.type === 'busy');
       store.set(questionAtom, session.state.getQuestion());
       store.set(permissionAtom, session.state.getPermission());
+      const nextUnreadablePermissions = session.state.getUnreadablePermissions();
+      if (!sameRequestIds(store.get(unreadablePermissionsAtom), nextUnreadablePermissions)) {
+        store.set(unreadablePermissionsAtom, nextUnreadablePermissions);
+      }
       store.set(suggestionAtom, session.state.getSuggestion());
       store.set(sessionInfoAtom, session.state.getSessionInfo());
       const nextPendingMessages = session.state.getPendingMessages();
@@ -3835,6 +3858,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       activePermission: activePermissionAtom,
       pendingQuestions: pendingQuestionsAtom,
       pendingPermissions: pendingPermissionsAtom,
+      unreadablePermissions: unreadablePermissionsAtom,
       suggestion: suggestionAtom,
       activeSuggestion: activeSuggestionAtom,
       pendingMessages: pendingMessagesAtom,

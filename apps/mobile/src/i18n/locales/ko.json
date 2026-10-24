@@ -2054,7 +2054,9 @@
       "retrying": "다시 시도 중…",
       "retryDeny": "거부 다시 시도",
       "retryAllowOnce": "이번만 허용 다시 시도",
-      "retryAlwaysAllow": "항상 허용 다시 시도"
+      "retryAlwaysAllow": "항상 허용 다시 시도",
+      "unreadableTitle": "권한 요청을 읽을 수 없음",
+      "unreadableBody": "에이전트가 권한 결정을 기다리고 있지만 이 앱에서는 해당 요청을 표시할 수 없습니다. 앱이나 CLI를 업데이트하거나 CLI에서 요청에 응답해 계속 진행하세요."
     },
     "questionCard": {
       "title": "에이전트의 질문",

@@ -2578,7 +2578,9 @@
       "retrying": "Duke u provuar përsëri…",
       "retryDeny": "Provo ta refuzosh përsëri",
       "retryAllowOnce": "Provo ta lejosh një herë përsëri",
-      "retryAlwaysAllow": "Provo ta lejosh gjithmonë përsëri"
+      "retryAlwaysAllow": "Provo ta lejosh gjithmonë përsëri",
+      "unreadableTitle": "Kërkesa për leje nuk mund të lexohej",
+      "unreadableBody": "Agjenti po pret një vendim për leje që ky aplikacion nuk mund ta shfaqë. Përditëso aplikacionin ose CLI, ose përgjigju kërkesës në CLI për të vazhduar."
     },
     "questionCard": {
       "title": "Agjenti kërkon përgjigjen tënde",

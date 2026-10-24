@@ -2650,7 +2650,9 @@
       "retrying": "Bandoma iš naujo…",
       "retryDeny": "Bandyti neleisti iš naujo",
       "retryAllowOnce": "Bandyti leisti vieną kartą iš naujo",
-      "retryAlwaysAllow": "Bandyti visada leisti iš naujo"
+      "retryAlwaysAllow": "Bandyti visada leisti iš naujo",
+      "unreadableTitle": "Nepavyko nuskaityti leidimo užklausos",
+      "unreadableBody": "Agentas laukia sprendimo dėl leidimo, kurio ši programa negali parodyti. Atnaujinkite programą arba CLI arba atsakykite į užklausą CLI, kad galėtumėte tęsti."
     },
     "questionCard": {
       "title": "Agentui reikia atsakymo",

@@ -27,6 +27,7 @@ import {
   type StandalonePermission,
   type StoredMessage,
   type ToolPart,
+  type UnreadablePermissionState,
 } from '@kilocode/cloud-agent-sdk';
 import { cloudAgentId, kiloId, stubTextPart } from '@kilocode/cloud-agent-sdk/test-helpers';
 
@@ -43,6 +44,7 @@ import {
 } from '@/components/agents/exit-remote-session-with-feedback';
 import { RemoteSessionExitFailure } from '@/components/agents/remote-session-exit-failure';
 import { PermissionCard } from '@/components/agents/permission-card';
+import { PermissionUnreadableNotice } from '@/components/agents/permission-unreadable-notice';
 import { setSessionAutoApproveEnabled } from '@/components/agents/session-auto-approve';
 import {
   isSessionGoalCollapsed,
@@ -2351,6 +2353,40 @@ describe('session detail per-session auto-approve', () => {
 
     expect(view.renderer.root.findAllByType(PermissionCard)).toHaveLength(1);
     expect(respondToPermission).not.toHaveBeenCalled();
+  });
+});
+
+describe('session detail unreadable permission notice', () => {
+  const waiting: readonly UnreadablePermissionState[] = [{ requestId: 'perm-1' }];
+  const none: readonly UnreadablePermissionState[] = [];
+
+  it('explains the waiting request and keeps the composer usable', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set(view.manager.atoms.unreadablePermissions, waiting);
+    });
+
+    expect(view.renderer.root.findAllByType(PermissionUnreadableNotice)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(PermissionCard)).toHaveLength(0);
+    expect(renderedText(view.renderer.root)).toContain(
+      'The agent is waiting for a permission decision this app cannot show.'
+    );
+
+    const composer = view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'));
+    expect(composer).toHaveLength(1);
+    expect(composer[0]?.parent?.parent?.props.className ?? '').not.toContain('hidden');
+  });
+
+  it('renders nothing once the request is answered', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set(view.manager.atoms.unreadablePermissions, waiting);
+    });
+    act(() => {
+      view.store.set(view.manager.atoms.unreadablePermissions, none);
+    });
+
+    expect(view.renderer.root.findAllByType(PermissionUnreadableNotice)).toHaveLength(0);
   });
 });
 

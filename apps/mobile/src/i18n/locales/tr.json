@@ -2054,7 +2054,9 @@
       "retrying": "Tekrar deneniyor…",
       "retryDeny": "Reddetmeyi tekrar dene",
       "retryAllowOnce": "Bir kez izin vermeyi tekrar dene",
-      "retryAlwaysAllow": "Her zaman izin vermeyi tekrar dene"
+      "retryAlwaysAllow": "Her zaman izin vermeyi tekrar dene",
+      "unreadableTitle": "İzin isteği okunamadı",
+      "unreadableBody": "Aracı, bu uygulamanın gösteremediği bir izin kararını bekliyor. Devam etmek için uygulamayı veya CLI'yi güncelle ya da isteği CLI'de yanıtla."
     },
     "questionCard": {
       "title": "Ajan yanıt bekliyor",

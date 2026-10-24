@@ -2650,7 +2650,9 @@
       "retrying": "Ponovni poskus…",
       "retryDeny": "Znova zavrni",
       "retryAllowOnce": "Znova dovoli enkrat",
-      "retryAlwaysAllow": "Znova vedno dovoli"
+      "retryAlwaysAllow": "Znova vedno dovoli",
+      "unreadableTitle": "Zahteve za dovoljenje ni bilo mogoče prebrati",
+      "unreadableBody": "Agent čaka na odločitev o dovoljenju, ki je ta aplikacija ne more prikazati. Posodobite aplikacijo ali CLI ali pa na zahtevo odgovorite v CLI, da nadaljujete."
     },
     "questionCard": {
       "title": "Agent potrebuje tvoj odgovor",

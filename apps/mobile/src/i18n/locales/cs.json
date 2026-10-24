@@ -2650,7 +2650,9 @@
       "retrying": "Opakování…",
       "retryDeny": "Zamítnout znovu",
       "retryAllowOnce": "Povolit jen tentokrát znovu",
-      "retryAlwaysAllow": "Vždy povolit znovu"
+      "retryAlwaysAllow": "Vždy povolit znovu",
+      "unreadableTitle": "Požadavek na oprávnění nelze načíst",
+      "unreadableBody": "Agent čeká na rozhodnutí o oprávnění, které tato aplikace nedokáže zobrazit. Aktualizujte aplikaci nebo CLI, případně odpovězte na žádost v CLI a pokračujte."
     },
     "questionCard": {
       "title": "Agent potřebuje odpověď",

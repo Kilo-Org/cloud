@@ -2578,7 +2578,9 @@
       "retrying": "Ana sake gwadawa…",
       "retryDeny": "Sake gwada ƙi",
       "retryAllowOnce": "Sake gwada ba da izini sau ɗaya",
-      "retryAlwaysAllow": "Sake gwada ba da izini koyaushe"
+      "retryAlwaysAllow": "Sake gwada ba da izini koyaushe",
+      "unreadableTitle": "Ba a iya karanta buƙatar izini",
+      "unreadableBody": "Wakilin yana jiran shawarar izini da wannan manhajar ba za ta iya nunawa ba. Sabunta manhajar ko CLI, ko kuma amsa buƙatar a cikin CLI domin ci gaba."
     },
     "questionCard": {
       "title": "Wakili yana buƙatar bayani",

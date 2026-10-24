@@ -6,8 +6,8 @@
  * list read:
  *
  * - `createKiloPairing` opens a pairing (`POST /api/device-auth/codes`).
- * - `pollKiloPairing` relays one pairing-status question
- *   (`GET /api/device-auth/codes/{code}`).
+ * - `redeemKiloPairing` redeems one pairing (`POST /api/device-auth/token`)
+ *   with the device secret.
  * - `fetchOrgOptions` lists the paired identity's organizations by calling the
  *   read-only `organizations.list` catalog query with the Kilo bearer.
  * - `fetchUserIsAdmin` answers whether the paired identity is a platform admin
@@ -34,10 +34,7 @@ export type KiloPairingDeps = {
 type ForwardedHeaderName = 'cf-connecting-ip' | 'x-forwarded-for' | 'user-agent';
 
 /**
- * Forward one client header only when it passes `forwardedClientHeadersSchema`
- * (bounded length, no CR/LF). Validating per header keeps a malformed value
- * (e.g. an oversized user-agent) from also stripping the Cloudflare-set IP
- * that apps/web rate-limits pending pairings by.
+ * Forward a request header only when it matches the shared schema.
  */
 function forwardedHeader(request: Request, name: ForwardedHeaderName): string | undefined {
   const value = request.headers.get(name);
@@ -49,15 +46,15 @@ function forwardedHeader(request: Request, name: ForwardedHeaderName): string | 
 export type KiloPairingFailure = 'rate_limited' | 'unreachable';
 
 /**
- * Create the Kilo device-auth pairing on apps/web
- * (`POST /api/device-auth/codes`, apps/web/src/app/api/device-auth/codes/route.ts).
- * apps/web rate-limits pending pairings per IP and requires the client IP in
- * production, so the incoming request's IP and user-agent are forwarded.
+ * Create the device authorization pairing on apps/web. The web service
+ * returns a display code and a credential for the worker.
  */
 export async function createKiloPairing(
   deps: KiloPairingDeps,
   request: Request
-): Promise<{ ok: true; pairingCode: string } | { ok: false; kind: KiloPairingFailure }> {
+): Promise<
+  { ok: true; pairingCode: string; deviceCode: string } | { ok: false; kind: KiloPairingFailure }
+> {
   const fetchImpl = deps.fetchImpl ?? fetch;
   const url = `${deps.webBaseUrl.replace(/\/$/, '')}/api/device-auth/codes`;
   const headers: Record<string, string> = { 'content-type': 'application/json' };
@@ -77,12 +74,19 @@ export async function createKiloPairing(
   if (!response.ok) return { ok: false, kind: 'unreachable' };
 
   const body: unknown = await response.json().catch(() => null);
-  const code =
-    typeof body === 'object' && body !== null ? (body as { code?: unknown }).code : undefined;
-  if (typeof code !== 'string' || code.length === 0) {
+  const record =
+    typeof body === 'object' && body !== null
+      ? (body as { user_code?: unknown; device_code?: unknown })
+      : undefined;
+  const pairingCode = record?.user_code;
+  const deviceCode = record?.device_code;
+  if (typeof pairingCode !== 'string' || pairingCode.length === 0) {
     return { ok: false, kind: 'unreachable' };
   }
-  return { ok: true, pairingCode: code };
+  if (typeof deviceCode !== 'string' || deviceCode.length === 0) {
+    return { ok: false, kind: 'unreachable' };
+  }
+  return { ok: true, pairingCode, deviceCode };
 }
 
 export type KiloPollOutcome =
@@ -93,21 +97,25 @@ export type KiloPollOutcome =
   | { status: 'unreachable' };
 
 /**
- * Relay one pairing-status question to apps/web
- * (`GET /api/device-auth/codes/{code}` — statuses pending/approved/denied/
- * expired, apps/web/src/app/api/device-auth/codes/[code]/route.ts). Any
- * transport-level or shape surprise is `unreachable`: the caller keeps the
- * user waiting and lets the next poll retry rather than failing the flow.
+ * Redeem one pairing on apps/web
+ * (`POST /api/device-auth/token` with the device secret — statuses pending/
+ * approved/denied/expired, apps/web/src/app/api/device-auth/token/route.ts).
+ * Any transport-level or shape surprise is `unreachable`: the caller retries
+ * on the next poll rather than failing the flow.
  */
-export async function pollKiloPairing(
+export async function redeemKiloPairing(
   deps: Pick<KiloPairingDeps, 'webBaseUrl' | 'fetchImpl'>,
-  deviceAuthCode: string
+  deviceCode: string
 ): Promise<KiloPollOutcome> {
   const fetchImpl = deps.fetchImpl ?? fetch;
-  const url = `${deps.webBaseUrl.replace(/\/$/, '')}/api/device-auth/codes/${encodeURIComponent(deviceAuthCode)}`;
+  const url = `${deps.webBaseUrl.replace(/\/$/, '')}/api/device-auth/token`;
   let response: Response;
   try {
-    response = await fetchImpl(url, { method: 'GET', headers: { Accept: 'application/json' } });
+    response = await fetchImpl(url, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceCode }),
+    });
   } catch {
     return { status: 'unreachable' };
   }
@@ -179,7 +187,7 @@ export const USER_ME_QUERY_PATH = 'user.getMe';
 /**
  * Answer whether the paired Kilo identity is a platform admin by calling the
  * catalog `user.getMe` query with the approved Kilo bearer. Unlike
- * `pollKiloPairing` this THROWS on any upstream failure (transport error or
+ * `redeemKiloPairing` this THROWS on any upstream failure (transport error or
  * non-ok status) instead of folding it into a false answer: the picker has to
  * tell 'not an admin' (a valid `false`) apart from 'could not check' (an error),
  * because only the latter raises the reload notice — and both stay fail-closed.

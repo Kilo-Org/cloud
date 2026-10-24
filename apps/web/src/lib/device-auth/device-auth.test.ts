@@ -5,14 +5,13 @@ import { eq } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import {
   generateUserCode,
-  generateDeviceCode,
   generateDeviceSecret,
   hashDeviceSecret,
   createDeviceAuthRequest,
   getDeviceAuthRequest,
+  getDeviceAuthRequestByPollCode,
   approveDeviceAuthRequest,
   denyDeviceAuthRequest,
-  pollDeviceAuthRequest,
   consumeDeviceAuthByDeviceCode,
   isDeviceAuthRequestExpired,
   cleanupExpiredDeviceAuthRequests,
@@ -99,13 +98,6 @@ describe('Device Auth', () => {
     });
   });
 
-  describe('generateDeviceCode (deprecated alias)', () => {
-    test('is an alias for generateUserCode', () => {
-      // They are the same function reference.
-      expect(generateDeviceCode).toBe(generateUserCode);
-    });
-  });
-
   describe('generateDeviceSecret', () => {
     test('generates a base64url-encoded 256-bit secret', () => {
       const secret = generateDeviceSecret();
@@ -141,7 +133,7 @@ describe('Device Auth', () => {
   });
 
   describe('createDeviceAuthRequest', () => {
-    test('enforces unique displayed user codes in the database', async () => {
+    test('enforces unique display codes in the database', async () => {
       const created = await createDeviceAuthRequest({});
       await approveDeviceAuthRequest(created.userCode, testUserId);
 
@@ -156,7 +148,7 @@ describe('Device Auth', () => {
       });
     });
 
-    test('retries a displayed user code collision with a fresh code', async () => {
+    test('retries a display-code collision with a fresh value', async () => {
       await db.insert(device_auth_requests).values({
         code: generateDeviceSecret(),
         user_code: 'AAAA-AAAA',
@@ -180,7 +172,7 @@ describe('Device Auth', () => {
       }
     });
 
-    test('bounds displayed user code allocation attempts', async () => {
+    test('bounds display-code allocation attempts', async () => {
       await db.insert(device_auth_requests).values({
         code: generateDeviceSecret(),
         user_code: 'AAAA-AAAA',
@@ -199,7 +191,7 @@ describe('Device Auth', () => {
       }
     });
 
-    test('stores a poll secret in code and the displayed user code separately', async () => {
+    test('stores generated request values in separate columns', async () => {
       const result = await createDeviceAuthRequest({
         userAgent: 'test-agent',
         ipAddress: '127.0.0.1',
@@ -218,21 +210,23 @@ describe('Device Auth', () => {
       expect(request?.status).toBe('pending');
       expect(request?.code).toBe(result.code);
       expect(request?.user_code).toBe(result.userCode);
+      expect((await getDeviceAuthRequestByPollCode(result.code))?.id).toBe(request?.id);
+      expect(await getDeviceAuthRequestByPollCode(result.userCode)).toBeUndefined();
       expect(request?.device_code_hash).toBe(hashDeviceSecret(result.deviceCode));
       expect(request?.user_agent).toBe('test-agent');
       expect(request?.ip_address).toBe('127.0.0.1');
     });
 
-    test('enforces rate limiting per IP — live rows block, expired rows do not', async () => {
-      const ipAddress = `192.168.1.${(Date.now() * 7) % 254}`;
+    test('enforces rate limits for request metadata', async () => {
+      const ipAddress = `192.0.2.${(Date.now() * 7) % 254}`;
 
-      // Clean up any leftover rows from previous runs with this IP.
+      // Clear test records associated with this source.
       await db.delete(device_auth_requests).where(eq(device_auth_requests.ip_address, ipAddress));
 
-      // Create 5 expired pending requests with the same IP — these must not block a new request.
+      // Create expired requests for this source.
       for (let i = 0; i < 5; i++) {
         const { userCode } = await createDeviceAuthRequest({ ipAddress });
-        // Manually expire each row so the pending count excludes them.
+        // Mark each row expired.
         await db
           .update(device_auth_requests)
           .set({
@@ -242,24 +236,23 @@ describe('Device Auth', () => {
           .where(eq(device_auth_requests.user_code, userCode));
       }
 
-      // A new request from the same IP should succeed because all pending rows
-      // are expired.
+      // A new request for this source should succeed.
       const result = await createDeviceAuthRequest({ ipAddress });
       expect(result.code).toBeDefined();
       expect(result.userCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
     });
-    test('rejects the sixth live pending request from the same IP', async () => {
-      const ipAddress = `192.168.1.${(Date.now() * 11) % 254}`;
+    test('rejects requests at the pending-count limit', async () => {
+      const ipAddress = `192.0.2.${(Date.now() * 11) % 254}`;
 
-      // Clean up any leftover rows.
+      // Clear test records.
       await db.delete(device_auth_requests).where(eq(device_auth_requests.ip_address, ipAddress));
 
-      // Create 5 live pending requests.
+      // Fill the pending request allowance.
       for (let i = 0; i < 5; i++) {
         await createDeviceAuthRequest({ ipAddress });
       }
 
-      // The 6th request must be rejected.
+      // The next request is rejected.
       await expect(createDeviceAuthRequest({ ipAddress })).rejects.toThrow(
         DeviceAuthPendingLimitError
       );
@@ -296,7 +289,7 @@ describe('Device Auth', () => {
       );
     });
 
-    test('concurrent approvals preserve the single winning user', async () => {
+    test('concurrent approvals preserve a single winner', async () => {
       const otherUserId = `${testUserId}-other`;
       await db.insert(kilocode_users).values({
         id: otherUserId,
@@ -533,11 +526,10 @@ describe('Device Auth', () => {
       expect(second.token).toBeUndefined();
     });
 
-    test('rejects the user code (display code) — device secret is not the user code', async () => {
+    test('requires a valid completion credential', async () => {
       const { userCode, deviceCode } = await createDeviceAuthRequest({});
       await approveDeviceAuthRequest(userCode, testUserId);
 
-      // Trying to consume with the displayed user code must fail.
       const result = await consumeDeviceAuthByDeviceCode(userCode);
       expect(result.status).toBe('expired');
       expect(result.token).toBeUndefined();
@@ -594,11 +586,11 @@ describe('Device Auth', () => {
       expect(result.expiresIn).toBeUndefined();
     });
 
-    test('returns denied for a blocked user (new path)', async () => {
+    test('returns denied for a blocked identity', async () => {
       const { userCode, deviceCode } = await createDeviceAuthRequest({});
       await approveDeviceAuthRequest(userCode, testUserId);
 
-      // Block the user
+      // Set a blocked status.
       await db
         .update(kilocode_users)
         .set({ blocked_reason: 'test block', blocked_at: new Date().toISOString() })
@@ -713,175 +705,6 @@ describe('Device Auth', () => {
     });
   });
 
-  describe('pollDeviceAuthRequest (legacy)', () => {
-    test('returns pending status for unapproved request', async () => {
-      const { code: pollSecret } = await createDeviceAuthRequest({});
-
-      const result = await pollDeviceAuthRequest(pollSecret);
-
-      expect(result.status).toBe('pending');
-      expect(result.token).toBeUndefined();
-    });
-
-    test('does not redeem an approved request with the displayed user code', async () => {
-      const { code: pollSecret, userCode } = await createDeviceAuthRequest({});
-      await approveDeviceAuthRequest(userCode, testUserId);
-
-      const result = await pollDeviceAuthRequest(userCode);
-
-      expect(result.status).toBe('expired');
-      expect(result.token).toBeUndefined();
-
-      // The row is still redeemable with the poll secret.
-      const retry = await pollDeviceAuthRequest(pollSecret);
-      expect(retry.status).toBe('approved');
-      expect(retry.token).toBeDefined();
-    });
-
-    test('returns approved status with token for approved request', async () => {
-      const { code: pollSecret, userCode } = await createDeviceAuthRequest({});
-      await approveDeviceAuthRequest(userCode, testUserId);
-
-      const result = await pollDeviceAuthRequest(pollSecret);
-
-      expect(result.status).toBe('approved');
-      expect(result.token).toBeDefined();
-      expect(result.userId).toBe(testUserId);
-      expect(result.userEmail).toBe(testUserEmail);
-    });
-
-    test('returns denied status for denied request', async () => {
-      const { code: pollSecret, userCode } = await createDeviceAuthRequest({});
-      await denyDeviceAuthRequest(userCode);
-
-      const result = await pollDeviceAuthRequest(pollSecret);
-
-      expect(result.status).toBe('denied');
-      expect(result.token).toBeUndefined();
-    });
-
-    test('returns expired status for expired request', async () => {
-      const { code: pollSecret, userCode } = await createDeviceAuthRequest({});
-
-      // Manually expire the request
-      await db
-        .update(device_auth_requests)
-        .set({ expires_at: new Date(Date.now() - 1000).toISOString() })
-        .where(eq(device_auth_requests.user_code, userCode));
-
-      const result = await pollDeviceAuthRequest(pollSecret);
-
-      expect(result.status).toBe('expired');
-      expect(result.token).toBeUndefined();
-    });
-
-    test('returns expired for non-existent code', async () => {
-      const result = await pollDeviceAuthRequest(generateDeviceSecret());
-      expect(result.status).toBe('expired');
-    });
-
-    test('concurrent legacy polls mint at most one token', async () => {
-      for (let i = 0; i < 20; i++) {
-        const { code: pollSecret, userCode } = await createDeviceAuthRequest({});
-        await approveDeviceAuthRequest(userCode, testUserId);
-
-        const [a, b] = await Promise.all([
-          pollDeviceAuthRequest(pollSecret),
-          pollDeviceAuthRequest(pollSecret),
-        ]);
-
-        const approved = [a, b].filter(r => r.status === 'approved');
-        expect(approved.length).toBe(1);
-        expect(approved[0]!.token).toBeDefined();
-      }
-    });
-
-    test('sequential legacy polls consume only once (single-use)', async () => {
-      const { code: pollSecret, userCode } = await createDeviceAuthRequest({});
-      await approveDeviceAuthRequest(userCode, testUserId);
-
-      const first = await pollDeviceAuthRequest(pollSecret);
-      expect(first.status).toBe('approved');
-      expect(first.token).toBeDefined();
-
-      const second = await pollDeviceAuthRequest(pollSecret);
-      // After consume, the second sequential poll returns expired.
-      expect(second.status).toBe('expired');
-      expect(second.token).toBeUndefined();
-    });
-
-    test('the poll secret and the device secret each redeem at most once', async () => {
-      const polled = await createDeviceAuthRequest({});
-      await approveDeviceAuthRequest(polled.userCode, testUserId);
-
-      const firstPoll = await pollDeviceAuthRequest(polled.code);
-      expect(firstPoll.status).toBe('approved');
-      expect(firstPoll.token).toBeDefined();
-
-      const afterPoll = await consumeDeviceAuthByDeviceCode(polled.deviceCode);
-      expect(afterPoll.status).toBe('consumed');
-      expect(afterPoll.token).toBeUndefined();
-
-      const consumed = await createDeviceAuthRequest({});
-      await approveDeviceAuthRequest(consumed.userCode, testUserId);
-
-      const firstConsume = await consumeDeviceAuthByDeviceCode(consumed.deviceCode);
-      expect(firstConsume.status).toBe('approved');
-      expect(firstConsume.token).toBeDefined();
-
-      const pollAfterConsume = await pollDeviceAuthRequest(consumed.code);
-      expect(pollAfterConsume.status).toBe('expired');
-      expect(pollAfterConsume.token).toBeUndefined();
-    });
-
-    test('returns denied for a blocked user (legacy path)', async () => {
-      const { code: pollSecret, userCode } = await createDeviceAuthRequest({});
-      await approveDeviceAuthRequest(userCode, testUserId);
-
-      // Block the user
-      await db
-        .update(kilocode_users)
-        .set({ blocked_reason: 'test block', blocked_at: new Date().toISOString() })
-        .where(eq(kilocode_users.id, testUserId));
-
-      const result = await pollDeviceAuthRequest(pollSecret);
-
-      expect(result.status).toBe('denied');
-      expect(result.token).toBeUndefined();
-
-      // Verify the request is durably denied, not consumed.
-      const request = await getDeviceAuthRequest(userCode);
-      expect(request?.status).toBe('denied');
-    });
-
-    test('failed token generation after consume restores row for re-redemption', async () => {
-      mockedGenerateApiToken.mockImplementation(() => {
-        throw new Error('token generation failed');
-      });
-
-      const { code: pollSecret, userCode } = await createDeviceAuthRequest({});
-      await approveDeviceAuthRequest(userCode, testUserId);
-
-      // First poll fails because generateApiToken throws.
-      await expect(pollDeviceAuthRequest(pollSecret)).rejects.toThrow('token generation failed');
-
-      // Row was restored to approved.
-      const request = await getDeviceAuthRequest(userCode);
-      expect(request?.status).toBe('approved');
-      expect(request?.consumed_at).toBeNull();
-
-      // Reset mock to pass-through for the re-consume.
-      mockedGenerateApiToken.mockImplementation((...args: any[]) =>
-        (_realGenerateApiToken as any)(...args)
-      );
-
-      // A later poll succeeds.
-      const retry = await pollDeviceAuthRequest(pollSecret);
-      expect(retry.status).toBe('approved');
-      expect(retry.token).toBeDefined();
-    });
-  });
-
   describe('isDeviceAuthRequestExpired', () => {
     test('returns true for expired request', () => {
       const request = {
@@ -933,13 +756,10 @@ describe('Device Auth', () => {
   });
 
   describe('verificationUrl', () => {
-    test('contains the user code, never the device secret', () => {
+    test('generates a well-formed device credential', () => {
       const secret = generateDeviceSecret();
-      // The verification URL is built from the user code only, so no code path
-      // ever puts the 256-bit device secret into a URL. We verify that the
-      // generateDeviceSecret output is clearly distinguishable from a user code.
       expect(secret).toMatch(/^[A-Za-z0-9_-]+$/);
-      expect(secret.length).toBeGreaterThan(9); // user codes are 9 chars
+      expect(secret.length).toBeGreaterThan(9);
     });
   });
 });

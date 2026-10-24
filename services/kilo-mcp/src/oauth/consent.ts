@@ -40,7 +40,7 @@ import {
   createKiloPairing,
   fetchOrgOptions,
   fetchUserIsAdmin,
-  pollKiloPairing,
+  redeemKiloPairing,
 } from './kilo-pairing';
 import {
   PERSONAL_ORG_ID,
@@ -137,27 +137,6 @@ function isPaired(record: PendingAuthorization): record is PendingAuthorization 
   );
 }
 
-/** Rebuild the client's original /authorize request from the stored library request. */
-function restartAuthorizeUrl(authRequest: AuthRequest, origin: string): string {
-  const url = new URL(AUTH_PATHS.authorize, origin);
-  url.searchParams.set('client_id', authRequest.clientId);
-  url.searchParams.set('redirect_uri', authRequest.redirectUri);
-  url.searchParams.set('response_type', authRequest.responseType);
-  if (authRequest.codeChallenge) {
-    url.searchParams.set('code_challenge', authRequest.codeChallenge);
-  }
-  if (authRequest.codeChallengeMethod) {
-    url.searchParams.set('code_challenge_method', authRequest.codeChallengeMethod);
-  }
-  const resource = Array.isArray(authRequest.resource)
-    ? authRequest.resource[0]
-    : authRequest.resource;
-  if (resource) url.searchParams.set('resource', resource);
-  if (authRequest.scope.length > 0) url.searchParams.set('scope', authRequest.scope.join(' '));
-  if (authRequest.state) url.searchParams.set('state', authRequest.state);
-  return url.toString();
-}
-
 /** Redirect to the client with the RFC 6749 §4.1.2.1 error params plus `iss` (RFC 9207). */
 function errorRedirect(error: AuthorizationError): Response {
   // Presence of `redirectUri` is the library's guarantee the client and exact
@@ -236,7 +215,7 @@ async function handleAuthorize(request: Request, env: Env, deps: ConsentDeps): P
   await deps.store.createPendingAuthorization({
     id,
     authRequest,
-    deviceAuthCode: pairing.pairingCode,
+    deviceAuthCode: pairing.deviceCode,
     flowToken,
     createdAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + PENDING_TTL_SECONDS * 1000).toISOString(),
@@ -302,7 +281,7 @@ async function handlePairingStatus(request: Request, deps: ConsentDeps): Promise
     return needsOrg(id);
   }
 
-  const upstream = await pollKiloPairing(deps, record.deviceAuthCode);
+  const upstream = await redeemKiloPairing(deps, record.deviceAuthCode);
   switch (upstream.status) {
     case 'pending':
     case 'unreachable':
@@ -392,15 +371,7 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
   const actionUrl = `${AUTH_PATHS.orgPicker}?id=${encodeURIComponent(id)}`;
 
   if (!isPaired(record)) {
-    // Kilo sign-in not finished for this record: send the user back through
-    // the consent page for the SAME pairing (the device-auth code is stored).
-    return consentPage({
-      clientName,
-      scope: MCP_SCOPE,
-      webSignInUrl: `${deps.webBaseUrl.replace(/\/$/, '')}/device-auth?code=${encodeURIComponent(record.deviceAuthCode)}`,
-      statusUrl: `${AUTH_PATHS.pairingStatus}?id=${encodeURIComponent(id)}`,
-      restartUrl: restartAuthorizeUrl(record.authRequest, url.origin),
-    });
+    return errorPage('invalid_request', STALE_REQUEST_MESSAGE);
   }
   const kiloToken = record.kiloToken;
 

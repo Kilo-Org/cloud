@@ -25,7 +25,7 @@ export const oauthPendingAuthorizations = sqliteTable(
     id: text('id').primaryKey(),
     /** JSON of the library AuthRequest (parsed authorize request). */
     auth_request: text('auth_request').notNull(),
-    /** The apps/web device-auth pairing code (`code` from POST /api/device-auth/codes). */
+    /** The apps/web device-auth polling secret (`device_code` from POST /api/device-auth/codes). */
     device_auth_code: text('device_auth_code').notNull(),
     status: text('status', {
       enum: ['pending', 'approved', 'denied', 'expired', 'completed'],

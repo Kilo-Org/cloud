@@ -245,7 +245,7 @@ async function seedPending(
   await store.createPendingAuthorization({
     id,
     authRequest: authRequest(),
-    deviceAuthCode: overrides.deviceAuthCode ?? 'PAIR-1',
+    deviceAuthCode: overrides.deviceAuthCode ?? 'device-secret-1',
     flowToken: overrides.flowToken ?? FLOW_TOKEN,
     createdAt: iso(-1000),
     expiresAt: overrides.expiresAt ?? iso(600_000),
@@ -256,7 +256,7 @@ async function seedPending(
 async function seedPaired(store: ReturnType<typeof createFakeStore>): Promise<string> {
   const id = await seedPending(store);
   await store.recordPairingApproval(
-    'PAIR-1',
+    'device-secret-1',
     { kiloUserId: 'u-1', kiloToken: 'kilo-tok-1' },
     iso(0)
   );
@@ -351,8 +351,14 @@ function flowFetch(
     for (const [suffix, response] of Object.entries(overrides)) {
       if (url.endsWith(suffix)) return response();
     }
-    if (url.endsWith('/api/device-auth/codes')) return Response.json({ code: 'PAIR-1' });
-    if (url.endsWith('/api/device-auth/codes/PAIR-1')) {
+    if (url.endsWith('/api/device-auth/codes')) {
+      return Response.json({
+        code: 'request-value',
+        user_code: 'PAIR-1',
+        device_code: 'device-secret-1',
+      });
+    }
+    if (url.endsWith('/api/device-auth/token')) {
       return Response.json({ status: 'approved', token: 'kilo-tok-1', userId: 'u-1' });
     }
     if (url.includes('/api/trpc/user.getMe')) {
@@ -415,18 +421,20 @@ describe('GET /authorize (consent)', () => {
     const html = await response.text();
     expect(html).toContain('Connect to Kilo MCP');
     expect(html).toContain('Test Client');
+    expect(html).toContain(`${WEB}/device-auth?code=PAIR-1`);
     const id = [...store.pending.keys()][0]!;
-    // The status URL carries the internal pending id, never the device-auth code.
     expect(html).toContain(`/authorize/status?id=${id}`);
     expectPrivateStatusUrl(html, id);
-    // A leaked query parameter must fail the invariant, not just visible text.
     expect(() =>
       expectPrivateStatusUrl(
         html.replace(`/authorize/status?id=${id}`, `/authorize/status?id=${id}&code=PAIR-1`),
         id
       )
     ).toThrow();
-    expect(store.pending.get(id)).toMatchObject({ deviceAuthCode: 'PAIR-1', status: 'pending' });
+    expect(store.pending.get(id)).toMatchObject({
+      deviceAuthCode: 'device-secret-1',
+      status: 'pending',
+    });
     expect(calls).toEqual([{ phase: 'started', identity: null, clientId: CLIENT_ID }]);
     expectNoCredentialLeak(calls);
   });
@@ -522,11 +530,11 @@ describe('GET /authorize (consent)', () => {
 });
 
 describe('GET /authorize/status', () => {
-  it('reports pending while the user has not approved upstream, and keeps the next poll alive', async () => {
+  it('reports pending while upstream approval is incomplete and keeps the next poll alive', async () => {
     const store = createFakeStore();
     await seedPending(store);
     const fetchImpl = flowFetch({
-      '/api/device-auth/codes/PAIR-1': () => new Response('', { status: 202 }),
+      '/api/device-auth/token': () => new Response('', { status: 202 }),
     });
     const handler = createDefaultHandler(deps(store, fetchImpl));
     const response = await run(
@@ -543,7 +551,7 @@ describe('GET /authorize/status', () => {
     await seedPending(store);
     let polls = 0;
     const fetchImpl = flowFetch({
-      '/api/device-auth/codes/PAIR-1': () => {
+      '/api/device-auth/token': () => {
         polls += 1;
         // Single-use upstream: only the first poll ever sees approved.
         return polls === 1
@@ -596,7 +604,7 @@ describe('GET /authorize/status', () => {
     const store = createFakeStore();
     await seedPending(store);
     const fetchImpl = flowFetch({
-      '/api/device-auth/codes/PAIR-1': () => new Response('', { status: 403 }),
+      '/api/device-auth/token': () => new Response('', { status: 403 }),
     });
     const { analytics, calls } = fakeAnalytics();
     const handler = createDefaultHandler(deps(store, fetchImpl, { analytics }));
@@ -627,7 +635,7 @@ describe('GET /authorize/status', () => {
     const store = createFakeStore();
     await seedPending(store);
     const fetchImpl = flowFetch({
-      '/api/device-auth/codes/PAIR-1': () => new Response('', { status: 410 }),
+      '/api/device-auth/token': () => new Response('', { status: 410 }),
     });
     const { analytics, calls } = fakeAnalytics();
     const handler = createDefaultHandler(deps(store, fetchImpl, { analytics }));
@@ -678,7 +686,7 @@ describe('GET /authorize/status', () => {
     const store = createFakeStore();
     const id = await seedPaired(store);
     await store.approvePendingAuthorization(
-      'PAIR-1',
+      'device-secret-1',
       { kiloUserId: 'u-1', organizationId: 'org-1' },
       iso(0)
     );
@@ -750,7 +758,7 @@ describe('GET /authorize/status', () => {
 });
 
 describe('GET/POST /authorize/org', () => {
-  it('renders the personal context plus each of the user organizations', async () => {
+  it('renders the personal context plus available organizations', async () => {
     const store = createFakeStore();
     const id = await seedPaired(store);
     const handler = createDefaultHandler(deps(store, flowFetch()));
@@ -803,7 +811,7 @@ describe('GET/POST /authorize/org', () => {
     expect(html).toContain('Personal account');
   });
 
-  it('sends an unpaired record back through the consent page for the same pairing', async () => {
+  it('rejects an org-picker visit before the pairing is approved', async () => {
     const store = createFakeStore();
     await seedPending(store);
     const handler = createDefaultHandler(deps(store, flowFetch()));
@@ -812,10 +820,10 @@ describe('GET/POST /authorize/org', () => {
       new Request(`${ISSUER}/authorize/org?id=pa-1`, { headers: { Cookie: flowCookie() } }),
       envWith(fakeHelpers({ client: clientInfo() }).helpers)
     );
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(400);
     const html = await response.text();
-    expect(html).toContain('Connect to Kilo MCP');
-    expect(html).toContain(`${WEB}/device-auth?code=PAIR-1`);
+    expect(html).toMatch(/no longer valid/);
+    expect(html).not.toContain('device-secret-1');
   });
 
   it('binds a member organization and completes the authorization with the library', async () => {

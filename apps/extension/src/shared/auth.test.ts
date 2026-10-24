@@ -94,24 +94,24 @@ describe('extension auth configuration', () => {
 
 describe('extension auth storage', () => {
   it('normalizes valid stored auth and rejects malformed values', () => {
-    expect(normalizeStoredAuth({ token: 'token-1', userEmail: 'user@kilo.ai' })).toStrictEqual({
+    expect(normalizeStoredAuth({ token: 'token-1', userEmail: 'user@example.com' })).toStrictEqual({
       token: 'token-1',
-      userEmail: 'user@kilo.ai',
+      userEmail: 'user@example.com',
     });
     expect(normalizeStoredAuth({ token: 'token-1' })).toStrictEqual({
       token: 'token-1',
       userEmail: undefined,
     });
-    expect(normalizeStoredAuth({ token: '', userEmail: 'user@kilo.ai' })).toBeUndefined();
-    expect(normalizeStoredAuth({ userEmail: 'user@kilo.ai' })).toBeUndefined();
+    expect(normalizeStoredAuth({ token: '', userEmail: 'user@example.com' })).toBeUndefined();
+    expect(normalizeStoredAuth({ userEmail: 'user@example.com' })).toBeUndefined();
   });
 
   it('loads, saves, and clears auth through the configured storage key', async () => {
-    const storage = createStorage({ token: 'token-1', userEmail: 'user@kilo.ai' });
+    const storage = createStorage({ token: 'token-1', userEmail: 'user@example.com' });
 
     await expect(loadStoredAuth(storage)).resolves.toStrictEqual({
       token: 'token-1',
-      userEmail: 'user@kilo.ai',
+      userEmail: 'user@example.com',
     });
 
     await saveStoredAuth(storage, { token: 'token-2', userEmail: undefined });
@@ -137,7 +137,9 @@ describe('device auth API client', () => {
       seenRequests.push(String(input));
       return jsonResponse(
         {
-          code: 'ABCD-2345',
+          code: 'request-value',
+          device_code: 'base64url-device-secret',
+          user_code: 'ABCD-2345',
           verificationUrl: 'https://app.kilo.ai/device-auth?code=ABCD-2345&app=1',
         },
         { status: 200 }
@@ -148,17 +150,24 @@ describe('device auth API client', () => {
       createDeviceAuthRequest({ apiBaseUrl: 'https://app.kilo.ai/', fetch })
     ).resolves.toStrictEqual({
       code: 'ABCD-2345',
+      deviceCode: 'base64url-device-secret',
       verificationUrl: 'https://app.kilo.ai/device-auth?code=ABCD-2345&app=1',
     });
     expect(seenRequests).toStrictEqual(['https://app.kilo.ai/api/device-auth/codes?app=1']);
   });
 
-  it('maps poll status codes to pending, approved, denied, and expired states', async () => {
+  it('maps token-endpoint status codes to pending, approved, denied, and expired states', async () => {
+    const seenRequests: string[] = [];
+    const seenBodies: unknown[] = [];
     const pollWithResponse = (response: Response) =>
       pollDeviceAuthCode({
         apiBaseUrl: 'https://app.kilo.ai',
-        code: 'ABCD-2345',
-        fetch: () => response,
+        deviceCode: 'base64url-device-secret',
+        fetch: (input, init) => {
+          seenRequests.push(String(input));
+          seenBodies.push(init?.body);
+          return response;
+        },
       });
 
     await expect(
@@ -166,10 +175,10 @@ describe('device auth API client', () => {
     ).resolves.toStrictEqual({ status: 'pending' });
     await expect(
       pollWithResponse(
-        jsonResponse({ status: 'approved', token: 'token-1', userEmail: 'user@kilo.ai' })
+        jsonResponse({ status: 'approved', token: 'token-1', userEmail: 'user@example.com' })
       )
     ).resolves.toStrictEqual({
-      auth: { token: 'token-1', userEmail: 'user@kilo.ai' },
+      auth: { token: 'token-1', userEmail: 'user@example.com' },
       status: 'approved',
     });
     await expect(
@@ -178,19 +187,26 @@ describe('device auth API client', () => {
     await expect(
       pollWithResponse(jsonResponse({ status: 'expired' }, { status: 410 }))
     ).resolves.toStrictEqual({ status: 'expired' });
+    expect(seenRequests).toHaveLength(4);
+    for (const requestUrl of seenRequests) {
+      expect(requestUrl).toContain('/api/device-auth/token');
+    }
+    for (const body of seenBodies) {
+      expect(body).toBe(JSON.stringify({ deviceCode: 'base64url-device-secret' }));
+    }
   });
 
   it('validates stored tokens with the user endpoint', async () => {
     const seenHeaders: string[] = [];
     const fetch: FetchLike = (_input, init) => {
       seenHeaders.push(String(new Headers(init?.headers).get('authorization')));
-      return jsonResponse({ google_user_email: 'user@kilo.ai' });
+      return jsonResponse({ google_user_email: 'user@example.com' });
     };
 
     await expect(
       validateAuthToken({ apiBaseUrl: 'https://app.kilo.ai', fetch, token: 'token-1' })
     ).resolves.toStrictEqual({
-      auth: { token: 'token-1', userEmail: 'user@kilo.ai' },
+      auth: { token: 'token-1', userEmail: 'user@example.com' },
       status: 'valid',
     });
     expect(seenHeaders).toStrictEqual(['Bearer token-1']);

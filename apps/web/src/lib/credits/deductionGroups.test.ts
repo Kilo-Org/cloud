@@ -12,6 +12,7 @@ function makeDeduction(overrides: Partial<CreditDeductionRow> = {}): CreditDeduc
       date: '2025-10-01T00:00:00.000Z',
       description: 'Promotional credits',
       amount_mUsd: 50_000_000,
+      is_free: false,
     },
     ...overrides,
   };
@@ -36,6 +37,24 @@ describe('buildDeductionGroups', () => {
         amount_mUsd: -50_000_000,
       },
     });
+  });
+
+  it('labels an uncharged grant as a credit grant, not a purchase', () => {
+    const groups = buildDeductionGroups([
+      makeDeduction({
+        purchase: {
+          id: 'grant-free',
+          date: '2025-10-01T00:00:00.000Z',
+          description: 'Referral bonus',
+          amount_mUsd: 5_000_000,
+          is_free: true,
+        },
+        amount_mUsd: -5_000_000,
+      }),
+    ]);
+
+    expect(groups[0].main.type).toBe('Credit grant');
+    expect(groups[0].child?.type).toBe('Adjustment');
   });
 
   it('leaves an unlinked deduction as a single row in its own date order', () => {
@@ -72,6 +91,7 @@ describe('buildDeductionGroups', () => {
           date: '2025-01-01T00:00:00.000Z',
           description: 'Older credits',
           amount_mUsd: 10_000_000,
+          is_free: false,
         },
       }),
       makeDeduction({

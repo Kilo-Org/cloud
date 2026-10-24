@@ -217,6 +217,8 @@ const CreditDeductionSchema = z.object({
       date: z.string(),
       description: z.string(),
       amount_mUsd: z.number(),
+      /** True for promotional, referral, and Pass grants the user did not buy. */
+      is_free: z.boolean(),
     })
     .nullable(),
 });
@@ -275,6 +277,7 @@ type RawDeduction = {
     date: string;
     description: string;
     amount_mUsd: number;
+    is_free: boolean;
   } | null;
 };
 

@@ -7,7 +7,13 @@ export type CreditDeductionRow = {
   amount_mUsd: number;
   kind: CreditDeductionKind;
   /** The grant this deduction closed, present for an expiry row. */
-  purchase: { id: string; date: string; description: string; amount_mUsd: number } | null;
+  purchase: {
+    id: string;
+    date: string;
+    description: string;
+    amount_mUsd: number;
+    is_free: boolean;
+  } | null;
 };
 
 export type DeductionGroup = {
@@ -51,7 +57,9 @@ export function buildDeductionGroups(deductions: CreditDeductionRow[]): Deductio
         main: {
           date: deduction.purchase.date,
           description: deduction.purchase.description,
-          type: 'Purchase',
+          // A promotional, referral, or Pass grant is not something the user
+          // bought, so it must not be typed `Purchase`.
+          type: deduction.purchase.is_free ? 'Credit grant' : 'Purchase',
           amount_mUsd: deduction.purchase.amount_mUsd,
         },
         child: {

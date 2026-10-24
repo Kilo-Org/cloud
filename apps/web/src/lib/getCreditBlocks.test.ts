@@ -245,6 +245,7 @@ describe('getCreditBlocks', () => {
         date: '2023-03-03',
         description: 'Promotional credits',
         amount_mUsd: 1_000_000,
+        is_free: true,
       },
     });
   });

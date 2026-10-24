@@ -105,6 +105,9 @@ export function getCreditBlocks(
       const source = tx.original_transaction_id
         ? transactionById.get(tx.original_transaction_id)
         : undefined;
+      // Not every expiring source is a purchase: promotional, referral, and
+      // Pass credits are grants the user did not pay for directly, so the row
+      // needs the grant's own free/paid flag to label it correctly.
       return {
         id: tx.id,
         date: tx.created_at,
@@ -116,8 +119,9 @@ export function getCreditBlocks(
             ? {
                 id: source.id,
                 date: source.created_at,
-                description: source.description ?? source.credit_category ?? 'Credit purchase',
+                description: source.description ?? source.credit_category ?? 'Credit grant',
                 amount_mUsd: source.amount_microdollars,
+                is_free: source.is_free,
               }
             : null,
       };

@@ -1065,8 +1065,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Aucun filtre disponible",
-      "noFiltersDescription": "Revenez en arrière et rouvrez les filtres depuis la liste des signalements.",
       "title": "Filtrer les signalements",
       "fixed": "Corrigé",
       "outcome": "Résultat",

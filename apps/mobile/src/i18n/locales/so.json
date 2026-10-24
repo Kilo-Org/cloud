@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Ma jiraan shaandhooyin la heli karo",
-      "noFiltersDescription": "Dib u noqo oo shaandhooyinka mar kale ka fur liiska natiijooyinka.",
       "title": "Shaandhaynta natiijooyinka",
       "reset": "Dib u deji",
       "severity": "Heerka halista",

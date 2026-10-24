@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "કોઈ ફિલ્ટર ઉપલબ્ધ નથી",
-      "noFiltersDescription": "પાછા જાઓ અને તારણોની યાદીમાંથી ફિલ્ટર ફરી ખોલો.",
       "title": "તારણો માટેના ફિલ્ટર",
       "reset": "રીસેટ કરો",
       "severity": "ગંભીરતા",

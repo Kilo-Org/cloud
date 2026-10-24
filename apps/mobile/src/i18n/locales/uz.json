@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Filtrlar mavjud emas",
-      "noFiltersDescription": "Orqaga qayting va muammolar ro'yxatidan filtrlarni qayta oching.",
       "title": "Muammolarni filtrlash",
       "reset": "Asliga qaytarish",
       "severity": "Xavf darajasi",

@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Tiada penapis tersedia",
-      "noFiltersDescription": "Kembali dan buka semula penapis daripada senarai penemuan.",
       "title": "Penapisan penemuan",
       "reset": "Set semula",
       "severity": "Keterukan",

@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Nem érhetők el szűrők",
-      "noFiltersDescription": "Lépj vissza, és nyisd meg újra a szűrőket a találatok listájából.",
       "title": "Találatok szűrése",
       "reset": "Visszaállítás",
       "severity": "Súlyosság",

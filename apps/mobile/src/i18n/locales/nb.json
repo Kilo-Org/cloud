@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Ingen tilgjengelige filtre",
-      "noFiltersDescription": "Gå tilbake og åpne filtrene på nytt fra funnlisten.",
       "title": "Filtrer funn",
       "reset": "Tilbakestill",
       "severity": "Alvorlighetsgrad",

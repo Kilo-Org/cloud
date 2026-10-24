@@ -625,10 +625,10 @@ test('the gate CLI keeps an edited workflow out of the installed namespace', () 
   assert.doesNotMatch(ghLog, /artifacts\?name=mobile-native-ios-ioshash/);
 });
 
-// The heavy jobs re-check their own artifact once the hash's concurrency slot
-// frees. The check must agree with the gate: a pull_request job may take the
-// one-day artifact it would publish itself, a push job must not.
-test('the published check reports the durable artifact to a waiting job', () => {
+// The heavy jobs re-check their own artifact before building. The check must
+// agree with the gate: a pull_request job may take the one-day artifact it
+// would publish itself, a push job must not.
+test('the published check reports the durable artifact to a job that is about to build', () => {
   const { outputs } = runGateCli({
     eventName: 'push',
     published: 'mobile-native-ios-ioshash',

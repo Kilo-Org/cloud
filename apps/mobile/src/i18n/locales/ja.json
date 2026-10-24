@@ -53,6 +53,7 @@
     "connected": "連携済み",
     "couldNotLoadModels": "モデルを読み込めませんでした。",
     "couldNotLoadRepositories": "リポジトリを読み込めませんでした。",
+    "noRepositoriesFound": "リポジトリが見つかりません",
     "critical": "重大",
     "delete": "削除",
     "deleted": "削除済み",
@@ -87,6 +88,7 @@
     "connect": "連携",
     "connectBitbucket": "Bitbucketと連携",
     "connectGitlab": "GitLabと連携",
+    "connectProvider": "プロバイダーを接続",
     "contentTruncated": "内容の一部を省略しています",
     "copyLink": "リンクをコピー",
     "couldNotLoadOrganizations": "組織を読み込めませんでした。",
@@ -883,7 +885,6 @@
       "gitlabNoRepositoriesDescription": "GitLabで、追加のグループやプロジェクトへのアクセスを許可する必要がある場合があります。",
       "installGithubApp": "リポジトリにGitHub Appをインストール",
       "installGithubAppDescription": "レビュー対象のリポジトリへのアクセスをKilo GitHub Appに許可してください。",
-      "noRepositoriesFound": "リポジトリが見つかりません",
       "repositoryAccess": "リポジトリへのアクセス権"
     },
     "style": {
@@ -907,7 +908,6 @@
     "followReviewMd": "REVIEW.mdに従う",
     "followReviewMdSubtitle": "各リポジトリのREVIEW.mdに記載された指示に従う",
     "manualReview": {
-      "connectProvider": "プロバイダーを接続",
       "connectProviderDescription": "プルリクエストの手動レビューを開始するにはGitHubを接続してください。",
       "couldNotCheckProviderStatus": "プロバイダーの状態を確認できませんでした。",
       "couldNotLoadProviders": "接続済みプロバイダーを読み込めませんでした。もう一度お試しください。",

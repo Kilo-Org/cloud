@@ -24,6 +24,7 @@ import {
   useAgentProfile,
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
+import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
@@ -48,8 +49,8 @@ type AgentRowViewProps = Readonly<{
   visibility: AgentVisibility;
   description: string;
   model: string;
-  onEdit: () => void;
-  onDelete: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }>;
 
 /** One agent row: name, slug, visibility, optional model and description, edit/delete. */
@@ -90,22 +91,26 @@ function AgentRowView({
           </Text>
         ) : null}
       </View>
-      <Pressable
-        className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-        accessibilityRole="button"
-        accessibilityLabel={t('profiles.agents.edit')}
-        onPress={onEdit}
-      >
-        <Pencil size={18} color={colors.mutedForeground} />
-      </Pressable>
-      <Pressable
-        className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-        accessibilityRole="button"
-        accessibilityLabel={t('common.delete')}
-        onPress={onDelete}
-      >
-        <Trash2 size={18} color={colors.destructive} />
-      </Pressable>
+      {onEdit !== undefined ? (
+        <Pressable
+          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+          accessibilityRole="button"
+          accessibilityLabel={t('profiles.agents.edit')}
+          onPress={onEdit}
+        >
+          <Pencil size={18} color={colors.mutedForeground} />
+        </Pressable>
+      ) : null}
+      {onDelete !== undefined ? (
+        <Pressable
+          className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.delete')}
+          onPress={onDelete}
+        >
+          <Trash2 size={18} color={colors.destructive} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -129,6 +134,7 @@ export function ProfileAgentsScreen({
   const { confirm, dialog } = useConfirmDialog();
   const profileQuery = useAgentProfile(profileId, organizationId);
   const { createAgent, updateAgent, deleteAgent } = useAgentProfileSectionMutations(organizationId);
+  const canManage = useCanManageOrganizationProfiles(organizationId);
 
   const agents = profileQuery.data?.agents ?? NO_AGENTS;
   const rows = agentRows(agents);
@@ -211,9 +217,11 @@ export function ProfileAgentsScreen({
         description={null}
         placement="top"
         action={
-          <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
-            <Text>{t('profiles.agents.add')}</Text>
-          </Button>
+          canManage ? (
+            <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
+              <Text>{t('profiles.agents.add')}</Text>
+            </Button>
+          ) : null
         }
       />
     );
@@ -233,19 +241,29 @@ export function ProfileAgentsScreen({
               visibility={row.visibility}
               description={row.description}
               model={row.model}
-              onEdit={() => {
-                setForm({ source });
-                setServerSlugConflict(false);
-              }}
-              onDelete={() => {
-                confirmDelete(source);
-              }}
+              onEdit={
+                canManage
+                  ? () => {
+                      setForm({ source });
+                      setServerSlugConflict(false);
+                    }
+                  : undefined
+              }
+              onDelete={
+                canManage
+                  ? () => {
+                      confirmDelete(source);
+                    }
+                  : undefined
+              }
             />
           );
         })}
-        <Button onPress={startAdd}>
-          <Text>{t('profiles.agents.add')}</Text>
-        </Button>
+        {canManage ? (
+          <Button onPress={startAdd}>
+            <Text>{t('profiles.agents.add')}</Text>
+          </Button>
+        ) : null}
       </>
     );
   }

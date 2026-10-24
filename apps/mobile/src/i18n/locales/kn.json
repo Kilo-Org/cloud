@@ -53,6 +53,7 @@
     "connected": "ಸಂಪರ್ಕಗೊಂಡಿದೆ",
     "couldNotLoadModels": "ಮಾದರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "couldNotLoadRepositories": "ರೆಪೊಸಿಟರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+    "noRepositoriesFound": "ಯಾವುದೇ ರೆಪೊಸಿಟರಿ ಕಂಡುಬಂದಿಲ್ಲ",
     "critical": "ಗಂಭೀರ",
     "delete": "ಅಳಿಸಿ",
     "deleted": "ಅಳಿಸಲಾಗಿದೆ",
@@ -87,6 +88,7 @@
     "connect": "ಸಂಪರ್ಕ ಕಲ್ಪಿಸಿ",
     "connectBitbucket": "Bitbucket ಸಂಪರ್ಕ ಕಲ್ಪಿಸಿ",
     "connectGitlab": "GitLab ಸಂಪರ್ಕ ಕಲ್ಪಿಸಿ",
+    "connectProvider": "ಸೇವಾ ಪೂರೈಕೆದಾರರನ್ನು ಸಂಪರ್ಕಿಸಿ",
     "contentTruncated": "ವಿಷಯವನ್ನು ಮೊಟಕುಗೊಳಿಸಲಾಗಿದೆ",
     "copyLink": "ಲಿಂಕ್ ನಕಲಿಸಿ",
     "couldNotLoadOrganizations": "ಸಂಸ್ಥೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
@@ -1407,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "GitLab ನಲ್ಲಿ ಇನ್ನಷ್ಟು ಗುಂಪುಗಳು ಅಥವಾ ಪ್ರಾಜೆಕ್ಟ್‌ಗಳಿಗೆ ಪ್ರವೇಶ ನೀಡಬೇಕಾಗಬಹುದು.",
       "installGithubApp": "ರೆಪೊಸಿಟರಿಗಳಲ್ಲಿ GitHub ಅಪ್ಲಿಕೇಶನ್ ಅನ್ನು ಸ್ಥಾಪಿಸಿ",
       "installGithubAppDescription": "ಪರಿಶೀಲಿಸಬೇಕಾದ ರೆಪೊಸಿಟರಿಗಳನ್ನು ಪ್ರವೇಶಿಸಲು Kilo GitHub ಅಪ್ಲಿಕೇಶನ್‌ಗೆ ಅನುಮತಿ ನೀಡಿ.",
-      "noRepositoriesFound": "ಯಾವುದೇ ರೆಪೊಸಿಟರಿ ಕಂಡುಬಂದಿಲ್ಲ",
       "repositoryAccess": "ರೆಪೊಸಿಟರಿ ಪ್ರವೇಶ"
     },
     "style": {
@@ -1489,7 +1490,6 @@
       "invalidUrl": "ಮಾನ್ಯವಾದ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ URL ನಮೂದಿಸಿ.",
       "couldNotCheckProviderStatus": "ಸೇವಾ ಪೂರೈಕೆದಾರರ ಸ್ಥಿತಿಯನ್ನು ಪರಿಶೀಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "couldNotLoadProviders": "ನೀವು ಸಂಪರ್ಕಿಸಿದ ಸೇವಾ ಪೂರೈಕೆದಾರರನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
-      "connectProvider": "ಸೇವಾ ಪೂರೈಕೆದಾರರನ್ನು ಸಂಪರ್ಕಿಸಿ",
       "connectProviderDescription": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ನ ಪರಿಶೀಲನೆಯನ್ನು ನೀವೇ ಪ್ರಾರಂಭಿಸಲು GitHub ಅನ್ನು ಸಂಪರ್ಕಿಸಿ.",
       "pullRequestUrl": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ URL",
       "instructions": "ಸೂಚನೆಗಳು (ಐಚ್ಛಿಕ)",

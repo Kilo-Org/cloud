@@ -53,6 +53,7 @@
     "connected": "Pripojené",
     "couldNotLoadModels": "Nepodarilo sa načítať modely.",
     "couldNotLoadRepositories": "Nepodarilo sa načítať repozitáre.",
+    "noRepositoriesFound": "Nenašli sa žiadne repozitáre",
     "critical": "Kritická",
     "delete": "Odstrániť",
     "deleted": "Odstránené",
@@ -87,6 +88,7 @@
     "connect": "Pripojiť",
     "connectBitbucket": "Pripojiť Bitbucket",
     "connectGitlab": "Pripojiť GitLab",
+    "connectProvider": "Pripojte poskytovateľa",
     "contentTruncated": "Obsah skrátený",
     "copyLink": "Kopírovať odkaz",
     "couldNotLoadOrganizations": "Nepodarilo sa načítať organizácie.",
@@ -1451,7 +1453,6 @@
       "gitlabNoRepositoriesDescription": "Možno bude potrebné udeliť prístup k ďalším skupinám alebo projektom na platforme GitLab.",
       "installGithubApp": "Inštalácia aplikácie GitHub pre repozitáre",
       "installGithubAppDescription": "Udeľte aplikácii Kilo na platforme GitHub prístup k repozitárom, ktoré chcete kontrolovať.",
-      "noRepositoriesFound": "Nenašli sa žiadne repozitáre",
       "repositoryAccess": "prístup k repozitárom"
     },
     "style": {
@@ -1533,7 +1534,6 @@
       "invalidUrl": "Zadajte platnú URL adresu PR.",
       "couldNotCheckProviderStatus": "Stav poskytovateľa sa nepodarilo overiť.",
       "couldNotLoadProviders": "Pripojených poskytovateľov sa nepodarilo načítať. Skúste to znova.",
-      "connectProvider": "Pripojte poskytovateľa",
       "connectProviderDescription": "Pripojte GitHub, aby ste mohli spustiť manuálnu kontrolu PR.",
       "pullRequestUrl": "URL adresa PR",
       "instructions": "Pokyny (voliteľné)",

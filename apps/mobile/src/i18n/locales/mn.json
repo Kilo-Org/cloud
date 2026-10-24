@@ -53,6 +53,7 @@
     "connected": "Холбогдсон",
     "couldNotLoadModels": "Загваруудыг ачаалж чадсангүй.",
     "couldNotLoadRepositories": "Кодын сангуудыг ачаалж чадсангүй.",
+    "noRepositoriesFound": "Репозитори олдсонгүй",
     "critical": "Ноцтой",
     "delete": "Устгах",
     "deleted": "Устгасан",
@@ -87,6 +88,7 @@
     "connect": "Холбох",
     "connectBitbucket": "Bitbucket холбох",
     "connectGitlab": "GitLab холбох",
+    "connectProvider": "Үйлчилгээ үзүүлэгчийг холбох",
     "contentTruncated": "Агуулгыг хэсэгчлэн харуулж байна",
     "copyLink": "Холбоосыг хуулах",
     "couldNotLoadOrganizations": "Байгууллагуудыг ачаалж чадсангүй.",
@@ -1407,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "GitLab дээр илүү олон бүлэг эсвэл төсөлд хандах эрх өгөх шаардлагатай байж болно.",
       "installGithubApp": "Репозиториудад GitHub апп суулгах",
       "installGithubAppDescription": "Kilo GitHub аппад шалгуулах репозиториуддаа хандах эрх олгоно уу.",
-      "noRepositoriesFound": "Репозитори олдсонгүй",
       "repositoryAccess": "репозиторийн хандах эрх"
     },
     "style": {
@@ -1489,7 +1490,6 @@
       "invalidUrl": "Нэгтгэх хүсэлтийн хүчинтэй URL оруулна уу.",
       "couldNotCheckProviderStatus": "Үйлчилгээ үзүүлэгчийн төлөвийг шалгаж чадсангүй.",
       "couldNotLoadProviders": "Холбосон үйлчилгээ үзүүлэгчдийн мэдээллийг ачаалж чадсангүй. Дахин оролдоно уу.",
-      "connectProvider": "Үйлчилгээ үзүүлэгчийг холбох",
       "connectProviderDescription": "Нэгтгэх хүсэлтийн шалгалтыг гараар эхлүүлэхийн тулд GitHub-ыг холбоно уу.",
       "pullRequestUrl": "Нэгтгэх хүсэлтийн URL",
       "instructions": "Заавар (заавал биш)",

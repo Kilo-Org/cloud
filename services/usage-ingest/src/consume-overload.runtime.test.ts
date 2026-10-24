@@ -3,19 +3,25 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { unstable_readConfig, unstable_startWorker } from 'wrangler';
 import { usage } from './usage.test-fixture';
 
 it('reports writer overload as a workerd queue exception while retaining individual decisions', async () => {
   const calls: unknown[] = [];
   let statuses: (number | 'recorded' | 'duplicate')[] = [];
+  let heldFirst: ReturnType<typeof Promise.withResolvers<void>> | undefined;
+  let active = 0;
+  let peak = 0;
   const writer = createServer(async (request, response) => {
     let body = '';
     for await (const chunk of request) body += chunk;
     const event = JSON.parse(body);
     calls.push(event);
+    peak = Math.max(peak, ++active);
+    response.once('finish', () => active--);
     const status = statuses.shift();
+    if (heldFirst && event.core.id.endsWith('3300')) await heldFirst.promise;
     if (typeof status === 'number') {
       response.writeHead(status, { 'x-sensitive-header': 'synthetic-private-header' });
       response.end('synthetic-private-body');
@@ -57,6 +63,7 @@ it('reports writer overload as a workerd queue exception while retaining individ
         compatibility_flags: service.compatibility_flags,
         vars: {
           USAGE_INGEST_MODE: 'processing',
+          USAGE_INGEST_PARALLELISM: '2',
           USAGE_WRITER_URL: `http://127.0.0.1:${address.port}/api/internal/usage/record`,
           USAGE_WRITER_SECRET: 'synthetic-writer-secret',
           USAGE_WRITER_PROTECTION_BYPASS: 'synthetic-bypass-secret',
@@ -92,10 +99,22 @@ it('reports writer overload as a workerd queue exception while retaining individ
     }));
     for (const status of [429, 503]) {
       statuses = ['recorded', status, 400, 'duplicate'];
-      const result = await entrypoint.queue('local-usage', messages);
+      heldFirst = Promise.withResolvers<void>();
+      const priorCalls = calls.length;
+      let finished = false;
+      const work = entrypoint.queue('local-usage', messages).then(result => {
+        finished = true;
+        return result;
+      });
+      await vi.waitFor(() => expect(calls).toHaveLength(priorCalls + 4));
+      expect(finished).toBe(false);
+      expect(peak).toBe(2);
+      heldFirst.resolve();
+      heldFirst = undefined;
+      const result = await work;
       expect(result.outcome).toBe('exception');
       expect(result.ackAll).toBe(false);
-      expect(result.explicitAcks).toEqual(['queue-0', 'queue-3']);
+      expect(result.explicitAcks.toSorted()).toEqual(['queue-0', 'queue-3']);
       expect(result.retryMessages.map(message => message.msgId)).toEqual(['queue-1', 'queue-2']);
       expect(calls.slice(-4)).toEqual(events);
       expect(statuses).toEqual([]);
@@ -128,6 +147,7 @@ it('reports writer overload as a workerd queue exception while retaining individ
       expect(serialized).not.toContain(sensitive);
     }
   } finally {
+    heldFirst?.resolve();
     try {
       await worker?.dispose();
     } finally {

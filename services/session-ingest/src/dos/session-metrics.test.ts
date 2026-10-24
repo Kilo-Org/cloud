@@ -444,7 +444,7 @@ describe('clampAssistantCostUsd', () => {
   });
 });
 
-function assistantRow(cost: number) {
+function assistantMessage(cost: number) {
   return makeItem('message', {
     role: 'assistant',
     time: { created: 1000 },
@@ -455,21 +455,20 @@ function assistantRow(cost: number) {
 
 describe('computeRunningAssistantCostUsd', () => {
   it('sums assistant message costs in USD', () => {
-    expect(computeRunningAssistantCostUsd([assistantRow(0.05), assistantRow(0.1)])).toBeCloseTo(
-      0.15
-    );
+    const rows = [assistantMessage(0.05), assistantMessage(0.1)];
+    expect(computeRunningAssistantCostUsd(rows)).toBeCloseTo(0.15);
   });
 
   it('ignores user messages', () => {
     const rows = [
       makeItem('message', { role: 'user', time: { created: 1000 } }),
-      assistantRow(0.2),
+      assistantMessage(0.2),
     ];
     expect(computeRunningAssistantCostUsd(rows)).toBeCloseTo(0.2);
   });
 
   it('skips malformed rows', () => {
-    const rows = [{ item_data: 'not json' }, { item_data: 'null' }, assistantRow(0.07)];
+    const rows = [{ item_data: 'not json' }, { item_data: 'null' }, assistantMessage(0.07)];
     expect(computeRunningAssistantCostUsd(rows)).toBeCloseTo(0.07);
   });
 
@@ -478,21 +477,20 @@ describe('computeRunningAssistantCostUsd', () => {
   });
 
   it('returns a non-negative cost total', () => {
-    expect(computeRunningAssistantCostUsd([assistantRow(-0.5)])).toBe(0);
+    expect(computeRunningAssistantCostUsd([assistantMessage(-0.5)])).toBe(0);
   });
 
   it('adds bounded message cost contributions', () => {
-    expect(computeRunningAssistantCostUsd([assistantRow(0.5), assistantRow(-1000)])).toBeCloseTo(
-      0.5
-    );
+    const rows = [assistantMessage(0.5), assistantMessage(-1000)];
+    expect(computeRunningAssistantCostUsd(rows)).toBeCloseTo(0.5);
   });
 
   it('applies the maximum message cost before summing', () => {
-    expect(computeRunningAssistantCostUsd([assistantRow(1e308)])).toBe(MAX_ASSISTANT_COST_USD);
+    expect(computeRunningAssistantCostUsd([assistantMessage(1e308)])).toBe(MAX_ASSISTANT_COST_USD);
   });
 
   it('converts to microdollars with the close-path formula (0.15 USD → 150_000)', () => {
-    const usd = computeRunningAssistantCostUsd([assistantRow(0.15)]);
+    const usd = computeRunningAssistantCostUsd([assistantMessage(0.15)]);
     expect(Math.max(0, Math.round(usd * 1_000_000))).toBe(150_000);
   });
 });

@@ -45,6 +45,9 @@ const authState = vi.hoisted(() => ({
   sessionEnded: false,
   token: undefined as string | undefined,
 }));
+// The measured layout re-reads the window on rotation, so a test changes these
+// and re-renders instead of re-mocking the module.
+const windowSize = vi.hoisted(() => ({ width: 390, height: 844 }));
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
@@ -58,7 +61,7 @@ vi.mock('react-native', () => ({
   PixelRatio: { roundToNearestPixel: (value: number) => Math.round(value) },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
-  useWindowDimensions: () => ({ width: 390, height: 844 }),
+  useWindowDimensions: () => windowSize,
   View: 'View',
 }));
 vi.mock('react-native-safe-area-context', () => ({
@@ -397,6 +400,61 @@ describe('login-screen language globe', () => {
     } finally {
       renderer.unmount();
       vi.mocked(useSafeAreaInsets).mockReturnValue({ top: 0, bottom: 0, left: 0, right: 0 });
+    }
+  });
+
+  it('re-measures the viewport when the window size changes', async () => {
+    const renderer = await mountLoginScreen();
+    const scroll = renderer.root.findByType('ScrollView');
+    const content = renderer.root.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        typeof node.props.onLayout === 'function'
+    );
+    const measureContent = content.props.onLayout as (event: {
+      nativeEvent: { layout: { height: number } };
+    }) => void;
+    const attachScroll = scroll.props.ref as (node: {
+      getNativeScrollRef: () => {
+        measureInWindow: (onMeasure: (...bounds: [number, number, number, number]) => void) => void;
+      };
+    }) => void;
+    const viewport = { width: 390, height: 700 };
+
+    try {
+      act(() => {
+        attachScroll({
+          getNativeScrollRef: () => ({
+            measureInWindow: onMeasure => {
+              onMeasure(0, 0, viewport.width, viewport.height);
+            },
+          }),
+        });
+        measureContent({ nativeEvent: { layout: { height: 200 } } });
+      });
+      expect(scroll.props.contentContainerStyle).toMatchObject({
+        paddingTop: 250,
+        paddingBottom: 250,
+      });
+
+      // A phone held sideways reports a shorter window: the layout has to read
+      // the viewport again, or the form keeps the landscape frame's padding.
+      act(() => {
+        viewport.width = 844;
+        viewport.height = 300;
+        windowSize.width = 844;
+        windowSize.height = 390;
+        renderer.update(createElement(LoginScreen));
+      });
+      expect(scroll.props.contentContainerStyle).toMatchObject({
+        paddingTop: 50,
+        paddingBottom: 50,
+      });
+    } finally {
+      renderer.unmount();
+      windowSize.width = 390;
+      windowSize.height = 844;
     }
   });
 

@@ -53,6 +53,7 @@
     "connected": "Nakakonekta",
     "couldNotLoadModels": "Hindi ma-load ang mga modelo.",
     "couldNotLoadRepositories": "Hindi ma-load ang mga repositoryo.",
+    "noRepositoriesFound": "Walang nahanap na repository",
     "critical": "Kritikal",
     "delete": "Burahin",
     "deleted": "Nabura",
@@ -87,6 +88,7 @@
     "connect": "Kumonekta",
     "connectBitbucket": "Ikonekta ang Bitbucket",
     "connectGitlab": "Ikonekta ang GitLab",
+    "connectProvider": "Ikonekta ang isang provider",
     "contentTruncated": "Pinaikli ang nilalaman",
     "copyLink": "Kopyahin ang link",
     "couldNotLoadOrganizations": "Hindi ma-load ang mga organisasyon.",
@@ -145,7 +147,8 @@
     "agent": "Ahente",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Mga pagbabago"
+    "changes": "Mga pagbabago",
+    "organizationTrialEnded": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update ng may-ari ng organisasyon ang billing sa kilo.ai, pagkatapos ay subukan muli."
   },
   "language": {
     "restarting": "Ini-restart para ilapat ang wika",
@@ -182,7 +185,7 @@
     "codeArrivalHint": "Kung maaaring gamitin ang address na ito, darating ang code sa loob ng isang minuto.",
     "verifyCode": "Patunayan ang code",
     "resendCode": "Ipadala muli ang code",
-    "termsPrefix": "Sa pagpapatuloy, sumasang-ayon ka sa aming",
+    "termsPrefix": "Sa pagpapatuloy, sumasang-ayon ka sa aming ",
     "terms": "Mga tuntunin",
     "termsConnector": " at ",
     "termsSuffix": ".",
@@ -293,7 +296,8 @@
     "condenseToolCallsSubtitle": "Pagsama-samahin ang magkakasunod na tawag ng kagamitan sa isang hilera na mabubuksan mo.",
     "toolSummaryTranslation": "Isalin ang mga buod ng kasangkapan",
     "toolSummaryTranslationSubtitle": "Ipadala ang bawat buod ng kasangkapan sa isang modelo upang isalin ito sa wika ng iyong app. Ipinapakita ang orihinal kung mabigo ang pagsasalin.",
-    "toolSummaryTranslationModelUnavailableNotice": "Hindi na inaalok ang modelong ito. I-tap ang $t(common.model) para pumili ng iba."
+    "toolSummaryTranslationModelUnavailableNotice": "Hindi na inaalok ang modelong ito. I-tap ang $t(common.model) para pumili ng iba.",
+    "autoExpandThinkingInactiveSubtitle": "Walang epekto habang itinatago ang mga detalye ng pag-iisip."
   },
   "prReview": {
     "pullRequestUnavailable": "Hindi mabuksan ang pull request",
@@ -493,7 +497,7 @@
       "unresolveThread": "Markahang hindi pa nalutas ang talakayan",
       "resolved": "Nalutas",
       "outdated": "Luma na",
-      "comment_one": "1 komento",
+      "comment_one": "{{displayCount}} komento",
       "comment": "{{displayCount}} na komento",
       "comment_other": "{{displayCount}} na komento",
       "startedRelative": " · nagsimula {{relative}}",
@@ -622,9 +626,15 @@
       "viewOnGitHub": "Tingnan ang PR sa GitHub",
       "noChecksReported": "Walang naiulat na pagsusuri",
       "passed": "{{displayCount}} ang pumasa",
+      "passed_one": "{{displayCount}} ang pumasa",
+      "passed_other": "{{displayCount}} ang pumasa",
       "failed": "{{displayCount}} ang hindi pumasa",
+      "failed_one": "{{displayCount}} ang hindi pumasa",
+      "failed_other": "{{displayCount}} ang hindi pumasa",
       "pending": "{{displayCount}} ang nakabinbin",
       "skipped": "{{displayCount}} ang nilaktawan",
+      "skipped_one": "{{displayCount}} ang nilaktawan",
+      "skipped_other": "{{displayCount}} ang nilaktawan",
       "checksCount": "{{displayCount}} na pagsusuri",
       "checksCount_one": "{{displayCount}} na pagsusuri",
       "checksCount_other": "{{displayCount}} na pagsusuri",
@@ -669,7 +679,8 @@
       "gitlabDescription": "Ikonekta ang iyong GitLab account para suriin ang mga merge request sa mobile.",
       "bitbucketDescription": "Ikonekta ang Bitbucket sa organizasyong ito para suriin ang mga pull request sa mobile.",
       "bitbucketOrgOnlyDescription": "Palitan ang account sa itaas ng isang organisasyon para suriin ang mga pull request nito sa Bitbucket.",
-      "contextLine": "Para sa {{organization}}"
+      "contextLine": "Para sa {{organization}}",
+      "contextLinePersonal": "Para sa pansariling account"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1399,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Maaaring kailangan mong magbigay ng access sa mas maraming grupo o proyekto sa GitLab.",
       "installGithubApp": "I-install ang GitHub app sa mga repository",
       "installGithubAppDescription": "Bigyan ang Kilo GitHub App ng access sa mga repository na gusto mong suriin.",
-      "noRepositoriesFound": "Walang nahanap na repository",
       "repositoryAccess": "access sa repository"
     },
     "style": {
@@ -1429,6 +1439,8 @@
       "showMore": "Magpakita ng higit pa",
       "created": "Nalikha",
       "started": "Nagsimula",
+      "reviewEnded": "Natapos na",
+      "severityNitpick": "Maliit na puna",
       "tokens": "Mga token",
       "tokensInOut": "{{input}} papasok / {{output}} palabas",
       "council": "Lupon",
@@ -1452,7 +1464,13 @@
       "sessionError": "Nagkaproblema sa sesyon: {{error}}.",
       "statusWithValue": "Katayuan: {{status}}",
       "toolName": "Kasangkapan: {{name}}",
-      "toolNameError": "Nagkaproblema ang kasangkapan: {{name}}."
+      "toolNameError": "Nagkaproblema ang kasangkapan: {{name}}.",
+      "cancelReasonSuperseded": "Na-push ang isang mas bagong commit, kaya napalitan ang pagsusuring ito.",
+      "cancelReasonIntegrationDisconnected": "Naka-disconnect ang {{platform}}, kaya kinansela ang pagsusuring ito. I-connect ito muli, pagkatapos ay patakbuhin muli ang pagsusuri.",
+      "cancelReasonBitbucketReviewerDisabled": "Naka-off ang Code Reviewer para sa Bitbucket, kaya kinansela ang pagsusuring ito. I-enable ito muli, pagkatapos ay patakbuhin muli ang pagsusuri.",
+      "cancelReasonBitbucketPullRequestChanged": "Nagbago ang pull request sa Bitbucket, kaya napalitan ang pagsusuring ito.",
+      "cancelReasonCancelled": "Kinansela ang pagsusuring ito.",
+      "cancelReasonInterrupted": "Naputol ang pagsusuring ito."
     },
     "reviewMemory": {
       "title": "Memorya ng pagsusuri",
@@ -1473,13 +1491,20 @@
       "invalidUrl": "Maglagay ng wastong URL ng pull request.",
       "couldNotCheckProviderStatus": "Hindi masuri ang katayuan ng provider.",
       "couldNotLoadProviders": "Hindi namin ma-load ang mga nakakonektang provider mo. Pakisubukang muli.",
-      "connectProvider": "Ikonekta ang isang provider",
       "connectProviderDescription": "Ikonekta ang GitHub para magsimula ng manu-manong pagsusuri ng isang pull request.",
       "pullRequestUrl": "URL ng pull request",
       "instructions": "Mga tagubilin (opsyonal)",
       "instructionsPlaceholder": "Mga partikular na bagay na dapat pagtuunan ng pansin sa pagsusuri…",
       "starting": "Sinisimulan ang pagsusuri...",
-      "start": "Simulan ang pagsusuri"
+      "start": "Simulan ang pagsusuri",
+      "startNotFound": "Hindi mabasa ang {{requestNoun}} na iyan mula sa {{provider}}. Pakisuri ang URL at kung naa-access ang repositoryo.",
+      "startRateLimited": "Naglilimita ng mga request ang {{provider}} sa ngayon. Subukan ulit pagkalipas ng ilang minuto.",
+      "startNotAllowed": "Wala kang access upang simulan ang pagsusuri ng {{requestNoun}} na iyan. Pakisuri ang iyong mga pahintulot at ang plano ng iyong organisasyon.",
+      "startProviderNeedsAttention": "Kailangan ng manu-manong pagsusuri ang karaniwang koneksyon sa {{provider}}. Ikonekta ito at subukan muli.",
+      "startAlreadyRunning": "Tumatakbo na ang pagsusuri ng {{requestNoun}} na iyan.",
+      "startRejected": "Hindi masusuri ang {{requestNoun}} na iyan. Tiyaking bukas ito, hindi draft, at tama ang URL.",
+      "startProviderUnavailable": "Hindi maabot ang {{provider}} para basahin ang {{requestNoun}} na iyan. Subukan muli.",
+      "startFailed": "Hindi masimulan ang pagsusuri. Suriin ang iyong koneksyon at subukan muli."
     },
     "notConnectedReadOnly": "Hindi nakakonekta ang {{platform}}. Mga may-ari ng organisasyon at admin lang ang maaaring magkonekta nito.",
     "gitlab": {
@@ -1731,7 +1756,7 @@
       "deadlinePassed": "Lampas na sa takdang petsa",
       "deadlinePassedDetail": "{{critical}} na kritikal, {{high}} na mataas",
       "dueThisWeek": "Takdang petsa ngayong linggo",
-      "dueThisWeekDetail": "{{exploitable}} kumpirmadong maaaring samantalahin",
+      "dueThisWeekDetail": "{{exploitable}} sa mga ito ang kumpirmadong maaaring samantalahin",
       "noDeadline": "Walang takdang petsa",
       "reviewSlaAssignment": "Suriin ang pagtatalaga ng SLA",
       "allOpenFindingsTracked": "Sinusubaybayan ang lahat ng bukas na isyu"
@@ -1891,11 +1916,17 @@
       "actorSystem": "Kilo system",
       "couldNotLoad": "Hindi ma-load ang ulat ng audit.",
       "events": "Mga kaganapan",
+      "eventConfidence": "Kumpiyansa: {{confidence}}",
+      "eventReason": "Dahilan: {{reason}}",
+      "eventsCount_one": "{{displayCount}} kaganapan",
+      "eventsCount_other": "{{displayCount}} kaganapan",
       "generated": "Nabuo noong {{generatedAt}}.",
       "noActivity": "Walang naitalang aktibidad",
       "noActivityDescription": "Walang aktibidad sa mga natukoy na isyu sa seguridad na maiuulat ang Kilo mula {{start}} hanggang {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Hindi naitala ang repository",
+      "reasonUnknown": "Hindi nakikilalang dahilan",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Buod ng ulat",
       "title": "Ulat ng audit",
       "unavailable": "Hindi makuha ang ulat ng audit",
@@ -1948,8 +1979,9 @@
       "couldNotLoad": "Hindi ma-load ang Security Agent.",
       "installApp": "I-install ang GitHub App",
       "reauthorizeButton": "Pahintulutan muli ang GitHub App",
-      "reauthorizeDescription": "Kailangan ng Security Agent ang pahintulot na vulnerability_alerts para ma-access ang mga alerto ng Dependabot. Pahintulutan muli ang GitHub App para ibigay ito.",
+      "reauthorizeDescription": "Kailangan ng Security Agent ng pahintulot para basahin ang mga alerto ng Dependabot. Pahintulutan muli ang GitHub App para ibigay ang pahintulot na ito.",
       "reauthorizeTitle": "Kailangan ng mga karagdagang pahintulot",
+      "retryFailed": "Hindi pa rin ma-load ang Security Agent. Pakisuri ang iyong koneksyon at subukang muli.",
       "setupFailed": "Hindi masimulan ang setup ng GitHub. Pakisubukang muli."
     },
     "queuedActionUntracked": "Hindi na masubaybayan ang isang nakapilang aksiyon. I-refresh para makita ang pinakabagong katayuan.",
@@ -2112,7 +2144,8 @@
       "dollar_other": "dolyar",
       "costSpoken": "gastos na {{cost}}",
       "costSpokenWithTime": "halagang {{cost}}, {{time}}",
-      "pullRequest": "pull request na {{number}}"
+      "pullRequest": "pull request na {{number}}",
+      "spokenJoiner": ", at"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Hindi mabuksan ang GitHub",
@@ -2241,13 +2274,13 @@
       "branchLoadError": "Hindi ma-load ang mga sangay",
       "branchUnavailable": "Walang available na sangay para sa repositoryong ito. Suriin ang access mo sa provider, tapos pumili ng ibang repositoryo.",
       "branchEmpty": "Walang available na sangay",
+      "branchListIncomplete": "Iilan lamang sa mga sangay ang ipinapakita. May mas maraming sangay ang repositoryo kaysa sa kayang isama ng listahang ito.",
       "branchPlaceholder": "Pumili ng sangay",
       "runOnWithTarget": "Patakbuhin sa: {{target}}",
       "environment": "Kapaligiran",
       "couldNotLoadEnvironment": "Hindi ma-load ang iyong kapaligiran.",
       "retryLoadingEnvironment": "Subukang i-load muli ang kapaligiran",
       "defaultEnvironment": "Paunang itinakdang kapaligiran",
-      "environmentSummary": "{{commands}} utos · {{mcp}} MCP · {{skills}} kasanayan · {{agents}} ahente",
       "leaveChanges": "Iwan ang mga pagbabago",
       "commitAndPush": "I-commit at i-push",
       "startSession": "Simulan ang sesyon",
@@ -2466,7 +2499,71 @@
       "preparationComplete": "Kumpleto ang paghahanda",
       "preparationFailed": "Nabigo ang paghahanda",
       "setupCommand": "Utos sa paghahanda {{index}}",
-      "setupCommandOf": "Utos sa paghahanda {{index}} sa {{displayCount}}"
+      "setupCommandOf": "Utos sa paghahanda {{index}} sa {{displayCount}}",
+      "stepWorkspaceSetup": "Pag-setup ng workspace",
+      "stepDiskCheck": "Pagsusuri ng disk",
+      "stepCloning": "Kinoklona ang repository",
+      "stepBranch": "Pagsasaayos ng branch",
+      "stepDevcontainerSetup": "Pag-setup ng dev container",
+      "stepWorkspaceRestore": "Ibinabalik ang workspace",
+      "stepWorkspaceBackup": "Iniimbak ang workspace",
+      "stepSandboxProvision": "Paghahanda ng sandbox",
+      "stepSandboxBoot": "Sinisimulan ang sandbox",
+      "stepSnapshotFallback": "Sumusubok muli nang walang snapshot",
+      "stepKiloServer": "Sinisimulan ang Kilo",
+      "stepKiloSession": "Inihahanda ang session",
+      "stepRestoreIncomplete": "Hindi kumpleto ang pagbabalik ng session",
+      "stepReady": "Handa na ang kapaligiran",
+      "stepFailed": "Nabigo ang pag-setup ng kapaligiran",
+      "stepUnknown": "Pag-setup ng kapaligiran",
+      "detailCreatingSandbox": "Ginagawa ang sandbox",
+      "detailUpdatingRepository": "Ina-update ang repository",
+      "detailCheckingOutBranch": "Ina-check out ang branch",
+      "detailRunningSetupCommands": "Pinapatakbo ang mga utos sa paghahanda",
+      "detailSavingRepository": "Sine-save ang repository para sa mas mabilis na pagsisimula",
+      "detailStartingKiloRuntime": "Sinisimulan ang Kilo runtime",
+      "detailPreparingKiloSession": "Inihahanda ang Kilo session",
+      "detailWaitingForPreviousSandbox": "Hinihintay matigil ang naunang sandbox",
+      "detailRetryingSandboxCreation": "Sumusubok muling gumawa ng sandbox",
+      "detailPreviousSnapshotFailed": "Nabigo ang pagsisimula gamit ang naunang snapshot. Sumusubok muli nang walang snapshot.",
+      "detailSnapshotStartupFailed": "Nabigo ang pagsisimula ng snapshot. Sumusubok muli nang walang snapshot.",
+      "detailStartingSandboxWithoutSnapshot": "Sinisimulan ang sandbox nang walang snapshot",
+      "detailSettingUpWorkspace": "Inaayos ang workspace",
+      "detailRestoringSession": "Ibinabalik ang session",
+      "detailWarmWorkspaceReused": "Muling nagamit ang warm workspace",
+      "detailRetryingClone": "Sumusubok ulit i-clone (pagsubok {{attempt}} sa {{total}})",
+      "detailSetupCommandFailed": "Nabigo ang utos sa paghahanda {{index}}",
+      "detailSetupCommandTimedOut": "Nag-time out ang utos sa paghahanda {{index}}",
+      "detailColdRestore": "Cold restore, nailapat ang snapshot, {{applied}} sa {{total}} files ang nabalik",
+      "detailProgressPercent": "{{percent}}% kumpleto",
+      "detailRestoreIncompleteReport": "Hindi kumpleto ang pagbabalik ng session: {{skipped}} sa {{total}} files ang hindi naibalik ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Nawawala: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} at {{omitted}} pa",
+      "detailReasonPatchFailed": "hindi naaplay ang patch",
+      "detailReasonOutsideWorkspace": "nasa labas ng workspace ang path",
+      "detailReasonMissingContent": "walang nilalaman ang snapshot para sa file",
+      "detailReasonIndexResetFailed": "hindi na-reset ang index pagkatapos ng nabigong pag-apply",
+      "detailReasonUnlinkFailed": "hindi matanggal ang file",
+      "detailReasonWriteFailed": "hindi maisulat ang file",
+      "detailReasonUnknown": "hindi alam na dahilan",
+      "detailUnknown": "Naghahanda pa",
+      "errorPreparationTimeout": "Nag-time out ang paghahanda ng kapaligiran",
+      "errorWorkspaceSetupFailed": "Nabigo ang pag-setup ng workspace",
+      "errorCredentialUpgradeRequired": "Kulang ang session sa kinakailangang pag-upgrade ng credential. Magsimula ng bagong session para magpatuloy.",
+      "errorAgentUnavailable": "Hindi na available ang agent",
+      "errorBillingBlocked": "Kailangan ng karagdagang credits ang pag-bill sa sandbox",
+      "errorBillingUnavailable": "Hindi available ang pag-bill sa sandbox o pag-verify ng kapasidad. Sumubok ulit sa lalong madaling panahon.",
+      "errorContainerLimitReached": "Naabot na ang limitasyon ng container. Ihinto ang isang umiiral na container bago magsimula ng bago.",
+      "errorInvalidConfiguration": "Hindi wasto o hindi sinusuportahan ang configuration ng sandbox",
+      "errorRuntimeArtifactUnauthorized": "Hindi awtorisado ang pag-download ng runtime",
+      "errorRuntimeArtifactInvalid": "Nabigo ang pag-verify ng runtime artifact",
+      "errorRuntimeCliProbeFailed": "Nabigo ang pagpapatunay ng runtime CLI",
+      "errorRuntimeSupervisorMissing": "Wala ang runtime supervisor",
+      "errorConnectionLost": "Nawala ang koneksyon sa sandbox",
+      "errorSandboxLost": "Nawala ang sandbox",
+      "errorAgentRestarted": "Nag-restart ang agent",
+      "errorSandboxOutOfMemory": "Naubusan ng memorya ang sandbox",
+      "errorPreparationDidNotComplete": "Hindi natapos ang paghahanda"
     },
     "permissionCard": {
       "title": "Kailangan ng pahintulot",
@@ -2478,7 +2575,10 @@
       "allowOnceAccessibility": "Payagan nang isang beses",
       "alwaysAllow": "Laging payagan",
       "alwaysAllowAccessibility": "Laging payagan",
-      "retrying": "Muling sinusubukan…"
+      "retrying": "Muling sinusubukan…",
+      "retryDeny": "Subukang tanggihan muli",
+      "retryAllowOnce": "Subukang payagan nang isang beses muli",
+      "retryAlwaysAllow": "Subukang laging payagan muli"
     },
     "questionCard": {
       "title": "Kailangan ng ahente ng sagot",
@@ -3030,22 +3130,16 @@
     "boundary": {
       "backToProfile": "Bumalik sa profile",
       "loadErrorMessage": "Suriin ang koneksyon mo at subukan muli.",
-
       "chooseAccount": "Pumili ng account",
       "loadErrorTitle": "Hindi ma-load ang iyong mga organisasyon.",
       "membershipLostNotice": "Wala ka nang access sa organisasyong ito. Lumipat sa {{target}}.",
       "noOrganization": "Walang organisasyon",
-
       "noOrganizationDescription": "Ang account na ito ay hindi bahagi ng isang organisasyon. Gumawa o sumali sa isang organisasyon sa web upang magamit ang mga feature ng organisasyon tulad ng mga imbitasyon ng miyembro at mga alerto sa mababang balanse.",
-
       "openWebOrganizations": "Buksan ang mga organisasyon sa web",
-
       "organizationUnavailable": "Hindi ma-access ang organisasyon.",
       "selectDescriptionWithOrganizations": "Kasapi ka ng isa o higit pang organisasyon. Piliin ang account na dapat gamitin ng screen na ito.",
-
       "selectOrganization": "Pumili ng organisasyon",
       "unavailableDescription": "Hindi na ma-access ang organisasyong ito. Pumili ng isa mula sa iyong profile para magpatuloy.",
-
       "unavailableSessionsDescription": "Hindi na ma-access ang organisasyong ito. Hindi ma-load ang mga session nito.",
       "accessDeniedDescription": "Wala kang access sa organisasyong ito."
     },
@@ -3073,7 +3167,11 @@
       "permissionDenied": "Wala kang pahintulot na mag-imbita ng mga miyembro.",
       "roleMember": "Tungkulin: Miyembro.",
       "sendInvite": "Ipadala ang imbitasyon",
-      "title": "Mag-imbita ng miyembro"
+      "title": "Mag-imbita ng miyembro",
+      "alreadyInvited": "Imbitado na sila o miyembro na.",
+      "sendError": "Hindi naipadala ang imbitasyon.",
+      "pendingInvitation": "May nakabinbing imbitasyon na ang email na ito.",
+      "alreadyMember": "Miembro na ng organisasyong ito ang taong ito."
     },
     "invoices": {
       "downloadA11y": "I-download ang talaan ng singil {{number}}",
@@ -3142,7 +3240,13 @@
       "inviteCreated": "Nalikha ang imbitasyon",
       "pendingInvitations": "Mga nakabinbing imbitasyon",
       "resendInvite": "Ipadala muli ang imbitasyon",
-      "shareInviteLink": "Ibahagi ang link ng imbitasyon"
+      "shareInviteLink": "Ibahagi ang link ng imbitasyon",
+      "resendInviteError": "Hindi naipadala muli ang imbitasyon.",
+      "inviteNotResendable": "Hindi na maaaring ipadala muli ang imbitasyong ito.",
+      "ownerAuthority": "Ang may-ari lamang ng organisasyon ang maaaring mamahala ng mga may-ari.",
+      "ownRoleChange": "Hindi mo maaaring baguhin ang iyong sariling tungkulin.",
+      "inviteExpired": "Nag-expire na ang imbitasyong ito.",
+      "inviteAccepted": "Tinanggap na ang imbitasyong ito."
     },
     "usageStats": {
       "inputTokens": "Mga papasok na token",
@@ -3290,7 +3394,8 @@
     "noneChosen": "Walang napili",
     "emptyTitle": "Walang modelo para sa pagsasalin ng boses sa teksto",
     "emptyDescription": "Walang iniaalok na modelo para sa pagsasalin ng boses sa teksto ang Kilo Gateway ngayon.",
-    "loadFailed": "Hindi ma-load ang mga modelo para sa pagsasalin ng boses sa teksto."
+    "loadFailed": "Hindi ma-load ang mga modelo para sa pagsasalin ng boses sa teksto.",
+    "choose": "Pumili ng modelo"
   },
   "voiceLanguage": {
     "title": "Wika ng pagdikta",
@@ -3386,7 +3491,12 @@
       "serverToolCount_one": "{{count}} tool",
       "serverToolCount_other": "{{count}} tool",
       "serverUnreachable": "Hindi maabot ang server na ito",
-      "serverOff": "Naka-off ang server na ito"
+      "serverOff": "Naka-off ang server na ito",
+      "app": {
+        "label": "Interface ng tool",
+        "failed": "Hindi na-load ang interface ng tool na ito.",
+        "empty": "Walang maipapakita ang interface ng tool na ito."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Pagpapatunay",
@@ -3500,6 +3610,7 @@
       "fromHuggingFace": "Mula sa Hugging Face",
       "loading": "Nilo-load ang mga modelo",
       "noResults": "Walang nakitang modelo",
+      "noResultsForQuery": "Walang nakitang modelo para sa \"{{query}}\"",
       "noFits": "Walang modelong kasya sa device na ito",
       "noFitsDescription": "Nasa tab na $t(common.all) ang mas malalaking modelo.",
       "fit": {
@@ -3530,8 +3641,6 @@
       "quantizations": "Mga quantization",
       "quantizationsHelp": "Mas kaunting memory at storage ang ginagamit ng mas maliliit na file. Kadalasang mas mahusay ang sagot ng mas malalaking file.",
       "quantDetail": "{{size}} na download · mga {{memory}} ng memory",
-      "downloadQuant": "I-download ang {{quant}}",
-      "downloadModelA11y": "I-download ang {{name}}",
       "detailsA11y": "Mga detalye: {{name}}",
       "loadingModel": "Nilo-load ang mga detalye ng modelo",
       "couldNotLoadModel": "Hindi ma-load ang modelong ito",
@@ -3576,13 +3685,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "Sinusuportahan ng modelong ito ang antas ng pag-iisip"
-    }
+    },
+    "creditsRequired": "Kulang ang kredito para ipadala ang mensaheng ito. Magdagdag ng kredito at subukang muli."
   },
   "settingsTools": {
     "confirmTitle": "Kumpirmahin ang pagbabagong ito?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "ang iyong pinakabagong repositoryo",
+      "confirmMessage": "Repositoryo: {{repository}}. Kahilingan: {{prompt}}.",
+      "confirmTitle": "Simulan ang agent na ito?",
       "promptRequired": "Nangangailangan ng prompt ang Simulan ang agent. Magdagdag ng prompt at patakbuhin itong muli.",
       "repositoryRequired": "Nangangailangan ng repositoryo ang Simulan ang agent. Buksan ang Kilo at pumili ng isa, pagkatapos ay patakbuhin itong muli.",
       "repositoryUnknown": "Hindi kinikilala ng Kilo ang {{repository}} bilang GitHub o GitLab na repositoryo. Pumili ng ibang repositoryo sa Kilo.",
@@ -3612,7 +3725,9 @@
     "spend24h": "Gastos sa nakalipas na 24 na oras",
     "multiplierError": "Maglagay ng multiplier na 1 o higit pa",
     "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga babala sa gastos.",
-    "pushOffByCategory": "Naka-off sa Mga abiso"
+    "pushOffByCategory": "Naka-off sa Mga abiso",
+    "multiplierMaxError": "Maglagay ng multiplier na {{max}} o mas mababa",
+    "thresholdMaxError": "Maglagay ng halagang {{max}} o mas mababa."
   },
   "profiles": {
     "title": "Mga profile",
@@ -3629,9 +3744,10 @@
       "skills_other": "{{count}} kasanayan",
       "commands_one": "{{count}} utos",
       "commands_other": "{{count}} utos",
-      "varsShort": "{{count}}v",
-      "skillsShort": "{{count}}k",
-      "commandsShort": "{{count}}u"
+      "setupCommands_one": "{{count}} utos sa pag-setup",
+      "setupCommands_other": "{{count}} utos sa pag-setup",
+      "agents_one": "{{count}} ahente",
+      "agents_other": "{{count}} ahente"
     },
     "nameLabel": "Pangalan ng profile",
     "namePlaceholder": "hal. Backend debugging",
@@ -3659,6 +3775,8 @@
     "keyTooLong": "Ang susi ay dapat 256 na character o mas kaunti",
     "keyDuplicate": "Umiiral na ang key na ito sa profile",
     "valueLabel": "Halaga",
+    "valueRequired": "Maglagay ng halaga",
+    "tooLong": "Dapat {{max}} na character o mas kaunti",
     "secrets": {
       "markSecret": "Markahan bilang sikreto",
       "masked": "Nakatagong halaga",
@@ -3709,7 +3827,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Maglagay ng pangalan ng server",
-      "nameInvalid": "Ang pangalan ay maaari lamang gumamit ng mga titik, numero, underscore, at gitling",
+      "nameInvalid": "Ang pangalan ay maaari lamang gumamit ng mga ASCII na titik, numero, underscore, at gitling, hanggang 100 na character",
       "commandRequired": "Maglagay ng command",
       "commandTooLong": "Gumamit ng hindi hihigit sa 50 argumento na 500 character bawat isa",
       "urlRequired": "Maglagay ng URL",
@@ -3737,7 +3855,7 @@
       "stepsPlaceholder": "hal. 50",
       "temperature": "Temperatura",
       "temperaturePlaceholder": "hal. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "hal. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Aking Ahente",
@@ -3746,7 +3864,7 @@
       "visibility": "Bisibilidad",
       "visibilityPrimary": "Pangunahin — ipinapakita sa picker",
       "visibilitySubagent": "Subagent — matatawag lang mula sa iba",
-      "visibilityAll": "Lahat - pareho",
+      "visibilityAll": "Lahat — pareho",
       "modePrimary": "Pangunahin lang",
       "modeSubagent": "Subagent lang",
       "modeAll": "Lahat",
@@ -3754,7 +3872,7 @@
       "deleteFailed": "Hindi ma-delete ang ahente",
       "nameRequired": "Maglagay ng pangalan ng ahente",
       "slugRequired": "Maglagay ng agent slug",
-      "slugInvalid": "Ang slug ay dapat magsimula sa isang titik at gumamit lamang ng maliliit na titik, digit, at gitling",
+      "slugInvalid": "Ang slug ay dapat magsimula sa isang maliliit na ASCII na titik at gumamit lamang ng maliliit na ASCII na titik, digit, at gitling, hanggang 50 na character",
       "slugConflict": "Ginagamit na ng isang built-in na agent o iba pang agent sa profile na ito ang slug na iyon",
       "edit": "I-edit ang ahente"
     },
@@ -3799,7 +3917,9 @@
       "pinFailed": "Hindi ma-pin ang repo",
       "unboundToast": "Nakalag ang repo",
       "unbindFailed": "Hindi ma-unbind ang repo"
-    }
+    },
+    "variablesDeleteFailed": "Hindi ma-delete ang variable",
+    "deleteCommand": "Burahin ang utos {{position}}"
   },
   "credits": {
     "title": "Bumili ng kredito",
@@ -3835,7 +3955,8 @@
       "archive": "I-archive",
       "unarchive": "Alisin sa archive",
       "deleteTitle": "Burahin ang {{name}}?",
-      "deleteMessage": "Burahin din ang mga gagawin nito. Nananatili ang mga sesyon nito."
+      "deleteMessage": "Burahin din ang mga gagawin nito. Nananatili ang mga sesyon nito.",
+      "createFailed": "Hindi malikha ang listahan"
     },
     "listSettings": {
       "title": "Mga setting ng listahan",
@@ -3903,20 +4024,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Briefing sa umaga",
+    "title": "Briefing ng agent",
     "atLeast": "≥{{value}}",
     "coverageHint": "Maaaring may kulang na nakaraang aktibidad. Ang ≥ ay nangangahulugang hindi bababa rito; ang hindi alam ay hindi zero.",
     "available": "Mga available na briefing",
     "history": "Kasaysayan ng briefing",
-    "historyHint": "Itinatago ang mga ulat nang 30 araw, kasama ang mga na-dismiss.",
+    "historyHint": "Itinatago ang mga briefing nang 30 araw, kasama ang mga na-dismiss.",
     "settings": "Mga setting ng briefing",
-    "empty": "Walang aktibidad magdamag",
-    "emptyHint": "Lalabas dito ang iyong mga cloud at CLI coding session pagkatapos ng aktibong gabi.",
+    "empty": "Walang aktibidad sa window ng briefing na ito",
+    "emptyHint": "Lalabas dito ang iyong mga cloud at CLI coding session kapag may aktibidad ang isang naka-iskedyul na briefing.",
     "loadError": "Hindi ma-load ang mga briefing",
-    "sessions": "Aktibo magdamag",
+    "sessions": "Aktibo sa window",
     "pullRequests": "Mga binuksang PRs",
     "blockers": "Mga bagong blocker",
-    "spend": "Gastos magdamag",
+    "spend": "Gastos sa window",
     "view": "Basahin ang briefing",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -3938,13 +4059,13 @@
     "sources": "Ebidensya at artifact",
     "timezone": "Time zone ng briefing",
     "deviceTimezone": "Gamitin ang time zone ng device",
-    "timezoneHint": "IANA time zone, halimbawa Europe/Berlin. Sa mga susunod na gabi magagamit ang pagbabago sa iskedyul.",
-    "nightStart": "Simula ng gabi",
-    "morningStart": "Katapusan ng gabi / simula ng umaga",
-    "morningEnd": "Katapusan ng umaga",
-    "timeHint": "Ibinabalik ng Home card ang live na status kapag natapos ang umaga, kahit offline.",
-    "invalidSchedule": "Pumili ng wastong time zone at hindi nagsasapaw at hindi walang lamang panahon ng gabi at umaga.",
-    "notificationsHint": "Isang pangkalahatang abiso bawat umaga kapag handa na ang iyong unang ulat. Hiwalay sa mga bayad na buod ng AI.",
+    "timezoneHint": "IANA time zone, halimbawa Europe/Berlin. Sa mga susunod na briefing magagamit ang pagbabago sa iskedyul.",
+    "nightStart": "Simula ng window ng briefing",
+    "morningStart": "Handa ang briefing sa",
+    "morningEnd": "Available ang briefing hanggang",
+    "timeHint": "Ibinabalik ng Home card ang live na status kapag natapos ang window ng briefing, kahit offline.",
+    "invalidSchedule": "Pumili ng wastong time zone at ng isang hindi walang laman na window ng briefing.",
+    "notificationsHint": "Isang pangkalahatang abiso bawat naka-iskedyul na briefing. Hiwalay sa mga bayad na buod ng AI.",
     "notificationPermission": "I-enable ang mga abiso ng device sa $t(common.notifications) para matanggap ang iyong briefing.",
     "aiOptIn": "Mga bayad na buod ng AI",
     "aiHint": "Opsyonal para sa kontekstong ito lamang. Ipinapadala sa iyong model ang mga piniling na-redact na sipi at nakaayos na datos sa wika ng iyong app. Ginagamit ng singil ang balanse ng kontekstong ito.",
@@ -3966,7 +4087,7 @@
     "contextSettings": "Mga setting ng AI · {{context}}",
     "allContexts": "Magkahiwalay ang mga personal at pang-organisasyong briefing.",
     "create": "Gumawa ng briefing",
-    "oneOff": "Isang beses lang",
+    "oneOff": "Sa kahilingan",
     "createdAt": "Ginawa {{time}}",
     "chooseContext": "Pumili ng isang konteksto",
     "period": "Panahon ng briefing",
@@ -3988,9 +4109,12 @@
     "emptyPeriod": "Walang nakitang aktibidad sa panahong ito. Walang buod ng AI o singil.",
     "emptyHistory": "Walang naka-save na briefing",
     "historicalStateHint": "Ipinapakita ng kalagayan ng sesyon ang kalagayan nito sa katapusan ng napiling panahon, hindi ang kasalukuyang kalagayan.",
-    "oneOffHint": "Tumatanggap ang AI ng mga napiling ebidensiyang may nakatagong sensitibong detalye sa wika ng iyong app. Hindi binabago ng minsanang ulat na ito ang iyong iskedyul sa umaga o mga kagustuhan sa AI.",
+    "oneOffHint": "Tumatanggap ang AI ng mga napiling ebidensiyang may nakatagong sensitibong detalye sa wika ng iyong app. Hindi binabago ng briefing sa kahilingan na ito ang iyong naka-iskedyul na briefing o mga kagustuhan sa AI.",
     "createOffline": "Kumonekta sa internet para suriin o gumawa ng briefing. Hindi kailanman ipinipila ang mga may bayad na kahilingan kapag walang koneksyon sa internet.",
     "estimateInputTooLarge": "Masyadong maraming ebidensiya sa panahong ito para sa napiling modelo.",
-    "estimatePermissionUnavailable": "Wala kang pahintulot na gamitin ang balanse ng kontekstong ito."
+    "estimatePermissionUnavailable": "Wala kang pahintulot na gamitin ang balanse ng kontekstong ito.",
+    "createFailed": "Hindi magawa ang briefing na ito.",
+    "reviewFailed": "Hindi masuri ang briefing na ito.",
+    "saved": "Na-save na ang mga setting ng briefing"
   }
 }

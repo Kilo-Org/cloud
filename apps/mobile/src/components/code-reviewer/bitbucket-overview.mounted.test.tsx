@@ -34,7 +34,11 @@ const queryError = vi.hoisted(() => ({
 }));
 const skeletonRenders = vi.hoisted(() => ({ count: 0 }));
 
-vi.mock('react-native', () => ({ View: 'View', Switch: 'Switch' }));
+vi.mock('react-native', () => ({
+  Platform: { OS: 'android' },
+  View: 'View',
+  Switch: 'Switch',
+}));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn() },

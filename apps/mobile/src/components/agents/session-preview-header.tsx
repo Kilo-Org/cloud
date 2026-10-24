@@ -51,7 +51,7 @@ export function SessionPreviewHeaderMeta({
     ? shouldShowNeedsInput({
         status: liveRow.status,
         raiseId,
-        isAcked: isAttentionAcked(target.sessionId, raiseId),
+        isAcked: isAttentionAcked(target.sessionId, { raiseId, status: liveRow.status }),
       })
     : target.needsInput;
   const liveStatus = liveRow?.status ?? null;

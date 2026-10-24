@@ -10,7 +10,7 @@ import {
   unlockRoot,
   unmountUnlock,
 } from '@/components/app-unlock-screen.test-helpers';
-import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
+import { publishRenderedTabBarHeight } from '@/lib/tab-bar-clearance';
 import { MIN_BOTTOM_CHROME_HEIGHT, TOAST_BOTTOM_GAP } from '@/lib/toast-offset';
 
 // One keyboard read for the whole app: the Toaster must read the height the
@@ -61,6 +61,7 @@ vi.mock('react-native-keyboard-controller', async () => {
 beforeEach(() => {
   resetUnlockMocks();
   keyboardStore.setHeight(0);
+  publishRenderedTabBarHeight(null);
 });
 afterEach(unmountUnlock);
 
@@ -118,16 +119,16 @@ it('clears the floating tab bar while a tab screen is on top', async () => {
   route.pathname = '/code-reviewer/personal/manual-review';
   await mount();
 
+  // The bar publishes the height it renders, so the toast clears exactly what is
+  // on screen instead of recomputing a height the bar may not match.
+  publishRenderedTabBarHeight(120);
+  await act(async () => {
+    await Promise.resolve();
+  });
+
   const toasters = unlockRoot().findAllByType('Toaster' as ElementType);
 
-  // Same predicate and height source as the tab bar's own layout
-  // (`(tabs)/_layout.tsx`), so the toast clears whatever the bar renders.
-  const tabOverlayHeight = getEffectiveTabBarHeight({
-    bottomInset: 12,
-    platform: 'android',
-    fontScale: 1,
-  });
-  expect(toasters[0]?.props.offset).toBe(tabOverlayHeight + TOAST_BOTTOM_GAP);
+  expect(toasters[0]?.props.offset).toBe(120 + TOAST_BOTTOM_GAP);
 });
 
 /**
@@ -139,6 +140,9 @@ it('keeps the resting offset when the route hides the tab bar', async () => {
   platform.OS = 'android';
   route.segments = ['(app)', '(tabs)', '(1_kiloclaw)', 'chat', 'sandbox', 'conversation'];
   route.pathname = '/chat/sandbox/conversation';
+  // The bar is off screen for this route even though the layout published a
+  // height, so the route predicate decides and the toast rests.
+  publishRenderedTabBarHeight(120);
   await mount();
 
   const toasters = unlockRoot().findAllByType('Toaster' as ElementType);

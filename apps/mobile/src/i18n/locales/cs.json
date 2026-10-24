@@ -53,6 +53,7 @@
     "connected": "Připojeno",
     "couldNotLoadModels": "Modely se nepodařilo načíst.",
     "couldNotLoadRepositories": "Repozitáře se nepodařilo načíst.",
+    "noRepositoriesFound": "Žádné repozitáře nebyly nalezeny",
     "critical": "Kritické",
     "delete": "Smazat",
     "deleted": "Smazáno",
@@ -87,6 +88,7 @@
     "connect": "Připojit",
     "connectBitbucket": "Připojit Bitbucket",
     "connectGitlab": "Připojit GitLab",
+    "connectProvider": "Připojení poskytovatele",
     "contentTruncated": "Obsah zkrácen",
     "copyLink": "Kopírovat odkaz",
     "couldNotLoadOrganizations": "Organizace se nepodařilo načíst.",
@@ -145,7 +147,8 @@
     "agent": "Činidlo",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Změny"
+    "changes": "Změny",
+    "organizationTrialEnded": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Vlastník organizace může aktualizovat fakturaci na kilo.ai a poté to zkuste znovu."
   },
   "language": {
     "restarting": "Aplikace se restartuje kvůli změně jazyka",
@@ -182,7 +185,7 @@
     "codeArrivalHint": "Pokud lze tuto adresu použít k přihlášení, kód dorazí do minuty.",
     "verifyCode": "Ověřit kód",
     "resendCode": "Odeslat kód znovu",
-    "termsPrefix": "Pokračováním souhlasíte s našimi",
+    "termsPrefix": "Pokračováním souhlasíte s našimi ",
     "terms": "Podmínkami",
     "termsConnector": " a ",
     "termsSuffix": ".",
@@ -293,7 +296,8 @@
     "condenseToolCallsSubtitle": "Seskupte po sobě jdoucí volání nástrojů do jednoho řádku, který můžete otevřít.",
     "toolSummaryTranslation": "Přeložit souhrny nástrojů",
     "toolSummaryTranslationSubtitle": "Pošli každý souhrn nástroje modelu, aby jej přeložil do jazyka tvé aplikace. Pokud překlad selže, zobrazí se originál.",
-    "toolSummaryTranslationModelUnavailableNotice": "Tento model se již nenabízí. Klepnutím na $t(common.model) vyberte jiný."
+    "toolSummaryTranslationModelUnavailableNotice": "Tento model se již nenabízí. Klepnutím na $t(common.model) vyberte jiný.",
+    "autoExpandThinkingInactiveSubtitle": "Nemá žádný účinek, dokud jsou podrobnosti uvažování skryté."
   },
   "prReview": {
     "pullRequestUnavailable": "PR není dostupný",
@@ -644,9 +648,21 @@
       "viewOnGitHub": "Zobrazit PR na GitHubu",
       "noChecksReported": "Zatím žádné výsledky kontrol",
       "passed": "úspěšné: {{displayCount}}",
+      "passed_one": "úspěšné: {{displayCount}}",
+      "passed_other": "úspěšné: {{displayCount}}",
+      "passed_few": "úspěšné: {{displayCount}}",
+      "passed_many": "úspěšné: {{displayCount}}",
       "failed": "neúspěšné: {{displayCount}}",
+      "failed_one": "neúspěšné: {{displayCount}}",
+      "failed_other": "neúspěšné: {{displayCount}}",
+      "failed_few": "neúspěšné: {{displayCount}}",
+      "failed_many": "neúspěšné: {{displayCount}}",
       "pending": "čekající: {{displayCount}}",
       "skipped": "přeskočené: {{displayCount}}",
+      "skipped_one": "přeskočené: {{displayCount}}",
+      "skipped_other": "přeskočené: {{displayCount}}",
+      "skipped_few": "přeskočené: {{displayCount}}",
+      "skipped_many": "přeskočené: {{displayCount}}",
       "checksCount": "kontroly: {{displayCount}}",
       "checksCount_one": "kontrola: {{displayCount}}",
       "checksCount_few": "kontroly: {{displayCount}}",
@@ -693,7 +709,8 @@
       "gitlabDescription": "Připoj svůj účet GitLab a kontroluj merge requesty na mobilu.",
       "bitbucketDescription": "Připoj Bitbucket k této organizaci a kontroluj PR na mobilu.",
       "bitbucketOrgOnlyDescription": "Přepni účet nahoře na organizaci a kontroluj její PR na Bitbucketu.",
-      "contextLine": "Pro {{organization}}"
+      "contextLine": "Pro {{organization}}",
+      "contextLinePersonal": "Pro osobní účet"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1437,7 +1454,6 @@
       "gitlabNoRepositoriesDescription": "Možná bude nutné udělit přístup k dalším skupinám nebo projektům na GitLabu.",
       "installGithubApp": "Instalace aplikace GitHub pro repozitáře",
       "installGithubAppDescription": "Udělte aplikaci Kilo na GitHubu přístup k repozitářům, které chcete nechat zkontrolovat.",
-      "noRepositoriesFound": "Žádné repozitáře nebyly nalezeny",
       "repositoryAccess": "přístup k repozitářům"
     },
     "style": {
@@ -1467,6 +1483,8 @@
       "showMore": "Zobrazit více",
       "created": "Vytvořeno",
       "started": "Zahájeno",
+      "reviewEnded": "Ukončeno",
+      "severityNitpick": "Drobnost",
       "tokens": "Tokeny",
       "tokensInOut": "Vstup: {{input}} / výstup: {{output}}",
       "council": "Rada modelů",
@@ -1490,7 +1508,13 @@
       "sessionError": "V relaci došlo k chybě: {{error}}.",
       "statusWithValue": "Stav: {{status}}",
       "toolName": "Nástroj: {{name}}",
-      "toolNameError": "V nástroji {{name}} došlo k chybě."
+      "toolNameError": "V nástroji {{name}} došlo k chybě.",
+      "cancelReasonSuperseded": "Byl odeslán novější commit, takže tato kontrola byla nahrazena.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} je odpojen, takže tato kontrola byla zrušena. Znovu jej připojte a kontrolu zopakujte.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer byl pro Bitbucket vypnut, takže tato kontrola byla zrušena. Znovu jej zapněte a kontrolu zopakujte.",
+      "cancelReasonBitbucketPullRequestChanged": "Pull request v Bitbucketu se změnil, takže tato kontrola byla nahrazena.",
+      "cancelReasonCancelled": "Tato kontrola byla zrušena.",
+      "cancelReasonInterrupted": "Tato kontrola byla přerušena."
     },
     "reviewMemory": {
       "title": "Paměť kontrol",
@@ -1511,13 +1535,20 @@
       "invalidUrl": "Zadejte platnou URL adresu PR.",
       "couldNotCheckProviderStatus": "Stav poskytovatele se nepodařilo ověřit.",
       "couldNotLoadProviders": "Připojené poskytovatele se nepodařilo načíst. Zkuste to znovu.",
-      "connectProvider": "Připojení poskytovatele",
       "connectProviderDescription": "Připojte GitHub, abyste mohli ručně spustit kontrolu PR.",
       "pullRequestUrl": "URL adresa PR",
       "instructions": "Pokyny (nepovinné)",
       "instructionsPlaceholder": "Na co se má kontrola zaměřit…",
       "starting": "Zahajuje se kontrola…",
-      "start": "Zahájit kontrolu"
+      "start": "Zahájit kontrolu",
+      "startNotFound": "Nepodařilo se přečíst {{requestNoun}} z {{provider}}. Zkontrolujte URL adresu a to, zda je repozitář přístupný.",
+      "startRateLimited": "Služba {{provider}} právě omezuje požadavky. Zkuste to znovu za pár minut.",
+      "startNotAllowed": "Nemáte přístup ke spuštění kontroly {{requestNoun}}. Zkontrolujte svá oprávnění a plán vaší organizace.",
+      "startProviderNeedsAttention": "Ruční kontrola vyžaduje standardní připojení {{provider}}. Připojte ho a zkuste to znovu.",
+      "startAlreadyRunning": "Kontrola pro daný {{requestNoun}} už běží.",
+      "startRejected": "Daný {{requestNoun}} nelze zkontrolovat. Ujistěte se, že je otevřený, není draft, a že URL adresa je správná.",
+      "startProviderUnavailable": "Daný {{requestNoun}} se ze služby {{provider}} nepodařilo načíst. Zkuste to znovu.",
+      "startFailed": "Kontrolu se nepodařilo zahájit. Zkontrolujte připojení a zkuste to znovu."
     },
     "notConnectedReadOnly": "Služba {{platform}} není připojená. Připojit ji mohou pouze vlastníci organizace a správci.",
     "gitlab": {
@@ -1775,7 +1806,7 @@
       "deadlinePassed": "Termín uplynul",
       "deadlinePassedDetail": "Kritické: {{critical}}, vysoké: {{high}}",
       "dueThisWeek": "Termín tento týden",
-      "dueThisWeekDetail": "Potvrzeně zneužitelné: {{exploitable}}",
+      "dueThisWeekDetail": "{{exploitable}} z nich je potvrzeně zneužitelných",
       "noDeadline": "Bez termínu",
       "reviewSlaAssignment": "Zkontrolovat přiřazení SLA",
       "allOpenFindingsTracked": "Všechny otevřené nálezy jsou sledovány"
@@ -1937,11 +1968,19 @@
       "actorSystem": "Systém Kilo",
       "couldNotLoad": "Zprávu o auditu se nepodařilo načíst.",
       "events": "Události",
+      "eventConfidence": "Spolehlivost: {{confidence}}",
+      "eventReason": "Důvod: {{reason}}",
+      "eventsCount_one": "{{displayCount}} událost",
+      "eventsCount_few": "{{displayCount}} události",
+      "eventsCount_many": "{{displayCount}} události",
+      "eventsCount_other": "{{displayCount}} událostí",
       "generated": "Zpráva byla vygenerována {{generatedAt}}.",
       "noActivity": "Žádná zaznamenaná aktivita",
       "noActivityDescription": "Kilo za období od {{start}} do {{end}} neeviduje žádnou aktivitu u bezpečnostních nálezů, kterou by bylo možné uvést ve zprávě.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repozitář nezaznamenán",
+      "reasonUnknown": "Nerozpoznaný důvod",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Souhrn zprávy",
       "title": "Zpráva o auditu",
       "unavailable": "Zpráva o auditu není k dispozici",
@@ -1994,8 +2033,9 @@
       "couldNotLoad": "Bezpečnostního agenta se nepodařilo načíst.",
       "installApp": "Nainstalovat aplikaci GitHub",
       "reauthorizeButton": "Znovu autorizovat aplikaci GitHub",
-      "reauthorizeDescription": "Bezpečnostní agent potřebuje k přístupu k upozorněním Dependabot oprávnění vulnerability_alerts. Udělte ho opětovnou autorizací aplikace GitHub.",
+      "reauthorizeDescription": "Bezpečnostní agent potřebuje oprávnění k čtení upozornění Dependabot. Udělte ho opětovnou autorizací aplikace GitHub.",
       "reauthorizeTitle": "Jsou vyžadována další oprávnění",
+      "retryFailed": "Bezpečnostního agenta se stále nepodařilo načíst. Zkontrolujte připojení a zkuste to znovu.",
       "setupFailed": "Nastavení GitHubu se nepodařilo spustit. Zkuste to znovu."
     },
     "queuedActionUntracked": "Akci zařazenou do fronty již nelze sledovat. Obnovte zobrazení, abyste viděli aktuální stav.",
@@ -2166,7 +2206,8 @@
       "dollar_many": "dolaru",
       "costSpoken": "náklady {{cost}}",
       "costSpokenWithTime": "náklady {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}"
+      "pullRequest": "pR {{number}}",
+      "spokenJoiner": "a"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub se nepodařilo otevřít",
@@ -2297,13 +2338,13 @@
       "branchLoadError": "Větve se nepodařilo načíst",
       "branchUnavailable": "Pro tento repozitář nejsou větve dostupné. Zkontroluj svůj přístup u poskytovatele a vyber jiný repozitář.",
       "branchEmpty": "Žádné dostupné větve",
+      "branchListIncomplete": "Zobrazeny jsou jen některé větve. Tento repozitář má více větví, než kolik jich tento seznam může obsahovat.",
       "branchPlaceholder": "Vybrat větev",
       "runOnWithTarget": "Spustit na: {{target}}",
       "environment": "Prostředí",
       "couldNotLoadEnvironment": "Vaše prostředí se nepodařilo načíst.",
       "retryLoadingEnvironment": "Znovu načíst prostředí",
       "defaultEnvironment": "Výchozí prostředí",
-      "environmentSummary": "příkazy: {{commands}} · MCP: {{mcp}} · dovednosti: {{skills}} · agenti: {{agents}}",
       "leaveChanges": "Ponechat změny",
       "commitAndPush": "Vytvořit commit a odeslat",
       "startSession": "Spustit relaci",
@@ -2530,7 +2571,71 @@
       "preparationComplete": "Příprava dokončena",
       "preparationFailed": "Příprava selhala",
       "setupCommand": "Příkaz pro přípravu prostředí {{index}}",
-      "setupCommandOf": "Příkaz pro přípravu prostředí {{index}} z {{displayCount}}"
+      "setupCommandOf": "Příkaz pro přípravu prostředí {{index}} z {{displayCount}}",
+      "stepWorkspaceSetup": "Nastavení pracovního prostoru",
+      "stepDiskCheck": "Kontrola disku",
+      "stepCloning": "Klonování repozitáře",
+      "stepBranch": "Nastavování větve",
+      "stepDevcontainerSetup": "Nastavení dev kontejneru",
+      "stepWorkspaceRestore": "Obnovování pracovního prostoru",
+      "stepWorkspaceBackup": "Ukládání pracovního prostoru",
+      "stepSandboxProvision": "Zřizování sandboxu",
+      "stepSandboxBoot": "Spouštění sandboxu",
+      "stepSnapshotFallback": "Opakování bez snímku",
+      "stepKiloServer": "Spouštění Kilo",
+      "stepKiloSession": "Příprava relace",
+      "stepRestoreIncomplete": "Obnovení relace nebylo úplné",
+      "stepReady": "Prostředí je připraveno",
+      "stepFailed": "Příprava prostředí selhala",
+      "stepUnknown": "Příprava prostředí",
+      "detailCreatingSandbox": "Vytváření sandboxu",
+      "detailUpdatingRepository": "Aktualizace repozitáře",
+      "detailCheckingOutBranch": "Přepínání na větev",
+      "detailRunningSetupCommands": "Spouštění příkazů pro přípravu",
+      "detailSavingRepository": "Ukládání repozitáře pro rychlejší spouštění",
+      "detailStartingKiloRuntime": "Spouštění běhového prostředí Kilo",
+      "detailPreparingKiloSession": "Příprava relace Kilo",
+      "detailWaitingForPreviousSandbox": "Čekání na ukončení předchozího sandboxu",
+      "detailRetryingSandboxCreation": "Opakování vytváření sandboxu",
+      "detailPreviousSnapshotFailed": "Spuštění z předchozího snímku selhalo. Opakuji se bez snímku.",
+      "detailSnapshotStartupFailed": "Spuštění ze snímku selhalo. Opakuji se bez snímku.",
+      "detailStartingSandboxWithoutSnapshot": "Spouštění sandboxu bez snímku",
+      "detailSettingUpWorkspace": "Nastavování pracovního prostoru",
+      "detailRestoringSession": "Obnovování relace",
+      "detailWarmWorkspaceReused": "Teplý pracovní prostor byl znovu použit",
+      "detailRetryingClone": "Opakování klonování (pokus {{attempt}} z {{total}})",
+      "detailSetupCommandFailed": "Příkaz pro přípravu prostředí {{index}} selhal",
+      "detailSetupCommandTimedOut": "Příkaz pro přípravu prostředí {{index}} vypršel",
+      "detailColdRestore": "Studené obnovení, snímek byl použit, obnoveno {{applied}} z {{total}} souborů",
+      "detailProgressPercent": "Dokončeno {{percent}} %",
+      "detailRestoreIncompleteReport": "Obnovení relace nebylo úplné: {{skipped}} z {{total}} souborů nebylo obnoveno ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Chybí: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} a {{omitted}} dalších",
+      "detailReasonPatchFailed": "patch se nepodařilo použít",
+      "detailReasonOutsideWorkspace": "cesta je mimo pracovní prostor",
+      "detailReasonMissingContent": "snímek neobsahoval obsah souboru",
+      "detailReasonIndexResetFailed": "index se po selhání nepodařilo resetovat",
+      "detailReasonUnlinkFailed": "soubor se nepodařilo odebrat",
+      "detailReasonWriteFailed": "soubor se nepodařilo zapsat",
+      "detailReasonUnknown": "neznámý důvod",
+      "detailUnknown": "Stále probíhá příprava",
+      "errorPreparationTimeout": "Vypršel čas přípravy prostředí",
+      "errorWorkspaceSetupFailed": "Nastavení pracovního prostoru selhalo",
+      "errorCredentialUpgradeRequired": "Této relaci chybí požadované upgradování přihlašovacích údajů. Pokračujte spuštěním nové relace.",
+      "errorAgentUnavailable": "Agent přestal být dostupný",
+      "errorBillingBlocked": "Vyúčtování sandboxu vyžaduje další kredity",
+      "errorBillingUnavailable": "Ověření vyúčtování nebo kapacity sandboxu není dostupné. Zkuste to za chvíli znovu.",
+      "errorContainerLimitReached": "Dosažen limit kontejnerů. Před spuštěním nového zastavte existující kontejner.",
+      "errorInvalidConfiguration": "Konfigurace sandboxu je neplatná nebo nepodporovaná",
+      "errorRuntimeArtifactUnauthorized": "Stažení běhového prostředí nebylo autorizováno",
+      "errorRuntimeArtifactInvalid": "Ověření artefaktu běhového prostředí selhalo",
+      "errorRuntimeCliProbeFailed": "Ověření CLI běhového prostředí selhalo",
+      "errorRuntimeSupervisorMissing": "Chybí supervizor běhového prostředí",
+      "errorConnectionLost": "Připojení k sandboxu bylo ztraceno",
+      "errorSandboxLost": "Sandbox byl ztracen",
+      "errorAgentRestarted": "Agent se restartoval",
+      "errorSandboxOutOfMemory": "Sandboxu došla paměť",
+      "errorPreparationDidNotComplete": "Příprava nebyla dokončena"
     },
     "permissionCard": {
       "title": "Požadované oprávnění",
@@ -2542,7 +2647,10 @@
       "allowOnceAccessibility": "Povolit jen tentokrát",
       "alwaysAllow": "Vždy povolit",
       "alwaysAllowAccessibility": "Vždy povolit",
-      "retrying": "Opakování…"
+      "retrying": "Opakování…",
+      "retryDeny": "Zamítnout znovu",
+      "retryAllowOnce": "Povolit jen tentokrát znovu",
+      "retryAlwaysAllow": "Vždy povolit znovu"
     },
     "questionCard": {
       "title": "Agent potřebuje odpověď",
@@ -3110,22 +3218,16 @@
     "boundary": {
       "backToProfile": "Zpět na profil",
       "loadErrorMessage": "Zkontroluj připojení a zkus to znovu.",
-
       "chooseAccount": "Vyberte účet",
       "loadErrorTitle": "Vaše organizace se nepodařilo načíst.",
       "membershipLostNotice": "Už nemáte přístup do této organizace. Přepnuto na {{target}}.",
       "noOrganization": "Žádná organizace",
-
       "noOrganizationDescription": "Tento účet není součástí organizace. Vytvořte organizaci nebo se k některé připojte na webu, abyste mohli využívat funkce organizace, jako jsou pozvánky pro členy a upozornění na nízký zůstatek.",
-
       "openWebOrganizations": "Otevřít organizace na webu",
-
       "organizationUnavailable": "Organizace není k dispozici.",
       "selectDescriptionWithOrganizations": "Patříte k jedné nebo více organizacím. Vyberte účet, který má tato obrazovka používat.",
-
       "selectOrganization": "Vyberte organizaci",
       "unavailableDescription": "Tato organizace už není dostupná. Vyberte ve svém profilu jinou organizaci a pokračujte.",
-
       "unavailableSessionsDescription": "Tato organizace už není dostupná. Její relace nelze načíst.",
       "accessDeniedDescription": "Nemáte přístup do této organizace."
     },
@@ -3153,7 +3255,11 @@
       "permissionDenied": "Nemáte oprávnění zvát členy.",
       "roleMember": "Role: člen",
       "sendInvite": "Odeslat pozvánku",
-      "title": "Pozvat člena"
+      "title": "Pozvat člena",
+      "alreadyInvited": "Tento uživatel už byl pozván nebo už je členem.",
+      "sendError": "Pozvánku se nepodařilo odeslat.",
+      "pendingInvitation": "Pro tento e-mail již existuje čekající pozvánka.",
+      "alreadyMember": "Tato osoba je již členem této organizace."
     },
     "invoices": {
       "downloadA11y": "Stáhnout fakturu {{number}}",
@@ -3222,7 +3328,13 @@
       "inviteCreated": "Pozvánka vytvořena",
       "pendingInvitations": "Čekající pozvánky",
       "resendInvite": "Poslat pozvánku znovu",
-      "shareInviteLink": "Sdílet odkaz na pozvánku"
+      "shareInviteLink": "Sdílet odkaz na pozvánku",
+      "resendInviteError": "Pozvánku se nepodařilo odeslat znovu.",
+      "inviteNotResendable": "Tuto pozvánku již nelze znovu poslat.",
+      "ownerAuthority": "Pouze vlastník organizace může spravovat vlastníky.",
+      "ownRoleChange": "Nemůžete změnit svou vlastní roli.",
+      "inviteExpired": "Tato pozvánka vypršela.",
+      "inviteAccepted": "Tato pozvánka již byla přijata."
     },
     "usageStats": {
       "inputTokens": "Vstupní tokeny",
@@ -3372,7 +3484,8 @@
     "noneChosen": "Není vybrán žádný",
     "emptyTitle": "Žádné modely přepisu",
     "emptyDescription": "Kilo Gateway nyní nenabízí žádné modely přepisu.",
-    "loadFailed": "Modely přepisu se nepodařilo načíst."
+    "loadFailed": "Modely přepisu se nepodařilo načíst.",
+    "choose": "Vybrat model"
   },
   "voiceLanguage": {
     "title": "Jazyk diktování",
@@ -3470,7 +3583,12 @@
       "serverToolCount_one": "{{count}} nástroj",
       "serverToolCount_other": "{{count}} nástrojů",
       "serverUnreachable": "Nepodařilo se připojit k tomuto serveru",
-      "serverOff": "Tento server je vypnutý"
+      "serverOff": "Tento server je vypnutý",
+      "app": {
+        "label": "Rozhraní nástroje",
+        "failed": "Rozhraní tohoto nástroje se nepodařilo načíst.",
+        "empty": "Rozhraní tohoto nástroje nemá co zobrazit."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Ověření",
@@ -3584,6 +3702,7 @@
       "fromHuggingFace": "Z Hugging Face",
       "loading": "Načítání modelů",
       "noResults": "Nebyly nalezeny žádné modely",
+      "noResultsForQuery": "Nebyly nalezeny žádné modely pro \"{{query}}\"",
       "noFits": "Pro toto zařízení není vhodný žádný model",
       "noFitsDescription": "Větší modely najdete na kartě $t(common.all).",
       "fit": {
@@ -3614,8 +3733,6 @@
       "quantizations": "Kvantizace",
       "quantizationsHelp": "Menší soubory zabírají méně paměti a úložiště. Větší soubory obvykle dávají lepší odpovědi.",
       "quantDetail": "Stažení {{size}} · asi {{memory}} paměti",
-      "downloadQuant": "Stáhnout {{quant}}",
-      "downloadModelA11y": "Stáhnout {{name}}",
       "detailsA11y": "Podrobnosti: {{name}}",
       "loadingModel": "Načítání podrobností o modelu",
       "couldNotLoadModel": "Tento model se nepodařilo načíst",
@@ -3660,13 +3777,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "Tento model podporuje úroveň uvažování"
-    }
+    },
+    "creditsRequired": "Nedostatek kreditů k odeslání této zprávy. Dobijte kredity a zkuste to znovu."
   },
   "settingsTools": {
     "confirmTitle": "Potvrdit tuto změnu?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "tvůj nejnovější repozitář",
+      "confirmMessage": "Repozitář: {{repository}}. Požadavek: {{prompt}}",
+      "confirmTitle": "Spustit tohoto agenta?",
       "promptRequired": "Ke spuštění agenta je potřeba zadání. Přidej zadání a spusť ho znovu.",
       "repositoryRequired": "Ke spuštění agenta je potřeba repozitář. Otevři Kilo a vyber jeden, a pak ho spusť znovu.",
       "repositoryUnknown": "Kilo nerozpoznává {{repository}} jako repozitář na GitHubu nebo GitLabu. Vyber jiný repozitář v Kilu.",
@@ -3696,7 +3817,9 @@
     "spend24h": "Útrata za posledních 24 hodin",
     "multiplierError": "Zadej násobitel 1 nebo větší",
     "permissionDenied": "Nemáš oprávnění spravovat upozornění na útratu.",
-    "pushOffByCategory": "Vypnuto v Oznámeních"
+    "pushOffByCategory": "Vypnuto v Oznámeních",
+    "multiplierMaxError": "Zadej násobitel {{max}} nebo menší",
+    "thresholdMaxError": "Zadejte částku {{max}} nebo menší."
   },
   "profiles": {
     "title": "Profily",
@@ -3706,22 +3829,27 @@
     "emptyDescription": "Vytvořte profil pro opětovné použití proměnných prostředí, instalačních příkazů a dovedností napříč relacemi.",
     "loadFailed": "Profily se nepodařilo načíst",
     "counts": {
+      "vars_one": "{{count}} proměnná",
       "vars_few": "{{count}} proměnné",
       "vars_many": "{{count}} proměnné",
-      "vars_one": "{{count}} proměnná",
       "vars_other": "{{count}} proměnných",
       "mcp": "{{count}} MCP",
+      "skills_one": "{{count}} dovednost",
       "skills_few": "{{count}} dovednosti",
       "skills_many": "{{count}} dovednosti",
-      "skills_one": "{{count}} dovednost",
       "skills_other": "{{count}} dovedností",
+      "commands_one": "{{count}} příkaz",
       "commands_few": "{{count}} příkazy",
       "commands_many": "{{count}} příkazu",
-      "commands_one": "{{count}} příkaz",
       "commands_other": "{{count}} příkazů",
-      "varsShort": "{{count}}prom",
-      "skillsShort": "{{count}}dov",
-      "commandsShort": "{{count}}pří"
+      "setupCommands_one": "{{count}} nastavení příkaz",
+      "setupCommands_few": "{{count}} nastavení příkazy",
+      "setupCommands_many": "{{count}} nastavení příkazu",
+      "setupCommands_other": "{{count}} nastavení příkazů",
+      "agents_one": "{{count}} agent",
+      "agents_few": "{{count}} agenti",
+      "agents_many": "{{count}} agentů",
+      "agents_other": "{{count}} agenta"
     },
     "nameLabel": "Název profilu",
     "namePlaceholder": "např. Ladění backendu",
@@ -3749,6 +3877,8 @@
     "keyTooLong": "Klíč musí mít 256 znaků nebo méně",
     "keyDuplicate": "Tento klíč už v profilu existuje",
     "valueLabel": "Hodnota",
+    "valueRequired": "Zadejte hodnotu",
+    "tooLong": "Použijte maximálně {{max}} znaků",
     "secrets": {
       "markSecret": "Označit jako tajné",
       "masked": "Skrytá hodnota",
@@ -3799,7 +3929,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Zadejte název serveru",
-      "nameInvalid": "Název může používat pouze písmena, čísla, podtržítka a pomlčky",
+      "nameInvalid": "Název může používat pouze písmena ASCII, číslice, podtržítka a pomlčky, maximálně 100 znaků",
       "commandRequired": "Zadejte příkaz",
       "commandTooLong": "Použijte nejvýše 50 argumentů o 500 znacích",
       "urlRequired": "Zadejte adresu URL",
@@ -3827,16 +3957,16 @@
       "stepsPlaceholder": "např. 50",
       "temperature": "Teplota",
       "temperaturePlaceholder": "např. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "např. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Můj agent",
       "promptPlaceholder": "ty jsi...",
       "tools": "Nástroje",
       "visibility": "Viditelnost",
-      "visibilityPrimary": "Primární – zobrazí se ve výběru",
+      "visibilityPrimary": "Primární — zobrazí se ve výběru",
       "visibilitySubagent": "Subagent — lze volat pouze od ostatních",
-      "visibilityAll": "Všichni – oba",
+      "visibilityAll": "Všichni — oba",
       "modePrimary": "Pouze primární",
       "modeSubagent": "Pouze subagent",
       "modeAll": "Všechny režimy",
@@ -3844,7 +3974,7 @@
       "deleteFailed": "Agenta se nepodařilo smazat",
       "nameRequired": "Zadejte jméno agenta",
       "slugRequired": "Zadejte agenta slimáka",
-      "slugInvalid": "Slug musí začínat písmenem a používat pouze malá písmena, číslice a pomlčky",
+      "slugInvalid": "Slug musí začínat malým písmenem ASCII a používat pouze malá písmena ASCII, číslice a pomlčky, maximálně 50 znaků",
       "slugConflict": "Tento slug už používá vestavěný agent nebo jiný agent v tomto profilu",
       "edit": "Upravit agenta"
     },
@@ -3889,7 +4019,9 @@
       "pinFailed": "Repo se nepodařilo připnout",
       "unboundToast": "Repo odpojeno",
       "unbindFailed": "Repo se nepodařilo zrušit"
-    }
+    },
+    "variablesDeleteFailed": "Proměnnou se nepodařilo smazat",
+    "deleteCommand": "Smazat příkaz {{position}}"
   },
   "credits": {
     "title": "Koupit kredity",
@@ -3929,7 +4061,8 @@
       "archive": "Archivovat",
       "unarchive": "Zrušit archivaci",
       "deleteTitle": "Smazat {{name}}?",
-      "deleteMessage": "Smažou se i jeho úkoly. Jejich relace zůstanou."
+      "deleteMessage": "Smažou se i jeho úkoly. Jejich relace zůstanou.",
+      "createFailed": "Seznam se nepodařilo vytvořit"
     },
     "listSettings": {
       "title": "Nastavení seznamu",
@@ -4001,20 +4134,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Ranní přehled",
+    "title": "Přehled agenta",
     "atLeast": "≥{{value}}",
     "coverageHint": "Část historické aktivity může chybět. ≥ znamená alespoň tolik; neznámá hodnota neznamená nulu.",
     "available": "Dostupné přehledy",
     "history": "Historie přehledů",
-    "historyHint": "Reporty se uchovávají 30 dní, včetně zavřených.",
+    "historyHint": "Přehledy se uchovávají 30 dní, včetně zamítnutých.",
     "settings": "Nastavení přehledu",
-    "empty": "Žádná noční aktivita",
-    "emptyHint": "Vaše cloudové a CLI relace programování se zde zobrazí po aktivní noci.",
+    "empty": "Žádná aktivita v tomto období přehledu",
+    "emptyHint": "Vaše cloudové a CLI relace programování se zde zobrazí, když naplánovaný přehled zaznamená aktivitu.",
     "loadError": "Přehledy se nepodařilo načíst",
-    "sessions": "Aktivní přes noc",
+    "sessions": "Aktivní v období",
     "pullRequests": "Otevřené PRs",
     "blockers": "Nové blokery",
-    "spend": "Noční útrata",
+    "spend": "Útrata v období",
     "view": "Číst přehled",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4036,13 +4169,13 @@
     "sources": "Důkazy a artefakty",
     "timezone": "Časové pásmo přehledu",
     "deviceTimezone": "Použít časové pásmo zařízení",
-    "timezoneHint": "Časové pásmo IANA, například Europe/Berlin. Změny plánu platí pro další noci.",
-    "nightStart": "Začátek noci",
-    "morningStart": "Konec noci / začátek rána",
-    "morningEnd": "Konec rána",
-    "timeHint": "Karta na domovské obrazovce po skončení rána obnoví živý stav, i offline.",
-    "invalidSchedule": "Zvolte platné časové pásmo a nepřekrývající se, neprázdné noční a ranní období.",
-    "notificationsHint": "Jedno obecné oznámení každé ráno, až bude první report hotový. Nezávisí na placených AI shrnutích.",
+    "timezoneHint": "Časové pásmo IANA, například Europe/Berlin. Změny plánu platí pro další přehledy.",
+    "nightStart": "Začátek období přehledu",
+    "morningStart": "Přehled připraven v",
+    "morningEnd": "Přehled dostupný do",
+    "timeHint": "Karta na domovské obrazovce obnoví živý stav po skončení období přehledu, i offline.",
+    "invalidSchedule": "Zvolte platné časové pásmo a neprázdné období přehledu.",
+    "notificationsHint": "Jedno obecné oznámení na každý naplánovaný přehled. Nezávisí na placených AI shrnutích.",
     "notificationPermission": "Pro příjem přehledu povolte oznámení zařízení v sekci $t(common.notifications).",
     "aiOptIn": "Placená AI shrnutí",
     "aiHint": "Volitelné pouze pro tento kontext. Vybrané anonymizované úryvky a strukturovaná fakta se odesílají vašemu modelu v jazyce aplikace. Poplatky se strhávají z kreditu tohoto kontextu.",
@@ -4060,7 +4193,7 @@
     "contextSettings": "Nastavení AI · {{context}}",
     "allContexts": "Osobní a organizační přehledy zůstávají oddělené.",
     "create": "Vytvořit přehled",
-    "oneOff": "Jednorázový",
+    "oneOff": "Na vyžádání",
     "createdAt": "Vytvořeno {{time}}",
     "chooseContext": "Vyberte jeden kontext",
     "period": "Období přehledu",
@@ -4082,13 +4215,16 @@
     "emptyPeriod": "V tomto období nebyla nalezena žádná aktivita. Bez AI shrnutí a bez poplatku.",
     "emptyHistory": "Žádné uložené přehledy",
     "historicalStateHint": "Stav relace odpovídá konci vybraného období, nikoli aktuálnímu živému stavu.",
-    "oneOffHint": "AI obdrží vybrané podklady s odstraněnými citlivými údaji v jazyce vaší aplikace. Tento jednorázový přehled nemění váš ranní rozvrh ani předvolby AI.",
+    "oneOffHint": "AI obdrží vybrané podklady s odstraněnými citlivými údaji v jazyce vaší aplikace. Tento přehled na vyžádání nemění váš naplánovaný přehled ani předvolby AI.",
     "createOffline": "Pro kontrolu nebo vytvoření přehledu se připojte k internetu. Placené požadavky se v režimu offline nikdy nezařazují do fronty.",
     "estimateInputTooLarge": "Toto období obsahuje příliš mnoho podkladů pro vybraný model.",
     "estimatePermissionUnavailable": "Nemáte oprávnění používat zůstatek tohoto kontextu.",
+    "createFailed": "Tento přehled se nepodařilo vytvořit.",
+    "reviewFailed": "Tento přehled se nepodařilo zkontrolovat.",
     "estimatePricingUnavailable": "Ceny pro tento model nejsou dostupné.",
     "estimateBalanceUnavailable": "Nedostatečný zůstatek pro placené shrnutí.",
     "estimateModelNotAllowed": "Tento model zde není povolen.",
-    "estimateSpendLimitTooLow": "Zvyšte limit výdajů, aby toto shrnutí bylo povoleno."
+    "estimateSpendLimitTooLow": "Zvyšte limit výdajů, aby toto shrnutí bylo povoleno.",
+    "saved": "Nastavení přehledu bylo uloženo."
   }
 }

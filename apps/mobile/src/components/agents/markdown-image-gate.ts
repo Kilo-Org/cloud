@@ -59,13 +59,31 @@ export function isMarkdownImageDisplayable(href: string): boolean {
 
 /** The image URI behind a gated image's "Load" link, or null for any other link. */
 export function parseImageLoadUrl(url: string): string | null {
-  return url.startsWith(IMAGE_LOAD_SCHEME)
-    ? decodeURIComponent(url.slice(IMAGE_LOAD_SCHEME.length))
-    : null;
+  if (!url.startsWith(IMAGE_LOAD_SCHEME)) {
+    return null;
+  }
+  try {
+    return decodeURIComponent(url.slice(IMAGE_LOAD_SCHEME.length));
+  } catch {
+    return null;
+  }
 }
 
 function escapeMarkdownText(text: string): string {
   return text.replaceAll(/\s+/g, ' ').replaceAll(/[\\`*_[\]<>!#~|()&]/g, String.raw`\$&`);
+}
+
+/**
+ * Percent-encoded link destination for an image URL, or null when the URL holds
+ * a lone surrogate and cannot be encoded. `image.href` comes from rendered
+ * markdown, so encoding it must not raise.
+ */
+function imageLoadDestination(href: string): string | null {
+  try {
+    return encodeURIComponent(href).replaceAll('(', '%28').replaceAll(')', '%29');
+  } catch {
+    return null;
+  }
 }
 
 function gatedImageMarkdown(image: MarkdownImageRef, t: TFunction): string {
@@ -85,7 +103,11 @@ function gatedImageMarkdown(image: MarkdownImageRef, t: TFunction): string {
     // The outer link keeps working; a nested link would split it.
     return escapeMarkdownText(prefix + (host ?? t('agentChat.markdownImage.httpsOnly')));
   }
-  const destination = encodeURIComponent(image.href).replaceAll('(', '%28').replaceAll(')', '%29');
+  const destination = imageLoadDestination(image.href);
+  if (destination === null) {
+    // A URL that cannot be percent-encoded has no load link to offer.
+    return escapeMarkdownText(prefix + (host ?? t('agentChat.markdownImage.httpsOnly')));
+  }
   return `[${escapeMarkdownText(prefix + load)}](${IMAGE_LOAD_SCHEME}${destination})`;
 }
 

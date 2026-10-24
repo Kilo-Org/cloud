@@ -1,11 +1,12 @@
 import { execFile } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer as createHttpServer } from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
 import { connect, type Server } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { afterAll, beforeAll, beforeEach, expect, it } from 'vitest';
 import { createControlPlaneCredential } from '../../src/sandbox-control/managed-credential.js';
@@ -16,12 +17,15 @@ import { git } from '../../wrapper/src/utils.js';
 const exec = promisify(execFile);
 const alias = createControlPlaneCredential('synthetic-sandbox', 'github');
 const authorization = `Basic ${Buffer.from(`x-access-token:${alias}`).toString('base64')}`;
-const url = `https://x-access-token:${alias}@github.com/synthetic/repo.git`;
+const url = 'https://github.com/synthetic/repo.git';
+/** The helper the sandbox image installs and every platform process pins. */
+const HELPER_PATH = fileURLToPath(new URL('../../scripts/kilo-git-credential', import.meta.url));
 const requests: Array<{ url: string | undefined; authorization: string | undefined }> = [];
 const connections: string[] = [];
 let redirect: string | undefined;
 let serveRepository = false;
 let root: string;
+let sessionHome: string;
 let bareRepository: string;
 let env: Record<string, string>;
 let https: ReturnType<typeof createHttpsServer>;
@@ -37,6 +41,7 @@ async function listen(server: Server): Promise<number> {
 
 beforeAll(async () => {
   root = await mkdtemp(path.join(tmpdir(), 'managed-github-auth-'));
+  sessionHome = path.join(root, 'session-home');
   const key = path.join(root, 'key.pem');
   const cert = path.join(root, 'cert.pem');
   await exec('openssl', [
@@ -61,7 +66,11 @@ beforeAll(async () => {
     (req, res) => {
       requests.push({ url: req.url, authorization: req.headers.authorization });
       if (req.headers.authorization !== authorization) {
-        res.writeHead(429).end('Anonymous rate limit');
+        // The challenge the helper answers. A managed session never sends git an
+        // anonymous-only flow: the pinned helper supplies the alias.
+        res
+          .writeHead(401, { 'WWW-Authenticate': 'Basic realm="git"' })
+          .end('Authentication required');
       } else if (redirect) {
         res.writeHead(302, { Location: redirect }).end();
       } else if (serveRepository) {
@@ -120,17 +129,27 @@ beforeAll(async () => {
   const proxyPort = await listen(proxy);
   env = {
     PATH: process.env.PATH ?? '/usr/bin:/bin',
-    HOME: root,
+    HOME: sessionHome,
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_TERMINAL_PROMPT: '0',
     GIT_SSL_CAINFO: cert,
-    GIT_CONFIG_COUNT: '2',
+    GIT_CONFIG_COUNT: '3',
     GIT_CONFIG_KEY_0: 'http.proxy',
     GIT_CONFIG_VALUE_0: `http://127.0.0.1:${proxyPort}`,
     GIT_CONFIG_KEY_1: 'credential.helper',
-    GIT_CONFIG_VALUE_1: '',
+    GIT_CONFIG_VALUE_1: HELPER_PATH,
+    GIT_CONFIG_KEY_2: 'credential.useHttpPath',
+    GIT_CONFIG_VALUE_2: 'false',
   };
+  // The platform credential record the helper reads. It lives in the runtime
+  // home, never in a worktree.
+  const recordPath = path.join(sessionHome, '.local/share/kilo/cloud-agent/git-credentials');
+  await mkdir(path.dirname(recordPath), { recursive: true });
+  await writeFile(
+    recordPath,
+    `protocol=https\nhost=github.com\nusername=x-access-token\npassword=${alias}\n`
+  );
   const source = path.join(root, 'source');
   bareRepository = path.join(root, 'repo.git');
   await exec('git', ['init', '-b', 'main', source], { env });
@@ -215,7 +234,7 @@ async function preparationCommand(
     directory,
     branch,
     ...(command === 'checkout' ? { createdOnPlatform: 'code-review' as const } : {}),
-    git: { url: 'https://github.com/synthetic/repo.git', token: alias, platform: 'github' },
+    git: { url, token: alias, platform: 'github' },
     kilo: {
       scopeId: 'synthetic',
       token: 'synthetic-kilo',
@@ -269,13 +288,25 @@ async function bloblessReviewRepository(): Promise<string> {
   return directory;
 }
 
-it('authenticates the first clone request instead of failing on anonymous discovery', async () => {
+/** The worktree may hold the reachable URL, never the credential. */
+async function expectCredentialFreeOrigin(directory: string): Promise<void> {
+  const config = await exec('git', ['-C', directory, 'config', '--get', 'remote.origin.url'], {
+    env,
+  });
+  expect(config.stdout.trim()).toBe(url);
+  const configFile = await readFile(path.join(directory, '.git/config'), 'utf8');
+  expect(configFile).not.toMatch(/x-access-token|@github\.com/);
+}
+
+it('authenticates the clone through the pinned helper and stores no credential', async () => {
   const directory = path.join(root, 'clone');
   const args = await preparationCommand('clone', directory);
   const options = { env, inheritEnv: false, hardTimeoutMs: 5_000 };
-  const anonymous = await git(['clone', url, directory], options);
+  const anonymous = await git(
+    ['-c', 'credential.helper=', 'clone', url, path.join(root, 'anonymous-clone')],
+    options
+  );
   expect(anonymous.exitCode).not.toBe(0);
-  expect(anonymous.stderr).toContain('429');
   expect(requests).toEqual([
     { url: '/synthetic/repo.git/info/refs?service=git-upload-pack', authorization: undefined },
   ]);
@@ -283,12 +314,12 @@ it('authenticates the first clone request instead of failing on anonymous discov
   requests.length = 0;
   const authenticated = await git(args, options);
   expect(authenticated.exitCode, authenticated.stderr).toBe(0);
-  expect(requests).toEqual([
-    { url: '/synthetic/repo.git/info/refs?service=git-upload-pack', authorization },
-  ]);
-  expect(await readFile(path.join(directory, '.git/config'), 'utf8')).not.toMatch(
-    /proactiveAuth|followRedirects/i
-  );
+  expect(requests.at(-1)).toEqual({
+    url: '/synthetic/repo.git/info/refs?service=git-upload-pack',
+    authorization,
+  });
+  expect(requests.every(request => request.url === requests[0]?.url)).toBe(true);
+  await expectCredentialFreeOrigin(directory);
 });
 
 it.each(['clone', 'fetch'] as const)(
@@ -317,9 +348,11 @@ it.each(['clone', 'fetch'] as const)(
       });
       expect(result.exitCode).not.toBe(0);
       expect(result.stderr).toContain('302');
-      expect(requests).toEqual([
-        { url: '/synthetic/repo.git/info/refs?service=git-upload-pack', authorization },
-      ]);
+      expect(requests.at(-1)).toEqual({
+        url: '/synthetic/repo.git/info/refs?service=git-upload-pack',
+        authorization,
+      });
+      expect(requests.every(request => request.url === requests[0]?.url)).toBe(true);
       expect(connections).toEqual(['github.com:443']);
     }
   }
@@ -331,9 +364,11 @@ it.each(['refs/pull/12/head', 'main'])(
     const directory = await bloblessReviewRepository();
     const args = await preparationCommand('checkout', directory, branch);
     const options = { cwd: directory, env, inheritEnv: false, hardTimeoutMs: 5_000 };
-    const anonymous = await git(args.slice(args.indexOf('checkout')), options);
+    const anonymous = await git(
+      ['-c', 'credential.helper=', ...args.slice(args.indexOf('checkout'))],
+      options
+    );
     expect(anonymous.exitCode).not.toBe(0);
-    expect(anonymous.stderr).toContain('429');
     expect(requests).toEqual([
       { url: '/synthetic/repo.git/info/refs?service=git-upload-pack', authorization: undefined },
     ]);
@@ -341,17 +376,21 @@ it.each(['refs/pull/12/head', 'main'])(
     requests.length = 0;
     const authenticated = await git(args, options);
     expect(authenticated.exitCode, authenticated.stderr).toBe(0);
-    expect(requests.map(request => request.url)).toEqual([
-      '/synthetic/repo.git/info/refs?service=git-upload-pack',
-      '/synthetic/repo.git/git-upload-pack',
-    ]);
-    expect(requests.every(request => request.authorization === authorization)).toBe(true);
+    expect(requests.at(-2)?.url).toBe('/synthetic/repo.git/info/refs?service=git-upload-pack');
+    expect(requests.at(-1)).toEqual({
+      url: '/synthetic/repo.git/git-upload-pack',
+      authorization,
+    });
+    expect(
+      requests.filter(request => request.authorization !== authorization).length
+    ).toBeLessThanOrEqual(1);
+    expect([...new Set(connections)]).toEqual(['github.com:443']);
     expect(await readFile(path.join(directory, 'review.txt'), 'utf8')).toBe(
       'Lazy review checkout contents\n'
     );
-    expect(await readFile(path.join(directory, '.git/config'), 'utf8')).not.toMatch(
-      /proactiveAuth|followRedirects/i
-    );
+    const configFile = await readFile(path.join(directory, '.git/config'), 'utf8');
+    expect(configFile).not.toMatch(/proactiveAuth|followRedirects/i);
+    await expectCredentialFreeOrigin(directory);
   }
 );
 
@@ -377,9 +416,10 @@ it.each(['refs/pull/12/head', 'main'])(
       });
       expect(result.exitCode).not.toBe(0);
       expect(result.stderr).toContain('302');
-      expect(requests).toEqual([
-        { url: '/synthetic/repo.git/info/refs?service=git-upload-pack', authorization },
-      ]);
+      expect(requests.at(-1)).toEqual({
+        url: '/synthetic/repo.git/info/refs?service=git-upload-pack',
+        authorization,
+      });
       expect(connections).toEqual(['github.com:443']);
       await expect(readFile(path.join(directory, 'review.txt'))).rejects.toMatchObject({
         code: 'ENOENT',

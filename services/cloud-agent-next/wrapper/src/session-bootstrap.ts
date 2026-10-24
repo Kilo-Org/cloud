@@ -1,5 +1,4 @@
 import { writeRuntimeSkills } from './runtime-skills.js';
-import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {
@@ -31,6 +30,7 @@ import { WrapperBootstrapError, workspaceBootstrapError } from './bootstrap-erro
 import { reportRestoreIncomplete } from './restore-incomplete.js';
 import { checkoutSyntheticReviewRef, isSyntheticReviewRef } from './git-review-ref.js';
 import { boundedUtf8Tail, cleanTerminalOutput, gitOperationError } from './git-errors.js';
+import { credentialFreeGitUrl, requireGitCredentialRecord } from './control/git-credentials.js';
 
 const LONG_COMMAND_INACTIVITY_TIMEOUT_MS = 120_000;
 // Kept below WORKSPACE_PREPARATION_TIMEOUT_MS so a stuck long command (notably
@@ -238,14 +238,7 @@ function longGitOptions(
 
 function canonicalGitUrl(repo: NonNullable<WrapperSessionReadyRequest['repo']>): string {
   const raw = repo.kind === 'github' ? `https://github.com/${repo.repo}.git` : repo.url;
-  try {
-    const url = new URL(raw);
-    url.username = '';
-    url.password = '';
-    return url.toString();
-  } catch {
-    return raw;
-  }
+  return credentialFreeGitUrl(raw);
 }
 
 function isHelperBackedRemote(
@@ -277,50 +270,13 @@ function sessionAuthFilePath(sessionHome: string): string {
 async function materializeRepositoryCredentials(
   request: WrapperSessionReadyRequest
 ): Promise<void> {
-  const credentialsPath = path.join(
-    request.workspace.sessionHome,
-    '.local/share/kilo/cloud-agent/git-credentials'
-  );
   const repo = request.repo;
-  if (!repo?.token) {
-    await fs.rm(credentialsPath, { force: true });
-    return;
-  }
-
-  const repositoryUrl = repo.kind === 'github' ? new URL('https://github.com') : new URL(repo.url);
-  if (repositoryUrl.protocol !== 'https:' || !repositoryUrl.host) {
-    throw new Error('Repository Git credentials require an HTTPS URL');
-  }
-
-  const username =
-    repo.kind === 'git' && repo.platform === 'gitlab'
-      ? 'oauth2'
-      : repo.kind === 'git' && repo.platform === 'bitbucket'
-        ? 'x-token-auth'
-        : 'x-access-token';
-  const values = ['https', repositoryUrl.host, username, repo.token];
-  if (values.some(value => value.includes('\r') || value.includes('\n') || value.includes('\0'))) {
-    throw new Error('Repository Git credentials contain invalid characters');
-  }
-
-  const credentials = `protocol=https\nhost=${repositoryUrl.host}\nusername=${username}\npassword=${repo.token}\n`;
-  const credentialsDirectory = path.dirname(credentialsPath);
-  await fs.mkdir(credentialsDirectory, { recursive: true, mode: 0o700 });
-  await fs.chmod(credentialsDirectory, 0o700);
-  const temporaryPath = path.join(credentialsDirectory, `git-credentials.${randomUUID()}.tmp`);
-
-  try {
-    const handle = await fs.open(temporaryPath, 'wx', 0o600);
-    try {
-      await handle.writeFile(credentials, 'utf8');
-    } finally {
-      await handle.close();
-    }
-    await fs.rename(temporaryPath, credentialsPath);
-  } catch (error) {
-    await fs.rm(temporaryPath, { force: true }).catch(() => {});
-    throw error;
-  }
+  await requireGitCredentialRecord({
+    home: request.workspace.sessionHome,
+    url: repo ? canonicalGitUrl(repo) : '',
+    token: repo?.token,
+    platform: repo?.kind === 'github' ? 'github' : repo?.platform,
+  });
 }
 
 // The marker is removed before re-bootstrapping and written only after restore

@@ -220,7 +220,7 @@ export class EnvironmentBuild extends DurableObject<Env> {
   async logs(input: {
     environmentId: string;
     buildId: string;
-    cursor: number;
+    cursor?: number;
     limit: number;
   }): Promise<EnvironmentBuildLogs | null> {
     return (await this.coordinatorFor(input.environmentId)).logs(

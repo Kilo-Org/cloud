@@ -511,7 +511,8 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   late wrapper cannot connect, and launches the image for the same allocation within the original
   deadline. When the previous snapshot start never connected or its preparation failed, the next
   launch uses the image once (`previousSnapshotStartFailed`); a completed image start clears this.
-  A failure never changes the published snapshot.
+  A failure never changes the published snapshot. Each native container coordinator retains up to 16 failed snapshot IDs.
+  After three failed restores of one snapshot, it starts from the image until a replacement is offered.
 - **No session capture.** A wrapper that predates this change may still send `workspace.capture`;
   the Sandbox DO answers `workspace.captured` with `ok: false` at once. The `REPO_SNAPSHOTS` index,
   repository keys and route `repo_key` are removed.

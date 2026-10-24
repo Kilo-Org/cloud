@@ -1,5 +1,6 @@
 import {
   ENVIRONMENT_BUILD_LOG_BATCH_MAX_BYTES,
+  ENVIRONMENT_BUILD_LOG_BATCH_MAX_LINES,
   ENVIRONMENT_BUILD_LOG_LINE_MAX_CHARS,
   type EnvironmentBuildRunnerStep,
 } from '../../../src/shared/environment-build-protocol.js';
@@ -47,8 +48,9 @@ export function createBuildReporter(deps: {
     if (dropped) {
       batch.push(DROPPED_MARKER);
       dropped = false;
+      bytes = Buffer.byteLength(DROPPED_MARKER, 'utf8');
     }
-    while (pending.length > 0) {
+    while (pending.length > 0 && batch.length < ENVIRONMENT_BUILD_LOG_BATCH_MAX_LINES) {
       const next = pending[0];
       const size = Buffer.byteLength(next, 'utf8');
       if (batch.length > 0 && bytes + size > ENVIRONMENT_BUILD_LOG_BATCH_MAX_BYTES) break;

@@ -1,3 +1,9 @@
+import {
+  MAX_SNAPSHOT_START_FAILURES,
+  SNAPSHOT_START_FAILURES_KEY,
+  parseSnapshotStartFailures,
+  recordSnapshotStartFailure,
+} from './snapshot-start-failures.js';
 import { getBillingContext } from '@kilocode/container-usage';
 import { withTimeout } from '@kilocode/worker-utils';
 import { DurableObject } from 'cloudflare:workers';
@@ -17,8 +23,7 @@ import {
 import { fetchPreviewPort, previewNotRunningResponse } from '../preview/container-port-fetch.js';
 import { isReservedPreviewPort } from '../shared/reserved-ports.js';
 import {
-  ENVIRONMENT_BUILD_RUNNER_DIR,
-  ENVIRONMENT_BUILD_RUNNER_PATH,
+  ENVIRONMENT_BUILD_RUNNER_DELIVERY_SCRIPT,
   type EnvironmentBuildRunner,
 } from '../shared/environment-build-protocol.js';
 import {
@@ -89,12 +94,6 @@ export type ContainersLaunchInput = {
  */
 const BUILDER_RUNNER_ENV = 'KILO_BUILDER_RUNNER';
 /** Atomic, owner-only write of the runner file; the value comes from exec env. */
-const BUILDER_RUNNER_DELIVERY_SCRIPT = [
-  'umask 077',
-  `mkdir -p ${ENVIRONMENT_BUILD_RUNNER_DIR}`,
-  `printf '%s' "$${BUILDER_RUNNER_ENV}" > ${ENVIRONMENT_BUILD_RUNNER_PATH}.tmp`,
-  `mv ${ENVIRONMENT_BUILD_RUNNER_PATH}.tmp ${ENVIRONMENT_BUILD_RUNNER_PATH}`,
-].join(' && ');
 
 export type ContainersBuilderLaunchInput = {
   allocationRef: string;
@@ -388,7 +387,7 @@ export class SandboxContainers extends DurableObject<Env> {
     if (input.containment === true || input.egressAllowlist !== undefined) {
       await this.installOutboundProxy(container, input.egressAllowlist);
     }
-    const start = this.resolveStart(input, 'supervisor', true);
+    const start = await this.resolveStart(input, 'supervisor', true);
     return this.issueNativeMainProcess(record, ref, start, input.egressAllowlist, input.deadlineAt);
   }
 
@@ -396,7 +395,7 @@ export class SandboxContainers extends DurableObject<Env> {
    * Start an environment builder for `allocationRef`. Only the environment
    * coordinator calls this, on the container DO named for its environment, so a
    * record held by another allocation is a previous builder and is destroyed
-   * first. A repeated call for the running builder is a no-op; a builder whose
+   * first. A repeated call for the running builder retries runner delivery; a builder whose
    * start may still be in flight is confirmed by its main-process identity.
    */
   async launchBuilder(input: ContainersBuilderLaunchInput): Promise<ContainersLaunchResult> {
@@ -410,6 +409,7 @@ export class SandboxContainers extends DurableObject<Env> {
         stored = await this.releaseSupersededAllocation(stored);
       }
       if (stored.allocationRef === ref && stored.state === 'running') {
+        await this.deliverBuilderRunner(this.requiredContainer(), input.runner, input.deadlineAt);
         return { started: false, startSource: 'image' };
       }
       const container = this.requiredContainer();
@@ -435,7 +435,7 @@ export class SandboxContainers extends DurableObject<Env> {
         throw new Error('Cannot start a builder on an unowned running container');
       }
       const record = await this.installLaunchInstance(stored, input.instance);
-      const start = this.resolveStart(
+      const start = await this.resolveStart(
         {
           env: {},
           instance: input.instance,
@@ -471,7 +471,7 @@ export class SandboxContainers extends DurableObject<Env> {
   ): Promise<void> {
     if (Date.now() >= deadlineAt) throw new WrapperExecTimeoutError();
     const proc = await this.awaitContainerCall(
-      container.exec(['/bin/sh', '-c', BUILDER_RUNNER_DELIVERY_SCRIPT], {
+      container.exec(['/bin/sh', '-c', ENVIRONMENT_BUILD_RUNNER_DELIVERY_SCRIPT], {
         env: { [BUILDER_RUNNER_ENV]: JSON.stringify(runner) },
         cwd: '/',
       }),
@@ -531,14 +531,22 @@ export class SandboxContainers extends DurableObject<Env> {
    * `snapshot_lookup` diagnostic per start so `image` vs `repository` and the
    * reason are visible. Like the capture line it carries no snapshot handle.
    */
-  private resolveStart(
+  private async resolveStart(
     input: Pick<
       ContainersLaunchInput,
       'env' | 'instance' | 'containment' | 'egressAllowlist' | 'snapshot' | 'command'
     >,
     mainProcess: NativeMainProcess,
     allowSnapshot: boolean
-  ): ResolvedStart {
+  ): Promise<ResolvedStart> {
+    const failures =
+      input.snapshot === undefined
+        ? []
+        : parseSnapshotStartFailures(await this.ctx.storage.get(SNAPSHOT_START_FAILURES_KEY));
+    const snapshotRejected =
+      input.snapshot !== undefined &&
+      (failures.find(record => record.snapshotId === input.snapshot?.snapshotId)?.failures ?? 0) >=
+        MAX_SNAPSHOT_START_FAILURES;
     const plan = planNativeStart(
       {
         image: this.containerImage(),
@@ -550,8 +558,9 @@ export class SandboxContainers extends DurableObject<Env> {
         command: input.command,
         ...(input.snapshot === undefined ? {} : { snapshot: input.snapshot }),
       },
-      allowSnapshot
+      allowSnapshot && !snapshotRejected
     );
+    if (snapshotRejected) plan.reason = 'restore_failures';
     logControlDiagnostic('snapshot_lookup', {
       sandboxId: this.sandboxNameForLog(),
       source: plan.source,
@@ -585,6 +594,13 @@ export class SandboxContainers extends DurableObject<Env> {
       return null;
     } catch (error) {
       if (start.source === 'repository' && start.snapshotId !== null) {
+        const failures = parseSnapshotStartFailures(
+          await this.ctx.storage.get(SNAPSHOT_START_FAILURES_KEY)
+        );
+        await this.ctx.storage.put(
+          SNAPSHOT_START_FAILURES_KEY,
+          recordSnapshotStartFailure(failures, start.snapshotId)
+        );
         logControlDiagnostic('snapshot_start_failed', {
           sandboxId: this.sandboxNameForLog(),
           reason: 'repository_start_failed',
@@ -826,7 +842,11 @@ export class SandboxContainers extends DurableObject<Env> {
     const interception = input.containment === true || input.egressAllowlist !== undefined;
     if (interception) await this.installOutboundProxy(container, input.egressAllowlist);
     if (!container.running) {
-      const start = this.resolveStart(input, 'supervisor', record.startSource === 'repository');
+      const start = await this.resolveStart(
+        input,
+        'supervisor',
+        record.startSource === 'repository'
+      );
       return this.issueNativeMainProcess(
         record,
         ref,

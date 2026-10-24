@@ -119,7 +119,7 @@ export const getEnvironmentBuildLogs = protectedProcedure
   .input(
     environmentScopeSchema.extend({
       buildId: z.string().uuid(),
-      cursor: z.number().int().nonnegative().default(0),
+      cursor: z.number().int().nonnegative().optional(),
       limit: z.number().int().min(1).max(1000).default(500),
     })
   )

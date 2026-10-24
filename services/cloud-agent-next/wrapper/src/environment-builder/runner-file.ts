@@ -42,6 +42,8 @@ export async function takeRunner(
       await sleep(RUNNER_FILE_POLL_MS);
       continue;
     }
+    // Mark consumption before deleting: launch retries must not recreate the credential.
+    await fs.writeFile(`${file}.consumed`, '', { mode: 0o600 });
     await remove(file);
     try {
       const parsed = environmentBuildRunnerSchema.safeParse(JSON.parse(text));

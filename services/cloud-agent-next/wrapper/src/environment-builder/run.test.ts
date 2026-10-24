@@ -1,3 +1,7 @@
+import {
+  environmentBuildInputSchema,
+  environmentBuildEventsSchema,
+} from '../../../src/shared/environment-build-protocol.js';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs/promises';
@@ -115,6 +119,18 @@ function harness(options: { cleanup?: typeof removeBuildCredentials } = {}) {
 }
 
 describe('environment build run', () => {
+  it('accepts and executes a full 16,000-character environment script', async () => {
+    const commands = [
+      ('#' + 'x'.repeat(15900) + '\nprintf prepared > long-script-proof').padEnd(16000, ' '),
+    ];
+    const input = environmentBuildInputSchema.parse(buildInput({ commands }));
+    expect(
+      environmentBuildInputSchema.safeParse({ ...input, commands: [commands[0] + 'x'] }).success
+    ).toBe(false);
+    expect(await harness().run(input)).toMatchObject({ outcome: 'ready' });
+    expect(await fs.readFile(path.join(directory, 'long-script-proof'), 'utf8')).toBe('prepared');
+  });
+
   it('clones the default branch, pins its commit, runs setup in the fixed home and stamps', async () => {
     const h = harness();
     const result = await h.run(
@@ -265,6 +281,28 @@ describe('builder process stop', () => {
 });
 
 describe('build reporter', () => {
+  it('delivers short-line output in valid batches without losing later lines', async () => {
+    const received: string[] = [];
+    const reporter = createBuildReporter({
+      client: {
+        events: async batch => {
+          const parsed = environmentBuildEventsSchema.parse(batch);
+          received.push(...(parsed.logs ?? []));
+          return { action: 'continue' };
+        },
+      },
+      intervalMs: 60_000,
+      onCancel: () => undefined,
+      log: () => undefined,
+    });
+    const lines = Array.from({ length: 650 }, (_, i) => `line ${i}`);
+    lines.forEach(line => reporter.line(line));
+    await reporter.flush();
+    expect(received).toEqual(lines.slice(0, 512));
+    await reporter.flush();
+    expect(received).toEqual(lines);
+  });
+
   it('sends the step once, batches lines with a sequence and retains them after a failure', async () => {
     const batches: EnvironmentBuildEvents[] = [];
     let fail = true;

@@ -36,6 +36,8 @@ type Harness = {
   /** The image a container would start from now; null when it cannot be read. */
   currentImage: string | null;
   alarms: number[];
+  gitUnavailable?: boolean;
+  billingAdmission?: (allocation: BuilderAllocation) => Promise<void>;
 };
 
 function reference(harness: Harness): EnvironmentReference {
@@ -73,7 +75,9 @@ async function setup(): Promise<Harness> {
     alarms: [],
   };
   const provider: BuilderProvider = {
-    admitBilling: async () => undefined,
+    admitBilling: async allocation => {
+      await harness.billingAdmission?.(allocation);
+    },
     launch: async (allocation, launch) => {
       if (harness.launchError) throw harness.launchError;
       harness.launches.push({ allocation, runner: launch.runner });
@@ -128,14 +132,17 @@ async function setup(): Promise<Harness> {
                 },
               },
         actorAccess: async () => harness.environment.access,
-        gitSource: async () => ({
-          ok: true,
-          git: {
-            url: 'https://github.com/acme/widgets.git',
-            token: 'gh-token',
-            platform: 'github',
-          },
-        }),
+        gitSource: async () =>
+          harness.gitUnavailable
+            ? { ok: false, reason: 'unavailable' }
+            : {
+                ok: true,
+                git: {
+                  url: 'https://github.com/acme/widgets.git',
+                  token: 'gh-token',
+                  platform: 'github',
+                },
+              },
         capacity: async () => 'ok',
       },
       provider,
@@ -222,6 +229,60 @@ afterEach(async () => {
 });
 
 describe('environment build lifecycle', () => {
+  it('settles a billing admission when cancellation wins before launch', async () => {
+    const h = await setup();
+    const accepted = await manualBuild(h);
+    if (accepted.status !== 'accepted') throw new Error('not accepted');
+    const admitted: BuilderAllocation[] = [];
+    await runInDurableObject(h.stub, (instance: EnvironmentBuild) => {
+      const coordinator = (instance as unknown as { coordinator: EnvironmentBuildCoordinator })
+        .coordinator;
+      h.billingAdmission = async allocation => {
+        admitted.push(allocation);
+        await coordinator.cancel(accepted.buildId);
+      };
+    });
+    await tick(h);
+    await drive(h);
+    expect(admitted).toHaveLength(1);
+    expect(h.launches).toHaveLength(0);
+    expect(h.stops).toEqual(admitted);
+    expect((await status(h)).latestBuild?.state).toBe('canceled');
+  });
+
+  it('delays queued retries while the repository token source is unavailable', async () => {
+    const h = await setup();
+    await manualBuild(h);
+    h.gitUnavailable = true;
+    const before = Date.now();
+    await tick(h);
+    expect((await status(h)).activeBuild?.state).toBe('queued');
+    expect(h.alarms.at(-1)).toBeGreaterThanOrEqual(before + 30_000);
+    h.gitUnavailable = false;
+    await tick(h);
+    expect(h.launches).toHaveLength(1);
+  });
+
+  it('returns recent log output when no page cursor is supplied', async () => {
+    const h = await setup();
+    const { buildId, auth } = await readyBuild(h);
+    await h.stub.runnerEvents(auth, {
+      sequence: 0,
+      logs: Array.from({ length: 512 }, (_, i) => `line ${i}`),
+    });
+    await h.stub.runnerEvents(auth, { sequence: 1, logs: ['failure detail at the end'] });
+    const tail = await h.stub.logs({ environmentId: h.environmentId, buildId, limit: 500 });
+    expect(tail?.lines).toHaveLength(500);
+    expect(tail?.lines.at(-1)?.text).toBe('failure detail at the end');
+    const first = await h.stub.logs({
+      environmentId: h.environmentId,
+      buildId,
+      cursor: 0,
+      limit: 10,
+    });
+    expect(first?.lines[0]?.text).toBe('line 0');
+  });
+
   it('builds without a chat, publishes the snapshot and stops the exact builder', async () => {
     const harness = await setup();
     const { buildId, auth } = await readyBuild(harness);

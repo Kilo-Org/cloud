@@ -157,6 +157,17 @@ export class BuildStore {
       .all();
   }
 
+  readRecentLogs(buildId: string, limit: number): Array<{ seq: number; text: string }> {
+    return this.db
+      .select({ seq: buildLogs.seq, text: buildLogs.text })
+      .from(buildLogs)
+      .where(eq(buildLogs.build_id, buildId))
+      .orderBy(desc(buildLogs.seq))
+      .limit(limit)
+      .all()
+      .reverse();
+  }
+
   published(): PublishedSnapshot | null {
     const row = this.db
       .select()

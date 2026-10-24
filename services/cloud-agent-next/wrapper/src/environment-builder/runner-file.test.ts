@@ -1,3 +1,8 @@
+import { execFileSync } from 'node:child_process';
+import {
+  ENVIRONMENT_BUILD_RUNNER_DELIVERY_SCRIPT,
+  ENVIRONMENT_BUILD_RUNNER_DIR,
+} from '../../../src/shared/environment-build-protocol.js';
 import { describe, expect, it } from 'bun:test';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -12,6 +17,23 @@ async function tempFile(): Promise<string> {
 }
 
 describe('takeRunner', () => {
+  it('does not recreate a consumed credential when delivery is retried', async () => {
+    const file = await tempFile();
+    const script = ENVIRONMENT_BUILD_RUNNER_DELIVERY_SCRIPT.replaceAll(
+      ENVIRONMENT_BUILD_RUNNER_DIR,
+      path.dirname(file)
+    );
+    const deliver = () =>
+      execFileSync('/bin/sh', ['-c', script], {
+        env: { PATH: process.env.PATH, KILO_BUILDER_RUNNER: JSON.stringify(RUNNER) },
+      });
+    deliver();
+    expect(await takeRunner({ path: file })).toEqual(RUNNER);
+    deliver();
+    expect(await fs.stat(file).catch(() => null)).toBeNull();
+    expect(await fs.readFile(`${file}.consumed`, 'utf8')).toBe('');
+  });
+
   it('reads the runner once and deletes the file', async () => {
     const file = await tempFile();
     await fs.writeFile(file, JSON.stringify(RUNNER));

@@ -2555,6 +2555,24 @@ function launchFromSnapshot(instance: SandboxContainers, ref: string, extra = {}
 }
 
 describe('SandboxContainers environment snapshot starts', () => {
+  it('stops retrying a repeatedly failing snapshot but permits a replacement', async () => {
+    const { instance, container } = setup();
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      container.startBehavior = 'effect-then-reject';
+      expect(await launchFromSnapshot(instance, REF_A)).toMatchObject({ snapshotFailed: true });
+      await instance.stop(REF_A);
+    }
+    container.startBehavior = 'ok';
+    expect(await launchFromSnapshot(instance, REF_A)).toMatchObject({ startSource: 'image' });
+    expect(container.startCalls.at(-1)).toHaveProperty('image', IMAGE);
+    await instance.stop(REF_A);
+    expect(
+      await launchFromSnapshot(instance, REF_A, {
+        snapshot: { ...SNAPSHOT, snapshotId: 'replacement' },
+      })
+    ).toMatchObject({ startSource: 'repository' });
+  });
+
   it('starts from the offered snapshot captured from the current image', async () => {
     const { diagnostics } = captureLogs();
     const { instance, container, readRecord } = setup();
@@ -2893,8 +2911,8 @@ describe('SandboxContainers environment builder', () => {
       startSource: 'image',
     });
     expect(container.startCalls).toHaveLength(1);
-    // A running builder already took its runner; nothing is written again.
-    expect(container.execCalls).toHaveLength(execs);
+    // The delivery script checks whether the runner was already consumed.
+    expect(container.execCalls).toHaveLength(execs + 1);
   });
 
   it('fails the launch when the runner cannot be delivered', async () => {
@@ -2902,6 +2920,10 @@ describe('SandboxContainers environment builder', () => {
     container.execHandler = cmd => makeExecProcess({ exitCode: cmd[0] === '/bin/sh' ? 1 : 0 });
 
     await expect(launchBuilder(instance, REF_A)).rejects.toThrow('Builder runner delivery failed');
+    container.execHandler = () => makeExecProcess({ exitCode: 0 });
+    await expect(launchBuilder(instance, REF_A)).resolves.toMatchObject({ started: false });
+    expect(container.startCalls).toHaveLength(1);
+    expect(container.execCalls.at(-1)?.cmd[2]).toContain('runner.json.consumed');
   });
 
   it('runs the builder through the runtime installer when a release is selected', async () => {

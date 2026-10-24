@@ -25,6 +25,15 @@ export const ENVIRONMENT_BUILD_LOG_PATH = '/tmp/kilocode-environment-builder.log
 export const ENVIRONMENT_BUILD_RUNNER_DIR = '/run/kilocode-environment-build';
 export const ENVIRONMENT_BUILD_RUNNER_PATH = `${ENVIRONMENT_BUILD_RUNNER_DIR}/runner.json`;
 
+export const ENVIRONMENT_BUILD_RUNNER_DELIVERY_SCRIPT = [
+  'umask 077',
+  `mkdir -p ${ENVIRONMENT_BUILD_RUNNER_DIR}`,
+  `{ [ ! -e ${ENVIRONMENT_BUILD_RUNNER_PATH}.consumed ] || exit 0; }`,
+  `printf '%s' "$KILO_BUILDER_RUNNER" > ${ENVIRONMENT_BUILD_RUNNER_PATH}.tmp`,
+  `mv ${ENVIRONMENT_BUILD_RUNNER_PATH}.tmp ${ENVIRONMENT_BUILD_RUNNER_PATH}`,
+  `if [ -e ${ENVIRONMENT_BUILD_RUNNER_PATH}.consumed ]; then rm -f ${ENVIRONMENT_BUILD_RUNNER_PATH}; fi`,
+].join(' && ');
+
 export const environmentBuildRunnerSchema = z
   .object({ url: z.string().url(), credential: z.string().min(1) })
   .strict();
@@ -34,6 +43,7 @@ export type EnvironmentBuildRunner = z.infer<typeof environmentBuildRunnerSchema
 export const ENVIRONMENT_BUILD_HEARTBEAT_MS = 15_000;
 /** Bound on the text of one log batch, after redaction. */
 export const ENVIRONMENT_BUILD_LOG_BATCH_MAX_BYTES = 64 * 1024;
+export const ENVIRONMENT_BUILD_LOG_BATCH_MAX_LINES = 512;
 /** Bound on one log line the builder forwards. */
 export const ENVIRONMENT_BUILD_LOG_LINE_MAX_CHARS = 8_192;
 
@@ -53,7 +63,7 @@ export const environmentBuildInputSchema = z
     allocationId: z.string().uuid(),
     git: environmentBuildGitSchema,
     directory: z.literal(ENVIRONMENT_BUILD_WORKSPACE),
-    commands: z.array(z.string().min(1).max(500)).max(20),
+    commands: z.array(z.string().min(1).max(16_000)).max(20),
     env: z.record(z.string().min(1).max(128), z.string().max(10_000)),
     /** Names of the secret entries in `env`, so the builder redacts their values. */
     secretKeys: z.array(z.string().min(1).max(128)).max(50),
@@ -72,7 +82,10 @@ export const environmentBuildEventsSchema = z
     sequence: z.number().int().nonnegative(),
     step: z.enum(ENVIRONMENT_BUILD_RUNNER_STEPS).optional(),
     /** Redacted output lines, in order. */
-    logs: z.array(z.string().max(ENVIRONMENT_BUILD_LOG_LINE_MAX_CHARS)).max(512).optional(),
+    logs: z
+      .array(z.string().max(ENVIRONMENT_BUILD_LOG_LINE_MAX_CHARS))
+      .max(ENVIRONMENT_BUILD_LOG_BATCH_MAX_LINES)
+      .optional(),
   })
   .strict();
 export type EnvironmentBuildEvents = z.infer<typeof environmentBuildEventsSchema>;

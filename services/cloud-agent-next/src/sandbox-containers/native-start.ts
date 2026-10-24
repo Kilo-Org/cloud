@@ -37,7 +37,12 @@ export type NativeStartRequest = {
 };
 
 /** Why a start uses the image even though one may have been offered. */
-export type NativeStartReason = 'no_snapshot' | 'not_allowed' | 'image_mismatch' | 'snapshot';
+export type NativeStartReason =
+  | 'no_snapshot'
+  | 'not_allowed'
+  | 'image_mismatch'
+  | 'snapshot'
+  | 'restore_failures';
 
 export type NativeStartPlan = {
   image: string;

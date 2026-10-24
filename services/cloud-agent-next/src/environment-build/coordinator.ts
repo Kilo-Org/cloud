@@ -452,11 +452,15 @@ export class EnvironmentBuildCoordinator {
     };
   }
 
-  logs(buildId: string, cursor: number, limit: number): EnvironmentBuildLogs | null {
+  logs(buildId: string, cursor: number | undefined, limit: number): EnvironmentBuildLogs | null {
     const build = this.deps.store.build(buildId);
     if (build === null) return null;
-    const lines = this.deps.store.readLogs(buildId, cursor, limit);
-    const nextCursor = lines.length === 0 ? cursor : (lines[lines.length - 1]?.seq ?? cursor);
+    const lines =
+      cursor === undefined
+        ? this.deps.store.readRecentLogs(buildId, limit)
+        : this.deps.store.readLogs(buildId, cursor, limit);
+    const nextCursor =
+      lines.length === 0 ? (cursor ?? 0) : (lines[lines.length - 1]?.seq ?? cursor ?? 0);
     return {
       buildId,
       lines,
@@ -655,6 +659,7 @@ export class EnvironmentBuildCoordinator {
     if (active === null) return null;
     switch (active.state) {
       case 'queued':
+        return Math.min(now + PREPARING_TICK_MS, active.deadline_at);
       case 'publishing':
         return now;
       case 'preparing':
@@ -754,23 +759,6 @@ export class EnvironmentBuildCoordinator {
       allocationId: this.deps.uuid(),
       instance: build.instance as BuilderAllocation['instance'],
     };
-    try {
-      await this.deps.provider.admitBilling(
-        allocation,
-        this.deps.billingInput({
-          owner: reference.owner,
-          actorUserId: build.actor_user_id,
-          sandboxId,
-          buildId: build.id,
-        })
-      );
-    } catch (error) {
-      const reason =
-        error instanceof ProviderCreationError && error.code === 'insufficient_credits'
-          ? 'billing_blocked'
-          : 'billing_unavailable';
-      return this.terminalWithoutAllocation(build, 'failed', reason);
-    }
     // Plan step 2: the allocation intent is durable before the provider request.
     const preparing = this.deps.store.transition(build.id, ['queued'], {
       state: 'preparing',
@@ -788,6 +776,26 @@ export class EnvironmentBuildCoordinator {
       this.beginStopping(build.id, ['preparing'], 'failed', { reason: 'builder_start_failed' });
       return;
     }
+    const input = parseBuildInput(build);
+    try {
+      await this.deps.provider.admitBilling(
+        allocation,
+        this.deps.billingInput({
+          owner: input.reference.owner,
+          actorUserId: build.actor_user_id,
+          sandboxId: allocation.sandboxId,
+          buildId: build.id,
+        })
+      );
+    } catch (error) {
+      const reason =
+        error instanceof ProviderCreationError && error.code === 'insufficient_credits'
+          ? 'billing_blocked'
+          : 'billing_unavailable';
+      this.beginStopping(build.id, ['preparing'], 'failed', { reason });
+      return;
+    }
+    if (this.deps.store.build(build.id)?.state !== 'preparing') return;
     const credential = await this.deps.runnerCredential({
       environmentId: this.environmentId,
       buildId: build.id,

@@ -49,6 +49,15 @@ describe('briefing model pricing', () => {
       );
     }
   );
+
+  it('reports invalid_model_pricing', async () => {
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
+      [target.id]: { ...target, endpoints: [{}] },
+    });
+    await expect(briefingPriceBound(target.id, 'Overnight activity', 2_000_000)).rejects.toThrow(
+      'invalid_model_pricing'
+    );
+  });
 });
 it('redacts credentials and retains outcome evidence and source links within the input limit', () => {
   const starts = Array.from({ length: 20 }, (_, index) => ({

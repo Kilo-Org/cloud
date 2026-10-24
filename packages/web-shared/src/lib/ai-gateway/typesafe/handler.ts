@@ -38,9 +38,11 @@ import { getEffectiveProviderPrivacy } from '../provider-privacy';
 import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
+  getOpenRouterModelsMetadataFromDatabase,
   getOpenRouterSystemOneModelsFromDatabase,
   resolveOpenRouterModelAlias,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { systemOneRequestCostBound } from '@kilocode/web-shared/lib/ai-gateway/request-cost-limit';
 import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
 import {
   bareIpLiteral,
@@ -98,11 +100,35 @@ export async function handleSystemOneRequest(request: NextRequest) {
       404
     );
   }
+  const resolvedModel = await resolveOpenRouterModelAlias(requestedModel);
 
   const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
     await getBalanceAndOrgSettings(organizationId, user, readDb);
   if (!canSpendPaidUsage(balance)) {
     return creditsBlockedResponse({ user, balance, organizationId, balanceLimitedByUserAllowance });
+  }
+
+  // Admit the request when the balance covers the cost bound: the schema bounds the bytes it can
+  // carry, and the bound prices those bytes plus the answer generation at the model's current
+  // rates.
+  const catalog = await getOpenRouterModelsMetadataFromDatabase();
+  const metadata = catalog[resolvedModel] ?? catalog[requestedModel];
+  const estimatedMaxCostMicrodollars = metadata
+    ? systemOneRequestCostBound(metadata, parsed.data)
+    : null;
+  if (estimatedMaxCostMicrodollars === null) {
+    errorExceptInTest(
+      'System One request cost unavailable',
+      metadata ? `unusable pricing for '${resolvedModel}'` : `no metadata for '${resolvedModel}'`
+    );
+    return errorResponse('Service temporarily unavailable', 'temporarily_unavailable', 503);
+  }
+  if (estimatedMaxCostMicrodollars > Math.floor(balance * 1_000_000)) {
+    return errorResponse(
+      'This request can cost more than the available balance covers. Add credits or send a smaller request.',
+      'insufficient_credits',
+      402
+    );
   }
 
   const providerConfig = getOrganizationProviderPrivacy(settings);
@@ -118,7 +144,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     const { decision } = await resolveOrganizationMemberModelDecision({
       organizationId,
       kiloUserId: user.id,
-      modelId: await resolveOpenRouterModelAlias(requestedModel),
+      modelId: resolvedModel,
       providerLookup: getProviderSlugsForModel,
       fromDb: readDb,
     });

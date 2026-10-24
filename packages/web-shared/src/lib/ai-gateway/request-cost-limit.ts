@@ -10,14 +10,21 @@ import {
 import { getCustomPricing } from './custom-pricing.constants';
 import { findKiloExclusiveModel } from './kilo-exclusive-models';
 
-export function textRequestPriceCeiling(metadata: StoredModel) {
-  if (metadata.endpoints.length === 0) throw new Error('Model pricing is unavailable');
+export type TextRequestPriceCeiling = {
+  inputRate: number;
+  outputRate: number;
+  requestCost: number;
+};
+
+/** Catalog-pricing failures are returned as messages; unexpected failures propagate. */
+export function textRequestPriceCeiling(metadata: StoredModel): TextRequestPriceCeiling | string {
+  if (metadata.endpoints.length === 0) return 'Model pricing is unavailable';
   let inputRate = 0;
   let outputRate = 0;
   let requestCost = 0;
   for (const endpoint of metadata.endpoints) {
     const price = getModelDisplayPricing(endpoint.pricing);
-    if (!price) throw new Error('Model has an unpriced route');
+    if (!price) return 'Model has an unpriced route';
     const values = [
       price.prompt,
       price.completion,
@@ -27,7 +34,7 @@ export function textRequestPriceCeiling(metadata: StoredModel) {
       price.internal_reasoning ?? '0',
     ].map(Number);
     if (values.some(value => !Number.isFinite(value) || value < 0))
-      throw new Error('Model has invalid pricing');
+      return 'Model has invalid pricing';
     inputRate = Math.max(inputRate, values[0] + Math.max(values[3], values[4]));
     outputRate = Math.max(outputRate, values[1] + values[5]);
     requestCost = Math.max(requestCost, values[2]);
@@ -45,7 +52,7 @@ export function textRequestPriceCeiling(metadata: StoredModel) {
       ) / 1_000_000;
     const output = pricing.completion_per_million / 1_000_000;
     if (![input, output].every(value => Number.isFinite(value) && value >= 0))
-      throw new Error('Model has invalid billed pricing');
+      return 'Model has invalid billed pricing';
     inputRate = Math.max(inputRate, input);
     outputRate = Math.max(outputRate, output);
   }
@@ -64,6 +71,35 @@ function requestTextBytes(value: unknown): number {
   }
   return 0;
 }
+/** Output-token allowance for one System One answer, covering its generation and envelope. */
+export const SYSTEM_ONE_MAX_OUTPUT_TOKENS = 16_384;
+
+/**
+ * Cost bound, in microdollars, of one System One request against a model's current prices, or
+ * `null` when the stored catalog cannot price the model.
+ *
+ * The questions bound the answer envelope: answers repeat the question criteria keys, and score
+ * questions their legend. `state` is read once and never echoed. The output allowance adds room
+ * for the answer generation each model also prices.
+ */
+export function systemOneRequestCostBound(
+  metadata: StoredModel,
+  request: { state: unknown; questions: Record<string, unknown> }
+): number | null {
+  const price = textRequestPriceCeiling(metadata);
+  if (typeof price === 'string') return null;
+  const questionBytes = Buffer.byteLength(JSON.stringify(request.questions) ?? '', 'utf8');
+  const inputTokenCeiling =
+    Buffer.byteLength(JSON.stringify(request.state) ?? '', 'utf8') + questionBytes + 1024;
+  const outputTokenCeiling = questionBytes + SYSTEM_ONE_MAX_OUTPUT_TOKENS;
+  return Math.ceil(
+    (inputTokenCeiling * price.inputRate +
+      outputTokenCeiling * price.outputRate +
+      price.requestCost) *
+      1_000_000
+  );
+}
+
 /** OpenAI serves at most this many choices per request; a larger count is refused as unpricable. */
 const MAX_BOUNDED_CHOICES = 128;
 
@@ -198,6 +234,7 @@ export async function enforceRequestCostLimit(
     )
       return 'Model alias target changed before bounded spending admission';
     const price = textRequestPriceCeiling(metadata.data);
+    if (typeof price === 'string') return price;
     const inputTokenCeiling = requestTextBytes(body) + 2048;
     // max_completion_tokens supersedes max_tokens where both are accepted, so the larger of the
     // two bounds either resolution; every requested choice carries its own output ceiling.

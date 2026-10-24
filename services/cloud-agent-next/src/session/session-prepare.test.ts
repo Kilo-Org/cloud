@@ -3516,8 +3516,8 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
   });
 
   it('regression: concurrent reconcile retries run the effect once and report creation_in_progress to the rest', async () => {
-    // The first retry atomically claimed the reconciliation lease and may
-    // reconcile; every concurrent retry sees the live lease and must not.
+    // The first admission atomically claims the reconciliation lease and may
+    // reconcile; every concurrent admission sees the live lease and must not.
     admitOperationMock
       .mockResolvedValueOnce({
         admission: 'duplicate_reconcile_pending',
@@ -3534,20 +3534,24 @@ describe('createSessionWithLedger takeover reconciliation ladder', () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);
 
-    const [winner, loser] = await Promise.all([
-      runCreate(ctx),
-      runCreate(ctx).then(
-        () => null,
-        (error: unknown) => error
-      ),
-    ]);
+    const outcomes = await Promise.allSettled([runCreate(ctx), runCreate(ctx)]);
 
-    expect(winner).toEqual({
-      cloudAgentSessionId: SANDBOX_SESSION_ID,
-      kiloSessionId: KILO_SESSION_ID,
-      replayed: true,
-    });
-    expect(loser).toMatchObject({ code: 'CONFLICT', message: 'creation_in_progress' });
+    expect(outcomes).toEqual(
+      expect.arrayContaining([
+        {
+          status: 'fulfilled',
+          value: {
+            cloudAgentSessionId: SANDBOX_SESSION_ID,
+            kiloSessionId: KILO_SESSION_ID,
+            replayed: true,
+          },
+        },
+        {
+          status: 'rejected',
+          reason: expect.objectContaining({ code: 'CONFLICT', message: 'creation_in_progress' }),
+        },
+      ])
+    );
     // Exactly one retry reconciled: the ladder read the DO state once.
     expect(doStub.getMessageResult).toHaveBeenCalledTimes(1);
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();

@@ -53,6 +53,7 @@
     "connected": "An haɗa",
     "couldNotLoadModels": "An kasa loda samfura.",
     "couldNotLoadRepositories": "An kasa loda ma'ajiyoyi.",
+    "noRepositoriesFound": "Ba a sami ma'ajiyoyi ba",
     "critical": "Mai tsanani",
     "delete": "Share",
     "deleted": "An share",
@@ -87,6 +88,7 @@
     "connect": "Haɗa",
     "connectBitbucket": "Haɗa Bitbucket",
     "connectGitlab": "Haɗa GitLab",
+    "connectProvider": "Haɗa mai ba da sabis",
     "contentTruncated": "Ba a nuna duk abin da ke ciki ba",
     "copyLink": "Kwafa hanyar haɗi",
     "couldNotLoadOrganizations": "An kasa loda ƙungiyoyi.",
@@ -145,7 +147,8 @@
     "agent": "Wakili",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Canje-canje"
+    "changes": "Canje-canje",
+    "organizationTrialEnded": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Mai mallakar ƙungiyar zai iya sabunta lissafin kuɗi a kilo.ai, sannan ya sake gwadawa."
   },
   "language": {
     "restarting": "Ana sake kunnawa don amfani da harshen da aka zaɓa",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Wataƙila kana buƙatar ba da damar shiga ƙarin ƙungiyoyi ko ayyuka a GitLab.",
       "installGithubApp": "Shigar da manhajar GitHub a ma'ajiyoyi",
       "installGithubAppDescription": "Ba manhajar Kilo ta GitHub damar shiga ma'ajiyoyin da kake son a yi bitarsu.",
-      "noRepositoriesFound": "Ba a sami ma'ajiyoyi ba",
       "repositoryAccess": "damar shiga ma'ajiya"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "Nuna ƙari",
       "created": "An ƙirƙira",
       "started": "An fara",
+      "reviewEnded": "An ƙare",
+      "severityNitpick": "Ƙaramin abu",
       "tokens": "Guntayen rubutu",
       "tokensInOut": "{{input}} sun shiga / {{output}} sun fita",
       "council": "Majalisa",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "Shigar da ingantaccen URL na buƙatar haɗa canje-canje.",
       "couldNotCheckProviderStatus": "An kasa duba halin mai ba da sabis.",
       "couldNotLoadProviders": "An kasa loda masu ba da sabis da ka haɗa. Sake gwadawa.",
-      "connectProvider": "Haɗa mai ba da sabis",
       "connectProviderDescription": "Haɗa GitHub don fara bitar buƙatar haɗa canje-canje da hannu.",
       "pullRequestUrl": "URL na buƙatar haɗa canje-canje",
       "instructions": "Umarni (na zaɓi)",
@@ -1615,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Babu matatun da za a zaɓa",
-      "noFiltersDescription": "Koma ka sake buɗe matatun daga jerin matsalolin da aka gano.",
       "title": "Tace matsalolin da aka gano",
       "reset": "Mayar da saitunan farko",
       "severity": "Tsanani",
@@ -1913,11 +1914,17 @@
       "actorSystem": "Tsarin Kilo",
       "couldNotLoad": "An kasa loda rahoton bincike.",
       "events": "Abubuwan da suka faru",
+      "eventConfidence": "Amincewa: {{confidence}}",
+      "eventReason": "Dalili: {{reason}}",
+      "eventsCount_one": "{{displayCount}} abubuwan da suka faru",
+      "eventsCount_other": "{{displayCount}} abubuwan da suka faru",
       "generated": "An samar da rahoton {{generatedAt}}.",
       "noActivity": "Babu aiki da aka rubuta",
       "noActivityDescription": "Kilo ba shi da wani aikin da ya shafi matsalolin tsaro da aka gano daga {{start}} zuwa {{end}} wanda za a saka a rahoto.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Ba a rubuta ma'ajiya ba",
+      "reasonUnknown": "Dalilin da ba a gane ba",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Taƙaitaccen rahoto",
       "title": "Rahoton bincike",
       "unavailable": "Ba a iya samun rahoton bincike",
@@ -1972,6 +1979,7 @@
       "reauthorizeButton": "Sake ba manhajar GitHub izini",
       "reauthorizeDescription": "Wakilin tsaro yana buƙatar izinin karanta faɗakarwar Dependabot. Sake ba manhajar GitHub izini don ba ta wannan damar.",
       "reauthorizeTitle": "Ana buƙatar ƙarin izini",
+      "retryFailed": "Har yanzu an kasa loda Wakilin tsaro. Ka duba hanyar haɗin ka ka sake gwadawa.",
       "setupFailed": "An kasa fara saitin GitHub. Sake gwadawa."
     },
     "queuedActionUntracked": "An kasa ci gaba da bin diddigin aikin da aka saka a jerin jira. Sabunta don ganin halin da ake ciki yanzu.",
@@ -2565,7 +2573,10 @@
       "allowOnceAccessibility": "Ba da izini sau ɗaya",
       "alwaysAllow": "Ba da izini koyaushe",
       "alwaysAllowAccessibility": "Ba da izini koyaushe",
-      "retrying": "Ana sake gwadawa…"
+      "retrying": "Ana sake gwadawa…",
+      "retryDeny": "Sake gwada ƙi",
+      "retryAllowOnce": "Sake gwada ba da izini sau ɗaya",
+      "retryAlwaysAllow": "Sake gwada ba da izini koyaushe"
     },
     "questionCard": {
       "title": "Wakili yana buƙatar bayani",
@@ -2941,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "Ana sauraro...",
-    "staysOff": "Shigar da rubutu ta murya zai kasance a kashe har sai ka ba da izinin mayar da magana rubutu ta intanet.",
     "onlineTitle": "Ana sarrafa magana ta intanet",
     "onlineMessage": "Wannan na'urar ba za ta iya mayar da magana rubutu ba tare da intanet ba. Ana aika sautin da ka ɗauka zuwa {{provider}} don a mayar da shi rubutu. Kilo ba ya adana sautin.",
     "allow": "Ba da izini",
@@ -3156,7 +3166,9 @@
       "sendInvite": "Aika gayyata",
       "title": "Gayyaci memba",
       "alreadyInvited": "An riga an aika musu gayyata ko kuma sun riga zama memba.",
-      "sendError": "Ba a iya aika gayyata ba."
+      "sendError": "Ba a iya aika gayyata ba.",
+      "pendingInvitation": "Wannan adireshin imel ɗin ya riga yana da gayyata da ke jiran amsa.",
+      "alreadyMember": "Wannan mutumin ya riga ya zama memba na wannan ƙungiyar."
     },
     "invoices": {
       "downloadA11y": "Sauke takardar biyan kuɗi {{number}}",
@@ -3226,7 +3238,12 @@
       "pendingInvitations": "Gayyatar da ke jiran amsa",
       "resendInvite": "Sake aika gayyata",
       "shareInviteLink": "Raba mahaɗin gayyata",
-      "resendInviteError": "Ba a iya sake aika gayyata ba."
+      "resendInviteError": "Ba a iya sake aika gayyata ba.",
+      "inviteNotResendable": "Ba za a iya sake aika wannan gayyatar ba.",
+      "ownerAuthority": "Mai mulkin ƙungiya ne kaɗai zai iya sarrafa masu mulki.",
+      "ownRoleChange": "Ba za ka iya canza matsayin kanka ba.",
+      "inviteExpired": "Wannan gayyatar ta ƙare.",
+      "inviteAccepted": "An riga an karɓi wannan gayyatar."
     },
     "usageStats": {
       "inputTokens": "Guntayen rubutun shigarwa",

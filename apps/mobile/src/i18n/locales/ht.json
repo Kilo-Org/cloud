@@ -53,6 +53,7 @@
     "connected": "Konekte",
     "couldNotLoadModels": "Nou pa t kapab chaje modèl yo.",
     "couldNotLoadRepositories": "Nou pa t kapab chaje depo yo.",
+    "noRepositoriesFound": "Pa jwenn okenn depo",
     "critical": "Kritik",
     "delete": "Efase",
     "deleted": "Efase",
@@ -87,6 +88,7 @@
     "connect": "Konekte",
     "connectBitbucket": "Konekte Bitbucket",
     "connectGitlab": "Konekte GitLab",
+    "connectProvider": "Konekte yon founisè",
     "contentTruncated": "Kontni koupe",
     "copyLink": "Kopye lyen an",
     "couldNotLoadOrganizations": "Nou pa t kapab chaje òganizasyon yo.",
@@ -145,7 +147,8 @@
     "agent": "Ajan",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Chanjman"
+    "changes": "Chanjman",
+    "organizationTrialEnded": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Yon pwopriyetè òganizasyon ka mete ajou faktirasyon sou kilo.ai, epi eseye ankò."
   },
   "language": {
     "restarting": "Ap rekòmanse pou itilize lang ou chwazi a",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Ou ka bezwen bay aksè nan plis gwoup oswa pwojè sou GitLab.",
       "installGithubApp": "Enstale aplikasyon GitHub la sou depo yo",
       "installGithubAppDescription": "Bay aplikasyon GitHub Kilo a aksè nan depo ou vle fè revize yo.",
-      "noRepositoriesFound": "Pa jwenn okenn depo",
       "repositoryAccess": "aksè nan depo yo"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "Montre plis",
       "created": "Kreye",
       "started": "Kòmanse",
+      "reviewEnded": "Revizyon fini",
+      "severityNitpick": "Ti detay",
       "tokens": "Jeton",
       "tokensInOut": "{{input}} antre / {{output}} sòti",
       "council": "Konsèy",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "Antre yon URL valab pou demann fizyon an.",
       "couldNotCheckProviderStatus": "Nou pa t ka verifye estati founisè a.",
       "couldNotLoadProviders": "Nou pa t ka chaje founisè ou konekte yo. Tanpri eseye ankò.",
-      "connectProvider": "Konekte yon founisè",
       "connectProviderDescription": "Konekte GitHub pou kòmanse yon revizyon manyèl sou yon demann fizyon.",
       "pullRequestUrl": "URL demann fizyon an",
       "instructions": "Enstriksyon (opsyonèl)",
@@ -1615,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Pa gen filtè ki disponib",
-      "noFiltersDescription": "Retounen epi ouvri filtè yo ankò nan lis konsta yo.",
       "title": "Filtè pou konsta yo",
       "reset": "Reyinisyalize",
       "severity": "Gravite",
@@ -1913,11 +1914,17 @@
       "actorSystem": "Sistèm Kilo",
       "couldNotLoad": "Nou pa t ka chaje rapò odit la.",
       "events": "Evènman",
+      "eventConfidence": "Konfyans: {{confidence}}",
+      "eventReason": "Rezon: {{reason}}",
+      "eventsCount_one": "{{displayCount}} evènman",
+      "eventsCount_other": "{{displayCount}} evènman",
       "generated": "Rapò a pwodui {{generatedAt}}.",
       "noActivity": "Pa gen aktivite anrejistre",
       "noActivityDescription": "Kilo pa gen aktivite sou konsta sekirite pou rapòte ant {{start}} ak {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Depo pa anrejistre",
+      "reasonUnknown": "Rezon pa rekonèt",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Rezime rapò",
       "title": "Rapò odit",
       "unavailable": "Rapò odit la pa disponib",
@@ -1972,6 +1979,7 @@
       "reauthorizeButton": "Otorize aplikasyon GitHub la ankò",
       "reauthorizeDescription": "Ajan sekirite a bezwen pèmisyon pou li alèt Dependabot yo. Otorize aplikasyon GitHub la ankò pou bay pèmisyon sa a.",
       "reauthorizeTitle": "Plis pèmisyon nesesè",
+      "retryFailed": "Nou pa t ka chaje Ajan sekirite a. Tanpri verifye koneksyon ou an epi eseye ankò.",
       "setupFailed": "Nou pa t ka kòmanse konfigirasyon GitHub la. Tanpri eseye ankò."
     },
     "queuedActionUntracked": "Nou pa ka swiv yon aksyon ki te nan lis datant lan ankò. Rafrechi pou wè dènye eta a.",
@@ -2565,7 +2573,10 @@
       "allowOnceAccessibility": "Pèmèt yon sèl fwa",
       "alwaysAllow": "Toujou pèmèt",
       "alwaysAllowAccessibility": "Toujou pèmèt",
-      "retrying": "Ap eseye ankò…"
+      "retrying": "Ap eseye ankò…",
+      "retryDeny": "Eseye refize ankò",
+      "retryAllowOnce": "Eseye pèmèt yon sèl fwa ankò",
+      "retryAlwaysAllow": "Eseye toujou pèmèt ankò"
     },
     "questionCard": {
       "title": "Ajan an bezwen yon repons",
@@ -2941,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "Ap koute...",
-    "staysOff": "Dikte a ap rete dezaktive jiskaske ou pèmèt transkripsyon sou entènèt.",
     "onlineTitle": "Tretman vwa a fèt sou entènèt",
     "onlineMessage": "Aparèy sa a pa ka transkri san koneksyon entènèt. Yo voye anrejistreman ou a bay {{provider}} pou konvèti li an tèks. Kilo pa konsève odyo a.",
     "allow": "Pèmèt",
@@ -3156,7 +3166,9 @@
       "sendInvite": "Voye envitasyon an",
       "title": "Envite yon manm",
       "alreadyInvited": "Yo deja gen yon envitasyon oswa yo deja se yon manm.",
-      "sendError": "Pa t ka voye envitasyon an."
+      "sendError": "Pa t ka voye envitasyon an.",
+      "pendingInvitation": "Imel sa a deja gen yon envitasyon ki an atant.",
+      "alreadyMember": "Moun sa a deja yon manm nan òganizasyon sa a."
     },
     "invoices": {
       "downloadA11y": "Telechaje fakti {{number}}",
@@ -3226,7 +3238,12 @@
       "pendingInvitations": "Envitasyon annatant",
       "resendInvite": "Revoye envitasyon an",
       "shareInviteLink": "Pataje lyen envitasyon an",
-      "resendInviteError": "Pa t ka revoye envitasyon an."
+      "resendInviteError": "Pa t ka revoye envitasyon an.",
+      "inviteNotResendable": "Yo pa ka revoye envitasyon sa a ankò.",
+      "ownerAuthority": "Se yon pwopriyetè òganizasyon sèlman ki ka jere pwopriyetè yo.",
+      "ownRoleChange": "Ou pa ka chanje pwòp wòl ou.",
+      "inviteExpired": "Envitasyon sa a ekspire.",
+      "inviteAccepted": "Yo deja aksepte envitasyon sa a."
     },
     "usageStats": {
       "inputTokens": "Jeton antre",

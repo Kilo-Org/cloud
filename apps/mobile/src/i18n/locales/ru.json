@@ -53,6 +53,7 @@
     "connected": "Подключено",
     "couldNotLoadModels": "Не удалось загрузить модели.",
     "couldNotLoadRepositories": "Не удалось загрузить репозитории.",
+    "noRepositoriesFound": "Репозитории не найдены",
     "critical": "Критический уровень",
     "delete": "Удалить",
     "deleted": "Удалено",
@@ -87,6 +88,7 @@
     "connect": "Подключить",
     "connectBitbucket": "Подключить Bitbucket",
     "connectGitlab": "Подключить GitLab",
+    "connectProvider": "Подключение сервиса",
     "contentTruncated": "Содержимое обрезано",
     "copyLink": "Скопировать ссылку",
     "couldNotLoadOrganizations": "Не удалось загрузить организации.",
@@ -145,7 +147,8 @@
     "agent": "Агент",
     "durationMinuteShort": "мин",
     "durationHourShort": "ч",
-    "changes": "Изменения"
+    "changes": "Изменения",
+    "organizationTrialEnded": "Пробный период организации закончился, и у неё нет активного плана. Владелец организации может обновить данные об оплате на kilo.ai, после чего повторите попытку."
   },
   "language": {
     "restarting": "Перезапуск для смены языка",
@@ -889,7 +892,6 @@
       "gitlabNoRepositoriesDescription": "Возможно, нужно предоставить доступ к дополнительным группам или проектам в GitLab.",
       "installGithubApp": "Установка приложения GitHub для репозиториев",
       "installGithubAppDescription": "Предоставьте приложению Kilo для GitHub доступ к репозиториям, которые нужно проверять.",
-      "noRepositoriesFound": "Репозитории не найдены",
       "repositoryAccess": "доступ к репозиторию"
     },
     "style": {
@@ -913,7 +915,6 @@
     "followReviewMd": "Следовать инструкциям REVIEW.md",
     "followReviewMdSubtitle": "Соблюдать инструкции из файла REVIEW.md в каждом репозитории",
     "manualReview": {
-      "connectProvider": "Подключение сервиса",
       "connectProviderDescription": "Подключите GitHub, чтобы запустить проверку пул-реквеста вручную.",
       "couldNotCheckProviderStatus": "Не удалось проверить статус сервиса.",
       "couldNotLoadProviders": "Не удалось загрузить подключённые сервисы. Попробуйте снова.",
@@ -976,6 +977,8 @@
       "retryTitle": "Повторить проверку?",
       "showMore": "Показать ещё",
       "started": "Начато",
+      "reviewEnded": "Окончено",
+      "severityNitpick": "Придирка",
       "threshold": "Порог",
       "title": "Проверка",
       "tokens": "Токены",
@@ -1097,8 +1100,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Нет доступных фильтров",
-      "noFiltersDescription": "Вернитесь к списку уязвимостей и снова откройте фильтры.",
       "title": "Фильтры уязвимостей",
       "fixed": "Исправлено",
       "outcome": "Результат",
@@ -1164,12 +1165,20 @@
       "actorSystem": "Система Kilo",
       "couldNotLoad": "Не удалось загрузить отчёт аудита.",
       "events": "События",
+      "eventConfidence": "Уверенность: {{confidence}}",
+      "eventReason": "Причина: {{reason}}",
+      "eventsCount_one": "{{displayCount}} событие",
+      "eventsCount_few": "{{displayCount}} события",
+      "eventsCount_many": "{{displayCount}} событий",
+      "eventsCount_other": "{{displayCount}} события",
       "generated": "Отчёт создан: {{generatedAt}}.",
       "noActivity": "Нет зарегистрированных действий",
       "noActivityDescription": "В Kilo нет действий с уязвимостями для включения в отчёт за период с {{start}} по {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "Не удалось завершить запрос отчёта. Попробуйте снова.",
       "repositoryNotRecorded": "Данные о репозитории не сохранены",
+      "reasonUnknown": "Нераспознанная причина",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Сводка отчёта",
       "title": "Отчёт аудита",
       "unavailable": "Отчёт аудита недоступен",
@@ -1417,6 +1426,7 @@
       "reauthorizeButton": "Повторно авторизовать приложение GitHub",
       "reauthorizeDescription": "Агенту безопасности требуется разрешение на чтение оповещений Dependabot. Повторно авторизуйте приложение GitHub, чтобы предоставить это разрешение.",
       "reauthorizeTitle": "Требуются дополнительные разрешения",
+      "retryFailed": "По-прежнему не удалось загрузить агента безопасности. Проверьте подключение и попробуйте снова.",
       "setupFailed": "Не удалось начать настройку GitHub. Попробуйте снова."
     },
     "settingsOverview": {
@@ -2073,7 +2083,10 @@
       "allowOnceAccessibility": "Разрешить один раз",
       "alwaysAllow": "Всегда разрешать",
       "alwaysAllowAccessibility": "Всегда разрешать",
-      "retrying": "Повторная попытка…"
+      "retrying": "Повторная попытка…",
+      "retryDeny": "Запретить ещё раз",
+      "retryAllowOnce": "Разрешить один раз ещё раз",
+      "retryAlwaysAllow": "Всегда разрешать ещё раз"
     },
     "questionCard": {
       "title": "Агенту нужен ответ",
@@ -2466,7 +2479,6 @@
     "allow": "Разрешить",
     "onlineMessage": "Это устройство не поддерживает распознавание речи без интернета. Запись отправляется сервису {{provider}} для преобразования в текст. Kilo не хранит аудиозапись.",
     "onlineTitle": "Речь обрабатывается онлайн",
-    "staysOff": "Голосовой ввод отключён, пока вы не разрешите распознавание речи онлайн.",
     "start": "Начать голосовой ввод",
     "stop": "Остановить голосовой ввод",
     "restricted": "Голосовой ввод ограничен на этом устройстве.",
@@ -2742,7 +2754,7 @@
       "mutedUser": "Сообщения от {{login}} скрыты",
       "noDiscussion": "Обсуждений пока нет",
       "noDiscussionDescription": "В этом запросе на слияние пока нет обсуждений кода и общих комментариев.",
-      "comment_one": "1 комментарий",
+      "comment_one": "{{displayCount}} комментарий",
       "outdated": "Устарело",
       "quotedDiffSnippet": "Цитата из фрагмента изменений",
       "reactionPill": "Реакция {{emoji}}: {{displayCount}} {{countLabel}}",
@@ -3241,7 +3253,9 @@
       "sendInvite": "Отправить приглашение",
       "title": "Пригласить участника",
       "alreadyInvited": "Этот адрес уже приглашён или уже принадлежит участнику организации.",
-      "sendError": "Не удалось отправить приглашение."
+      "sendError": "Не удалось отправить приглашение.",
+      "pendingInvitation": "Для этого адреса электронной почты уже есть ожидающее приглашение.",
+      "alreadyMember": "Этот человек уже является участником этой организации."
     },
     "invoices": {
       "downloadA11y": "Скачать счёт {{number}}",
@@ -3311,7 +3325,12 @@
       "pendingInvitations": "Приглашения без ответа",
       "resendInvite": "Отправить приглашение повторно",
       "shareInviteLink": "Поделиться ссылкой для приглашения",
-      "resendInviteError": "Не удалось отправить приглашение повторно."
+      "resendInviteError": "Не удалось отправить приглашение повторно.",
+      "inviteNotResendable": "Это приглашение больше нельзя отправить повторно.",
+      "ownerAuthority": "Только владелец организации может управлять владельцами.",
+      "ownRoleChange": "Вы не можете изменить собственную роль.",
+      "inviteExpired": "Срок действия этого приглашения истёк.",
+      "inviteAccepted": "Это приглашение уже принято."
     },
     "usageStats": {
       "inputTokens": "Входные токены",

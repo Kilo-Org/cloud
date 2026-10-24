@@ -44,7 +44,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
 
 /** The Notifications screen owns the push gate the channel rows point at. */
-const NOTIFICATIONS_HREF = '/(app)/(tabs)/(3_profile)/notifications' as Href;
+const NOTIFICATIONS_HREF = '/(app)/notifications' as Href;
 
 const WINDOW_LABEL_KEYS = {
   '24': 'spendAlerts.window24h',

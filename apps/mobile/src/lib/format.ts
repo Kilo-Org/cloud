@@ -139,7 +139,7 @@ const DECIMAL_DIGIT = /\p{Nd}/u;
  * separator (the mathematical alphabets form one 50-code-point run), so a
  * digit's value is its offset from the start of its run modulo ten.
  */
-function foldDecimalDigits(value: string): string {
+export function foldDecimalDigits(value: string): string {
   return value.replaceAll(/\p{Nd}/gu, digit => {
     const codePoint = digit.codePointAt(0) ?? 0;
     let start = codePoint;

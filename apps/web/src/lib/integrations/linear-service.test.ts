@@ -1,17 +1,23 @@
+jest.mock('@/lib/slack-bot/model-allow-list', () => ({
+  getDefaultAllowedModel: jest.fn(),
+}));
+
 import { afterEach, beforeAll, beforeEach, describe, expect, test } from '@jest/globals';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { platform_integrations } from '@kilocode/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { organizations, platform_integrations } from '@kilocode/db/schema';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { User } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { PLATFORM, INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
+import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { LinearWorkspaceAlreadyConnectedError, upsertLinearInstallation } from './linear-service';
 
 describe('upsertLinearInstallation', () => {
   let user: User;
   let otherUser: User;
   const originalFetch = globalThis.fetch;
+  const createdOrganizationIds: string[] = [];
 
   beforeAll(async () => {
     user = await insertTestUser({
@@ -27,6 +33,7 @@ describe('upsertLinearInstallation', () => {
   beforeEach(() => {
     // Stub revoke endpoint so revokeLinearToken doesn't hit the network.
     globalThis.fetch = (async () => new Response(null, { status: 200 })) as typeof fetch;
+    jest.mocked(getDefaultAllowedModel).mockReset();
   });
 
   afterEach(async () => {
@@ -47,6 +54,18 @@ describe('upsertLinearInstallation', () => {
           eq(platform_integrations.owned_by_user_id, otherUser.id)
         )
       );
+    if (createdOrganizationIds.length > 0) {
+      await db
+        .delete(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.platform, PLATFORM.LINEAR),
+            inArray(platform_integrations.owned_by_organization_id, createdOrganizationIds)
+          )
+        );
+      await db.delete(organizations).where(inArray(organizations.id, createdOrganizationIds));
+      createdOrganizationIds.length = 0;
+    }
   });
 
   test('inserts a new row when no existing installation', async () => {
@@ -65,6 +84,76 @@ describe('upsertLinearInstallation', () => {
         model_slug: DEFAULT_BOT_MODEL,
       })
     );
+  });
+
+  test('stores no model when the caller supplies null for the model', async () => {
+    const result = await upsertLinearInstallation(
+      {
+        owner: { type: 'user', id: user.id },
+        organizationId: 'workspace-unsupplied-model',
+        organizationName: 'Unsupplied Model Workspace',
+        botUserId: 'bot-1',
+      },
+      { defaultModel: null }
+    );
+
+    expect(result.metadata).not.toHaveProperty('model_slug');
+  });
+
+  test('uses the supplied transaction for installation ownership and updates', async () => {
+    const rollback = new Error('Rollback test transaction');
+    await expect(
+      db.transaction(async tx => {
+        const result = await upsertLinearInstallation(
+          {
+            owner: { type: 'user', id: user.id },
+            organizationId: 'workspace-transaction',
+            organizationName: 'Transaction Workspace',
+            botUserId: 'bot-1',
+          },
+          { defaultModel: 'test/default-model' },
+          tx
+        );
+        const updated = await upsertLinearInstallation(
+          {
+            owner: { type: 'user', id: user.id },
+            organizationId: 'workspace-transaction',
+            organizationName: 'Updated Transaction Workspace',
+            botUserId: 'bot-2',
+          },
+          { defaultModel: 'test/replacement-model' },
+          tx
+        );
+        expect(updated.id).toBe(result.id);
+        expect(updated.metadata).toEqual(
+          expect.objectContaining({ model_slug: 'test/default-model', bot_user_id: 'bot-2' })
+        );
+        await expect(
+          upsertLinearInstallation(
+            {
+              owner: { type: 'user', id: otherUser.id },
+              organizationId: 'workspace-transaction',
+              organizationName: 'Transaction Workspace',
+              botUserId: 'bot-3',
+            },
+            {},
+            tx
+          )
+        ).rejects.toBeInstanceOf(LinearWorkspaceAlreadyConnectedError);
+        throw rollback;
+      })
+    ).rejects.toBe(rollback);
+
+    const integrations = await db
+      .select()
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.platform, PLATFORM.LINEAR),
+          eq(platform_integrations.owned_by_user_id, user.id)
+        )
+      );
+    expect(integrations).toEqual([]);
   });
 
   test('rejects when another owner already holds the same Linear workspace', async () => {
@@ -163,5 +252,75 @@ describe('upsertLinearInstallation', () => {
     );
 
     expect(calls).toEqual([]);
+  });
+  test('clears the lifecycle marker when the owner re-authorizes a workspace', async () => {
+    const [suspended] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: user.id,
+        platform: PLATFORM.LINEAR,
+        integration_type: 'oauth',
+        platform_installation_id: null,
+        platform_account_id: 'workspace-recover',
+        platform_account_login: 'Recovery Workspace',
+        scopes: [],
+        integration_status: INTEGRATION_STATUS.SUSPENDED,
+        suspended_at: new Date().toISOString(),
+        suspended_by: 'workspace_detach',
+      })
+      .returning();
+
+    const result = await upsertLinearInstallation({
+      owner: { type: 'user', id: user.id },
+      organizationId: 'workspace-recover',
+      organizationName: 'Recovery Workspace',
+      botUserId: 'bot-recovered',
+    });
+
+    expect(result.id).toBe(suspended.id);
+    expect(result).toMatchObject({
+      integration_status: INTEGRATION_STATUS.ACTIVE,
+      suspended_at: null,
+      suspended_by: null,
+      platform_installation_id: 'workspace-recover',
+    });
+  });
+
+  test('stores no model for an organization installation when the resolver returns no model', async () => {
+    const [organization] = await db
+      .insert(organizations)
+      .values({ name: `Linear Model Org ${crypto.randomUUID()}` })
+      .returning();
+    createdOrganizationIds.push(organization.id);
+
+    jest.mocked(getDefaultAllowedModel).mockResolvedValue(null);
+
+    const result = await upsertLinearInstallation({
+      owner: { type: 'org', id: organization.id },
+      organizationId: `workspace-org-blocked-${crypto.randomUUID()}`,
+      organizationName: 'Workspace Org',
+      botUserId: 'bot-1',
+    });
+
+    expect(result.metadata).not.toHaveProperty('model_slug');
+  });
+
+  test('stores the allowed model for an organization installation', async () => {
+    const [organization] = await db
+      .insert(organizations)
+      .values({ name: `Linear Model Org ${crypto.randomUUID()}` })
+      .returning();
+    createdOrganizationIds.push(organization.id);
+
+    jest.mocked(getDefaultAllowedModel).mockResolvedValue('test/allowed-model');
+
+    const result = await upsertLinearInstallation({
+      owner: { type: 'org', id: organization.id },
+      organizationId: `workspace-org-allowed-${crypto.randomUUID()}`,
+      organizationName: 'Workspace Org',
+      botUserId: 'bot-1',
+    });
+
+    expect(result.metadata).toMatchObject({ model_slug: 'test/allowed-model' });
   });
 });

@@ -53,6 +53,7 @@
     "connected": "مرتبط",
     "couldNotLoadModels": "تعذّر تحميل النماذج.",
     "couldNotLoadRepositories": "تعذّر تحميل المستودعات.",
+    "noRepositoriesFound": "لم يتم العثور على مستودعات",
     "critical": "حرج",
     "delete": "حذف",
     "deleted": "محذوف",
@@ -87,6 +88,7 @@
     "connect": "ربط",
     "connectBitbucket": "ربط Bitbucket",
     "connectGitlab": "ربط GitLab",
+    "connectProvider": "اربط مزوّدًا",
     "contentTruncated": "تم اقتطاع المحتوى",
     "copyLink": "نسخ الرابط",
     "couldNotLoadOrganizations": "تعذّر تحميل المؤسسات.",
@@ -145,7 +147,8 @@
     "agent": "عامل",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "التغييرات"
+    "changes": "التغييرات",
+    "organizationTrialEnded": "انتهت الفترة التجريبية للمؤسسة ولم تعد لديها خطة نشطة. يمكن لمالك المؤسسة تحديث الفوترة على kilo.ai، ثم المحاولة مرة أخرى."
   },
   "language": {
     "restarting": "جارٍ إعادة التشغيل لتطبيق اللغة",
@@ -895,7 +898,6 @@
       "gitlabNoRepositoriesDescription": "قد تحتاج إلى منح صلاحية الوصول إلى مزيد من المجموعات أو المشاريع على GitLab.",
       "installGithubApp": "ثبّت تطبيق GitHub على المستودعات",
       "installGithubAppDescription": "امنح تطبيق Kilo على GitHub صلاحية الوصول إلى المستودعات التي تريد مراجعتها.",
-      "noRepositoriesFound": "لم يتم العثور على مستودعات",
       "repositoryAccess": "الوصول إلى المستودع"
     },
     "style": {
@@ -919,7 +921,6 @@
     "followReviewMd": "اتباع تعليمات REVIEW.md",
     "followReviewMdSubtitle": "الالتزام بملفات تعليمات REVIEW.md لكل مستودع",
     "manualReview": {
-      "connectProvider": "اربط مزوّدًا",
       "connectProviderDescription": "اربط GitHub لبدء مراجعة يدوية لطلب سحب.",
       "couldNotCheckProviderStatus": "تعذّر التحقق من حالة المزوّد.",
       "couldNotLoadProviders": "تعذّر تحميل المزوّدين الذين ربطتهم بحسابك. حاول مرة أخرى.",
@@ -982,6 +983,8 @@
       "retryTitle": "إعادة المراجعة؟",
       "showMore": "عرض المزيد",
       "started": "وقت البدء",
+      "reviewEnded": "وقت الانتهاء",
+      "severityNitpick": "ملاحظة طفيفة",
       "threshold": "حد الفشل",
       "title": "مراجعة",
       "tokens": "رموز",
@@ -1103,8 +1106,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "لا توجد عوامل تصفية متاحة",
-      "noFiltersDescription": "ارجع وأعد فتح عوامل التصفية من قائمة النتائج.",
       "title": "تصفية النتائج",
       "fixed": "تم الإصلاح",
       "outcome": "النتيجة",
@@ -1170,12 +1171,22 @@
       "actorSystem": "نظام Kilo",
       "couldNotLoad": "تعذّر تحميل تقرير التدقيق.",
       "events": "الأحداث",
+      "eventConfidence": "الثقة: {{confidence}}",
+      "eventReason": "السبب: {{reason}}",
+      "eventsCount_zero": "{{displayCount}} حدث",
+      "eventsCount_one": "{{displayCount}} حدث",
+      "eventsCount_two": "{{displayCount}} حدثان",
+      "eventsCount_few": "{{displayCount}} أحداث",
+      "eventsCount_many": "{{displayCount}} حدثًا",
+      "eventsCount_other": "{{displayCount}} حدث",
       "generated": "أُنشئ التقرير في {{generatedAt}}.",
       "noActivity": "لا يوجد نشاط مسجّل",
       "noActivityDescription": "لم يسجّل Kilo نشاطًا للنتائج الأمنية يمكن تضمينه في التقرير من {{start}} إلى {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "لم يكتمل استعلام التقرير. حاول مرة أخرى.",
       "repositoryNotRecorded": "المستودع غير مسجّل",
+      "reasonUnknown": "سبب غير معروف",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "ملخص التقرير",
       "title": "تقرير التدقيق",
       "unavailable": "تقرير التدقيق غير متاح",
@@ -1429,6 +1440,7 @@
       "reauthorizeButton": "إعادة تفويض تطبيق GitHub",
       "reauthorizeDescription": "يتطلب وكيل الأمان صلاحية لقراءة تنبيهات Dependabot. أعد تفويض تطبيق GitHub لمنح هذه الصلاحية.",
       "reauthorizeTitle": "يلزم الحصول على صلاحيات إضافية",
+      "retryFailed": "لا يزال تعذّر تحميل وكيل الأمان. تحقق من اتصالك وحاول مرة أخرى.",
       "setupFailed": "تعذّر بدء إعداد GitHub. حاول مرة أخرى."
     },
     "settingsOverview": {
@@ -2105,7 +2117,10 @@
       "allowOnceAccessibility": "السماح لمرة واحدة",
       "alwaysAllow": "السماح دائمًا",
       "alwaysAllowAccessibility": "السماح دائمًا",
-      "retrying": "جارٍ إعادة المحاولة…"
+      "retrying": "جارٍ إعادة المحاولة…",
+      "retryDeny": "إعادة محاولة الرفض",
+      "retryAllowOnce": "إعادة محاولة السماح لمرة واحدة",
+      "retryAlwaysAllow": "إعادة محاولة السماح دائمًا"
     },
     "questionCard": {
       "title": "الوكيل بحاجة إلى إجابتك",
@@ -2512,7 +2527,6 @@
     "allow": "السماح",
     "onlineMessage": "لا يستطيع هذا الجهاز تحويل الكلام إلى نص دون اتصال بالإنترنت. يُرسل تسجيلك إلى {{provider}} لتحويله إلى نص. لا يخزّن Kilo التسجيل الصوتي.",
     "onlineTitle": "تتم معالجة الكلام عبر الإنترنت",
-    "staysOff": "يبقى الإدخال الصوتي معطّلًا حتى تسمح بتحويل الكلام إلى نص عبر الإنترنت.",
     "start": "بدء الإدخال الصوتي",
     "stop": "إيقاف الإدخال الصوتي",
     "restricted": "الإدخال الصوتي مقيد على هذا الجهاز.",
@@ -3327,7 +3341,9 @@
       "sendInvite": "إرسال الدعوة",
       "title": "دعوة عضو",
       "alreadyInvited": "سبق إرسال دعوة لهذا البريد الإلكتروني أو أنه يعود إلى عضو بالفعل.",
-      "sendError": "تعذّر إرسال الدعوة."
+      "sendError": "تعذّر إرسال الدعوة.",
+      "pendingInvitation": "توجد بالفعل دعوة معلّقة لهذا البريد الإلكتروني.",
+      "alreadyMember": "هذا الشخص عضو بالفعل في هذه المؤسسة."
     },
     "invoices": {
       "downloadA11y": "تنزيل الفاتورة {{number}}",
@@ -3397,7 +3413,12 @@
       "pendingInvitations": "الدعوات المعلّقة",
       "resendInvite": "إعادة إرسال الدعوة",
       "shareInviteLink": "مشاركة رابط الدعوة",
-      "resendInviteError": "تعذّر إعادة إرسال الدعوة."
+      "resendInviteError": "تعذّر إعادة إرسال الدعوة.",
+      "inviteNotResendable": "لم يعد من الممكن إعادة إرسال هذه الدعوة.",
+      "ownerAuthority": "لا يمكن إلا لمالك المؤسسة إدارة المالكين.",
+      "ownRoleChange": "لا يمكنك تغيير دورك.",
+      "inviteExpired": "انتهت صلاحية هذه الدعوة.",
+      "inviteAccepted": "تم قبول هذه الدعوة بالفعل."
     },
     "usageStats": {
       "inputTokens": "رموز الإدخال",

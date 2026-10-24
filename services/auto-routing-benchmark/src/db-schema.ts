@@ -14,7 +14,7 @@ import type {
   BenchmarkModelSummary,
   CandidatePricing,
   CustomRouterEntryRef,
-  CustomRouterScope,
+  OwnerType,
   ProductionTokenProfile,
   EffortByComplexity,
   BenchmarkProfileStatus,
@@ -491,7 +491,7 @@ export const clientProfiles = sqliteTable(
   'client_profiles',
   {
     id: text('id').primaryKey(),
-    owner_type: text('owner_type').$type<CustomRouterScope>().notNull(),
+    owner_type: text('owner_type').$type<OwnerType>().notNull(),
     owner_id: text('owner_id').notNull(),
     router: text('router').$type<AutoRouter>().notNull(),
     entry_kind: text('entry_kind').$type<CustomRouterEntryRef['kind']>().notNull(),

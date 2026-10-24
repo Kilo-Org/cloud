@@ -53,6 +53,7 @@
     "connected": "מחובר",
     "couldNotLoadModels": "לא הצלחנו לטעון את המודלים.",
     "couldNotLoadRepositories": "לא הצלחנו לטעון את המאגרים.",
+    "noRepositoriesFound": "לא נמצאו מאגרים",
     "critical": "קריטית",
     "delete": "מחיקה",
     "deleted": "נמחק",
@@ -87,6 +88,7 @@
     "connect": "חיבור",
     "connectBitbucket": "חיבור ל-Bitbucket",
     "connectGitlab": "חיבור ל-GitLab",
+    "connectProvider": "חיבור ספק",
     "contentTruncated": "התוכן קוצר",
     "copyLink": "העתקת קישור",
     "couldNotLoadOrganizations": "לא הצלחנו לטעון את הארגונים.",
@@ -145,7 +147,8 @@
     "agent": "סוֹכֵן",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "שינויים"
+    "changes": "שינויים",
+    "organizationTrialEnded": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. בעל הארגון יכול לעדכן את החיוב ב-kilo.ai, ואז לנסות שוב."
   },
   "language": {
     "restarting": "האפליקציה מופעלת מחדש לשינוי השפה",
@@ -886,7 +889,6 @@
       "gitlabNoRepositoriesDescription": "ייתכן שתצטרך להעניק גישה לעוד קבוצות או פרויקטים ב-GitLab.",
       "installGithubApp": "התקנת אפליקציית GitHub במאגרים",
       "installGithubAppDescription": "תן לאפליקציית Kilo ב-GitHub גישה למאגרים שברצונך לסקור.",
-      "noRepositoriesFound": "לא נמצאו מאגרים",
       "repositoryAccess": "גישה למאגר"
     },
     "style": {
@@ -910,7 +912,6 @@
     "followReviewMd": "פעולה לפי REVIEW.md",
     "followReviewMdSubtitle": "שימוש בהוראות שבקובץ REVIEW.md בכל מאגר",
     "manualReview": {
-      "connectProvider": "חיבור ספק",
       "connectProviderDescription": "חבר את GitHub כדי להתחיל סקירה ידנית של בקשת משיכה.",
       "couldNotCheckProviderStatus": "לא ניתן לבדוק את מצב הספק.",
       "couldNotLoadProviders": "לא ניתן לטעון את הספקים המחוברים שלך. נסה שוב.",
@@ -973,6 +974,8 @@
       "retryTitle": "להריץ את הסקירה שוב?",
       "showMore": "הצגת עוד",
       "started": "התחילה",
+      "reviewEnded": "הסתיימה",
+      "severityNitpick": "הערה",
       "threshold": "סף",
       "title": "סקירה",
       "tokens": "טוקנים",
@@ -1094,8 +1097,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "אין מסננים זמינים",
-      "noFiltersDescription": "חזור ופתח את המסננים מתוך רשימת הממצאים.",
       "title": "סינון ממצאים",
       "fixed": "תוקן",
       "outcome": "תוצאה",
@@ -1161,12 +1162,19 @@
       "actorSystem": "מערכת Kilo",
       "couldNotLoad": "לא ניתן לטעון את דוח הביקורת.",
       "events": "אירועים",
+      "eventConfidence": "רמת ביטחון: {{confidence}}",
+      "eventReason": "סיבה: {{reason}}",
+      "eventsCount_one": "{{displayCount}} אירוע",
+      "eventsCount_two": "{{displayCount}} אירועים",
+      "eventsCount_other": "{{displayCount}} אירועים",
       "generated": "מועד יצירת הדוח: {{generatedAt}}.",
       "noActivity": "אין פעילות מתועדת",
       "noActivityDescription": "אין ב-Kilo פעילות לדיווח הקשורה לממצאי אבטחה בתקופה שבין {{start}} ל-{{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "השאילתה להפקת הדוח לא הושלמה. נסה שוב.",
       "repositoryNotRecorded": "המאגר לא תועד",
+      "reasonUnknown": "סיבה לא מזוהה",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "סיכום הדוח",
       "title": "דוח ביקורת",
       "unavailable": "דוח הביקורת אינו זמין",
@@ -1411,6 +1419,7 @@
       "reauthorizeButton": "חידוש ההרשאה לאפליקציית GitHub",
       "reauthorizeDescription": "סוכן האבטחה זקוק להרשאה כדי לקרוא את התראות Dependabot. חדש את ההרשאה לאפליקציית GitHub כדי להעניק לו את ההרשאה.",
       "reauthorizeTitle": "נדרשות הרשאות נוספות",
+      "retryFailed": "עדיין לא ניתן לטעון את סוכן האבטחה. בדוק את החיבור ונסה שוב.",
       "setupFailed": "לא ניתן להתחיל את הגדרת GitHub. נסה שוב."
     },
     "settingsOverview": {
@@ -2057,7 +2066,10 @@
       "allowOnceAccessibility": "הרשאה חד-פעמית",
       "alwaysAllow": "הרשאה קבועה",
       "alwaysAllowAccessibility": "הרשאה קבועה",
-      "retrying": "מנסה שוב…"
+      "retrying": "מנסה שוב…",
+      "retryDeny": "ניסיון דחייה נוסף",
+      "retryAllowOnce": "ניסיון הרשאה חד-פעמית נוסף",
+      "retryAlwaysAllow": "ניסיון הרשאה קבועה נוסף"
     },
     "questionCard": {
       "title": "הסוכן ממתין לתשובה",
@@ -2443,7 +2455,6 @@
     "allow": "אישור",
     "onlineMessage": "המכשיר הזה לא יכול לתמלל ללא חיבור לאינטרנט. ההקלטה שלך נשלחת אל {{provider}} לצורך תמלול. Kilo לא שומר את ההקלטה.",
     "onlineTitle": "הדיבור מעובד דרך האינטרנט",
-    "staysOff": "ההכתבה תישאר כבויה עד שתאשר תמלול מקוון.",
     "start": "התחלת הכתבה",
     "stop": "עצירת הכתבה",
     "restricted": "השימוש בהכתבה מוגבל במכשיר הזה.",
@@ -3198,7 +3209,9 @@
       "sendInvite": "שליחת הזמנה",
       "title": "הזמנת חבר לארגון",
       "alreadyInvited": "כתובת זו כבר הוזמנה או שהיא שייכת לחבר קיים בארגון.",
-      "sendError": "שליחת ההזמנה נכשלה."
+      "sendError": "שליחת ההזמנה נכשלה.",
+      "pendingInvitation": "לכתובת דוא״ל זו כבר יש הזמנה ממתינה.",
+      "alreadyMember": "אדם זה כבר חבר בארגון הזה."
     },
     "invoices": {
       "downloadA11y": "הורדת חשבונית {{number}}",
@@ -3268,7 +3281,12 @@
       "pendingInvitations": "הזמנות ממתינות",
       "resendInvite": "שליחת ההזמנה מחדש",
       "shareInviteLink": "שיתוף הקישור להזמנה",
-      "resendInviteError": "שליחת ההזמנה מחדש נכשלה."
+      "resendInviteError": "שליחת ההזמנה מחדש נכשלה.",
+      "inviteNotResendable": "לא ניתן עוד לשלוח את ההזמנה הזו מחדש.",
+      "ownerAuthority": "רק בעל ארגון יכול לנהל בעלים.",
+      "ownRoleChange": "אינך יכול לשנות את התפקיד שלך.",
+      "inviteExpired": "ההזמנה הזו פגה.",
+      "inviteAccepted": "ההזמנה הזו כבר התקבלה."
     },
     "usageStats": {
       "inputTokens": "טוקני קלט",

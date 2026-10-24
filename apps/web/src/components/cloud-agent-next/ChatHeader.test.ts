@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import type { SessionCostBreakdown } from './session-cost-breakdown';
 
 jest.mock('./ShareSessionDialog', () => ({ ShareSessionDialog: () => null }));
+jest.mock('./SessionFailureHistory', () => ({ SessionFailureHistory: () => null }));
 
 jest.mock('@/components/ui/dialog', () => {
   const react = jest.requireActual<typeof React>('react');

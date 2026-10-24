@@ -136,6 +136,7 @@ export const adminWebhookTriggersRouter = createTRPCRouter({
     return {
       ...workerResult.config,
       inboundUrl,
+      canEdit: true,
     };
   }),
 

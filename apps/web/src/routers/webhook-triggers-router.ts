@@ -2,6 +2,8 @@ import { webhookBodySchema } from '@kilocode/worker-utils/webhook-body-validatio
 import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { generateCloudAgentToken } from '@kilocode/web-shared/lib/tokens';
+import { canManageOrganization } from '@kilocode/app-shared/organizations';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import { and, eq, isNull } from 'drizzle-orm';
@@ -46,6 +48,8 @@ import {
   buildInboundUrl,
   type EnrichedCapturedRequest,
 } from '@/lib/webhook-agent/webhook-agent-client';
+
+const TRIGGER_WRITE_ROLES: OrganizationRole[] = ['owner', 'admin', 'member'];
 
 // Input schemas
 const variantSchema = z
@@ -285,17 +289,34 @@ async function cleanupOrphanDbRecord(dbTriggerId: string, triggerId: string): Pr
     .where(eq(cloud_agent_webhook_triggers.id, dbTriggerId));
 }
 
-function assertCanActAsExecutionUser(
+function assertCanRunAsExecutionUser(
   executionUserId: string | null | undefined,
-  userId: string,
-  action: 'update' | 'run'
+  userId: string
 ): void {
   if (executionUserId && executionUserId !== userId) {
     throw new TRPCError({
       code: 'FORBIDDEN',
-      message: `Only the creator can ${action} a trigger that runs as its creator`,
+      message: 'Only the creator can run a trigger that runs as its creator',
     });
   }
+}
+
+function assertCanEditExecutionUserTrigger(
+  executionUserId: string | null | undefined,
+  userId: string,
+  actorRole: OrganizationRole | undefined
+): void {
+  if (!executionUserId || executionUserId === userId) {
+    return;
+  }
+  if (actorRole && canManageOrganization(actorRole)) {
+    return;
+  }
+  throw new TRPCError({
+    code: 'FORBIDDEN',
+    message:
+      'Only the creator, an organization owner, or an admin can edit a trigger that runs as its creator',
+  });
 }
 
 async function getOrganizationTriggerExecutionUserId(
@@ -524,9 +545,9 @@ export const webhookTriggersRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const userId = ctx.user.id;
 
-      // Verify org membership if organizationId provided
+      let actorRole: OrganizationRole | undefined;
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        actorRole = await ensureOrganizationAccess(ctx, input.organizationId);
       }
 
       // Verify ownership via PostgreSQL
@@ -567,9 +588,17 @@ export const webhookTriggersRouter = createTRPCRouter({
         input.triggerId
       );
 
+      const executionUserId = workerResult.config.executionUserId ?? null;
+      const canEdit =
+        !input.organizationId ||
+        (actorRole !== undefined &&
+          TRIGGER_WRITE_ROLES.includes(actorRole) &&
+          (!executionUserId || executionUserId === userId || canManageOrganization(actorRole)));
+
       return {
         ...workerResult.config,
         inboundUrl,
+        canEdit,
       };
     }),
 
@@ -583,7 +612,7 @@ export const webhookTriggersRouter = createTRPCRouter({
 
     // Verify org membership if organizationId provided
     if (input.organizationId) {
-      await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'member']);
+      await ensureOrganizationAccess(ctx, input.organizationId, TRIGGER_WRITE_ROLES);
     }
 
     if (input.runAsCreator && input.organizationId) {
@@ -776,9 +805,9 @@ export const webhookTriggersRouter = createTRPCRouter({
   update: baseProcedure.input(WebhookTriggerUpdateInput).mutation(async ({ ctx, input }) => {
     const userId = ctx.user.id;
 
-    // Verify org membership if organizationId provided
+    let actorRole: OrganizationRole | undefined;
     if (input.organizationId) {
-      await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'member']);
+      actorRole = await ensureOrganizationAccess(ctx, input.organizationId, TRIGGER_WRITE_ROLES);
     }
 
     // Verify ownership via PostgreSQL
@@ -791,7 +820,7 @@ export const webhookTriggersRouter = createTRPCRouter({
         input.triggerId,
         dbTrigger.id
       );
-      assertCanActAsExecutionUser(executionUserId, userId, 'update');
+      assertCanEditExecutionUserTrigger(executionUserId, userId, actorRole);
       if (executionUserId && input.webhookAuth?.secret) {
         assertCreatorWebhookSecretStrength(input.webhookAuth.secret);
       }
@@ -931,7 +960,7 @@ export const webhookTriggersRouter = createTRPCRouter({
     const userId = ctx.user.id;
 
     if (input.organizationId) {
-      await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'member']);
+      await ensureOrganizationAccess(ctx, input.organizationId, TRIGGER_WRITE_ROLES);
     }
 
     const dbTrigger = await assertTriggerOwnership(userId, input.triggerId, input.organizationId);
@@ -942,7 +971,7 @@ export const webhookTriggersRouter = createTRPCRouter({
         input.triggerId,
         dbTrigger.id
       );
-      assertCanActAsExecutionUser(executionUserId, userId, 'run');
+      assertCanRunAsExecutionUser(executionUserId, userId);
     }
 
     const result = await invokeWorkerScheduledTrigger(
@@ -989,7 +1018,7 @@ export const webhookTriggersRouter = createTRPCRouter({
 
       // Verify org membership if organizationId provided
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'member']);
+        await ensureOrganizationAccess(ctx, input.organizationId, TRIGGER_WRITE_ROLES);
       }
 
       // Verify ownership via PostgreSQL

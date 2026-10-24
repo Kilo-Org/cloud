@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Engar síur tiltækar",
-      "noFiltersDescription": "Farðu til baka og opnaðu síurnar aftur úr frávikalistanum.",
       "title": "Sía frávik",
       "reset": "Endurstilla",
       "severity": "Alvarleiki",
@@ -2954,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "Hlusta…",
-    "staysOff": "Raddinnsláttur er óvirkur þar til þú leyfir umritun á netinu.",
     "onlineTitle": "Tal er unnið á netinu",
     "onlineMessage": "Þetta tæki getur ekki umritað án nettengingar. Upptakan þín er send til {{provider}} til að breyta henni í texta. Kilo geymir ekki hljóðið.",
     "allow": "Leyfa",

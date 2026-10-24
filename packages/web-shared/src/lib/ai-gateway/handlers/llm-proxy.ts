@@ -822,6 +822,7 @@ export async function handleLlmProxyRequest(
 
   const isNonTrialEnterprise = await resolveIsNonTrialEnterprise();
   const ignoredProviders = getIgnoredProviders(effectiveModelIdLowerCased, isNonTrialEnterprise);
+  const requestCostLimit = request.headers.get('x-kilo-max-cost-microdollars');
 
   const providerResult = await getProvider({
     requestedModel: effectiveModelIdLowerCased,
@@ -829,6 +830,7 @@ export async function handleLlmProxyRequest(
     user,
     organizationId,
     botId,
+    boundedSpending: requestCostLimit !== null,
     getRoutingProviderConfig: async () =>
       withIgnoredProviders(
         (await accessCheckResolver.getRoutingProviderConfig?.()) ?? requestBodyParsed.body.provider,
@@ -1014,7 +1016,6 @@ export async function handleLlmProxyRequest(
   const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
   if (bouncerRejection) return bouncerRejection;
   if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
-  const requestCostLimit = request.headers.get('x-kilo-max-cost-microdollars');
   const requestCostBalance = requestCostLimit !== null ? await balanceAndSettingsPromise : null;
 
   const attempt = await sendUpstreamAttempt({

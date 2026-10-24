@@ -1640,8 +1640,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Nema dostupnih filtera",
-      "noFiltersDescription": "Vrati se i ponovo otvori filtere sa liste nalaza.",
       "title": "Filtriranje nalaza",
       "reset": "Poništi",
       "severity": "Ozbiljnost",
@@ -2997,7 +2995,6 @@
   },
   "voiceInput": {
     "listening": "Slušam…",
-    "staysOff": "Glasovni unos ostaje isključen dok ne dozvoliš pretvaranje govora u tekst preko interneta.",
     "onlineTitle": "Govor se obrađuje preko interneta",
     "onlineMessage": "Ovaj uređaj ne može da pretvori govor u tekst bez interneta. Tvoj snimak se šalje servisu {{provider}} radi pretvaranja u tekst. Kilo ne čuva zvučni snimak.",
     "allow": "Dozvoli",

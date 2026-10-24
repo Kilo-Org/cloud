@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Calaltuun hin jiru",
-      "noFiltersDescription": "Duubatti deebi'ii tarree argamootaa irraa calaltuu irra deebi'ii bani.",
       "title": "Argamoota calaluu",
       "reset": "Gara duraaniitti deebisi",
       "severity": "Cimina",
@@ -2954,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "Dhaggeeffachaa jira...",
-    "staysOff": "Hanga sagalee intarneetiin gara barreeffamaatti jijjiiruu hayyamtutti, sagaleen galchuun cufamee tura.",
     "onlineTitle": "Haasaan intarneetiin qindaa'a",
     "onlineMessage": "Meeshaan kun intarneetii malee sagalee gara barreeffamaatti jijjiiruu hin danda'u. Waraabbiin kee gara barreeffamaatti jijjiiramuuf gara {{provider}} ergama. Kilo sagalee hin kuusu.",
     "allow": "Hayyami",

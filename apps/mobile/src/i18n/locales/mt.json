@@ -1684,8 +1684,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "L-ebda filtru disponibbli",
-      "noFiltersDescription": "Mur lura u erġa' iftaħ il-filtri mil-lista tas-sejbiet.",
       "title": "Filtri tas-sejbiet",
       "reset": "Irrisettja l-filtri",
       "severity": "Severità",
@@ -3083,7 +3081,6 @@
   },
   "voiceInput": {
     "listening": "Qed nisimgħu…",
-    "staysOff": "Id-dħul bil-vuċi jibqa' diżattivat sakemm tippermetti t-traskrizzjoni onlajn.",
     "onlineTitle": "Id-diskors jiġi pproċessat onlajn",
     "onlineMessage": "Dan l-apparat ma jistax jittraskrivi offlajn. Ir-reġistrazzjoni tiegħek tintbagħat lil {{provider}} biex tinbidel f'test. Kilo ma jaħżinx l-awdjo.",
     "allow": "Ippermetti",

@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Hakuna vichujio vinavyopatikana",
-      "noFiltersDescription": "Rudi nyuma kisha ufungue tena vichujio kutoka kwenye orodha ya matatizo.",
       "title": "Chuja matatizo",
       "reset": "Weka upya",
       "severity": "Ukali",
@@ -2954,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "Inasikiliza...",
-    "staysOff": "Uingizaji kwa sauti utaendelea kuzimwa hadi uruhusu ubadilishaji wa sauti kuwa maandishi mtandaoni.",
     "onlineTitle": "Sauti huchakatwa mtandaoni",
     "onlineMessage": "Kifaa hiki hakiwezi kubadilisha sauti kuwa maandishi bila mtandao. Rekodi yako inatumwa kwa {{provider}} ili ibadilishwe kuwa maandishi. Kilo haihifadhi sauti.",
     "allow": "Ruhusu",

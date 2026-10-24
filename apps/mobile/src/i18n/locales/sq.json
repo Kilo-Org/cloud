@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Nuk ka filtra të disponueshëm",
-      "noFiltersDescription": "Kthehu dhe rihapi filtrat nga lista e gjetjeve.",
       "title": "Filtrimi i gjetjeve",
       "reset": "Rivendos",
       "severity": "Niveli i rrezikut",
@@ -2954,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "Po dëgjon...",
-    "staysOff": "Diktimi mbetet i çaktivizuar derisa të lejosh transkriptimin në internet.",
     "onlineTitle": "Të folurit përpunohet në internet",
     "onlineMessage": "Kjo pajisje nuk mund të transkriptojë pa internet. Regjistrimi yt dërgohet te {{provider}} për t'u kthyer në tekst. Kilo nuk e ruan audion.",
     "allow": "Lejo",

@@ -1065,8 +1065,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Nessun filtro disponibile",
-      "noFiltersDescription": "Torna indietro e riapri i filtri dall'elenco delle segnalazioni.",
       "title": "Filtri delle segnalazioni",
       "fixed": "Risolto",
       "outcome": "Esito",
@@ -2457,7 +2455,6 @@
     "allow": "Consenti",
     "onlineMessage": "Questo dispositivo non può trascrivere offline. La tua registrazione viene inviata a {{provider}} per convertirla in testo. Kilo non archivia l'audio.",
     "onlineTitle": "La voce viene elaborata online",
-    "staysOff": "La dettatura resta disattivata finché non consenti la trascrizione online.",
     "start": "Avvia la dettatura",
     "stop": "Interrompi la dettatura",
     "restricted": "La dettatura è soggetta a restrizioni su questo dispositivo.",

@@ -1618,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Filtrlar mavjud emas",
-      "noFiltersDescription": "Orqaga qayting va muammolar ro'yxatidan filtrlarni qayta oching.",
       "title": "Muammolarni filtrlash",
       "reset": "Asliga qaytarish",
       "severity": "Xavf darajasi",
@@ -2954,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "Tinglanmoqda...",
-    "staysOff": "Nutqni onlayn matnga aylantirishga ruxsat bermaguningizcha ovozli kiritish o'chiq qoladi.",
     "onlineTitle": "Nutq onlayn qayta ishlanadi",
     "onlineMessage": "Bu qurilma nutqni oflayn matnga aylantira olmaydi. Ovoz yozuvingiz matnga aylantirish uchun {{provider}} xizmatiga yuboriladi. Kilo ovoz yozuvini saqlamaydi.",
     "allow": "Ruxsat berish",

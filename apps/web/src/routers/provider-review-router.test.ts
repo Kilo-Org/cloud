@@ -18,6 +18,7 @@ import {
   BITBUCKET_PR_REVIEW_CAPABILITIES,
 } from '@/lib/provider-review/bitbucket-write';
 import { GITLAB_MR_REVIEW_CAPABILITIES } from '@/lib/provider-review/gitlab-write';
+import { createSignedToken } from '@/lib/signed-token';
 import { providerLedgerResourceKey, providerReviewRouter } from './provider-review-router';
 
 const ORG_ID = '2b1d4c8e-9f3a-4e5d-8c7b-6a5948372615';
@@ -275,6 +276,33 @@ describe('providerReviewRouter inputs', () => {
       7,
       'c1',
       undefined
+    );
+  });
+  it('round-trips a maximum-size signed inbox cursor through the router', async () => {
+    const base = {
+      kind: 'bitbucket-inbox-cursor',
+      identity: 'bitbucket-inbox:acme',
+      boundary: '2026-09-02T00:00:00.000000+00:00',
+      served: [],
+      pages: [],
+    };
+    let cursor = createSignedToken({ ...base, padding: '' });
+    for (let length = 0; length < 2048; length += 1) {
+      const candidate = createSignedToken({ ...base, padding: 'x'.repeat(length) });
+      if (candidate.length > 2048) break;
+      cursor = candidate;
+    }
+    expect(cursor.length).toBeLessThanOrEqual(2048);
+    bitbucketRead.listInbox.mockResolvedValueOnce({ items: [], nextCursor: cursor });
+    await caller.listInbox({ platform: 'bitbucket', organizationId: ORG_ID });
+    bitbucketRead.listInbox.mockResolvedValueOnce({ items: [], nextCursor: null });
+
+    await caller.listInbox({ platform: 'bitbucket', organizationId: ORG_ID, cursor });
+    expect(cursor.length).toBeGreaterThan(2000);
+
+    expect(bitbucketRead.listInbox).toHaveBeenLastCalledWith(
+      { type: 'organization', organizationId: ORG_ID, userId: USER_ID },
+      cursor
     );
   });
 });

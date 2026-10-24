@@ -30,6 +30,11 @@ permissions:
 
 jobs:
   promote:
+    # Guard: this reusable workflow promotes a Vercel deployment to production
+    # using repo secrets. It is only ever called by guarded caller jobs, but
+    # the guard is also applied here so the workflow cannot run outside the
+    # canonical repo even if a caller skips its own guard.
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: production

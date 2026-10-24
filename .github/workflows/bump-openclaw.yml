@@ -10,6 +10,11 @@ permissions:
 
 jobs:
   check:
+    # Guard: this workflow acts on shared state (the OpenClaw release webhook,
+    # which edits the KiloClaw Dockerfile and opens a bump PR) and only makes
+    # sense for the canonical repo. A fork with Actions enabled would otherwise
+    # attempt the same job and fail on missing repo secrets/vars.
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     steps:

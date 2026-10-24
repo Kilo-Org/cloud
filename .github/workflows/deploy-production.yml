@@ -20,13 +20,18 @@ env:
 
 jobs:
   check-changes:
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/check-deployment-changes.yml
     with:
       workflow_file: deploy-production.yml
 
   check-production-db-startup:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: `schedule` and `workflow_dispatch` are reachable from a fork, so
+    # this is a real fork block. It is applied to every job so the workflow
+    # cannot run outside the canonical repo under any path.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: production
@@ -59,7 +64,8 @@ jobs:
 
   run-migrations:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: production
@@ -92,7 +98,8 @@ jobs:
 
   stage-app:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
@@ -103,7 +110,8 @@ jobs:
 
   stage-ai-gateway:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
@@ -114,6 +122,7 @@ jobs:
 
   promote-app:
     needs: [stage-app, check-production-db-startup, run-migrations]
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-app.outputs.deployment_url }}
@@ -124,6 +133,8 @@ jobs:
 
   promote-ai-gateway:
     needs: [stage-ai-gateway, check-production-db-startup, run-migrations]
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-ai-gateway.outputs.deployment_url }}
@@ -149,6 +160,7 @@ jobs:
       ]
     if: >-
       ${{
+        github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
         needs.check-changes.outputs.should_deploy == 'true' &&
         needs.check-production-db-startup.result == 'success' &&
@@ -168,7 +180,7 @@ jobs:
   # successful worker deploy and releases only when the kilo-mcp bundle changed.
   kilo-mcp-release:
     needs: [check-changes, deploy-workers]
-    if: ${{ !cancelled() && needs.deploy-workers.result == 'success' }}
+    if: ${{ github.repository == 'Kilo-Org/cloud' && !cancelled() && needs.deploy-workers.result == 'success' }}
     # Ceiling for the reusable workflow's GITHUB_TOKEN (a called workflow cannot
     # exceed the caller).
     permissions:
@@ -182,7 +194,8 @@ jobs:
 
   detect-gastown-wasteland-changes:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
@@ -255,6 +268,7 @@ jobs:
       ]
     if: >-
       ${{
+        github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
         needs.check-changes.outputs.should_deploy == 'true' &&
         needs.check-production-db-startup.result == 'success' &&
@@ -332,6 +346,7 @@ jobs:
       ]
     if: >-
       ${{
+        github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
         needs.check-changes.outputs.should_deploy == 'true' &&
         needs.check-production-db-startup.result == 'success' &&

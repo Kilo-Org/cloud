@@ -12,9 +12,10 @@ import {
   type BlockingCardSubmissionError,
   formatBlockingCardTitle,
   getBlockingCardPresentationForKind,
+  type PermissionResponse,
 } from '@/components/agents/blocking-card-state';
 import { permissionToolLabel } from '@/components/agents/permission-tool-label';
-import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
+import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -80,7 +81,7 @@ export function PermissionCard({
     () =>
       applyBlockingCardAppearance(presentationRef.current, titleRef, {
         announce: announceForA11y,
-        focus: moveA11yFocus,
+        focus: requestA11yFocus,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only announce/focus on a new request
     [requestId]
@@ -101,6 +102,22 @@ export function PermissionCard({
   // Skill-shell batches accept only once/reject (CLI/TUI show no persist option);
   // never offer Always Allow for them.
   const isSkillShell = metadata?.skillShell === true;
+
+  // The retry CTA re-sends the decision that failed, so its label names that
+  // decision from the catalog. Without a recorded decision there is no retry
+  // CTA and no label.
+  const retryPermissionResponse = presentation.retryPermissionResponse;
+  const retryLabel = retryPermissionResponse ? retryLabelFor(retryPermissionResponse) : null;
+
+  function retryLabelFor(response: PermissionResponse): string {
+    if (response === 'reject') {
+      return t('agentChat.permissionCard.retryDeny');
+    }
+    if (response === 'always') {
+      return t('agentChat.permissionCard.retryAlwaysAllow');
+    }
+    return t('agentChat.permissionCard.retryAllowOnce');
+  }
 
   // Only the command is display copy. Other metadata entries are control flags
   // or machine payloads and must not reach the card as raw key/value rows.
@@ -223,22 +240,22 @@ export function PermissionCard({
               ) : null}
             </>
           ) : null}
-          {presentation.hasRetryCta ? (
+          {presentation.hasRetryCta && retryPermissionResponse && retryLabel ? (
             <Button
               size="sm"
               className="flex-1"
               onPress={() => {
-                handleRespond(activeResponse ?? 'once');
+                handleRespond(retryPermissionResponse);
               }}
               disabled={isSubmitting || isInert}
               accessibilityRole="button"
-              accessibilityLabel={t('common.retry')}
+              accessibilityLabel={retryLabel}
             >
               {isSubmitting ? (
                 <ActivityIndicator size="small" color={colors.primaryForeground} />
               ) : null}
               <Text className={cn('text-xs text-primary-foreground', isSubmitting && 'ml-2')}>
-                {isSubmitting ? t('agentChat.permissionCard.retrying') : t('common.retry')}
+                {isSubmitting ? t('agentChat.permissionCard.retrying') : retryLabel}
               </Text>
             </Button>
           ) : null}

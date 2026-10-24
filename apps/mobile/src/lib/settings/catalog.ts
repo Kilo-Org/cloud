@@ -94,7 +94,8 @@ const BOOLEAN_TOGGLES: readonly BooleanToggle[] = [
   },
   {
     name: 'autoExpandThinking',
-    description: 'Expand thinking rows by default in new messages.',
+    description:
+      'Expand thinking rows by default in new messages. No effect while hideThinking is on.',
     read: getAutoExpandThinking,
     write: setAutoExpandThinking,
   },

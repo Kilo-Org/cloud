@@ -10,24 +10,22 @@ COPY --from=node-runtime /usr/local/lib/node_modules /usr/local/lib/node_modules
 # Build arguments for metadata (all optional with defaults)
 ARG BUILD_DATE=""
 ARG VCS_REF=""
-ARG KILOCODE_CLI_VERSION="7.8.1"
-ARG BUN_VERSION="1.3.14"
+ARG KILOCODE_CLI_VERSION="7.8.17"
+ARG BUN_VERSION="1.4.4"
 ARG PNPM_VERSION="12.14.0"
 ARG GLAB_VERSION="1.124.0"
 ARG GH_VERSION="2.102.0"
 
-# Install latest stable git + git-lfs from the git-core PPA, GitHub CLI, and supporting tools.
-# The default Ubuntu git (2.34.1 on 22.04) is outdated; the git-core PPA ships the latest
-# stable release. git-lfs is installed from the same PPA so it stays in lockstep with git,
-# and `git lfs install --system` enables LFS smudge/clean filters globally.
 RUN set -eux; \
 	apt-get update; \
 	apt-get install -y --no-install-recommends \
 		ca-certificates \
-		gnupg \
-		software-properties-common \
 		wget; \
-	add-apt-repository -y ppa:git-core/ppa; \
+	wget -nv -O /usr/share/keyrings/git-core-ppa.asc \
+		"https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xF911AB184317630C59970973E363C90F8F1B6217"; \
+	. /etc/os-release; \
+	printf 'deb [signed-by=/usr/share/keyrings/git-core-ppa.asc] https://ppa.launchpadcontent.net/git-core/ppa/ubuntu %s main\n' \
+		"$VERSION_CODENAME" > /etc/apt/sources.list.d/git-core-ppa.list; \
 	apt-get update; \
 	apt-get install -y --no-install-recommends \
 		git \

@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { i18n } from '@/i18n';
 import { parseLocalizedNumber } from '@/lib/format';
+import { knownServerErrorMessage } from '@/lib/server-error-copy';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /**
@@ -60,12 +61,18 @@ export type SaveErrorCopy = Readonly<{
 /**
  * A save rejected by the input schema is a recipient problem (the form
  * validators already cover the threshold), so it belongs on the recipient
- * field. Every other failure — transport, server error — gets the form-level
- * line next to Save. The raw server message never reaches the UI: a schema
- * rejection carries a JSON array of zod issues, not a sentence.
+ * field. A rejection the app can explain — a lapsed organization plan — names
+ * itself on the form line. Every other failure, transport or server error,
+ * gets the form-level line next to Save. The raw server message never reaches
+ * the UI: a schema rejection carries a JSON array of zod issues, not a
+ * sentence.
  */
 export function saveErrorCopy(error: unknown): SaveErrorCopy {
-  return readTrpcErrorField(error, 'code') === 'BAD_REQUEST'
-    ? { field: 'emails', message: i18n.t('organization.lowBalanceAlert.saveEmailsError') }
-    : { field: 'form', message: i18n.t('organization.lowBalanceAlert.saveError') };
+  if (readTrpcErrorField(error, 'code') === 'BAD_REQUEST') {
+    return { field: 'emails', message: i18n.t('organization.lowBalanceAlert.saveEmailsError') };
+  }
+  return {
+    field: 'form',
+    message: knownServerErrorMessage(error) ?? i18n.t('organization.lowBalanceAlert.saveError'),
+  };
 }

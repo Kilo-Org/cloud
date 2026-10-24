@@ -37,9 +37,10 @@ type Props = {
   profileId: string;
   organizationId: string | undefined;
   mcpServers: ProfileMcpServer[];
+  readOnly?: boolean;
 };
 
-export function McpServersTab({ profileId, organizationId, mcpServers }: Props) {
+export function McpServersTab({ profileId, organizationId, mcpServers, readOnly = false }: Props) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -66,6 +67,7 @@ export function McpServersTab({ profileId, organizationId, mcpServers }: Props) 
             server={server}
             profileId={profileId}
             organizationId={organizationId}
+            readOnly={readOnly}
             onEdit={() => {
               setEditingId(server.id);
               setIsAdding(false);
@@ -82,17 +84,19 @@ export function McpServersTab({ profileId, organizationId, mcpServers }: Props) 
           onDone={() => setIsAdding(false)}
         />
       ) : (
-        <Button
-          variant="outline"
-          className="h-11 w-full border-dashed"
-          onClick={() => {
-            setIsAdding(true);
-            setEditingId(null);
-          }}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add MCP server
-        </Button>
+        !readOnly && (
+          <Button
+            variant="outline"
+            className="h-11 w-full border-dashed"
+            onClick={() => {
+              setIsAdding(true);
+              setEditingId(null);
+            }}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add MCP server
+          </Button>
+        )
       )}
 
       {mcpServers.length === 0 && !isAdding && (
@@ -106,11 +110,13 @@ function McpServerRow({
   server,
   profileId,
   organizationId,
+  readOnly = false,
   onEdit,
 }: {
   server: ProfileMcpServer;
   profileId: string;
   organizationId: string | undefined;
+  readOnly?: boolean;
   onEdit: () => void;
 }) {
   const { deleteMcp } = useProfileMutations({ organizationId });
@@ -153,35 +159,39 @@ function McpServerRow({
           <p className="text-muted-foreground mt-0.5 truncate font-mono text-xs">{summary}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7"
-            onClick={onEdit}
-            disabled={deleting}
-            aria-label="Edit MCP server"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
-          <InlineDeleteConfirmation
-            onDelete={async () => {
-              setDeleting(true);
-              try {
-                await deleteMcp.mutateAsync({
-                  profileId,
-                  organizationId,
-                  mcpServerId: server.id,
-                });
-                toast.success(`MCP server "${server.name}" deleted`);
-              } catch (error) {
-                console.error('Failed to delete MCP server:', error);
-                toast.error('Failed to delete MCP server');
-              } finally {
-                setDeleting(false);
-              }
-            }}
-            isLoading={deleting}
-          />
+          {!readOnly && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7"
+                onClick={onEdit}
+                disabled={deleting}
+                aria-label="Edit MCP server"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+              <InlineDeleteConfirmation
+                onDelete={async () => {
+                  setDeleting(true);
+                  try {
+                    await deleteMcp.mutateAsync({
+                      profileId,
+                      organizationId,
+                      mcpServerId: server.id,
+                    });
+                    toast.success(`MCP server "${server.name}" deleted`);
+                  } catch (error) {
+                    console.error('Failed to delete MCP server:', error);
+                    toast.error('Failed to delete MCP server');
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+                isLoading={deleting}
+              />
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -282,6 +292,15 @@ function McpForm(props: McpFormProps) {
   /** Only populated when the user attempts to save with invalid JSON; cleared on edit. */
   const [jsonError, setJsonError] = useState<string | null>(null);
 
+  // The form shows the command as one string, so joining and re-splitting it
+  // can change an argument that contains whitespace. Keep the stored array and
+  // only rebuild it once the text differs from the one the form was seeded
+  // with, so an untouched command stays byte-identical for the destination
+  // check on the server.
+  const originalCommand =
+    mode === 'edit' && 'command' in props.initial.config ? props.initial.config.command : undefined;
+  const originalCommandText = originalCommand?.join(' ');
+
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm(prev => ({ ...prev, [key]: value }));
 
@@ -300,10 +319,13 @@ function McpForm(props: McpFormProps) {
     setSaving(true);
     try {
       if (form.type === 'local') {
-        const parts = form.commandText
-          .split(/\s+/)
-          .map(p => p.trim())
-          .filter(Boolean);
+        const parts =
+          originalCommand !== undefined && form.commandText.trim() === originalCommandText?.trim()
+            ? originalCommand
+            : form.commandText
+                .split(/\s+/)
+                .map(p => p.trim())
+                .filter(Boolean);
         if (parts.length === 0) {
           toast.error('Command is required');
           return;

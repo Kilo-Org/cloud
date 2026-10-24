@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/empty-state';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
 export type QueryErrorVariant = 'neutral' | 'offline' | 'permission' | 'not-found' | 'server';
 
@@ -107,6 +108,7 @@ export function QueryError({
         action ??
         (onRetry && (
           <Button
+            className={STATE_ACTION_CLASS}
             variant="outline"
             onPress={onRetry}
             loading={isRetrying}

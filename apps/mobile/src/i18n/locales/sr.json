@@ -3779,6 +3779,7 @@
     "title": "Profili",
     "entrySubtitle": "Ponovo koristite podešavanja okruženja u svim sesijama",
     "newProfile": "Novi profil",
+    "openHint": "Otvara profil",
     "emptyTitle": "Još nema profila",
     "emptyDescription": "Napravite profil da biste ponovo koristili promenljive okruženja, komande za podešavanje i veštine u svim sesijama.",
     "loadFailed": "Učitavanje profila nije uspelo",

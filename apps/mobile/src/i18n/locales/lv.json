@@ -3779,6 +3779,7 @@
     "title": "Profili",
     "entrySubtitle": "Atkārtoti izmantojiet vides iestatījumus sesijās",
     "newProfile": "Jauns profils",
+    "openHint": "Atver profilu",
     "emptyTitle": "Vēl nav neviena profila",
     "emptyDescription": "Izveidojiet profilu, lai sesijās atkārtoti izmantotu vides mainīgos, iestatīšanas komandas un prasmes.",
     "loadFailed": "Nevarēja ielādēt profilus",

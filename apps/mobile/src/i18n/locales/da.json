@@ -3733,6 +3733,7 @@
     "title": "Profiler",
     "entrySubtitle": "Genbrug miljøindstillinger på tværs af sessioner",
     "newProfile": "Ny profil",
+    "openHint": "Åbner profilen",
     "emptyTitle": "Ingen profiler endnu",
     "emptyDescription": "Opret en profil for at genbruge miljøvariabler, opsætningskommandoer og færdigheder på tværs af sessioner.",
     "loadFailed": "Kunne ikke indlæse profiler",

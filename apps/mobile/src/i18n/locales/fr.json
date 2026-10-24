@@ -3779,6 +3779,7 @@
     "title": "Profils",
     "entrySubtitle": "Réutiliser les paramètres d'environnement d'une session à l'autre",
     "newProfile": "Nouveau profil",
+    "openHint": "Ouvre le profil",
     "emptyTitle": "Aucun profil pour l'instant",
     "emptyDescription": "Créez un profil pour réutiliser les variables d'environnement, les commandes de configuration et les compétences au fil des sessions.",
     "loadFailed": "Impossible de charger les profils",

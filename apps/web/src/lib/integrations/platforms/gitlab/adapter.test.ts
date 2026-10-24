@@ -910,6 +910,7 @@ describe('revokeProjectAccessToken', () => {
       name: 'GitLabProjectAccessTokenRevocationError',
       projectId: 42,
       status: 503,
+      message: 'GitLab revoke Project Access Token failed: 503',
     });
   });
 

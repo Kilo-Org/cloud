@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { TRPCClientError } from '@trpc/client';
 
+import {
+  CloudAgentBillingError,
+  InsufficientCreditsError,
+} from '@/lib/cloud-agent-next/cloud-agent-client';
 import { releaseRefusedSend, workerRefusalStatus } from './release-refused-send';
 
 const mockRelease = jest.fn(
@@ -45,6 +49,44 @@ describe('releaseRefusedSend', () => {
     );
 
     expect(mockRelease).not.toHaveBeenCalled();
+  });
+
+  it('returns the rows when the client rewrote a credits refusal', async () => {
+    await releaseRefusedSend(
+      {
+        attachments,
+        error: new InsufficientCreditsError(),
+        kiloUserId: 'user-1',
+        linkedObjectKeys,
+      },
+      dependencies
+    );
+
+    expect(mockRelease).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns the rows for a billing refusal but keeps them for a billing outage', async () => {
+    await releaseRefusedSend(
+      {
+        attachments,
+        error: new CloudAgentBillingError({ kind: 'billing' } as never, 402),
+        kiloUserId: 'user-1',
+        linkedObjectKeys,
+      },
+      dependencies
+    );
+    expect(mockRelease).toHaveBeenCalledTimes(1);
+
+    await releaseRefusedSend(
+      {
+        attachments,
+        error: new CloudAgentBillingError({ kind: 'billing' } as never, 503),
+        kiloUserId: 'user-1',
+        linkedObjectKeys,
+      },
+      dependencies
+    );
+    expect(mockRelease).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the rows when the send failed without a worker answer', async () => {
@@ -102,6 +144,10 @@ describe('releaseRefusedSend', () => {
 describe('workerRefusalStatus', () => {
   it('reads the status the worker answered with, and nothing else', () => {
     expect(workerRefusalStatus(refusal(400))).toBe(400);
+    expect(workerRefusalStatus(new InsufficientCreditsError())).toBe(402);
+    expect(workerRefusalStatus(new CloudAgentBillingError({ kind: 'billing' } as never, 409))).toBe(
+      409
+    );
     expect(workerRefusalStatus(new TRPCClientError('fetch failed'))).toBeUndefined();
     expect(workerRefusalStatus(new Error('boom'))).toBeUndefined();
     expect(workerRefusalStatus(undefined)).toBeUndefined();

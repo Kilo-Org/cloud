@@ -41,6 +41,7 @@ import {
   createDeviceSession,
   issueSessionCredentials,
   createDeviceSessionWithAttestedKey,
+  revokeDeviceSession,
 } from '@/lib/auth/device-sessions';
 import { captureMessage } from '@sentry/nextjs';
 import PostHogClient from '@kilocode/web-shared/lib/posthog';
@@ -109,6 +110,7 @@ async function checkExistingProviderAccount(
 }
 
 /**
+ * Mint the long-lived credential returned to a sign-in that does not receive a
  * refresh pair. The response shape stays the same, and the credential carries
  * the device session resolved by the caller.
  */
@@ -373,6 +375,22 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     }
 
     let phase: 'reserved' | 'release' | 'committed' = 'reserved';
+    // Session-bound credentials prepared for this request. They are minted
+    // before the code is finalized, so a request that ends without delivering
+    // them must revoke what it created.
+    let preparedSessionId: string | undefined;
+    let preparedCredentials: { token: string; refreshToken: string; expiresIn: number } | undefined;
+
+    const abandonPreparedCredentials = async () => {
+      if (!preparedSessionId) {
+        return;
+      }
+      try {
+        await revokeDeviceSession(preparedSessionId, 'sign_in_not_completed');
+      } catch {
+        captureMessage('native_token_session_cleanup_failed');
+      }
+    };
 
     try {
       const eligibility = await checkDomainSignInEligibility(email);
@@ -437,11 +455,6 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       // ── Step 5: Persist attested key after settlement ─────────────────
       // Must run BEFORE code commit so a key collision does not burn the
       // sign-in code without issuing a credential.
-      let sessionId: string | undefined;
-      let refreshCredentials:
-        | { token: string; refreshToken: string; expiresIn: number }
-        | undefined;
-
       if (data.supportsRefresh) {
         // Bind key persistence and session creation in one transaction.
         try {
@@ -451,8 +464,8 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
             user: result.user,
             verification: admissionVerification,
           });
-          sessionId = combined.sessionId;
-          refreshCredentials = {
+          preparedSessionId = combined.sessionId;
+          preparedCredentials = {
             token: combined.token,
             refreshToken: combined.refreshToken,
             expiresIn: combined.expiresIn,
@@ -481,13 +494,13 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
 
       // ── Step 5.5: Resolve the device session and credential pair ───────
       // Prepare session-bound credentials before finalizing the sign-in code.
-      sessionId ??= await createDeviceSession({
+      preparedSessionId ??= await createDeviceSession({
         userId: result.user.id,
         userAgent: request.headers.get('user-agent') ?? undefined,
       });
 
-      if (data.supportsRefresh && !refreshCredentials) {
-        refreshCredentials = await issueSessionCredentials(result.user, sessionId);
+      if (data.supportsRefresh && !preparedCredentials) {
+        preparedCredentials = await issueSessionCredentials(result.user, preparedSessionId);
       }
 
       // ── Step 6: Consume the sign-in code AFTER key and session persistence ─
@@ -497,6 +510,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       if (!committed) {
         const consumed = await consumeSignInCode(data.email, data.code, data.challengeId);
         if (!consumed) {
+          await abandonPreparedCredentials();
           return NextResponse.json({ error: 'INVALID_CODE' }, { status: 401 });
         }
         captureMessage('native_token_code_reservation_lapsed');
@@ -508,12 +522,12 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         posthogClient.capture(result.deferredSignInEvent);
       }
 
-      if (refreshCredentials) {
+      if (preparedCredentials) {
         return NextResponse.json(
           {
-            token: refreshCredentials.token,
-            refreshToken: refreshCredentials.refreshToken,
-            expiresIn: refreshCredentials.expiresIn,
+            token: preparedCredentials.token,
+            refreshToken: preparedCredentials.refreshToken,
+            expiresIn: preparedCredentials.expiresIn,
             created: result.isNew,
           },
           { status: 200 }
@@ -522,10 +536,12 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
 
       return legacyTokenResponse({
         user: result.user,
-        deviceSessionId: sessionId,
+        deviceSessionId: preparedSessionId,
         created: result.isNew,
       });
     } catch (error) {
+      // Nothing was delivered, so nothing minted for this request stays usable.
+      await abandonPreparedCredentials();
       phase = 'release';
       throw error;
     } finally {

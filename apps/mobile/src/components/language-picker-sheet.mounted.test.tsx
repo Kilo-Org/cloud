@@ -100,6 +100,9 @@ vi.mock('@/i18n/apply-language', async importOriginal => {
     applyLanguagePreference: vi.fn(actual.applyLanguagePreference),
   };
 });
+// The apply path records the direction relaunch; the record itself is covered
+// by the apply-language suite, and its real store pulls in the native keychain.
+vi.mock('@/i18n/direction-attempt', () => ({ writeDirectionAttemptAsync: vi.fn() }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/picker-sheet', () => ({
   PickerSheet: (props: { headerContent?: ReactNode; children?: ReactNode }) =>

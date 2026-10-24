@@ -45,7 +45,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 
 import { useRootNavigationReady } from '@/lib/navigation-ready';
 import { useTranslation } from 'react-i18next';
-import { View, type ViewInstance } from 'react-native';
+import { I18nManager, View, type ViewInstance } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
@@ -87,7 +87,13 @@ import {
   useThemePreference,
 } from '@/lib/hooks/use-theme-preference';
 import { i18n } from '@/i18n';
-import { syncRtl } from '@/i18n/rtl';
+import {
+  clearDirectionAttemptAsync,
+  readDirectionAttemptAsync,
+  writeDirectionAttemptAsync,
+} from '@/i18n/direction-attempt';
+import { isRtlLanguage, syncRtl } from '@/i18n/rtl';
+import { resolveLanguageStartupStep } from '@/i18n/startup-direction';
 import { type LanguageReturnTarget, readLanguageReturnTarget } from '@/i18n/return-target';
 import {
   getResolvedLanguage,
@@ -452,7 +458,23 @@ function RootLayoutNav({
     const prepareLanguage = async () => {
       const resolved = getResolvedLanguage();
       let reloadFailed = false;
-      if (syncRtl(resolved)) {
+      const directionStep = resolveLanguageStartupStep({
+        isRtl: I18nManager.isRTL,
+        shouldBeRtl: isRtlLanguage(resolved),
+        language: resolved,
+        lastAttempt: await readDirectionAttemptAsync(),
+      });
+      if (directionStep === 'apply') {
+        // The direction matches, so the record of a relaunch attempt has done
+        // its job: a later change back to the other direction may relaunch again.
+        void clearDirectionAttemptAsync();
+      } else if (directionStep === 'fallback') {
+        // The previous launch relaunched for this very direction and the
+        // platform came back with the other one. Relaunching again would loop
+        // forever on a blank frame; show the retry screen instead.
+        reloadFailed = true;
+      } else if (await writeDirectionAttemptAsync(resolved)) {
+        syncRtl(resolved);
         try {
           await reloadAppAsync();
           // The native reload tears down this JS context; nothing below runs.
@@ -463,6 +485,11 @@ function RootLayoutNav({
           // direction.
           reloadFailed = true;
         }
+      } else {
+        // Without the record, a relaunch that did not take the direction would
+        // repeat on every launch. Keep the current direction and let the user
+        // retry from the screen below.
+        reloadFailed = true;
       }
       // Reopen the screen the user was on before an RTL reload. Read once,
       // after the reload path, so the helper's one-shot delete is the only read.
@@ -1223,6 +1250,10 @@ function RootLayoutNav({
         onRetry={() => {
           void (async () => {
             try {
+              // A retry is the user asking for another attempt, not the
+              // automatic relaunch the record guards against: drop the record
+              // so the next launch relaunches for the direction once more.
+              await clearDirectionAttemptAsync();
               await reloadAppAsync();
             } catch {
               // Reload failed: the screen stays so the user can retry or continue.

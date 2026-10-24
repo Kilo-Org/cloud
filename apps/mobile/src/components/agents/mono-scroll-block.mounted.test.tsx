@@ -189,7 +189,7 @@ describe('MonoScrollBlock mounted', () => {
     expect(findByType(renderer.root, 'Text')).toHaveLength(0);
     const text = findMonoText(renderer.root, 'SelectableText');
     const className = propOf(text, 'className') as string;
-    expect(className).toContain('font-mono text-xs leading-4');
+    expect(className).toContain('font-mono text-xs leading-[1rem]');
     expect(className).not.toContain('shrink-0');
 
     await unmount(renderer);
@@ -205,7 +205,7 @@ describe('MonoScrollBlock mounted', () => {
     const text = findMonoText(renderer.root, 'Text');
     expect(propOf(text, 'selectable')).toBe(true);
     const className = propOf(text, 'className') as string;
-    expect(className).toContain('font-mono text-xs leading-4');
+    expect(className).toContain('font-mono text-xs leading-[1rem]');
     expect(className).not.toContain('shrink-0');
 
     await unmount(renderer);

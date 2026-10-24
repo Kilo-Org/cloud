@@ -79,6 +79,7 @@ function TransferControls({
     <View className="flex-row gap-2">
       <Button
         variant="outline"
+        disabled={download.pending}
         accessibilityLabel={namedWithDetail(transferText, detail)}
         onPress={() => {
           if (download.phase === 'paused') {

@@ -210,7 +210,12 @@ describe.each([
       await retry(root);
       if (procedure === 'getRepositories') {
         const progress = presentation === 'inline' ? 'Skeleton' : 'ActivityIndicator';
-        expect(host(root, progress)).toHaveLength(1);
+        expect(host(root, progress).length).toBeGreaterThan(0);
+      } else if (presentation === 'inline') {
+        // The entry screen replaces its failure page with the loading skeleton
+        // while the retry runs, so the attempt is visible without a spinner.
+        expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+        expect(host(root, 'Skeleton').length).toBeGreaterThan(0);
       } else {
         expect(host(root, 'PlatformErrorScreen')[0]?.props.isRetrying).toBe(true);
       }

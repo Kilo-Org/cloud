@@ -126,6 +126,7 @@ function VoiceLanguageList({
 
   return (
     <FlashList
+      nestedScrollEnabled
       style={[listStyle, { backgroundColor: colors.background }]}
       contentContainerStyle={listContentContainerStyle}
       data={filtered}

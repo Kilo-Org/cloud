@@ -18,9 +18,10 @@ type ManualReviewStartFeedbackProps = {
  * Failure feedback for the manual-review start, pinned with the action in the
  * screen's footer so the recovery control is visible with the keyboard up too.
  * The watchdog stall says the wait exceeded the budget; a settled failure says
- * what the server or transport reported. Both clear on the next submit. The
- * a11y announcement rides the inline `AccessibleStatus` (the screen renders
- * the failure, so no toast fires beside it).
+ * what the server or transport reported. Both describe the input that produced
+ * them, so they clear when that input changes or on the next submit. The a11y
+ * announcement rides the inline `AccessibleStatus` (the screen renders the
+ * failure, so no toast fires beside it).
  */
 export function ManualReviewStartFeedback({
   stalled,

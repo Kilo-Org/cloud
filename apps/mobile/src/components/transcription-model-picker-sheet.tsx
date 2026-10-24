@@ -96,6 +96,7 @@ export function TranscriptionModelPickerSheet() {
   } else {
     content = (
       <FlashList
+        nestedScrollEnabled
         style={[listStyle, { backgroundColor: colors.background }]}
         contentContainerStyle={listContentContainerStyle}
         data={models}

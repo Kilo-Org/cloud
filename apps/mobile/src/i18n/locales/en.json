@@ -147,6 +147,7 @@
     "connected": "Connected",
     "couldNotLoadModels": "Could not load models",
     "couldNotLoadRepositories": "Could not load repositories",
+    "noRepositoriesFound": "No repositories found",
     "critical": "Critical",
     "delete": "Delete",
     "deleted": "Deleted",
@@ -181,6 +182,7 @@
     "connect": "Connect",
     "connectBitbucket": "Connect Bitbucket",
     "connectGitlab": "Connect GitLab",
+    "connectProvider": "Connect a provider",
     "contentTruncated": "Content truncated",
     "copyLink": "Copy link",
     "couldNotLoadOrganizations": "Could not load organizations",
@@ -239,7 +241,8 @@
     "dismissed": "Dismissed",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Changes"
+    "changes": "Changes",
+    "organizationTrialEnded": "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again."
   },
   "language": {
     "restarting": "Restarting to apply language",
@@ -1501,7 +1504,6 @@
       "gitlabNoRepositoriesDescription": "You may need to grant access to more groups or projects on GitLab.",
       "installGithubApp": "Install the GitHub app on repositories",
       "installGithubAppDescription": "Grant the Kilo GitHub App access to the repositories you want reviewed.",
-      "noRepositoriesFound": "No repositories found",
       "repositoryAccess": "repository access"
     },
     "style": {
@@ -1531,6 +1533,8 @@
       "showMore": "Show more",
       "created": "Created",
       "started": "Started",
+      "reviewEnded": "Review ended",
+      "severityNitpick": "Nitpick",
       "tokens": "Tokens",
       "tokensInOut": "{{input}} in / {{output}} out",
       "transcriptWaiting": "Waiting for the review transcript.",
@@ -1581,7 +1585,6 @@
       "invalidUrl": "Enter a valid pull request URL",
       "couldNotCheckProviderStatus": "Couldn't check provider status",
       "couldNotLoadProviders": "We couldn't load your connected providers. Please try again.",
-      "connectProvider": "Connect a provider",
       "connectProviderDescription": "Connect GitHub to start a manual review of a pull request.",
       "pullRequestUrl": "Pull request URL",
       "instructions": "Instructions (optional)",
@@ -1709,8 +1712,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "No filters available",
-      "noFiltersDescription": "Go back and reopen filters from the findings list.",
       "title": "Filter findings",
       "reset": "Reset",
       "severity": "Severity",
@@ -2024,11 +2025,17 @@
         "remediationCancelled": "Cancelled",
         "findingDeleted": "Deleted"
       },
+      "eventConfidence": "Confidence: {{confidence}}",
+      "eventReason": "Reason: {{reason}}",
+      "eventsCount_one": "{{displayCount}} event",
+      "eventsCount_other": "{{displayCount}} events",
       "generated": "Generated {{generatedAt}}",
       "noActivity": "No recorded activity",
       "noActivityDescription": "Kilo has no reportable Security Finding activity from {{start}} to {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
+      "reasonUnknown": "Unrecognized reason",
       "repositoryNotRecorded": "Repository not recorded",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Report summary",
       "title": "Audit report",
       "unavailable": "Audit report unavailable",
@@ -2066,6 +2073,7 @@
       "reauthorizeButton": "Re-authorize GitHub App",
       "reauthorizeDescription": "Security Agent needs permission to read Dependabot alerts. Re-authorize the GitHub App to grant this permission.",
       "reauthorizeTitle": "Additional permissions required",
+      "retryFailed": "Still could not load Security Agent. Check your connection and try again.",
       "setupFailed": "Could not start GitHub setup. Please try again."
     },
     "queuedActionUntracked": "A queued action could no longer be tracked. Refresh to see the latest state.",
@@ -2678,7 +2686,10 @@
       "allowOnceAccessibility": "Allow once",
       "alwaysAllow": "Always Allow",
       "alwaysAllowAccessibility": "Always allow",
-      "retrying": "Retrying…"
+      "retrying": "Retrying…",
+      "retryDeny": "Retry deny",
+      "retryAllowOnce": "Retry allow once",
+      "retryAlwaysAllow": "Retry always allow"
     },
     "questionCard": {
       "title": "Agent needs input",
@@ -3049,7 +3060,6 @@
   "voiceInput": {
     "listening": "Listening...",
     "listeningStopped": "Listening stopped.",
-    "staysOff": "Speech stays off until you allow online transcription.",
     "onlineTitle": "Speech is processed online",
     "onlineMessage": "This device cannot transcribe offline. Your recording is sent to {{provider}} to turn it into text. Kilo does not store the audio.",
     "allow": "Allow",
@@ -3263,7 +3273,9 @@
       "sendInvite": "Send invite",
       "title": "Invite member",
       "alreadyInvited": "They're already invited or already a member.",
-      "sendError": "Couldn't send the invite."
+      "sendError": "Couldn't send the invite.",
+      "pendingInvitation": "This email already has a pending invitation.",
+      "alreadyMember": "This person is already a member of this organization."
     },
     "invoices": {
       "downloadA11y": "Download invoice {{number}}",
@@ -3333,7 +3345,12 @@
       "pendingInvitations": "Pending invitations",
       "resendInvite": "Resend invite",
       "shareInviteLink": "Share invite link",
-      "resendInviteError": "Couldn't resend the invite."
+      "resendInviteError": "Couldn't resend the invite.",
+      "inviteNotResendable": "This invitation can no longer be resent.",
+      "ownerAuthority": "Only an organization owner can manage owners.",
+      "ownRoleChange": "You cannot change your own role.",
+      "inviteExpired": "This invitation has expired.",
+      "inviteAccepted": "This invitation has already been accepted."
     },
     "usageStats": {
       "inputTokens": "Input Tokens",

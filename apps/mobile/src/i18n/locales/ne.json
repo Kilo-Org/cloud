@@ -53,6 +53,7 @@
     "connected": "जडित",
     "couldNotLoadModels": "मोडेलहरू लोड गर्न सकिएन।",
     "couldNotLoadRepositories": "रिपोजिटरीहरू लोड गर्न सकिएन।",
+    "noRepositoriesFound": "कुनै रिपोजिटरी फेला परेन",
     "critical": "अति गम्भीर",
     "delete": "मेट्नुहोस्",
     "deleted": "मेटियो",
@@ -87,6 +88,7 @@
     "connect": "जडान गर्नुहोस्",
     "connectBitbucket": "Bitbucket जडान गर्नुहोस्",
     "connectGitlab": "GitLab जडान गर्नुहोस्",
+    "connectProvider": "प्रदायक जडान गर्नुहोस्",
     "contentTruncated": "सामग्रीको केही भाग मात्र देखाइएको छ",
     "copyLink": "लिङ्क प्रतिलिपि गर्नुहोस्",
     "couldNotLoadOrganizations": "संस्थाहरू लोड गर्न सकिएन।",
@@ -145,7 +147,8 @@
     "agent": "एजेन्ट",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "परिवर्तनहरू"
+    "changes": "परिवर्तनहरू",
+    "organizationTrialEnded": "संस्थाको परीक्षण अवधि सकिएको छ र यसको कुनै सक्रिय योजना छैन। संस्थाको मालिकले kilo.ai मा बिलिङ अद्यावधिक गर्न सक्छ, त्यसपछि फेरि प्रयास गर्नुहोस्।"
   },
   "language": {
     "restarting": "भाषा लागू गर्न पुनः सुरु गर्दै",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "तपाईंले GitLab मा थप समूह वा परियोजनाहरूमा पहुँच दिनुपर्ने हुन सक्छ।",
       "installGithubApp": "रिपोजिटरीहरूमा GitHub एप स्थापना गर्नुहोस्",
       "installGithubAppDescription": "तपाईंले समीक्षा गराउन चाहेका रिपोजिटरीहरूमा Kilo GitHub एपलाई पहुँच दिनुहोस्।",
-      "noRepositoriesFound": "कुनै रिपोजिटरी फेला परेन",
       "repositoryAccess": "रिपोजिटरीको पहुँच"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "थप देखाउनुहोस्",
       "created": "सिर्जना गरिएको",
       "started": "सुरु भएको",
+      "reviewEnded": "समाप्त भएको",
+      "severityNitpick": "सानो टिप्पणी",
       "tokens": "टोकन",
       "tokensInOut": "{{input}} इनपुट / {{output}} आउटपुट",
       "council": "समीक्षक मण्डल",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "पुल रिक्वेस्टको मान्य URL लेख्नुहोस्।",
       "couldNotCheckProviderStatus": "प्रदायकको स्थिति जाँच्न सकिएन।",
       "couldNotLoadProviders": "तपाईंले जडान गरेका प्रदायकहरू लोड गर्न सकिएन। फेरि प्रयास गर्नुहोस्।",
-      "connectProvider": "प्रदायक जडान गर्नुहोस्",
       "connectProviderDescription": "पुल रिक्वेस्टको म्यानुअल समीक्षा सुरु गर्न GitHub जडान गर्नुहोस्।",
       "pullRequestUrl": "पुल रिक्वेस्टको URL",
       "instructions": "निर्देशनहरू (ऐच्छिक)",
@@ -1615,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "कुनै फिल्टर उपलब्ध छैन",
-      "noFiltersDescription": "पछाडि जानुहोस् र सुरक्षा समस्याहरूको सूचीबाट फिल्टरहरू फेरि खोल्नुहोस्।",
       "title": "सुरक्षा समस्याका फिल्टरहरू",
       "reset": "रिसेट गर्नुहोस्",
       "severity": "गम्भीरता",
@@ -1913,11 +1914,17 @@
       "actorSystem": "Kilo प्रणाली",
       "couldNotLoad": "अडिट प्रतिवेदन लोड गर्न सकिएन।",
       "events": "घटनाहरू",
+      "eventConfidence": "विश्वास: {{confidence}}",
+      "eventReason": "कारण: {{reason}}",
+      "eventsCount_one": "{{displayCount}} घटना",
+      "eventsCount_other": "{{displayCount}} घटना",
       "generated": "{{generatedAt}} मा तयार गरिएको हो।",
       "noActivity": "कुनै गतिविधिको अभिलेख छैन",
       "noActivityDescription": "Kilo मा {{start}} देखि {{end}} सम्म सुरक्षा समस्यासम्बन्धी प्रतिवेदनमा समावेश गर्न मिल्ने कुनै गतिविधि छैन।",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "रिपोजिटरीको अभिलेख छैन",
+      "reasonUnknown": "नचिनिएको कारण",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "प्रतिवेदनको सारांश",
       "title": "अडिट प्रतिवेदन",
       "unavailable": "अडिट प्रतिवेदन उपलब्ध छैन",
@@ -1972,6 +1979,7 @@
       "reauthorizeButton": "GitHub एपलाई फेरि अनुमति दिनुहोस्",
       "reauthorizeDescription": "Dependabot का चेतावनीहरू पढ्न सुरक्षा एजेन्टलाई अनुमति चाहिन्छ। यो अनुमति दिन GitHub एपलाई फेरि अनुमति प्रदान गर्नुहोस्।",
       "reauthorizeTitle": "थप अनुमतिहरू आवश्यक छन्",
+      "retryFailed": "अझै पनि सुरक्षा एजेन्ट लोड गर्न सकिएन। आफ्नो जडान जाँच गर्नुहोस् र फेरि प्रयास गर्नुहोस्।",
       "setupFailed": "GitHub सेटअप सुरु गर्न सकिएन। फेरि प्रयास गर्नुहोस्।"
     },
     "queuedActionUntracked": "पालोमा राखिएको कार्यको स्थिति अब हेर्न सकिएन। पछिल्लो स्थिति हेर्न रिफ्रेस गर्नुहोस्।",
@@ -2565,7 +2573,10 @@
       "allowOnceAccessibility": "एक पटक अनुमति दिनुहोस्",
       "alwaysAllow": "सधैँ अनुमति दिनुहोस्",
       "alwaysAllowAccessibility": "सधैँ अनुमति दिनुहोस्",
-      "retrying": "पुनः प्रयास गर्दै…"
+      "retrying": "पुनः प्रयास गर्दै…",
+      "retryDeny": "अस्वीकार गर्न पुनः प्रयास गर्नुहोस्",
+      "retryAllowOnce": "एक पटक अनुमति दिन पुनः प्रयास गर्नुहोस्",
+      "retryAlwaysAllow": "सधैँ अनुमति दिन पुनः प्रयास गर्नुहोस्"
     },
     "questionCard": {
       "title": "एजेन्टलाई उत्तर चाहिएको छ",
@@ -2941,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "सुन्दै…",
-    "staysOff": "आवाजलाई अनलाइनमार्फत पाठमा बदल्न अनुमति नदिएसम्म भ्वाइस इनपुट बन्द रहन्छ।",
     "onlineTitle": "आवाजको प्रशोधन अनलाइन हुन्छ",
     "onlineMessage": "यो यन्त्रले अफलाइन हुँदा आवाजलाई पाठमा बदल्न सक्दैन। तपाईंको रेकर्डिङलाई पाठमा बदल्न {{provider}} लाई पठाइन्छ। Kilo ले अडियो भण्डारण गर्दैन।",
     "allow": "अनुमति दिनुहोस्",
@@ -3156,7 +3166,9 @@
       "sendInvite": "निम्तो पठाउनुहोस्",
       "title": "सदस्यलाई निम्तो दिनुहोस्",
       "alreadyInvited": "उनलाई पहिले नै निम्तो पठाइएको छ वा उनी पहिले नै सदस्य हुन्।",
-      "sendError": "निम्तो पठाउन सकिएन।"
+      "sendError": "निम्तो पठाउन सकिएन।",
+      "pendingInvitation": "यो इमेलमा पहिले नै एउटा पेन्डिङ निम्तो छ।",
+      "alreadyMember": "यो व्यक्ति पहिले नै यो संस्थाको सदस्य हो।"
     },
     "invoices": {
       "downloadA11y": "बिल {{number}} डाउनलोड गर्नुहोस्",
@@ -3226,7 +3238,12 @@
       "pendingInvitations": "पर्खाइमा रहेका निम्तोहरू",
       "resendInvite": "निम्तो पुनः पठाउनुहोस्",
       "shareInviteLink": "निम्तोको लिङ्क साझा गर्नुहोस्",
-      "resendInviteError": "निम्तो पुनः पठाउन सकिएन।"
+      "resendInviteError": "निम्तो पुनः पठाउन सकिएन।",
+      "inviteNotResendable": "यो निम्तो अब पुनः पठाउन सकिँदैन।",
+      "ownerAuthority": "संस्थाको मालिकले मात्र मालिकहरूको व्यवस्थापन गर्न सक्छ।",
+      "ownRoleChange": "तपाईं आफ्नो भूमिका परिवर्तन गर्न सक्नुहुन्न।",
+      "inviteExpired": "यो निम्तोको म्याद सकिएको छ।",
+      "inviteAccepted": "यो निम्तो पहिले नै स्वीकार भइसकेको छ।"
     },
     "usageStats": {
       "inputTokens": "इनपुट टोकनहरू",

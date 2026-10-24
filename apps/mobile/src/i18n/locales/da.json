@@ -53,6 +53,7 @@
     "connected": "Tilknyttet",
     "couldNotLoadModels": "Modellerne kunne ikke indlæses.",
     "couldNotLoadRepositories": "Kodelagrene kunne ikke indlæses.",
+    "noRepositoriesFound": "Ingen kodelagre fundet",
     "critical": "Kritisk",
     "delete": "Slet",
     "deleted": "Slettet",
@@ -87,6 +88,7 @@
     "connect": "Tilknyt",
     "connectBitbucket": "Tilknyt Bitbucket",
     "connectGitlab": "Tilknyt GitLab",
+    "connectProvider": "Tilslut en udbyder",
     "contentTruncated": "Indhold afkortet",
     "copyLink": "Kopiér link",
     "couldNotLoadOrganizations": "Organisationerne kunne ikke indlæses.",
@@ -145,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Ændringer"
+    "changes": "Ændringer",
+    "organizationTrialEnded": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. En ejer af organisationen kan opdatere betalingen på kilo.ai og derefter prøve igen."
   },
   "language": {
     "restarting": "Genstarter for at skifte sprog",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Du skal muligvis give adgang til flere grupper eller projekter på GitLab.",
       "installGithubApp": "Installér GitHub-appen på kodelagre",
       "installGithubAppDescription": "Giv Kilos GitHub-app adgang til de kodelagre, du vil have gennemgået.",
-      "noRepositoriesFound": "Ingen kodelagre fundet",
       "repositoryAccess": "adgang til kodelagre"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "Vis mere",
       "created": "Oprettet",
       "started": "Startet",
+      "reviewEnded": "Ophørt",
+      "severityNitpick": "Detalje",
       "tokens": "Teksttokens",
       "tokensInOut": "{{input}} ind / {{output}} ud",
       "council": "Bedømmelsespanel",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "Indtast en gyldig URL til en pull request.",
       "couldNotCheckProviderStatus": "Udbyderens status kunne ikke kontrolleres.",
       "couldNotLoadProviders": "Dine tilsluttede udbydere kunne ikke indlæses. Prøv igen.",
-      "connectProvider": "Tilslut en udbyder",
       "connectProviderDescription": "Tilslut GitHub for at starte en manuel gennemgang af en pull request.",
       "pullRequestUrl": "URL til pull request",
       "instructions": "Instruktioner (valgfrie)",
@@ -1615,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Ingen filtre tilgængelige",
-      "noFiltersDescription": "Gå tilbage, og åbn filtrene igen fra listen over fund.",
       "title": "Filtrering af fund",
       "reset": "Nulstil",
       "severity": "Alvorlighed",
@@ -1913,11 +1914,17 @@
       "actorSystem": "Kilo-system",
       "couldNotLoad": "Revisionsrapporten kunne ikke indlæses.",
       "events": "Hændelser",
+      "eventConfidence": "Konfidens: {{confidence}}",
+      "eventReason": "Begrundelse: {{reason}}",
+      "eventsCount_one": "{{displayCount}} hændelse",
+      "eventsCount_other": "{{displayCount}} hændelser",
       "generated": "Rapporten blev genereret {{generatedAt}}.",
       "noActivity": "Ingen registreret aktivitet",
       "noActivityDescription": "Kilo har ingen aktivitet om sikkerhedsfund at rapportere fra {{start}} til {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Kodelager ikke registreret",
+      "reasonUnknown": "Ukendt begrundelse",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Resumé af rapporten",
       "title": "Revisionsrapport",
       "unavailable": "Revisionsrapport utilgængelig",
@@ -1972,6 +1979,7 @@
       "reauthorizeButton": "Godkend GitHub-appen igen",
       "reauthorizeDescription": "Security Agent har brug for tilladelse til at læse Dependabot-advarsler. Godkend GitHub-appen igen for at give denne tilladelse.",
       "reauthorizeTitle": "Yderligere tilladelser påkrævet",
+      "retryFailed": "Security Agent kunne stadig ikke indlæses. Kontroller din forbindelse, og prøv igen.",
       "setupFailed": "Opsætningen af GitHub kunne ikke startes. Prøv igen."
     },
     "queuedActionUntracked": "Status for en handling i kø kunne ikke længere følges. Opdatér for at se den seneste status.",
@@ -2565,7 +2573,10 @@
       "allowOnceAccessibility": "Tillad én gang",
       "alwaysAllow": "Tillad altid",
       "alwaysAllowAccessibility": "Tillad altid",
-      "retrying": "Prøver igen…"
+      "retrying": "Prøver igen…",
+      "retryDeny": "Prøv at afvise igen",
+      "retryAllowOnce": "Prøv at tillade én gang igen",
+      "retryAlwaysAllow": "Prøv at tillade altid igen"
     },
     "questionCard": {
       "title": "Agenten har brug for svar",
@@ -2941,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "Lytter...",
-    "staysOff": "Diktering er slået fra, indtil du tillader transskription på nettet.",
     "onlineTitle": "Tale behandles på nettet",
     "onlineMessage": "Denne enhed kan ikke omdanne tale til tekst uden internetforbindelse. Din optagelse sendes til {{provider}} for at blive omdannet til tekst. Kilo gemmer ikke lyden.",
     "allow": "Tillad",
@@ -3156,7 +3166,9 @@
       "sendInvite": "Send invitation",
       "title": "Invitér medlem",
       "alreadyInvited": "Personen er allerede inviteret eller allerede medlem.",
-      "sendError": "Invitationen kunne ikke sendes."
+      "sendError": "Invitationen kunne ikke sendes.",
+      "pendingInvitation": "Denne e-mailadresse har allerede en afventende invitation.",
+      "alreadyMember": "Denne person er allerede medlem af denne organisation."
     },
     "invoices": {
       "downloadA11y": "Download faktura {{number}}",
@@ -3226,7 +3238,12 @@
       "pendingInvitations": "Ubesvarede invitationer",
       "resendInvite": "Send invitation igen",
       "shareInviteLink": "Del invitationslink",
-      "resendInviteError": "Invitationen kunne ikke sendes igen."
+      "resendInviteError": "Invitationen kunne ikke sendes igen.",
+      "inviteNotResendable": "Denne invitation kan ikke længere sendes igen.",
+      "ownerAuthority": "Kun en organisationsejer kan administrere ejere.",
+      "ownRoleChange": "Du kan ikke ændre din egen rolle.",
+      "inviteExpired": "Denne invitation er udløbet.",
+      "inviteAccepted": "Denne invitation er allerede blevet accepteret."
     },
     "usageStats": {
       "inputTokens": "Tokens i inddata",

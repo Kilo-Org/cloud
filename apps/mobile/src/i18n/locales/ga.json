@@ -53,6 +53,7 @@
     "connected": "Nasctha",
     "couldNotLoadModels": "Níorbh fhéidir na samhlacha a lódáil.",
     "couldNotLoadRepositories": "Níorbh fhéidir na stóir a lódáil.",
+    "noRepositoriesFound": "Níor aimsíodh aon stór",
     "critical": "Criticiúil",
     "delete": "Scrios",
     "deleted": "Scriosta",
@@ -87,6 +88,7 @@
     "connect": "Ceangail",
     "connectBitbucket": "Ceangail le Bitbucket",
     "connectGitlab": "Ceangail le GitLab",
+    "connectProvider": "Ceangail soláthraí",
     "contentTruncated": "Ábhar teasctha",
     "copyLink": "Cóipeáil an nasc",
     "couldNotLoadOrganizations": "Níorbh fhéidir na heagraíochtaí a lódáil.",
@@ -145,7 +147,8 @@
     "agent": "Gníomhaire",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Athruithe"
+    "changes": "Athruithe",
+    "organizationTrialEnded": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir le húinéir eagraíochta an billeáil a nuashonrú ag kilo.ai agus ansin triail a bhaint as arís."
   },
   "language": {
     "restarting": "Ag atosú chun an teanga a chur i bhfeidhm",
@@ -1473,7 +1476,6 @@
       "gitlabNoRepositoriesDescription": "Seans go mbeidh ort rochtain ar thuilleadh grúpaí nó tionscadal a thabhairt ar GitLab.",
       "installGithubApp": "Suiteáil an aip GitHub ar stórtha",
       "installGithubAppDescription": "Tabhair rochtain d'aip GitHub Kilo ar na stórtha ar mhaith leat go ndéanfaí athbhreithniú orthu.",
-      "noRepositoriesFound": "Níor aimsíodh aon stór",
       "repositoryAccess": "rochtain ar stórtha"
     },
     "style": {
@@ -1503,6 +1505,8 @@
       "showMore": "Taispeáin níos mó",
       "created": "Cruthaithe",
       "started": "Tosaithe",
+      "reviewEnded": "Athbhreithniú thart",
+      "severityNitpick": "Mionrud",
       "tokens": "Comharthaí",
       "tokensInOut": "{{input}} isteach / {{output}} amach",
       "council": "Comhairle",
@@ -1553,7 +1557,6 @@
       "invalidUrl": "Cuir isteach URL bailí d'iarratas tarraingthe.",
       "couldNotCheckProviderStatus": "Níorbh fhéidir stádas an tsoláthraí a sheiceáil.",
       "couldNotLoadProviders": "Níorbh fhéidir linn do sholáthraithe nasctha a lódáil. Bain triail as arís le do thoil.",
-      "connectProvider": "Ceangail soláthraí",
       "connectProviderDescription": "Ceangail GitHub chun athbhreithniú de láimh a thosú ar iarratas tarraingthe.",
       "pullRequestUrl": "URL an iarratais tarraingthe",
       "instructions": "Treoracha (roghnach)",
@@ -1681,8 +1684,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Níl aon scagairí ar fáil",
-      "noFiltersDescription": "Téigh ar ais agus oscail na scagairí arís ó liosta na dtorthaí.",
       "title": "Scagadh torthaí",
       "reset": "Athshocraigh",
       "severity": "Déine",
@@ -1991,11 +1992,20 @@
       "actorSystem": "Córas Kilo",
       "couldNotLoad": "Níorbh fhéidir an tuarascáil iniúchta a lódáil.",
       "events": "Imeachtaí",
+      "eventConfidence": "Muinín: {{confidence}}",
+      "eventReason": "Cúis: {{reason}}",
+      "eventsCount_one": "{{displayCount}} imeacht",
+      "eventsCount_two": "{{displayCount}} imeacht",
+      "eventsCount_few": "{{displayCount}} imeacht",
+      "eventsCount_many": "{{displayCount}} imeacht",
+      "eventsCount_other": "{{displayCount}} imeachtaí",
       "generated": "Gineadh an tuarascáil: {{generatedAt}}.",
       "noActivity": "Níl aon ghníomhaíocht taifeadta",
       "noActivityDescription": "Níl aon ghníomhaíocht maidir le torthaí slándála le tuairisciú ag Kilo ó {{start}} go dtí {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Stór gan taifeadadh",
+      "reasonUnknown": "Cúis neamhaitheanta",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Achoimre na tuarascála",
       "title": "Tuarascáil iniúchta",
       "unavailable": "Níl an tuarascáil iniúchta ar fáil",
@@ -2050,6 +2060,7 @@
       "reauthorizeButton": "Athúdaraigh an aip GitHub",
       "reauthorizeDescription": "Teastaíonn cead ón nGníomhaire slándála chun foláirimh Dependabot a léamh. Athúdaraigh an aip GitHub chun an cead seo a thabhairt.",
       "reauthorizeTitle": "Teastaíonn ceadanna breise",
+      "retryFailed": "Fós níorbh fhéidir an Gníomhaire slándála a lódáil. Seiceáil do cheangal agus bain triail as arís.",
       "setupFailed": "Níorbh fhéidir socrú GitHub a thosú. Bain triail as arís le do thoil."
     },
     "queuedActionUntracked": "Níorbh fhéidir gníomh i scuaine a rianú a thuilleadh. Athnuaigh chun an staid is déanaí a fheiceáil.",
@@ -2670,7 +2681,10 @@
       "allowOnceAccessibility": "Ceadaigh uair amháin",
       "alwaysAllow": "Ceadaigh i gcónaí",
       "alwaysAllowAccessibility": "Ceadaigh i gcónaí",
-      "retrying": "Ag triail arís…"
+      "retrying": "Ag triail arís…",
+      "retryDeny": "Bain triail eile as diúltú",
+      "retryAllowOnce": "Bain triail eile as ceadú uair amháin",
+      "retryAlwaysAllow": "Bain triail eile as ceadú i gcónaí"
     },
     "questionCard": {
       "title": "Tá ionchur ag teastáil ón ngníomhaire",
@@ -3067,7 +3081,6 @@
   },
   "voiceInput": {
     "listening": "Ag éisteacht...",
-    "staysOff": "Fanfaidh ionchur gutha díchumasaithe go dtí go gceadóidh tú tras-scríobh ar líne.",
     "onlineTitle": "Déantar an chaint a phróiseáil ar líne",
     "onlineMessage": "Ní féidir leis an ngléas seo tras-scríobh a dhéanamh as líne. Seoltar do thaifeadadh chuig {{provider}} chun é a thiontú ina théacs. Ní stórálann Kilo an fhuaim.",
     "allow": "Ceadaigh",
@@ -3285,7 +3298,9 @@
       "sendInvite": "Seol cuireadh",
       "title": "Tabhair cuireadh do bhall",
       "alreadyInvited": "Tá cuireadh acu cheana féin nó is ball den eagraíocht iad cheana féin.",
-      "sendError": "Níorbh fhéidir an cuireadh a sheoladh."
+      "sendError": "Níorbh fhéidir an cuireadh a sheoladh.",
+      "pendingInvitation": "Tá cuireadh ar feitheamh ag an seoladh ríomhphoist seo cheana féin.",
+      "alreadyMember": "Tá an duine seo ina bhall den eagraíocht seo cheana féin."
     },
     "invoices": {
       "downloadA11y": "Íoslódáil sonrasc {{number}}",
@@ -3355,7 +3370,12 @@
       "pendingInvitations": "Cuirí ar feitheamh",
       "resendInvite": "Seol an cuireadh arís",
       "shareInviteLink": "Roinn nasc an chuiridh",
-      "resendInviteError": "Níorbh fhéidir an cuireadh a sheoladh arís."
+      "resendInviteError": "Níorbh fhéidir an cuireadh a sheoladh arís.",
+      "inviteNotResendable": "Ní féidir an cuireadh seo a sheoladh arís a thuilleadh.",
+      "ownerAuthority": "Ní féidir ach le húinéir eagraíochta úinéirí a bhainistiú.",
+      "ownRoleChange": "Ní féidir leat do ról féin a athrú.",
+      "inviteExpired": "Tá an cuireadh seo imithe in éag.",
+      "inviteAccepted": "Tá an cuireadh seo glactha cheana féin."
     },
     "usageStats": {
       "inputTokens": "Comharthaí ionchuir",

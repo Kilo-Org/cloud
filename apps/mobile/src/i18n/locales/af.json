@@ -53,6 +53,7 @@
     "connected": "Gekoppel",
     "couldNotLoadModels": "Die modelle kon nie gelaai word nie.",
     "couldNotLoadRepositories": "Die bewaarplekke kon nie gelaai word nie.",
+    "noRepositoriesFound": "Geen bewaarplekke gevind nie",
     "critical": "Krities",
     "delete": "Skrap",
     "deleted": "Geskrap",
@@ -87,6 +88,7 @@
     "connect": "Koppel",
     "connectBitbucket": "Koppel Bitbucket",
     "connectGitlab": "Koppel GitLab",
+    "connectProvider": "Koppel 'n verskaffer",
     "contentTruncated": "Inhoud afgekap",
     "copyLink": "Kopieer skakel",
     "couldNotLoadOrganizations": "Die organisasies kon nie gelaai word nie.",
@@ -145,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Wysigings"
+    "changes": "Wysigings",
+    "organizationTrialEnded": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. 'n Organisasie-eienaar kan die fakturering by kilo.ai opdateer en dan weer probeer."
   },
   "language": {
     "restarting": "Herbegin om die taal toe te pas",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Jy moet dalk toegang tot meer groepe of projekte op GitLab verleen.",
       "installGithubApp": "Installeer die GitHub-app op bewaarplekke",
       "installGithubAppDescription": "Gee die Kilo GitHub-app toegang tot die bewaarplekke wat jy wil laat hersien.",
-      "noRepositoriesFound": "Geen bewaarplekke gevind nie",
       "repositoryAccess": "bewaarplektoegang"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "Wys meer",
       "created": "Geskep",
       "started": "Begin",
+      "reviewEnded": "Beëindig",
+      "severityNitpick": "Kleinigheid",
       "tokens": "Tekseenhede",
       "tokensInOut": "{{input}} in / {{output}} uit",
       "council": "Raad",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "Voer 'n geldige URL vir 'n trekversoek in.",
       "couldNotCheckProviderStatus": "Die verskafferstatus kon nie nagegaan word nie.",
       "couldNotLoadProviders": "Ons kon nie jou gekoppelde verskaffers laai nie. Probeer asseblief weer.",
-      "connectProvider": "Koppel 'n verskaffer",
       "connectProviderDescription": "Koppel GitHub om 'n handmatige hersiening van 'n trekversoek te begin.",
       "pullRequestUrl": "Trekversoek-URL",
       "instructions": "Instruksies (opsioneel)",
@@ -1615,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Geen filters beskikbaar",
-      "noFiltersDescription": "Gaan terug en maak die filters weer vanuit die bevindingslys oop.",
       "title": "Filtreer bevindings",
       "reset": "Stel terug",
       "severity": "Ernsgraad",
@@ -1913,11 +1914,17 @@
       "actorSystem": "Kilo-stelsel",
       "couldNotLoad": "Die ouditverslag kon nie gelaai word nie.",
       "events": "Gebeure",
+      "eventConfidence": "Vertroue: {{confidence}}",
+      "eventReason": "Rede: {{reason}}",
+      "eventsCount_one": "{{displayCount}} gebeurtenis",
+      "eventsCount_other": "{{displayCount}} gebeurtenisse",
       "generated": "Die verslag is op {{generatedAt}} gegenereer.",
       "noActivity": "Geen aangetekende aktiwiteit nie",
       "noActivityDescription": "Kilo het geen rapporteerbare aktiwiteit oor sekuriteitsbevindings van {{start}} tot {{end}} nie.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Bewaarplek nie aangeteken nie",
+      "reasonUnknown": "Onherkende rede",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Verslagoorsig",
       "title": "Ouditverslag",
       "unavailable": "Ouditverslag onbeskikbaar",
@@ -1972,6 +1979,7 @@
       "reauthorizeButton": "Magtig die GitHub-app weer",
       "reauthorizeDescription": "Die Sekuriteitsagent benodig toestemming om Dependabot-waarskuwings te lees. Magtig die GitHub-app weer om hierdie toestemming te verleen.",
       "reauthorizeTitle": "Bykomende toestemmings vereis",
+      "retryFailed": "Die Sekuriteitsagent kon steeds nie gelaai word nie. Kontroleer jou verbinding en probeer asseblief weer.",
       "setupFailed": "Kon nie GitHub-opstelling begin nie. Probeer asseblief weer."
     },
     "queuedActionUntracked": "'N Aksie in die tou kon nie meer gemonitor word nie. Verfris om die jongste status te sien.",
@@ -2565,7 +2573,10 @@
       "allowOnceAccessibility": "Laat een keer toe",
       "alwaysAllow": "Laat altyd toe",
       "alwaysAllowAccessibility": "Laat altyd toe",
-      "retrying": "Probeer weer…"
+      "retrying": "Probeer weer…",
+      "retryDeny": "Probeer weer weier",
+      "retryAllowOnce": "Probeer weer laat een keer toe",
+      "retryAlwaysAllow": "Probeer weer laat altyd toe"
     },
     "questionCard": {
       "title": "Agent benodig insette",
@@ -2941,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "Luister...",
-    "staysOff": "Steminvoer bly af totdat jy aanlyn transkripsie toelaat.",
     "onlineTitle": "Spraak word aanlyn verwerk",
     "onlineMessage": "Hierdie toestel kan nie vanlyn transkribeer nie. Jou opname word na {{provider}} gestuur om dit in teks te verander. Kilo stoor nie die klank nie.",
     "allow": "Laat toe",
@@ -3156,7 +3166,9 @@
       "sendInvite": "Stuur uitnodiging",
       "title": "Nooi lid uit",
       "alreadyInvited": "Hulle is reeds genooi of is reeds 'n lid.",
-      "sendError": "Kon nie die uitnodiging stuur nie."
+      "sendError": "Kon nie die uitnodiging stuur nie.",
+      "pendingInvitation": "Hierdie e-posadres het reeds 'n hangende uitnodiging.",
+      "alreadyMember": "Hierdie persoon is reeds 'n lid van hierdie organisasie."
     },
     "invoices": {
       "downloadA11y": "Laai faktuur {{number}} af",
@@ -3226,7 +3238,12 @@
       "pendingInvitations": "Hangende uitnodigings",
       "resendInvite": "Stuur uitnodiging weer",
       "shareInviteLink": "Deel uitnodigingskakel",
-      "resendInviteError": "Kon nie die uitnodiging weer stuur nie."
+      "resendInviteError": "Kon nie die uitnodiging weer stuur nie.",
+      "inviteNotResendable": "Hierdie uitnodiging kan nie meer weer gestuur word nie.",
+      "ownerAuthority": "Slegs 'n organisasie-eienaar kan eienaars bestuur.",
+      "ownRoleChange": "Jy kan nie jou eie rol verander nie.",
+      "inviteExpired": "Hierdie uitnodiging het verval.",
+      "inviteAccepted": "Hierdie uitnodiging is reeds aanvaar."
     },
     "usageStats": {
       "inputTokens": "Invoertekens",

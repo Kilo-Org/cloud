@@ -53,6 +53,7 @@
     "connected": "Свързан",
     "couldNotLoadModels": "Моделите не се заредиха.",
     "couldNotLoadRepositories": "Хранилищата не се заредиха.",
+    "noRepositoriesFound": "Не са намерени хранилища",
     "critical": "Критично",
     "delete": "Изтрий",
     "deleted": "Изтрито",
@@ -87,6 +88,7 @@
     "connect": "Свържи",
     "connectBitbucket": "Свържи Bitbucket",
     "connectGitlab": "Свържи GitLab",
+    "connectProvider": "Свържи доставчик",
     "contentTruncated": "Съдържанието е съкратено",
     "copyLink": "Копирай връзката",
     "couldNotLoadOrganizations": "Организациите не се заредиха.",
@@ -145,7 +147,8 @@
     "agent": "агент",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Промени"
+    "changes": "Промени",
+    "organizationTrialEnded": "Пробният период на организацията е приключил и тя няма активен план. Собственик на организацията може да актуализира фактурирането на kilo.ai и след това да опита отново."
   },
   "language": {
     "restarting": "Рестартиране за смяна на езика",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Може да се наложи да предоставиш достъп до повече групи или проекти в GitLab.",
       "installGithubApp": "Инсталирай приложението за GitHub в хранилищата",
       "installGithubAppDescription": "Предостави на приложението на Kilo за GitHub достъп до хранилищата, които искаш да бъдат преглеждани.",
-      "noRepositoriesFound": "Не са намерени хранилища",
       "repositoryAccess": "достъп до хранилища"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "Покажи още",
       "created": "Създаден",
       "started": "Започнат",
+      "reviewEnded": "Прекратен",
+      "severityNitpick": "Забележка",
       "tokens": "Токени",
       "tokensInOut": "{{input}} входящи / {{output}} изходящи",
       "council": "Съвет",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "Въведи валиден URL адрес на заявка за сливане.",
       "couldNotCheckProviderStatus": "Не успяхме да проверим състоянието на доставчика.",
       "couldNotLoadProviders": "Не успяхме да заредим свързаните доставчици. Моля, опитай отново.",
-      "connectProvider": "Свържи доставчик",
       "connectProviderDescription": "Свържи GitHub, за да започнеш ръчен преглед на заявка за сливане.",
       "pullRequestUrl": "URL адрес на заявка за сливане",
       "instructions": "Инструкции (по желание)",
@@ -1615,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Няма налични филтри",
-      "noFiltersDescription": "Върни се назад и отвори отново филтрите от списъка с проблеми.",
       "title": "Филтриране на проблеми",
       "reset": "Нулирай",
       "severity": "Сериозност",
@@ -1913,11 +1914,17 @@
       "actorSystem": "Система Kilo",
       "couldNotLoad": "Не успяхме да заредим одитния доклад.",
       "events": "Събития",
+      "eventConfidence": "Увереност: {{confidence}}",
+      "eventReason": "Причина: {{reason}}",
+      "eventsCount_one": "{{displayCount}} събитие",
+      "eventsCount_other": "{{displayCount}} събития",
       "generated": "Докладът е генериран на {{generatedAt}}.",
       "noActivity": "Няма записана активност",
       "noActivityDescription": "В Kilo няма действия по проблеми със сигурността за включване в доклада за периода от {{start}} до {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Хранилището не е записано",
+      "reasonUnknown": "Неразпозната причина",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Резюме на доклада",
       "title": "Одитен доклад",
       "unavailable": "Одитният доклад не е достъпен",
@@ -1972,6 +1979,7 @@
       "reauthorizeButton": "Поднови правата на приложението за GitHub",
       "reauthorizeDescription": "Агентът за сигурност се нуждае от разрешение да чете сигналите от Dependabot. Поднови правата на приложението за GitHub, за да предоставиш това разрешение.",
       "reauthorizeTitle": "Изискват се допълнителни права",
+      "retryFailed": "Все още не успяхме да заредим агента за сигурност. Провери връзката си и опитай отново.",
       "setupFailed": "Не може да се започне настройката на GitHub. Моля, опитай отново."
     },
     "queuedActionUntracked": "Действие в опашката вече не може да се проследи. Опресни, за да видиш актуалното състояние.",
@@ -2565,7 +2573,10 @@
       "allowOnceAccessibility": "Разреши веднъж",
       "alwaysAllow": "Винаги разрешавай",
       "alwaysAllowAccessibility": "Винаги разрешавай",
-      "retrying": "Повторен опит…"
+      "retrying": "Повторен опит…",
+      "retryDeny": "Опитай да откажеш отново",
+      "retryAllowOnce": "Опитай да разрешиш веднъж отново",
+      "retryAlwaysAllow": "Опитай да разрешаваш винаги отново"
     },
     "questionCard": {
       "title": "Агентът очаква отговор",
@@ -2941,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "Слушам…",
-    "staysOff": "Гласовото въвеждане остава изключено, докато не разрешиш онлайн преобразуването на реч в текст.",
     "onlineTitle": "Речта се обработва онлайн",
     "onlineMessage": "Това устройство не може да преобразува реч в текст офлайн. Записът ти се изпраща до {{provider}} за преобразуване в текст. Kilo не съхранява аудиозаписа.",
     "allow": "Разреши",
@@ -3156,7 +3166,9 @@
       "sendInvite": "Изпрати покана",
       "title": "Покани член",
       "alreadyInvited": "Вече е поканен или вече е член.",
-      "sendError": "Не можахме да изпратим поканата."
+      "sendError": "Не можахме да изпратим поканата.",
+      "pendingInvitation": "За този имейл вече има чакаща покана.",
+      "alreadyMember": "Този човек вече е член на тази организация."
     },
     "invoices": {
       "downloadA11y": "Изтегли фактура {{number}}",
@@ -3226,7 +3238,12 @@
       "pendingInvitations": "Покани в изчакване",
       "resendInvite": "Изпрати поканата отново",
       "shareInviteLink": "Сподели връзката за покана",
-      "resendInviteError": "Не можахме да изпратим поканата отново."
+      "resendInviteError": "Не можахме да изпратим поканата отново.",
+      "inviteNotResendable": "Тази покана вече не може да бъде изпратена отново.",
+      "ownerAuthority": "Само собственик на организация може да управлява собственици.",
+      "ownRoleChange": "Не можете да промените собствената си роля.",
+      "inviteExpired": "Тази покана е изтекла.",
+      "inviteAccepted": "Тази покана вече е приета."
     },
     "usageStats": {
       "inputTokens": "Входни токени",

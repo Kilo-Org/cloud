@@ -53,6 +53,7 @@
     "connected": "نښلول شوی",
     "couldNotLoadModels": "ماډلونه بار نه شول.",
     "couldNotLoadRepositories": "زېرمتونونه بار نه شول.",
+    "noRepositoriesFound": "هېڅ ذخیره و نه موندل شوه",
     "critical": "خورا جدي",
     "delete": "ړنګ کړئ",
     "deleted": "ړنګ شوی",
@@ -87,6 +88,7 @@
     "connect": "ونښلوئ",
     "connectBitbucket": "Bitbucket ونښلوئ",
     "connectGitlab": "GitLab ونښلوئ",
+    "connectProvider": "د خدمت چمتو کوونکی ونښلوئ",
     "contentTruncated": "منځپانګه پرې شوې",
     "copyLink": "لینک کاپي کړئ",
     "couldNotLoadOrganizations": "سازمانونه بار نه شول.",
@@ -145,7 +147,8 @@
     "agent": "اجنټ",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "بدلونونه"
+    "changes": "بدلونونه",
+    "organizationTrialEnded": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. د سازمان مالک کولی شي په kilo.ai کې بیلنګ تازه کړي، بیا یو ځل بیا هڅه وکړي."
   },
   "language": {
     "restarting": "د ژبې د پلي کولو لپاره بیا پیلېږي",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "ښايي په GitLab کې نورو ډلو یا پروژو ته هم د لاسرسي اجازه ورکړئ.",
       "installGithubApp": "په ذخیرو کې د GitHub اپ نصب کړئ",
       "installGithubAppDescription": "د Kilo د GitHub اپ ته هغو ذخیرو ته لاسرسی ورکړئ چې غواړئ بیاکتنه یې وشي.",
-      "noRepositoriesFound": "هېڅ ذخیره و نه موندل شوه",
       "repositoryAccess": "ذخیرې ته لاسرسی"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "نور وښایئ",
       "created": "جوړ شوی",
       "started": "پیل شوی",
+      "reviewEnded": "پای شوی",
+      "severityNitpick": "کوچنی تذکر",
       "tokens": "ټوکنونه",
       "tokensInOut": "{{input}} ننوتونکي / {{output}} وتونکي",
       "council": "شورا",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "د PR یو معتبر URL ولیکئ.",
       "couldNotCheckProviderStatus": "د خدمت چمتو کوونکي حالت و نه کتل شو.",
       "couldNotLoadProviders": "ستاسو نښلول شوي خدمت چمتو کوونکي بار نه شول. مهرباني وکړئ بیا هڅه وکړئ.",
-      "connectProvider": "د خدمت چمتو کوونکی ونښلوئ",
       "connectProviderDescription": "د PR د لاسي بیاکتنې د پیل لپاره GitHub ونښلوئ.",
       "pullRequestUrl": "د PR پته (URL)",
       "instructions": "لارښوونې (اختیاري)",
@@ -1615,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "هېڅ فلټر نشته",
-      "noFiltersDescription": "بېرته لاړ شئ او د موندنو له لړلیک څخه فلټرونه بیا پرانیزئ.",
       "title": "د موندنو فلټر کول",
       "reset": "بېرته تنظیم کړئ",
       "severity": "شدت",
@@ -1913,11 +1914,17 @@
       "actorSystem": "د Kilo سیسټم",
       "couldNotLoad": "د پلټنې راپور بار نه شو.",
       "events": "پېښې",
+      "eventConfidence": "باور: {{confidence}}",
+      "eventReason": "دلیل: {{reason}}",
+      "eventsCount_one": "{{displayCount}} پېښې",
+      "eventsCount_other": "{{displayCount}} پېښې",
       "generated": "په {{generatedAt}} جوړ شو.",
       "noActivity": "هېڅ ثبت شوی فعالیت نشته",
       "noActivityDescription": "Kilo له {{start}} څخه تر {{end}} پورې د امنیتي موندنو په اړه د راپور وړ هېڅ فعالیت نه لري.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "ذخیره ثبت شوې نه ده",
+      "reasonUnknown": "ناتپېژندل شوی دلیل",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "د راپور لنډیز",
       "title": "د پلټنې راپور",
       "unavailable": "د پلټنې راپور نشته",
@@ -1972,6 +1979,7 @@
       "reauthorizeButton": "د GitHub اپ ته بیا اجازه ورکړئ",
       "reauthorizeDescription": "امنیتي اجنټ د Dependabot خبرتیاوو د لوستلو لپاره اجازې ته اړتیا لري. د دې اجازې د ورکولو لپاره د GitHub اپ ته بیا اجازه ورکړئ.",
       "reauthorizeTitle": "نورو اجازو ته اړتیا ده",
+      "retryFailed": "لا هم امنیتي اجنټ بار نه شو. مهرباني وکړئ خپل اتصال وګورئ او بیا هڅه وکړئ.",
       "setupFailed": "د GitHub ترتیب پیل نه شو. مهرباني وکړئ بیا هڅه وکړئ."
     },
     "queuedActionUntracked": "په کتار کې د یوې کړنې څارل نور ممکن نه دي. د وروستي حالت د لیدلو لپاره معلومات تازه کړئ.",
@@ -2565,7 +2573,10 @@
       "allowOnceAccessibility": "یو ځل اجازه ورکړئ",
       "alwaysAllow": "تل اجازه ورکړئ",
       "alwaysAllowAccessibility": "تل اجازه ورکړئ",
-      "retrying": "بیا هڅه روانه ده…"
+      "retrying": "بیا هڅه روانه ده…",
+      "retryDeny": "د رد بیا هڅه وکړئ",
+      "retryAllowOnce": "د یو ځل اجازې بیا هڅه وکړئ",
+      "retryAlwaysAllow": "د تل اجازې بیا هڅه وکړئ"
     },
     "questionCard": {
       "title": "ایجنټ ځواب ته اړتیا لري",
@@ -2941,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "اورېدل کېږي...",
-    "staysOff": "تر هغه چې انلاین د غږ په متن بدلولو اجازه ور نه کړئ، غږیز لیکل غیرفعال پاتې کېږي.",
     "onlineTitle": "غږ انلاین پروسس کېږي",
     "onlineMessage": "دا وسیله له انټرنېټ پرته غږ په متن نه شي بدلولی. ستاسو ثبت شوی غږ {{provider}} ته لېږل کېږي، څو په متن یې بدل کړي. Kilo غږ نه ساتي.",
     "allow": "اجازه ورکړئ",
@@ -3156,7 +3166,9 @@
       "sendInvite": "بلنه واستوئ",
       "title": "غړي ته بلنه ورکړئ",
       "alreadyInvited": "هغوی ته دمخه بلنه ورکړل شوې یا دمخه غړی دی.",
-      "sendError": "بلنه ونه لېږل شوه."
+      "sendError": "بلنه ونه لېږل شوه.",
+      "pendingInvitation": "دا برېښنالیک لا دمخه یوه په تمه بلنه لري.",
+      "alreadyMember": "دا کس لا دمخه د دې سازمان غړی دی."
     },
     "invoices": {
       "downloadA11y": "د {{number}} بل ښکته کړئ",
@@ -3226,7 +3238,12 @@
       "pendingInvitations": "په تمه بلنې",
       "resendInvite": "بلنه بیا واستوئ",
       "shareInviteLink": "د بلنې لینک شریک کړئ",
-      "resendInviteError": "بلنه بیا ونه لېږل شوه."
+      "resendInviteError": "بلنه بیا ونه لېږل شوه.",
+      "inviteNotResendable": "دا بلنه نوره بیا نه شي استول کېدای.",
+      "ownerAuthority": "یوازې د سازمان مالک کولی شي مالکان مدیریت کړي.",
+      "ownRoleChange": "تاسو نشئ کولی خپله دنده بدله کړئ.",
+      "inviteExpired": "دا بلنه پای ته رسېدلې ده.",
+      "inviteAccepted": "دا بلنه دمخه منل شوې ده."
     },
     "usageStats": {
       "inputTokens": "د ننوتنې ټوکنونه",

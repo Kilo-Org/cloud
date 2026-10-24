@@ -53,6 +53,7 @@
     "connected": "Lidhur",
     "couldNotLoadModels": "Modelet nuk u ngarkuan.",
     "couldNotLoadRepositories": "Depot nuk u ngarkuan.",
+    "noRepositoriesFound": "Nuk u gjet asnjë depo",
     "critical": "Kritike",
     "delete": "Fshi",
     "deleted": "Fshirë",
@@ -87,6 +88,7 @@
     "connect": "Lidhu",
     "connectBitbucket": "Lidhu me Bitbucket",
     "connectGitlab": "Lidhu me GitLab",
+    "connectProvider": "Lidh një ofrues",
     "contentTruncated": "Përmbajtja u shkurtua",
     "copyLink": "Kopjo lidhjen",
     "couldNotLoadOrganizations": "Organizatat nuk u ngarkuan.",
@@ -145,7 +147,8 @@
     "agent": "Agjenti",
     "durationMinuteShort": "min",
     "durationHourShort": "orë",
-    "changes": "Ndryshimet"
+    "changes": "Ndryshimet",
+    "organizationTrialEnded": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv. Një pronar i organizatës mund të përditësojë faturimin në kilo.ai dhe më pas të provojë përsëri."
   },
   "language": {
     "restarting": "Po riniset për të zbatuar ndryshimin e gjuhës",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Mund të të duhet të japësh qasje në më shumë grupe ose projekte në GitLab.",
       "installGithubApp": "Instalo aplikacionin GitHub në depot",
       "installGithubAppDescription": "Jepi aplikacionit Kilo për GitHub qasje në depot që dëshiron të shqyrtohen.",
-      "noRepositoriesFound": "Nuk u gjet asnjë depo",
       "repositoryAccess": "qasja në depot"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "Shfaq më shumë",
       "created": "Krijuar",
       "started": "Filluar",
+      "reviewEnded": "Mbaruar",
+      "severityNitpick": "Vërejtje",
       "tokens": "Tokenë",
       "tokensInOut": "{{input}} hyrës / {{output}} dalës",
       "council": "Këshilli",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "Shkruaj një URL të vlefshme për PR.",
       "couldNotCheckProviderStatus": "Nuk u kontrollua statusi i ofruesit.",
       "couldNotLoadProviders": "Nuk u ngarkuan ofruesit që ke lidhur. Provo përsëri.",
-      "connectProvider": "Lidh një ofrues",
       "connectProviderDescription": "Lidh GitHub për të filluar shqyrtimin manual të një PR.",
       "pullRequestUrl": "URL-ja e PR",
       "instructions": "Udhëzimet (opsionale)",
@@ -1615,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Nuk ka filtra të disponueshëm",
-      "noFiltersDescription": "Kthehu dhe rihapi filtrat nga lista e gjetjeve.",
       "title": "Filtrimi i gjetjeve",
       "reset": "Rivendos",
       "severity": "Niveli i rrezikut",
@@ -1913,11 +1914,17 @@
       "actorSystem": "Sistemi Kilo",
       "couldNotLoad": "Nuk u ngarkua raporti i auditimit.",
       "events": "Ngjarjet",
+      "eventConfidence": "Besueshmëria: {{confidence}}",
+      "eventReason": "Arsyeja: {{reason}}",
+      "eventsCount_one": "{{displayCount}} ngjarje",
+      "eventsCount_other": "{{displayCount}} ngjarje",
       "generated": "Raporti u gjenerua më {{generatedAt}}.",
       "noActivity": "Asnjë aktivitet i regjistruar",
       "noActivityDescription": "Kilo nuk ka aktivitet për të raportuar për gjetjet e sigurisë nga {{start}} deri më {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Depoja nuk është regjistruar",
+      "reasonUnknown": "Arsye e panjohur",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Përmbledhja e raportit",
       "title": "Raporti i auditimit",
       "unavailable": "Raporti i auditimit nuk është i disponueshëm",
@@ -1972,6 +1979,7 @@
       "reauthorizeButton": "Riautorizo aplikacionin GitHub",
       "reauthorizeDescription": "Agjenti i sigurisë ka nevojë për leje për të lexuar njoftimet e Dependabot. Riautorizo aplikacionin GitHub për t'ia dhënë këtë leje.",
       "reauthorizeTitle": "Kërkohen leje shtesë",
+      "retryFailed": "Nuk u ngarkua akoma agjenti i sigurisë. Kontrollo lidhjen dhe provo përsëri.",
       "setupFailed": "Nuk u nis konfigurimi i GitHub. Provo përsëri."
     },
     "queuedActionUntracked": "Nuk mund të ndiqej më gjendja e një veprimi në radhë. Rifresko për të parë gjendjen më të fundit.",
@@ -2565,7 +2573,10 @@
       "allowOnceAccessibility": "Lejo një herë",
       "alwaysAllow": "Lejo gjithmonë",
       "alwaysAllowAccessibility": "Lejo gjithmonë",
-      "retrying": "Duke u provuar përsëri…"
+      "retrying": "Duke u provuar përsëri…",
+      "retryDeny": "Provo ta refuzosh përsëri",
+      "retryAllowOnce": "Provo ta lejosh një herë përsëri",
+      "retryAlwaysAllow": "Provo ta lejosh gjithmonë përsëri"
     },
     "questionCard": {
       "title": "Agjenti kërkon përgjigjen tënde",
@@ -2941,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "Po dëgjon...",
-    "staysOff": "Diktimi mbetet i çaktivizuar derisa të lejosh transkriptimin në internet.",
     "onlineTitle": "Të folurit përpunohet në internet",
     "onlineMessage": "Kjo pajisje nuk mund të transkriptojë pa internet. Regjistrimi yt dërgohet te {{provider}} për t'u kthyer në tekst. Kilo nuk e ruan audion.",
     "allow": "Lejo",
@@ -3156,7 +3166,9 @@
       "sendInvite": "Dërgo ftesën",
       "title": "Fto anëtar",
       "alreadyInvited": "Ky person është ftuar tashmë ose është tashmë anëtar.",
-      "sendError": "Ftesa nuk u dërgua."
+      "sendError": "Ftesa nuk u dërgua.",
+      "pendingInvitation": "Ky email ka tashmë një ftesë në pritje.",
+      "alreadyMember": "Ky person është tashmë anëtar i kësaj organizate."
     },
     "invoices": {
       "downloadA11y": "Shkarko faturën {{number}}",
@@ -3226,7 +3238,12 @@
       "pendingInvitations": "Ftesat në pritje",
       "resendInvite": "Ridërgo ftesën",
       "shareInviteLink": "Ndaj lidhjen e ftesës",
-      "resendInviteError": "Ftesa nuk u ridërgua."
+      "resendInviteError": "Ftesa nuk u ridërgua.",
+      "inviteNotResendable": "Kjo ftesë nuk mund të ridërgohet më.",
+      "ownerAuthority": "Vetëm pronari i organizatës mund të menaxhojë pronarët.",
+      "ownRoleChange": "Nuk mund të ndryshosh rolin tënd.",
+      "inviteExpired": "Kjo ftesë ka skaduar.",
+      "inviteAccepted": "Kjo ftesë është pranuar tashmë."
     },
     "usageStats": {
       "inputTokens": "Tokenët hyrës",

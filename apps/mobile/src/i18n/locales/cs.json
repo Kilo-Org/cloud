@@ -53,6 +53,7 @@
     "connected": "Připojeno",
     "couldNotLoadModels": "Modely se nepodařilo načíst.",
     "couldNotLoadRepositories": "Repozitáře se nepodařilo načíst.",
+    "noRepositoriesFound": "Žádné repozitáře nebyly nalezeny",
     "critical": "Kritické",
     "delete": "Smazat",
     "deleted": "Smazáno",
@@ -87,6 +88,7 @@
     "connect": "Připojit",
     "connectBitbucket": "Připojit Bitbucket",
     "connectGitlab": "Připojit GitLab",
+    "connectProvider": "Připojení poskytovatele",
     "contentTruncated": "Obsah zkrácen",
     "copyLink": "Kopírovat odkaz",
     "couldNotLoadOrganizations": "Organizace se nepodařilo načíst.",
@@ -145,7 +147,8 @@
     "agent": "Činidlo",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Změny"
+    "changes": "Změny",
+    "organizationTrialEnded": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Vlastník organizace může aktualizovat fakturaci na kilo.ai a poté to zkuste znovu."
   },
   "language": {
     "restarting": "Aplikace se restartuje kvůli změně jazyka",
@@ -1451,7 +1454,6 @@
       "gitlabNoRepositoriesDescription": "Možná bude nutné udělit přístup k dalším skupinám nebo projektům na GitLabu.",
       "installGithubApp": "Instalace aplikace GitHub pro repozitáře",
       "installGithubAppDescription": "Udělte aplikaci Kilo na GitHubu přístup k repozitářům, které chcete nechat zkontrolovat.",
-      "noRepositoriesFound": "Žádné repozitáře nebyly nalezeny",
       "repositoryAccess": "přístup k repozitářům"
     },
     "style": {
@@ -1481,6 +1483,8 @@
       "showMore": "Zobrazit více",
       "created": "Vytvořeno",
       "started": "Zahájeno",
+      "reviewEnded": "Ukončeno",
+      "severityNitpick": "Drobnost",
       "tokens": "Tokeny",
       "tokensInOut": "Vstup: {{input}} / výstup: {{output}}",
       "council": "Rada modelů",
@@ -1531,7 +1535,6 @@
       "invalidUrl": "Zadejte platnou URL adresu PR.",
       "couldNotCheckProviderStatus": "Stav poskytovatele se nepodařilo ověřit.",
       "couldNotLoadProviders": "Připojené poskytovatele se nepodařilo načíst. Zkuste to znovu.",
-      "connectProvider": "Připojení poskytovatele",
       "connectProviderDescription": "Připojte GitHub, abyste mohli ručně spustit kontrolu PR.",
       "pullRequestUrl": "URL adresa PR",
       "instructions": "Pokyny (nepovinné)",
@@ -1659,8 +1662,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Žádné filtry nejsou k dispozici",
-      "noFiltersDescription": "Vraťte se na seznam nálezů a znovu otevřete filtry.",
       "title": "Filtrování nálezů",
       "reset": "Obnovit výchozí",
       "severity": "Závažnost",
@@ -1965,11 +1966,19 @@
       "actorSystem": "Systém Kilo",
       "couldNotLoad": "Zprávu o auditu se nepodařilo načíst.",
       "events": "Události",
+      "eventConfidence": "Spolehlivost: {{confidence}}",
+      "eventReason": "Důvod: {{reason}}",
+      "eventsCount_one": "{{displayCount}} událost",
+      "eventsCount_few": "{{displayCount}} události",
+      "eventsCount_many": "{{displayCount}} události",
+      "eventsCount_other": "{{displayCount}} událostí",
       "generated": "Zpráva byla vygenerována {{generatedAt}}.",
       "noActivity": "Žádná zaznamenaná aktivita",
       "noActivityDescription": "Kilo za období od {{start}} do {{end}} neeviduje žádnou aktivitu u bezpečnostních nálezů, kterou by bylo možné uvést ve zprávě.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repozitář nezaznamenán",
+      "reasonUnknown": "Nerozpoznaný důvod",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Souhrn zprávy",
       "title": "Zpráva o auditu",
       "unavailable": "Zpráva o auditu není k dispozici",
@@ -2024,6 +2033,7 @@
       "reauthorizeButton": "Znovu autorizovat aplikaci GitHub",
       "reauthorizeDescription": "Bezpečnostní agent potřebuje oprávnění k čtení upozornění Dependabot. Udělte ho opětovnou autorizací aplikace GitHub.",
       "reauthorizeTitle": "Jsou vyžadována další oprávnění",
+      "retryFailed": "Bezpečnostního agenta se stále nepodařilo načíst. Zkontrolujte připojení a zkuste to znovu.",
       "setupFailed": "Nastavení GitHubu se nepodařilo spustit. Zkuste to znovu."
     },
     "queuedActionUntracked": "Akci zařazenou do fronty již nelze sledovat. Obnovte zobrazení, abyste viděli aktuální stav.",
@@ -2635,7 +2645,10 @@
       "allowOnceAccessibility": "Povolit jen tentokrát",
       "alwaysAllow": "Vždy povolit",
       "alwaysAllowAccessibility": "Vždy povolit",
-      "retrying": "Opakování…"
+      "retrying": "Opakování…",
+      "retryDeny": "Zamítnout znovu",
+      "retryAllowOnce": "Povolit jen tentokrát znovu",
+      "retryAlwaysAllow": "Vždy povolit znovu"
     },
     "questionCard": {
       "title": "Agent potřebuje odpověď",
@@ -3025,7 +3038,6 @@
   },
   "voiceInput": {
     "listening": "Poslouchám…",
-    "staysOff": "Diktování zůstane vypnuté, dokud nepovolíte online přepis.",
     "onlineTitle": "Řeč se zpracovává online",
     "onlineMessage": "Toto zařízení neumí přepisovat řeč bez připojení k internetu. Nahrávka se odešle poskytovateli {{provider}}, který ji převede na text. Kilo zvuk neukládá.",
     "allow": "Povolit",
@@ -3242,7 +3254,9 @@
       "sendInvite": "Odeslat pozvánku",
       "title": "Pozvat člena",
       "alreadyInvited": "Tento uživatel už byl pozván nebo už je členem.",
-      "sendError": "Pozvánku se nepodařilo odeslat."
+      "sendError": "Pozvánku se nepodařilo odeslat.",
+      "pendingInvitation": "Pro tento e-mail již existuje čekající pozvánka.",
+      "alreadyMember": "Tato osoba je již členem této organizace."
     },
     "invoices": {
       "downloadA11y": "Stáhnout fakturu {{number}}",
@@ -3312,7 +3326,12 @@
       "pendingInvitations": "Čekající pozvánky",
       "resendInvite": "Poslat pozvánku znovu",
       "shareInviteLink": "Sdílet odkaz na pozvánku",
-      "resendInviteError": "Pozvánku se nepodařilo odeslat znovu."
+      "resendInviteError": "Pozvánku se nepodařilo odeslat znovu.",
+      "inviteNotResendable": "Tuto pozvánku již nelze znovu poslat.",
+      "ownerAuthority": "Pouze vlastník organizace může spravovat vlastníky.",
+      "ownRoleChange": "Nemůžete změnit svou vlastní roli.",
+      "inviteExpired": "Tato pozvánka vypršela.",
+      "inviteAccepted": "Tato pozvánka již byla přijata."
     },
     "usageStats": {
       "inputTokens": "Vstupní tokeny",

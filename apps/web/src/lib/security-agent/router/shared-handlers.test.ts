@@ -44,17 +44,19 @@ const mockTryReserveAnalysisRestartSlot = jest.fn<(...args: unknown[]) => Promis
 const mockReleaseAnalysisStartReservation = jest.fn<(...args: unknown[]) => Promise<void>>();
 const mockEnqueueBacklogFindings = jest.fn<() => Promise<number>>();
 const mockGetSecurityAgentConfigWithStatus = jest.fn<() => Promise<unknown>>();
-const mockDecorateFindingWithRemediation = jest.fn<() => Promise<unknown>>();
-const mockDecorateFindingsWithRemediation = jest.fn<() => Promise<unknown>>();
+const mockDecorateFindingWithRemediation = jest.fn<(params: unknown) => Promise<unknown>>();
+const mockDecorateFindingsWithRemediation = jest.fn<(params: unknown) => Promise<unknown>>();
 const mockGetRemediationAttemptHistory = jest.fn<() => Promise<unknown>>();
 const mockDeleteFindingsByRepository =
   jest.fn<(params: unknown) => Promise<{ deletedCount: number }>>();
+const mockGetOrphanedRepositoriesWithFindingCounts =
+  jest.fn<(params: unknown) => Promise<unknown>>();
 const mockTrackSecurityAgentSync = jest.fn();
+const mockTrackSecurityAgentEnabled = jest.fn();
 const mockTrackSecurityAgentUiInteraction = jest.fn();
 const mockTrackSecurityAgentRemediationAction = jest.fn();
 const mockLogSecurityAudit = jest.fn();
 const mockCreateSecurityAuditLog = jest.fn();
-const mockUpsertSecurityAgentConfig = jest.fn();
 const mockSaveSecurityAgentConfigWithRevision = jest.fn<
   (params: unknown) => Promise<{
     newRevision: number;
@@ -86,6 +88,10 @@ const mockSettleOperation = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockGetSecurityAgentCommandStatus = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockGetSecurityAgentCommandStatuses = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 const mockGetReauthorizeUrl = jest.fn<(installationId: string) => string>();
+const mockFetchGitHubRepositories =
+  jest.fn<(installationId: string, appType: string, integrationId: string) => Promise<unknown[]>>();
+const mockUpdateRepositoriesForIntegration =
+  jest.fn<(integrationId: string, repositories: unknown[]) => Promise<void>>();
 
 jest.mock('../services/manual-sync-client', () => ({
   submitManualSecuritySync: mockSubmitManualSecuritySync,
@@ -117,7 +123,7 @@ jest.mock('../github/dependabot-api', () => ({
   checkDependabotAlertsAvailability: mockCheckDependabotAlertsAvailability,
 }));
 jest.mock('../posthog-tracking', () => ({
-  trackSecurityAgentEnabled: jest.fn(),
+  trackSecurityAgentEnabled: mockTrackSecurityAgentEnabled,
   trackSecurityAgentConfigSaved: jest.fn(),
   trackSecurityAgentSync: mockTrackSecurityAgentSync,
   trackSecurityAgentFindingDismissed: jest.fn(),
@@ -137,7 +143,6 @@ jest.mock('../services/audit-log-service', () => ({
 }));
 jest.mock('../db/security-config', () => ({
   getSecurityAgentConfigWithStatus: mockGetSecurityAgentConfigWithStatus,
-  upsertSecurityAgentConfig: mockUpsertSecurityAgentConfig,
   saveSecurityAgentConfigWithRevision: mockSaveSecurityAgentConfigWithRevision,
   setSecurityAgentEnabled: mockSetSecurityAgentEnabled,
 }));
@@ -146,7 +151,7 @@ jest.mock('../db/security-findings', () => ({
   getSecurityFindingById: mockGetSecurityFindingById,
   getSecurityFindingsSummary: jest.fn(),
   getLastSyncTime: jest.fn(),
-  getOrphanedRepositoriesWithFindingCounts: jest.fn(),
+  getOrphanedRepositoriesWithFindingCounts: mockGetOrphanedRepositoriesWithFindingCounts,
   deleteFindingsByRepository: mockDeleteFindingsByRepository,
 }));
 jest.mock('../db/security-remediation', () => ({
@@ -172,10 +177,10 @@ jest.mock('../services/auto-dismiss-service', () => ({
   countEligibleForAutoDismiss: jest.fn(),
 }));
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
-  updateRepositoriesForIntegration: jest.fn(),
+  updateRepositoriesForIntegration: mockUpdateRepositoriesForIntegration,
 }));
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
-  fetchGitHubRepositories: jest.fn(),
+  fetchGitHubRepositories: mockFetchGitHubRepositories,
 }));
 
 let createSecurityAgentHandlers: typeof createSecurityAgentHandlersType;
@@ -359,7 +364,7 @@ describe('trackUiInteraction', () => {
       input: { interaction: 'findings_filtered' },
     });
 
-    expect(mockUpsertSecurityAgentConfig).not.toHaveBeenCalled();
+    expect(mockSaveSecurityAgentConfigWithRevision).not.toHaveBeenCalled();
     expect(mockSetSecurityAgentEnabled).not.toHaveBeenCalled();
     expect(mockCreateSecurityAuditLog).not.toHaveBeenCalled();
     expect(mockLogSecurityAudit).not.toHaveBeenCalled();
@@ -493,12 +498,210 @@ describe('getConfig', () => {
 });
 
 describe('setEnabled', () => {
+  const acceptedSync = {
+    accepted: true as const,
+    commandId,
+    runId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    messageId: 'enable-sync-message-123',
+  };
+  const orgScopeResourceKey = 'security:manual_sync:org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:*';
+
+  function storedConfig(
+    overrides: {
+      repositorySelectionMode?: 'all' | 'selected';
+      selectedRepositoryIds?: number[];
+    } = {}
+  ) {
+    return {
+      isEnabled: true,
+      configRevision: 2,
+      storedConfig: {},
+      config: {
+        repository_selection_mode: overrides.repositorySelectionMode ?? 'all',
+        selected_repository_ids: overrides.selectedRepositoryIds ?? [],
+      },
+    };
+  }
+
+  function createHandlersWithRepositories(repositories: { id: number; full_name: string }[]) {
+    return createSecurityAgentHandlers({
+      resolveOwner: () => ({
+        type: 'org',
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        userId: 'user-123',
+      }),
+      resolveSecurityOwner: () => ({ organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }),
+      resolveResourceId: () => 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      verifyFindingOwnership: () => true,
+      getIntegration: async () =>
+        ({
+          id: 'integration-123',
+          integration_status: 'active',
+          platform_installation_id: 'installation-123',
+          repositories: repositories.map(repository => ({
+            ...repository,
+            name: repository.full_name.split('/')[1],
+            private: true,
+          })),
+        }) as never,
+      trackingExtras: () => ({}),
+    });
+  }
+
+  function admitSyncLedgerRow() {
+    mockAdmitOperation.mockResolvedValue({
+      admission: 'admitted',
+      row: {
+        id: 'ledger-row-id',
+        intent: 'manual_sync',
+        resource_key: orgScopeResourceKey,
+        taxonomy: 'reconcile-first',
+        status: 'admitted',
+        outcome_code: null,
+        canonical_result: null,
+        admitted_at: '2026-06-17T10:00:00.000Z',
+        settled_at: null,
+        lease_expires_at: '2026-06-17T10:02:00.000Z',
+        expires_at: '2026-07-17T10:00:00.000Z',
+      },
+    });
+  }
+
   it('returns initial sync command correlation after enable', async () => {
-    mockSubmitManualSecuritySync.mockResolvedValue({
-      accepted: true,
-      commandId,
-      runId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
-      messageId: 'enable-sync-message-123',
+    admitSyncLedgerRow();
+    mockSubmitManualSecuritySync.mockResolvedValue(acceptedSync);
+
+    await expect(
+      createHandlers().setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'all', selectedRepositoryIds: [] },
+      })
+    ).resolves.toEqual({
+      success: true,
+      initialSync: acceptedSync,
+      initialSyncAdmissionFailed: false,
+    });
+    expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedRevision: null })
+    );
+    expect(mockSubmitManualSecuritySync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        origin: 'enable_initial_sync',
+        operationKey: expect.stringMatching(/^enable_sync:[0-9a-f]{64}$/),
+      })
+    );
+  });
+
+  it('keeps the stored selection when an enable repeats it', async () => {
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue(storedConfig());
+
+    await expect(
+      createHandlers().setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'all', selectedRepositoryIds: [] },
+      })
+    ).resolves.toEqual({ success: true });
+
+    expect(mockSaveSecurityAgentConfigWithRevision).not.toHaveBeenCalled();
+    expect(mockAdmitOperation).not.toHaveBeenCalled();
+    expect(mockSubmitManualSecuritySync).not.toHaveBeenCalled();
+    expect(mockTrackSecurityAgentEnabled).not.toHaveBeenCalled();
+    expect(mockLogSecurityAudit).not.toHaveBeenCalled();
+  });
+
+  it('submits one sync when the effective repositories change', async () => {
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue(
+      storedConfig({ repositorySelectionMode: 'selected', selectedRepositoryIds: [1] })
+    );
+    admitSyncLedgerRow();
+    mockSubmitManualSecuritySync.mockResolvedValue(acceptedSync);
+
+    await expect(
+      createHandlersWithRepositories([
+        { id: 1, full_name: 'kilo/repo' },
+        { id: 2, full_name: 'kilo/other' },
+      ]).setEnabled.handler({
+        ctx: context,
+        input: {
+          isEnabled: true,
+          repositorySelectionMode: 'selected',
+          selectedRepositoryIds: [1, 2],
+        },
+      })
+    ).resolves.toEqual({
+      success: true,
+      initialSync: acceptedSync,
+      initialSyncAdmissionFailed: false,
+    });
+
+    expect(mockSubmitManualSecuritySync).toHaveBeenCalledTimes(1);
+    expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedRevision: 2 })
+    );
+  });
+
+  it('saves a new selection mode without a sync when the repositories match', async () => {
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue(
+      storedConfig({ repositorySelectionMode: 'selected', selectedRepositoryIds: [1] })
+    );
+
+    await expect(
+      createHandlers().setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'all', selectedRepositoryIds: [1] },
+      })
+    ).resolves.toEqual({
+      success: true,
+      initialSync: undefined,
+      initialSyncAdmissionFailed: false,
+    });
+
+    expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: { repository_selection_mode: 'all', selected_repository_ids: [1] },
+      })
+    );
+    expect(mockSubmitManualSecuritySync).not.toHaveBeenCalled();
+  });
+
+  it('submits one sync for a re-enable after disable', async () => {
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue({
+      ...storedConfig(),
+      isEnabled: false,
+    });
+    admitSyncLedgerRow();
+    mockSubmitManualSecuritySync.mockResolvedValue(acceptedSync);
+
+    await expect(
+      createHandlers().setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'all', selectedRepositoryIds: [] },
+      })
+    ).resolves.toMatchObject({ success: true, initialSyncAdmissionFailed: false });
+
+    expect(mockSubmitManualSecuritySync).toHaveBeenCalledTimes(1);
+    expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedRevision: 2 })
+    );
+  });
+
+  it('returns partial success when the sync ledger reports an in-flight command', async () => {
+    admitSyncLedgerRow();
+    mockAdmitOperation.mockResolvedValue({
+      admission: 'duplicate_in_flight',
+      row: {
+        id: 'ledger-row-id',
+        intent: 'manual_sync',
+        resource_key: orgScopeResourceKey,
+        taxonomy: 'reconcile-first',
+        status: 'admitted',
+        outcome_code: null,
+        canonical_result: null,
+        admitted_at: '2026-06-17T10:00:00.000Z',
+        settled_at: null,
+        lease_expires_at: '2026-06-17T10:02:00.000Z',
+        expires_at: '2026-07-17T10:00:00.000Z',
+      },
     });
 
     await expect(
@@ -508,20 +711,15 @@ describe('setEnabled', () => {
       })
     ).resolves.toEqual({
       success: true,
-      initialSync: {
-        accepted: true,
-        commandId,
-        runId: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
-        messageId: 'enable-sync-message-123',
-      },
-      initialSyncAdmissionFailed: false,
+      initialSync: undefined,
+      initialSyncAdmissionFailed: true,
     });
-    expect(mockSubmitManualSecuritySync).toHaveBeenCalledWith(
-      expect.objectContaining({ origin: 'enable_initial_sync' })
-    );
+
+    expect(mockSubmitManualSecuritySync).not.toHaveBeenCalled();
   });
 
   it('reports partial success when initial sync admission fails after enable', async () => {
+    admitSyncLedgerRow();
     mockSubmitManualSecuritySync.mockRejectedValue(new Error('queue unavailable'));
 
     await expect(
@@ -536,6 +734,46 @@ describe('setEnabled', () => {
     });
   });
 
+  it('propagates a stale config revision instead of submitting a sync', async () => {
+    mockSaveSecurityAgentConfigWithRevision.mockRejectedValue(
+      new TRPCError({
+        code: 'CONFLICT',
+        message:
+          'This configuration changed in another tab. Review the latest settings and save again.',
+      })
+    );
+
+    await expect(
+      createHandlers().setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: true, repositorySelectionMode: 'all', selectedRepositoryIds: [] },
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+    expect(mockSubmitManualSecuritySync).not.toHaveBeenCalled();
+    expect(mockSetSecurityAgentEnabled).not.toHaveBeenCalled();
+  });
+
+  it('disables without writing the selection or submitting a sync', async () => {
+    await expect(
+      createHandlers().setEnabled.handler({
+        ctx: context,
+        input: { isEnabled: false },
+      })
+    ).resolves.toEqual({ success: true });
+
+    expect(mockSetSecurityAgentEnabled).toHaveBeenCalledWith(
+      {
+        type: 'org',
+        id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        userId: 'user-123',
+      },
+      false
+    );
+    expect(mockSaveSecurityAgentConfigWithRevision).not.toHaveBeenCalled();
+    expect(mockSubmitManualSecuritySync).not.toHaveBeenCalled();
+  });
+
   it('refuses enabling with an empty selected repo set', async () => {
     await expect(
       createHandlers().setEnabled.handler({
@@ -546,7 +784,7 @@ describe('setEnabled', () => {
       code: 'PRECONDITION_FAILED',
       message: 'Select at least one repository before enabling Security Agent.',
     });
-    expect(mockUpsertSecurityAgentConfig).not.toHaveBeenCalled();
+    expect(mockSaveSecurityAgentConfigWithRevision).not.toHaveBeenCalled();
     expect(mockSetSecurityAgentEnabled).not.toHaveBeenCalled();
   });
 
@@ -560,7 +798,7 @@ describe('setEnabled', () => {
       code: 'PRECONDITION_FAILED',
       message: 'Select at least one repository before enabling Security Agent.',
     });
-    expect(mockUpsertSecurityAgentConfig).not.toHaveBeenCalled();
+    expect(mockSaveSecurityAgentConfigWithRevision).not.toHaveBeenCalled();
     expect(mockSetSecurityAgentEnabled).not.toHaveBeenCalled();
   });
 });
@@ -2212,5 +2450,241 @@ describe('findings list DTO narrowing', () => {
     expect(result.raw_data).toBeDefined();
     expect(result.analysis).toEqual(decoratedFinding.analysis);
     expect(result.remediationSummary?.latestAttempt).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cached repository snapshot
+//
+// `platform_integrations.repositories` is typed `number | string` ids, and the
+// strict reader other modules use throws on an id it cannot match. Every
+// findings-decorating procedure reads the snapshot through one tolerant reader,
+// so a damaged snapshot costs those repositories their scope instead of
+// answering 500 for the whole findings surface.
+// ---------------------------------------------------------------------------
+
+const ORGANIZATION_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+function createHandlersWithRepositorySnapshot(repositories: unknown[]) {
+  return createSecurityAgentHandlers({
+    resolveOwner: () => ({ type: 'org', id: ORGANIZATION_ID, userId: 'user-123' }),
+    resolveSecurityOwner: () => ({ organizationId: ORGANIZATION_ID }),
+    resolveResourceId: () => ORGANIZATION_ID,
+    verifyFindingOwnership: () => true,
+    getIntegration: async () =>
+      ({
+        id: 'integration-123',
+        integration_status: 'active',
+        platform_installation_id: 'installation-123',
+        github_app_type: 'standard',
+        repositories,
+      }) as never,
+    trackingExtras: () => ({}),
+  });
+}
+
+// Only the fields the decorator and the DTO narrowing touch; the handlers are
+// asserted on the decorated payload the mocks return.
+const snapshotFinding = {
+  id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  owned_by_organization_id: ORGANIZATION_ID,
+  owned_by_user_id: null,
+  repo_full_name: 'kilo/repo',
+  status: 'open',
+  raw_data: { number: 42 },
+} as unknown as SecurityFindingWithRemediation;
+
+const unreadableSnapshot = [{ id: '1', full_name: 'kilo/repo', name: 'repo', private: true }];
+const mixedSnapshot = [
+  { id: 1, full_name: 'kilo/repo', name: 'repo', private: true },
+  { id: '2', full_name: 'kilo/other', name: 'other', private: true },
+];
+
+describe('cached repository snapshot', () => {
+  beforeEach(() => {
+    mockListSecurityFindings.mockResolvedValue({ findings: [snapshotFinding], totalCount: 1 });
+    mockDecorateFindingsWithRemediation.mockResolvedValue([snapshotFinding]);
+    mockCanStartAnalysis.mockResolvedValue({ allowed: true, currentCount: 0, limit: 3 });
+    mockGetSecurityFindingById.mockResolvedValue(snapshotFinding);
+    mockDecorateFindingWithRemediation.mockResolvedValue(snapshotFinding);
+  });
+
+  it('still lists findings when every cached repository id is unreadable', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(
+      createHandlersWithRepositorySnapshot(unreadableSnapshot).listFindings.handler({
+        ctx: context,
+        input: { sortBy: 'severity_desc', limit: 10, offset: 0 },
+      })
+    ).resolves.toMatchObject({ totalCount: 1 });
+
+    expect(mockDecorateFindingsWithRemediation).toHaveBeenCalledWith(
+      expect.objectContaining({ repoFullNamesInScope: [] })
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining('could not match cached repository ids'),
+      expect.objectContaining({ ownerId: ORGANIZATION_ID, unreadableCount: 1 })
+    );
+    consoleError.mockRestore();
+  });
+
+  it('still returns a finding detail when every cached repository id is unreadable', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(
+      createHandlersWithRepositorySnapshot(unreadableSnapshot).getFinding.handler({
+        ctx: context,
+        input: { id: snapshotFinding.id },
+      })
+    ).resolves.toEqual(snapshotFinding);
+    expect(mockDecorateFindingWithRemediation).toHaveBeenCalledWith(
+      expect.objectContaining({ repoFullNamesInScope: [] })
+    );
+    consoleError.mockRestore();
+  });
+
+  it('keeps the repositories that carry a numeric id in a mixed snapshot', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue({
+      config: { repository_selection_mode: 'all' },
+      storedConfig: { repository_selection_mode: 'all' },
+      isEnabled: true,
+      configRevision: 1,
+    });
+
+    await createHandlersWithRepositorySnapshot(mixedSnapshot).listFindings.handler({
+      ctx: context,
+      input: { sortBy: 'severity_desc', limit: 10, offset: 0 },
+    });
+
+    expect(mockDecorateFindingsWithRemediation).toHaveBeenCalledWith(
+      expect.objectContaining({ repoFullNamesInScope: ['kilo/repo'] })
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      expect.stringContaining('could not match cached repository ids'),
+      expect.objectContaining({ unreadableCount: 1 })
+    );
+    consoleError.mockRestore();
+  });
+
+  it.each([
+    { snapshot: unreadableSnapshot, mode: 'all' as const, selectedIds: [] },
+    { snapshot: mixedSnapshot, mode: 'selected' as const, selectedIds: [2] },
+  ])('refuses enabling without a readable repository in $mode scope', async testCase => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await expect(
+        createHandlersWithRepositorySnapshot(testCase.snapshot).setEnabled.handler({
+          ctx: context,
+          input: {
+            isEnabled: true,
+            repositorySelectionMode: testCase.mode,
+            selectedRepositoryIds: testCase.selectedIds,
+          },
+        })
+      ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+      expect(mockSaveSecurityAgentConfigWithRevision).not.toHaveBeenCalled();
+      expect(mockSubmitManualSecuritySync).not.toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it('replaces an unreadable snapshot by refetching it for the repository list', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const fetched = [{ id: 7, full_name: 'kilo/refetched', name: 'refetched', private: false }];
+    mockFetchGitHubRepositories.mockResolvedValue(fetched);
+    mockUpdateRepositoriesForIntegration.mockResolvedValue();
+
+    const repositories = await createHandlersWithRepositorySnapshot(
+      unreadableSnapshot
+    ).getRepositories({ ctx: context, input: {} });
+
+    expect(repositories).toEqual([
+      {
+        id: 7,
+        fullName: 'kilo/refetched',
+        name: 'refetched',
+        private: false,
+        dependabotAlerts: 'unknown',
+      },
+    ]);
+    expect(mockUpdateRepositoriesForIntegration).toHaveBeenCalledWith('integration-123', fetched);
+    consoleError.mockRestore();
+  });
+});
+
+describe('cached repository snapshot with an unreadable id', () => {
+  beforeEach(() => {
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue({
+      config: { repository_selection_mode: 'all' },
+      storedConfig: { repository_selection_mode: 'all' },
+      isEnabled: true,
+      configRevision: 1,
+    });
+  });
+
+  it('keeps an unmatched repository connected for orphan detection', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const orphaned = [
+      { repoFullName: 'kilo/repo', findingCount: 4 },
+      { repoFullName: 'kilo/gone', findingCount: 2 },
+    ];
+    mockGetOrphanedRepositoriesWithFindingCounts.mockResolvedValue(orphaned);
+
+    const result = await createHandlersWithRepositorySnapshot(
+      unreadableSnapshot
+    ).getOrphanedRepositories({ ctx: context, input: {} });
+
+    // The entry keeps its name even though its id cannot be matched, so only a
+    // repository missing from the snapshot is reported as orphaned.
+    expect(mockGetOrphanedRepositoriesWithFindingCounts).toHaveBeenCalledWith({
+      owner: { organizationId: ORGANIZATION_ID },
+      accessibleRepoFullNames: ['kilo/repo'],
+    });
+    expect(result).toEqual(orphaned);
+    consoleError.mockRestore();
+  });
+
+  it('refetches a snapshot that kept some entries but dropped others', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const fetched = [
+      { id: 1, full_name: 'kilo/repo', name: 'repo', private: true },
+      { id: 2, full_name: 'kilo/other', name: 'other', private: true },
+    ];
+    mockFetchGitHubRepositories.mockResolvedValue(fetched);
+    mockUpdateRepositoriesForIntegration.mockResolvedValue();
+
+    const repositories = await createHandlersWithRepositorySnapshot(mixedSnapshot).getRepositories({
+      ctx: context,
+      input: {},
+    });
+
+    // Reading one numeric entry is not enough: the dropped one stays invisible
+    // until the snapshot is rebuilt from the provider.
+    expect(mockUpdateRepositoriesForIntegration).toHaveBeenCalledWith('integration-123', fetched);
+    expect(repositories.map(repository => repository.fullName)).toEqual([
+      'kilo/repo',
+      'kilo/other',
+    ]);
+    consoleError.mockRestore();
+  });
+
+  it('still lists the entries it could read when the refresh fails', async () => {
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+    mockFetchGitHubRepositories.mockRejectedValue(new Error('GitHub unavailable'));
+
+    const repositories = await createHandlersWithRepositorySnapshot(mixedSnapshot).getRepositories({
+      ctx: context,
+      input: {},
+    });
+
+    expect(repositories.map(repository => repository.fullName)).toEqual(['kilo/repo']);
+    expect(consoleError).toHaveBeenCalledWith(
+      'Could not refresh the cached GitHub repositories',
+      expect.objectContaining({ ownerId: ORGANIZATION_ID, error: 'GitHub unavailable' })
+    );
+    consoleError.mockRestore();
   });
 });

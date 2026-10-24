@@ -53,6 +53,7 @@
     "connected": "متصل",
     "couldNotLoadModels": "بارگذاری مدل‌ها ناموفق بود.",
     "couldNotLoadRepositories": "بارگذاری مخازن ناموفق بود.",
+    "noRepositoriesFound": "مخزنی پیدا نشد",
     "critical": "بحرانی",
     "delete": "حذف",
     "deleted": "حذف‌شده",
@@ -87,6 +88,7 @@
     "connect": "اتصال",
     "connectBitbucket": "اتصال به Bitbucket",
     "connectGitlab": "اتصال به GitLab",
+    "connectProvider": "یک ارائه‌دهنده را متصل کنید",
     "contentTruncated": "بخشی از محتوا نمایش داده نمی‌شود",
     "copyLink": "کپی پیوند",
     "couldNotLoadOrganizations": "بارگذاری سازمان‌ها ناموفق بود.",
@@ -145,7 +147,8 @@
     "agent": "عامل",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "تغییرات"
+    "changes": "تغییرات",
+    "organizationTrialEnded": "دوره آزمایشی سازمان به پایان رسیده است و هیچ طرح فعالی ندارد. مالک سازمان می‌تواند صورتحساب را در kilo.ai به‌روزرسانی کند و سپس دوباره تلاش کند."
   },
   "language": {
     "restarting": "در حال راه‌اندازی مجدد برای تغییر زبان",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "ممکن است لازم باشد در GitLab به گروه‌ها یا پروژه‌های بیشتری دسترسی بدهید.",
       "installGithubApp": "برنامه GitHub را روی مخازن نصب کنید",
       "installGithubAppDescription": "به برنامه Kilo در GitHub اجازه دسترسی به مخازنی را بدهید که می‌خواهید بررسی شوند.",
-      "noRepositoriesFound": "مخزنی پیدا نشد",
       "repositoryAccess": "دسترسی به مخزن"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "نمایش بیشتر",
       "created": "زمان ایجاد",
       "started": "زمان شروع",
+      "reviewEnded": "زمان پایان",
+      "severityNitpick": "جزئی",
       "tokens": "توکن",
       "tokensInOut": "{{input}} ورودی / {{output}} خروجی",
       "council": "شورا",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "یک URL معتبر برای درخواست ادغام وارد کنید.",
       "couldNotCheckProviderStatus": "بررسی وضعیت ارائه‌دهنده ممکن نشد.",
       "couldNotLoadProviders": "نتوانستیم ارائه‌دهنده‌های متصل شما را بارگذاری کنیم. لطفاً دوباره تلاش کنید.",
-      "connectProvider": "یک ارائه‌دهنده را متصل کنید",
       "connectProviderDescription": "برای شروع بررسی دستی یک درخواست ادغام، GitHub را متصل کنید.",
       "pullRequestUrl": "URL درخواست ادغام",
       "instructions": "دستورالعمل‌ها (اختیاری)",
@@ -1615,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "فیلتری در دسترس نیست",
-      "noFiltersDescription": "برگردید و فیلترها را از فهرست یافته‌ها دوباره باز کنید.",
       "title": "فیلتر یافته‌ها",
       "reset": "بازنشانی",
       "severity": "شدت",
@@ -1913,11 +1914,17 @@
       "actorSystem": "سیستم Kilo",
       "couldNotLoad": "بارگذاری گزارش ممیزی ممکن نشد.",
       "events": "رویدادها",
+      "eventConfidence": "اطمینان: {{confidence}}",
+      "eventReason": "دلیل: {{reason}}",
+      "eventsCount_one": "{{displayCount}} رویداد",
+      "eventsCount_other": "{{displayCount}} رویداد",
       "generated": "این گزارش در {{generatedAt}} تولید شده است.",
       "noActivity": "هیچ فعالیتی ثبت نشده",
       "noActivityDescription": "از {{start}} تا {{end}}، هیچ فعالیت قابل گزارشی درباره یافته‌های امنیتی در Kilo ثبت نشده است.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "مخزن ثبت نشده",
+      "reasonUnknown": "دلیل ناشناخته",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "خلاصه گزارش",
       "title": "گزارش ممیزی",
       "unavailable": "گزارش ممیزی در دسترس نیست",
@@ -1972,6 +1979,7 @@
       "reauthorizeButton": "اعطای مجدد مجوز به برنامه GitHub",
       "reauthorizeDescription": "عامل امنیتی برای خواندن هشدارهای Dependabot به مجوز نیاز دارد. برای دادن این مجوز، دوباره دسترسی برنامه GitHub را تأیید کنید.",
       "reauthorizeTitle": "مجوزهای بیشتری لازم است",
+      "retryFailed": "بارگذاری عامل امنیتی همچنان ممکن نشد. اتصال خود را بررسی کرده و دوباره تلاش کنید.",
       "setupFailed": "شروع راه‌اندازی GitHub ممکن نشد. لطفاً دوباره تلاش کنید."
     },
     "queuedActionUntracked": "پیگیری یکی از اقدامات در صف دیگر ممکن نیست. برای دیدن آخرین وضعیت، تازه‌سازی کنید.",
@@ -2565,7 +2573,10 @@
       "allowOnceAccessibility": "اجازه برای یک بار",
       "alwaysAllow": "اجازه همیشگی",
       "alwaysAllowAccessibility": "اجازه همیشگی",
-      "retrying": "در حال تلاش دوباره…"
+      "retrying": "در حال تلاش دوباره…",
+      "retryDeny": "تلاش دوباره برای رد کردن",
+      "retryAllowOnce": "تلاش دوباره برای اجازه برای یک بار",
+      "retryAlwaysAllow": "تلاش دوباره برای اجازه همیشگی"
     },
     "questionCard": {
       "title": "نیاز عامل به پاسخ شما",
@@ -2941,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "در حال گوش دادن...",
-    "staysOff": "تا اجازه تبدیل آنلاین گفتار به متن را ندهید، ورودی صوتی غیرفعال می‌ماند.",
     "onlineTitle": "گفتار به‌صورت آنلاین پردازش می‌شود",
     "onlineMessage": "این دستگاه نمی‌تواند گفتار را به‌صورت آفلاین به متن تبدیل کند. صدای ضبط‌شده شما برای تبدیل به متن به {{provider}} ارسال می‌شود. Kilo صدا را ذخیره نمی‌کند.",
     "allow": "اجازه دادن",
@@ -3156,7 +3166,9 @@
       "sendInvite": "ارسال دعوت‌نامه",
       "title": "دعوت از عضو",
       "alreadyInvited": "این آدرس ایمیل قبلاً دعوت شده است یا از قبل عضو است.",
-      "sendError": "ارسال دعوت‌نامه ممکن نشد."
+      "sendError": "ارسال دعوت‌نامه ممکن نشد.",
+      "pendingInvitation": "این ایمیل از قبل یک دعوت‌نامه در انتظار دارد.",
+      "alreadyMember": "این شخص از قبل عضو این سازمان است."
     },
     "invoices": {
       "downloadA11y": "دانلود فاکتور {{number}}",
@@ -3226,7 +3238,12 @@
       "pendingInvitations": "دعوت‌نامه‌های در انتظار پذیرش",
       "resendInvite": "ارسال دوبارهٔ دعوت‌نامه",
       "shareInviteLink": "اشتراک‌گذاری پیوند دعوت",
-      "resendInviteError": "ارسال دوبارهٔ دعوت‌نامه ممکن نشد."
+      "resendInviteError": "ارسال دوبارهٔ دعوت‌نامه ممکن نشد.",
+      "inviteNotResendable": "این دعوت‌نامه دیگر قابل ارسال دوباره نیست.",
+      "ownerAuthority": "تنها مالک سازمان می‌تواند مالکان را مدیریت کند.",
+      "ownRoleChange": "شما نمی‌توانید نقش خودتان را تغییر دهید.",
+      "inviteExpired": "این دعوت‌نامه منقضی شده است.",
+      "inviteAccepted": "این دعوت‌نامه قبلاً پذیرفته شده است."
     },
     "usageStats": {
       "inputTokens": "توکن‌های ورودی",

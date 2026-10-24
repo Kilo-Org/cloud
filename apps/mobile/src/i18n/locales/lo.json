@@ -53,6 +53,7 @@
     "connected": "ເຊື່ອມຕໍ່ແລ້ວ",
     "couldNotLoadModels": "ບໍ່ສາມາດໂຫຼດໂມເດວໄດ້.",
     "couldNotLoadRepositories": "ບໍ່ສາມາດໂຫຼດຄັງໂຄ້ດໄດ້.",
+    "noRepositoriesFound": "ບໍ່ພົບຄັງໂຄ້ດ",
     "critical": "ຮ້າຍແຮງ",
     "delete": "ລຶບ",
     "deleted": "ລຶບແລ້ວ",
@@ -87,6 +88,7 @@
     "connect": "ເຊື່ອມຕໍ່",
     "connectBitbucket": "ເຊື່ອມຕໍ່ Bitbucket",
     "connectGitlab": "ເຊື່ອມຕໍ່ GitLab",
+    "connectProvider": "ເຊື່ອມຕໍ່ຜູ້ໃຫ້ບໍລິການ",
     "contentTruncated": "ສະແດງເນື້ອຫາບໍ່ຄົບ",
     "copyLink": "ຄັດລອກລິ້ງ",
     "couldNotLoadOrganizations": "ບໍ່ສາມາດໂຫຼດລາຍຊື່ອົງກອນໄດ້.",
@@ -145,7 +147,8 @@
     "agent": "ຕົວແທນ",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "ການປ່ຽນແປງ"
+    "changes": "ການປ່ຽນແປງ",
+    "organizationTrialEnded": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າຂອງອົງກອນສາມາດອັບເດດການເກັບເງິນໄດ້ທີ່ kilo.ai, ແລ້ວລອງອີກຄັ້ງ."
   },
   "language": {
     "restarting": "ກຳລັງເປີດແອັບໃໝ່ເພື່ອໃຊ້ພາສາທີ່ເລືອກ",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "ເຈົ້າອາດຕ້ອງໃຫ້ສິດເຂົ້າເຖິງກຸ່ມ ຫຼື ໂຄງການເພີ່ມໃນ GitLab.",
       "installGithubApp": "ຕິດຕັ້ງແອັບ GitHub ໃນຄັງໂຄ້ດ",
       "installGithubAppDescription": "ໃຫ້ສິດແອັບ GitHub ຂອງ Kilo ເຂົ້າເຖິງຄັງໂຄ້ດທີ່ເຈົ້າຕ້ອງການໃຫ້ກວດທານ.",
-      "noRepositoriesFound": "ບໍ່ພົບຄັງໂຄ້ດ",
       "repositoryAccess": "ສິດເຂົ້າເຖິງຄັງໂຄ້ດ"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "ສະແດງເພີ່ມເຕີມ",
       "created": "ສ້າງເມື່ອ",
       "started": "ເລີ່ມເມື່ອ",
+      "reviewEnded": "ສິ້ນສຸດເມື່ອ",
+      "severityNitpick": "ຂໍ້ຕິນ້ອຍ",
       "tokens": "ໂທເຄັນ",
       "tokensInOut": "{{input}} ເຂົ້າ / {{output}} ອອກ",
       "council": "ຄະນະຜູ້ກວດສອບ",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "ໃສ່ URL ຂອງຄຳຂໍລວມໂຄ້ດທີ່ຖືກຕ້ອງ.",
       "couldNotCheckProviderStatus": "ບໍ່ສາມາດກວດສອບສະຖານະຂອງຜູ້ໃຫ້ບໍລິການໄດ້.",
       "couldNotLoadProviders": "ບໍ່ສາມາດໂຫຼດລາຍການຜູ້ໃຫ້ບໍລິການທີ່ທ່ານເຊື່ອມຕໍ່ໄວ້ໄດ້. ກະລຸນາລອງອີກຄັ້ງ.",
-      "connectProvider": "ເຊື່ອມຕໍ່ຜູ້ໃຫ້ບໍລິການ",
       "connectProviderDescription": "ເຊື່ອມຕໍ່ GitHub ເພື່ອເລີ່ມກວດສອບຄຳຂໍລວມໂຄ້ດດ້ວຍຕົນເອງ.",
       "pullRequestUrl": "URL ຂອງຄຳຂໍລວມໂຄ້ດ",
       "instructions": "ຄຳແນະນຳ (ບໍ່ຈຳເປັນຕ້ອງໃສ່)",
@@ -1615,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "ບໍ່ມີຕົວກັ່ນຕອງ",
-      "noFiltersDescription": "ກັບໄປທີ່ລາຍການບັນຫາທີ່ກວດພົບ ແລ້ວເປີດຕົວກັ່ນຕອງອີກຄັ້ງ.",
       "title": "ກັ່ນຕອງບັນຫາທີ່ກວດພົບ",
       "reset": "ຄືນຄ່າເດີມ",
       "severity": "ລະດັບຄວາມຮ້າຍແຮງ",
@@ -1913,11 +1914,17 @@
       "actorSystem": "ລະບົບ Kilo",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດລາຍງານການກວດສອບໄດ້.",
       "events": "ເຫດການ",
+      "eventConfidence": "ຄວາມໝັ້ນໃຈ: {{confidence}}",
+      "eventReason": "ເຫດຜົນ: {{reason}}",
+      "eventsCount_one": "{{displayCount}} ເຫດການ",
+      "eventsCount_other": "{{displayCount}} ເຫດການ",
       "generated": "ສ້າງເມື່ອ {{generatedAt}}.",
       "noActivity": "ບໍ່ມີກິດຈະກຳທີ່ບັນທຶກໄວ້",
       "noActivityDescription": "Kilo ບໍ່ມີກິດຈະກຳກ່ຽວກັບບັນຫາຄວາມປອດໄພທີ່ກວດພົບທີ່ສາມາດລາຍງານໄດ້ ຕັ້ງແຕ່ {{start}} ຫາ {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "ບໍ່ໄດ້ບັນທຶກຄັງໂຄ້ດ",
+      "reasonUnknown": "ເຫດຜົນທີ່ບໍ່ຮູ້ຈັກ",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "ສະຫຼຸບລາຍງານ",
       "title": "ລາຍງານການກວດສອບ",
       "unavailable": "ບໍ່ສາມາດເບິ່ງລາຍງານການກວດສອບໄດ້",
@@ -1972,6 +1979,7 @@
       "reauthorizeButton": "ໃຫ້ສິດແອັບ GitHub ອີກຄັ້ງ",
       "reauthorizeDescription": "ຕົວຊ່ວຍດ້ານຄວາມປອດໄພຕ້ອງການສິດເພື່ອອ່ານການແຈ້ງເຕືອນ Dependabot. ໃຫ້ສິດແອັບ GitHub ອີກຄັ້ງເພື່ອໃຫ້ສິດນີ້.",
       "reauthorizeTitle": "ຕ້ອງການສິດເພີ່ມເຕີມ",
+      "retryFailed": "ຍັງບໍ່ສາມາດໂຫຼດຕົວຊ່ວຍດ້ານຄວາມປອດໄພໄດ້. ກະລຸນາກວດສອບການເຊື່ອມຕໍ່ຂອງທ່ານ ແລະ ລອງໃໝ່.",
       "setupFailed": "ບໍ່ສາມາດເລີ່ມການຕັ້ງຄ່າ GitHub. ກະລຸນາລອງໃໝ່."
     },
     "queuedActionUntracked": "ບໍ່ສາມາດຕິດຕາມການດຳເນີນການທີ່ຢູ່ໃນຄິວໄດ້ອີກແລ້ວ. ໂຫຼດຂໍ້ມູນໃໝ່ເພື່ອເບິ່ງສະຖານະລ່າສຸດ.",
@@ -2565,7 +2573,10 @@
       "allowOnceAccessibility": "ອະນຸຍາດສະເພາະຄັ້ງນີ້",
       "alwaysAllow": "ອະນຸຍາດທຸກຄັ້ງ",
       "alwaysAllowAccessibility": "ອະນຸຍາດທຸກຄັ້ງ",
-      "retrying": "ກຳລັງລອງໃໝ່…"
+      "retrying": "ກຳລັງລອງໃໝ່…",
+      "retryDeny": "ລອງບໍ່ອະນຸຍາດໃໝ່",
+      "retryAllowOnce": "ລອງອະນຸຍາດສະເພາະຄັ້ງນີ້ໃໝ່",
+      "retryAlwaysAllow": "ລອງອະນຸຍາດທຸກຄັ້ງໃໝ່"
     },
     "questionCard": {
       "title": "ເອເຈນຕ້ອງການຄຳຕອບ",
@@ -2941,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "ກຳລັງຟັງ...",
-    "staysOff": "ການປ້ອນຂໍ້ຄວາມດ້ວຍສຽງຈະຍັງປິດຢູ່ ຈົນກວ່າທ່ານຈະອະນຸຍາດໃຫ້ແປງສຽງເປັນຂໍ້ຄວາມຜ່ານອິນເຕີເນັດ.",
     "onlineTitle": "ປະມວນຜົນສຽງເວົ້າຜ່ານອິນເຕີເນັດ",
     "onlineMessage": "ອຸປະກອນນີ້ບໍ່ສາມາດແປງສຽງເປັນຂໍ້ຄວາມໂດຍບໍ່ໃຊ້ອິນເຕີເນັດໄດ້. ສຽງທີ່ທ່ານບັນທຶກຈະຖືກສົ່ງໄປຫາ {{provider}} ເພື່ອແປງເປັນຂໍ້ຄວາມ. Kilo ບໍ່ເກັບຮັກສາສຽງດັ່ງກ່າວ.",
     "allow": "ອະນຸຍາດ",
@@ -3156,7 +3166,9 @@
       "sendInvite": "ສົ່ງຄຳເຊີນ",
       "title": "ເຊີນສະມາຊິກ",
       "alreadyInvited": "ພວກເຂົາຖືກເຊີນແລ້ວ ຫຼື ເປັນສະມາຊິກແລ້ວ.",
-      "sendError": "ບໍ່ສາມາດສົ່ງຄຳເຊີນໄດ້."
+      "sendError": "ບໍ່ສາມາດສົ່ງຄຳເຊີນໄດ້.",
+      "pendingInvitation": "ອີເມວນີ້ມີຄຳເຊີນທີ່ລໍຖ້າຢູ່ແລ້ວ.",
+      "alreadyMember": "ບຸກຄົນນີ້ເປັນສະມາຊິກຂອງອົງກອນນີ້ແລ້ວ."
     },
     "invoices": {
       "downloadA11y": "ດາວໂຫຼດໃບແຈ້ງໜີ້ {{number}}",
@@ -3226,7 +3238,12 @@
       "pendingInvitations": "ຄຳເຊີນທີ່ລໍຖ້າການຕອບຮັບ",
       "resendInvite": "ສົ່ງຄຳເຊີນອີກຄັ້ງ",
       "shareInviteLink": "ແບ່ງປັນລິ້ງເຊີນ",
-      "resendInviteError": "ບໍ່ສາມາດສົ່ງຄຳເຊີນອີກຄັ້ງໄດ້."
+      "resendInviteError": "ບໍ່ສາມາດສົ່ງຄຳເຊີນອີກຄັ້ງໄດ້.",
+      "inviteNotResendable": "ບໍ່ສາມາດສົ່ງຄຳເຊີນນີ້ອີກຄັ້ງໄດ້ອີກແລ້ວ.",
+      "ownerAuthority": "ມີພຽງເຈົ້າຂອງອົງກອນເທົ່ານັ້ນທີ່ສາມາດຈັດການເຈົ້າຂອງໄດ້.",
+      "ownRoleChange": "ທ່ານບໍ່ສາມາດປ່ຽນບົດບາດຂອງຕົນເອງໄດ້.",
+      "inviteExpired": "ຄຳເຊີນນີ້ໝົດອາຍຸແລ້ວ.",
+      "inviteAccepted": "ຄຳເຊີນນີ້ໄດ້ຮັບການຕອບຮັບແລ້ວ."
     },
     "usageStats": {
       "inputTokens": "ໂທເຄັນຂາເຂົ້າ",

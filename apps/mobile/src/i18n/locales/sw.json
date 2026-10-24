@@ -53,6 +53,7 @@
     "connected": "Imeunganishwa",
     "couldNotLoadModels": "Imeshindikana kupakia modeli.",
     "couldNotLoadRepositories": "Imeshindikana kupakia hazina.",
+    "noRepositoriesFound": "Hakuna hazina zilizopatikana",
     "critical": "Hatari sana",
     "delete": "Futa",
     "deleted": "Imefutwa",
@@ -87,6 +88,7 @@
     "connect": "Unganisha",
     "connectBitbucket": "Unganisha Bitbucket",
     "connectGitlab": "Unganisha GitLab",
+    "connectProvider": "Unganisha mtoa huduma",
     "contentTruncated": "Maudhui yamepunguzwa",
     "copyLink": "Nakili kiungo",
     "couldNotLoadOrganizations": "Imeshindikana kupakia mashirika.",
@@ -145,7 +147,8 @@
     "agent": "Wakala",
     "durationMinuteShort": "dk",
     "durationHourShort": "saa",
-    "changes": "Mabadiliko"
+    "changes": "Mabadiliko",
+    "organizationTrialEnded": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Mmiliki wa shirika anaweza kusasisha malipo kwenye kilo.ai, kisha ajaribu tena."
   },
   "language": {
     "restarting": "Programu inaanza upya ili kutumia lugha",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Huenda unahitaji kutoa ufikiaji kwa vikundi au miradi zaidi kwenye GitLab.",
       "installGithubApp": "Sakinisha programu ya GitHub kwenye hazina",
       "installGithubAppDescription": "Ipe programu ya Kilo ya GitHub ruhusa ya kufikia hazina unazotaka zikaguliwe.",
-      "noRepositoriesFound": "Hakuna hazina zilizopatikana",
       "repositoryAccess": "ufikiaji wa hazina"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "Onyesha zaidi",
       "created": "Uliundwa",
       "started": "Ulianza",
+      "reviewEnded": "Umeisha",
+      "severityNitpick": "Kidokezo",
       "tokens": "Tokeni",
       "tokensInOut": "{{input}} ingizo / {{output}} tokeo",
       "council": "Baraza",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "Ingiza URL halali ya ombi la kuunganisha.",
       "couldNotCheckProviderStatus": "Imeshindikana kuangalia hali ya mtoa huduma.",
       "couldNotLoadProviders": "Hatukuweza kupakia watoa huduma wako waliounganishwa. Tafadhali jaribu tena.",
-      "connectProvider": "Unganisha mtoa huduma",
       "connectProviderDescription": "Unganisha GitHub ili kuanzisha mwenyewe ukaguzi wa ombi la kuunganisha.",
       "pullRequestUrl": "URL ya ombi la kuunganisha",
       "instructions": "Maagizo (si lazima)",
@@ -1615,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Hakuna vichujio vinavyopatikana",
-      "noFiltersDescription": "Rudi nyuma kisha ufungue tena vichujio kutoka kwenye orodha ya matatizo.",
       "title": "Chuja matatizo",
       "reset": "Weka upya",
       "severity": "Ukali",
@@ -1913,11 +1914,17 @@
       "actorSystem": "Mfumo wa Kilo",
       "couldNotLoad": "Imeshindikana kupakia ripoti ya ukaguzi.",
       "events": "Matukio",
+      "eventConfidence": "Uhakika: {{confidence}}",
+      "eventReason": "Sababu: {{reason}}",
+      "eventsCount_one": "{{displayCount}} tukio",
+      "eventsCount_other": "{{displayCount}} matukio",
       "generated": "Ripoti imetengenezwa {{generatedAt}}.",
       "noActivity": "Hakuna shughuli iliyorekodiwa",
       "noActivityDescription": "Kilo haina shughuli zinazoweza kuripotiwa kuhusu matatizo ya usalama kuanzia {{start}} hadi {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Hazina haikurekodiwa",
+      "reasonUnknown": "Sababu isiyotambulika",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Muhtasari wa ripoti",
       "title": "Ripoti ya ukaguzi",
       "unavailable": "Ripoti ya ukaguzi haipatikani",
@@ -1972,6 +1979,7 @@
       "reauthorizeButton": "Idhinisha upya programu ya GitHub",
       "reauthorizeDescription": "Wakala wa usalama anahitaji ruhusa ya kusoma arifa za Dependabot. Idhinisha upya programu ya GitHub ili kutoa ruhusa hii.",
       "reauthorizeTitle": "Ruhusa za ziada zinahitajika",
+      "retryFailed": "Bado imeshindikana kupakia wakala wa usalama. Tafadhali angalia muunganisho wako kisha ujaribu tena.",
       "setupFailed": "Imeshindikana kuanza usanidi wa GitHub. Tafadhali jaribu tena."
     },
     "queuedActionUntracked": "Hatua iliyoongezwa kwenye foleni haiwezi kufuatiliwa tena. Onyesha upya ili kuona hali ya sasa.",
@@ -2565,7 +2573,10 @@
       "allowOnceAccessibility": "Ruhusu mara moja",
       "alwaysAllow": "Ruhusu daima",
       "alwaysAllowAccessibility": "Ruhusu daima",
-      "retrying": "Inajaribu tena…"
+      "retrying": "Inajaribu tena…",
+      "retryDeny": "Jaribu tena kukataa",
+      "retryAllowOnce": "Jaribu tena kuruhusu mara moja",
+      "retryAlwaysAllow": "Jaribu tena kuruhusu daima"
     },
     "questionCard": {
       "title": "Wakala anahitaji jibu",
@@ -2941,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "Inasikiliza...",
-    "staysOff": "Uingizaji kwa sauti utaendelea kuzimwa hadi uruhusu ubadilishaji wa sauti kuwa maandishi mtandaoni.",
     "onlineTitle": "Sauti huchakatwa mtandaoni",
     "onlineMessage": "Kifaa hiki hakiwezi kubadilisha sauti kuwa maandishi bila mtandao. Rekodi yako inatumwa kwa {{provider}} ili ibadilishwe kuwa maandishi. Kilo haihifadhi sauti.",
     "allow": "Ruhusu",
@@ -3156,7 +3166,9 @@
       "sendInvite": "Tuma mwaliko",
       "title": "Alika mwanachama",
       "alreadyInvited": "Wamekwishaalikwa au ni wanachama tayari.",
-      "sendError": "Imeshindikana kutuma mwaliko."
+      "sendError": "Imeshindikana kutuma mwaliko.",
+      "pendingInvitation": "Barua pepe hii tayari ina mwaliko unaosubiri.",
+      "alreadyMember": "Mtu huyu tayari ni mwanachama wa shirika hili."
     },
     "invoices": {
       "downloadA11y": "Pakua ankara {{number}}",
@@ -3226,7 +3238,12 @@
       "pendingInvitations": "Mialiko inayosubiri",
       "resendInvite": "Tuma mwaliko tena",
       "shareInviteLink": "Shiriki kiungo cha mwaliko",
-      "resendInviteError": "Imeshindikana kutuma mwaliko tena."
+      "resendInviteError": "Imeshindikana kutuma mwaliko tena.",
+      "inviteNotResendable": "Mwaliko huu hauwezi kutumwa tena.",
+      "ownerAuthority": "Ni mmiliki wa shirika pekee anayeweza kusimamia wamiliki.",
+      "ownRoleChange": "Huwezi kubadilisha jukumu lako mwenyewe.",
+      "inviteExpired": "Mwaliko huu umeisha muda wake.",
+      "inviteAccepted": "Mwaliko huu tayari umekubaliwa."
     },
     "usageStats": {
       "inputTokens": "Tokeni za ingizo",

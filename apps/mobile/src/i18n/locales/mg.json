@@ -53,6 +53,7 @@
     "connected": "Mifandray",
     "couldNotLoadModels": "Tsy tafiditra ny modely.",
     "couldNotLoadRepositories": "Tsy tafiditra ny tahirin-kaody.",
+    "noRepositoriesFound": "Tsy nisy tahirin-kaody hita",
     "critical": "Tena avo",
     "delete": "Fafao",
     "deleted": "Voafafa",
@@ -87,6 +88,7 @@
     "connect": "Ampifandraiso",
     "connectBitbucket": "Ampifandraiso ny Bitbucket",
     "connectGitlab": "Ampifandraiso ny GitLab",
+    "connectProvider": "Ampifandraiso ny mpanome tolotra",
     "contentTruncated": "Nohafohy ny votoaty",
     "copyLink": "Adikao ny rohy",
     "couldNotLoadOrganizations": "Tsy tafiditra ny fikambanana.",
@@ -145,7 +147,8 @@
     "agent": "mpandraharaha",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Fiovana"
+    "changes": "Fiovana",
+    "organizationTrialEnded": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Ny tompon'ny fikambanana dia afaka manavao ny faktiora ao amin'ny kilo.ai, ary hanandrana indray."
   },
   "language": {
     "restarting": "Manomboka indray mba hampiharana ny fiteny",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Mety mila manome alalana hidirana amin'ny vondrona na tetikasa fanampiny ao amin'ny GitLab ianao.",
       "installGithubApp": "Apetraho amin'ny tahirin-kaody ny rindranasa GitHub",
       "installGithubAppDescription": "Omeo alalana hiditra amin'ny tahirin-kaody tianao hohamarinina ny rindranasa Kilo ao amin'ny GitHub.",
-      "noRepositoriesFound": "Tsy nisy tahirin-kaody hita",
       "repositoryAccess": "alalana hidirana amin'ny tahirin-kaody"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "Asehoy bebe kokoa",
       "created": "Noforonina",
       "started": "Nanomboka",
+      "reviewEnded": "Nifarana",
+      "severityNitpick": "Fanamarihana kely",
       "tokens": "Sombin-tsoratra",
       "tokensInOut": "{{input}} miditra / {{output}} mivoaka",
       "council": "Filankevitra",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "Ampidiro ny URL manan-kery an'ny PR.",
       "couldNotCheckProviderStatus": "Tsy nety nohamarinina ny satan'ny mpanome tolotra.",
       "couldNotLoadProviders": "Tsy nety nampidirina ny mpanome tolotra nampifandraisinao. Andramo indray azafady.",
-      "connectProvider": "Ampifandraiso ny mpanome tolotra",
       "connectProviderDescription": "Ampifandraiso ny GitHub mba hanombohana mivantana ny fanamarinana PR.",
       "pullRequestUrl": "URL-n'ny PR",
       "instructions": "Torolalana (tsy voatery)",
@@ -1615,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Tsy misy sivana azo ampiasaina",
-      "noFiltersDescription": "Miverena ary sokafy indray ny sivana avy amin'ny lisitry ny olana hita.",
       "title": "Sivana ho an'ny olana hita",
       "reset": "Avereno amin'ny voalohany",
       "severity": "Hamafin'ny olana",
@@ -1913,11 +1914,17 @@
       "actorSystem": "Rafitra Kilo",
       "couldNotLoad": "Tsy nety nampidirina ny tatitra fanaraha-maso.",
       "events": "Zava-nitranga",
+      "eventConfidence": "Fahatokisana: {{confidence}}",
+      "eventReason": "Antony: {{reason}}",
+      "eventsCount_one": "{{displayCount}} Zava-nitranga",
+      "eventsCount_other": "{{displayCount}} Zava-nitranga",
       "generated": "Noforonina tamin'ny {{generatedAt}}.",
       "noActivity": "Tsy misy asa voarakitra",
       "noActivityDescription": "Tsy manana asa momba ny olana hita amin'ny fiarovana azo ampidirina anaty tatitra i Kilo, nanomboka ny {{start}} ka hatramin'ny {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Tsy voarakitra ny tahirin-kaody",
+      "reasonUnknown": "Antony tsy fantatra",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Famintinana ny tatitra",
       "title": "Tatitra fanaraha-maso",
       "unavailable": "Tsy azo jerena ny tatitra fanaraha-maso",
@@ -1972,6 +1979,7 @@
       "reauthorizeButton": "Omeo alalana indray ny rindranasa GitHub",
       "reauthorizeDescription": "Mila ny alalana ny Security Agent hamaky ny fampandrenesan'ny Dependabot. Omeo alalana indray ny rindranasa GitHub mba hanomezana azy io alalana io.",
       "reauthorizeTitle": "Ilaina ny alalana fanampiny",
+      "retryFailed": "Tsy nety nampidirina ny Security Agent. Jereo ny fifandraisanao dia andramo indray azafady.",
       "setupFailed": "Tsy nety natomboka ny fametrahana ny GitHub. Andramo indray azafady."
     },
     "queuedActionUntracked": "Tsy azo arahi-maso intsony ny asa iray voalahatra. Havaozy ny angona hijerena ny sata farany.",
@@ -2565,7 +2573,10 @@
       "allowOnceAccessibility": "Avelao indray mandeha",
       "alwaysAllow": "Avelao foana",
       "alwaysAllowAccessibility": "Avelao foana",
-      "retrying": "Manandrana indray…"
+      "retrying": "Manandrana indray…",
+      "retryDeny": "Andramo lavino indray",
+      "retryAllowOnce": "Andramo avelao indray mandeha indray",
+      "retryAlwaysAllow": "Andramo avelao foana indray"
     },
     "questionCard": {
       "title": "Mila valiny ny mpanampy",
@@ -2941,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "Mihaino...",
-    "staysOff": "Tsy handeha ny fampidirana amin'ny feo raha tsy avelanao hovadika ho soratra an-tserasera ny feo.",
     "onlineTitle": "Karakaraina an-tserasera ny feo",
     "onlineMessage": "Tsy afaka mamadika feo ho soratra ity fitaovana ity raha tsy mifandray amin'ny aterineto. Alefa any amin'ny {{provider}} ny feo noraketinao mba havadika ho soratra. Tsy mitahiry ny feo i Kilo.",
     "allow": "Avelao",
@@ -3156,7 +3166,9 @@
       "sendInvite": "Alefaso ny fanasana",
       "title": "Manasà mpikambana",
       "alreadyInvited": "Efa voasa na efa mpikambana izy.",
-      "sendError": "Tsy azo nalefa ny fanasana."
+      "sendError": "Tsy azo nalefa ny fanasana.",
+      "pendingInvitation": "Efa manana fanasana miandry ity mailaka ity.",
+      "alreadyMember": "Efa mpikambana ao amin'ity fikambanana ity ity olona ity."
     },
     "invoices": {
       "downloadA11y": "Alao ny faktiora {{number}}",
@@ -3226,7 +3238,12 @@
       "pendingInvitations": "Fanasana miandry",
       "resendInvite": "Alefaso indray ny fanasana",
       "shareInviteLink": "Zarao ny rohy fanasana",
-      "resendInviteError": "Tsy azo nalefa indray ny fanasana."
+      "resendInviteError": "Tsy azo nalefa indray ny fanasana.",
+      "inviteNotResendable": "Tsy afaka alefa indray intsony io fanasana io.",
+      "ownerAuthority": "Ny tompon'ny fikambanana ihany no afaka mitantana ny tompony.",
+      "ownRoleChange": "Tsy afaka manova ny andraikitrao ianao.",
+      "inviteExpired": "Efa lany andro io fanasana io.",
+      "inviteAccepted": "Efa nekena io fanasana io."
     },
     "usageStats": {
       "inputTokens": "Sombin-tsoratra miditra",

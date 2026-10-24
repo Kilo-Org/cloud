@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
+import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { captureException, captureMessage } from '@sentry/nextjs';
@@ -8,7 +9,7 @@ import {
   SlackWorkspaceAlreadyConnectedError,
   upsertSlackInstallation,
 } from '@/lib/integrations/slack-service';
-import { isLegacyProviderOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
+import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { bot } from '@/lib/bot';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -19,6 +20,7 @@ import {
   buildIntegrationOAuthRedirectPathFromState,
   parseOAuthStateOwner,
   cancelMissingCodeProviderOAuthAttempt,
+  organizationAccessDenialErrorCode,
 } from '@/lib/integrations/oauth/common';
 import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
 
@@ -114,9 +116,11 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
 
-    // 6. Verify user has access to the owner
+    // 6. Verify the user may change the owner's Slack connection. An organization
+    // connection carries a shared bot token and model policy, so it needs
+    // organization management authority, not just membership.
     if (owner.type === 'org') {
-      await ensureOrganizationAccess({ user }, owner.id);
+      await ensureOrganizationAccess({ user }, owner.id, ORGANIZATION_MANAGE_ROLES);
     } else {
       // For user-owned integrations, verify it's the same user
       if (user.id !== owner.id) {
@@ -124,7 +128,7 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
       }
     }
 
-    if (verified.purpose !== 'provider_install' && !isLegacyProviderOAuthState(verified)) {
+    if (verified.provider !== PLATFORM.SLACK || verified.purpose !== 'provider_install') {
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
 
@@ -149,9 +153,16 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
     const patchedRequest = new Request(url, request);
     const { teamId, installation } = await slackAdapter.handleOAuthCallback(patchedRequest);
 
-    // 8. Store installation in database
+    // 8. Store installation in database. The organization path is the only caller
+    // allowed to move an existing organization connection to another workspace,
+    // and only after the organization-management check above.
     try {
-      await upsertSlackInstallation({ owner, teamId, installation });
+      await upsertSlackInstallation({
+        owner,
+        teamId,
+        installation,
+        allowWorkspaceRebind: owner.type === 'org',
+      });
     } catch (error) {
       if (error instanceof SlackWorkspaceAlreadyConnectedError) {
         return NextResponse.redirect(
@@ -181,6 +192,16 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
     // Capture error to Sentry with context for debugging
     const searchParams = request.nextUrl.searchParams;
     const state = searchParams.get('state');
+
+    const denialCode = organizationAccessDenialErrorCode(error);
+    if (denialCode) {
+      return NextResponse.redirect(
+        new URL(
+          buildIntegrationOAuthRedirectPathFromState(PLATFORM.SLACK, state, `error=${denialCode}`),
+          APP_URL
+        )
+      );
+    }
 
     captureException(error, {
       tags: {

@@ -53,6 +53,7 @@
     "connected": "Підключено",
     "couldNotLoadModels": "Не вдалося завантажити моделі.",
     "couldNotLoadRepositories": "Не вдалося завантажити репозиторії.",
+    "noRepositoriesFound": "Репозиторіїв не знайдено",
     "critical": "Критичний",
     "delete": "Видалити",
     "deleted": "Видалено",
@@ -87,6 +88,7 @@
     "connect": "Підключити",
     "connectBitbucket": "Підключити Bitbucket",
     "connectGitlab": "Підключити GitLab",
+    "connectProvider": "Підключіть сервіс",
     "contentTruncated": "Вміст обрізано",
     "copyLink": "Скопіювати посилання",
     "couldNotLoadOrganizations": "Не вдалося завантажити організації.",
@@ -145,7 +147,8 @@
     "agent": "Агент",
     "durationMinuteShort": "хв",
     "durationHourShort": "год",
-    "changes": "Зміни"
+    "changes": "Зміни",
+    "organizationTrialEnded": "Пробний період організації завершився, і вона не має активного плану. Власник організації може оновити платіжні дані на kilo.ai, а потім спробувати ще раз."
   },
   "language": {
     "restarting": "Перезапуск для зміни мови",
@@ -889,7 +892,6 @@
       "gitlabNoRepositoriesDescription": "Можливо, потрібно надати доступ до більшої кількості груп або проєктів у GitLab.",
       "installGithubApp": "Установіть застосунок GitHub для репозиторіїв",
       "installGithubAppDescription": "Надайте застосунку Kilo для GitHub доступ до репозиторіїв, які потрібно перевіряти.",
-      "noRepositoriesFound": "Репозиторіїв не знайдено",
       "repositoryAccess": "доступ до репозиторію"
     },
     "style": {
@@ -913,7 +915,6 @@
     "followReviewMd": "Дотримуватися інструкцій REVIEW.md",
     "followReviewMdSubtitle": "Враховувати файли інструкцій REVIEW.md для кожного репозиторію",
     "manualReview": {
-      "connectProvider": "Підключіть сервіс",
       "connectProviderDescription": "Підключіть GitHub, щоб запустити перевірку запиту на злиття вручну.",
       "couldNotCheckProviderStatus": "Не вдалося перевірити стан сервісу.",
       "couldNotLoadProviders": "Не вдалося завантажити список підключених сервісів. Спробуйте ще раз.",
@@ -976,6 +977,8 @@
       "retryTitle": "Повторити перевірку?",
       "showMore": "Показати більше",
       "started": "Розпочато",
+      "reviewEnded": "Закінчено",
+      "severityNitpick": "Дрібниця",
       "threshold": "Поріг",
       "title": "Перевірка",
       "tokens": "Токени",
@@ -1097,8 +1100,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Немає доступних фільтрів",
-      "noFiltersDescription": "Поверніться назад і знову відкрийте фільтри зі списку проблем.",
       "title": "Фільтри проблем",
       "fixed": "Виправлено",
       "outcome": "Результат",
@@ -1164,12 +1165,20 @@
       "actorSystem": "Система Kilo",
       "couldNotLoad": "Не вдалося завантажити звіт аудиту.",
       "events": "Події",
+      "eventConfidence": "Впевненість: {{confidence}}",
+      "eventReason": "Причина: {{reason}}",
+      "eventsCount_one": "{{displayCount}} подія",
+      "eventsCount_few": "{{displayCount}} події",
+      "eventsCount_many": "{{displayCount}} подій",
+      "eventsCount_other": "{{displayCount}} події",
       "generated": "Звіт сформовано {{generatedAt}}.",
       "noActivity": "Немає зафіксованих дій",
       "noActivityDescription": "За період із {{start}} до {{end}} у Kilo не зафіксовано дій із проблемами безпеки, які можна включити до звіту.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "Не вдалося завершити запит на звіт. Спробуйте ще раз.",
       "repositoryNotRecorded": "Репозиторій не зафіксовано",
+      "reasonUnknown": "Нерозпізнана причина",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Підсумок звіту",
       "title": "Звіт аудиту",
       "unavailable": "Звіт аудиту недоступний",
@@ -1417,6 +1426,7 @@
       "reauthorizeButton": "Повторно авторизувати застосунок GitHub",
       "reauthorizeDescription": "Агент безпеки потребує дозволу на читання сповіщень Dependabot. Повторно авторизуйте застосунок GitHub, щоб надати цей дозвіл.",
       "reauthorizeTitle": "Потрібні додаткові дозволи",
+      "retryFailed": "Все ще не вдалося завантажити Агента безпеки. Перевірте підключення та спробуйте ще раз.",
       "setupFailed": "Не вдалося розпочати налаштування GitHub. Спробуйте ще раз."
     },
     "settingsOverview": {
@@ -2073,7 +2083,10 @@
       "allowOnceAccessibility": "Дозволити один раз",
       "alwaysAllow": "Завжди дозволяти",
       "alwaysAllowAccessibility": "Завжди дозволяти",
-      "retrying": "Повторна спроба…"
+      "retrying": "Повторна спроба…",
+      "retryDeny": "Спробувати не дозволяти ще раз",
+      "retryAllowOnce": "Спробувати дозволити один раз ще раз",
+      "retryAlwaysAllow": "Спробувати завжди дозволяти ще раз"
     },
     "questionCard": {
       "title": "Агенту потрібна відповідь",
@@ -2466,7 +2479,6 @@
     "allow": "Дозволити",
     "onlineMessage": "Цей пристрій не може розпізнавати мовлення без інтернету. Ваш запис надсилається до {{provider}} для перетворення на текст. Kilo не зберігає аудіо.",
     "onlineTitle": "Мовлення обробляється онлайн",
-    "staysOff": "Голосове введення залишатиметься вимкненим, доки ви не дозволите розпізнавання мовлення онлайн.",
     "start": "Почати голосове введення",
     "stop": "Зупинити голосове введення",
     "restricted": "Голосове введення обмежене на цьому пристрої.",
@@ -2742,7 +2754,7 @@
       "mutedUser": "Користувача {{login}} додано до ігнорованих",
       "noDiscussion": "Обговорень ще немає",
       "noDiscussionDescription": "У цьому запиті на злиття ще немає обговорень коду чи загальних коментарів.",
-      "comment_one": "1 коментар",
+      "comment_one": "{{displayCount}} коментар",
       "outdated": "Застаріло",
       "quotedDiffSnippet": "Цитований фрагмент змін",
       "reactionPill": "реакція {{emoji}}, {{displayCount}} {{countLabel}}",
@@ -3241,7 +3253,9 @@
       "sendInvite": "Надіслати запрошення",
       "title": "Запросити учасника",
       "alreadyInvited": "Ця адреса вже запрошена або вже належить учаснику організації.",
-      "sendError": "Не вдалося надіслати запрошення."
+      "sendError": "Не вдалося надіслати запрошення.",
+      "pendingInvitation": "Для цієї адреси електронної пошти вже є очікуване запрошення.",
+      "alreadyMember": "Ця особа вже є учасником цієї організації."
     },
     "invoices": {
       "downloadA11y": "Завантажити рахунок {{number}}",
@@ -3311,7 +3325,12 @@
       "pendingInvitations": "Неприйняті запрошення",
       "resendInvite": "Надіслати запрошення повторно",
       "shareInviteLink": "Поділитися посиланням на запрошення",
-      "resendInviteError": "Не вдалося надіслати запрошення повторно."
+      "resendInviteError": "Не вдалося надіслати запрошення повторно.",
+      "inviteNotResendable": "Це запрошення більше не можна надіслати повторно.",
+      "ownerAuthority": "Лише власник організації може керувати власниками.",
+      "ownRoleChange": "Ви не можете змінити власну роль.",
+      "inviteExpired": "Термін дії цього запрошення минув.",
+      "inviteAccepted": "Це запрошення вже прийнято."
     },
     "usageStats": {
       "inputTokens": "Вхідні токени",

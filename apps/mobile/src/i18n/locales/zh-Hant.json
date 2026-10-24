@@ -53,6 +53,7 @@
     "connected": "已連結",
     "couldNotLoadModels": "無法載入模型。",
     "couldNotLoadRepositories": "無法載入存放庫。",
+    "noRepositoriesFound": "找不到存放庫",
     "critical": "嚴重",
     "delete": "刪除",
     "deleted": "已刪除",
@@ -87,6 +88,7 @@
     "connect": "連結",
     "connectBitbucket": "連結 Bitbucket",
     "connectGitlab": "連結 GitLab",
+    "connectProvider": "連結平台",
     "contentTruncated": "內容已截斷",
     "copyLink": "複製連結",
     "couldNotLoadOrganizations": "無法載入組織。",
@@ -145,7 +147,8 @@
     "agent": "代理人",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "變更"
+    "changes": "變更",
+    "organizationTrialEnded": "組織的試用期已結束，且沒有使用中的方案。組織擁有者可以在 kilo.ai 更新帳單資訊，然後再試一次。"
   },
   "language": {
     "restarting": "正在重新啟動以套用語言",
@@ -883,7 +886,6 @@
       "gitlabNoRepositoriesDescription": "你可能需要授權存取 GitLab 上的更多群組或專案。",
       "installGithubApp": "為存放庫安裝 GitHub App",
       "installGithubAppDescription": "請授權 Kilo GitHub App 存取要審查的存放庫。",
-      "noRepositoriesFound": "找不到存放庫",
       "repositoryAccess": "存放庫存取權限"
     },
     "style": {
@@ -907,7 +909,6 @@
     "followReviewMd": "遵循 REVIEW.md",
     "followReviewMdSubtitle": "遵循每個存放庫的 REVIEW.md 指示檔案",
     "manualReview": {
-      "connectProvider": "連結平台",
       "connectProviderDescription": "連結 GitHub，即可手動開始審查 PR。",
       "couldNotCheckProviderStatus": "無法檢查平台狀態。",
       "couldNotLoadProviders": "無法載入已連結的平台。請再試一次。",
@@ -970,6 +971,8 @@
       "retryTitle": "要重新嘗試審查嗎？",
       "showMore": "顯示更多",
       "started": "開始時間",
+      "reviewEnded": "結束時間",
+      "severityNitpick": "挑剔",
       "threshold": "門檻",
       "title": "審查",
       "tokens": "詞元",
@@ -1091,8 +1094,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "沒有可用的篩選條件",
-      "noFiltersDescription": "請返回資安問題清單，再重新開啟篩選設定。",
       "title": "篩選資安問題",
       "fixed": "已修復",
       "outcome": "結果",
@@ -1158,12 +1159,18 @@
       "actorSystem": "Kilo 系統",
       "couldNotLoad": "無法載入稽核報告。",
       "events": "事件",
+      "eventConfidence": "信心度：{{confidence}}",
+      "eventReason": "原因：{{reason}}",
+      "eventsCount_one": "{{displayCount}} 個事件",
+      "eventsCount_other": "{{displayCount}} 個事件",
       "generated": "已於 {{generatedAt}} 產生。",
       "noActivity": "尚無活動記錄",
       "noActivityDescription": "Kilo 在 {{start}} 至 {{end}} 期間沒有可列入報告的資安問題活動。",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "報告查詢未完成。請再試一次。",
       "repositoryNotRecorded": "未記錄存放庫",
+      "reasonUnknown": "無法辨識的原因",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "報告摘要",
       "title": "稽核報告",
       "unavailable": "無法取得稽核報告",
@@ -1405,6 +1412,7 @@
       "reauthorizeButton": "重新授權 GitHub App",
       "reauthorizeDescription": "資安代理需要讀取 Dependabot 警報的權限。請重新授權 GitHub App 以授予此權限。",
       "reauthorizeTitle": "需要額外權限",
+      "retryFailed": "仍然無法載入資安代理。請檢查您的網路連線並再試一次。",
       "setupFailed": "無法開始 GitHub 設定。請再試一次。"
     },
     "settingsOverview": {
@@ -1680,7 +1688,7 @@
       "restartExitFailed": "已開始新的工作階段，但上一個工作階段仍未結束。",
       "exitNotSupported": "目前的工作階段不支援遠端結束功能。",
       "exitUnavailable": "目前無法從遠端結束此工作階段。",
-      "exitNeedsNewerCli": "遠端斜線指令需要較新版本的 Kilo CLI。請更新 Kilo CLI 後重新連線。"
+      "exitNeedsNewerCli": "遠端斜槓命令需要較新版本的 Kilo CLI。請更新 Kilo CLI 後重新連線。"
     },
     "sessionConnection": {
       "label": "連線",
@@ -2041,7 +2049,10 @@
       "allowOnceAccessibility": "僅允許這次",
       "alwaysAllow": "一律允許",
       "alwaysAllowAccessibility": "一律允許",
-      "retrying": "重試中…"
+      "retrying": "重試中…",
+      "retryDeny": "再次嘗試拒絕",
+      "retryAllowOnce": "再次嘗試僅允許這次",
+      "retryAlwaysAllow": "再次嘗試一律允許"
     },
     "questionCard": {
       "title": "智慧代理需要你的回覆",
@@ -2179,7 +2190,7 @@
     "composer": {
       "addAttachment": "新增附件",
       "removeOrRetryFailed": "請先移除上傳失敗的附件，或重新上傳。",
-      "attachmentsWithSlashCommands": "附件無法與斜線指令一起傳送。",
+      "attachmentsWithSlashCommands": "附件無法與斜槓命令一起傳送。",
       "photoMetadataNotRemoved": "無法移除附件中的照片中繼資料。",
       "waitForUploads": "請等待附件上傳完成。",
       "pasteFromClipboard": "從剪貼簿貼上",
@@ -2420,7 +2431,6 @@
     "allow": "允許",
     "onlineMessage": "此裝置無法離線將語音轉成文字。你的錄音會傳送至 {{provider}} 以轉換為文字。Kilo 不會儲存音訊。",
     "onlineTitle": "語音會在線上處理",
-    "staysOff": "允許線上語音轉文字後，才能啟用語音輸入。",
     "start": "開始語音輸入",
     "stop": "停止語音輸入",
     "restricted": "此裝置上的語音輸入受到限制。",
@@ -3155,7 +3165,9 @@
       "sendInvite": "傳送邀請",
       "title": "邀請成員",
       "alreadyInvited": "該電子郵件地址已有待處理的邀請，或已是成員。",
-      "sendError": "無法傳送邀請。"
+      "sendError": "無法傳送邀請。",
+      "pendingInvitation": "這個電子郵件地址已有待處理的邀請。",
+      "alreadyMember": "這個人已經是此組織的成員。"
     },
     "invoices": {
       "downloadA11y": "下載發票 {{number}}",
@@ -3225,7 +3237,12 @@
       "pendingInvitations": "待處理的邀請",
       "resendInvite": "重新傳送邀請",
       "shareInviteLink": "分享邀請連結",
-      "resendInviteError": "無法重新傳送邀請。"
+      "resendInviteError": "無法重新傳送邀請。",
+      "inviteNotResendable": "此邀請已無法重新傳送。",
+      "ownerAuthority": "只有組織擁有者可以管理擁有者。",
+      "ownRoleChange": "您無法變更自己的角色。",
+      "inviteExpired": "此邀請已過期。",
+      "inviteAccepted": "此邀請已被接受。"
     },
     "usageStats": {
       "inputTokens": "輸入詞元",
@@ -3782,7 +3799,7 @@
     "skillMarkdownLabel": "技能內容",
     "skillsEmpty": "還沒有技能",
     "skillNameRequired": "輸入技能名稱",
-    "skillNameInvalid": "技能名稱必須以字母或數字開頭，且只能使用小寫字母、數字和破折號",
+    "skillNameInvalid": "技能名稱必須以字母或數字開頭，且只能使用小寫字母、數字和連字符",
     "skillContentRequired": "技能內容為必填項",
     "skillSaveFailed": "無法保存技能",
     "skillSourceCustom": "自訂",
@@ -3807,7 +3824,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "輸入伺服器名稱",
-      "nameInvalid": "名稱只能使用 ASCII 字母、數字、底線和破折號，最多 100 個字元",
+      "nameInvalid": "名稱只能使用 ASCII 字母、數字、底線和連字符，最多 100 個字元",
       "commandRequired": "輸入命令",
       "commandTooLong": "最多使用 50 個引數，每個引數 500 個字元",
       "urlRequired": "輸入網址",
@@ -3852,14 +3869,14 @@
       "deleteFailed": "無法刪除代理",
       "nameRequired": "輸入代理名稱",
       "slugRequired": "輸入代理 slug",
-      "slugInvalid": "Slug 必須以小寫 ASCII 字母開頭，且只能使用小寫 ASCII 字母、數字和破折號，最多 50 個字元",
+      "slugInvalid": "Slug 必須以小寫 ASCII 字母開頭，且只能使用小寫 ASCII 字母、數字和連字符，最多 50 個字元",
       "slugConflict": "該 slug 已被內建代理或此設定檔中的另一個代理使用",
       "edit": "編輯代理"
     },
     "slashCommands": {
       "title": "斜槓命令",
-      "add": "添加斜杠命令",
-      "empty": "還沒有斜線指令",
+      "add": "新增斜槓命令",
+      "empty": "還沒有斜槓命令",
       "name": "命令名稱",
       "description": "命令說明",
       "template": "範本",
@@ -3871,7 +3888,7 @@
       "saveFailed": "無法保存命令",
       "deleteFailed": "無法刪除命令",
       "nameRequired": "輸入命令名稱",
-      "nameInvalid": "名稱必須以小寫字母開頭，且只能使用小寫字母、數字和破折號",
+      "nameInvalid": "名稱必須以小寫字母開頭，且只能使用小寫字母、數字和連字符",
       "templateRequired": "輸入命令模板",
       "nameConflict": "該名稱由內建指令保留"
     },

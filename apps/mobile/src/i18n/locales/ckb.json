@@ -53,6 +53,7 @@
     "connected": "بەستراوەتەوە",
     "couldNotLoadModels": "نەتوانرا مۆدێلەکان بار بکرێن.",
     "couldNotLoadRepositories": "نەتوانرا کۆگاکان بار بکرێن.",
+    "noRepositoriesFound": "هیچ کۆگایەک نەدۆزرایەوە",
     "critical": "زۆر مەترسیدار",
     "delete": "سڕینەوە",
     "deleted": "سڕاوەتەوە",
@@ -87,6 +88,7 @@
     "connect": "بەستنەوە",
     "connectBitbucket": "بەستنەوەی Bitbucket",
     "connectGitlab": "بەستنەوەی GitLab",
+    "connectProvider": "پەیوەندی بە دابینکەرێک بکە",
     "contentTruncated": "ناوەڕۆک کورتکراوەتەوە",
     "copyLink": "کۆپیکردنی بەستەر",
     "couldNotLoadOrganizations": "نەتوانرا ڕێکخراوەکان بار بکرێن.",
@@ -145,7 +147,8 @@
     "agent": "بریکار",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "گۆڕانکارییەکان"
+    "changes": "گۆڕانکارییەکان",
+    "organizationTrialEnded": "تاقیکردنەوەی ڕێکخراوەکە کۆتایی هاتووە و هیچ پلانێکی چالاکی نییە. خاوەنێکی ڕێکخراو دەتوانێت لە kilo.ai پارەدان نوێ بکاتەوە، پاشان دووبارە هەوڵ بداتەوە."
   },
   "language": {
     "restarting": "بۆ جێبەجێکردنی گۆڕینی زمان، دووبارە دەست پێ دەکاتەوە",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "ڕەنگە پێویست بکات مۆڵەتی دەستگەیشتن بە گرووپ یان پڕۆژەی زیاتر لە GitLab بدەیت.",
       "installGithubApp": "ئەپی GitHub لەسەر کۆگاکان دابمەزرێنە",
       "installGithubAppDescription": "مۆڵەت بدە بە ئەپی Kilo لە GitHub بگاتە ئەو کۆگایانەی دەتەوێت پێداچوونەوەیان بۆ بکرێت.",
-      "noRepositoriesFound": "هیچ کۆگایەک نەدۆزرایەوە",
       "repositoryAccess": "دەستگەیشتن بە کۆگا"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "زیاتر پیشان بدە",
       "created": "دروست کراوە",
       "started": "دەستی پێ کراوە",
+      "reviewEnded": "کۆتایی پێ هاتووە",
+      "severityNitpick": "تێبینی بچووک",
       "tokens": "تۆکن",
       "tokensInOut": "{{input}} هاتوو / {{output}} دەرچوو",
       "council": "ئەنجوومەن",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "URLێکی دروست بۆ داواکاری تێکەڵکردن بنووسە.",
       "couldNotCheckProviderStatus": "نەتوانرا دۆخی دابینکەر بپشکنرێت.",
       "couldNotLoadProviders": "نەمانتوانی دابینکەرە بەستراوەکانت بار بکەین. تکایە دووبارە هەوڵ بدە.",
-      "connectProvider": "پەیوەندی بە دابینکەرێک بکە",
       "connectProviderDescription": "بۆ دەستپێکردنی پێداچوونەوەیەکی دەستی بۆ داواکاری تێکەڵکردن، پەیوەندی بە GitHub بکە.",
       "pullRequestUrl": "URLی داواکاری تێکەڵکردن",
       "instructions": "ڕێنماییەکان (بژاردەیی)",
@@ -1615,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "هیچ پاڵێوەرێک بەردەست نییە",
-      "noFiltersDescription": "بگەڕێوە و لە لیستی دۆزینەوەکانەوە پاڵێوەرەکان دووبارە بکەرەوە.",
       "title": "پاڵاوتنی دۆزینەوەکان",
       "reset": "بگەڕێنەوە بۆ دۆخی سەرەتا",
       "severity": "ئاستی مەترسی",
@@ -1913,11 +1914,17 @@
       "actorSystem": "سیستەمی Kilo",
       "couldNotLoad": "نەتوانرا ڕاپۆرتی وردبینی بار بکرێت.",
       "events": "ڕووداوەکان",
+      "eventConfidence": "دڵنیایی: {{confidence}}",
+      "eventReason": "هۆکار: {{reason}}",
+      "eventsCount_one": "{{displayCount}} ڕووداو",
+      "eventsCount_other": "{{displayCount}} ڕووداو",
       "generated": "لە {{generatedAt}} دروست کراوە.",
       "noActivity": "هیچ چالاکییەکی تۆمارکراو نییە",
       "noActivityDescription": "لە {{start}} تا {{end}}، Kilo هیچ چالاکییەکی دۆزینەوەی ئاسایشی نییە کە بکرێت لە ڕاپۆرتدا بخرێتە ڕوو.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "کۆگا تۆمارنەکراوە",
+      "reasonUnknown": "هۆکاری نەناسراو",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "پوختەی ڕاپۆرت",
       "title": "ڕاپۆرتی وردبینی",
       "unavailable": "ڕاپۆرتی وردبینی بەردەست نییە",
@@ -1972,6 +1979,7 @@
       "reauthorizeButton": "دووبارە مۆڵەت بدە بە ئەپی GitHub",
       "reauthorizeDescription": "ئەجێنتی ئاسایش پێویستی بە مۆڵەت هەیە بۆ خوێندنەوەی ئاگادارکردنەوەکانی Dependabot. بۆ پێدانی ئەم مۆڵەتە، دووبارە مۆڵەت بدە بە ئەپی GitHub.",
       "reauthorizeTitle": "مۆڵەتی زیاتر پێویستە",
+      "retryFailed": "هێشتا نەتوانرا ئەجێنتی ئاسایش بار بکرێت. تکایە پەیوەندییەکەت بپشکنە و دووبارە هەوڵ بدە.",
       "setupFailed": "نەتوانرا ڕێکخستنی GitHub دەست پێ بکرێت. تکایە دووبارە هەوڵ بدە."
     },
     "queuedActionUntracked": "چیتر نەتوانرا بەدواداچوون بۆ کردارێکی ناو ڕیزی چاوەڕوانی بکرێت. بۆ بینینی نوێترین دۆخ، نوێ بکەرەوە.",
@@ -2565,7 +2573,10 @@
       "allowOnceAccessibility": "ڕێگەپێدان بۆ یەک جار",
       "alwaysAllow": "ڕێگەپێدانی هەمیشەیی",
       "alwaysAllowAccessibility": "ڕێگەپێدانی هەمیشەیی",
-      "retrying": "دووبارە هەوڵدان…"
+      "retrying": "دووبارە هەوڵدان…",
+      "retryDeny": "دووبارە هەوڵدان بۆ ڕەتکردنەوە",
+      "retryAllowOnce": "دووبارە هەوڵدان بۆ ڕێگەپێدان بۆ یەک جار",
+      "retryAlwaysAllow": "دووبارە هەوڵدان بۆ ڕێگەپێدانی هەمیشەیی"
     },
     "questionCard": {
       "title": "ئەجێنتەکە پێویستی بە وەڵامە",
@@ -2941,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "گوێ دەگرێت...",
-    "staysOff": "نووسین بە دەنگ ناچالاک دەمێنێتەوە تا ڕێگە بە گۆڕینی دەنگ بۆ دەق بە ئینتەرنێت بدەیت.",
     "onlineTitle": "دەنگەکەت بە ئینتەرنێت پرۆسێس دەکرێت",
     "onlineMessage": "ئەم ئامێرە بەبێ ئینتەرنێت ناتوانێت دەنگ بگۆڕێت بۆ دەق. دەنگە تۆمارکراوەکەت بۆ {{provider}} دەنێردرێت تا بیکاتە دەق. Kilo دەنگەکە هەڵناگرێت.",
     "allow": "ڕێگە بدە",
@@ -3156,7 +3166,9 @@
       "sendInvite": "ناردنی بانگهێشت",
       "title": "بانگهێشتکردنی ئەندام",
       "alreadyInvited": "ئەو کەسە پێشتر بانگهێشت کراوە یان پێشتر ئەندامە.",
-      "sendError": "نەتوانرا بانگهێشتەکە بنێردرێت."
+      "sendError": "نەتوانرا بانگهێشتەکە بنێردرێت.",
+      "pendingInvitation": "ئەم ئیمەیڵە پێشتر بانگهێشتێکی چاوەڕوانی هەیە.",
+      "alreadyMember": "ئەم کەسە پێشتر ئەندامی ئەم ڕێکخراوەیە."
     },
     "invoices": {
       "downloadA11y": "داگرتنی فاکتۆرەی {{number}}",
@@ -3226,7 +3238,12 @@
       "pendingInvitations": "بانگهێشتە چاوەڕوانەکان",
       "resendInvite": "دووبارە ناردنی بانگهێشت",
       "shareInviteLink": "هاوبەشکردنی بەستەری بانگهێشت",
-      "resendInviteError": "نەتوانرا بانگهێشتەکە دووبارە بنێردرێت."
+      "resendInviteError": "نەتوانرا بانگهێشتەکە دووبارە بنێردرێت.",
+      "inviteNotResendable": "ئەم بانگهێشتە ئیتر ناتوانرێت دووبارە بنێردرێت.",
+      "ownerAuthority": "تەنها خاوەنی ڕێکخراو دەتوانێت خاوەنەکان بەڕێوە ببات.",
+      "ownRoleChange": "ناتوانیت ڕۆڵی خۆت بگۆڕیت.",
+      "inviteExpired": "ئەم بانگهێشتە بەسەرچووە.",
+      "inviteAccepted": "ئەم بانگهێشتە پێشتر پەسەند کراوە."
     },
     "usageStats": {
       "inputTokens": "تۆکنەکانی تێدراو",

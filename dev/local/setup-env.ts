@@ -4,6 +4,7 @@ import * as readline from 'node:readline';
 import { spawnSync } from 'node:child_process';
 
 import { LOCAL_ENVELOPE_KEY_SPECS, planEnvelopeProvisioning } from './envelope-keys';
+import { writeSecretsFile } from './secrets-file';
 
 const RESET = '\x1b[0m';
 const BOLD = '\x1b[1m';
@@ -314,18 +315,7 @@ async function main(): Promise<void> {
     }
   }
 
-  const tmpPath = path.join(repoRoot, '.env.local.tmp');
-  try {
-    fs.writeFileSync(tmpPath, finalContent, 'utf-8');
-    fs.renameSync(tmpPath, envLocalPath);
-  } catch (err) {
-    try {
-      if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath);
-    } catch {
-      // ignore cleanup failure
-    }
-    throw err;
-  }
+  writeSecretsFile(envLocalPath, finalContent);
 
   console.log();
   console.log(`${GREEN}${BOLD}✓ Wrote .env.local${RESET}`);

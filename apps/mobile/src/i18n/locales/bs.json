@@ -53,6 +53,7 @@
     "connected": "Povezano",
     "couldNotLoadModels": "Nije moguće učitati modele.",
     "couldNotLoadRepositories": "Nije moguće učitati repozitorije.",
+    "noRepositoriesFound": "Nisu pronađeni repozitoriji",
     "critical": "Kritično",
     "delete": "Obriši",
     "deleted": "Obrisano",
@@ -87,6 +88,7 @@
     "connect": "Poveži",
     "connectBitbucket": "Poveži Bitbucket",
     "connectGitlab": "Poveži GitLab",
+    "connectProvider": "Poveži platformu",
     "contentTruncated": "Sadržaj skraćen",
     "copyLink": "Kopiraj vezu",
     "couldNotLoadOrganizations": "Nije moguće učitati organizacije.",
@@ -145,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Izmjene"
+    "changes": "Izmjene",
+    "organizationTrialEnded": "Probni period organizacije je završen i ona nema aktivan plan. Vlasnik organizacije može ažurirati naplatu na kilo.ai, a zatim pokušati ponovo."
   },
   "language": {
     "restarting": "Ponovno pokretanje radi primjene jezika",
@@ -502,7 +505,7 @@
       "unresolveThread": "Označi nit kao neriješenu",
       "resolved": "Riješeno",
       "outdated": "Zastarjelo",
-      "comment_one": "1 komentar",
+      "comment_one": "{{displayCount}} komentar",
       "comment": "{{displayCount}} komentara",
       "comment_other": "{{displayCount}} komentara",
       "startedRelative": " · započeto {{relative}}",
@@ -1429,7 +1432,6 @@
       "gitlabNoRepositoriesDescription": "Možda trebaš odobriti pristup dodatnim grupama ili projektima na GitLabu.",
       "installGithubApp": "Instaliraj GitHub aplikaciju na repozitorije",
       "installGithubAppDescription": "Dodijeli Kilo GitHub aplikaciji pristup repozitorijima koje želiš pregledati.",
-      "noRepositoriesFound": "Nisu pronađeni repozitoriji",
       "repositoryAccess": "pristup repozitoriju"
     },
     "style": {
@@ -1459,6 +1461,8 @@
       "showMore": "Prikaži više",
       "created": "Kreirano",
       "started": "Započeto",
+      "reviewEnded": "Okončano",
+      "severityNitpick": "Sitnica",
       "tokens": "Tokeni",
       "tokensInOut": "Ulaz: {{input}} / Izlaz: {{output}}",
       "council": "Vijeće",
@@ -1509,7 +1513,6 @@
       "invalidUrl": "Unesi važeći URL zahtjeva za spajanje.",
       "couldNotCheckProviderStatus": "Nije moguće provjeriti status platforme.",
       "couldNotLoadProviders": "Nije moguće učitati povezane platforme. Pokušaj ponovo.",
-      "connectProvider": "Poveži platformu",
       "connectProviderDescription": "Poveži GitHub da započneš ručni pregled zahtjeva za spajanje.",
       "pullRequestUrl": "URL zahtjeva za spajanje",
       "instructions": "Upute (nisu obavezne)",
@@ -1637,8 +1640,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Nema dostupnih filtera",
-      "noFiltersDescription": "Vrati se i ponovo otvori filtere s liste nalaza.",
       "title": "Filtriranje nalaza",
       "reset": "Poništi",
       "severity": "Ozbiljnost",
@@ -1939,11 +1940,18 @@
       "actorSystem": "Kilo sistem",
       "couldNotLoad": "Nije moguće učitati revizijski izvještaj.",
       "events": "Događaji",
+      "eventConfidence": "Pouzdanost: {{confidence}}",
+      "eventReason": "Razlog: {{reason}}",
+      "eventsCount_one": "{{displayCount}} događaj",
+      "eventsCount_few": "{{displayCount}} događaja",
+      "eventsCount_other": "{{displayCount}} događaja",
       "generated": "Izvještaj je generiran {{generatedAt}}.",
       "noActivity": "Nema zabilježene aktivnosti",
       "noActivityDescription": "Kilo nema aktivnosti vezanih za sigurnosne nalaze koje treba prikazati u izvještaju za period od {{start}} do {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repozitorij nije zabilježen",
+      "reasonUnknown": "Neprepoznat razlog",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Sažetak izvještaja",
       "title": "Revizijski izvještaj",
       "unavailable": "Revizijski izvještaj nije dostupan",
@@ -1998,6 +2006,7 @@
       "reauthorizeButton": "Ponovo autoriziraj GitHub aplikaciju",
       "reauthorizeDescription": "Sigurnosni agent zahtijeva dozvolu da čita upozorenja iz Dependabota. Ponovo autoriziraj GitHub aplikaciju da dodijeliš ovu dozvolu.",
       "reauthorizeTitle": "Potrebne dodatne dozvole",
+      "retryFailed": "I dalje nije moguće učitati sigurnosnog agenta. Provjeri vezu i pokušaj ponovo.",
       "setupFailed": "Nije moguće započeti podešavanje GitHuba. Pokušaj ponovo."
     },
     "queuedActionUntracked": "Više nije moguće pratiti radnju dodanu u red. Osvježi prikaz da vidiš najnovije stanje.",
@@ -2600,7 +2609,10 @@
       "allowOnceAccessibility": "Dozvoli jednom",
       "alwaysAllow": "Uvijek dozvoli",
       "alwaysAllowAccessibility": "Uvijek dozvoli",
-      "retrying": "Ponovni pokušaj…"
+      "retrying": "Ponovni pokušaj…",
+      "retryDeny": "Pokušaj ponovo odbiti",
+      "retryAllowOnce": "Pokušaj ponovo dozvoliti jednom",
+      "retryAlwaysAllow": "Pokušaj ponovo uvijek dozvoliti"
     },
     "questionCard": {
       "title": "Agent traži odgovor",
@@ -2983,7 +2995,6 @@
   },
   "voiceInput": {
     "listening": "Slušam...",
-    "staysOff": "Glasovni unos ostaje isključen dok ne dozvoliš pretvaranje govora u tekst putem interneta.",
     "onlineTitle": "Govor se obrađuje putem interneta",
     "onlineMessage": "Ovaj uređaj ne može pretvarati govor u tekst bez interneta. Tvoj snimak se šalje servisu {{provider}} radi pretvaranja u tekst. Kilo ne čuva zvučni snimak.",
     "allow": "Dozvoli",
@@ -3199,7 +3210,9 @@
       "sendInvite": "Pošalji pozivnicu",
       "title": "Pozovi člana",
       "alreadyInvited": "Osoba je već pozvana ili je već član.",
-      "sendError": "Slanje pozivnice nije uspjelo."
+      "sendError": "Slanje pozivnice nije uspjelo.",
+      "pendingInvitation": "Ova e-pošta već ima pozivnicu na čekanju.",
+      "alreadyMember": "Ova osoba je već član ove organizacije."
     },
     "invoices": {
       "downloadA11y": "Preuzmi fakturu {{number}}",
@@ -3269,7 +3282,12 @@
       "pendingInvitations": "Pozivnice na čekanju",
       "resendInvite": "Ponovo pošalji pozivnicu",
       "shareInviteLink": "Podijeli link pozivnice",
-      "resendInviteError": "Ponovno slanje pozivnice nije uspjelo."
+      "resendInviteError": "Ponovno slanje pozivnice nije uspjelo.",
+      "inviteNotResendable": "Ova pozivnica se više ne može ponovo poslati.",
+      "ownerAuthority": "Samo vlasnik organizacije može upravljati vlasnicima.",
+      "ownRoleChange": "Ne možeš promijeniti svoju ulogu.",
+      "inviteExpired": "Ova pozivnica je istekla.",
+      "inviteAccepted": "Ova pozivnica je već prihvaćena."
     },
     "usageStats": {
       "inputTokens": "Ulazni tokeni",

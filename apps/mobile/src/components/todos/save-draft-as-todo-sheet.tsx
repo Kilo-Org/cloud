@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { QueryError } from '@/components/query-error';
+import { SheetTitleRow } from '@/components/sheet-title-row';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Button } from '@/components/ui/button';
 import { ListTodo } from '@/components/ui/icons';
@@ -153,13 +154,17 @@ export function SaveDraftAsTodoSheet({
           onClose();
         }
       }}
+      // The body scrolls, so the native sheet's drag would dismiss it on a
+      // scroll and the iOS backdrop tap is gone with it; the title row's close
+      // control and Android Back are this sheet's exits.
+      dismissGestures={false}
       snapPoints={['60%']}
     >
       <View className="flex-1 pt-4">
-        <Text accessibilityRole="header" className="px-5 pb-2 text-base font-semibold">
-          {t('todos.saveSheet.title')}
-        </Text>
-        <ScrollView contentContainerStyle={{ paddingBottom: bottom + 16 }}>{body}</ScrollView>
+        <SheetTitleRow title={t('todos.saveSheet.title')} onClose={onClose} />
+        <ScrollView nestedScrollEnabled contentContainerStyle={{ paddingBottom: bottom + 16 }}>
+          {body}
+        </ScrollView>
       </View>
     </Sheet>
   );

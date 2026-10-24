@@ -53,6 +53,7 @@
     "connected": "Tilkoblet",
     "couldNotLoadModels": "Kunne ikke laste inn modellene.",
     "couldNotLoadRepositories": "Kunne ikke laste inn kodelagrene.",
+    "noRepositoriesFound": "Ingen kodelagre funnet",
     "critical": "Kritisk",
     "delete": "Slett",
     "deleted": "Slettet",
@@ -87,6 +88,7 @@
     "connect": "Koble til",
     "connectBitbucket": "Koble til Bitbucket",
     "connectGitlab": "Koble til GitLab",
+    "connectProvider": "Koble til en leverandør",
     "contentTruncated": "Innholdet er forkortet",
     "copyLink": "Kopier lenke",
     "couldNotLoadOrganizations": "Kunne ikke laste inn organisasjonene.",
@@ -145,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Endringer"
+    "changes": "Endringer",
+    "organizationTrialEnded": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. En organisasjonseier kan oppdatere faktureringen på kilo.ai og deretter prøve igjen."
   },
   "language": {
     "restarting": "Starter på nytt for å bruke språket",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Du må kanskje gi tilgang til flere grupper eller prosjekter på GitLab.",
       "installGithubApp": "Installer GitHub-appen for kodelagre",
       "installGithubAppDescription": "Gi Kilos GitHub-app tilgang til kodelagrene du vil ha gjennomgått.",
-      "noRepositoriesFound": "Ingen kodelagre funnet",
       "repositoryAccess": "tilgang til kodelagre"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "Vis mer",
       "created": "Opprettet",
       "started": "Startet",
+      "reviewEnded": "Avsluttet",
+      "severityNitpick": "Pirk",
       "tokens": "Tokener",
       "tokensInOut": "{{input}} inn / {{output}} ut",
       "council": "Vurderingspanel",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "Skriv inn en gyldig URL til en PR.",
       "couldNotCheckProviderStatus": "Kunne ikke sjekke leverandørstatusen.",
       "couldNotLoadProviders": "Kunne ikke laste inn de tilkoblede leverandørene dine. Prøv igjen.",
-      "connectProvider": "Koble til en leverandør",
       "connectProviderDescription": "Koble til GitHub for å starte en manuell gjennomgang av en PR.",
       "pullRequestUrl": "URL til PR",
       "instructions": "Instruksjoner (valgfritt)",
@@ -1615,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Ingen tilgjengelige filtre",
-      "noFiltersDescription": "Gå tilbake og åpne filtrene på nytt fra funnlisten.",
       "title": "Filtrer funn",
       "reset": "Tilbakestill",
       "severity": "Alvorlighetsgrad",
@@ -1913,11 +1914,17 @@
       "actorSystem": "Kilo-system",
       "couldNotLoad": "Kunne ikke laste inn revisjonsrapporten.",
       "events": "Hendelser",
+      "eventConfidence": "Konfidens: {{confidence}}",
+      "eventReason": "Årsak: {{reason}}",
+      "eventsCount_one": "{{displayCount}} hendelse",
+      "eventsCount_other": "{{displayCount}} hendelser",
       "generated": "Rapporten ble generert {{generatedAt}}.",
       "noActivity": "Ingen registrert aktivitet",
       "noActivityDescription": "Kilo har ingen aktivitet knyttet til sikkerhetsfunn å rapportere fra {{start}} til {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Kodelager ikke registrert",
+      "reasonUnknown": "Ukjent årsak",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Rapportsammendrag",
       "title": "Revisjonsrapport",
       "unavailable": "Revisjonsrapport utilgjengelig",
@@ -1972,6 +1979,7 @@
       "reauthorizeButton": "Autoriser GitHub-appen på nytt",
       "reauthorizeDescription": "Sikkerhetsagenten trenger tillatelse til å lese Dependabot-varsler. Autoriser GitHub-appen på nytt for å gi denne tillatelsen.",
       "reauthorizeTitle": "Flere tillatelser kreves",
+      "retryFailed": "Kunne fortsatt ikke laste inn sikkerhetsagenten. Sjekk tilkoblingen din og prøv igjen.",
       "setupFailed": "Kunne ikke starte GitHub-oppsettet. Prøv igjen."
     },
     "queuedActionUntracked": "Kunne ikke lenger følge statusen til en handling i kø. Oppdater for å se gjeldende status.",
@@ -2565,7 +2573,10 @@
       "allowOnceAccessibility": "Tillat én gang",
       "alwaysAllow": "Tillat alltid",
       "alwaysAllowAccessibility": "Tillat alltid",
-      "retrying": "Prøver på nytt…"
+      "retrying": "Prøver på nytt…",
+      "retryDeny": "Prøv å nekte på nytt",
+      "retryAllowOnce": "Prøv å tillate én gang på nytt",
+      "retryAlwaysAllow": "Prøv å tillate alltid på nytt"
     },
     "questionCard": {
       "title": "Agenten trenger svar",
@@ -2941,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "Lytter...",
-    "staysOff": "Diktering er deaktivert til du tillater at tale gjøres om til tekst på nettet.",
     "onlineTitle": "Tale behandles på nettet",
     "onlineMessage": "Denne enheten kan ikke gjøre tale om til tekst uten nettilkobling. Opptaket ditt sendes til {{provider}} for å gjøres om til tekst. Kilo lagrer ikke lyden.",
     "allow": "Tillat",
@@ -3156,7 +3166,9 @@
       "sendInvite": "Send invitasjon",
       "title": "Inviter medlem",
       "alreadyInvited": "Personen er allerede invitert eller allerede medlem.",
-      "sendError": "Kunne ikke sende invitasjonen."
+      "sendError": "Kunne ikke sende invitasjonen.",
+      "pendingInvitation": "Denne e-postadressen har allerede en ventende invitasjon.",
+      "alreadyMember": "Denne personen er allerede medlem av denne organisasjonen."
     },
     "invoices": {
       "downloadA11y": "Last ned faktura {{number}}",
@@ -3226,7 +3238,12 @@
       "pendingInvitations": "Ventende invitasjoner",
       "resendInvite": "Send invitasjon på nytt",
       "shareInviteLink": "Del invitasjonslenke",
-      "resendInviteError": "Kunne ikke sende invitasjonen på nytt."
+      "resendInviteError": "Kunne ikke sende invitasjonen på nytt.",
+      "inviteNotResendable": "Denne invitasjonen kan ikke lenger sendes på nytt.",
+      "ownerAuthority": "Bare en organisasjonseier kan administrere eiere.",
+      "ownRoleChange": "Du kan ikke endre din egen rolle.",
+      "inviteExpired": "Denne invitasjonen er utløpt.",
+      "inviteAccepted": "Denne invitasjonen er allerede akseptert."
     },
     "usageStats": {
       "inputTokens": "Inndatatokener",

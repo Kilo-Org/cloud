@@ -53,6 +53,7 @@
     "connected": "Ixhunyiwe",
     "couldNotLoadModels": "Asikwazanga ukulayisha amamodeli.",
     "couldNotLoadRepositories": "Asikwazanga ukulayisha izinqolobane zekhodi.",
+    "noRepositoriesFound": "Azikho izinqolobane zekhodi ezitholakele",
     "critical": "Okubucayi",
     "delete": "Susa",
     "deleted": "Kususiwe",
@@ -87,6 +88,7 @@
     "connect": "Xhuma",
     "connectBitbucket": "Xhuma i-Bitbucket",
     "connectGitlab": "Xhuma i-GitLab",
+    "connectProvider": "Xhuma umhlinzeki",
     "contentTruncated": "Okuqukethwe kunqanyuliwe",
     "copyLink": "Kopisha isixhumanisi",
     "couldNotLoadOrganizations": "Asikwazanga ukulayisha izinhlangano.",
@@ -145,7 +147,8 @@
     "agent": "Umenzeli",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Izinguquko"
+    "changes": "Izinguquko",
+    "organizationTrialEnded": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Umnikazi wenhlangano angabuyekeza ukukhokhela ku-kilo.ai, bese ezama futhi."
   },
   "language": {
     "restarting": "Kuqaliswa kabusha ukuze kusetshenziswe ulimi olukhethiwe",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Kungenzeka udinge ukunikeza ukufinyelela kumaqembu noma amaphrojekthi engeziwe ku-GitLab.",
       "installGithubApp": "Faka uhlelo lokusebenza lwe-GitHub ezinqolobaneni zekhodi",
       "installGithubAppDescription": "Nika uhlelo lokusebenza lwe-Kilo ku-GitHub imvume yokufinyelela ezinqolobaneni zekhodi ofuna zihlolwe.",
-      "noRepositoriesFound": "Azikho izinqolobane zekhodi ezitholakele",
       "repositoryAccess": "ukufinyelela enqolobaneni yekhodi"
     },
     "style": {
@@ -1437,6 +1439,8 @@
       "showMore": "Khombisa okunye",
       "created": "Kudaliwe",
       "started": "Kuqalisiwe",
+      "reviewEnded": "Kuphelile",
+      "severityNitpick": "Okuncane",
       "tokens": "Amathokheni",
       "tokensInOut": "{{input}} angenayo / {{output}} aphumayo",
       "council": "Umkhandlu",
@@ -1487,7 +1491,6 @@
       "invalidUrl": "Faka i-URL evumelekile yesicelo sokuhlanganisa ikhodi.",
       "couldNotCheckProviderStatus": "Asikwazanga ukuhlola isimo somhlinzeki.",
       "couldNotLoadProviders": "Asikwazanga ukulayisha abahlinzeki bakho abaxhunyiwe. Sicela uzame futhi.",
-      "connectProvider": "Xhuma umhlinzeki",
       "connectProviderDescription": "Xhuma i-GitHub ukuze uqalise ngokwakho ukuhlolwa kwesicelo sokuhlanganisa ikhodi.",
       "pullRequestUrl": "I-URL yesicelo sokuhlanganisa ikhodi",
       "instructions": "Imiyalo (ayidingekile)",
@@ -1615,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Azikho izihlungi ezitholakalayo",
-      "noFiltersDescription": "Buyela emuva bese uphinde uvule izihlungi ohlwini lokutholakele.",
       "title": "Izihlungi zokutholakele",
       "reset": "Setha kabusha",
       "severity": "Ubucayi",
@@ -1913,11 +1914,17 @@
       "actorSystem": "Isistimu ye-Kilo",
       "couldNotLoad": "Asikwazanga ukulayisha umbiko wokuhlola.",
       "events": "Izehlakalo",
+      "eventConfidence": "Ukuzethemba: {{confidence}}",
+      "eventReason": "Isizathu: {{reason}}",
+      "eventsCount_one": "{{displayCount}} isehlakalo",
+      "eventsCount_other": "{{displayCount}} izehlakalo",
       "generated": "Umbiko wenziwe ngo-{{generatedAt}}.",
       "noActivity": "Akukho msebenzi orekhodiwe",
       "noActivityDescription": "I-Kilo ayinawo umsebenzi ongabikwa ophathelene nokutholakele kwezokuphepha kusukela ku-{{start}} kuya ku-{{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Inqolobane yekhodi ayirekhodwanga",
+      "reasonUnknown": "Isizathu esingaziwa",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Isifinyezo sombiko",
       "title": "Umbiko wokuhlola",
       "unavailable": "Umbiko wokuhlola awutholakali",
@@ -1972,6 +1979,7 @@
       "reauthorizeButton": "Phinda unike uhlelo lokusebenza lwe-GitHub imvume",
       "reauthorizeDescription": "I-ejenti yezokuphepha idinga imvume yokufunda izexwayiso ze-Dependabot. Phinda unike uhlelo lokusebenza lwe-GitHub imvume ukuze lunikeze le mvume.",
       "reauthorizeTitle": "Ezinye izimvume ziyadingeka",
+      "retryFailed": "I-ejenti yezokuphepha isayingenaki ukulayisha. Sicela uhlole ukuxhumana kwakho bese uzama futhi.",
       "setupFailed": "Asikwazanga ukuqala ukusetha i-GitHub. Sicela uzame futhi."
     },
     "queuedActionUntracked": "Asisakwazi ukulandelela isenzo esifakwe emgqeni. Vuselela ukuze ubone isimo sakamuva.",
@@ -2565,7 +2573,10 @@
       "allowOnceAccessibility": "Vumela kanye",
       "alwaysAllow": "Vumela njalo",
       "alwaysAllowAccessibility": "Vumela njalo",
-      "retrying": "Kuzanywa futhi…"
+      "retrying": "Kuzanywa futhi…",
+      "retryDeny": "Zama ukwenqaba futhi",
+      "retryAllowOnce": "Zama ukuvumela kanye futhi",
+      "retryAlwaysAllow": "Zama ukuvumela njalo futhi"
     },
     "questionCard": {
       "title": "Umenzeli udinga impendulo",
@@ -2941,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "Kulalelwa...",
-    "staysOff": "Ukufaka ngezwi kuzohlala kuvaliwe kuze kube uvumela ukuguqulwa kwezwi libe umbhalo nge-inthanethi.",
     "onlineTitle": "Izwi licutshungulwa nge-inthanethi",
     "onlineMessage": "Le divayisi ayikwazi ukuguqula izwi libe umbhalo ngaphandle kwe-inthanethi. Okurekhodile kuthunyelwa ku-{{provider}} ukuze kuguqulwe kube umbhalo. I-Kilo ayiwugcini umsindo.",
     "allow": "Vumela",
@@ -3156,7 +3166,9 @@
       "sendInvite": "Thumela isimemo",
       "title": "Mema ilungu",
       "alreadyInvited": "Isimemo sabo sesivele sikhona noma bese belilungu leqembu.",
-      "sendError": "Asikwazanga ukuthumela isimemo."
+      "sendError": "Asikwazanga ukuthumela isimemo.",
+      "pendingInvitation": "Le imeyili isivele inesimemo esilindile.",
+      "alreadyMember": "Lo muntu usevele eyilungu lale nhlangano."
     },
     "invoices": {
       "downloadA11y": "Landa i-invoyisi {{number}}",
@@ -3226,7 +3238,12 @@
       "pendingInvitations": "Izimemo ezilindile",
       "resendInvite": "Thumela kabusha isimemo",
       "shareInviteLink": "Yabelana ngesixhumanisi sesimemo",
-      "resendInviteError": "Asikwazanga ukuthumela kabusha isimemo."
+      "resendInviteError": "Asikwazanga ukuthumela kabusha isimemo.",
+      "inviteNotResendable": "Lesi simemo asisenakuthunyelwa kabusha.",
+      "ownerAuthority": "Kuphela umnikazi wenhlangano ongakwazi ukuphatha abanikazi.",
+      "ownRoleChange": "Awukwazi ukushintsha iqhaza lakho.",
+      "inviteExpired": "Lesi simemo sesiphelelwe yisikhathi.",
+      "inviteAccepted": "Lesi simemo sesamukelwe kakade."
     },
     "usageStats": {
       "inputTokens": "Amathokheni okufakiwe",

@@ -27,8 +27,6 @@ export const MAX_CLIENT_PRICE_PER_MTOK_USD = 1_000_000;
 // `gateway:<model>` or `client:<provider>/<model>` at the bounds above.
 export const MAX_CUSTOM_ROUTER_ENTRY_KEY_LENGTH = 320;
 
-export const CustomRouterScopeSchema = z.enum(['user', 'org']);
-export type CustomRouterScope = z.infer<typeof CustomRouterScopeSchema>;
 export const CustomRouterSlugSchema = z.string().regex(CUSTOM_ROUTER_SLUG_PATTERN);
 
 export const CustomRouterReferenceSchema = z

@@ -1,4 +1,5 @@
 /* oxlint-disable @typescript-eslint/no-unsafe-call @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable max-lines -- selection persistence and membership recovery share one provider harness */
 import { type QueryClient } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { act } from '@/test/renderer';
@@ -143,6 +144,66 @@ describe('OrganizationProvider.setOrganizationId', () => {
     expect(hoisted.writePrivacySnapshotAndEnd).toHaveBeenCalledTimes(1);
     expect(hoisted.unregisterActivityTokensAndTombstone).toHaveBeenCalledTimes(1);
     expect(hoisted.setAccountMetadata).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('lands each selection after the previous one settled', async () => {
+    const stored = new Map<string, string>();
+    const gates: (() => void)[] = [];
+    /** Parks one storage call until the test releases it. */
+    async function nextGate(): Promise<void> {
+      const { promise, resolve } = Promise.withResolvers<undefined>();
+      gates.push(() => {
+        resolve(undefined);
+      });
+      await promise;
+    }
+    // Every storage call parks until released, so the test decides when each
+    // write completes: the first selection completes last.
+    hoisted.setAccountMetadata.mockImplementation(async (key: string, value: string) => {
+      await nextGate();
+      stored.set(key, value);
+    });
+    hoisted.deleteAccountMetadata.mockImplementation(async (key: string) => {
+      await nextGate();
+      stored.delete(key);
+    });
+
+    const { getCtx, unmount } = await mountProvider();
+
+    await act(() => {
+      getCtx().setOrganizationId('org-a');
+    });
+    await act(() => {
+      getCtx().setOrganizationId('org-b');
+    });
+
+    // One selection at a time: the second one is written after the first pair.
+    expect(hoisted.setAccountMetadata).toHaveBeenCalledTimes(1);
+    expect(hoisted.setAccountMetadata).toHaveBeenCalledWith(ORGANIZATION_STORAGE_KEY, 'org-a');
+
+    async function releaseNext(): Promise<void> {
+      const release = gates.shift();
+      if (release) {
+        await act(async () => {
+          release();
+          await Promise.resolve();
+        });
+      }
+    }
+    await releaseNext();
+    await releaseNext();
+    await releaseNext();
+    await releaseNext();
+    await releaseNext();
+
+    expect(stored.get(ORGANIZATION_STORAGE_KEY)).toBe('org-b');
+    expect(stored.has(ORGANIZATION_PERSONAL_STORAGE_KEY)).toBe(false);
+    expect(hoisted.setAccountMetadata.mock.calls.at(-1)).toEqual([
+      ORGANIZATION_STORAGE_KEY,
+      'org-b',
+    ]);
 
     unmount();
   });

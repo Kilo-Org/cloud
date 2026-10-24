@@ -21,6 +21,7 @@ import { unregisterActivityTokensAndTombstone } from '@/lib/auth/logout-cleanup'
 import { writePrivacySnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
+import { chainSave } from '@/lib/hooks/save-chain';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { i18n } from '@/i18n';
 import { ORGANIZATION_PERSONAL_STORAGE_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
@@ -35,6 +36,14 @@ import { ORGANIZATION_PERSONAL_STORAGE_KEY, ORGANIZATION_STORAGE_KEY } from '@/l
  * the organization list.
  */
 const PERSONAL_MARKER = 'personal';
+
+/**
+ * One queue slot for the whole selection: a save runs after the previous save
+ * settled, so the two keys above are written as one pair and in the order the
+ * selections were made, and the stored pair always names the selection the
+ * provider publishes.
+ */
+const SELECTION_QUEUE_KEY = 'organization-selection';
 
 type OrganizationContextValue = {
   /** null = personal, string = org UUID */
@@ -107,7 +116,8 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
       // A stored organization is an explicit choice; the marker beside it is an
       // explicit Personal choice. An absent value is 'not chosen yet': the
       // organization list decides the default and the effect below publishes it.
-      // A legacy absent value is treated the same way.
+      // A legacy absent value is treated the same way. The reads are direct:
+      // restore decides whether the app is loaded, so it never waits on a save.
       // The two reads are kept apart: a stored organization stands alone, so a
       // marker-read failure must not discard it. The marker is only consulted
       // when no organization is stored, and a failure there stays a restore
@@ -148,12 +158,30 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     setState(current => ({ ...current, isSaving: true }));
     let error: 'save' | null = null;
     try {
-      await (id
-        ? setAccountMetadata(ORGANIZATION_STORAGE_KEY, id)
-        : deleteAccountMetadata(ORGANIZATION_STORAGE_KEY));
-      await (id
-        ? deleteAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY)
-        : setAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY, PERSONAL_MARKER));
+      // One slot per account: a save queued behind this one only starts once
+      // both keys of this pair have settled, and the newest selection is always
+      // the last one written.
+      await chainSave(SELECTION_QUEUE_KEY, async () => {
+        // Only the selection the provider still publishes is written: a newer
+        // selection, a sign-in, or a sign-out owns the stored state, and its
+        // own save (or the sign-out cleanup, whose deletes chain behind these
+        // keys) writes the pair this save would have written.
+        if (generation.current !== operation || !isCurrentAuthEpoch(epoch)) {
+          return;
+        }
+        // Keep the pair ordered with saves, but stop between keys if a new
+        // selection or auth epoch supersedes this one. Its queued save, or
+        // sign-out cleanup, owns the remaining storage update.
+        await (id
+          ? setAccountMetadata(ORGANIZATION_STORAGE_KEY, id)
+          : deleteAccountMetadata(ORGANIZATION_STORAGE_KEY));
+        if (generation.current !== operation || !isCurrentAuthEpoch(epoch)) {
+          return;
+        }
+        await (id
+          ? deleteAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY)
+          : setAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY, PERSONAL_MARKER));
+      });
     } catch {
       error = 'save';
     }

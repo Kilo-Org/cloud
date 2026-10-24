@@ -16,10 +16,12 @@
 // durable retention) instead of spending a runner on a second build.
 //
 // A finished artifact is the only thing the gate can see, and one native build
-// takes longer than the gap between two pushes of the same native inputs, so
-// the workflow also serializes the jobs of one nativeHash behind a job-level
-// concurrency group and each heavy job re-checks its artifact (`--published`)
-// before it builds.
+// takes longer than the gap between two pushes of the same native inputs, so a
+// later run can start before an earlier one publishes. Each heavy job therefore
+// re-checks its own artifact (`--published`) immediately before it builds. That
+// re-check is best-effort deduplication, not serialization: two runs of one
+// nativeHash may build at the same time, and the cost of a missed skip is a
+// duplicate build publishing the same bytes, never a hash left without one.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -208,11 +210,12 @@ function lookupOrMissing(repository: string, name: string): ArtifactLookup {
   }
 }
 
-// A heavy job re-checks its own artifact once its concurrency slot is free:
-// the run that held the slot may have published it, and a second build of the
-// same nativeHash is the waste this workflow exists to avoid. A pull_request
-// run accepts the short-lived artifact it would publish itself; anything else
-// must find the durable one.
+// A heavy job re-checks its own artifact immediately before it builds: another
+// run of the same nativeHash may have published it while this one was starting,
+// and a second build of it is the waste this check avoids. Concurrent builds
+// are accepted, so this is a skip when the artifact is already there, not a
+// wait for other runs. A pull_request run accepts the short-lived artifact it
+// would publish itself; anything else must find the durable one.
 function isPublished(name: string): boolean {
   const repository = process.env.GITHUB_REPOSITORY ?? '';
   const found = lookupOrMissing(repository, name);

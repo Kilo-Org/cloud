@@ -1,0 +1,70 @@
+diff --git a/android/src/main/java/com/swmansion/enriched/markdown/accessibility/MarkdownAccessibilityHelper.kt b/android/src/main/java/com/swmansion/enriched/markdown/accessibility/MarkdownAccessibilityHelper.kt
+--- a/android/src/main/java/com/swmansion/enriched/markdown/accessibility/MarkdownAccessibilityHelper.kt
++++ b/android/src/main/java/com/swmansion/enriched/markdown/accessibility/MarkdownAccessibilityHelper.kt
+@@ -447,7 +447,7 @@
+       return singleLineBounds(vs, ve, startLine)
+     }
+ 
+-    return multiLineBounds(vs, startLine, endLine)
++    return multiLineBounds(startLine, endLine)
+   }
+ 
+   private fun singleLineBounds(
+@@ -456,9 +456,22 @@
+     line: Int,
+   ): Rect {
+     val layout = textView.layout
+-    val left = layout.getPrimaryHorizontal(start).toInt() + textView.paddingLeft
+-    val rawRight = layout.getPrimaryHorizontal(end).toInt() + textView.paddingLeft
+-    val right = if (rawRight <= left) layout.getLineRight(line).toInt() + textView.paddingLeft else rawRight
++    val padLeft = textView.paddingLeft
++    val startX = layout.getPrimaryHorizontal(start).toInt() + padLeft
++    val endX = layout.getPrimaryHorizontal(end).toInt() + padLeft
++    // `getPrimaryHorizontal` measures from the paragraph's start edge, so in a
++    // right-to-left paragraph the start offset sits near the line's right edge and the
++    // end offset near its left one. Ordering the two unconditionally keeps the rect
++    // positive there; a rect without area is not focusable, and ExploreByTouchHelper
++    // then publishes no reachable child for the paragraph.
++    var left = minOf(startX, endX)
++    var right = maxOf(startX, endX)
++    // A collapsed range can still put both offsets on one pixel. Bound the painted
++    // line instead of leaving the node without area.
++    if (right <= left) {
++      left = layout.getLineLeft(line).toInt() + padLeft
++      right = layout.getLineRight(line).toInt() + padLeft
++    }
+ 
+     return Rect(
+       left,
+@@ -469,25 +482,24 @@
+   }
+ 
+   private fun multiLineBounds(
+-    visibleStart: Int,
+     startLine: Int,
+     endLine: Int,
+   ): Rect {
+     val layout = textView.layout
+     val padLeft = textView.paddingLeft
+ 
+-    val firstLineLeft = layout.getPrimaryHorizontal(visibleStart).toInt() + padLeft
+-    val firstLineRight = layout.getLineRight(startLine).toInt() + padLeft
+-
+-    var minLeft = firstLineLeft
+-    var maxRight = firstLineRight
++    // `getPrimaryHorizontal` returns the paragraph-direction start edge, which is the
++    // line's right edge in a right-to-left paragraph, so the item's extent comes from
++    // every covered line's painted edges rather than from one offset.
++    var minLeft = layout.getLineLeft(startLine).toInt() + padLeft
++    var maxRight = layout.getLineRight(startLine).toInt() + padLeft
+     for (line in (startLine + 1)..endLine) {
+       minLeft = minOf(minLeft, layout.getLineLeft(line).toInt() + padLeft)
+       maxRight = maxOf(maxRight, layout.getLineRight(line).toInt() + padLeft)
+     }
+ 
+     return Rect(
+-      minOf(firstLineLeft, minLeft),
++      minLeft,
+       layout.getLineTop(startLine) + textView.paddingTop,
+       maxRight,
+       layout.getLineBottom(endLine) + textView.paddingTop,

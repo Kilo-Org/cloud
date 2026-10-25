@@ -51,6 +51,7 @@ describe('PermissionUnreadableNotice mounted', () => {
 
     const alerts = renderer.root.findAll(node => node.props.accessibilityRole === 'alert');
     expect(alerts).toHaveLength(1);
+    expect(alerts[0]?.props.accessibilityLiveRegion).toBe('polite');
     expect(renderer.root.findAll(node => node.props.accessibilityRole === 'button')).toHaveLength(
       0
     );

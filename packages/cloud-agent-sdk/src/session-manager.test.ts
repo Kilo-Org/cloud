@@ -6684,8 +6684,9 @@ describe('createSessionManager', () => {
           { requestId: 'perm-2' },
         ]);
 
-        // The same ids in the same order keep the atom identity, so unrelated
-        // state notifications do not repaint the notice.
+        // A fresh array with the same ids in the same order keeps the atom
+        // identity, so unrelated state notifications do not repaint the notice.
+        unreadable.mockImplementation(() => [{ requestId: 'perm-1' }, { requestId: 'perm-2' }]);
         const stable = atomValue(config.store, mgr.atoms.unreadablePermissions);
         notifyStateChange?.();
         expect(atomValue(config.store, mgr.atoms.unreadablePermissions)).toBe(stable);

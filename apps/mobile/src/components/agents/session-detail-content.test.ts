@@ -2360,8 +2360,18 @@ describe('session detail unreadable permission notice', () => {
   const waiting: readonly UnreadablePermissionState[] = [{ requestId: 'perm-1' }];
   const none: readonly UnreadablePermissionState[] = [];
 
-  it('explains the waiting request and keeps the composer usable', async () => {
+  /** An answerable session, so the composer claim is about the notice, not read-only mode. */
+  function makeAnswerable(view: Awaited<ReturnType<typeof mountDetails>>): void {
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.canSend, true);
+    });
+  }
+
+  it('explains the waiting request and leaves the composer usable', async () => {
     const view = await mountDetails([]);
+    makeAnswerable(view);
     act(() => {
       view.store.set(view.manager.atoms.unreadablePermissions, waiting);
     });
@@ -2375,6 +2385,7 @@ describe('session detail unreadable permission notice', () => {
     const composer = view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'));
     expect(composer).toHaveLength(1);
     expect(composer[0]?.parent?.parent?.props.className ?? '').not.toContain('hidden');
+    expect(composer[0]?.parent?.parent?.props.accessibilityElementsHidden).toBe(false);
   });
 
   it('renders nothing once the request is answered', async () => {

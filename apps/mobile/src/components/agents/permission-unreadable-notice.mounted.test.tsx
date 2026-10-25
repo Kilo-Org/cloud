@@ -6,11 +6,22 @@ import { act, TestRenderer } from '@/test/renderer';
 import { i18n } from '@/i18n';
 import { PermissionUnreadableNotice } from './permission-unreadable-notice';
 
+const platform = vi.hoisted(() => ({ os: 'android' as string }));
+const announceForA11y = vi.hoisted(() => vi.fn<(message: string) => void>());
+
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
   return { ...actual, useTranslation: () => ({ t: actual.getI18n().t.bind(actual.getI18n()) }) };
 });
-vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('react-native', () => ({
+  View: 'View',
+  Platform: {
+    get OS() {
+      return platform.os;
+    },
+  },
+}));
+vi.mock('@/lib/a11y/announce', () => ({ announceForA11y }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
 async function renderNotice() {
@@ -54,6 +65,25 @@ describe('PermissionUnreadableNotice mounted', () => {
     expect(alerts[0]?.props.accessibilityLiveRegion).toBe('polite');
     expect(renderer.root.findAll(node => node.props.accessibilityRole === 'button')).toHaveLength(
       0
+    );
+  });
+
+  it('lets Android read the live region instead of announcing as well', async () => {
+    platform.os = 'android';
+    announceForA11y.mockClear();
+    await renderNotice();
+
+    expect(announceForA11y).not.toHaveBeenCalled();
+  });
+
+  it('announces once on iOS, which has no live region', async () => {
+    platform.os = 'ios';
+    announceForA11y.mockClear();
+    await renderNotice();
+
+    expect(announceForA11y).toHaveBeenCalledTimes(1);
+    expect(announceForA11y).toHaveBeenCalledWith(
+      'The agent is waiting for a permission decision this app cannot show. Update the app or the CLI, or answer the request in the CLI to continue.'
     );
   });
 });

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { announceForA11y } from '@/lib/a11y/announce';
@@ -11,16 +11,19 @@ import { announceForA11y } from '@/lib/a11y/announce';
  * never parsed; the CLI can still answer the request, so the notice points the
  * user there instead of leaving the run stalled without explanation.
  *
- * The notice appears without any user action, so a screen reader has to be
- * told: the polite live region covers Android as the node is added, and the
- * announcement covers a tree the reader already had focused.
+ * The notice appears without any user action, so a screen reader has to learn
+ * about it. Android reads the polite live region as the node is added; iOS has
+ * no live region, so the same copy is announced once there. Announcing on both
+ * would read it twice on Android.
  */
 export function PermissionUnreadableNotice() {
   const { t } = useTranslation();
   const announcement = t('agentChat.permissionCard.unreadableBody');
 
   useEffect(() => {
-    announceForA11y(announcement);
+    if (Platform.OS !== 'android') {
+      announceForA11y(announcement);
+    }
   }, [announcement]);
 
   return (

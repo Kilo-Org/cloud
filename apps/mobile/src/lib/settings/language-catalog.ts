@@ -44,6 +44,10 @@ const LANGUAGE_OUTCOME = {
     applied: false,
     reason: 'the language was saved but the app could not restart to apply it',
   },
+  'restart-skipped': {
+    applied: false,
+    reason: 'the language was saved but the app could not prepare the restart',
+  },
   'catalog-failed': { applied: false, reason: 'the language catalog could not be loaded' },
 } satisfies Record<ApplyLanguageOutcome['kind'], LanguageReport>;
 

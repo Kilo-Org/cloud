@@ -88,6 +88,61 @@ export type PermissionState =
   | { status: 'error'; refetch: () => void; isRetrying: boolean }
   | { status: 'ready'; canEdit: boolean };
 
+/**
+ * Discriminated status for a reviewer config read's body, so a screen always
+ * has exactly one surface to paint. The overview screens used to compose the
+ * body from separate `isLoading` / `isError` / `paused` tests, and a config
+ * query that reported none of them (`status: 'pending'`, `fetchStatus: 'idle'`,
+ * no data — the state react-query reverts a cancelled first fetch to) matched
+ * no branch at all: the header painted over an empty scroll area with no
+ * spinner, no error, and nothing that would ever resolve it.
+ *
+ * - `ready`: cached config exists; a background refetch failure keeps the rows.
+ * - `error`: a failed load with no cache, or a paused one whose pause is real
+ *   (connectivity is known), so retry is the useful action.
+ * - `loading`: any other in-flight, paused-while-connectivity-is-unsettled, or
+ *   never-started read. `useIdleLoadRetry` restarts the last one.
+ */
+export type ConfigBodyState =
+  | {
+      status: 'loading';
+      /** Pending with nothing in flight: nothing will ever resolve it on its own. */
+      idle: boolean;
+    }
+  | { status: 'error'; variant: 'server' | 'offline'; isRetrying: boolean; refetch: () => void }
+  | { status: 'ready' };
+
+export function classifyConfigBody(input: {
+  hasData: boolean;
+  isError: boolean;
+  isFetching: boolean;
+  fetchStatus: 'fetching' | 'paused' | 'idle';
+  /** False while the app's probe-backed connectivity is still `unknown`. */
+  connectivityKnown: boolean;
+  refetch: () => void;
+}): ConfigBodyState {
+  if (input.hasData) {
+    return { status: 'ready' };
+  }
+  if (input.isError) {
+    return {
+      status: 'error',
+      variant: 'server',
+      isRetrying: input.isFetching,
+      refetch: input.refetch,
+    };
+  }
+  if (input.fetchStatus === 'paused' && input.connectivityKnown) {
+    return {
+      status: 'error',
+      variant: 'offline',
+      isRetrying: input.isFetching,
+      refetch: input.refetch,
+    };
+  }
+  return { status: 'loading', idle: input.fetchStatus === 'idle' };
+}
+
 export function classifyPermission(input: {
   isPersonal: boolean;
   isLoading: boolean;

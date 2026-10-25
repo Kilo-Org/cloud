@@ -86,6 +86,76 @@ describe('upsertLinearInstallation', () => {
     );
   });
 
+  test('stores no model when the caller supplies null for the model', async () => {
+    const result = await upsertLinearInstallation(
+      {
+        owner: { type: 'user', id: user.id },
+        organizationId: 'workspace-unsupplied-model',
+        organizationName: 'Unsupplied Model Workspace',
+        botUserId: 'bot-1',
+      },
+      { defaultModel: null }
+    );
+
+    expect(result.metadata).not.toHaveProperty('model_slug');
+  });
+
+  test('uses the supplied transaction for installation ownership and updates', async () => {
+    const rollback = new Error('Rollback test transaction');
+    await expect(
+      db.transaction(async tx => {
+        const result = await upsertLinearInstallation(
+          {
+            owner: { type: 'user', id: user.id },
+            organizationId: 'workspace-transaction',
+            organizationName: 'Transaction Workspace',
+            botUserId: 'bot-1',
+          },
+          { defaultModel: 'test/default-model' },
+          tx
+        );
+        const updated = await upsertLinearInstallation(
+          {
+            owner: { type: 'user', id: user.id },
+            organizationId: 'workspace-transaction',
+            organizationName: 'Updated Transaction Workspace',
+            botUserId: 'bot-2',
+          },
+          { defaultModel: 'test/replacement-model' },
+          tx
+        );
+        expect(updated.id).toBe(result.id);
+        expect(updated.metadata).toEqual(
+          expect.objectContaining({ model_slug: 'test/default-model', bot_user_id: 'bot-2' })
+        );
+        await expect(
+          upsertLinearInstallation(
+            {
+              owner: { type: 'user', id: otherUser.id },
+              organizationId: 'workspace-transaction',
+              organizationName: 'Transaction Workspace',
+              botUserId: 'bot-3',
+            },
+            {},
+            tx
+          )
+        ).rejects.toBeInstanceOf(LinearWorkspaceAlreadyConnectedError);
+        throw rollback;
+      })
+    ).rejects.toBe(rollback);
+
+    const integrations = await db
+      .select()
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.platform, PLATFORM.LINEAR),
+          eq(platform_integrations.owned_by_user_id, user.id)
+        )
+      );
+    expect(integrations).toEqual([]);
+  });
+
   test('rejects when another owner already holds the same Linear workspace', async () => {
     await upsertLinearInstallation({
       owner: { type: 'user', id: user.id },
@@ -182,6 +252,38 @@ describe('upsertLinearInstallation', () => {
     );
 
     expect(calls).toEqual([]);
+  });
+  test('clears the lifecycle marker when the owner re-authorizes a workspace', async () => {
+    const [suspended] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: user.id,
+        platform: PLATFORM.LINEAR,
+        integration_type: 'oauth',
+        platform_installation_id: null,
+        platform_account_id: 'workspace-recover',
+        platform_account_login: 'Recovery Workspace',
+        scopes: [],
+        integration_status: INTEGRATION_STATUS.SUSPENDED,
+        suspended_at: new Date().toISOString(),
+        suspended_by: 'workspace_detach',
+      })
+      .returning();
+
+    const result = await upsertLinearInstallation({
+      owner: { type: 'user', id: user.id },
+      organizationId: 'workspace-recover',
+      organizationName: 'Recovery Workspace',
+      botUserId: 'bot-recovered',
+    });
+
+    expect(result.id).toBe(suspended.id);
+    expect(result).toMatchObject({
+      integration_status: INTEGRATION_STATUS.ACTIVE,
+      suspended_at: null,
+      suspended_by: null,
+      platform_installation_id: 'workspace-recover',
+    });
   });
 
   test('stores no model for an organization installation when the resolver returns no model', async () => {

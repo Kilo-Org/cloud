@@ -12,7 +12,10 @@ import {
   recordAdminAction,
   userActionTarget,
 } from '@/lib/admin/admin-action-audit';
-import { triggerIdSchema } from '@/lib/webhook-trigger-validation';
+import {
+  triggerIdSchema,
+  type WebhookTriggerEditRestriction,
+} from '@/lib/webhook-trigger-validation';
 import {
   getWorkerTrigger,
   listWorkerRequests,
@@ -136,6 +139,9 @@ export const adminWebhookTriggersRouter = createTRPCRouter({
     return {
       ...workerResult.config,
       inboundUrl,
+      canEdit: true,
+      canEditReason: null as WebhookTriggerEditRestriction,
+      canRun: true,
     };
   }),
 

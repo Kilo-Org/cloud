@@ -337,7 +337,7 @@ export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
 /**
  * Send-only execution payload for follow-up messages. Mirrors
  * `sendMessageNextPayloadSchema` but allows an empty prompt, because a
- * follow-up send may carry attachments or images with no text; that is the
+ * follow-up send may carry attachments with no text; that is the
  * only difference, since both paths keep the shared length cap. Used only by
  * `baseSendMessageNextSchema.payload`; prepare `initialPayload` keeps the
  * `.min(1)` prompt via `sendMessageNextPayloadSchema`.
@@ -551,7 +551,13 @@ export const baseSendMessageNextSchema = z
     payload: sendMessageNextSendPayloadSchema,
     expectedWorktreeId: cloudAgentWorktreeIdSchema.optional(),
     autoCommit: z.boolean().optional(),
-    messageId: messageIdNextSchema.nullish(),
+    /**
+     * Durable user-message identity. The control plane replays a repeated id
+     * instead of admitting a second turn, so a client retry after a failed
+     * response must carry the id of the turn it is retrying; the server cannot
+     * invent one on the client's behalf.
+     */
+    messageId: messageIdNextSchema,
     attachments: cloudAgentAttachmentsSchema.optional(),
   })
   .refine(

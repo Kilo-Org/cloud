@@ -191,7 +191,12 @@ type CloudAgentApi = {
   send: (payload: {
     sessionId: CloudAgentSessionId;
     payload: CloudAgentSendPayload;
-    messageId?: string;
+    /**
+     * Durable user-message identity minted by the caller. The Cloud Agent
+     * replays a repeated id instead of admitting a second turn, so it must be
+     * the same value on a retry of the same turn.
+     */
+    messageId: string;
     attachments?: CloudAgentAttachments;
   }) => Promise<unknown>;
   interrupt: (payload: { sessionId: CloudAgentSessionId }) => Promise<unknown>;

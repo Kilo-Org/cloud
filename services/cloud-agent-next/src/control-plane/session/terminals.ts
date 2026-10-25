@@ -557,6 +557,7 @@ export function createControlPlaneTerminals(deps: ControlPlaneTerminalsDeps) {
     handleClose: bridge.handleClose,
     handleError: bridge.handleError,
     closeAll: bridge.closeAll,
+    closeBrowserSockets: bridge.closeBrowserSockets,
     closeRuntime: bridge.closeRuntime,
     closeTerminal: bridge.closeTerminal,
   };

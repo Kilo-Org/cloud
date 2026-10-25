@@ -26,7 +26,7 @@ function mountRow(item: LanguagePickerItem): TestRenderer.ReactTestRenderer {
         item,
         first: item.kind === 'section',
         showDivider: false,
-        selected: 'device',
+        selected: false,
         disabled: false,
         deviceEndonym: 'English',
         isRtl: false,

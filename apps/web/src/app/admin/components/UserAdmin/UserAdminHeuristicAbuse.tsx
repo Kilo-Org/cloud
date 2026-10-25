@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
 import type { UserDetailProps } from '@/types/admin';
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import type {
   ApiResponse,
   GroupByDimension,
@@ -22,6 +23,17 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toNonNullish } from '@/lib/utils';
+
+export function getSessionTraceHref(sessionId: string | null | undefined): string | null {
+  if (!sessionId) return null;
+
+  const match = sessionId.match(
+    /^(?:(?:agent|workspace|ses)_[A-Za-z0-9_-]+|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/
+  );
+  if (match?.[0] !== sessionId) return null;
+
+  return `/admin/session-traces?sessionId=${encodeURIComponent(sessionId)}`;
+}
 
 // Table column definition structure
 type TableColumn<T> = {
@@ -291,7 +303,23 @@ const createMicrodollarUsageColumns = (): TableColumn<UsageForTableDisplay>[] =>
   {
     key: 'session_id',
     title: 'Session',
-    render: row => row.session_id || 'N/A',
+    render: row => {
+      const href = getSessionTraceHref(row.session_id);
+      if (!href) return row.session_id || 'N/A';
+
+      return (
+        <Link
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          prefetch={false}
+          title="Open session viewer in a new tab"
+          className="break-all text-link underline decoration-current/40 underline-offset-4"
+        >
+          {row.session_id}
+        </Link>
+      );
+    },
     visible: true,
   },
   {

@@ -65,9 +65,20 @@ export const prepared: PreparedBriefing = {
     unavailableReason: null,
   },
 };
+export const draft = {
+  id: prepared.report.id,
+  context: prepared.report.context,
+  startAt: input.startAt,
+  endAt: input.endAt,
+  timezone: input.timezone,
+  language: input.language,
+  createdAt: prepared.report.createdAt,
+  status: 'pending' as const,
+  error: null,
+};
 const published: { current?: CreateBriefingState } = {};
-function Harness() {
-  published.current = useCreateBriefing();
+function Harness({ reportId }: { readonly reportId?: string }) {
+  published.current = useCreateBriefing(reportId);
   return null;
 }
 export function state() {
@@ -76,20 +87,22 @@ export function state() {
   }
   return published.current;
 }
-export function mount() {
+export function mount(reportId?: string, existingClient?: QueryClient) {
   published.current = undefined;
-  const client = new QueryClient({
-    defaultOptions: { mutations: { retry: false } },
-    mutationCache: new MutationCache({
-      onError: error => {
-        void handleTrpcQueryError(error);
-      },
-    }),
-  });
+  const client =
+    existingClient ??
+    new QueryClient({
+      defaultOptions: { mutations: { retry: false }, queries: { retry: false, gcTime: Infinity } },
+      mutationCache: new MutationCache({
+        onError: error => {
+          void handleTrpcQueryError(error);
+        },
+      }),
+    });
   const holder: { renderer?: TestRenderer.ReactTestRenderer } = {};
   act(() => {
     holder.renderer = TestRenderer.create(
-      createElement(QueryClientProvider, { client }, createElement(Harness))
+      createElement(QueryClientProvider, { client }, createElement(Harness, { reportId }))
     );
   });
   if (!holder.renderer) {

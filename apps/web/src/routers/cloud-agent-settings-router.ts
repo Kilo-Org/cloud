@@ -5,11 +5,9 @@ import {
   ORGANIZATION_MANAGE_ROLES,
   canManageOrganization,
 } from '@kilocode/app-shared/organizations';
-import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
   SELECTABLE_SANDBOX_ALLOCATIONS,
-  getKiloSandboxAllocation,
   sandboxSelectionCapabilitiesSchema,
   type SandboxSelectionCapabilities,
 } from '@kilocode/worker-utils/sandbox-allocation';
@@ -24,10 +22,13 @@ import {
   type ProfileOwner,
   type RepositoryPlatform,
 } from '@kilocode/cloud-agent-profile';
-import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
-import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
+import {
+  assertAllocationOffered,
+  findSandboxOption,
+  getSavedAllocationReason,
+  loadSandboxCapabilities,
+} from '@/lib/cloud-agent-next/sandbox-allocation-offers';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import type { User } from '@kilocode/db/schema';
 
 const RepositoryPlatformSchema = z.enum(['github', 'gitlab']);
 
@@ -61,56 +62,6 @@ function ownerFromInput(organizationId: string | undefined, userId: string): Pro
     : { type: 'user', id: userId };
 }
 
-async function loadCapabilities(
-  user: User,
-  headersList: Headers | undefined,
-  organizationId: string | undefined,
-  repositoryType?: 'github' | 'gitlab' | 'bitbucket' | 'git'
-): Promise<SandboxSelectionCapabilities> {
-  const { token } = await createControlTokenForRequest(user, 'cloud-agent-next', {
-    headers: headersList,
-    ...(organizationId ? { organizationId } : {}),
-    tokenSource: 'cloud-agent',
-  });
-  return createCloudAgentNextClient(token).getSandboxSelectionOptions({
-    ...(organizationId ? { kilocodeOrganizationId: organizationId } : {}),
-    ...(repositoryType ? { repositoryType } : {}),
-  });
-}
-
-function findOption(
-  capabilities: SandboxSelectionCapabilities,
-  allocation: string
-): SandboxSelectionCapabilities['options'][number] | undefined {
-  return capabilities.options.find(
-    option => getKiloSandboxAllocation(option.allocation) === allocation
-  );
-}
-
-function getSavedAllocationReason(
-  capabilities: SandboxSelectionCapabilities,
-  allocation: string,
-  repositoryType?: RepositoryPlatform
-): string | undefined {
-  if (!capabilities.enabled) return 'Sandbox selection is not enabled for this owner';
-  const option = findOption(capabilities, allocation);
-  if (!option) return 'This sandbox allocation is no longer offered';
-  return repositoryType
-    ? (option.repositoryUnavailableReason ?? option.unavailableReason)
-    : option.unavailableReason;
-}
-
-function assertAllocationOffered(
-  capabilities: SandboxSelectionCapabilities,
-  allocation: string,
-  repositoryType?: RepositoryPlatform
-): void {
-  const reason = getSavedAllocationReason(capabilities, allocation, repositoryType);
-  if (reason) {
-    throw new TRPCError({ code: 'BAD_REQUEST', message: reason });
-  }
-}
-
 function toRepositoryPlatform(platform: string): RepositoryPlatform {
   return platform === 'gitlab' ? 'gitlab' : 'github';
 }
@@ -135,7 +86,7 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
       const owner = ownerFromInput(organizationId, ctx.user.id);
 
       const [capabilities, settings, bindings] = await Promise.all([
-        loadCapabilities(ctx.user, ctx.headersList, organizationId),
+        loadSandboxCapabilities(ctx.user, ctx.headersList, organizationId),
         getSandboxAllocationSettings(db, owner),
         listBindings(db, owner),
       ]);
@@ -172,7 +123,12 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
       const repositoryCapabilities = new Map<RepositoryPlatform, SandboxSelectionCapabilities>();
       await Promise.all(
         repositoryPlatforms.map(async platform => {
-          const caps = await loadCapabilities(ctx.user, ctx.headersList, organizationId, platform);
+          const caps = await loadSandboxCapabilities(
+            ctx.user,
+            ctx.headersList,
+            organizationId,
+            platform
+          );
           repositoryCapabilities.set(platform, caps);
         })
       );
@@ -182,7 +138,10 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
           if (!row.allocation) return row;
           const caps = repositoryCapabilities.get(row.repositoryPlatform) ?? capabilities;
           const ownerReason = getSavedAllocationReason(capabilities, row.allocation);
-          const repositoryReason = findOption(caps, row.allocation)?.repositoryUnavailableReason;
+          const repositoryReason = findSandboxOption(
+            caps,
+            row.allocation
+          )?.repositoryUnavailableReason;
           return {
             ...row,
             ...(ownerReason ? { allocationUnavailableReason: ownerReason } : {}),
@@ -233,7 +192,11 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
         return { success: true };
       }
 
-      const capabilities = await loadCapabilities(ctx.user, ctx.headersList, input.organizationId);
+      const capabilities = await loadSandboxCapabilities(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
       assertAllocationOffered(capabilities, input.allocation);
       await setContextSandboxAllocation(db, owner, input.allocation);
       return { success: true };
@@ -266,7 +229,7 @@ export const cloudAgentSettingsRouter = createTRPCRouter({
             row.repositoryFullName === canonicalRepoFullName(input.repoFullName)
         )?.allocation;
         if (input.allocation !== currentAllocation) {
-          const capabilities = await loadCapabilities(
+          const capabilities = await loadSandboxCapabilities(
             ctx.user,
             ctx.headersList,
             input.organizationId,

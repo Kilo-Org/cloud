@@ -48,6 +48,8 @@ export const triggerIdCreateSchema = triggerIdSchema.refine(
 export const MIN_CREATOR_WEBHOOK_SECRET_LENGTH = 16;
 export const CREATOR_WEBHOOK_SECRET_LENGTH_MESSAGE = `Webhook auth secret must be at least ${MIN_CREATOR_WEBHOOK_SECRET_LENGTH} characters when running as the creator`;
 
+export type WebhookTriggerEditRestriction = 'creator_run' | 'role' | null;
+
 /**
  * Transform user input to a valid trigger ID format.
  * - Converts to lowercase

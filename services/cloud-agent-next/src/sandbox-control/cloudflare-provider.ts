@@ -127,6 +127,11 @@ export function createCloudflareProviderAdapter(deps: {
 
   return {
     ensureBillingAdmission,
+    async isBillingBlocked(ref) {
+      const parsed = ref === null ? null : decodeCloudflareProviderRef(ref);
+      if (parsed?.sandboxId !== deps.sandboxId) return false;
+      return isSandboxBillingBlocked(deps.getSandbox(parsed.sandboxId, parsed));
+    },
     describeRuntime(ref) {
       const parsed = decodeCloudflareProviderRef(ref);
       if (parsed?.sandboxId !== deps.sandboxId) return undefined;

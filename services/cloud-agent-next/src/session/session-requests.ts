@@ -72,6 +72,12 @@ export type SessionCreateRequest = {
     /** Inclusive cut: copy source messages up to and including this ID. */
     cloneUpToMessageId?: string;
   };
+  /**
+   * The saved allocation key of the repository's environment, set only by
+   * preflight and never by a client. It is the first saved candidate;
+   * eligibility is checked when the saved allocation is resolved.
+   */
+  environmentSandboxAllocation?: string;
   profile?: {
     id?: string;
     overrides?: ProfileOverrides;

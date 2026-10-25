@@ -171,6 +171,7 @@
     "autolinking": {
       "android": {
         "buildFromSource": [
+          "expo-localization",
           "expo-ui",
           "expo-background-task",
           "expo-notifications",

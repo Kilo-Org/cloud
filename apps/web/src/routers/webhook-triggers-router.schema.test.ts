@@ -334,6 +334,16 @@ describe('webhook trigger variant inputs', () => {
     );
   });
 
+  it('permits owners, admins, and members to write organization triggers', async () => {
+    const organizationId = '00000000-0000-4000-8000-000000000001';
+    await createCaller({ user }).create({ ...createInput, organizationId });
+    expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(expect.anything(), organizationId, [
+      'owner',
+      'admin',
+      'member',
+    ]);
+  });
+
   it('derives creator execution identity from the authenticated user, not input', async () => {
     const organizationId = '00000000-0000-4000-8000-000000000001';
     const forgedInput = {
@@ -452,6 +462,7 @@ describe('webhook trigger variant inputs', () => {
   });
 
   it('rejects editing another members creator-run trigger before changing configuration', async () => {
+    mockEnsureOrganizationAccess.mockResolvedValue('member');
     mockGetWorkerTrigger.mockResolvedValue({
       found: true,
       config: { ...triggerConfig, executionUserId: 'another-user' },
@@ -465,6 +476,102 @@ describe('webhook trigger variant inputs', () => {
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(mockUpdateWorkerTrigger).not.toHaveBeenCalled();
     expect(mockDbUpdate).not.toHaveBeenCalled();
+  });
+
+  it.each(['owner', 'admin'] as const)(
+    'allows an organization %s to edit another members creator-run trigger',
+    async role => {
+      mockEnsureOrganizationAccess.mockResolvedValue(role);
+      mockGetWorkerTrigger.mockResolvedValue({
+        found: true,
+        config: { ...triggerConfig, executionUserId: 'another-user' },
+      });
+      await createCaller({ user }).update({
+        triggerId: 'trigger-id',
+        organizationId: '00000000-0000-4000-8000-000000000001',
+        promptTemplate: 'Changed prompt',
+      });
+      expect(mockUpdateWorkerTrigger).toHaveBeenCalledWith(
+        undefined,
+        '00000000-0000-4000-8000-000000000001',
+        'trigger-id',
+        expect.objectContaining({ promptTemplate: 'Changed prompt' })
+      );
+      expect(mockDbInsert).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it.each([
+    ['member', 'another-user', false, 'creator_run', false],
+    ['billing_manager', 'another-user', false, 'creator_run', false],
+    ['admin', 'another-user', true, null, false],
+    ['owner', 'another-user', true, null, false],
+    ['member', user.id, true, null, true],
+    ['billing_manager', null, false, 'role', false],
+  ] as const)(
+    'reports edit and run permissions for a %s viewing a trigger that runs as %s',
+    async (role, executionUserId, canEdit, canEditReason, canRun) => {
+      mockEnsureOrganizationAccess.mockResolvedValue(role);
+      mockGetWorkerTrigger.mockResolvedValue({
+        found: true,
+        config: { ...triggerConfig, executionUserId },
+      });
+      await expect(
+        createCaller({ user }).get({
+          triggerId: 'trigger-id',
+          organizationId: '00000000-0000-4000-8000-000000000001',
+        })
+      ).resolves.toMatchObject({ canEdit, canEditReason, canRun });
+    }
+  );
+
+  it('keeps child members editable when they also inherit a billing manager role', async () => {
+    mockEnsureOrganizationAccess.mockImplementation(async (_ctx, _organizationId, roles) =>
+      roles?.includes('member') ? 'member' : 'billing_manager'
+    );
+    mockGetWorkerTrigger.mockResolvedValue({
+      found: true,
+      config: { ...triggerConfig, executionUserId: user.id },
+    });
+
+    await expect(
+      createCaller({ user }).get({
+        triggerId: 'trigger-id',
+        organizationId: '00000000-0000-4000-8000-000000000001',
+      })
+    ).resolves.toMatchObject({ canEdit: true, canEditReason: null, canRun: true });
+  });
+
+  it('preserves read-only access when a billing manager has no write role', async () => {
+    mockEnsureOrganizationAccess
+      .mockRejectedValueOnce(new TRPCError({ code: 'UNAUTHORIZED' }))
+      .mockResolvedValueOnce('billing_manager');
+
+    await expect(
+      createCaller({ user }).get({
+        triggerId: 'trigger-id',
+        organizationId: '00000000-0000-4000-8000-000000000001',
+      })
+    ).resolves.toMatchObject({ canEdit: false, canEditReason: 'role', canRun: false });
+    expect(mockEnsureOrganizationAccess.mock.calls.map(call => call[2])).toEqual([
+      ['owner', 'admin', 'member'],
+      undefined,
+    ]);
+  });
+
+  it('does not fall back to read access after an unexpected authorization failure', async () => {
+    mockEnsureOrganizationAccess.mockRejectedValueOnce(
+      new TRPCError({ code: 'INTERNAL_SERVER_ERROR' })
+    );
+
+    await expect(
+      createCaller({ user }).get({
+        triggerId: 'trigger-id',
+        organizationId: '00000000-0000-4000-8000-000000000001',
+      })
+    ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+    expect(mockEnsureOrganizationAccess).toHaveBeenCalledTimes(1);
+    expect(mockGetWorkerTrigger).not.toHaveBeenCalled();
   });
 
   it('allows the creator to edit without changing execution identity', async () => {
@@ -485,6 +592,7 @@ describe('webhook trigger variant inputs', () => {
       expect.objectContaining({ promptTemplate: 'Changed prompt' })
     );
     expect(mockUpdateWorkerTrigger.mock.calls[0][3]).not.toHaveProperty('executionUserId');
+    expect(mockDbInsert).not.toHaveBeenCalled();
   });
 
   it('fails closed when the worker execution identity cannot be read', async () => {
@@ -1023,15 +1131,16 @@ describe('scheduled trigger invocation', () => {
     expect(mockDbUpdate).not.toHaveBeenCalled();
   });
 
-  it('allows organization owners and members to invoke owned organization triggers', async () => {
+  it('allows organization owners, admins, and members to invoke owned organization triggers', async () => {
     const organizationId = '00000000-0000-4000-8000-000000000003';
-    for (const role of ['owner', 'member'] as const) {
+    for (const role of ['owner', 'admin', 'member'] as const) {
       mockEnsureOrganizationAccess.mockResolvedValueOnce(role);
       await createCaller({ user }).invoke({ triggerId: 'trigger-id', organizationId });
     }
 
     expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(expect.anything(), organizationId, [
       'owner',
+      'admin',
       'member',
     ]);
     expect(mockInvokeWorkerScheduledTrigger).toHaveBeenLastCalledWith(

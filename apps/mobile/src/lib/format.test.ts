@@ -4,6 +4,7 @@ import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
 
 import {
   firstGrapheme,
+  foldDecimalDigits,
   formatCalendarDate,
   formatFileSize,
   formatList,
@@ -41,6 +42,7 @@ describe('localized format helpers', () => {
   it('parses localized numbers and rejects other input', () => {
     expect(parseLocalizedNumber('1.234,5', 'de-DE')).toBe(1234.5);
     expect(parseLocalizedNumber('1 234,5', 'ru')).toBe(1234.5);
+    expect(parseLocalizedNumber('١٢٣٤', 'ar-EG')).toBe(1234);
     expect(parseLocalizedNumber('twelve', 'en')).toBeNull();
   });
 
@@ -97,5 +99,40 @@ describe('localized format helpers', () => {
 
   it('formats a calendar date without a time-zone shift', () => {
     expect(formatCalendarDate('2026-08-03', 'en-US')).toBe('8/3/2026');
+  });
+});
+
+describe('foldDecimalDigits', () => {
+  it('converts the Arabic-Indic digits a phone keyboard types for a code', () => {
+    expect(foldDecimalDigits('٢٤٦٨١٠')).toBe('246810');
+  });
+
+  it.each([
+    ['Extended Arabic-Indic', '۲۴۶۸۱۰'],
+    ['Devanagari', '२४६८१०'],
+    ['Bengali', '২৪৬৮১০'],
+    ['Myanmar', '၂၄၆၈၁၀'],
+  ])('converts %s digits', (_script, digits) => {
+    expect(foldDecimalDigits(digits)).toBe('246810');
+  });
+
+  it('converts digits a Latin-numbering locale formats as Latin', () => {
+    expect(foldDecimalDigits('๒๔๖๘๑๐')).toBe('246810');
+    expect(foldDecimalDigits('໒໔໖໘໑໐')).toBe('246810');
+    expect(foldDecimalDigits('２４６８１０')).toBe('246810');
+  });
+
+  it('reads one digit from a run that holds several digit sets', () => {
+    // U+1D7CE–U+1D7FF is one run of five sets: the value is the offset from the
+    // run start modulo ten, so double-struck zero reads as 0, not 10.
+    expect(foldDecimalDigits('𝟚𝟜𝟞𝟠𝟙𝟘')).toBe('246810');
+    expect(foldDecimalDigits('𝟘')).toBe('0');
+    expect(foldDecimalDigits('𝟡')).toBe('9');
+  });
+
+  it('converts each digit of a mixed-script value and leaves other characters alone', () => {
+    expect(foldDecimalDigits('٢٤6٨๑0')).toBe('246810');
+    expect(foldDecimalDigits('24a6')).toBe('24a6');
+    expect(foldDecimalDigits('')).toBe('');
   });
 });

@@ -11,6 +11,16 @@ import { knownServerErrorMessage } from '@/lib/server-error-copy';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /**
+ * The runtime's repository preflight refusal: the caller selected a GitHub
+ * repository the connected installation cannot reach, so no session can be
+ * created for it. Only the reasons a different repository (or a fixed
+ * installation) can resolve are matched; a credential-service failure keeps the
+ * generic, retryable line.
+ */
+const REPOSITORY_AUTHORIZATION_REFUSAL_MESSAGE =
+  /^GitHub repository authorization failed \((?:integration_mismatch|no_installation_found|repository_not_installed)\)$/;
+
+/**
  * The localized failure copy for a rejected cloud prepare. Only failures the
  * message names precisely, plus the missing-selection code, get actionable
  * copy; every other rejection — an unclassified server detail, an unknown
@@ -23,6 +33,12 @@ export function cloudPrepareFailureMessage(error: unknown): string {
   const known = knownServerErrorMessage(error);
   if (known != null) {
     return known;
+  }
+  const message = readTrpcErrorField(error, 'message');
+  if (message !== undefined && REPOSITORY_AUTHORIZATION_REFUSAL_MESSAGE.test(message)) {
+    // The same guidance the branch row gives for the same refusal: check the
+    // provider access, then pick another repository.
+    return i18n.t('agentChat.newSession.branchUnavailable');
   }
   const code = readTrpcErrorField(error, 'code');
   if (code === 'NOT_FOUND') {

@@ -60,6 +60,7 @@ describe('GET /api/integrations/bitbucket/connect', () => {
       })
     );
     expect(verifyOAuthState(url.searchParams.get('state'))).toEqual({
+      provider: 'bitbucket',
       owner: `org_${ORGANIZATION_ID}`,
       userId: USER_ID,
       returnTo: `/organizations/${ORGANIZATION_ID}/integrations/bitbucket`,

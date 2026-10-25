@@ -232,3 +232,14 @@ not authority to restore a cleared account. The native renderer retains its
 last-confirmed Home data on transient failures, ages using shared/server-derived
 presentation timeline boundaries, and clears private data on explicit auth or
 privacy failure.
+
+## MCP account approval
+
+MCP sign-in uses apps/web for account approval and the worker for organization
+selection and OAuth issuance. The approval page presents app-provided connection
+details for the user to confirm. The worker retains the display code for approval
+links and the polling value for the server-side status read, including when the
+user returns to an unfinished request.
+
+Deploy the shared database migration, apps/web, then the MCP worker. The worker's
+SQLite migration runs on first access to its authorization store.

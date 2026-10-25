@@ -50,3 +50,10 @@ export const CONTROL_RUNTIME_RESERVED_ENV_VARS = [
   'CONTROL_LOG_UPLOAD_GRANT',
   'CONTROL_WRAPPER_INSTANCE_ID',
 ] as const;
+
+/**
+ * Prefixes the sandbox runtime owns. `buildWorktreeKiloEnvironment` drops them
+ * from what reaches the Kilo process, and the profile package mirrors them for
+ * write-time rejection because it cannot import from this service.
+ */
+export const RESERVED_ENV_VAR_PREFIXES = ['XDG_', 'KILO', 'OPENCODE'] as const;

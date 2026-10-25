@@ -58,7 +58,7 @@
     "estimateSpendLimitTooLow": "Raise the spend safeguard to allow this summary.",
     "confirmPaid": "Enable paid summaries for {{context}}?",
     "confirmGeneration": "Generate a paid summary?",
-    "paidDisclosure": "{{estimate}} estimated, up to {{maximum}}, with a {{minutes}} minute limit. Charges apply even if generation fails.",
+    "paidDisclosure": "{{estimate}} estimated, up to {{maximum}}, with a {{minutes}}-minute limit. Charges apply even if generation fails.",
     "enable": "Enable paid summaries",
     "contextSettings": "AI settings · {{context}}",
     "allContexts": "Personal and organization briefs stay separate.",
@@ -91,7 +91,13 @@
     "estimatePermissionUnavailable": "You do not have permission to use this context’s balance.",
     "createFailed": "Could not create this brief.",
     "reviewFailed": "Could not review this brief.",
-    "saved": "Briefing settings saved"
+    "saved": "Brief settings saved",
+    "preparing": "Preparing your brief…",
+    "preparationHint": "You can leave and return while activity is collected. No AI work or charge starts until you review and confirm the estimate.",
+    "resumeReview": "Continue review",
+    "preparationFailed": "Could not collect activity for this brief. Try again.",
+    "preparationTimedOut": "Collecting activity took too long. Try again.",
+    "preparationDrafts": "Unconfirmed briefs"
   },
   "common": {
     "cancel": "Cancel",

@@ -4031,8 +4031,8 @@
     "empty": "此簡報時段無活動",
     "emptyHint": "當排定的簡報有活動時，你的雲端與 CLI 程式設計工作階段會顯示在這裡。",
     "loadError": "無法載入簡報",
-    "sessions": "時段內執行",
-    "pullRequests": "已開啟的 PRs",
+    "sessions": "時段內有活動的工作階段",
+    "pullRequests": "時段內新開啟的 PRs",
     "blockers": "新的阻礙",
     "spend": "時段內花費",
     "view": "閱讀簡報",
@@ -4065,7 +4065,7 @@
     "notificationsHint": "每個排定的簡報會傳送一則一般通知。與付費 AI 摘要無關。",
     "notificationPermission": "請在$t(common.notifications)中啟用裝置通知以接收簡報。",
     "aiOptIn": "付費 AI 摘要",
-    "aiHint": "僅適用於此情境，可選擇啟用。經挑選並遮蔽敏感資訊的摘錄與結構化資料會以你的 App 語言傳送至你的模型。費用從此情境的餘額扣除。",
+    "aiHint": "可為此情境單獨選擇啟用。經挑選並遮蔽敏感資訊的摘錄與結構化資料會以你的 App 語言傳送至你的模型。費用從此情境的餘額扣除。",
     "defaultModel": "使用 Kilo 的預設模型",
     "duration": "時間上限（分鐘）",
     "spendLimit": "花費上限（USD）",
@@ -4111,7 +4111,13 @@
     "estimatePricingUnavailable": "此模型的定價無法取得。",
     "estimateBalanceUnavailable": "餘額不足以產生付費摘要。",
     "estimateModelNotAllowed": "此模型在此不受允許。",
-    "estimateSpendLimitTooLow": "請提高消費保障上限，才能允許此摘要。",
-    "saved": "簡報設定已儲存"
+    "estimateSpendLimitTooLow": "請提高花費上限，才能產生此摘要。",
+    "saved": "簡報設定已儲存",
+    "preparing": "正在準備你的簡報…",
+    "preparationHint": "收集活動資料期間，你可以離開並稍後返回。在你檢視並確認預估費用之前，不會開始 AI 作業或收費。",
+    "resumeReview": "繼續檢視",
+    "preparationFailed": "無法收集此簡報的活動資料。請再試一次。",
+    "preparationTimedOut": "收集活動資料耗時過長。請再試一次。",
+    "preparationDrafts": "待確認的簡報"
   }
 }

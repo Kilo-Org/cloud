@@ -626,6 +626,22 @@ One-off period sampling and the summary model's 16-source/24-session selection r
 History pages allow up to 100 reports within a 3 MB JSON response budget.
 Stored reports must satisfy the shared contract; unreadable records are skipped during pagination.
 
+Manual preparation persists an unpublished draft through `startOneOffPreparation` before collecting evidence in `after()`.
+`oneOffPreparation` returns preparation progress or the completed report and a fresh cost estimate.
+`oneOffDrafts` lists resumable, unconfirmed drafts after navigation or an app restart.
+Attempt claims prevent concurrent or stale workers from overwriting a newer attempt.
+Interrupted preparation reaches a terminal failure and requires explicit retry.
+The summary cron recovers pending preparation independently of paid summary work.
+Preparation scheduler failures are logged without discarding completed summary job results.
+Preparations use the existing indexed `next_refresh_at` marker: pending work is immediately due,
+running work is due at its deadline, and terminal attempts clear the marker.
+Expiry checks use this due index, and each preparation collection batch selects at most five drafts.
+Scheduled refresh excludes one-off drafts.
+Preparation does not publish a report, invoke inference, or authorize a charge.
+`createOneOff` remains the explicit cost-confirmation step.
+Deploy the backend before releasing the new mobile client.
+The synchronous `prepareOneOff` endpoint remains supported for released clients.
+
 The protected cron routes are `/api/cron/agent-briefing` and `/api/cron/agent-briefing-summaries`.
 They use the existing cron authorization, database, gateway, and notification configuration.
 Local verification must use an isolated database and fake accounts.

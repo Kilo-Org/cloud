@@ -85,14 +85,22 @@ export async function sendUpstreamAttempt({
     isNonTrialEnterprise
   );
   if (costLimit) {
-    const refusal = await enforceRequestCostLimit(
+    const decision = await enforceRequestCostLimit(
       costLimit.maximumMicrodollars,
       requestedModel,
       request.body,
-      costLimit.availableBalanceMicrodollars
+      costLimit.availableBalanceMicrodollars,
+      {
+        id: providerContext.provider.id,
+        userFunded: providerContext.userByok !== null,
+      }
     );
-    if (refusal)
-      return { type: 'error', response: NextResponse.json({ error: refusal }, { status: 402 }) };
+    if (decision.refusal)
+      return {
+        type: 'error',
+        response: NextResponse.json({ error: decision.refusal }, { status: 402 }),
+      };
+    if (decision.providerConfig) request.body.provider = decision.providerConfig;
   }
 
   if (providerContext.provider.id === 'openrouter') {

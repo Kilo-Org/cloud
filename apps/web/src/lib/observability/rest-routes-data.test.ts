@@ -115,6 +115,7 @@ describe('REST data routes emit one api_timing line', () => {
       userCode: 'ABCD-EFGH',
       deviceCode: 'device-secret',
       expiresAt: new Date(Date.now() + 600_000),
+      requestingClient: null,
     });
 
     const response = await codesRoute.POST(

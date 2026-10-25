@@ -18,6 +18,20 @@ export async function processLinkedMessage({
   user: User;
 }) {
   const botPlatform = botPlatforms.requireByAdapter(thread.adapter);
+
+  const authorization = await botPlatform.authorizeBotActions?.({
+    thread,
+    message,
+    platformIntegration,
+  });
+  if (authorization && !authorization.allowed) {
+    await botPlatform.withAuthContext({
+      platformIntegration,
+      fn: () => thread.post({ markdown: authorization.markdown }),
+    });
+    return;
+  }
+
   const stopProcessingIndicator = await botPlatform.startProcessingIndicator({
     thread,
     messageId: message.id,
@@ -114,6 +128,7 @@ async function processMessage({
       botRequestId,
       prompt: message.text,
       attachments,
+      actorLogin: message.author.userName,
     });
 
     updateBotRequest(botRequestId, {

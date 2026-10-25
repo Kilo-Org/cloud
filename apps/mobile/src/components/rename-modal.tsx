@@ -7,7 +7,7 @@ import { DialogCard } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { withUiDeadline } from '@/lib/ui-deadline';
+import { isUiDeadlineError, withUiDeadline } from '@/lib/ui-deadline';
 import { cn } from '@/lib/utils';
 
 const SAVE_UI_DEADLINE_MS = 15_000;
@@ -26,6 +26,13 @@ type RenameModalProps<TSaveResult> = {
    * keep the single-line field.
    */
   multiline?: boolean;
+  /**
+   * Turns a rejected save into the line shown under the field. Defaults to the
+   * error's own message; a caller whose procedure returns server sentences
+   * meant for logs passes a mapper that yields localized copy instead
+   * (organization rename, for example).
+   */
+  errorCopy?: (error: unknown) => string;
 };
 
 // Mount this component only while the dialog should be open (e.g. `{visible && <RenameModal ... />}`)
@@ -38,6 +45,7 @@ export function RenameModal<TSaveResult>({
   onClose,
   maxLength = 50,
   multiline = false,
+  errorCopy,
 }: Readonly<RenameModalProps<TSaveResult>>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -87,7 +95,13 @@ export function RenameModal<TSaveResult>({
       await withUiDeadline(operation, SAVE_UI_DEADLINE_MS);
       onClose();
     } catch (error) {
-      setErrorText(error instanceof Error ? error.message : t('common.somethingWentWrong'));
+      // The deadline is the app's own message, already localized; only a
+      // rejection from the save itself goes through the caller's mapper.
+      if (errorCopy && !isUiDeadlineError(error)) {
+        setErrorText(errorCopy(error));
+      } else {
+        setErrorText(error instanceof Error ? error.message : t('common.somethingWentWrong'));
+      }
     } finally {
       setPending(false);
     }

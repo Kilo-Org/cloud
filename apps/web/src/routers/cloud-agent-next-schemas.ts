@@ -1,3 +1,4 @@
+import { setupCommandsSchema } from '@kilocode/cloud-agent-profile/setup-script';
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
@@ -173,17 +174,6 @@ export const cloudAgentGetAttachmentUploadUrlSchema = z
 export const cloudAgentGetAttachmentDownloadUrlSchema = z.object({
   messageUuid: z.uuid(),
   filename: cloudAgentRelaxedAttachmentFilenameSchema,
-});
-
-/**
- * Send-time finalization input for the pending-upload ledger. The object keys
- * are full R2 keys produced by the upload presign; the server scopes the link
- * to the caller's own rows, so the array needs no per-key structure beyond a
- * length cap that reuses the landed attachment-count constant.
- */
-export const cloudAgentLinkPendingUploadsSchema = z.object({
-  messageUuid: z.uuid(),
-  objectKeys: z.array(z.string().min(1).max(1024)).min(1).max(CLOUD_AGENT_ATTACHMENT_MAX_COUNT),
 });
 
 /**
@@ -449,7 +439,7 @@ const PrepareSessionSharedFields = {
 
   // Optional configuration
   envVars: z.record(z.string().max(256), z.string().max(256)).optional(),
-  setupCommands: z.array(z.string().max(500)).max(20).optional(),
+  setupCommands: setupCommandsSchema.optional(),
   mcpServers: z.record(z.string(), mcpServerConfigNextSchema).optional(),
   runtimeSkills: z.array(runtimeSkillInputSchema).max(50).optional(),
   runtimeAgents: z.array(runtimeAgentInputSchema).max(20).optional(),
@@ -593,7 +583,13 @@ export const baseSendMessageNextSchema = z
     payload: sendMessageNextSendPayloadSchema,
     expectedWorktreeId: cloudAgentWorktreeIdSchema.optional(),
     autoCommit: z.boolean().optional(),
-    messageId: messageIdNextSchema.nullish(),
+    /**
+     * Durable user-message identity. The control plane replays a repeated id
+     * instead of admitting a second turn, so a client retry after a failed
+     * response must carry the id of the turn it is retrying; the server cannot
+     * invent one on the client's behalf.
+     */
+    messageId: messageIdNextSchema,
     attachments: cloudAgentAttachmentsSchema.optional(),
     images: cloudAgentImagesSchema,
   })

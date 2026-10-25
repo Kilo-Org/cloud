@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
-import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
 import { act } from '@/test/renderer';
-import { type PreparedBriefing } from './use-create-briefing';
-import { input, mount, prepared, state } from './use-create-briefing-test-utils';
+import { waitFor } from '@/test/render-with-providers';
+import { type CreateBriefingState, type PreparedBriefing } from './use-create-briefing';
+import { draft, input, mount, prepared, state } from './use-create-briefing-test-utils';
 
 const mocks = vi.hoisted(() => ({
   prepare: vi.fn(),
+  status: vi.fn(),
   create: vi.fn(),
   toast: vi.fn(),
   offline: false,
@@ -27,9 +28,16 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     agentBriefing: {
-      prepareOneOff: {
+      startOneOffPreparation: {
         mutationOptions: (options: object) => ({ ...options, mutationFn: mocks.prepare }),
       },
+      oneOffPreparation: {
+        queryOptions: ({ reportId }: { reportId: string }) => ({
+          queryKey: ['preparation', reportId],
+          queryFn: () => mocks.status(reportId),
+        }),
+      },
+      oneOffDrafts: { pathKey: () => ['briefing-drafts'] },
       createOneOff: {
         mutationOptions: (options: object) => ({ ...options, mutationFn: mocks.create }),
       },
@@ -39,53 +47,122 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 
-describe('one-off briefing request state', () => {
+async function waitForReview() {
+  await waitFor(() => state().prepared !== null);
+  expect(state().prepared).toEqual(prepared);
+}
+
+describe('background one-off briefing state', () => {
   beforeEach(() => {
     bumpAuthEpoch();
-    mocks.prepare.mockReset();
-    mocks.create.mockReset();
+    mocks.prepare.mockReset().mockResolvedValue(draft);
+    mocks.status.mockReset().mockResolvedValue({ draft: { ...draft, status: 'ready' }, prepared });
+    mocks.create.mockReset().mockResolvedValue(prepared.report);
     mocks.toast.mockReset();
     mocks.offline = false;
     mocks.nextId = 0;
   });
 
-  it('coalesces double review taps and keeps the UUID and exact range after a transport failure', async () => {
-    mocks.prepare
-      .mockRejectedValueOnce(new Error('Transport failed'))
-      .mockResolvedValueOnce(prepared);
-    const { renderer } = mount();
+  it('coalesces start taps, returns the persisted draft before collection, and never generates automatically', async () => {
+    const pending = Promise.withResolvers<{ draft: typeof draft; prepared: null }>();
+    mocks.status.mockReturnValue(pending.promise);
+    const { renderer, client } = mount();
     await act(async () => {
-      await Promise.all([state().prepare(input), state().prepare(input)]);
+      const results = await Promise.all([state().prepare(input), state().prepare(input)]);
+      expect(results).toEqual([draft, null]);
     });
     expect(mocks.prepare).toHaveBeenCalledTimes(1);
+    expect(state().prepared).toBeNull();
+    expect(await state().create()).toBeNull();
+    expect(mocks.create).not.toHaveBeenCalled();
+    renderer.unmount();
+    act(() => {
+      pending.resolve({ draft, prepared: null });
+    });
+    client.clear();
+  });
+
+  it('retains the request ID and exact range after an ambiguous transport failure', async () => {
+    mocks.prepare.mockRejectedValueOnce(new Error('Transport failed')).mockResolvedValueOnce(draft);
+    const { renderer, client } = mount();
+    await act(async () => {
+      await state().prepare(input);
+    });
     expect(state().error).toBe('agentBriefing.reviewFailed');
     await act(async () => {
       await state().prepare({ ...input, endAt: '2026-10-20T12:10:00.000Z' });
     });
+    await waitForReview();
     expect(mocks.prepare.mock.calls[0]?.[0]).toEqual({ ...input, requestId: 'request-1' });
     expect(mocks.prepare.mock.calls[1]?.[0]).toEqual(mocks.prepare.mock.calls[0]?.[0]);
-    expect(state().prepared).toEqual(prepared);
     renderer.unmount();
+    client.clear();
   });
 
-  it('discards late preparation after an edit and allocates a fresh request for the edited input', async () => {
-    const pending = Promise.withResolvers<PreparedBriefing>();
-    mocks.prepare.mockReturnValueOnce(pending.promise).mockResolvedValueOnce(prepared);
-    const { renderer } = mount();
-    let reviewing: Promise<void> | undefined = undefined;
+  it('keeps one preparation observer and one failure notice after the form hands off its draft', async () => {
+    const form = mount();
+    await act(async () => {
+      await state().prepare(input);
+    });
+    await waitForReview();
     act(() => {
-      reviewing = state().prepare(input);
+      state().reset();
+    });
+    const review = mount(draft.id, form.client);
+    await waitForReview();
+    expect(
+      form.client
+        .getQueryCache()
+        .find({ queryKey: ['preparation', draft.id] })
+        ?.getObserversCount()
+    ).toBe(1);
+    mocks.status.mockRejectedValue(new Error('Status unavailable'));
+    await act(async () => {
+      await state().refresh();
+    });
+    await waitFor(() => state().error !== null);
+    expect(mocks.toast).toHaveBeenCalledExactlyOnceWith('agentBriefing.reviewFailed');
+    form.renderer.unmount();
+    review.renderer.unmount();
+    form.client.clear();
+  });
+
+  it('resumes a persisted draft on a fresh screen and requires explicit paid confirmation', async () => {
+    const first = mount(draft.id);
+    await waitForReview();
+    first.renderer.unmount();
+    first.client.clear();
+    const second = mount(draft.id);
+    await waitForReview();
+    expect(mocks.prepare).not.toHaveBeenCalled();
+    expect(mocks.create).not.toHaveBeenCalled();
+    await act(async () => {
+      await state().create();
+    });
+    expect(mocks.create.mock.calls[0]?.[0]).toEqual({
+      reportId: draft.id,
+      estimateToken: 'bound-token',
+    });
+    second.renderer.unmount();
+    second.client.clear();
+  });
+
+  it('discards a late start after a form edit and uses a fresh ID for the edited context', async () => {
+    const pending = Promise.withResolvers<typeof draft>();
+    mocks.prepare.mockReturnValueOnce(pending.promise);
+    const { renderer, client } = mount();
+    let starting: Promise<CreateBriefingState['draft']> | undefined = undefined;
+    act(() => {
+      starting = state().prepare(input);
     });
     act(() => {
       state().reset();
     });
     await act(async () => {
-      pending.resolve(prepared);
-      await reviewing;
+      pending.resolve(draft);
+      expect(await starting).toBeNull();
     });
     expect(state().prepared).toBeNull();
-    expect(await state().create()).toBeNull();
-    expect(mocks.create).not.toHaveBeenCalled();
     await act(async () => {
       await state().prepare({ ...input, organizationId: 'org-2' });
     });
@@ -95,37 +172,57 @@ describe('one-off briefing request state', () => {
       requestId: 'request-2',
     });
     renderer.unmount();
+    client.clear();
   });
 
-  it('never submits offline review or paid confirmation, including after an online review', async () => {
-    const { renderer } = mount();
-    mocks.offline = true;
-    await act(async () => {
-      await state().prepare(input);
+  it('retries a terminal collection failure only on demand and reuses its persisted identity', async () => {
+    mocks.status.mockResolvedValue({
+      draft: { ...draft, status: 'failed', error: 'time_limit' },
+      prepared: null,
     });
+    const { renderer, client } = mount(draft.id);
+    await waitFor(() => state().draft?.status === 'failed');
     expect(mocks.prepare).not.toHaveBeenCalled();
-    mocks.offline = false;
-    mocks.prepare.mockResolvedValue(prepared);
+    mocks.status.mockResolvedValue({ draft: { ...draft, status: 'ready' }, prepared });
     await act(async () => {
-      await state().prepare(input);
+      await state().retryPreparation();
     });
-    mocks.offline = true;
-    await act(async () => {
-      expect(await state().create()).toBeNull();
+    await waitForReview();
+    expect(mocks.prepare.mock.calls[0]?.[0]).toEqual({
+      ...input,
+      organizationId: undefined,
+      requestId: draft.id,
     });
     expect(mocks.create).not.toHaveBeenCalled();
-    expect(state().error).toBe('agentBriefing.createOffline');
     renderer.unmount();
+    client.clear();
   });
 
-  it('coalesces concurrent confirmations into one request', async () => {
-    const pending = Promise.withResolvers<PreparedBriefing['report']>();
-    mocks.prepare.mockResolvedValue(prepared);
-    mocks.create.mockReturnValueOnce(pending.promise).mockResolvedValue(prepared.report);
-    const { renderer } = mount();
+  it('keeps the reviewed report and bound token after an ambiguous paid confirmation failure', async () => {
+    mocks.create
+      .mockRejectedValueOnce(new Error('Connection lost'))
+      .mockResolvedValueOnce(prepared.report);
+    const { renderer, client } = mount(draft.id);
+    await waitForReview();
     await act(async () => {
-      await state().prepare(input);
+      await state().create();
     });
+    expect(state().prepared).toEqual(prepared);
+    expect(state().error).toBe('agentBriefing.createFailed');
+    await act(async () => {
+      await state().create();
+    });
+    expect(mocks.create.mock.calls[1]?.[0]).toEqual(mocks.create.mock.calls[0]?.[0]);
+    expect(mocks.prepare).not.toHaveBeenCalled();
+    renderer.unmount();
+    client.clear();
+  });
+
+  it('coalesces paid confirmation taps', async () => {
+    const pending = Promise.withResolvers<PreparedBriefing['report']>();
+    mocks.create.mockReturnValue(pending.promise);
+    const { renderer, client } = mount(draft.id);
+    await waitForReview();
     let creating: Promise<PreparedBriefing['report'] | null> | undefined = undefined;
     act(() => {
       creating = state().create();
@@ -136,148 +233,34 @@ describe('one-off briefing request state', () => {
       await creating;
     });
     expect(mocks.create).toHaveBeenCalledTimes(1);
-    expect(mocks.create.mock.calls[0]?.[0]).toEqual({
-      reportId: 'report-1',
-      estimateToken: 'bound-token',
-    });
     renderer.unmount();
-  });
-
-  it('keeps the reviewed report and bound token after an ambiguous create failure', async () => {
-    mocks.prepare.mockResolvedValue(prepared);
-    mocks.create
-      .mockRejectedValueOnce(new Error('Connection lost'))
-      .mockResolvedValueOnce(prepared.report);
-    const { renderer } = mount();
-    await act(async () => {
-      await state().prepare(input);
-      await state().create();
-    });
-    expect(state().prepared).toEqual(prepared);
-    expect(state().error).toBe('agentBriefing.createFailed');
-    await act(async () => {
-      await state().create();
-    });
-    expect(mocks.create.mock.calls[1]?.[0]).toEqual(mocks.create.mock.calls[0]?.[0]);
-    expect(mocks.prepare).toHaveBeenCalledTimes(1);
-    renderer.unmount();
-  });
-
-  it('does not publish an earlier account’s report after the account changes', async () => {
-    const pending = Promise.withResolvers<PreparedBriefing['report']>();
-    const started = Promise.withResolvers<undefined>();
-    mocks.prepare.mockResolvedValue(prepared);
-    mocks.create.mockImplementation(async () => {
-      started.resolve(undefined);
-      const result = await pending.promise;
-      return result;
-    });
-    const { renderer, client } = mount();
-    await act(async () => {
-      await state().prepare(input);
-    });
-    let creating: Promise<PreparedBriefing['report'] | null> | undefined = undefined;
-    await act(async () => {
-      creating = state().create();
-      await started.promise;
-    });
-    bumpAuthEpoch();
     client.clear();
-    let result: PreparedBriefing['report'] | null | undefined = undefined;
-    await act(async () => {
-      pending.resolve(prepared.report);
-      result = await creating;
-    });
-    expect(result).toBeNull();
-    expect(client.getQueryData(['briefing', prepared.report.id])).toBeUndefined();
-    renderer.unmount();
-  });
-
-  it('discards a review that finishes after the account changes', async () => {
-    const pending = Promise.withResolvers<PreparedBriefing>();
-    const started = Promise.withResolvers<undefined>();
-    mocks.prepare.mockImplementation(async () => {
-      started.resolve(undefined);
-      const result = await pending.promise;
-      return result;
-    });
-    const { renderer } = mount();
-    let reviewing: Promise<void> | undefined = undefined;
-    await act(async () => {
-      reviewing = state().prepare(input);
-      await started.promise;
-    });
-    bumpAuthEpoch();
-    await act(async () => {
-      pending.resolve(prepared);
-      await reviewing;
-    });
-    expect(state().prepared).toBeNull();
-    expect(await state().create()).toBeNull();
-    renderer.unmount();
-  });
-
-  it('does not sign out the current account for an earlier account’s failed request', async () => {
-    const pending = Promise.withResolvers<PreparedBriefing['report']>();
-    const started = Promise.withResolvers<undefined>();
-    mocks.prepare.mockResolvedValue(prepared);
-    mocks.create.mockImplementation(async () => {
-      started.resolve(undefined);
-      const result = await pending.promise;
-      return result;
-    });
-    const signOut = vi.fn<() => void>();
-    const restoreHandler = setTrpcUnauthorizedHandler(signOut);
-    const { renderer } = mount();
-    try {
-      await act(async () => {
-        await state().prepare(input);
-      });
-      let creating: Promise<PreparedBriefing['report'] | null> | undefined = undefined;
-      await act(async () => {
-        creating = state().create();
-        await started.promise;
-      });
-      bumpAuthEpoch();
-      await act(async () => {
-        pending.reject(
-          Object.assign(new Error('Expired session'), { data: { authRequired: true } })
-        );
-        await creating;
-      });
-      expect(signOut).not.toHaveBeenCalled();
-      expect(state().error).toBeNull();
-      expect(mocks.toast).not.toHaveBeenCalled();
-    } finally {
-      restoreHandler();
-      renderer.unmount();
-    }
   });
 
   it('blocks unavailable paid estimates and permits empty reports without an estimate token', async () => {
-    mocks.prepare.mockResolvedValueOnce({
-      ...prepared,
-      estimate: { ...prepared.estimate, canGenerate: false },
+    mocks.status.mockResolvedValue({
+      draft: { ...draft, status: 'ready' },
+      prepared: { ...prepared, estimate: { ...prepared.estimate, canGenerate: false } },
     });
-    const { renderer } = mount();
-    await act(async () => {
-      await state().prepare(input);
-    });
+    const { renderer, client } = mount(draft.id);
+    await waitFor(() => state().prepared?.estimate?.canGenerate === false);
     expect(await state().create()).toBeNull();
-    expect(mocks.create).not.toHaveBeenCalled();
-    act(() => {
-      state().reset();
+    mocks.status.mockResolvedValue({
+      draft: { ...draft, status: 'ready' },
+      prepared: { ...prepared, estimate: null },
     });
-    mocks.prepare.mockResolvedValueOnce({ ...prepared, estimate: null });
-    mocks.create.mockResolvedValue(prepared.report);
     await act(async () => {
-      await state().prepare(input);
+      await state().refresh();
+    });
+    await waitFor(() => state().prepared !== null && state().prepared?.estimate === null);
+    await act(async () => {
       await state().create();
     });
     expect(mocks.create.mock.calls[0]?.[0]).toEqual({
-      reportId: 'report-1',
+      reportId: draft.id,
       estimateToken: undefined,
     });
     renderer.unmount();
+    client.clear();
   });
 });

@@ -7,7 +7,7 @@ import {
   buildSlackCredentialLockKey,
   type SlackCredentialOwner,
 } from '@kilocode/worker-utils/slack-credential';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   decryptSlackCredentialSecret,
   encryptSlackCredentialSecret,
@@ -58,9 +58,10 @@ export type SlackCredentialWriteOutcome =
  * interleave a read of the current version with a write of the next one.
  */
 export async function writeSlackCredential(
-  input: WriteSlackCredentialInput
+  input: WriteSlackCredentialInput,
+  database: typeof db | DrizzleTransaction = db
 ): Promise<SlackOAuthCredential> {
-  const outcome = await upsertSlackCredential(input, { onlyIfAbsent: false });
+  const outcome = await upsertSlackCredential(input, { onlyIfAbsent: false }, database);
   if (outcome.status === 'skipped_existing') {
     // Unreachable: only `onlyIfAbsent` can skip. Asserted rather than cast so a future
     // change to the skip conditions cannot silently drop a credential write.
@@ -86,9 +87,10 @@ export async function createSlackCredentialIfAbsent(
 
 async function upsertSlackCredential(
   input: WriteSlackCredentialInput,
-  { onlyIfAbsent }: { onlyIfAbsent: boolean }
+  { onlyIfAbsent }: { onlyIfAbsent: boolean },
+  database: typeof db | DrizzleTransaction = db
 ): Promise<SlackCredentialWriteOutcome> {
-  return db.transaction(async tx => {
+  return database.transaction(async tx => {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${buildSlackCredentialLockKey(input.integrationId)}, 0))`
     );

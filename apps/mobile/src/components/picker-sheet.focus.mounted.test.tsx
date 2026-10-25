@@ -22,6 +22,10 @@ vi.mock('expo-router', () => ({
   useNavigation: () => ({
     addListener: () => () => undefined,
   }),
+  // The shell's hardware Back listener dismisses through the router; this
+  // suite mounts with the platform Back module absent, so the listener never
+  // arms and the mock only has to satisfy the import.
+  useRouter: () => ({ back: vi.fn() }),
 }));
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',

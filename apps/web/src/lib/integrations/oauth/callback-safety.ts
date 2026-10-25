@@ -24,3 +24,18 @@ export function validOAuthCode(code: string | null): string | null {
   if (!code || code.length > 2048 || !/^[A-Za-z0-9._~+/-]+$/.test(code)) return null;
   return code;
 }
+
+/**
+ * Context for an OAuth callback diagnostic: presence flags for the callback
+ * query and a non-reversible digest of its state, so events stay correlatable
+ * without carrying the query itself.
+ */
+export function safeCallbackContext(searchParams: URLSearchParams) {
+  const state = searchParams.get('state');
+  return {
+    hasCode: Boolean(searchParams.get('code')),
+    hasState: Boolean(state),
+    stateHash: oauthStateHash(state),
+    hasProviderError: Boolean(searchParams.get('error')),
+  };
+}

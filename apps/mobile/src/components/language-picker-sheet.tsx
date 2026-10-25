@@ -164,7 +164,10 @@ export function LanguagePickerSheet({
         // reloadAppAsync succeeded; the native reload wipes this state.
         break;
       }
-      case 'reload-failed': {
+      case 'reload-failed':
+      case 'restart-skipped': {
+        // Both leave the language saved without a relaunch: offer the sheet's
+        // retry so the user can ask for the restart again.
         setBusy(false);
         setRestarting(false);
         setReloadFailed(true);

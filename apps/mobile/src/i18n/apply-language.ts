@@ -17,6 +17,7 @@ import { prewarmIntl } from '@/lib/intl-cache';
 export type ApplyLanguageOutcome =
   | { kind: 'applied-ltr' }
   | { kind: 'restarting-rtl' }
+  | { kind: 'restart-skipped' }
   | { kind: 'reload-failed' }
   | { kind: 'persist-failed' }
   | { kind: 'catalog-failed' };
@@ -63,8 +64,12 @@ export async function applyLanguagePreference(
     }
     // Record the relaunch so a cold start that comes back with the previous
     // direction does not relaunch again for it; the cold start then shows the
-    // retry screen instead of reloading forever.
-    await writeDirectionAttemptAsync(resolved);
+    // retry screen instead of reloading forever. Without the record a relaunch
+    // that does not take the direction repeats on every launch, so a failed
+    // write skips the relaunch instead of risking that loop.
+    if (!(await writeDirectionAttemptAsync(resolved))) {
+      return { kind: 'restart-skipped' };
+    }
     syncRtl(resolved);
     try {
       await reloadAppAsync();

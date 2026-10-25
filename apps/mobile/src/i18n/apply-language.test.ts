@@ -111,6 +111,20 @@ describe('applyLanguagePreference — needs-input category re-registration', () 
     expect(mocks.renameAndroidNotificationChannels).not.toHaveBeenCalled();
   });
 
+  it('skips the relaunch when the attempt record cannot be written', async () => {
+    mocks.syncRtl.mockReturnValue(true);
+    mocks.writeDirectionAttemptAsync.mockResolvedValue(false);
+
+    await expect(applyLanguagePreference('ar', 'ar', 'login')).resolves.toEqual({
+      kind: 'restart-skipped',
+    });
+
+    // Without the record a relaunch that did not take the direction would
+    // repeat on every launch, so neither the direction nor the reload runs.
+    expect(mocks.syncRtl).not.toHaveBeenCalled();
+    expect(mocks.reloadAppAsync).not.toHaveBeenCalled();
+  });
+
   it('registers nothing when the catalog fails to load', async () => {
     const changeLanguageSpy = vi
       .spyOn(i18n, 'changeLanguage')

@@ -14,6 +14,7 @@ import { LanguagePickerSheet } from '@/components/language-picker-sheet';
 const reloadAppAsync = vi.hoisted(() => vi.fn());
 const setLanguagePreferenceAsync = vi.hoisted(() => vi.fn());
 const writeLanguageReturnTarget = vi.hoisted(() => vi.fn());
+const writeDirectionAttemptAsync = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 const renameAndroidNotificationChannels = vi.hoisted(() => vi.fn());
 const registerNeedsInputCategories = vi.hoisted(() => vi.fn());
 const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
@@ -102,7 +103,7 @@ vi.mock('@/i18n/apply-language', async importOriginal => {
 });
 // The apply path records the direction relaunch; the record itself is covered
 // by the apply-language suite, and its real store pulls in the native keychain.
-vi.mock('@/i18n/direction-attempt', () => ({ writeDirectionAttemptAsync: vi.fn() }));
+vi.mock('@/i18n/direction-attempt', () => ({ writeDirectionAttemptAsync }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/picker-sheet', () => ({
   PickerSheet: (props: { headerContent?: ReactNode; children?: ReactNode }) =>
@@ -217,6 +218,8 @@ describe('LanguagePickerSheet apply', () => {
     setLanguagePreferenceAsync.mockReset();
     setLanguagePreferenceAsync.mockResolvedValue(true);
     reloadAppAsync.mockReset();
+    writeDirectionAttemptAsync.mockReset();
+    writeDirectionAttemptAsync.mockResolvedValue(true);
     writeLanguageReturnTarget.mockReset();
     renameAndroidNotificationChannels.mockReset();
     registerNeedsInputCategories.mockReset();
@@ -474,6 +477,27 @@ describe('LanguagePickerSheet apply', () => {
     });
     expect(reloadAppAsync).toHaveBeenCalledTimes(2);
     expect(prevention.enabled).toBe(true);
+
+    renderer.unmount();
+  });
+
+  it('shows Could not restart without reloading when the relaunch cannot be recorded', async () => {
+    writeDirectionAttemptAsync.mockResolvedValue(false);
+    const onClose = vi.fn<() => void>();
+    const renderer = await applySelection(onClose, 'العربية');
+
+    expect(writeDirectionAttemptAsync).toHaveBeenCalledWith('ar');
+    // Without the record a relaunch that did not take the direction would
+    // repeat on every launch, so the sheet refuses it and offers Retry.
+    expect(reloadAppAsync).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+
+    const failedSheet = findByType(renderer.root, 'PickerSheet')[0];
+    if (!failedSheet) {
+      throw new Error('PickerSheet not found');
+    }
+    expect(failedSheet.props.title).toBe('Could not restart');
+    expect(failedSheet.props.doneLabel).toBe('Retry');
 
     renderer.unmount();
   });

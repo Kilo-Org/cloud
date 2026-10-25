@@ -46,7 +46,6 @@ type ProfileVarEditorPresentationProps = {
   error?: boolean;
   activeTab: 'vars' | 'commands';
   onTabChange: (tab: 'vars' | 'commands') => void;
-  // Add variable state
   isAddingVar: boolean;
   newVarKey: string;
   newVarValue: string;
@@ -59,7 +58,6 @@ type ProfileVarEditorPresentationProps = {
   onNewVarIsSecretChange: (isSecret: boolean) => void;
   onToggleShowNewVarValue: () => void;
   onAddVar: () => void;
-  // Edit variable state
   editingVarKey: string | null;
   editingVarValue: string;
   showEditingVarValue: boolean;
@@ -69,7 +67,6 @@ type ProfileVarEditorPresentationProps = {
   onToggleShowEditingVarValue: () => void;
   onSaveVar: (varItem: ProfileVar) => void;
   onDeleteVar: (key: string) => void;
-  // Add command state
   isAddingCommand: boolean;
   newCommand: string;
   onStartAddCommand: () => void;
@@ -77,7 +74,6 @@ type ProfileVarEditorPresentationProps = {
   onNewCommandChange: (command: string) => void;
   onAddCommand: () => void;
   onDeleteCommand: (index: number) => void;
-  // Loading states
   savingVarKey: string | null;
   deletingVarKey: string | null;
   savingCommands: boolean;
@@ -143,7 +139,6 @@ function ProfileVarEditorPresentation({
           </div>
         </DialogHeader>
 
-        {/* Tab navigation */}
         <div className="flex gap-1 border-b">
           <button
             className={`border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
@@ -180,7 +175,6 @@ function ProfileVarEditorPresentation({
               <span>Failed to load profile</span>
             </div>
           ) : activeTab === 'vars' ? (
-            /* Variables Tab */
             <div className="space-y-2">
               {profile?.vars.map(varItem => (
                 <div
@@ -188,7 +182,6 @@ function ProfileVarEditorPresentation({
                   className="hover:bg-accent/50 rounded-lg border p-3 transition-colors"
                 >
                   {editingVarKey === varItem.key ? (
-                    // Edit mode
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <code className="bg-muted rounded px-2 py-1 font-mono text-sm">
@@ -239,7 +232,6 @@ function ProfileVarEditorPresentation({
                       </div>
                     </div>
                   ) : (
-                    // View mode
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex min-w-0 flex-1 items-center gap-2">
                         <code className="bg-muted shrink-0 rounded px-2 py-1 font-mono text-sm">
@@ -284,7 +276,6 @@ function ProfileVarEditorPresentation({
                 </div>
               ))}
 
-              {/* Add new variable form */}
               {isAddingVar ? (
                 <div className="space-y-3 rounded-lg border border-dashed p-3">
                   <div className="grid gap-2">
@@ -370,7 +361,6 @@ function ProfileVarEditorPresentation({
               )}
             </div>
           ) : (
-            /* Commands Tab */
             <div className="space-y-2">
               {profile?.commands.map((cmd, index) => (
                 <div
@@ -393,7 +383,6 @@ function ProfileVarEditorPresentation({
                 </div>
               ))}
 
-              {/* Add new command form */}
               {isAddingCommand ? (
                 <div className="space-y-3 rounded-lg border border-dashed p-3">
                   <div className="grid gap-2">
@@ -455,7 +444,6 @@ function ProfileVarEditorPresentation({
   );
 }
 
-// Wrapper component to handle state
 function ProfileVarEditorWrapper({
   profile = mockProfileDetails,
   isLoading = false,
@@ -476,19 +464,16 @@ function ProfileVarEditorWrapper({
   const [open, setOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<'vars' | 'commands'>(initialTab);
 
-  // Add variable state
   const [isAddingVar, setIsAddingVar] = useState(initialIsAddingVar);
   const [newVarKey, setNewVarKey] = useState('');
   const [newVarValue, setNewVarValue] = useState('');
   const [newVarIsSecret, setNewVarIsSecret] = useState(false);
   const [showNewVarValue, setShowNewVarValue] = useState(false);
 
-  // Edit variable state
   const [editingVarKey, setEditingVarKey] = useState<string | null>(initialEditingVarKey);
   const [editingVarValue, setEditingVarValue] = useState('');
   const [showEditingVarValue, setShowEditingVarValue] = useState(false);
 
-  // Add command state
   const [isAddingCommand, setIsAddingCommand] = useState(initialIsAddingCommand);
   const [newCommand, setNewCommand] = useState('');
 

@@ -1,5 +1,3 @@
-// Constant data used in our stories.
-
 export const PROJECT_WORDS = [
   'alpha',
   'bravo',
@@ -36,7 +34,6 @@ export const MODELS = [
 
 export const PROVIDERS = ['openai', 'anthropic', 'google', 'meta'] as const;
 
-// Generic English word lists used for mock data.
 export const PROVIDER_DESCRIPTION_ADJECTIVES = [
   'powerful',
   'efficient',

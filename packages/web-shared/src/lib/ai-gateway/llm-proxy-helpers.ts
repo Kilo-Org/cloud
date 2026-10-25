@@ -664,7 +664,9 @@ export function accountForMicrodollarUsage(
 ) {
   const logFileExtension = usageContext.isStreaming ? '.log.resp.sse' : '.log.resp.json';
   debugSaveProxyResponseStream(clonedReponse, logFileExtension);
-  after(countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan));
+  const accounting = countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan);
+  after(accounting);
+  return accounting;
 }
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {

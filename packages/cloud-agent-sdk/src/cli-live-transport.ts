@@ -219,6 +219,19 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       config.onRemoteCommandStateChange?.(next);
     }
 
+    function isCurrentDiscoveryRequest(
+      currentRequestGeneration: number,
+      expectedOwnerConnectionId: string,
+      expectedGeneration: number,
+      expectedRequestGeneration: number
+    ): boolean {
+      return (
+        expectedGeneration === generation &&
+        expectedRequestGeneration === currentRequestGeneration &&
+        ownerConnectionId === expectedOwnerConnectionId
+      );
+    }
+
     function canExitSession(): boolean {
       return (
         remoteCommandState.canExitSession === true && remoteCommandState.ownerConnectionId !== null
@@ -258,23 +271,15 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         refresh: nextOwnerConnectionId ? 'loading' : 'idle',
       });
       // Owner replacement clears the command cache; emit an empty catalog
-      // event and the matching idle state so consumers can re-render.
-      if (previousOwnerConnectionId) {
-        publishCommands([]);
-        publishRemoteCommandState({
-          ownerConnectionId: nextOwnerConnectionId,
-          refresh: 'idle',
-          commands: snapshotCommands(),
-          canExitSession: undefined,
-        });
-      } else {
-        publishRemoteCommandState({
-          ownerConnectionId: nextOwnerConnectionId,
-          refresh: 'idle',
-          commands: snapshotCommands(),
-          canExitSession: undefined,
-        });
-      }
+      // event and the matching idle state so consumers can re-render. A
+      // transition from no owner preserves whatever cache exists.
+      if (previousOwnerConnectionId) publishCommands([]);
+      publishRemoteCommandState({
+        ownerConnectionId: nextOwnerConnectionId,
+        refresh: 'idle',
+        commands: snapshotCommands(),
+        canExitSession: undefined,
+      });
       // A CLI handoff or a permanent drop invalidates whatever the prior
       // owner reported. The session manager's gate is optimistic, so it keeps
       // the feature available until the new owner's next heartbeat /
@@ -296,9 +301,12 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       expectedRequestGeneration: number
     ): void {
       if (
-        expectedGeneration !== generation ||
-        expectedRequestGeneration !== catalogRequestGeneration ||
-        ownerConnectionId !== expectedOwnerConnectionId
+        !isCurrentDiscoveryRequest(
+          catalogRequestGeneration,
+          expectedOwnerConnectionId,
+          expectedGeneration,
+          expectedRequestGeneration
+        )
       ) {
         return;
       }
@@ -357,9 +365,12 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         .then(
           result => {
             if (
-              expectedGeneration !== generation ||
-              expectedRequestGeneration !== catalogRequestGeneration ||
-              ownerConnectionId !== expectedOwnerConnectionId
+              !isCurrentDiscoveryRequest(
+                catalogRequestGeneration,
+                expectedOwnerConnectionId,
+                expectedGeneration,
+                expectedRequestGeneration
+              )
             ) {
               return;
             }
@@ -428,9 +439,12 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       clearCatalog: boolean
     ): void {
       if (
-        expectedGeneration !== generation ||
-        expectedRequestGeneration !== commandCatalogRequestGeneration ||
-        ownerConnectionId !== expectedOwnerConnectionId
+        !isCurrentDiscoveryRequest(
+          commandCatalogRequestGeneration,
+          expectedOwnerConnectionId,
+          expectedGeneration,
+          expectedRequestGeneration
+        )
       ) {
         return;
       }
@@ -520,9 +534,12 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         .then(
           result => {
             if (
-              expectedGeneration !== generation ||
-              expectedRequestGeneration !== commandCatalogRequestGeneration ||
-              ownerConnectionId !== expectedOwnerConnectionId
+              !isCurrentDiscoveryRequest(
+                commandCatalogRequestGeneration,
+                expectedOwnerConnectionId,
+                expectedGeneration,
+                expectedRequestGeneration
+              )
             ) {
               return;
             }
@@ -798,10 +815,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           bufferedCliEvents = [];
 
           if (!config.fetchSnapshot && !config.fetchSnapshotPage) {
-            bufferedCliEvents = [
-              ...bufferedEventsFromSupersededSnapshot,
-              ...(bufferedCliEvents ?? []),
-            ];
+            bufferedCliEvents = [...bufferedEventsFromSupersededSnapshot];
             bufferedEventsFromSupersededSnapshot = [];
             drainBufferedCliEvents();
             return;

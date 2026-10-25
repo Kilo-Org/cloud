@@ -91,11 +91,11 @@ import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishR
 import {
   computeOpenRouterCostFields,
   drainSseStream,
-  extractVercelGenerationTime,
   extractVercelIsByok,
   extractVercelUpstreamId,
   isResponseInterruptedError,
   reportUpstreamStreamError,
+  timeResponseBody,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import {
   calculateCost_mUsd,
@@ -1073,25 +1073,30 @@ export function countAndStoreUsage(
 ) {
   let usageStatsPromise: Promise<MicrodollarUsageStats | null> = Promise.resolve(null);
 
-  const parseResponseText = async (
-    parse: (content: string) => MicrodollarUsageStats
-  ): Promise<MicrodollarUsageStats | null> => {
-    try {
-      return parse(await clonedReponse.text());
-    } catch (error) {
-      if (isResponseInterruptedError(error)) return null;
-      throw error;
-    }
-  };
+  const timedResponse = clonedReponse.body
+    ? timeResponseBody(clonedReponse.body, usageContext.isStreaming)
+    : null;
 
   const usesUserCredentials =
     usageContext.user_byok || usageContext.provider === OPENAI_CHATGPT_PROVIDER_ID;
 
-  if (clonedReponse.body) {
+  if (timedResponse) {
+    const body = timedResponse.body;
+    const parseResponseText = async (
+      parse: (content: string) => MicrodollarUsageStats
+    ): Promise<MicrodollarUsageStats | null> => {
+      try {
+        return parse(await new Response(body).text());
+      } catch (error) {
+        if (isResponseInterruptedError(error)) return null;
+        throw error;
+      }
+    };
+
     if (usageContext.api_kind === 'responses') {
       usageStatsPromise = usageContext.isStreaming
         ? parseResponsesMicrodollarUsageFromStream(
-            clonedReponse.body,
+            body,
             usageContext.kiloUserId,
             openrouterRequestSpan,
             usageContext.provider,
@@ -1105,7 +1110,7 @@ export function countAndStoreUsage(
     if (usageContext.api_kind === 'chat_completions') {
       usageStatsPromise = usageContext.isStreaming
         ? parseMicrodollarUsageFromStream(
-            clonedReponse.body,
+            body,
             usageContext.kiloUserId,
             openrouterRequestSpan,
             usageContext.provider,
@@ -1119,7 +1124,7 @@ export function countAndStoreUsage(
     if (usageContext.api_kind === 'messages') {
       usageStatsPromise = usageContext.isStreaming
         ? parseMessagesMicrodollarUsageFromStream(
-            clonedReponse.body,
+            body,
             usageContext.kiloUserId,
             openrouterRequestSpan,
             usageContext.provider,
@@ -1132,7 +1137,12 @@ export function countAndStoreUsage(
     }
   }
 
-  return usageStatsPromise.then(usageStats => processTokenData(usageStats, usageContext));
+  return usageStatsPromise.then(usageStats => {
+    if (usageStats && timedResponse) {
+      Object.assign(usageStats, timedResponse.timing(usageContext.requestStartedAt));
+    }
+    return processTokenData(usageStats, usageContext);
+  });
 }
 
 export function processOpenRouterUsage(
@@ -1282,7 +1292,7 @@ export async function parseMicrodollarUsageFromStream(
     upstream_id: extractVercelUpstreamId(vercelProviderMetadata),
     latency: null,
     moderation_latency: null,
-    generation_time: extractVercelGenerationTime(vercelProviderMetadata),
+    generation_time: null,
     streamed: true,
     cancelled: null,
     status_code: effectiveStatusCode,
@@ -1325,7 +1335,7 @@ export function parseMicrodollarUsageFromString(
     finish_reason,
     latency: null,
     moderation_latency: null,
-    generation_time: extractVercelGenerationTime(vercelProviderMetadata),
+    generation_time: null,
     streamed: false,
     cancelled: null,
     status_code: statusCode,
@@ -1410,7 +1420,8 @@ export async function processTokenData(
 
     genStats.model = usageStats.model; // openrouter bug?
     genStats.upstream_id ??= usageStats.upstream_id; // keep the id the response already reported
-    genStats.generation_time ??= usageStats.generation_time;
+    genStats.latency = usageStats.latency;
+    genStats.generation_time = usageStats.generation_time;
     genStats.finish_reason ??= usageStats.finish_reason;
     genStats.hasError = usageStats.hasError; // retain by choice
     genStats.status_code = usageStats.status_code; // retain by choice
@@ -1615,9 +1626,10 @@ export const mapToUsageStats = (
     inference_provider: data.provider_name ?? null,
     upstream_id: data.upstream_id ?? null,
     finish_reason: data.finish_reason ?? null,
-    latency: data.latency ?? null,
+    // The gateway measures latency and generation_time itself; see timeResponseBody.
+    latency: null,
     moderation_latency: data.moderation_latency ?? null,
-    generation_time: data.generation_time ?? null,
+    generation_time: null,
     streamed: data.streamed ?? null,
     cancelled: data.cancelled ?? null,
     status_code: 200,

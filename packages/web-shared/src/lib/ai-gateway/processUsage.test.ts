@@ -502,7 +502,6 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     expect(result.upstream_id).toBe('chatcmpl-ccebc94c526d4f8797cfe00023478a9a');
     expect(result.inference_provider).toBe('fireworks');
     expect(result.cost_mUsd).toBe(47482);
-    expect(result.generation_time).toBe(4287);
   });
 
   test('leaves upstream_id null when the Vercel gateway reports no provider request id', async () => {
@@ -525,7 +524,6 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     );
 
     expect(result.upstream_id).toBeNull();
-    expect(result.generation_time).toBeNull();
   });
 
   test('records the Vercel upstream provider request id for non-streamed responses', () => {
@@ -574,7 +572,6 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
 
     expect(result.upstream_id).toBe('chatcmpl-non-streamed');
     expect(result.inference_provider).toBe('fireworks');
-    expect(result.generation_time).toBe(39303);
   });
 });
 
@@ -1625,6 +1622,40 @@ describe('logMicrodollarUsage', () => {
       }
     }
   );
+
+  test('stores latency and generation_time measured from the response body', async () => {
+    const user = await insertTestUser({
+      id: 'test-measured-timing-user',
+      microdollars_used: 0,
+      google_user_email: 'measured-timing@example.com',
+    });
+    const chunk = {
+      id: 'gen-measured-timing',
+      model: 'anthropic/claude-3.7-sonnet',
+      provider: 'Anthropic',
+      choices: [{ index: 0, delta: { content: 'hi' }, finish_reason: 'stop' }],
+      usage: {
+        prompt_tokens: 10,
+        completion_tokens: 2,
+        total_tokens: 12,
+        cost: 0.001,
+        is_byok: false,
+      },
+    };
+
+    const result = await countAndStoreUsage(
+      new Response(`: OPENROUTER PROCESSING\n\ndata: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`),
+      { ...createBaseUsageContext(user), requestStartedAt: performance.now() - 1000 },
+      undefined
+    );
+
+    assert(result);
+    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+      where: eq(microdollar_usage_metadata.id, result.usageId),
+    });
+    expect(metadataRecord?.latency).toBeGreaterThanOrEqual(1000);
+    expect(metadataRecord?.generation_time).toBeGreaterThanOrEqual(0);
+  });
 
   test('preserves a paid snapshot when the requested id later becomes a custom model', async () => {
     const user = await insertTestUser({

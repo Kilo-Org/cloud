@@ -1,5 +1,6 @@
 import { captureException, captureMessage } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
+import { createParser } from 'eventsource-parser';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gateway/processUsage.constants';
@@ -111,21 +112,72 @@ export function extractVercelUpstreamId(
   return attempt?.providerRequestId ?? attempt?.providerResponseId ?? null;
 }
 
+export type ResponseTiming = Pick<NotYetCostedUsageStats, 'latency' | 'generation_time'>;
+
+const ASCII_WHITESPACE = new Set([0x09, 0x0a, 0x0d, 0x20]);
+
 /**
- * Derives `generation_time` in milliseconds from the `startTime`/`endTime` of
- * the provider attempt that served the request, so Vercel AI Gateway usage gets
- * it without a `/generation` lookup. Returns `null` when either timestamp is
- * missing or the interval is negative.
+ * Passes a response body through unchanged while recording when its first and
+ * final chunks arrive. Measuring this ourselves keeps `latency` and
+ * `generation_time` comparable across providers, which report their own
+ * timings inconsistently or not at all.
+ *
+ * For a streamed response a chunk is an SSE event, so keep-alive comments such
+ * as OpenRouter's `: OPENROUTER PROCESSING` do not count as the first chunk.
+ * For a JSON response, whitespace-only chunks are ignored for the same reason.
+ *
+ * `timing(requestStartedAt)` reports, in milliseconds:
+ * - `latency`: from `requestStartedAt` (a `performance.now()` value) until the
+ *   first chunk, or null when the start is unknown.
+ * - `generation_time`: from the first chunk until the final chunk, excluding
+ *   `latency`, so the two add up to the total response time.
+ * Both are null when no chunk arrived.
  */
-export function extractVercelGenerationTime(
-  vercelProviderMetadata: VercelProviderMetaData | undefined | null
-): number | null {
-  const attempt = findVercelServingProviderAttempt(vercelProviderMetadata?.gateway);
-  const startTime = attempt?.startTime;
-  const endTime = attempt?.endTime;
-  if (typeof startTime !== 'number' || typeof endTime !== 'number') return null;
-  const generationTime = endTime - startTime;
-  return Number.isFinite(generationTime) && generationTime >= 0 ? generationTime : null;
+export function timeResponseBody(
+  body: ReadableStream<Uint8Array>,
+  isStreaming: boolean
+): {
+  body: ReadableStream<Uint8Array>;
+  timing: (requestStartedAt: number | undefined) => ResponseTiming;
+} {
+  let firstChunkAt: number | null = null;
+  let finalChunkAt: number | null = null;
+  const markChunk = () => {
+    const now = performance.now();
+    firstChunkAt ??= now;
+    finalChunkAt = now;
+  };
+  const decoder = new TextDecoder();
+  const sseParser = createParser({ onEvent: markChunk });
+
+  const timedBody = body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        if (isStreaming) {
+          sseParser.feed(decoder.decode(chunk, { stream: true }));
+        } else if (chunk.some(byte => !ASCII_WHITESPACE.has(byte))) {
+          markChunk();
+        }
+        controller.enqueue(chunk);
+      },
+    })
+  );
+
+  return {
+    body: timedBody,
+    timing(requestStartedAt) {
+      if (firstChunkAt === null || finalChunkAt === null) {
+        return { latency: null, generation_time: null };
+      }
+      return {
+        latency:
+          requestStartedAt === undefined
+            ? null
+            : Math.max(0, Math.round(firstChunkAt - requestStartedAt)),
+        generation_time: Math.round(finalChunkAt - firstChunkAt),
+      };
+    },
+  };
 }
 
 /**

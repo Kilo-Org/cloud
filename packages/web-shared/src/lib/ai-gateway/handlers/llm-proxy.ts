@@ -955,6 +955,7 @@ export async function handleLlmProxyRequest(
     mode: modeHeader,
     auto_model: autoModel,
     ttfb_ms: null,
+    requestStartedAt,
     clientRequestId,
     // Anonymous requests have no bouncer account: bouncer keys them on the IP
     // and must never turn them into a payer-sharing row.
@@ -1049,7 +1050,6 @@ export async function handleLlmProxyRequest(
   );
 
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
-  usageContext.ttfb_ms = ttfbMs;
 
   emitApiMetricsForResponse(
     {

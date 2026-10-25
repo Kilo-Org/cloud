@@ -490,6 +490,7 @@ describe('LanguagePickerSheet apply', () => {
     // Without the record a relaunch that did not take the direction would
     // repeat on every launch, so the sheet refuses it and offers Retry.
     expect(reloadAppAsync).not.toHaveBeenCalled();
+    expect(i18nManager.forceRTL).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
 
     const failedSheet = findByType(renderer.root, 'PickerSheet')[0];
@@ -498,6 +499,24 @@ describe('LanguagePickerSheet apply', () => {
     }
     expect(failedSheet.props.title).toBe('Could not restart');
     expect(failedSheet.props.doneLabel).toBe('Retry');
+
+    // Retry has to resume the step that failed: this outcome never forced the
+    // direction, so reloading alone would relaunch into the previous one with
+    // still no record. The apply path runs again, retries the record write and
+    // only then relaunches.
+    writeDirectionAttemptAsync.mockResolvedValue(true);
+    await act(async () => {
+      (failedSheet.props.onDone as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(writeDirectionAttemptAsync).toHaveBeenCalledTimes(2);
+    expect(i18nManager.forceRTL).toHaveBeenCalledWith(true);
+    expect(reloadAppAsync).toHaveBeenCalledTimes(1);
+    // The retry re-runs the same apply path, so the idempotent preference write
+    // runs again before the relaunch.
+    expect(setLanguagePreferenceAsync).toHaveBeenLastCalledWith('ar');
 
     renderer.unmount();
   });

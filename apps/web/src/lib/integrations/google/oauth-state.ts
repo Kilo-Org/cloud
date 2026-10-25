@@ -85,14 +85,16 @@ export type VerifiedGoogleOAuthState = GoogleOAuthStatePayload & {
 
 export function createGoogleOAuthState(payload: GoogleOAuthStatePayload, userId: string): string {
   const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  return createOAuthState(`${GOOGLE_OAUTH_STATE_PREFIX}${encodedPayload}`, userId);
+  return createOAuthState(`${GOOGLE_OAUTH_STATE_PREFIX}${encodedPayload}`, userId, undefined, {
+    provider: 'google',
+  });
 }
 
 export function verifyGoogleOAuthState(state: string | null): VerifiedGoogleOAuthState | null {
   const verified = verifyOAuthState(state);
   if (!verified) return null;
 
-  if (!verified.owner.startsWith(GOOGLE_OAUTH_STATE_PREFIX)) {
+  if (!verified.owner.startsWith(GOOGLE_OAUTH_STATE_PREFIX) || verified.provider !== 'google') {
     return null;
   }
 

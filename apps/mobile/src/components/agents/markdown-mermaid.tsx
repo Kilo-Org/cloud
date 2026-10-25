@@ -93,8 +93,25 @@ function parseDiagramMessage(data: string) {
 export function MarkdownMermaid({ source, palette }: Readonly<MarkdownMermaidProps>) {
   const dark = useColorScheme() === 'dark';
   const [height, setHeight] = useState(MIN_HEIGHT);
-  const [failed, setFailed] = useState(false);
+  // A failure belongs to the source that produced it: a recycled row hands a
+  // new diagram to a mounted instance, and a late host rejection or page
+  // message from the superseded diagram must not mask the new one.
+  const [failure, setFailure] = useState<{ source: string } | null>(null);
+  const failed = failure?.source === source;
   const [host, setHost] = useState<MermaidHost | null>(null);
+  // Every source change starts a fresh render attempt: drop the previous
+  // diagram's failure and measured height synchronously during render (React's
+  // "adjust state when a prop changes" pattern). A source that comes back gets
+  // its own attempt rather than a failure recorded for an earlier one.
+  const [prevSource, setPrevSource] = useState(source);
+  if (prevSource !== source) {
+    setPrevSource(source);
+    setFailure(null);
+    setHeight(MIN_HEIGHT);
+  }
+  // The host is prepared once per process, so a source change only re-runs this
+  // after a failed copy: a failure clears the cached promise, and the retry then
+  // either recovers the host or re-asserts the fallback.
   useEffect(() => {
     let active = true;
     const load = async () => {
@@ -105,7 +122,7 @@ export function MarkdownMermaid({ source, palette }: Readonly<MarkdownMermaidPro
         }
       } catch {
         if (active) {
-          setFailed(true);
+          setFailure({ source });
         }
       }
     };
@@ -113,7 +130,7 @@ export function MarkdownMermaid({ source, palette }: Readonly<MarkdownMermaidPro
     return () => {
       active = false;
     };
-  }, []);
+  }, [source]);
   const webSource = useMemo(() => (host === null ? null : { uri: host.pageUri }), [host]);
   const webViewStyle = useMemo(
     () => ({ backgroundColor: palette.codeBackground }),
@@ -161,11 +178,11 @@ export function MarkdownMermaid({ source, palette }: Readonly<MarkdownMermaidPro
               setHeight(Math.max(MIN_HEIGHT, message.height));
             } else {
               // An error or a malformed message keeps the source as a code block.
-              setFailed(true);
+              setFailure({ source });
             }
           }}
           onError={() => {
-            setFailed(true);
+            setFailure({ source });
           }}
           // The page paints the card color itself, so the native view must not
           // flash its own white background before the diagram loads.

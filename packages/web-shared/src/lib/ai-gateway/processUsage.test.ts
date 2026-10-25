@@ -141,6 +141,15 @@ describe('authoritative usage transaction configuration', () => {
 
 const sampleDir = join(process.cwd(), 'src/tests/sample');
 describe('parseMicrodollarUsageFromStream approval tests', () => {
+  // Usage processing times the response chunks; a fixed clock keeps the approved output stable.
+  let performanceNow: jest.SpiedFunction<typeof performance.now>;
+  beforeEach(() => {
+    performanceNow = jest.spyOn(performance, 'now').mockReturnValue(0);
+  });
+  afterEach(() => {
+    performanceNow.mockRestore();
+  });
+
   const normalAnthropic = 'normal-anthropic.log.resp.sse';
   test(normalAnthropic, async () => {
     const inputFile = join(sampleDir, normalAnthropic);
@@ -1643,18 +1652,45 @@ describe('logMicrodollarUsage', () => {
       },
     };
 
-    const result = await countAndStoreUsage(
-      new Response(`: OPENROUTER PROCESSING\n\ndata: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`),
-      { ...createBaseUsageContext(user), requestStartedAt: performance.now() - 1000 },
-      undefined
+    let now = 0;
+    const performanceNow = jest.spyOn(performance, 'now').mockImplementation(() => now);
+    const chunks: [at: number, text: string][] = [
+      [100, ': OPENROUTER PROCESSING\n\n'],
+      [700, `data: ${JSON.stringify(chunk)}\n\n`],
+      [1000, 'data: [DONE]\n\n'],
+    ];
+    // With a high-water mark of 0 each chunk is produced, and the clock set to
+    // its arrival time, only when usage processing reads it.
+    const body = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          const next = chunks.shift();
+          if (!next) {
+            controller.close();
+            return;
+          }
+          now = next[0];
+          controller.enqueue(new TextEncoder().encode(next[1]));
+        },
+      },
+      { highWaterMark: 0 }
     );
 
-    assert(result);
-    const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
-      where: eq(microdollar_usage_metadata.id, result.usageId),
-    });
-    expect(metadataRecord?.latency).toBeGreaterThanOrEqual(1000);
-    expect(metadataRecord?.generation_time).toBeGreaterThanOrEqual(0);
+    try {
+      const result = await countAndStoreUsage(
+        new Response(body),
+        { ...createBaseUsageContext(user), requestStartedAt: 50 },
+        undefined
+      );
+
+      assert(result);
+      const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+        where: eq(microdollar_usage_metadata.id, result.usageId),
+      });
+      expect(metadataRecord).toMatchObject({ latency: 650, generation_time: 300 });
+    } finally {
+      performanceNow.mockRestore();
+    }
   });
 
   test('preserves a paid snapshot when the requested id later becomes a custom model', async () => {

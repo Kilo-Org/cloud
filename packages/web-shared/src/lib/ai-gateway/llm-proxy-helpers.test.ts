@@ -794,14 +794,14 @@ describe('parseTranscriptionUsageFromResponse', () => {
     expect(result.is_byok).toBe(true);
   });
 
-  it('stores duration as generation time', () => {
+  it('does not store the audio duration as generation time', () => {
     const result = parseTranscriptionUsageFromResponse(
       makeResponse(),
       200,
       'openai/gpt-4o-mini-transcribe'
     );
 
-    expect(result.generation_time).toBe(2.5);
+    expect(result.generation_time).toBeNull();
   });
 
   it('falls back to requested model when response model is absent', () => {

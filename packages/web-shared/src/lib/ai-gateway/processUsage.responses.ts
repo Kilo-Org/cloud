@@ -1,5 +1,5 @@
 import type { OpenAI } from 'openai';
-import { createParser, type EventSourceMessage } from 'eventsource-parser';
+import type { EventSourceMessage } from 'eventsource-parser';
 import { captureException, captureMessage, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
 import { sentryRootSpan } from '../getRootSpan';
@@ -111,7 +111,8 @@ export async function parseResponsesMicrodollarUsageFromStream(
   openrouterRequestSpan: Span | undefined,
   provider: ProviderId,
   statusCode: number,
-  usesUserCredentials: boolean
+  usesUserCredentials: boolean,
+  requestStartedAt?: number
 ): Promise<MicrodollarUsageStats> {
   openrouterRequestSpan?.end();
   const streamProcessingSpan = startInactiveSpan({
@@ -134,74 +135,73 @@ export async function parseResponsesMicrodollarUsageFromStream(
   let inference_provider: string | null = null;
   let finish_reason: string | null = null;
 
-  const sseStreamParser = createParser({
-    onEvent(event: EventSourceMessage) {
-      if (!firstTokenReceived) {
-        sentryRootSpan()?.setAttribute(
-          'responses.time_to_first_token_ms',
-          performance.now() - startedAt
-        );
-        firstTokenReceived = true;
-        timeToFirstTokenSpan.end();
+  const onEvent = (event: EventSourceMessage) => {
+    if (!firstTokenReceived) {
+      sentryRootSpan()?.setAttribute(
+        'responses.time_to_first_token_ms',
+        performance.now() - startedAt
+      );
+      firstTokenReceived = true;
+      timeToFirstTokenSpan.end();
+    }
+
+    if (event.data === '[DONE]') {
+      return;
+    }
+
+    const json = JSON.parse(event.data) as ResponsesApiStreamEvent;
+
+    if (!json) {
+      captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
+        extra: { event },
+      });
+      return;
+    }
+
+    if ('error' in json && json.error) {
+      reportedError = true;
+      reportUpstreamStreamError({
+        label: 'Responses API error',
+        source: 'responses_sse_processing',
+        error: json.error,
+        usesUserCredentials,
+        logContext: { provider, inference_provider, messageId, model },
+        sentryExtra: { json, event },
+      });
+    }
+
+    if (json.type === 'response.output_text.delta' && json.delta) {
+      responseContent += json.delta;
+    }
+
+    // Extract metadata whenever json.response is present so that aborted
+    // streams still capture messageId/model/usage from early events like
+    // response.created and response.in_progress.
+    if (json.response) {
+      const response = json.response;
+      messageId = response.id ?? messageId;
+      model = response.model ?? model;
+      if (response.usage) {
+        usage = response.usage as ResponsesApiUsage;
       }
-
-      if (event.data === '[DONE]') {
-        return;
+      const meta = response.provider_metadata;
+      if (meta) {
+        providerMetadata = meta;
+        inference_provider = meta.gateway?.routing?.finalProvider ?? inference_provider;
       }
+      finish_reason = response.status ?? finish_reason;
+    }
 
-      const json = JSON.parse(event.data) as ResponsesApiStreamEvent;
+    if (json.type === 'response.failed' || json.type === 'response.incomplete') {
+      reportedError = true;
+    }
+  };
 
-      if (!json) {
-        captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
-          extra: { event },
-        });
-        return;
-      }
-
-      if ('error' in json && json.error) {
-        reportedError = true;
-        reportUpstreamStreamError({
-          label: 'Responses API error',
-          source: 'responses_sse_processing',
-          error: json.error,
-          usesUserCredentials,
-          logContext: { provider, inference_provider, messageId, model },
-          sentryExtra: { json, event },
-        });
-      }
-
-      if (json.type === 'response.output_text.delta' && json.delta) {
-        responseContent += json.delta;
-      }
-
-      // Extract metadata whenever json.response is present so that aborted
-      // streams still capture messageId/model/usage from early events like
-      // response.created and response.in_progress.
-      if (json.response) {
-        const response = json.response;
-        messageId = response.id ?? messageId;
-        model = response.model ?? model;
-        if (response.usage) {
-          usage = response.usage as ResponsesApiUsage;
-        }
-        const meta = response.provider_metadata;
-        if (meta) {
-          providerMetadata = meta;
-          inference_provider = meta.gateway?.routing?.finalProvider ?? inference_provider;
-        }
-        finish_reason = response.status ?? finish_reason;
-      }
-
-      if (json.type === 'response.failed' || json.type === 'response.incomplete') {
-        reportedError = true;
-      }
-    },
-  });
-
-  const wasAborted = await drainSseStream(
+  const { wasAborted, timing } = await drainSseStream(
     stream,
-    chunk => sseStreamParser.feed(chunk),
-    streamProcessingSpan
+    onEvent,
+    streamProcessingSpan,
+    requestStartedAt
   );
 
   if (!reportedError && !usage) {
@@ -220,9 +220,9 @@ export async function parseResponsesMicrodollarUsageFromStream(
     inference_provider,
     finish_reason,
     upstream_id: extractVercelUpstreamId(providerMetadata),
-    latency: null,
+    latency: timing.latency,
     moderation_latency: null,
-    generation_time: null,
+    generation_time: timing.generation_time,
     streamed: true,
     cancelled: null,
     status_code: statusCode,

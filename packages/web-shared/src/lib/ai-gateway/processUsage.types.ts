@@ -156,7 +156,7 @@ export type MicrodollarUsageContext = {
    */
   ttfb_ms: number | null;
   /**
-   * `performance.now()` when the gateway received the request. `countAndStoreUsage`
+   * `performance.now()` when the gateway received the request. Usage processing
    * measures `latency` from it until the first response chunk.
    */
   requestStartedAt?: number;

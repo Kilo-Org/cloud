@@ -214,6 +214,15 @@ describe('processMessagesApiUsage', () => {
 });
 
 describe('parseMessagesMicrodollarUsageFromStream approval tests', () => {
+  // Usage processing times the response chunks; a fixed clock keeps the approved output stable.
+  let performanceNow: jest.SpiedFunction<typeof performance.now>;
+  beforeEach(() => {
+    performanceNow = jest.spyOn(performance, 'now').mockReturnValue(0);
+  });
+  afterEach(() => {
+    performanceNow.mockRestore();
+  });
+
   const vercelMessages = 'vercel-messages.log.resp.sse';
   test(vercelMessages, async () => {
     const inputFile = join(sampleDir, vercelMessages);

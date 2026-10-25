@@ -46,7 +46,10 @@ import type {
   GatewayChatApiKind,
   ProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { computeOpenRouterCostFields } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
+import {
+  computeOpenRouterCostFields,
+  readResponseText,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
@@ -1321,7 +1324,6 @@ type EmbeddingResponse = {
 };
 
 type TranscriptionUsage = {
-  seconds?: number;
   total_tokens?: number;
   input_tokens?: number;
   output_tokens?: number;
@@ -1385,7 +1387,7 @@ export function parseTranscriptionUsageFromResponse(
     finish_reason: null,
     latency: null,
     moderation_latency: null,
-    generation_time: json.usage?.seconds ?? null,
+    generation_time: null,
     streamed: false,
     cancelled: false,
     status_code: statusCode,
@@ -1472,11 +1474,11 @@ export function countAndStoreTranscriptionUsage(
   const statusCode = usageContext.status_code ?? 0;
   const usageStatsPromise = !clonedResponse.body
     ? Promise.resolve(null)
-    : clonedResponse
-        .text()
-        .then(text =>
-          parseTranscriptionUsageFromResponse(text, statusCode, usageContext.requested_model)
-        )
+    : readResponseText(clonedResponse.body, usageContext.requestStartedAt)
+        .then(({ text, timing }) => ({
+          ...parseTranscriptionUsageFromResponse(text, statusCode, usageContext.requested_model),
+          ...timing,
+        }))
         .catch(() => null);
 
   after(

@@ -210,6 +210,15 @@ describe('processResponsesApiUsage', () => {
 });
 
 describe('parseMicrodollarUsageFromStream approval tests', () => {
+  // Usage processing times the response chunks; a fixed clock keeps the approved output stable.
+  let performanceNow: jest.SpiedFunction<typeof performance.now>;
+  beforeEach(() => {
+    performanceNow = jest.spyOn(performance, 'now').mockReturnValue(0);
+  });
+  afterEach(() => {
+    performanceNow.mockRestore();
+  });
+
   const openrouterResponses = 'openrouter-responses.log.resp.sse';
   test(openrouterResponses, async () => {
     const inputFile = join(sampleDir, openrouterResponses);

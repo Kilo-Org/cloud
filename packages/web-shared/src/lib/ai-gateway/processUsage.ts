@@ -19,7 +19,7 @@ import type { MicrodollarUsage } from '@kilocode/db/schema';
 import { microdollar_usage } from '@kilocode/db/schema';
 import { createTimer } from '@kilocode/web-shared/lib/timer';
 import type { OpenAI } from 'openai';
-import { createParser, type EventSourceMessage } from 'eventsource-parser';
+import type { EventSourceMessage } from 'eventsource-parser';
 import type {
   OpenRouterChatCompletionRequest,
   OpenRouterGeneration,
@@ -95,7 +95,7 @@ import {
   extractVercelUpstreamId,
   isResponseInterruptedError,
   reportUpstreamStreamError,
-  timeResponseBody,
+  readResponseText,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import {
   calculateCost_mUsd,
@@ -1072,77 +1072,73 @@ export function countAndStoreUsage(
   openrouterRequestSpan: Span | undefined
 ) {
   let usageStatsPromise: Promise<MicrodollarUsageStats | null> = Promise.resolve(null);
+  const { requestStartedAt } = usageContext;
 
-  const timedResponse = clonedReponse.body
-    ? timeResponseBody(clonedReponse.body, usageContext.isStreaming)
-    : null;
+  const parseResponseText = async (
+    body: ReadableStream<Uint8Array>,
+    parse: (content: string) => MicrodollarUsageStats
+  ): Promise<MicrodollarUsageStats | null> => {
+    try {
+      const { text, timing } = await readResponseText(body, requestStartedAt);
+      return { ...parse(text), ...timing };
+    } catch (error) {
+      if (isResponseInterruptedError(error)) return null;
+      throw error;
+    }
+  };
 
   const usesUserCredentials =
     usageContext.user_byok || usageContext.provider === OPENAI_CHATGPT_PROVIDER_ID;
 
-  if (timedResponse) {
-    const body = timedResponse.body;
-    const parseResponseText = async (
-      parse: (content: string) => MicrodollarUsageStats
-    ): Promise<MicrodollarUsageStats | null> => {
-      try {
-        return parse(await new Response(body).text());
-      } catch (error) {
-        if (isResponseInterruptedError(error)) return null;
-        throw error;
-      }
-    };
-
+  if (clonedReponse.body) {
     if (usageContext.api_kind === 'responses') {
       usageStatsPromise = usageContext.isStreaming
         ? parseResponsesMicrodollarUsageFromStream(
-            body,
+            clonedReponse.body,
             usageContext.kiloUserId,
             openrouterRequestSpan,
             usageContext.provider,
             clonedReponse.status,
-            usesUserCredentials
+            usesUserCredentials,
+            requestStartedAt
           )
-        : parseResponseText(content =>
+        : parseResponseText(clonedReponse.body, content =>
             parseResponsesMicrodollarUsageFromString(content, clonedReponse.status)
           );
     }
     if (usageContext.api_kind === 'chat_completions') {
       usageStatsPromise = usageContext.isStreaming
         ? parseMicrodollarUsageFromStream(
-            body,
+            clonedReponse.body,
             usageContext.kiloUserId,
             openrouterRequestSpan,
             usageContext.provider,
             clonedReponse.status,
-            usesUserCredentials
+            usesUserCredentials,
+            requestStartedAt
           )
-        : parseResponseText(content =>
+        : parseResponseText(clonedReponse.body, content =>
             parseMicrodollarUsageFromString(content, usageContext.kiloUserId, clonedReponse.status)
           );
     }
     if (usageContext.api_kind === 'messages') {
       usageStatsPromise = usageContext.isStreaming
         ? parseMessagesMicrodollarUsageFromStream(
-            body,
+            clonedReponse.body,
             usageContext.kiloUserId,
             openrouterRequestSpan,
             usageContext.provider,
             clonedReponse.status,
-            usesUserCredentials
+            usesUserCredentials,
+            requestStartedAt
           )
-        : parseResponseText(content =>
+        : parseResponseText(clonedReponse.body, content =>
             parseMessagesMicrodollarUsageFromString(content, clonedReponse.status)
           );
     }
   }
 
-  return usageStatsPromise.then(usageStats => {
-    if (usageStats && timedResponse) {
-      Object.assign(usageStats, timedResponse.timing(usageContext.requestStartedAt));
-    }
-    return processTokenData(usageStats, usageContext);
-  });
+  return usageStatsPromise.then(usageStats => processTokenData(usageStats, usageContext));
 }
 
 export function processOpenRouterUsage(
@@ -1176,7 +1172,8 @@ export async function parseMicrodollarUsageFromStream(
   openrouterRequestSpan: Span | undefined,
   provider: ProviderId,
   statusCode: number,
-  usesUserCredentials: boolean
+  usesUserCredentials: boolean,
+  requestStartedAt?: number
 ): Promise<MicrodollarUsageStats> {
   // End the request span immediately as this function starts
   openrouterRequestSpan?.end();
@@ -1201,76 +1198,73 @@ export async function parseMicrodollarUsageFromStream(
   let finish_reason: string | null = null;
   let vercelProviderMetadata: VercelProviderMetaData | null = null;
 
-  const sseStreamParser = createParser({
-    onEvent(event: EventSourceMessage) {
-      if (!firstTokenReceived) {
-        sentryRootSpan()?.setAttribute(
-          'openrouter.time_to_first_token_ms',
-          performance.now() - startedAt
-        );
-        firstTokenReceived = true;
-        timeToFirstTokenSpan.end();
+  const onEvent = (event: EventSourceMessage) => {
+    if (!firstTokenReceived) {
+      sentryRootSpan()?.setAttribute(
+        'openrouter.time_to_first_token_ms',
+        performance.now() - startedAt
+      );
+      firstTokenReceived = true;
+      timeToFirstTokenSpan.end();
+    }
+
+    if (event.data === '[DONE]') {
+      return;
+    }
+
+    const json = JSON.parse(event.data) as ChatCompletionChunk;
+
+    if (!json) {
+      captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
+        extra: { event },
+      });
+      return;
+    }
+
+    if ('error' in json) {
+      const error = json.error as OpenRouterError;
+      reportedError = true;
+      if (typeof error.code === 'number') {
+        effectiveStatusCode = error.code;
       }
+      reportUpstreamStreamError({
+        label: 'OpenRouter error',
+        source: 'sse_processing',
+        error,
+        usesUserCredentials,
+        logContext: {
+          provider,
+          inference_provider: json.provider ?? inference_provider,
+          messageId: json.id ?? messageId,
+          model: json.model ?? model,
+        },
+        sentryExtra: { json, event },
+      });
+    }
 
-      if (event.data === '[DONE]') {
-        return;
-      }
+    model = json.model ?? model;
+    messageId = json.id ?? messageId;
+    usage = json.usage ?? usage;
+    const choice = json.choices?.[0];
+    const chunkProviderMetadata = choice?.delta?.provider_metadata;
+    if (chunkProviderMetadata) {
+      vercelProviderMetadata = chunkProviderMetadata;
+    }
+    inference_provider =
+      json.provider ?? chunkProviderMetadata?.gateway?.routing?.finalProvider ?? inference_provider;
+    finish_reason = choice?.finish_reason ?? finish_reason;
 
-      const json = JSON.parse(event.data) as ChatCompletionChunk;
+    const contentDelta = choice?.delta?.content;
+    if (contentDelta) {
+      responseContent += contentDelta;
+    }
+  };
 
-      if (!json) {
-        captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
-          extra: { event },
-        });
-        return;
-      }
-
-      if ('error' in json) {
-        const error = json.error as OpenRouterError;
-        reportedError = true;
-        if (typeof error.code === 'number') {
-          effectiveStatusCode = error.code;
-        }
-        reportUpstreamStreamError({
-          label: 'OpenRouter error',
-          source: 'sse_processing',
-          error,
-          usesUserCredentials,
-          logContext: {
-            provider,
-            inference_provider: json.provider ?? inference_provider,
-            messageId: json.id ?? messageId,
-            model: json.model ?? model,
-          },
-          sentryExtra: { json, event },
-        });
-      }
-
-      model = json.model ?? model;
-      messageId = json.id ?? messageId;
-      usage = json.usage ?? usage;
-      const choice = json.choices?.[0];
-      const chunkProviderMetadata = choice?.delta?.provider_metadata;
-      if (chunkProviderMetadata) {
-        vercelProviderMetadata = chunkProviderMetadata;
-      }
-      inference_provider =
-        json.provider ??
-        chunkProviderMetadata?.gateway?.routing?.finalProvider ??
-        inference_provider;
-      finish_reason = choice?.finish_reason ?? finish_reason;
-
-      const contentDelta = choice?.delta?.content;
-      if (contentDelta) {
-        responseContent += contentDelta;
-      }
-    },
-  });
-
-  const wasAborted = await drainSseStream(
+  const { wasAborted, timing } = await drainSseStream(
     stream,
-    chunk => sseStreamParser.feed(chunk),
-    streamProcessingSpan
+    onEvent,
+    streamProcessingSpan,
+    requestStartedAt
   );
 
   if (!reportedError && !usage) {
@@ -1290,9 +1284,9 @@ export async function parseMicrodollarUsageFromStream(
     inference_provider,
     finish_reason,
     upstream_id: extractVercelUpstreamId(vercelProviderMetadata),
-    latency: null,
+    latency: timing.latency,
     moderation_latency: null,
-    generation_time: null,
+    generation_time: timing.generation_time,
     streamed: true,
     cancelled: null,
     status_code: effectiveStatusCode,

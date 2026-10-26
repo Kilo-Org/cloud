@@ -17,6 +17,7 @@ import type {
   UsageContext,
 } from '@kilocode/container-usage';
 import { heartbeatIdempotencyKey } from '@kilocode/container-usage';
+import { checkContainerCapacity } from './capacity';
 import {
   billingModeFor,
   MINIMUM_REMAINING_MICRODOLLARS,
@@ -372,7 +373,9 @@ export async function applyStartWithDb(
   receivedAtMs: number,
   billingConfig: BillingConfig = SHADOW_ONLY_BILLING_CONFIG
 ): Promise<StartSkuAdmission> {
-  const operation: Promise<StartSkuAdmission> = db.transaction(async tx => {
+  const admit = async (
+    tx: Parameters<Parameters<WorkerDb['transaction']>[0]>[0]
+  ): Promise<StartSkuAdmission> => {
     const [existing] = await tx
       .select()
       .from(container_usage_interval)
@@ -434,6 +437,11 @@ export async function applyStartWithDb(
       if (open.start_epoch_ms > input.startEpochMs) {
         throw new UsageMutationConflictError('Cannot supersede a newer usage interval');
       }
+    }
+
+    if (input.enforceCapacity) {
+      const rejection = await checkContainerCapacity(tx, input);
+      if (rejection) return rejection;
     }
 
     if (billingMode === 'paid') {
@@ -504,8 +512,12 @@ export async function applyStartWithDb(
       };
     }
     return { kind: 'applied', dedup: false, billingMode: 'shadow' };
-  });
-  return operation.catch(mapSingleOpenIntervalConflict);
+  };
+  // Read committed: the capacity count after the lock must see intervals that
+  // other admissions committed while this transaction waited.
+  return db
+    .transaction(admit, { isolationLevel: 'read committed' })
+    .catch(mapSingleOpenIntervalConflict);
 }
 
 export async function applyHeartbeat(

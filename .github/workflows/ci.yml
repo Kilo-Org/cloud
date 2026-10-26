@@ -608,7 +608,7 @@ jobs:
 
   test-scripts:
     needs: changes
-    if: needs.changes.outputs.kilocode_backend == 'true'
+    if: needs.changes.outputs.kilocode_backend == 'true' || contains(fromJSON(needs.changes.outputs.affected).packages, 'container-usage-meter')
     # The Postgres regressions ran on the large runner in the job this one
     # replaces. The builder cleanup test drives two claims against the same
     # rows, so keep the runner it was written for.

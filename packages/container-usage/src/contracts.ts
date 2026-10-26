@@ -88,6 +88,11 @@ export const recordStartInputSchema = usageContextBaseSchema
   .extend({
     idempotencyKey: z.string().min(1).max(1_024),
     startEpochMs: z.number().int().nonnegative().finite(),
+    /**
+     * Set when the container has not launched yet. The meter then applies the
+     * concurrent-container cap in the same transaction that opens the interval.
+     */
+    enforceCapacity: z.literal(true).optional(),
   })
   .strict()
   .superRefine(validateAttribution);
@@ -134,11 +139,19 @@ export const nonRetryableSkuAdmissionCodes = [
 export const recordStartFailureCodeSchema = z.enum([
   ...nonRetryableSkuAdmissionCodes,
   'insufficient_credits',
+  'container_limit_reached',
 ]);
 export type RecordStartFailureCode = z.infer<typeof recordStartFailureCodeSchema>;
 
 /** Customer-safe billing admission failure carried across Worker and client boundaries. */
 const recordStartFailureSchema = z.discriminatedUnion('code', [
+  z
+    .object({
+      code: z.literal('container_limit_reached'),
+      // The prefix lets callers recognize the limit after Durable Object RPC flattens the error.
+      message: z.string().startsWith('container_limit_reached:'),
+    })
+    .strict(),
   z
     .object({
       code: z.literal('insufficient_credits'),

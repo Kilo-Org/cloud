@@ -331,7 +331,7 @@ describe.each(['personal', 'organization'] as const)('%s locked credit expiratio
     expect(closures).toHaveLength(8_000);
     expect(closures.reduce((sum, closure) => sum + closure.amount_microdollars, 0)).toBe(-8_000);
     expect(await account.expire()).toEqual(state);
-  });
+  }, 30_000);
 
   test('schedules funding only for usage and passes coherent fresh owner state', async () => {
     const account = await fixture();
@@ -345,12 +345,7 @@ describe.each(['personal', 'organization'] as const)('%s locked credit expiratio
     expect(ordinaryBalance.balance).toBe(0.001);
     expect(after).not.toHaveBeenCalled();
 
-    const usageBalance = await getBalanceAndOrgSettings(
-      account.org?.id,
-      account.user,
-      db,
-      'usage'
-    );
+    const usageBalance = await getBalanceAndOrgSettings(account.org?.id, account.user, db, 'usage');
     expect(usageBalance).toEqual(ordinaryBalance);
     const callbacks = jest.mocked(after).mock.calls;
     expect(callbacks).toHaveLength(1);

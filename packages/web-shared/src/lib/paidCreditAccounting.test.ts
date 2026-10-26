@@ -134,8 +134,8 @@ describe('paid grant persistence', () => {
     });
     if (!snapshot) throw new Error('Missing test user');
     await Promise.all([
-      processLocalExpirations(snapshot, new Date('2029-03-01')),
-      processLocalExpirations(snapshot, new Date('2029-03-01')),
+      processLocalExpirations(snapshot.id, new Date('2029-03-01')),
+      processLocalExpirations(snapshot.id, new Date('2029-03-01')),
     ]);
     const after = await db.query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
@@ -195,7 +195,7 @@ describe('primary expiration snapshot safety', () => {
       .update(kilocode_users)
       .set({ microdollars_used: 20_000_000 })
       .where(eq(kilocode_users.id, user.id));
-    expect(await processLocalExpirations(snapshot, new Date('2031-01-01'))).toEqual({
+    expect(await processLocalExpirations(snapshot.id, new Date('2031-01-01'))).toEqual({
       total_microdollars_acquired: 20_000_000,
       microdollars_used: 20_000_000,
       next_credit_expiration_at: null,
@@ -229,7 +229,7 @@ describe('nonexpiring source consumption preservation', () => {
         },
       ])
       .returning();
-    await processLocalExpirations(user, new Date('2030-01-01'));
+    await processLocalExpirations(user.id, new Date('2030-01-01'), { force: true });
     const surviving = await db.query.credit_transactions.findFirst({
       where: eq(credit_transactions.id, apple.id),
     });

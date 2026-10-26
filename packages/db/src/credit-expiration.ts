@@ -148,8 +148,7 @@ export async function reconcileCreditExpirationsInTransaction(
   if (!entity) throw new Error(`Credit owner not found: ${owner.type}:${owner.id}`);
   if (
     options?.onlyIfDue &&
-    (entity.next_credit_expiration_at === null ||
-      new Date(entity.next_credit_expiration_at) > now)
+    (entity.next_credit_expiration_at === null || new Date(entity.next_credit_expiration_at) > now)
   ) {
     return entity;
   }

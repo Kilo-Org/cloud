@@ -44,11 +44,13 @@ function PricingRows({
   overriddenModels,
   onEdit,
   onRemove,
+  actionsDisabled = false,
 }: {
   models: readonly CustomPricingModelConfig[];
   overriddenModels?: ReadonlySet<string>;
   onEdit?: (model: CustomPricingModelConfig) => void;
   onRemove?: (model: string) => void;
+  actionsDisabled?: boolean;
 }) {
   const hasActions = Boolean(onEdit || onRemove);
   return (
@@ -113,6 +115,7 @@ function PricingRows({
                       variant="ghost"
                       size="icon-sm"
                       aria-label={`Edit ${model.model}`}
+                      disabled={actionsDisabled}
                       onClick={() => onEdit(model)}
                     >
                       <Pencil className="size-4" />
@@ -123,6 +126,7 @@ function PricingRows({
                       variant="ghost"
                       size="icon-sm"
                       aria-label={`Remove ${model.model}`}
+                      disabled={actionsDisabled}
                       onClick={() => onRemove(model.model)}
                     >
                       <X className="size-4" />
@@ -167,11 +171,13 @@ export function CustomPricingContent() {
 
   const mutation = useMutation(
     trpc.admin.gatewayCustomPricing.set.mutationOptions({
-      onSuccess: result => {
-        void queryClient.invalidateQueries({
+      // Awaiting the refetch keeps the mutation pending, and editing disabled, until the
+      // stored pricing that replaces the local list has loaded.
+      onSuccess: async result => {
+        toast.success(result.config ? 'Custom pricing saved' : 'Custom pricing cleared');
+        await queryClient.invalidateQueries({
           queryKey: trpc.admin.gatewayCustomPricing.get.queryKey(),
         });
-        toast.success(result.config ? 'Custom pricing saved' : 'Custom pricing cleared');
       },
       onError: error => {
         toast.error(formatZodError(error));
@@ -250,6 +256,7 @@ export function CustomPricingContent() {
 
           <PricingRows
             models={models}
+            actionsDisabled={mutation.isPending}
             onEdit={model => {
               setForm(customPricingToForm(model));
               setValidationError(null);
@@ -308,7 +315,12 @@ export function CustomPricingContent() {
                   Fallback only (bill only when upstream reports no cost)
                 </Label>
               </div>
-              <Button type="submit" variant="outline" size="sm" disabled={!form.model.trim()}>
+              <Button
+                type="submit"
+                variant="outline"
+                size="sm"
+                disabled={mutation.isPending || !form.model.trim()}
+              >
                 {isUpdate ? 'Update model' : 'Add model'}
               </Button>
             </div>

@@ -38,7 +38,6 @@ export function UserAdminCreditGrant({
   const queryClient = useQueryClient();
   const { canManageCredits } = useAdminCreditManagementPermission();
 
-  // Credit form state
   const [selectedCredit, setSelectedCredit] = useState<string>('custom');
   const [showSelfServe, setShowSelfServe] = useState(false);
   const [includeNonSupport, setIncludeNonSupport] = useState(false);
@@ -48,7 +47,6 @@ export function UserAdminCreditGrant({
   const [expiryHours, setExpiryHours] = useState<string>('');
   const [neverExpire, setNeverExpire] = useState(false);
 
-  // API state
   const [isGrantingCredit, setIsGrantingCredit] = useState(false);
   const [creditMessage, setCreditMessage] = useState<CreditMessage | null>(null);
 
@@ -57,15 +55,12 @@ export function UserAdminCreditGrant({
   );
   const expectNegative = selectedCreditCategory?.expect_negative_amount ?? false;
 
-  // Check if expiration is provided (either via date, hours, or category default)
   const hasExpirationFromCategory =
     selectedCreditCategory?.expiry_hours != null ||
     selectedCreditCategory?.credit_expiry_date != null;
   const hasExpirationFromForm = expirationDate.trim() !== '' || Number(expiryHours) > 0;
   const hasExpiration = hasExpirationFromCategory || hasExpirationFromForm || neverExpire;
 
-  // Form validation - credit category required; description required for negative amount categories
-  // For non-negative amounts, expiration is required unless "Never expire" is checked
   const isExpirationValid = expectNegative || hasExpiration;
   const isFormValid =
     selectedCredit && (!expectNegative || customDescription.trim().length > 0) && isExpirationValid;

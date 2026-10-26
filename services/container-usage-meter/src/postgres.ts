@@ -17,7 +17,13 @@ import type {
   UsageContext,
 } from '@kilocode/container-usage';
 import { heartbeatIdempotencyKey } from '@kilocode/container-usage';
+import { computeMemberId } from '@kilocode/worker-utils/compute-member';
 import { checkContainerCapacity } from './capacity';
+import {
+  findOrganizationMemberBalanceRow,
+  organizationMemberBalance,
+} from '@kilocode/worker-utils/account-access';
+import { recordOrganizationConsumption } from '@kilocode/worker-utils/organization-consumption';
 import {
   billingModeFor,
   MINIMUM_REMAINING_MICRODOLLARS,
@@ -70,6 +76,7 @@ export type ApplyResult = {
   kind: 'applied';
   dedup: boolean;
   billingMode: 'shadow' | 'paid';
+  organizationBalanceAlert?: string;
   budget:
     | { verdict: 'continue' }
     | {
@@ -134,11 +141,35 @@ function intervalValues(
   } as const;
 }
 
-async function balanceForSubject(
+type BillingAttribution = Pick<UsageContext, 'service' | 'subject' | 'actor' | 'metadata'>;
+
+function isNativeOrganizationUsage(context: BillingAttribution): boolean {
+  return (
+    context.subject.type === 'org' &&
+    context.service.startsWith('cloud-agent-next-sandbox-containers-')
+  );
+}
+
+function organizationMemberId(context: BillingAttribution): string | undefined {
+  return computeMemberId(context.actor, context.metadata);
+}
+
+function intervalAttribution(
+  interval: typeof container_usage_interval.$inferSelect
+): BillingAttribution {
+  return {
+    service: interval.service,
+    subject: { type: interval.subject_type, id: interval.subject_id },
+    actor: { type: interval.actor_type, id: interval.actor_id },
+    ...(interval.metadata ? { metadata: interval.metadata } : {}),
+  };
+}
+
+async function balanceForUsage(
   tx: Parameters<Parameters<WorkerDb['transaction']>[0]>[0],
-  subject: UsageContext['subject'],
-  lock = false
+  context: BillingAttribution
 ): Promise<number> {
+  const subject = context.subject;
   const query =
     subject.type === 'user'
       ? tx
@@ -155,10 +186,13 @@ async function balanceForSubject(
           .from(organizations)
           .where(eq(organizations.id, subject.id))
           .limit(1);
-  const rows = lock ? await query.for('update') : await query;
-  const row = rows[0];
+  const [row] = await query.for('update');
   if (!row) throw new UsageMutationConflictError('Billing subject not found');
-  return Number(row.remaining);
+  if (!isNativeOrganizationUsage(context)) return Number(row.remaining);
+  const userId = organizationMemberId(context);
+  if (!userId) return 0;
+  const member = await findOrganizationMemberBalanceRow(tx, subject.id, userId);
+  return member ? organizationMemberBalance(member).balanceMicrodollars : 0;
 }
 
 function budgetForRemaining(
@@ -170,7 +204,7 @@ function budgetForRemaining(
   // The budget contract reports a nonnegative balance; the stored balance
   // stays exact even when a settlement overdraws it.
   const reportedMicrodollars = Math.max(0, remainingMicrodollars);
-  if (remainingMicrodollars <= MINIMUM_REMAINING_MICRODOLLARS) {
+  if (remainingMicrodollars < MINIMUM_REMAINING_MICRODOLLARS) {
     return {
       verdict: 'stop',
       remainingMicrodollars: reportedMicrodollars,
@@ -194,7 +228,7 @@ async function settleSegment(
   appliedSeconds: number,
   receivedAt: string,
   billingConfig: BillingConfig
-): Promise<ApplyResult['budget']> {
+): Promise<Pick<ApplyResult, 'budget' | 'organizationBalanceAlert'>> {
   if (interval.billing_mode === 'shadow') {
     await tx
       .update(container_usage_interval)
@@ -202,7 +236,7 @@ async function settleSegment(
         confirmed_seconds: sql`${container_usage_interval.confirmed_seconds} + ${appliedSeconds}`,
       })
       .where(eq(container_usage_interval.id, interval.id));
-    return { verdict: 'continue' };
+    return { budget: { verdict: 'continue' } };
   }
   if (!interval.rate_cents_per_unit) {
     throw new UsageMutationConflictError('Paid usage interval is missing its rate snapshot');
@@ -228,6 +262,10 @@ async function settleSegment(
     .where(eq(container_usage_interval.id, interval.id));
 
   let remainingMicrodollars: number;
+  let organizationBalanceAlert: string | undefined;
+  const attribution = intervalAttribution(interval);
+  const nativeOrganization = isNativeOrganizationUsage(attribution);
+  const memberId = nativeOrganization ? organizationMemberId(attribution) : undefined;
   if (amountMicrodollars > 0) {
     const charge: typeof compute_usage_charge.$inferInsert = {
       usage_source: 'container_usage_segment',
@@ -254,6 +292,22 @@ async function settleSegment(
         });
       if (!payer) throw new UsageMutationConflictError('Billing subject not found');
       remainingMicrodollars = Number(payer.remaining);
+    } else if (memberId) {
+      const result = await recordOrganizationConsumption(tx, {
+        organizationId: interval.subject_id,
+        kiloUserId: memberId,
+        amountMicrodollars,
+        occurredAt: receivedAt,
+        source: 'compute',
+        sourceId: usageSourceId,
+      });
+      if (!result.recorded)
+        throw new UsageMutationConflictError(
+          'Compute consumption was already recorded without its segment'
+        );
+      if (result.organizationUsage.crossedMinimumBalance)
+        organizationBalanceAlert = interval.subject_id;
+      remainingMicrodollars = await balanceForUsage(tx, attribution);
     } else {
       const [payer] = await tx
         .update(organizations)
@@ -270,13 +324,17 @@ async function settleSegment(
       remainingMicrodollars = Number(payer.remaining);
     }
   } else {
-    remainingMicrodollars = await balanceForSubject(
-      tx,
-      { type: interval.subject_type, id: interval.subject_id },
-      true
-    );
+    remainingMicrodollars = await balanceForUsage(tx, attribution);
   }
-  return budgetForRemaining('paid', remainingMicrodollars, billingConfig.warnRemainingMicrodollars);
+  if (nativeOrganization && !memberId) remainingMicrodollars = 0;
+  return {
+    budget: budgetForRemaining(
+      'paid',
+      remainingMicrodollars,
+      billingConfig.warnRemainingMicrodollars
+    ),
+    ...(organizationBalanceAlert ? { organizationBalanceAlert } : {}),
+  };
 }
 
 function assertMatchingContext(
@@ -388,7 +446,7 @@ export async function applyStartWithDb(
           kind: 'applied',
           dedup: true,
           billingMode: 'paid',
-          remainingMicrodollars: await balanceForSubject(tx, input.subject, true),
+          remainingMicrodollars: await balanceForUsage(tx, input),
         };
       }
       return { kind: 'applied', dedup: true, billingMode: 'shadow' };
@@ -445,8 +503,13 @@ export async function applyStartWithDb(
     }
 
     if (billingMode === 'paid') {
-      const remaining = await balanceForSubject(tx, input.subject, true);
-      if (remaining <= MINIMUM_REMAINING_MICRODOLLARS) {
+      if (isNativeOrganizationUsage(input) && !organizationMemberId(input)) {
+        throw new UsageMutationConflictError(
+          'Native organization compute requires an acting member'
+        );
+      }
+      const remaining = await balanceForUsage(tx, input);
+      if (remaining < MINIMUM_REMAINING_MICRODOLLARS) {
         return {
           kind: 'rejected',
           code: 'insufficient_credits',
@@ -498,7 +561,7 @@ export async function applyStartWithDb(
           kind: 'applied',
           dedup: true,
           billingMode: 'paid',
-          remainingMicrodollars: await balanceForSubject(tx, input.subject, true),
+          remainingMicrodollars: await balanceForUsage(tx, input),
         };
       }
       return { kind: 'applied', dedup: true, billingMode: 'shadow' };
@@ -508,7 +571,7 @@ export async function applyStartWithDb(
         kind: 'applied',
         dedup: false,
         billingMode: 'paid',
-        remainingMicrodollars: await balanceForSubject(tx, input.subject),
+        remainingMicrodollars: await balanceForUsage(tx, input),
       };
     }
     return { kind: 'applied', dedup: false, billingMode: 'shadow' };
@@ -583,9 +646,7 @@ export async function applyHeartbeatWithDb(
         throw new UsageMutationConflictError('Heartbeat sequence has conflicting payload');
       }
       const remaining =
-        interval.billing_mode === 'paid'
-          ? await balanceForSubject(tx, input.context.subject, true)
-          : 0;
+        interval.billing_mode === 'paid' ? await balanceForUsage(tx, input.context) : 0;
       return {
         kind: 'applied',
         dedup: true,
@@ -635,7 +696,7 @@ export async function applyHeartbeatWithDb(
       usage_seconds: appliedSeconds,
       received_at: receivedAt,
     });
-    const budget = await settleSegment(
+    const settlement = await settleSegment(
       tx,
       interval,
       input.idempotencyKey,
@@ -650,7 +711,7 @@ export async function applyHeartbeatWithDb(
         last_heartbeat_seq: sql`GREATEST(${container_usage_interval.last_heartbeat_seq}, ${input.seq})`,
       })
       .where(eq(container_usage_interval.id, intervalId));
-    return { kind: 'applied', dedup: false, billingMode: interval.billing_mode, budget };
+    return { kind: 'applied', dedup: false, billingMode: interval.billing_mode, ...settlement };
   });
   return operation.catch(mapSingleOpenIntervalConflict);
 }
@@ -727,9 +788,7 @@ export async function applyStopWithDb(
         throw new UsageMutationConflictError('Closed interval has conflicting stop details');
       }
       const remaining =
-        interval.billing_mode === 'paid'
-          ? await balanceForSubject(tx, input.context.subject, true)
-          : 0;
+        interval.billing_mode === 'paid' ? await balanceForUsage(tx, input.context) : 0;
       return {
         kind: 'applied',
         dedup: true,
@@ -770,14 +829,16 @@ export async function applyStopWithDb(
       ? (interval.stopped_at ?? interval.last_seen_at)
       : timestamp(Math.max(new Date(interval.last_seen_at).getTime(), receivedAtMs));
 
-    const budget = wasReconciled
+    const settlement = wasReconciled
       ? interval.billing_mode === 'paid'
-        ? budgetForRemaining(
-            'paid',
-            await balanceForSubject(tx, input.context.subject, true),
-            billingConfig.warnRemainingMicrodollars
-          )
-        : { verdict: 'continue' as const }
+        ? {
+            budget: budgetForRemaining(
+              'paid',
+              await balanceForUsage(tx, input.context),
+              billingConfig.warnRemainingMicrodollars
+            ),
+          }
+        : { budget: { verdict: 'continue' as const } }
       : await settleSegment(tx, interval, finalSegmentKey, finalSeconds, receivedAt, billingConfig);
 
     await tx
@@ -795,7 +856,7 @@ export async function applyStopWithDb(
           : interval.confirmed_seconds + finalSeconds,
       })
       .where(eq(container_usage_interval.id, intervalId));
-    return { kind: 'applied', dedup: false, billingMode: interval.billing_mode, budget };
+    return { kind: 'applied', dedup: false, billingMode: interval.billing_mode, ...settlement };
   });
   return operation.catch(mapSingleOpenIntervalConflict);
 }

@@ -22,6 +22,8 @@ export type ControlPlaneTimers = {
   sandbox: {
     providerCreateMs: number;
     providerCreateRetryMs: number;
+    billingAdmissionMs: number;
+    billingAdmissionMinimumMs: number;
     wrapperFirstConnectMs: number;
     wrapperHelloMs: number;
     heartbeatMs: number;
@@ -84,6 +86,9 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
   const sandbox = {
     providerCreateMs: 2 * MINUTE_MS,
     providerCreateRetryMs: 10_000,
+    billingAdmissionMs: MINUTE_MS,
+    // Reserve time for a meter round trip before opening a new interval.
+    billingAdmissionMinimumMs: 1_000,
     wrapperFirstConnectMs: 5 * MINUTE_MS,
     wrapperHelloMs: 30_000,
     heartbeatMs: ms(45_000),

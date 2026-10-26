@@ -1,3 +1,4 @@
+import { billingFailureFromAdmission } from '../billing-failure.js';
 import { getBillingContext } from '@kilocode/container-usage';
 import { withTimeout } from '@kilocode/worker-utils';
 import { DurableObject } from 'cloudflare:workers';
@@ -5,6 +6,9 @@ import { containerCapacityEnforced } from '../container-concurrency.js';
 import { billingHeartbeatSeconds } from '../container-usage.js';
 import { resolveControlPlaneTimers } from '../shared/control-plane-timers.js';
 import { logger } from '../logger.js';
+import type { BillingStopDetails } from '../metered-billing-lifecycle.js';
+import { getSandboxControlStub } from '../sandbox-control/stub.js';
+import { withDORetry } from '../utils/do-retry.js';
 import {
   CONTAINERS_INTERCEPT_CA_PATH,
   SANDBOX_INTERCEPT_HTTPS_ENABLED,
@@ -689,10 +693,11 @@ export class SandboxContainers extends DurableObject<Env> {
     if (!container || typeof container.destroy !== 'function') {
       throw new Error('Native container destruction is unavailable');
     }
+    const stoppedAtMs = container.running ? Date.now() : undefined;
     await container.destroy();
     const record = await this.readRecord();
     await this.writeRecord(this.terminalRecord(record));
-    await this.settleBillingAtStop(record);
+    await this.settleBillingAtStop(record, stoppedAtMs);
   }
 
   async getBillingRuntimeStatus() {
@@ -1281,6 +1286,7 @@ export class SandboxContainers extends DurableObject<Env> {
       return stopPath('no_container_not_started', 'terminal');
     }
     const destroyStartedAt = Date.now();
+    const stoppedAtMs = container.running ? destroyStartedAt : undefined;
     try {
       await withTimeout(container.destroy(), DESTROY_TIMEOUT_MS, 'container destroy timed out');
     } catch (error) {
@@ -1295,7 +1301,7 @@ export class SandboxContainers extends DurableObject<Env> {
     }
     const current = await this.readRecord();
     await this.writeRecord(this.terminalRecord(current));
-    await this.settleBillingAtStop(current);
+    await this.settleBillingAtStop(current, stoppedAtMs);
     return stopPath('destroyed', 'terminal', { destroyMs: Date.now() - destroyStartedAt });
   }
 
@@ -1510,16 +1516,48 @@ export class SandboxContainers extends DurableObject<Env> {
     await this.activateBillingIfRunning(container, record);
   }
 
-  private async settleBillingAtStop(record: ContainersRecord): Promise<void> {
+  private async settleBillingAtStop(record: ContainersRecord, stoppedAtMs?: number): Promise<void> {
     const billing = this.billingForRecord(record);
     if (!billing) return;
-    await billing.onContainerStopped({ reason: 'runtime_signal' });
+    await billing.onContainerStopped({ reason: 'runtime_signal', stoppedAtMs });
   }
 
-  private async stopBillingContainer(): Promise<void> {
+  private async stopBillingContainer(budget?: BillingStopDetails): Promise<void> {
     const record = await this.readRecord();
-    if (record.allocationRef === null) return;
-    await this.stop(record.allocationRef);
+    if (record.allocationRef === null) {
+      logger.warn('Native billing stop has no allocation');
+      return;
+    }
+    const context = await getBillingContext(this.ctx.storage);
+    if (!context) {
+      logger
+        .withFields({ allocationRef: record.allocationRef })
+        .warn('Native billing stop has no billing context');
+      return;
+    }
+    const request = {
+      allocationRef: record.allocationRef,
+      billingFailure: billingFailureFromAdmission(context.subject, {
+        code: budget?.code === 'BILLING_UNAVAILABLE' ? 'meter_unavailable' : 'insufficient_credits',
+        remainingMicrodollars: budget?.remainingMicrodollars,
+        minimumRequiredMicrodollars: budget?.minimumRequiredMicrodollars,
+      }),
+    };
+    this.ctx.waitUntil(
+      Promise.resolve()
+        .then(() =>
+          withDORetry(
+            () => getSandboxControlStub(this.env, context.instanceId),
+            stub => stub.requestBillingStop(request),
+            'requestNativeBillingStop'
+          )
+        )
+        .catch(error => {
+          logger
+            .withFields({ errorName: error instanceof Error ? error.name : 'UnknownError' })
+            .warn('Native billing stop notification failed');
+        })
+    );
   }
 
   private async destroyBillingContainer(): Promise<void> {
@@ -1538,7 +1576,7 @@ export class SandboxContainers extends DurableObject<Env> {
       enforceContainerCapacity: containerCapacityEnforced(this.env),
       heartbeatSeconds: billingHeartbeatSeconds(this.env.CONTAINER_BILLING_HEARTBEAT_SECONDS),
       isContainerRunning: () => this.ctx.container?.running === true,
-      stopContainer: () => this.stopBillingContainer(),
+      stopContainer: budget => this.stopBillingContainer(budget),
       destroyContainer: () => this.destroyBillingContainer(),
       durableObjectId: this.ctx.id.toString(),
       waitUntil: promise => this.ctx.waitUntil(promise),

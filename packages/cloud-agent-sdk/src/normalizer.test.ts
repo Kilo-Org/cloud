@@ -2305,6 +2305,43 @@ describe('normalize', () => {
   });
 
   describe('cloud.message.failed', () => {
+    it('retains valid billing details only for a billing-blocked message', () => {
+      const billingFailure = {
+        code: 'INSUFFICIENT_CREDITS',
+        payer: { type: 'org', id: 'org-1' },
+        retryable: true,
+        remainingMicrodollars: 4_000_000,
+        minimumRequiredMicrodollars: 5_000_000,
+      };
+      expect(
+        normalize(
+          createRaw('cloud.message.failed', {
+            messageId: 'msg',
+            reason: 'billing_blocked',
+            billingFailure,
+          })
+        )
+      ).toMatchObject({ billingFailure });
+      expect(
+        normalize(
+          createRaw('cloud.message.failed', {
+            messageId: 'msg',
+            reason: 'connection_lost',
+            billingFailure,
+          })
+        )
+      ).not.toHaveProperty('billingFailure');
+      expect(
+        normalize(
+          createRaw('cloud.message.failed', {
+            messageId: 'msg',
+            reason: 'billing_blocked',
+            billingFailure: { ...billingFailure, payer: {} },
+          })
+        )
+      ).toMatchObject({ type: 'cloud.message.failed', messageId: 'msg' });
+    });
+
     it('retains explicit non-acceptance without requiring delivery', () => {
       expect(
         normalize(createRaw('cloud.message.failed', { messageId: 'msg', accepted: false }))

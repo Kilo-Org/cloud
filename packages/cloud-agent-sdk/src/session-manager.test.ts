@@ -3679,6 +3679,31 @@ describe('createSessionManager', () => {
       expect(atomValue(config.store, mgr.atoms.failedPrompt)).toBe('/help');
     });
 
+    it('shows streamed billing failure details and clears them when a new message starts', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+      await mgr.switchSession(kiloId('ses-1'));
+      const billingFailure = {
+        code: 'INSUFFICIENT_CREDITS' as const,
+        payer: { type: 'org' as const, id: 'org-1' },
+        retryable: true,
+        remainingMicrodollars: 4_000_000,
+        minimumRequiredMicrodollars: 5_000_000,
+      };
+      mockSessionCallbacks.onEvent?.({
+        type: 'cloud.message.failed',
+        messageId: 'm1',
+        reason: 'execution',
+        error: 'Sandbox billing requires additional credits',
+        accepted: true,
+        billingFailure,
+      });
+      expect(atomValue(config.store, mgr.atoms.billingFailure)).toEqual(billingFailure);
+      mockSessionCallbacks.onEvent?.({ type: 'cloud.message.queued', messageId: 'm2' });
+      expect(atomValue(config.store, mgr.atoms.billingFailure)).toBeNull();
+      mgr.destroy();
+    });
+
     it('clears structured billing state for a normal failure and on reset', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

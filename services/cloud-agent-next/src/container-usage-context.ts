@@ -1,8 +1,10 @@
+import { computeMemberMetadata } from '@kilocode/worker-utils/compute-member';
 import {
   billingActorSchema,
   billingSubjectSchema,
   usageContextSchema,
   ContainerUsageAdmissionError,
+  isNonRetryableSkuAdmissionError,
   type UsageContext,
 } from '@kilocode/container-usage';
 import { z } from 'zod';
@@ -24,21 +26,11 @@ import {
 import type { SessionMetadata } from './persistence/session-metadata.js';
 import type { SandboxId, SandboxInstance } from './types.js';
 import type { BillingContext } from '@kilocode/container-usage';
-
-export const SANDBOX_USAGE_SKUS = {
-  Sandbox: 'cloud-agent-standard-2026-07',
-  SandboxContainment: 'cloud-agent-standard-2026-07',
-  SandboxSmall: 'cloud-agent-small-2026-07',
-  SandboxSmallContainment: 'cloud-agent-small-2026-07',
-  SandboxDIND: 'cloud-agent-dind-2026-07',
-  SandboxCodeReview: 'cloud-agent-code-review-2026-07',
-  SandboxCodeReviewContainment: 'cloud-agent-code-review-2026-07',
-  SandboxContainersStandard3: 'cloud-agent-containers-standard-3-2026-09',
-  SandboxContainersStandard4: 'cloud-agent-containers-standard-4-2026-09',
-  SandboxContainersCodeReview: 'cloud-agent-code-review-2026-07',
-  SandboxVercelSmall: 'cloud-agent-vercel-small-2026-09',
-  SandboxVercelLarge: 'cloud-agent-vercel-large-2026-09',
-} as const;
+import {
+  CLOUD_AGENT_CONTAINER_CLASSES,
+  SANDBOX_USAGE_SKUS,
+} from '@kilocode/worker-utils/cloud-agent-compute';
+export { SANDBOX_USAGE_SKUS };
 
 export type SandboxClassName = keyof typeof SANDBOX_USAGE_SKUS;
 
@@ -144,8 +136,7 @@ export type ContainersBillingIdentity = {
 };
 
 const CONTAINERS_CLASS_BY_INSTANCE: Record<string, ContainersBillingClassName | undefined> = {
-  'standard-3': 'SandboxContainersStandard3',
-  'standard-4': 'SandboxContainersStandard4',
+  ...CLOUD_AGENT_CONTAINER_CLASSES,
   [CODE_REVIEW_CONTAINERS_INSTANCE]: 'SandboxContainersCodeReview',
 } satisfies Record<
   CloudflareContainersInstance | typeof CODE_REVIEW_CONTAINERS_INSTANCE,
@@ -202,7 +193,7 @@ export type SandboxBillingAdmissionResult =
   | { success: true }
   | {
       success: false;
-      code: 'insufficient_credits' | 'meter_unavailable' | 'stopping';
+      code: 'insufficient_credits' | 'meter_unavailable' | 'stopping' | 'invalid_configuration';
       message: string;
       remainingMicrodollars?: number;
       minimumRequiredMicrodollars?: number;
@@ -293,6 +284,10 @@ export function buildSandboxBillingInput(
       ? {
           metadata: {
             origin: normalizedOrigin(metadata.identity.billingOrigin),
+            ...(metadata.workspace?.sandboxProvider === 'cloudflare-containers' &&
+            subject.type === 'org'
+              ? computeMemberMetadata(actor, metadata.identity.userId)
+              : {}),
           },
         }
       : {}),
@@ -381,6 +376,13 @@ export function assertSandboxBillingAllocation(
     throw new Error('Isolated sandbox billing origin is unsupported');
   }
   const allowedMetadata = new Set(['origin']);
+  if (
+    isContainersBillingClassName(sandboxClassName) &&
+    input.subject.type === 'org' &&
+    input.actor.type === 'bot'
+  ) {
+    allowedMetadata.add('billingUserId');
+  }
   if (Object.keys(metadata).some(key => !allowedMetadata.has(key))) {
     throw new Error('Isolated sandbox billing metadata contains an unsupported field');
   }
@@ -419,6 +421,13 @@ export async function ensureSandboxBillingAdmissionInput(
 }
 
 export function billingAdmissionFailureFromError(error: unknown): SandboxBillingAdmissionResult {
+  if (isNonRetryableSkuAdmissionError(error)) {
+    return {
+      success: false,
+      code: 'invalid_configuration',
+      message: 'Compute billing configuration requires correction',
+    };
+  }
   if (error instanceof ContainerUsageAdmissionError) {
     if (error.code === 'insufficient_credits') {
       return {

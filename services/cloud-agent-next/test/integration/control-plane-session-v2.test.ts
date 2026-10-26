@@ -551,26 +551,116 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     expect(await readAlarm(stub)).toBeNull();
   });
 
-  it('fails accepted and re-prepares queued messages on a lost route', async () => {
-    const { stub, peer } = await setup();
-    peer.prepareView = peer.view('ready');
-    await stub.send(promptPayload('m1'));
-    await waitFor(async () => expect(await messageStatus(stub, 'm1')).toBe('running'));
+  it.each(['connection_lost', 'billing_blocked'] as const)(
+    'fails accepted and re-prepares queued messages on a %s lost route',
+    async reason => {
+      const { stub, peer } = await setup();
+      peer.prepareView = peer.view('ready');
+      await stub.send(promptPayload('m1'));
+      await waitFor(async () => expect(await messageStatus(stub, 'm1')).toBe('running'));
 
-    peer.prepareView = peer.view('preparing');
-    await stub.onRoute({ state: 'preparing', attemptId: peer.attemptId });
-    await stub.send(promptPayload('m2'));
-    const preparesBefore = peer.prepareCalls.length;
+      peer.prepareView = peer.view('preparing');
+      await stub.onRoute({ state: 'preparing', attemptId: peer.attemptId });
+      await stub.send(promptPayload('m2'));
+      const preparesBefore = peer.prepareCalls.length;
 
-    const oldAttempt = peer.attemptId;
-    peer.status = async input => ({ sessionId: input.sessionId, view: { state: 'unknown' } });
-    peer.attemptId = crypto.randomUUID();
-    peer.prepareView = peer.view('preparing');
-    await stub.onRoute({ state: 'lost', attemptId: oldAttempt, reason: 'connection_lost' });
-    expect(await messageStatus(stub, 'm1')).toBe('failed');
-    expect(await messageStatus(stub, 'm2')).toBe('queued');
-    expect(peer.prepareCalls.length).toBeGreaterThan(preparesBefore);
-  });
+      const oldAttempt = peer.attemptId;
+      peer.status = async input => ({ sessionId: input.sessionId, view: { state: 'unknown' } });
+      peer.attemptId = crypto.randomUUID();
+      peer.prepareView = peer.view('preparing');
+      const billingFailure =
+        reason === 'billing_blocked'
+          ? {
+              code: 'INSUFFICIENT_CREDITS' as const,
+              payer: { type: 'user' as const, id: SESSION_OWNER_ID },
+              retryable: true,
+              remainingMicrodollars: 4_000_000,
+              minimumRequiredMicrodollars: 5_000_000,
+            }
+          : undefined;
+      await stub.onRoute({ state: 'lost', attemptId: oldAttempt, reason, billingFailure });
+      expect(await messageStatus(stub, 'm1')).toBe('failed');
+      expect(await messageStatus(stub, 'm2')).toBe('queued');
+      expect(peer.prepareCalls.length).toBeGreaterThan(preparesBefore);
+      const saved = await runInDurableObject(stub, async (_instance, state) => {
+        const db = drizzle(state.storage, { logger: false });
+        const [message] = await db
+          .select()
+          .from(controlPlaneMessages)
+          .where(eq(controlPlaneMessages.message_id, 'm1'));
+        return message;
+      });
+      expect(saved.reason).toBe(reason);
+      expect(
+        saved.billing_failure === null ? undefined : JSON.parse(saved.billing_failure)
+      ).toEqual(billingFailure);
+    }
+  );
+
+  it.each(['failed', 'lost'] as const)(
+    'persists and replays billing details from a %s route, then recovers',
+    async state => {
+      const { stub, peer } = await setup();
+      peer.prepareView = peer.view(state === 'lost' ? 'ready' : 'preparing');
+      await stub.send(promptPayload('billing-message'));
+      if (state === 'lost')
+        await waitFor(async () =>
+          expect(await messageStatus(stub, 'billing-message')).toBe('running')
+        );
+      const billingFailure = {
+        code: 'INSUFFICIENT_CREDITS' as const,
+        payer: { type: 'user' as const, id: SESSION_OWNER_ID },
+        retryable: true,
+        remainingMicrodollars: 4_000_000,
+        minimumRequiredMicrodollars: 5_000_000,
+      };
+      if (state === 'failed')
+        peer.prepareView = {
+          state,
+          attemptId: peer.attemptId,
+          reason: 'billing_blocked',
+          billingFailure,
+        };
+      await stub.onRoute({
+        state,
+        attemptId: peer.attemptId,
+        reason: 'billing_blocked',
+        billingFailure,
+      });
+      expect(await messageStatus(stub, 'billing-message')).toBe('failed');
+      expect(await readMessageReason(stub, 'billing-message')).toBe('billing_blocked');
+      await evictAllDurableObjects();
+      await installPeer(stub, peer);
+      const saved = await runInDurableObject(stub, async (_instance, durableState) => {
+        const db = drizzle(durableState.storage, { logger: false });
+        const [message] = await db
+          .select()
+          .from(controlPlaneMessages)
+          .where(eq(controlPlaneMessages.message_id, 'billing-message'));
+        const terminal = await db
+          .select()
+          .from(events)
+          .where(eq(events.stream_event_type, 'cloud.message.failed'));
+        return { message, terminal };
+      });
+      expect(JSON.parse(saved.message.billing_failure ?? 'null')).toEqual(billingFailure);
+      expect(saved.terminal.map(event => JSON.parse(event.payload))).toContainEqual(
+        expect.objectContaining({
+          messageId: 'billing-message',
+          reason: 'billing_blocked',
+          billingFailure,
+        })
+      );
+
+      peer.attemptId = crypto.randomUUID();
+      peer.prepareView = peer.view('ready');
+      await stub.send(promptPayload('recovered-message'));
+      await waitFor(async () =>
+        expect(await messageStatus(stub, 'recovered-message')).toBe('running')
+      );
+      expect(await messageStatus(stub, 'billing-message')).toBe('failed');
+    }
+  );
 
   it('fails a queued message on the backstop and clears the alarm', async () => {
     const { stub, peer } = await setup();

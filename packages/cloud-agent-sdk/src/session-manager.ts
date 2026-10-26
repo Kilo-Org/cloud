@@ -2996,6 +2996,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       },
       onEvent: event => {
         if (expectedGeneration !== switchGeneration) return;
+        if (event.type === 'cloud.message.failed' && !open.resolvedFailures.has(event.messageId)) {
+          store.set(billingFailureAtom, event.billingFailure ?? null);
+        } else if (
+          event.type === 'cloud.message.queued' ||
+          event.type === 'cloud.message.sent' ||
+          event.type === 'cloud.message.completed'
+        ) {
+          store.set(billingFailureAtom, null);
+        }
         const session = getSession();
         const eventSessionId = chatEventSessionId(event);
         if (eventSessionId !== null) {

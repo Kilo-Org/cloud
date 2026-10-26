@@ -4,7 +4,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['test/postgres.test.ts', 'test/capacity.test.ts'],
+    include: [
+      'test/postgres.test.ts',
+      'test/capacity.test.ts',
+      'test/organization-consumption.test.ts',
+    ],
     fileParallelism: false,
   },
 });

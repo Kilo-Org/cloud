@@ -49,7 +49,17 @@ const ADMISSION_REUSE_MS = 5 * 60_000;
 
 export type BillingIdentity = { sandboxClassName: SandboxClassName };
 
-export type ContainerStopParams = { reason: 'exit' | 'runtime_signal'; exitCode?: number };
+export type BillingStopDetails = {
+  code?: 'INSUFFICIENT_CREDITS' | 'BILLING_UNAVAILABLE';
+  remainingMicrodollars?: number;
+  minimumRequiredMicrodollars?: number;
+};
+
+export type ContainerStopParams = {
+  reason: 'exit' | 'runtime_signal';
+  exitCode?: number;
+  stoppedAtMs?: number;
+};
 
 const sdkCallbackStateSchema = z.enum([
   'running',
@@ -84,7 +94,7 @@ export type MeteredBillingHost = {
   deleteSchedules: (callback: string) => void;
   getState: () => Promise<{ status: string; lastChange?: number; exitCode?: number }>;
   isContainerRunning: () => boolean;
-  stopContainer: () => Promise<void>;
+  stopContainer: (budget?: BillingStopDetails) => Promise<void>;
   destroyContainer: () => Promise<void>;
   durableObjectId: string;
   waitUntil: (promise: Promise<unknown>) => void;
@@ -106,11 +116,13 @@ const pendingStopReasonSchema = z
 
 const billingBlockSchema = z
   .object({
+    code: z.enum(['INSUFFICIENT_CREDITS', 'BILLING_UNAVAILABLE']).optional(),
     generation: z.uuid(),
     startEpochMs: z.number().int().nonnegative(),
     blockedAt: z.number().int().nonnegative(),
     forceStopAt: z.number().int().nonnegative(),
     remainingMicrodollars: z.number().int().optional(),
+    minimumRequiredMicrodollars: z.number().int().nonnegative().optional(),
   })
   .strict();
 
@@ -428,7 +440,7 @@ export class MeteredBillingLifecycle {
       const block = await this.getBillingBlock();
       if (block) {
         await this.scheduleForceStop(block);
-        await this.host.stopContainer();
+        await this.host.stopContainer(block);
         return;
       }
       const previous = await getBillingContext(this.host.storage);
@@ -474,33 +486,23 @@ export class MeteredBillingLifecycle {
     stopContainer: () => Promise<void>
   ): Promise<void> {
     await stopContainer();
-    // `onStop` is the first durable lifecycle signal after the container has
-    // actually stopped. Do not use the earlier budget verdict or force-destroy
-    // request as the usage boundary.
-    const { stoppedAtMs, ...sdkStopFields } = await this.getObservedStopSnapshot();
+    const { stoppedAtMs: stopBoundaryMs, ...sdkStopFields } =
+      params?.stoppedAtMs === undefined
+        ? await this.getObservedStopSnapshot()
+        : { stoppedAtMs: params.stoppedAtMs };
+    const stopObservedAtMs = Date.now();
     const activityExpiryRequested = this.activityExpiryRequested;
     this.activityExpiryRequested = false;
     this.runShadowTask(identity, 'stop lifecycle', async () => {
       const context = await getBillingContext(this.host.storage);
       if (!context) return;
+      const stoppedAtMs = Math.min(
+        stopObservedAtMs,
+        Math.max(context.usageMeasuredAtMs, stopBoundaryMs)
+      );
       const requestedReason = activityExpiryRequested
         ? 'activity_expired'
         : await this.getPendingStopReason(context.generation);
-      // Pairs with `container_started`: reason plus lifetime makes idle-expiry patterns
-      // queryable in logs instead of only in the usage tables.
-      logger
-        .withTags({ logTag: 'container_stopped', sandboxId: context.instanceId })
-        .withFields({
-          sandboxClass: identity.sandboxClassName,
-          generation: context.generation,
-          startEpochMs: context.startEpochMs,
-          reason: requestedReason ?? params?.reason ?? 'runtime_signal',
-          exitCode: params?.exitCode,
-          lifetimeMs: stoppedAtMs - context.startEpochMs,
-          sessionId: context.sessionId,
-          ...sdkStopFields,
-        })
-        .info('Container stopped');
       const pending = await this.heartbeat.persistStop(
         {
           reason: requestedReason ?? params?.reason ?? 'runtime_signal',
@@ -508,7 +510,20 @@ export class MeteredBillingLifecycle {
         },
         stoppedAtMs
       );
-      if (!pending) return;
+      if (!pending?.pendingStop) return;
+      logger
+        .withTags({ logTag: 'container_stopped', sandboxId: context.instanceId })
+        .withFields({
+          sandboxClass: identity.sandboxClassName,
+          generation: context.generation,
+          startEpochMs: context.startEpochMs,
+          reason: pending.pendingStop.reason,
+          exitCode: pending.pendingStop.exitCode,
+          lifetimeMs: pending.pendingStop.measuredAtMs - context.startEpochMs,
+          sessionId: context.sessionId,
+          ...sdkStopFields,
+        })
+        .info('Container stopped');
       await this.ensureStartAcknowledged(pending);
       await this.heartbeat.recordStop({
         reason: requestedReason ?? params?.reason ?? 'runtime_signal',
@@ -576,8 +591,9 @@ export class MeteredBillingLifecycle {
 
   async enforceBudgetStop(
     identity: BillingIdentity,
-    budget: { verdict: string; remainingMicrodollars?: number },
-    expected: { generation: string; startEpochMs: number }
+    budget: { verdict: string } & BillingStopDetails,
+    expected: { generation: string; startEpochMs: number },
+    failureCode?: 'BILLING_UNAVAILABLE'
   ): Promise<void> {
     const active = await getBillingContext(this.host.storage);
     if (
@@ -592,11 +608,13 @@ export class MeteredBillingLifecycle {
     const block =
       existing ??
       ({
+        ...(failureCode === undefined ? {} : { code: failureCode }),
         generation: expected.generation,
         startEpochMs: expected.startEpochMs,
         blockedAt: Date.now(),
         forceStopAt: Date.now() + BILLING_FORCE_STOP_SECONDS * 1_000,
         remainingMicrodollars: budget.remainingMicrodollars,
+        minimumRequiredMicrodollars: budget.minimumRequiredMicrodollars,
       } satisfies z.infer<typeof billingBlockSchema>);
     if (!existing) await this.host.storage.put(BILLING_BLOCK_STORAGE_KEY, block);
     await this.scheduleForceStop(block);
@@ -609,7 +627,7 @@ export class MeteredBillingLifecycle {
         forceStopAt: block.forceStopAt,
       })
       .warn('Container billing stop initiated');
-    await this.host.stopContainer();
+    await this.host.stopContainer({ ...budget, code: block.code });
   }
 
   async billingForceStop(identity: BillingIdentity, generation: string): Promise<void> {

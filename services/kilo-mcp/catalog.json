@@ -9412,6 +9412,80 @@
     ],
     "searchBlob": "codingPlans.subscribe Start a subscription to a Kilo coding plan. Pay the plan cost in credits and get the managed provider credential installed. codingplans subscribe planid idempotencykey planId idempotencyKey"
   },
+  "computeBilling.charges": {
+    "path": "computeBilling.charges",
+    "kind": "query",
+    "summary": "List compute usage charges for your personal account or an organization, optionally filtered to your own usage or specific date ranges.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "view": {
+          "default": "self",
+          "type": "string",
+          "enum": [
+            "self",
+            "all"
+          ]
+        },
+        "startDate": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+        },
+        "endDate": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+        },
+        "groupBy": {
+          "default": "day",
+          "type": "string",
+          "enum": [
+            "day",
+            "session"
+          ]
+        },
+        "page": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        }
+      },
+      "required": [
+        "startDate",
+        "endDate"
+      ]
+    },
+    "tags": [
+      "computebilling",
+      "charges",
+      "organizationid",
+      "view",
+      "startdate",
+      "enddate",
+      "groupby",
+      "page"
+    ],
+    "searchBlob": "computeBilling.charges List compute usage charges for your personal account or an organization, optionally filtered to your own usage or specific date ranges. computebilling charges organizationid view startdate enddate groupby page organizationId view startDate endDate groupBy page"
+  },
+  "computeBilling.rates": {
+    "path": "computeBilling.rates",
+    "kind": "query",
+    "summary": "Get the current compute pricing rates used to bill usage.",
+    "inputSchema": {},
+    "tags": [
+      "computebilling",
+      "rates"
+    ],
+    "searchBlob": "computeBilling.rates Get the current compute pricing rates used to bill usage. computebilling rates"
+  },
   "credits.completeAppStorePurchase": {
     "path": "credits.completeAppStorePurchase",
     "kind": "mutation",

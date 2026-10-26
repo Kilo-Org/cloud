@@ -38,6 +38,7 @@ export const routes = sqliteTable('routes', {
   attempt_id: text('attempt_id').notNull(),
   attempt_deadline_at: integer('attempt_deadline_at'),
   reason: text('reason'),
+  billing_failure: text('billing_failure'),
   updated_at: integer('updated_at').notNull(),
 });
 

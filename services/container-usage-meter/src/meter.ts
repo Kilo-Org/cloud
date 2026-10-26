@@ -19,6 +19,7 @@ import {
 } from '@kilocode/container-usage';
 import { applyHeartbeat, applyStart, applyStop } from './postgres';
 import { billingConfigFromEnv } from './billing-config';
+import { notifyOrganizationBalanceAlert } from './balance-alert';
 
 function assertContextMatches(
   input: RecordHeartbeatInput | RecordStopInput,
@@ -157,6 +158,8 @@ export class ContainerUsageMeter
       throw error;
     }
     logRpcOutcome('heartbeat', parsed.service, 'accepted', { dedup: result.dedup });
+    if (result.organizationBalanceAlert)
+      this.ctx.waitUntil(notifyOrganizationBalanceAlert(this.env, result.organizationBalanceAlert));
     return {
       intervalId: id,
       durable: 'pg',
@@ -191,6 +194,8 @@ export class ContainerUsageMeter
       throw error;
     }
     logRpcOutcome('stop', parsed.service, 'accepted', { dedup: result.dedup });
+    if (result.organizationBalanceAlert)
+      this.ctx.waitUntil(notifyOrganizationBalanceAlert(this.env, result.organizationBalanceAlert));
     return { intervalId: id, durable: 'pg', dedup: result.dedup };
   }
 }

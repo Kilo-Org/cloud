@@ -18,6 +18,7 @@ import {
   MeteredBillingLifecycle,
   type BillingIdentity,
   type ContainerStopParams,
+  type BillingStopDetails,
 } from '../metered-billing-lifecycle.js';
 import type { ContainerInstanceSize } from './SandboxContainers.js';
 import { CODE_REVIEW_CONTAINERS_INSTANCE } from './instance-size.js';
@@ -33,7 +34,7 @@ export type ContainersBillingHost = {
   enforceContainerCapacity: boolean;
   heartbeatSeconds: number;
   isContainerRunning: () => boolean;
-  stopContainer: () => Promise<void>;
+  stopContainer: (budget?: BillingStopDetails) => Promise<void>;
   destroyContainer: () => Promise<void>;
   durableObjectId: string;
   waitUntil: (promise: Promise<unknown>) => void;
@@ -62,7 +63,7 @@ export function unavailableContainersBillingAdmission(
   parseSandboxBillingInput(input);
   return {
     success: false,
-    code: 'meter_unavailable',
+    code: 'invalid_configuration',
     message: 'Container billing is not configured for this instance size',
   };
 }
@@ -264,8 +265,8 @@ export class ContainersBilling {
       onGenerationClosed: (context, cause) =>
         this.lifecycle.onGenerationClosed(this.billingIdentity, context, cause),
       onBudgetWarning: budget => this.lifecycle.onBudgetWarning(this.billingIdentity, budget),
-      enforceBudgetStop: (budget, expected) =>
-        this.lifecycle.enforceBudgetStop(this.billingIdentity, budget, expected),
+      enforceBudgetStop: (budget, expected, failureCode) =>
+        this.lifecycle.enforceBudgetStop(this.billingIdentity, budget, expected, failureCode),
     });
     this.lifecycle.attachHeartbeat(this.heartbeat);
   }

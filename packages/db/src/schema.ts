@@ -10837,6 +10837,7 @@ export const compute_usage_charge = pgTable(
   },
   table => [
     primaryKey({ columns: [table.usage_source, table.usage_source_id, table.created_at] }),
+    index('IDX_compute_usage_charge_created').on(table.created_at),
     index('IDX_compute_usage_charge_user_created').on(table.user_id, table.created_at),
     index('IDX_compute_usage_charge_organization_created').on(
       table.organization_id,

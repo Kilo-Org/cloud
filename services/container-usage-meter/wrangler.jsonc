@@ -20,6 +20,7 @@
     "traces": { "enabled": true, "head_sampling_rate": 0.01 },
   },
   "vars": {
+    "KILOCODE_BACKEND_BASE_URL": "https://api.kilo.ai",
     "CONTAINER_BILLING_SERVICES": "gastown,cloud-agent-next",
     "CONTAINER_BILLING_USER_IDS": "daef8451-f3f3-490e-93f1-21fafc2b005e",
     "CONTAINER_BILLING_ORG_IDS": "",
@@ -35,6 +36,13 @@
       "binding": "HYPERDRIVE",
       "id": "624ec80650dd414199349f4e217ddb10",
       "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+    },
+  ],
+  "secrets_store_secrets": [
+    {
+      "binding": "INTERNAL_API_SECRET_PROD",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "INTERNAL_API_SECRET_PROD",
     },
   ],
 }

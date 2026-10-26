@@ -1,0 +1,1 @@
+CREATE INDEX "IDX_compute_usage_charge_created" ON "compute_usage_charge" USING btree ("created_at");

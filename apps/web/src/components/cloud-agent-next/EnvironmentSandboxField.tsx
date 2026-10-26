@@ -2,11 +2,15 @@
 
 import { useId } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { SelectableSandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
+import {
+  getSandboxAllocationRequest,
+  type SelectableSandboxAllocation,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import { Label } from '@/components/ui/label';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { EnvironmentRepository } from '@/hooks/useCloudAgentEnvironments';
 import { SandboxSelect } from './settings/SandboxSelect';
+import { ComputePrice } from './ComputePrice';
 import { describeDefaultSandbox, getEligibleAllocationChoices } from './settings/settings-options';
 
 type EnvironmentSandboxFieldProps = {
@@ -59,6 +63,14 @@ export function EnvironmentSandboxField({
         labelledBy={labelId}
         disabled={disabled || isPending}
         onChange={onChange}
+      />
+      <ComputePrice
+        destination={
+          value
+            ? getSandboxAllocationRequest(value)
+            : (capabilities?.effectiveDestination ?? capabilities?.defaultDestination)
+        }
+        label="Compute"
       />
     </div>
   );

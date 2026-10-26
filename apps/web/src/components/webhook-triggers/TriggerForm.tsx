@@ -166,10 +166,13 @@ export function TriggerForm({
   const { data: session } = useSession();
   const isEditMode = formMode === 'edit';
   const [runAsCreator, setRunAsCreator] = useState(!!initialData?.executionUserId);
-  const creatorLabel =
-    isEditMode && initialData?.executionUserId !== session?.user?.id
-      ? 'Webhook creator'
-      : session?.user?.name || session?.user?.email || 'Your account';
+  const isOtherCreator =
+    isEditMode &&
+    !!initialData?.executionUserId &&
+    initialData.executionUserId !== session?.user?.id;
+  const creatorLabel = isOtherCreator
+    ? 'Webhook creator'
+    : session?.user?.name || session?.user?.email || 'Your account';
 
   // Form state
   const [activationMode, setActivationMode] = useState<'webhook' | 'scheduled'>(
@@ -880,28 +883,35 @@ export function TriggerForm({
             {/* Optional execution profile */}
             <div className="space-y-2">
               <Label>Environment Profile (optional)</Label>
-              <ProfileSelector
-                organizationId={runAsCreator ? undefined : organizationId}
-                emptyLabel="Use defaults"
-                savedSelectionLabel={
-                  isEditMode && profileId === initialData?.profileId
-                    ? 'Saved profile (unchanged)'
-                    : undefined
-                }
-                selectedProfileId={profileId}
-                onProfileSelect={setProfileId}
-                disabled={isLoading}
-                orgProfilesOnly={!!organizationId}
-                onRepoDefaultsClick={() => setShowRepoDefaults(true)}
-              />
+              {isOtherCreator ? (
+                <p className="text-sm">
+                  {profileId ? 'Saved creator profile (unchanged)' : 'Use defaults'}
+                </p>
+              ) : (
+                <ProfileSelector
+                  organizationId={runAsCreator ? undefined : organizationId}
+                  emptyLabel="Use defaults"
+                  savedSelectionLabel={
+                    isEditMode && profileId === initialData?.profileId
+                      ? 'Saved profile (unchanged)'
+                      : undefined
+                  }
+                  selectedProfileId={profileId}
+                  onProfileSelect={setProfileId}
+                  disabled={isLoading}
+                  orgProfilesOnly={!!organizationId}
+                  onRepoDefaultsClick={() => setShowRepoDefaults(true)}
+                />
+              )}
               <RepoProfileBindingsDialog
                 organizationId={organizationId}
                 open={showRepoDefaults}
                 onOpenChange={setShowRepoDefaults}
               />
               <p className="text-muted-foreground text-xs">
-                Use defaults applies repository settings and the effective default profile. Selected
-                profiles override default profile settings. Secrets resolve when the trigger runs.
+                {isOtherCreator
+                  ? 'Only the trigger creator can change its personal environment profile. The saved setting is kept.'
+                  : 'Use defaults applies repository settings and the effective default profile. Selected profiles override default profile settings. Secrets resolve when the trigger runs.'}
               </p>
             </div>
 

@@ -240,6 +240,35 @@
     ],
     "searchBlob": "agentBriefing.list List existing agent briefing reports for the user, optionally filtered by personal or organization scope with pagination. agentbriefing list scope organizationid cursor limit currentonly scope organizationId cursor limit currentOnly"
   },
+  "agentBriefing.oneOffDrafts": {
+    "path": "agentBriefing.oneOffDrafts",
+    "kind": "query",
+    "summary": "List resumable, unconfirmed agent briefs, including preparation progress and failures. Use the cursor to retrieve older drafts.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cursor": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "limit": {
+          "default": 20,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    },
+    "tags": [
+      "agentbriefing",
+      "oneoffdrafts",
+      "cursor",
+      "limit"
+    ],
+    "searchBlob": "agentBriefing.oneOffDrafts List resumable, unconfirmed agent briefs, including preparation progress and failures. Use the cursor to retrieve older drafts. agentbriefing oneoffdrafts cursor limit cursor limit"
+  },
   "agentBriefing.oneOffPreferences": {
     "path": "agentBriefing.oneOffPreferences",
     "kind": "query",
@@ -267,6 +296,31 @@
       "language"
     ],
     "searchBlob": "agentBriefing.oneOffPreferences Get the saved timezone and language preferences used when generating a one-off agent activity briefing for a custom date range. agentbriefing oneoffpreferences timezone language timezone language"
+  },
+  "agentBriefing.oneOffPreparation": {
+    "path": "agentBriefing.oneOffPreparation",
+    "kind": "query",
+    "summary": "Check background brief preparation and retrieve its report and cost estimate when ready. Paid generation still requires confirmation in the app.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reportId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "reportId"
+      ]
+    },
+    "tags": [
+      "agentbriefing",
+      "oneoffpreparation",
+      "reportid"
+    ],
+    "searchBlob": "agentBriefing.oneOffPreparation Check background brief preparation and retrieve its report and cost estimate when ready. Paid generation still requires confirmation in the app. agentbriefing oneoffpreparation reportid reportId"
   },
   "agentBriefing.preferences": {
     "path": "agentBriefing.preferences",
@@ -379,6 +433,65 @@
       "reportid"
     ],
     "searchBlob": "agentBriefing.read Mark an agent briefing report as read for the current user. agentbriefing read reportid reportId"
+  },
+  "agentBriefing.startOneOffPreparation": {
+    "path": "agentBriefing.startOneOffPreparation",
+    "kind": "mutation",
+    "summary": "Prepare a historical agent brief in the background for a selected period and context. Preparation does not publish a report or authorize a paid summary.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "startAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "endAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 35
+        }
+      },
+      "required": [
+        "requestId",
+        "startAt",
+        "endAt",
+        "timezone",
+        "language"
+      ]
+    },
+    "tags": [
+      "agentbriefing",
+      "startoneoffpreparation",
+      "requestid",
+      "organizationid",
+      "startat",
+      "endat",
+      "timezone",
+      "language"
+    ],
+    "searchBlob": "agentBriefing.startOneOffPreparation Prepare a historical agent brief in the background for a selected period and context. Preparation does not publish a report or authorize a paid summary. agentbriefing startoneoffpreparation requestid organizationid startat endat timezone language requestId organizationId startAt endAt timezone language"
   },
   "agentBriefing.updatePreferences": {
     "path": "agentBriefing.updatePreferences",
@@ -7653,15 +7766,8 @@
           "type": "boolean"
         },
         "messageId": {
-          "anyOf": [
-            {
-              "type": "string",
-              "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string",
+          "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
         },
         "attachments": {
           "type": "object",
@@ -7711,7 +7817,8 @@
       },
       "required": [
         "cloudAgentSessionId",
-        "payload"
+        "payload",
+        "messageId"
       ]
     },
     "tags": [
@@ -15278,6 +15385,7 @@
               "organization.mode.create",
               "organization.mode.update",
               "organization.mode.delete",
+              "organization.webhook_trigger.update",
               "organization.group.create",
               "organization.group.update",
               "organization.group.delete",
@@ -18668,15 +18776,8 @@
           "type": "boolean"
         },
         "messageId": {
-          "anyOf": [
-            {
-              "type": "string",
-              "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string",
+          "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
         },
         "attachments": {
           "type": "object",
@@ -18727,7 +18828,8 @@
       "required": [
         "organizationId",
         "cloudAgentSessionId",
-        "payload"
+        "payload",
+        "messageId"
       ]
     },
     "tags": [

@@ -1203,6 +1203,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
         const socket = {
           readyState: WebSocket.OPEN,
           deserializeAttachment: () => attachment,
+          serializeAttachment: (next: object) => Object.assign(attachment, next),
           send,
         } as unknown as WebSocket;
         const target = instance as unknown as { applyEvent(event: unknown): Promise<void> };

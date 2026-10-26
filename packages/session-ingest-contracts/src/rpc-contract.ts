@@ -1,9 +1,13 @@
 import { z } from 'zod';
-import { cloudAgentChildSessionLineageSchema } from './cloud-agent-session-scope';
+import {
+  cloudAgentChildSessionLineageSchema,
+  cloudAgentWorktreeIdSchema,
+  type CloudAgentWorktreeId,
+} from './cloud-agent-session-scope';
+
+export { cloudAgentWorktreeIdSchema, type CloudAgentWorktreeId };
 
 export const sessionIdSchema = z.string().startsWith('ses_').length(30);
-export const cloudAgentWorktreeIdSchema = z.templateLiteral(['worktree_', z.uuid()]);
-export type CloudAgentWorktreeId = z.infer<typeof cloudAgentWorktreeIdSchema>;
 
 export const cloudAgentWorktreeLocationSchema = z
   .object({
@@ -345,11 +349,25 @@ export const cloudAgentRootSessionsCursorSchema = z
   .strict();
 export type CloudAgentRootSessionsCursor = z.infer<typeof cloudAgentRootSessionsCursorSchema>;
 
-function encodeBase64Url(value: string): string {
-  const bytes = new TextEncoder().encode(value);
+/** Carries a JSON text as the unpadded base64url an opaque cursor puts on the wire. */
+function encodeBase64Url(text: string): string {
+  const bytes = new TextEncoder().encode(text);
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+/**
+ * Reads the JSON text back out of an unpadded base64url value. Callers keep the
+ * pre-validation that fits their cursor — length, charset, and any canonical
+ * re-encode check — and choose whether invalid UTF-8 is fatal.
+ */
+function decodeBase64Url(value: string, options: { fatalUtf8: boolean }): string {
+  const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
+  const paddingLength = (4 - (base64.length % 4)) % 4;
+  const binary = atob(base64 + '='.repeat(paddingLength));
+  const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
+  return new TextDecoder('utf-8', { fatal: options.fatalUtf8, ignoreBOM: false }).decode(bytes);
 }
 
 export function encodeCloudAgentRootSessionsCursor(
@@ -363,12 +381,8 @@ export function decodeCloudAgentRootSessionsCursor(cursor: string): CloudAgentRo
   if (!/^[A-Za-z0-9_-]{1,256}$/.test(cursor)) {
     throw new Error('Invalid Cloud Agent root sessions cursor');
   }
-  const base64 = cursor.replace(/-/g, '+').replace(/_/g, '/');
-  const paddingLength = (4 - (base64.length % 4)) % 4;
-  const binary = atob(base64 + '='.repeat(paddingLength));
-  const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
   const parsed = cloudAgentRootSessionsCursorSchema.parse(
-    JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes))
+    JSON.parse(decodeBase64Url(cursor, { fatalUtf8: true }))
   );
   if (encodeBase64Url(JSON.stringify(parsed)) !== cursor) {
     throw new Error('Invalid Cloud Agent root sessions cursor');
@@ -880,19 +894,27 @@ function normalizePersistedKiloSdkMessageHistory(value: unknown): unknown {
     (count, message) => count + message.omittedItemCount,
     0
   );
-  const omittedItemCount = z.number().int().nonnegative().safeParse(value['omittedItemCount']);
+  const suppliedOmittedItemCount = z
+    .number()
+    .int()
+    .nonnegative()
+    .safeParse(value['omittedItemCount']);
+  let mergedOmittedItemCount: unknown;
+  if (additionalOmittedItemCount === 0) {
+    // Nothing was dropped, so the property keeps whatever the caller supplied.
+    mergedOmittedItemCount = undefined;
+  } else if (suppliedOmittedItemCount.success) {
+    mergedOmittedItemCount = suppliedOmittedItemCount.data + additionalOmittedItemCount;
+  } else if (value['omittedItemCount'] === undefined) {
+    mergedOmittedItemCount = additionalOmittedItemCount;
+  } else {
+    // Keep an invalid supplied value so the history schema still rejects it.
+    mergedOmittedItemCount = value['omittedItemCount'];
+  }
   return {
     ...value,
     messages: normalizedMessages.map(message => message.message),
-    ...(additionalOmittedItemCount === 0
-      ? {}
-      : {
-          omittedItemCount: omittedItemCount.success
-            ? omittedItemCount.data + additionalOmittedItemCount
-            : value['omittedItemCount'] === undefined
-              ? additionalOmittedItemCount
-              : value['omittedItemCount'],
-        }),
+    ...(mergedOmittedItemCount === undefined ? {} : { omittedItemCount: mergedOmittedItemCount }),
   };
 }
 
@@ -956,17 +978,8 @@ export type KiloSdkMessagesLegacyCursor = z.infer<typeof kiloSdkMessagesLegacyCu
 export const kiloSdkMessagesCursorSchema = kiloSdkMessagesLegacyCursorSchema;
 export type KiloSdkMessagesCursor = KiloSdkMessagesLegacyCursor;
 
-function serializeKiloSdkMessagesCursor(cursor: KiloSdkMessagesCursor): string {
-  const bytes = utf8Encoder.encode(JSON.stringify(cursor));
-  let binary = '';
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-}
-
 export function encodeKiloSdkMessagesCursor(cursor: KiloSdkMessagesCursor): string {
-  return serializeKiloSdkMessagesCursor(kiloSdkMessagesCursorSchema.parse(cursor));
+  return encodeBase64Url(JSON.stringify(kiloSdkMessagesCursorSchema.parse(cursor)));
 }
 
 /**
@@ -976,7 +989,7 @@ export function encodeKiloSdkMessagesCursor(cursor: KiloSdkMessagesCursor): stri
  */
 export function tryEncodeKiloSdkMessagesCursor(cursor: KiloSdkMessagesCursor): string | null {
   const parsed = kiloSdkMessagesCursorSchema.safeParse(cursor);
-  return parsed.success ? serializeKiloSdkMessagesCursor(parsed.data) : null;
+  return parsed.success ? encodeBase64Url(JSON.stringify(parsed.data)) : null;
 }
 
 export function decodeKiloSdkMessagesCursor(cursor: string): KiloSdkMessagesCursor {
@@ -986,11 +999,9 @@ export function decodeKiloSdkMessagesCursor(cursor: string): KiloSdkMessagesCurs
   ) {
     throw new Error('message cursor is not valid');
   }
-  const base64 = cursor.replace(/-/g, '+').replace(/_/g, '/');
-  const paddingLength = (4 - (base64.length % 4)) % 4;
-  const binary = atob(base64 + '='.repeat(paddingLength));
-  const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
-  return kiloSdkMessagesCursorSchema.parse(JSON.parse(new TextDecoder().decode(bytes)));
+  return kiloSdkMessagesCursorSchema.parse(
+    JSON.parse(decodeBase64Url(cursor, { fatalUtf8: false }))
+  );
 }
 
 export function validateKiloSdkMessagesCursor(cursor: string): boolean {

@@ -9,17 +9,11 @@
 import { beads, BeadRecord } from '../../db/tables/beads.table';
 import { agent_metadata } from '../../db/tables/agent-metadata.table';
 import { query } from '../../util/query.util';
+import { generateId } from '../../util/id.util';
+import { now } from '../../util/time.util';
 import { logBeadEvent } from './beads';
 import { getAgent } from './agents';
 import type { SendMailInput, Mail } from '../../types';
-
-function generateId(): string {
-  return crypto.randomUUID();
-}
-
-function now(): string {
-  return new Date().toISOString();
-}
 
 export function initMailTables(_sql: SqlStorage): void {
   // Mail tables are now part of the beads table (type='message').

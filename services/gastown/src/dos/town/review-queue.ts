@@ -14,6 +14,8 @@ import { agent_metadata } from '../../db/tables/agent-metadata.table';
 import { convoy_metadata } from '../../db/tables/convoy-metadata.table';
 import { bead_events } from '../../db/tables/bead-events.table';
 import { query } from '../../util/query.util';
+import { generateId } from '../../util/id.util';
+import { now } from '../../util/time.util';
 import {
   logBeadEvent,
   getBead,
@@ -28,14 +30,6 @@ import {
 import { getAgent, unhookBead, updateAgentStatus } from './agents';
 import { getRig } from './rigs';
 import type { ReviewQueueInput, ReviewQueueEntry, AgentDoneInput, Molecule } from '../../types';
-
-function generateId(): string {
-  return crypto.randomUUID();
-}
-
-function now(): string {
-  return new Date().toISOString();
-}
 
 /**
  * Extract the human-readable failure message from a bead event's metadata.

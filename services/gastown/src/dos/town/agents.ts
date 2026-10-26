@@ -9,6 +9,8 @@ import { z } from 'zod';
 import { beads, BeadRecord, AgentBeadRecord } from '../../db/tables/beads.table';
 import { agent_metadata } from '../../db/tables/agent-metadata.table';
 import { query } from '../../util/query.util';
+import { generateId } from '../../util/id.util';
+import { now } from '../../util/time.util';
 import { logBeadEvent, getBead, deleteBead } from './beads';
 import { readAndDeliverMail } from './mail';
 import type {
@@ -43,14 +45,6 @@ const POLECAT_NAME_POOL = [
   'Drift',
   'Lark',
 ];
-
-function generateId(): string {
-  return crypto.randomUUID();
-}
-
-function now(): string {
-  return new Date().toISOString();
-}
 
 /** Map a parsed AgentBeadRecord to the Agent API type. */
 function toAgent(row: AgentBeadRecord): Agent {

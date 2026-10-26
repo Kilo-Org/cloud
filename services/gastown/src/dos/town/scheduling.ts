@@ -10,6 +10,7 @@ import * as Sentry from '@sentry/cloudflare';
 import { beads } from '../../db/tables/beads.table';
 import { agent_metadata } from '../../db/tables/agent-metadata.table';
 import { query } from '../../util/query.util';
+import { now } from '../../util/time.util';
 import * as beadOps from './beads';
 import * as agents from './agents';
 import * as rigs from './rigs';
@@ -45,10 +46,6 @@ type RigConfig = {
   platformIntegrationId?: string;
   merge_strategy?: string;
 };
-
-function now(): string {
-  return new Date().toISOString();
-}
 
 /**
  * Dispatch a single agent to the container. Transitions the bead to

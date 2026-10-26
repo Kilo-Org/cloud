@@ -2,20 +2,14 @@ import { DurableObject } from 'cloudflare:workers';
 import { createTableOrgTowns, org_towns, OrgTownRecord } from '../db/tables/org-towns.table';
 import { createTableUserRigs, user_rigs, UserRigRecord } from '../db/tables/user-rigs.table';
 import { query } from '../util/query.util';
+import { generateId } from '../util/id.util';
+import { now } from '../util/time.util';
 import { getTownDOStub } from './Town.do';
 
 const ORG_LOG = '[GastownOrg.do]';
 
 /** Health watchdog interval — check town alarms every 5 minutes */
 const WATCHDOG_INTERVAL_MS = 5 * 60_000;
-
-function generateId(): string {
-  return crypto.randomUUID();
-}
-
-function now(): string {
-  return new Date().toISOString();
-}
 
 /**
  * GastownOrgDO — per-org control-plane metadata for towns and rigs.

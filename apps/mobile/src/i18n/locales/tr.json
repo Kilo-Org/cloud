@@ -4025,6 +4025,7 @@
       "startNewSessionHint": "Yeni bir oturum başlatmak için uzun bas.",
       "linkSession": "Oturum bağla",
       "linkFailed": "Oturum göreve bağlanamadı",
+      "moveToAnotherTodo": "Başka bir göreve taşı",
       "startRefreshFailed": "Oturum başladı, ancak bu liste güncellenmedi."
     },
     "linkSession": {
@@ -4034,6 +4035,7 @@
     },
     "upNext": "Sıradaki",
     "sessionTodo": "Görev: {{title}}",
+    "openTodoHint": "Görevi açar.",
     "linkToTodo": "Göreve bağla",
     "candidates": {
       "empty": "Açık görev yok"

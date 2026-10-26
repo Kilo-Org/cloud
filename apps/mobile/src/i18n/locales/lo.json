@@ -4025,6 +4025,7 @@
       "startNewSessionHint": "ກົດຍາວເພື່ອເລີ່ມເຊສຊັນໃໝ່.",
       "linkSession": "ເຊື່ອມຕໍ່ເຊດຊັນ",
       "linkFailed": "ບໍ່ສາມາດເຊື່ອມຕໍ່ເຊດຊັນກັບວຽກໄດ້.",
+      "moveToAnotherTodo": "ຍ້າຍໄປວຽກອື່ນ",
       "startRefreshFailed": "ເຊດຊັນເລີ່ມແລ້ວ, ແຕ່ລາຍການນີ້ບໍ່ໄດ້ອັບເດດ."
     },
     "linkSession": {
@@ -4034,6 +4035,7 @@
     },
     "upNext": "ຕໍ່ໄປ",
     "sessionTodo": "ວຽກ: {{title}}",
+    "openTodoHint": "ເປີດວຽກ.",
     "linkToTodo": "ເຊື່ອມຕໍ່ກັບວຽກ",
     "candidates": {
       "empty": "ບໍ່ມີວຽກທີ່ເປີດຢູ່"

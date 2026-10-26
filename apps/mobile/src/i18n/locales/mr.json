@@ -4025,6 +4025,7 @@
       "startNewSessionHint": "नवीन सत्र सुरू करण्यासाठी दीर्घ दाबा.",
       "linkSession": "सत्र लिंक करा",
       "linkFailed": "सत्र कामाशी लिंक करता आले नाही",
+      "moveToAnotherTodo": "दुसऱ्या कामात हलवा",
       "startRefreshFailed": "सत्र सुरू झाले, पण ही यादी अद्ययावत झाली नाही."
     },
     "linkSession": {
@@ -4034,6 +4035,7 @@
     },
     "upNext": "पुढे",
     "sessionTodo": "काम: {{title}}",
+    "openTodoHint": "काम उघडते.",
     "linkToTodo": "कामाशी लिंक करा",
     "candidates": {
       "empty": "खुली कामे नाहीत"

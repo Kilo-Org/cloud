@@ -4025,6 +4025,7 @@
       "startNewSessionHint": "Eduki sakatuta saio berri bat hasteko.",
       "linkSession": "Lotu saioa",
       "linkFailed": "Ezin izan da saioa zereginarekin lotu",
+      "moveToAnotherTodo": "Eraman beste zeregin batera",
       "startRefreshFailed": "Saioa hasi da, baina zerrenda hau ez da eguneratu."
     },
     "linkSession": {
@@ -4034,6 +4035,7 @@
     },
     "upNext": "Hurrengoa",
     "sessionTodo": "Zeregina: {{title}}",
+    "openTodoHint": "Zeregina irekitzen du.",
     "linkToTodo": "Lotu zereginarekin",
     "candidates": {
       "empty": "Ez dago zeregin irekirik"

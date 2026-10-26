@@ -115,7 +115,11 @@ export type ProviderLaunchResult = {
 };
 
 /** The first process that a provider runs in a new or restored sandbox. */
-export type ProviderStartupCommand = { argv: readonly string[] };
+export type ProviderStartupCommand = {
+  argv: readonly string[];
+  /** Trusted bootstrap needs to install runtime files outside the workspace. */
+  user?: 'root';
+};
 
 export type ProviderAdapter = {
   describeRuntime?(ref: string): CloudAgentRunContainer | undefined;

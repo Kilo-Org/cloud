@@ -4135,6 +4135,7 @@
       "startNewSessionHint": "Za novo sejo pridržite.",
       "linkSession": "Poveži sejo",
       "linkFailed": "Seje ni bilo mogoče povezati z nalogo",
+      "moveToAnotherTodo": "Premakni v drugo nalogo",
       "startRefreshFailed": "Seja se je začela, vendar se ta seznam ni posodobil."
     },
     "linkSession": {
@@ -4144,6 +4145,7 @@
     },
     "upNext": "Naslednje",
     "sessionTodo": "Naloga: {{title}}",
+    "openTodoHint": "Odpre nalogo.",
     "linkToTodo": "Poveži z nalogo",
     "candidates": {
       "empty": "Ni odprtih nalog"

@@ -1,5 +1,5 @@
 {
-  "id": "d28b7f66-1c72-40bd-a82b-f99441b096df",
+  "id": "53a48f7f-7f1f-47c1-9607-259103016378",
   "prevId": "3ef93f9d-c2d8-4ef7-87ce-4876b6dba5de",
   "version": "7",
   "dialect": "postgresql",
@@ -3863,6 +3863,221 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.byoc_connections": {
+      "name": "byoc_connections",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "credentials_encrypted": {
+          "name": "credentials_encrypted",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "config": {
+          "name": "config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "runtime": {
+          "name": "runtime",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "setup_status": {
+          "name": "setup_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "setup_step": {
+          "name": "setup_step",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "setup_error": {
+          "name": "setup_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "build_generation": {
+          "name": "build_generation",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "upgrade_status": {
+          "name": "upgrade_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "upgrade_step": {
+          "name": "upgrade_step",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "upgrade_error": {
+          "name": "upgrade_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "setup_started_at": {
+          "name": "setup_started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "setup_completed_at": {
+          "name": "setup_completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_byoc_connections_organization_provider": {
+          "name": "UQ_byoc_connections_organization_provider",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "provider",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"byoc_connections\".\"organization_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_byoc_connections_user_provider": {
+          "name": "UQ_byoc_connections_user_provider",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "provider",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"byoc_connections\".\"user_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "byoc_connections_organization_id_organizations_id_fk": {
+          "name": "byoc_connections_organization_id_organizations_id_fk",
+          "tableFrom": "byoc_connections",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "byoc_connections_owner_check": {
+          "name": "byoc_connections_owner_check",
+          "value": "(\"byoc_connections\".\"organization_id\" IS NOT NULL AND \"byoc_connections\".\"user_id\" IS NULL) OR (\"byoc_connections\".\"organization_id\" IS NULL AND \"byoc_connections\".\"user_id\" IS NOT NULL)"
+        },
+        "byoc_connections_provider_check": {
+          "name": "byoc_connections_provider_check",
+          "value": "length(trim(\"byoc_connections\".\"provider\")) > 0"
+        },
+        "byoc_connections_config_check": {
+          "name": "byoc_connections_config_check",
+          "value": "jsonb_typeof(\"byoc_connections\".\"config\") = 'object'"
+        },
+        "byoc_connections_runtime_check": {
+          "name": "byoc_connections_runtime_check",
+          "value": "jsonb_typeof(\"byoc_connections\".\"runtime\") = 'object'"
+        },
+        "byoc_connections_status_check": {
+          "name": "byoc_connections_status_check",
+          "value": "\"byoc_connections\".\"setup_status\" IN ('pending', 'building', 'ready', 'failed')"
+        },
+        "byoc_connections_ready_fields_check": {
+          "name": "byoc_connections_ready_fields_check",
+          "value": "\"byoc_connections\".\"setup_status\" <> 'ready' OR \"byoc_connections\".\"setup_completed_at\" IS NOT NULL"
+        },
+        "byoc_connections_upgrade_status_check": {
+          "name": "byoc_connections_upgrade_status_check",
+          "value": "\"byoc_connections\".\"upgrade_status\" IS NULL OR \"byoc_connections\".\"upgrade_status\" IN ('pending', 'building', 'failed')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.byok_api_keys": {
@@ -10976,44 +11191,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "consumed_microdollars": {
-          "name": "consumed_microdollars",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "retired_microdollars": {
-          "name": "retired_microdollars",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "paid_credit_policy": {
-          "name": "paid_credit_policy",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "credit_source": {
-          "name": "credit_source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "source_transaction_id": {
-          "name": "source_transaction_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "refund_principal_microdollars": {
-          "name": "refund_principal_microdollars",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
         "is_free": {
           "name": "is_free",
           "type": "boolean",
@@ -11201,21 +11378,6 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_credit_transactions_source_transaction_id": {
-          "name": "IDX_credit_transactions_source_transaction_id",
-          "columns": [
-            {
-              "expression": "source_transaction_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -21971,22 +22133,6 @@
           "method": "btree",
           "with": {}
         },
-        "IDX_kilocode_users_next_credit_expiration_at": {
-          "name": "IDX_kilocode_users_next_credit_expiration_at",
-          "columns": [
-            {
-              "expression": "next_credit_expiration_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"kilocode_users\".\"next_credit_expiration_at\" IS NOT NULL",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
         "IDX_kilocode_users_blocked_at": {
           "name": "IDX_kilocode_users_blocked_at",
           "columns": [
@@ -25755,22 +25901,6 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_organizations_next_credit_expiration_at": {
-          "name": "IDX_organizations_next_credit_expiration_at",
-          "columns": [
-            {
-              "expression": "next_credit_expiration_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"organizations\".\"next_credit_expiration_at\" IS NOT NULL",
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },

@@ -22,14 +22,17 @@ import type {
 } from '@kilocode/app-shared/provider-review';
 import {
   fetchGitLabMergeRequest,
-  fetchGitLabRootTextFileAtRef,
   fetchGitLabUser,
   getMRHeadCommit,
   type GitLabDiscussion,
   type GitLabMergeRequest,
   type GitLabMergeRequestDetail,
 } from '@/lib/integrations/platforms/gitlab/adapter';
-import { FILE_LINES_MAX } from '@/lib/github-pr-review/dtos';
+import {
+  FILE_LINES_MAX,
+  FILE_READ_MAX_BYTES,
+  FILE_READ_TOO_LARGE_MESSAGE,
+} from '@/lib/github-pr-review/dtos';
 import {
   authorizeOwner,
   authorizeProject,
@@ -40,7 +43,7 @@ import {
   type GitLabReviewOwner,
 } from './gitlab-authorization';
 import { getGitLabDiscussionState } from './gitlab-discussion';
-import { requestGitLabJson } from './gitlab-http';
+import { requestGitLabJson, requestGitLabText } from './gitlab-http';
 
 const GITLAB_PAGE_SIZE = 50;
 /**
@@ -303,21 +306,15 @@ export async function getFileLines(
 ): Promise<GitLabFileLines> {
   const access = await authorizeProject(owner, projectPath, instanceHint);
   try {
-    const text = await fetchGitLabRootTextFileAtRef(
-      access.accessToken,
-      access.projectPath,
-      path,
-      ref,
-      access.instanceUrl
+    const text = await requestGitLabText(
+      access,
+      `/api/v4/projects/${encodeURIComponent(access.projectPath)}/repository/files/${encodeURIComponent(path)}/raw`,
+      { ref },
+      FILE_READ_MAX_BYTES,
+      FILE_READ_TOO_LARGE_MESSAGE
     );
-    if (text === null) {
-      throw new GitLabReviewError('not_found', 'The file was not found at this ref.');
-    }
     const allLines = text.split('\n');
     const start = Math.max(1, Math.min(startLine, allLines.length));
-    // The window is bounded by the same shared cap the GitHub adapter applies,
-    // so a caller cannot pull an unbounded slice of the file as comment
-    // context (the response transport cap is not a window cap).
     const cappedEnd = Math.min(endLine, startLine + FILE_LINES_MAX - 1);
     const end = Math.max(start, Math.min(cappedEnd, allLines.length));
     return { lines: allLines.slice(start - 1, end), totalLines: allLines.length };

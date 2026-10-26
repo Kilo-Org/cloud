@@ -4025,6 +4025,7 @@
       "startNewSessionHint": "Mahabang pindot para magsimula ng bagong session.",
       "linkSession": "I-link ang sesyon",
       "linkFailed": "Hindi na-link ang sesyon sa gagawin",
+      "moveToAnotherTodo": "Ilipat sa ibang gagawin",
       "startRefreshFailed": "Nagsimula na ang sesyon, pero hindi na-update ang listahang ito."
     },
     "linkSession": {
@@ -4034,6 +4035,7 @@
     },
     "upNext": "Susunod",
     "sessionTodo": "Gagawin: {{title}}",
+    "openTodoHint": "Binubuksan ang gagawin.",
     "linkToTodo": "I-link sa gagawin",
     "candidates": {
       "empty": "Walang bukas na gagawin"

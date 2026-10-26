@@ -4025,6 +4025,7 @@
       "startNewSessionHint": "Uue seansi alustamiseks vajuta pikalt.",
       "linkSession": "Seo seanss",
       "linkFailed": "Seanssi ei õnnestunud ülesandega siduda",
+      "moveToAnotherTodo": "Teisalda teise ülesandesse",
       "startRefreshFailed": "Seanss algas, kuid seda loendit ei värskendatud."
     },
     "linkSession": {
@@ -4034,6 +4035,7 @@
     },
     "upNext": "Järgmisena",
     "sessionTodo": "Ülesanne: {{title}}",
+    "openTodoHint": "Avab ülesande.",
     "linkToTodo": "Lingi ülesandega",
     "candidates": {
       "empty": "Avatud ülesandeid pole"

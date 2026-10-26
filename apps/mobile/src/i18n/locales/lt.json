@@ -4135,6 +4135,7 @@
       "startNewSessionHint": "Paspauskite ir palaikykite, kad pradėtumėte naują sesiją.",
       "linkSession": "Susieti sesiją",
       "linkFailed": "Sesijos susieti su užduotimi nepavyko",
+      "moveToAnotherTodo": "Perkelti į kitą užduotį",
       "startRefreshFailed": "Sesija prasidėjo, bet šis sąrašas neatsinaujino."
     },
     "linkSession": {
@@ -4144,6 +4145,7 @@
     },
     "upNext": "Toliau",
     "sessionTodo": "Užduotis: {{title}}",
+    "openTodoHint": "Atidaro užduotį.",
     "linkToTodo": "Susieti su užduotimi",
     "candidates": {
       "empty": "Nėra atvirų užduočių"

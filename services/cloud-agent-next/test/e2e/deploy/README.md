@@ -15,6 +15,7 @@ modified, so the production/default deploy is unaffected.
 ## Prerequisites
 
 - `pnpm install` at the repo root.
+- Bun 1.4.4. The Cloud Agent deploy script builds the wrapper before bundling, including for `dry-run`.
 - Cloudflare auth for account `e115e769bcdd4c3d66af59d3332cb394`.
 - A fake-llm admin token, exported as `FAKE_LLM_ADMIN_TOKEN` or provided by
   `E2E_AUTH_FILE`, and a user token supplied by `E2E_USER_TOKEN` or

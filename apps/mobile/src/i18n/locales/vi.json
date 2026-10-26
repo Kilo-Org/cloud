@@ -4025,6 +4025,7 @@
       "startNewSessionHint": "Nhấn giữ để bắt đầu phiên mới.",
       "linkSession": "Liên kết phiên",
       "linkFailed": "Không thể liên kết phiên với việc cần làm",
+      "moveToAnotherTodo": "Chuyển sang việc cần làm khác",
       "startRefreshFailed": "Phiên đã bắt đầu, nhưng danh sách này chưa được cập nhật."
     },
     "linkSession": {
@@ -4034,6 +4035,7 @@
     },
     "upNext": "Tiếp theo",
     "sessionTodo": "Việc cần làm: {{title}}",
+    "openTodoHint": "Mở việc cần làm.",
     "linkToTodo": "Liên kết với việc cần làm",
     "candidates": {
       "empty": "Không có việc cần làm đang mở"

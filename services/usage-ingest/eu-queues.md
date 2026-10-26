@@ -4,16 +4,15 @@
 with processing parallelism2 (at most 400 concurrent writer calls).
 The preparation step explicitly supplies `jurisdiction: "eu"` for both queues.
 
-Normal staging deployment has one preparation step before the existing relay and
-consumer uploads. The [helper](scripts/provision-queues.mjs) looks up both exact
-names, verifies existing EU jurisdiction, creates only missing queues with explicit
+Normal staging deployment has one preparation step before the consumer upload.
+The [helper](scripts/provision-queues.mjs) looks up both exact names, verifies existing EU jurisdiction, creates only missing queues with explicit
 EU jurisdiction (DLQ first), and reads each creation back. Reruns reuse the pair;
 wrong/unknown jurisdiction, ambiguous/incomplete lookup or API/network errors stop
 upload. No queue is deleted or modified. Native global auto-provisioning is disabled
 for EU deployments. Historical revisions without EU config keep their existing path.
 
 Local deployment uses `pnpm --filter cloudflare-usage-ingest queues:prepare` before
-the existing relay/consumer commands in README, with an already injected
+the consumer commands in README, with an already injected
 `CLOUDFLARE_API_TOKEN`. No login or credentials file is loaded. Wrangler retains
 responsibility for consumer settings; retention remains separately managed as
 before. Production, writer/relay code, retry policy and dependencies are unchanged.

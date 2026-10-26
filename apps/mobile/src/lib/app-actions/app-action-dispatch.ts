@@ -6,6 +6,8 @@
 // async and reports a real outcome — `StartAgent` is the only action that can
 // fail in a way the caller has to hear about.
 
+import { type NewSessionRepository } from '@/components/agents/new-session-repository-state';
+
 import { i18n } from '@/i18n';
 
 import {
@@ -32,15 +34,27 @@ type StartAgentInput = Omit<Extract<AppActionRequest, { action: 'StartAgent' }>,
  * mount without one failing.
  */
 export type AppActionDispatcherDeps = {
+  /** Resolves the repository value used by the session start path. */
+  resolveRepository?: (
+    input: StartAgentInput
+  ) => Promise<
+    { ok: true; repository: NewSessionRepository } | { ok: false; result: AppActionResult }
+  >;
   /**
    * Asks the person to confirm an externally requested `StartAgent`.
    * Resolves true only on the explicit continue answer.
    */
   confirmStart: (input: StartAgentInput) => Promise<boolean>;
-  startAgent: (input: StartAgentInput) => Promise<AppActionResult>;
+  startAgent: (
+    input: StartAgentInput & { resolvedRepository?: NewSessionRepository }
+  ) => Promise<AppActionResult>;
 };
 
 const defaultDeps: AppActionDispatcherDeps = {
+  resolveRepository: async input => {
+    const { resolveStartAgentRepository } = await import('./start-agent');
+    return resolveStartAgentRepository(input);
+  },
   confirmStart: async input => {
     const { confirmAppActionStart } = await import('./confirm-app-action-start');
     return confirmAppActionStart(input);
@@ -162,9 +176,34 @@ async function runStartAgent(
     ...(request.repository === undefined ? {} : { repository: request.repository }),
     ...(request.sessionId === undefined ? {} : { sessionId: request.sessionId }),
   };
+  let confirmedInput = input;
+  let resolvedRepository: NewSessionRepository | undefined = undefined;
+  if (deps.resolveRepository !== undefined) {
+    try {
+      const resolution = await deps.resolveRepository(input);
+      if (!resolution.ok) {
+        return resolution.result;
+      }
+      resolvedRepository = resolution.repository;
+      const provider = resolution.repository.platform === 'github' ? 'GitHub' : 'GitLab';
+      confirmedInput = {
+        ...input,
+        repository: `${provider}: ${resolution.repository.fullName}`,
+      };
+    } catch (error) {
+      await captureAppActionError(error, 'resolve_start_agent_repository');
+      return {
+        ok: false,
+        action: 'StartAgent',
+        retryable: true,
+        code: 'start-failed',
+        message: i18n.t('agentChat.session.serviceUnavailable'),
+      };
+    }
+  }
   let confirmed = false;
   try {
-    confirmed = await deps.confirmStart(input);
+    confirmed = await deps.confirmStart(confirmedInput);
   } catch (error) {
     await captureAppActionError(error, 'confirm_start_agent');
     return {
@@ -179,7 +218,10 @@ async function runStartAgent(
     return startCancelledResult();
   }
   try {
-    return await deps.startAgent(input);
+    return await deps.startAgent({
+      ...input,
+      ...(resolvedRepository === undefined ? {} : { resolvedRepository }),
+    });
   } catch (error) {
     await captureAppActionError(error, 'start_agent');
     return {

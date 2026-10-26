@@ -104,7 +104,7 @@ describe('dispatchAppActionRequest', () => {
     const order: string[] = [];
     const resolveRepository = vi.fn(() => {
       order.push('resolve');
-      return Promise.resolve({ ok: true, repository });
+      return Promise.resolve({ ok: true as const, repository });
     });
     const confirmStart = vi.fn(() => {
       order.push('confirm');

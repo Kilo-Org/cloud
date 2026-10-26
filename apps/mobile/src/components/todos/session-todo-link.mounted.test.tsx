@@ -46,7 +46,9 @@ vi.mock('@/components/ui/icons', () => ({
   ChevronLeft: 'ChevronLeft',
   ArrowRight: 'ArrowRight',
   ArrowLeft: 'ArrowLeft',
+  X: 'X',
 }));
+vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/sheet', () => ({
   Sheet: (props: { visible: boolean; children: ReactNode }) =>
     createElement('Sheet', { visible: props.visible }, props.children),

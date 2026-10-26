@@ -1,14 +1,14 @@
 import { describe, test, expect, beforeEach } from '@jest/globals';
 import { after } from 'next/server';
 import {
-  rewriteModelResponse_ChatCompletions,
-  rewriteModelResponse_Messages,
-  rewriteModelResponse_Responses,
   rewriteModelResponse,
   logUnrewrittenResponse,
   redactApiRequestLogRequest,
   type RequestLoggingParams,
 } from './rewriteModelResponse';
+import { rewriteModelResponse_ChatCompletions } from './rewriteModelResponse.chatCompletions';
+import { rewriteModelResponse_Messages } from './rewriteModelResponse.messages';
+import { rewriteModelResponse_Responses } from './rewriteModelResponse.responses';
 import {
   getDynamicRequestLoggingMode,
   type RequestLoggingMode,
@@ -804,25 +804,36 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       }
     });
 
-    test('drops chunk usage without token counts and keeps complete usage', async () => {
+    test.each([true, false])('drops incomplete chunk usage (removeCost=%s)', async removeCost => {
       const upstream = sseResponse(
         'data: {"id":"gen-1","choices":[{"index":0,"delta":{"content":"hi"}}],"usage":{"extra_properties":{"google":{"traffic_type":"ON_DEMAND"}}}}\n\n' +
-          'data: {"id":"gen-1","choices":[],"usage":{"prompt_tokens":3,"completion_tokens":1,"total_tokens":4}}\n\n' +
+          'data: {"id":"gen-1","choices":[],"usage":{"prompt_tokens":0,"completion_tokens":1,"total_tokens":1,"cost":0.01}}\n\n' +
           'data: [DONE]\n\n'
       );
 
       const result = await rewriteModelResponse_ChatCompletions({
         response: upstream,
-        removeCost: true,
+        removeCost,
         capture: null,
         vercelRequestId: null,
         reasoningEffort: null,
         responseTransforms: null,
       });
-      const [first, last] = dataObjects(await readOutputStream(result));
-
-      expect(first).not.toHaveProperty('usage');
-      expect(last).toMatchObject({ usage: { prompt_tokens: 3, completion_tokens: 1 } });
+      const output = await readOutputStream(result);
+      expect(dataObjects(output)).toEqual([
+        { id: 'gen-1', choices: [{ index: 0, delta: { content: 'hi' } }] },
+        {
+          id: 'gen-1',
+          choices: [],
+          usage: {
+            prompt_tokens: 0,
+            completion_tokens: 1,
+            total_tokens: 1,
+            ...(removeCost ? {} : { cost: 0.01 }),
+          },
+        },
+      ]);
+      expect(dataPayloads(output).at(-1)).toBe('[DONE]');
     });
 
     test.each([
@@ -1495,7 +1506,7 @@ describe('rewriteModelResponse_Responses', () => {
           name: 'read',
           arguments: '{}',
         },
-        { type: 'message', id: 'msg_1', content: [] },
+        { type: 'message', id: 'msg_1', item_id: 'other_id', content: [] },
       ],
     });
 
@@ -1508,14 +1519,19 @@ describe('rewriteModelResponse_Responses', () => {
     });
 
     expect(await result.json()).toMatchObject({
-      output: [{ id: 'fc_1', item_id: 'fc_1' }, { id: 'msg_1' }],
+      output: [
+        { id: 'fc_1', item_id: 'fc_1' },
+        { id: 'msg_1', item_id: 'other_id' },
+      ],
     });
   });
 
   test('restores the id of output items that only carry item_id in streams', async () => {
     const upstream = sseResponse(
-      'data: {"type":"response.output_item.done","item":{"type":"function_call","item_id":"fc_1","call_id":"call_1","name":"read","arguments":"{}"}}\n\n' +
-        'data: {"type":"response.completed","response":{"output":[{"type":"function_call","item_id":"fc_1","call_id":"call_1"},{"type":"message","id":"msg_1"}]}}\n\n'
+      'data: {"type":"response.function_call_arguments.delta","sequence_number":1,"item_id":"fc_1","delta":"{}"}\n\n' +
+        'data: {"type":"response.output_item.done","sequence_number":2,"item":{"type":"function_call","item_id":"fc_1","call_id":"call_1","name":"read","arguments":"{}"}}\n\n' +
+        'data: {"type":"response.output_item.done","sequence_number":3,"item":{"type":"message","id":"msg_1","item_id":"other_id"}}\n\n' +
+        'data: {"type":"response.completed","sequence_number":4,"response":{"output":[{"type":"function_call","item_id":"fc_1","call_id":"call_1"},{"type":"message","id":"msg_1","item_id":"other_id"}]}}\n\n'
     );
 
     const result = await rewriteModelResponse_Responses({
@@ -1525,12 +1541,41 @@ describe('rewriteModelResponse_Responses', () => {
       vercelRequestId: null,
       reasoningEffort: null,
     });
-    const [done, completed] = dataObjects(await readOutputStream(result));
-
-    expect(done).toMatchObject({ item: { id: 'fc_1', item_id: 'fc_1' } });
-    expect(completed).toMatchObject({
-      response: { output: [{ id: 'fc_1' }, { id: 'msg_1' }] },
-    });
+    expect(dataObjects(await readOutputStream(result))).toEqual([
+      {
+        type: 'response.function_call_arguments.delta',
+        sequence_number: 1,
+        item_id: 'fc_1',
+        delta: '{}',
+      },
+      {
+        type: 'response.output_item.done',
+        sequence_number: 2,
+        item: {
+          type: 'function_call',
+          id: 'fc_1',
+          item_id: 'fc_1',
+          call_id: 'call_1',
+          name: 'read',
+          arguments: '{}',
+        },
+      },
+      {
+        type: 'response.output_item.done',
+        sequence_number: 3,
+        item: { type: 'message', id: 'msg_1', item_id: 'other_id' },
+      },
+      {
+        type: 'response.completed',
+        sequence_number: 4,
+        response: {
+          output: [
+            { type: 'function_call', id: 'fc_1', item_id: 'fc_1', call_id: 'call_1' },
+            { type: 'message', id: 'msg_1', item_id: 'other_id' },
+          ],
+        },
+      },
+    ]);
   });
 
   test('strips nested response usage and closes after the completed event', async () => {

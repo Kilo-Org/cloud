@@ -18,6 +18,14 @@ current render time. Elapsed grants and non-expiring credits do not contribute t
 its amount or earliest expiry, for both personal and organization accounts.
 The balance continues to come from the balance query.
 
+## Session restoration
+
+The first auth-provider mount uses the credentials preloaded when JavaScript
+starts. Later mounts read secure storage again: Android can recreate the activity
+without restarting JavaScript, so the initial snapshot may predate sign-in.
+Back-exit and force-stop preserve the stored session; explicit sign-out clears it.
+The existing bootstrap loading and retryable-error surfaces cover restoration.
+
 ## Runtime recovery
 
 Retry on the runtime-error screen restores the last focused route for the
@@ -41,6 +49,25 @@ Unavailable usage and low-balance settings expose Retry. The low-balance row
 retries its settings read until data is available, then opens configuration.
 Cached settings remain visible during offline pauses and refresh failures.
 
+## Sheet list gestures and actions
+
+Vertical scroll containers inside native route sheets and `Sheet` surfaces enable
+`nestedScrollEnabled` so Android scrolls the list before handing a downward drag
+to the sheet at the top. Keep self-scrolling picker lists outside the shell's
+`ScrollView`.
+
+Shared `SheetHeader` actions use explicit 48px minimum width and height, not
+rem-based sizes: native rem is 14dp. Labels retain their intrinsic size as text
+scales; the title takes the remaining space.
+
+## Selectable row accessibility
+
+Use `selectableRowA11y` from `@/lib/a11y/selectable-row` for custom checkbox and
+radio rows. It exposes button/selected traits on iOS and checkbox or radio roles
+with checked state on Android. `ChoiceRow` and `radioItemA11y` use this mapping.
+Verify both the native role and state transitions in device accessibility trees;
+a rendered checkmark alone does not verify accessibility.
+
 ## PR merge sheet
 
 The merge sheet composes the form and provider-specific bodies. `usePrMergeDraft`
@@ -61,6 +88,14 @@ A response that fails before producing any content still shows its failure and
 Retry action, including after reopening the session. Retry resends the original
 user prompt as a new turn in the same session; the original prompt remains in
 the transcript.
+
+## Email sign-in
+
+The email form validates syntax and a 254-character maximum after trimming and
+lowercasing. Invalid addresses stay on the email step with localized inline
+feedback. The code-step destination abbreviates addresses longer than 48
+characters with a middle ellipsis; delivery and verification use the full address.
+The code input and Verify action remain available below the destination prompt.
 
 ## Transcript action targets
 
@@ -110,8 +145,13 @@ Every build localizes the local-network prompt, because Chat can connect to a lo
 Changes require a new iOS build; an over-the-air update cannot change the native permission prompt.
 
 1. obtain Expo access
-2. `pnpx eas-cli login -b`
+2. `pnpm exec eas login -b`
 3. obtain Apple access (developer)
+
+Run these commands from `apps/mobile` after `pnpm install --frozen-lockfile`.
+When updating EAS CLI, keep the `eas-cli` development dependency and `eas.json`'s
+`cli.version` aligned, regenerate the workspace dependency graph, and verify with
+`pnpm exec eas --version`.
 
 ### Android
 
@@ -119,9 +159,13 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 2. `pnpm start`
 3. open installed app on your phone
 
+Production Android builds use the EAS `large` resource class to give Gradle and
+JavaScript bundling more memory. Development, preview, and iOS builds retain
+their default resource classes. The production builder requires a paid EAS plan.
+
 ### iOS
 
-1. add your device to the list of internal devices using `pnpx eas-cli device:create`
+1. add your device to the list of internal devices using `pnpm exec eas device:create`
 2. install the provisioning profile from step 1 on your device (it may involve a 1hr wait)
 3. create a new dev build using `pnpm build:ios`
 4. `pnpm start`
@@ -159,7 +203,17 @@ Changes require a new iOS build; an over-the-air update cannot change the native
 - An inactive display produces a black screenshot.
 - Type a draft, change the appearance in both directions, and verify the draft stays readable.
 
-## Briefing localization
+## Diagram host checks
+
+Mermaid uses a packaged renderer and a shared HTML host document.
+Run `pnpm --filter web exec playwright install chromium`, then
+`pnpm --filter web run test:mobile-mermaid` for its browser regression suite.
+CI runs the same command when the host document, its renderer asset, or the
+suite changes.
+The suite needs no backend or signed-in account and includes flowcharts and
+data-image diagrams.
+
+## Agent brief localization
 
 Scheduled report dates use the app language and preserve the report's calendar
 day across device timezones. Period windows retain the report's own timezone.
@@ -168,10 +222,28 @@ and locale separators. Positive amounts below half a cent display as less than
 one cent; partial-coverage lower bounds retain the separate at-least marker.
 The summary prompt requests the same precision, separators, and sub-cent rule.
 
-## One-off agent briefings
+A brief is a saved retrospective activity report. Its preview precedes confirmation.
+Its AI summary is an optional section, not the complete report.
 
-- Open **Briefings → Create briefing** and select Personal or one organization.
+- Use a consistent artifact noun in each locale's title, history, settings, actions, progress messages, and unconfirmed drafts.
+- Keep natural inflections and established loanwords. Do not force identical substrings.
+- Keep the preview and AI summary distinct from the saved report.
+- Treat a window as a time period. Treat an agent as software, not a human representative.
+- Describe redaction as concealment of sensitive information, not editing or censorship.
+- Preserve separate balances, per-context opt-in, explicit paid consent, and offline restrictions.
+- After finding a meaning error, check that concept across every supported locale.
+
+Catalog checks verify structure, not translation meaning. Verify corrected copy on its native screen.
+
+## On-demand agent briefs
+
+- Open **Agent brief → Create brief** and select Personal or one organization.
 - Select a preset or a custom period of up to 31 days, then review the exact range and timezone.
+- Review starts persisted background activity collection.
+- Leave and return through **Unconfirmed briefs** to continue the same review, including after an app restart.
+- The creation form stays usable while activity collection continues in the background.
+- **Prepare a new review** returns to the creation form to choose a new context or period.
+- Collection has a two-minute deadline. Failed or interrupted collection becomes a visible terminal failure; retrying is explicit and keeps the original request and evidence cutoff.
 - Review coverage, the payer, the model, and the cost limit before creating a paid summary.
 - Incomplete history remains available with a coverage warning. Missing data does not mean zero activity.
 - Empty periods produce a saved report without an AI request or charge.
@@ -183,7 +255,11 @@ The summary prompt requests the same precision, separators, and sub-cent rule.
 - Paid retries require another cost review. Offline paid requests do not enter a background queue.
 - The Kilo Model Context Protocol (MCP) catalog excludes paid briefing confirmation.
 
-Deploy the database migration before the backend that uses the new report metadata.
+Background preparation uses existing report metadata and needs no additional database migration.
+Deploy the background preparation API before releasing the mobile client that uses it.
+The existing synchronous `prepareOneOff` API remains supported for released clients;
+new clients use `startOneOffPreparation`, `oneOffPreparation`, and paginated `oneOffDrafts`.
+Only `createOneOff` publishes a reviewed draft or authorizes its paid summary.
 
 ## Quick Chat backends
 

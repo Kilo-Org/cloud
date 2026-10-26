@@ -78,7 +78,7 @@ export function BriefingNotificationToggle({
           variant="ghost"
           size="sm"
           onPress={() => {
-            router.push('/(app)/(tabs)/(3_profile)/notifications' as Href);
+            router.push('/(app)/notifications' as Href);
           }}
         >
           <Text>{t('agentBriefing.notificationPermission')}</Text>

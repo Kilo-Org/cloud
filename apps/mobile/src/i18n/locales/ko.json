@@ -53,6 +53,7 @@
     "connected": "연결됨",
     "couldNotLoadModels": "모델을 불러오지 못했습니다.",
     "couldNotLoadRepositories": "저장소를 불러오지 못했습니다.",
+    "noRepositoriesFound": "저장소를 찾을 수 없습니다",
     "critical": "치명적",
     "delete": "삭제",
     "deleted": "삭제됨",
@@ -87,6 +88,7 @@
     "connect": "연결",
     "connectBitbucket": "Bitbucket 연결",
     "connectGitlab": "GitLab 연결",
+    "connectProvider": "서비스 연결",
     "contentTruncated": "내용 일부 생략됨",
     "copyLink": "링크 복사",
     "couldNotLoadOrganizations": "조직을 불러오지 못했습니다.",
@@ -145,7 +147,8 @@
     "agent": "대리인",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "변경 사항"
+    "changes": "변경 사항",
+    "organizationTrialEnded": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. 조직 소유자는 kilo.ai에서 결제 정보를 업데이트한 후 다시 시도하세요."
   },
   "language": {
     "restarting": "언어 적용을 위해 다시 시작 중",
@@ -883,7 +886,6 @@
       "gitlabNoRepositoriesDescription": "GitLab에서 더 많은 그룹이나 프로젝트에 대한 접근 권한을 부여해야 할 수 있습니다.",
       "installGithubApp": "저장소에 GitHub 앱 설치",
       "installGithubAppDescription": "Kilo GitHub 앱에 리뷰할 저장소의 접근 권한을 부여하세요.",
-      "noRepositoriesFound": "저장소를 찾을 수 없습니다",
       "repositoryAccess": "저장소 접근 권한"
     },
     "style": {
@@ -907,7 +909,6 @@
     "followReviewMd": "REVIEW.md 따르기",
     "followReviewMdSubtitle": "저장소별 REVIEW.md 파일의 지침을 따릅니다.",
     "manualReview": {
-      "connectProvider": "서비스 연결",
       "connectProviderDescription": "풀 리퀘스트 수동 리뷰를 시작하려면 GitHub를 연결하세요.",
       "couldNotCheckProviderStatus": "연결 서비스 상태를 확인할 수 없습니다.",
       "couldNotLoadProviders": "연결된 서비스를 불러올 수 없습니다. 다시 시도하세요.",
@@ -1093,8 +1094,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "사용 가능한 필터 없음",
-      "noFiltersDescription": "뒤로 돌아가 발견된 문제 목록에서 필터를 다시 여세요.",
       "title": "발견된 문제 필터",
       "fixed": "수정됨",
       "outcome": "결과",
@@ -1648,8 +1647,8 @@
       "title": "세션",
       "copyErrorDetails": "오류 세부 정보 복사",
       "backToSessions": "세션으로 돌아가기",
-      "follow": "잠금 화면에서 팔로우",
-      "unfollow": "잠금 화면에서 팔로우 중지",
+      "follow": "세션 팔로우",
+      "unfollow": "세션 팔로우 중지",
       "couldNotLoad": "세션을 불러올 수 없습니다.",
       "failedToLoadDetails": "세션 세부 정보를 불러오지 못했습니다.",
       "failedToStopExecution": "실행을 중지하지 못했습니다.",
@@ -2432,7 +2431,6 @@
     "allow": "허용",
     "onlineMessage": "이 기기는 오프라인에서 음성을 텍스트로 변환할 수 없습니다. 녹음한 음성은 {{provider}}에 전송되어 텍스트로 변환됩니다. Kilo는 음성을 저장하지 않습니다.",
     "onlineTitle": "온라인 음성 처리 안내",
-    "staysOff": "온라인 음성 변환을 허용하기 전에는 음성 입력을 사용할 수 없습니다.",
     "start": "음성 입력 시작",
     "stop": "음성 입력 중지",
     "restricted": "이 기기에서 음성 입력이 제한되어 있습니다.",
@@ -3167,7 +3165,9 @@
       "sendInvite": "초대 보내기",
       "title": "멤버 초대",
       "alreadyInvited": "이미 초대되었거나 이미 멤버입니다.",
-      "sendError": "초대를 보내지 못했습니다."
+      "sendError": "초대를 보내지 못했습니다.",
+      "pendingInvitation": "이 이메일에는 이미 보류 중인 초대가 있습니다.",
+      "alreadyMember": "이 사용자는 이미 이 조직의 멤버입니다."
     },
     "invoices": {
       "downloadA11y": "청구서 {{number}} 다운로드",
@@ -3237,7 +3237,12 @@
       "pendingInvitations": "수락 대기 중인 초대",
       "resendInvite": "초대 다시 보내기",
       "shareInviteLink": "초대 링크 공유",
-      "resendInviteError": "초대를 다시 보내지 못했습니다."
+      "resendInviteError": "초대를 다시 보내지 못했습니다.",
+      "inviteNotResendable": "이 초대는 더 이상 다시 보낼 수 없습니다.",
+      "ownerAuthority": "조직 소유자만 소유자를 관리할 수 있습니다.",
+      "ownRoleChange": "자신의 역할은 변경할 수 없습니다.",
+      "inviteExpired": "이 초대는 만료되었습니다.",
+      "inviteAccepted": "이 초대는 이미 수락되었습니다."
     },
     "usageStats": {
       "inputTokens": "입력 토큰",
@@ -3351,7 +3356,7 @@
     "activityKitDisabledBody": "잠금 화면에서 활성 에이전트를 보려면 설정에서 실시간 현황을 켜세요.",
     "openSession": "열기",
     "finished": "완료됨",
-    "followFailed": "이 에이전트를 잠금 화면에 표시할 수 없습니다.",
+    "followFailed": "이 세션을 팔로우할 수 없습니다.",
     "approveFailed": "승인하지 못했습니다. 다시 시도하려면 $t(common.approve)을 탭하세요.",
     "checked": "마지막 확인",
     "lastKnown": "마지막 알려진 상태",
@@ -4060,11 +4065,11 @@
     "notificationsHint": "예약된 브리핑마다 일반 알림을 한 번 보냅니다. 유료 AI 요약과는 별개입니다.",
     "notificationPermission": "브리핑을 받으려면 $t(common.notifications)에서 기기 알림을 켜세요.",
     "aiOptIn": "유료 AI 요약",
-    "aiHint": "이 컨텍스트에만 적용되는 선택 사항입니다. 선택 및 비식별 처리된 발췌문과 구조화된 정보가 앱 언어로 모델에 전송됩니다. 요금은 이 컨텍스트의 잔액에서 차감됩니다.",
+    "aiHint": "이 컨텍스트에만 적용되는 선택 사항입니다. 선택된 발췌문에서 민감한 정보를 가린 내용과 구조화된 정보가 앱 언어로 모델에 전송됩니다. 요금은 이 컨텍스트의 잔액에서 차감됩니다.",
     "defaultModel": "Kilo 기본 모델 사용",
     "duration": "시간 안전 한도(분)",
     "spendLimit": "지출 안전 한도(USD)",
-    "safeguardHint": "일일 예산이 아닌 요약별 고정 안전 한도입니다. 기본값: 10분 및 $2. 보고서는 최대 5분 후 게시되며, 생성은 이 한도 내에서 계속됩니다.",
+    "safeguardHint": "일일 예산이 아닌 요약별 유한한 안전 한도입니다. 기본값: 10분 및 $2. 보고서는 최대 5분 후 게시되며, 생성은 이 한도 내에서 계속됩니다.",
     "invalidSafeguards": "유한한 양수로 시간 및 지출 한도를 입력하세요.",
     "estimate": "예상 비용 {{estimate}} · 최대 {{maximum}}",
     "estimateUnavailable": "이 설정에는 유료 요약을 사용할 수 없습니다.",
@@ -4097,7 +4102,7 @@
     "emptyPeriod": "이 기간에 활동이 없습니다. AI 요약이 생성되지 않으며 요금도 부과되지 않습니다.",
     "emptyHistory": "저장된 브리핑 없음",
     "historicalStateHint": "세션 상태는 현재 실시간 상태가 아니라 선택한 기간의 종료 시점 상태를 반영합니다.",
-    "oneOffHint": "AI는 선택된 근거 자료에서 민감한 정보를 가린 후 앱 언어로 전달받습니다. 이 온디맨드 브리핑은 예약된 브리핑이나 AI 환경설정을 변경하지 않습니다.",
+    "oneOffHint": "AI는 선택된 근거 자료를 민감한 정보가 가려진 상태로 앱 언어로 전달받습니다. 이 온디맨드 브리핑은 예약된 브리핑이나 AI 환경설정을 변경하지 않습니다.",
     "createOffline": "브리핑을 검토하거나 만들려면 인터넷에 연결하세요. 유료 요청은 오프라인 상태에서 대기열에 추가되지 않습니다.",
     "estimateInputTooLarge": "이 기간의 근거 자료가 선택한 모델이 처리하기에 너무 많습니다.",
     "estimatePermissionUnavailable": "이 컨텍스트의 잔액을 사용할 권한이 없습니다.",
@@ -4107,6 +4112,12 @@
     "estimateBalanceUnavailable": "유료 요약을 위한 잔액이 부족합니다.",
     "estimateModelNotAllowed": "이 모델은 여기서 사용할 수 없습니다.",
     "estimateSpendLimitTooLow": "이 요약을 허용하려면 지출 안전장치를 높이세요.",
-    "saved": "브리핑 설정이 저장되었습니다"
+    "saved": "브리핑 설정이 저장되었습니다",
+    "preparing": "브리핑 준비 중…",
+    "preparationHint": "활동을 수집하는 동안 다른 곳으로 이동했다가 돌아와도 됩니다. 브리핑을 검토하고 예상 비용을 확정하기 전까지는 AI 작업이 시작되거나 요금이 부과되지 않습니다.",
+    "resumeReview": "검토 계속하기",
+    "preparationFailed": "이 브리핑의 활동을 수집할 수 없습니다. 다시 시도하세요.",
+    "preparationTimedOut": "활동 수집에 너무 오래 걸렸습니다. 다시 시도하세요.",
+    "preparationDrafts": "미확정 브리핑"
   }
 }

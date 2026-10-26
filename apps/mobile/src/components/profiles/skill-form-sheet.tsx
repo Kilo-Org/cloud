@@ -14,6 +14,7 @@ import {
   skillNameFromMarkdown,
   validateSkillInput,
 } from '@/lib/agent-profile-forms';
+import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 
 /** The validated fields a saved skill is built from. */
 export type SkillFormSubmission = {
@@ -59,6 +60,7 @@ export function SkillFormSheet({
   const nameEditedRef = useRef(false);
   const [prefill, setPrefill] = useState(skill?.name ?? '');
   const [error, setError] = useState<SkillInputError | null>(null);
+  const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<'name' | 'content'>();
 
   const nameError = error === 'empty' || error === 'bad-name' ? t(skillErrorKey(error)) : undefined;
   const contentError = error === 'no-content' ? t(skillErrorKey(error)) : undefined;
@@ -73,6 +75,7 @@ export function SkillFormSheet({
     const result = validateSkillInput({ name: nameRef.current, content: contentRef.current });
     if (result.error !== null) {
       setError(result.error);
+      scrollToField(result.error === 'no-content' ? 'content' : 'name');
       return;
     }
     setError(null);
@@ -94,6 +97,7 @@ export function SkillFormSheet({
         topInset="ios-page-sheet"
       />
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
         contentContainerClassName="gap-4 px-6 pt-4 pb-8"
         keyboardShouldPersistTaps="handled"
@@ -111,6 +115,7 @@ export function SkillFormSheet({
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="next"
+          containerOnLayout={fieldLayout('name')}
           onChangeText={value => {
             nameEditedRef.current = true;
             nameRef.current = value;
@@ -126,9 +131,10 @@ export function SkillFormSheet({
           disabled={isSaving}
           multiline
           textAlignVertical="top"
-          className="min-h-40 leading-[1.25rem]"
+          className="min-h-40 max-h-52 leading-[1.25rem]"
           autoCapitalize="none"
           autoCorrect={false}
+          containerOnLayout={fieldLayout('content')}
           onChangeText={value => {
             contentRef.current = value;
             if (error === 'no-content' && value.trim().length > 0) {

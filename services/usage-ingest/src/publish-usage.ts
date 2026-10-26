@@ -1,10 +1,11 @@
 import { timingSafeEqual } from '@kilocode/encryption';
 import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
 import { UsageRecordRequestSchema, type UsageRecordRequest } from '@kilocode/usage-contracts';
+import { logSafely, queueMetrics } from './diagnostics';
 
 export type Env = Omit<
   CloudflareEnv,
-  'USAGE_INGEST_QUEUE' | 'USAGE_INGEST_MODE' | 'USAGE_WRITER_URL'
+  'USAGE_INGEST_QUEUE' | 'USAGE_INGEST_MODE' | 'USAGE_WRITER_URL' | 'USAGE_INGEST_DIAGNOSTICS'
 > & {
   USAGE_INGEST_QUEUE: Queue<UsageRecordRequest>;
   USAGE_INGEST_PUBLISH_SECRET?: string;
@@ -12,6 +13,7 @@ export type Env = Omit<
   USAGE_WRITER_URL?: string;
   USAGE_WRITER_SECRET?: string;
   USAGE_WRITER_PROTECTION_BYPASS?: string;
+  USAGE_INGEST_DIAGNOSTICS?: string;
 };
 
 // Queues allow 128,000 bytes including internal metadata; leave 8,000 bytes of headroom.
@@ -40,7 +42,11 @@ async function readUsageBody(request: Request) {
   }
 }
 
-async function handlePublishUsage(request: Request, env: Env): Promise<Response> {
+async function handlePublishUsage(
+  request: Request,
+  env: Env,
+  entryAtMs: number
+): Promise<Response> {
   const secret = env.USAGE_INGEST_PUBLISH_SECRET;
   if (!secret) return errorResponse('Service unavailable', 503);
   const authorization = request.headers.get('Authorization');
@@ -61,15 +67,48 @@ async function handlePublishUsage(request: Request, env: Env): Promise<Response>
     return errorResponse('Usage payload too large', 413);
   }
 
+  const diagnostic = env.USAGE_INGEST_DIAGNOSTICS === 'all';
+  const beforeSendAtMs = Date.now();
+  if (diagnostic)
+    logSafely('info', () => ({
+      event: 'usage_ingest_enqueue_start',
+      usage_id: result.data.core.id,
+      publisher_entry_at_ms: entryAtMs,
+      before_send_at_ms: beforeSendAtMs,
+    }));
+  const sendStartedAt = performance.now();
+  let response: unknown;
   try {
-    await env.USAGE_INGEST_QUEUE.send(result.data, { contentType: 'json' });
+    response = await env.USAGE_INGEST_QUEUE.send(result.data, { contentType: 'json' });
   } catch {
+    if (diagnostic)
+      logSafely('warn', () => ({
+        event: 'usage_ingest_enqueue',
+        usage_id: result.data.core.id,
+        outcome: 'unavailable',
+        after_send_at_ms: Date.now(),
+        send_duration_ms: Math.round(performance.now() - sendStartedAt),
+      }));
     return errorResponse('Queue unavailable', 503);
   }
+  const afterSendAtMs = Date.now();
+  const sendDurationMs = Math.round(performance.now() - sendStartedAt);
+  if (diagnostic)
+    logSafely('info', () => ({
+      event: 'usage_ingest_enqueue',
+      usage_id: result.data.core.id,
+      outcome: 'accepted',
+      publisher_entry_at_ms: entryAtMs,
+      before_send_at_ms: beforeSendAtMs,
+      after_send_at_ms: afterSendAtMs,
+      send_duration_ms: sendDurationMs,
+      ...queueMetrics(response),
+    }));
   return new Response(null, { status: 202 });
 }
 
 export async function handleFetch(request: Request, env: Env): Promise<Response> {
+  const entryAtMs = Date.now();
   if (new URL(request.url).pathname !== '/usage') {
     return new Response('Not Found', { status: 404 });
   }
@@ -77,5 +116,5 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
     return new Response('Method Not Allowed', { status: 405, headers: { Allow: 'POST' } });
   }
 
-  return handlePublishUsage(request, env);
+  return handlePublishUsage(request, env, entryAtMs);
 }

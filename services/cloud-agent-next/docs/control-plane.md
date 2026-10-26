@@ -182,6 +182,8 @@ public stream has no reconnecting status today, so `reconnecting` changes no cli
 - Wrapper events are appended to the event log and broadcast on `/stream` with the current schema.
   The Session DO emits `cloud.message.*` events on message changes and `preparing` events from route
   progress.
+- Session event error fields use the shared public failure projection before event storage and delivery.
+  Public execution-stop notices retain their bounded reason and recovery guidance.
 - Pending questions and permissions are projected from events. Answers go to the wrapper through the
   Sandbox DO. If the turn already settled, for example because the sandbox stopped, the answer is
   sent as a new message.
@@ -410,6 +412,13 @@ These keep their current owners and evidence; the rewrite ports them, it does no
 
 - Compute billing follows the physical container lifecycle (`metered-billing-lifecycle.ts`), not
   the routing state.
+- The Sandbox DO reconciles the current wrapper's stored compute policy on a 30-second cadence.
+  A confirmed `billing_blocked` result enters the allocation's existing stop ladder and closes
+  the wrapper socket with code `4402`. Allocation state fences forwarding and activity renewal.
+  Unavailable policy reads remain non-enforcing; message admission retains its own checks. The
+  read shares the serial queue with frame handling, so it is bounded by half of
+  `wrapper.heartbeatAckTimeoutMs`: a slower read is abandoned as unavailable rather than holding
+  back the acknowledgement the wrapper watchdog waits for.
 - The Sandbox DO mints the wrapper launch credential and owns one canonical Git/Kilo grant per
   compatible credential scope in DO SQLite. Route rows reference that owner rather than storing
   writable grant copies. Compatibility requires the same user, organization, worktree/directory,

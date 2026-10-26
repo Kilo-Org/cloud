@@ -122,10 +122,10 @@ async function buildSystemPrompt(
   return composeBotSystemPrompt({
     platform: botPlatform.platform,
     documentationUrl: botPlatform.documentationUrl,
-    hasGitHubRepositories: Boolean(githubContext.repositories),
-    hasGitLabProjects: Boolean(gitlabContext.repositories),
-    githubRepositoryContext: formatGitHubRepositoriesForPrompt(githubContext),
-    gitlabProjectContext: formatGitLabRepositoriesForPrompt(gitlabContext),
+    hasGitHubRepositories: Boolean(githubContext?.repositories),
+    hasGitLabProjects: Boolean(gitlabContext?.repositories),
+    githubRepositoryContext: githubContext ? formatGitHubRepositoriesForPrompt(githubContext) : '',
+    gitlabProjectContext: gitlabContext ? formatGitLabRepositoriesForPrompt(gitlabContext) : '',
     conversationContext,
   });
 }

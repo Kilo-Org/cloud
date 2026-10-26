@@ -14929,6 +14929,17 @@
     ],
     "searchBlob": "modelPreferences.setLastSelected Save the model and variant a user selected most recently, so the app can preselect it next time. modelpreferences setlastselected model variant model variant"
   },
+  "models.customPricing": {
+    "path": "models.customPricing",
+    "kind": "query",
+    "summary": "Get the configured custom model pricing, such as discounted or overridden model prices used by the AI gateway. Use to look up current custom price settings per model.",
+    "inputSchema": {},
+    "tags": [
+      "models",
+      "custompricing"
+    ],
+    "searchBlob": "models.customPricing Get the configured custom model pricing, such as discounted or overridden model prices used by the AI gateway. Use to look up current custom price settings per model. models custompricing"
+  },
   "models.list": {
     "path": "models.list",
     "kind": "query",

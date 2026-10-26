@@ -182,6 +182,48 @@ function SupportedModelsList({ models }: { models: string[] }) {
   );
 }
 
+function CatalogModeSetting({
+  providerName,
+  enabled,
+  canChange,
+  isOrganizationKey,
+  isPending,
+  onChange,
+}: {
+  providerName: string;
+  enabled: boolean;
+  canChange: boolean;
+  isOrganizationKey: boolean;
+  isPending: boolean;
+  onChange: (enabled: boolean) => void;
+}) {
+  return (
+    <div className="mt-2 space-y-1">
+      <div className="flex items-center gap-2">
+        <Switch
+          checked={enabled}
+          onCheckedChange={onChange}
+          disabled={!canChange || isPending}
+          aria-label={`Use Kilo catalog model IDs for the ${apiKeyObjectLabel(providerName)}`}
+        />
+        <span className="text-muted-foreground text-xs">
+          Use Kilo catalog model IDs (required for model policies)
+        </span>
+      </div>
+      {!enabled && canChange ? (
+        <p className="text-muted-foreground text-xs">
+          Turn this on to use catalog models such as moonshotai/kimi-k2.6 with this key.
+        </p>
+      ) : null}
+      {!canChange && isOrganizationKey ? (
+        <p className="text-muted-foreground text-xs">
+          Only organization owners and admins can change this setting.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 type BYOKKeysManagerProps = {
   organizationId?: string;
 };
@@ -295,6 +337,24 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     })
   );
 
+  const setCatalogModeMutation = useMutation(
+    trpc.byok.setCatalogMode.mutationOptions({
+      onSuccess: data => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.byok.list.queryKey(listQueryInput),
+        });
+        toast.success(
+          data.serve_catalog_models
+            ? 'Key now serves Kilo catalog model IDs'
+            : 'Key now serves provider model IDs'
+        );
+      },
+      onError: (error: { message: string }) => {
+        toast.error(`Failed to update catalog model IDs: ${error.message}`);
+      },
+    })
+  );
+
   const testMutation = useMutation(
     trpc.byok.testApiKey.mutationOptions({
       onSuccess: result => {
@@ -403,6 +463,35 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     }
   };
 
+  const handleToggleCatalogMode = async (
+    key: { id: string; provider_id: string },
+    serve_catalog_models: boolean
+  ) => {
+    const providerName = getProviderDisplayName(key.provider_id);
+    const prefix = `${key.provider_id}/`;
+    const confirmed = await confirm(
+      serve_catalog_models
+        ? {
+            title: `Use Kilo catalog model IDs for the ${apiKeyObjectLabel(providerName)}?`,
+            description: `The key will serve catalog models such as moonshotai/kimi-k2.6, and model IDs that start with ${prefix} stop working with it. Models without a catalog ID are no longer available through this key.${organizationId ? ' Organization model policies apply to every request through this key.' : ''}`,
+            confirmLabel: 'Use catalog model IDs',
+          }
+        : {
+            title: `Use provider model IDs for the ${apiKeyObjectLabel(providerName)}?`,
+            description: `The key will stop serving Kilo catalog models and serve model IDs that start with ${prefix} instead.${organizationId ? ' Organization model policies no longer apply to these models.' : ''}`,
+            confirmLabel: 'Use provider model IDs',
+            destructive: !!organizationId,
+          }
+    );
+    if (confirmed) {
+      setCatalogModeMutation.mutate({
+        ...(organizationId && { organizationId }),
+        id: key.id,
+        serve_catalog_models,
+      });
+    }
+  };
+
   const handleToggleEnabled = (keyId: string, is_enabled: boolean) => {
     setEnabledMutation.mutate({
       ...(organizationId && { organizationId }),
@@ -475,6 +564,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                       created_at: string;
                       management_source: 'user' | 'coding_plan';
                       is_enabled: boolean;
+                      serve_catalog_models: boolean;
+                      supports_catalog_mode: boolean;
+                      can_change_catalog_mode: boolean;
                     }) => {
                       const isManaged = !organizationId && key.management_source === 'coding_plan';
                       return (
@@ -496,6 +588,20 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                               </p>
                             ) : null}
                             <SupportedModelsList models={getProviderModels(key.provider_id)} />
+                            {/* Shown while enabled so a key can leave catalog mode after its
+                                provider loses every catalog mapping. */}
+                            {key.supports_catalog_mode || key.serve_catalog_models ? (
+                              <CatalogModeSetting
+                                providerName={getProviderDisplayName(key.provider_id)}
+                                enabled={key.serve_catalog_models}
+                                canChange={key.can_change_catalog_mode}
+                                isOrganizationKey={!!organizationId}
+                                isPending={setCatalogModeMutation.isPending}
+                                onChange={serveCatalogModels =>
+                                  handleToggleCatalogMode(key, serveCatalogModels)
+                                }
+                              />
+                            ) : null}
                           </td>
                           <td className="text-muted-foreground p-4">
                             {new Date(key.created_at).toLocaleDateString()}
@@ -821,6 +927,32 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                   const directProvider = DIRECT_BYOK_PROVIDERS_LIST.find(
                     p => p.id === selectedProvider
                   );
+                  // New keys start outside catalog mode; updating a key keeps its mode.
+                  const editingKey = keys?.find(key => key.id === editingKeyId);
+                  if (directProvider && editingKey?.serve_catalog_models) {
+                    return (
+                      <Alert>
+                        <Info className="size-4" />
+                        <AlertDescription>
+                          <p>
+                            This key uses Kilo catalog model IDs: select catalog models such as
+                            moonshotai/kimi-k2.6, and requests for models this provider serves use
+                            your key.
+                          </p>
+                          <p className="mt-1">
+                            {organizationId ? 'Organization owners and admins' : 'You'} can switch
+                            the key to model IDs with the <strong>{directProvider.name}</strong>{' '}
+                            prefix in the key list.
+                          </p>
+                          {organizationId ? (
+                            <p className="mt-2">
+                              Organization model restrictions apply to models served by this key.
+                            </p>
+                          ) : null}
+                        </AlertDescription>
+                      </Alert>
+                    );
+                  }
                   if (directProvider) {
                     return (
                       <Alert className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400">

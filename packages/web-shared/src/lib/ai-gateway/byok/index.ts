@@ -74,7 +74,7 @@ export function servesCatalogModels(settings: unknown): boolean {
 
 export type EnabledByokProvider = {
   providerId: UserByokProviderId;
-  /** Catalog mode as stored. */
+  /** Catalog mode as stored; only providers that support it can store true. */
   serveCatalogModels: boolean;
 };
 
@@ -117,9 +117,14 @@ export async function getOrganizationByokProviderIds(
   return providers.map(provider => provider.providerId);
 }
 
+/**
+ * Marks catalog models the caller's own keys can serve: through a Vercel BYOK provider, or
+ * through a direct BYOK key in catalog mode (`directByokCatalogModelIds`).
+ */
 export async function addUserByokAvailability(
   models: OpenRouterModel[],
-  enabledProviderIds: UserByokProviderId[]
+  enabledProviderIds: UserByokProviderId[],
+  directByokCatalogModelIds: ReadonlySet<string> = new Set()
 ): Promise<OpenRouterModel[]> {
   const enabledProviders = new Set(enabledProviderIds);
   const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
@@ -130,11 +135,12 @@ export async function addUserByokAvailability(
   return Promise.all(
     models.map(async model => {
       const hasUserByokAvailable =
-        hasMetadata &&
-        !isKiloExclusiveModel(model.id) &&
-        (await deriveModelUserByokProviders(model.id, vercelModelMetadata)).some(provider =>
-          enabledProviders.has(provider)
-        );
+        directByokCatalogModelIds.has(model.id) ||
+        (hasMetadata &&
+          !isKiloExclusiveModel(model.id) &&
+          (await deriveModelUserByokProviders(model.id, vercelModelMetadata)).some(provider =>
+            enabledProviders.has(provider)
+          ));
       return { ...model, hasUserByokAvailable };
     })
   );

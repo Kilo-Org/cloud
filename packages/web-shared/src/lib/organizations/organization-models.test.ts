@@ -34,8 +34,11 @@ const mockCustom = jest.fn<
   [string, readonly string[], string | null]
 >();
 const mockProviderIds = jest.fn(async (_db: unknown, _organizationId: string) => ['openai']);
-const mockAvailability = jest.fn(async (models: OpenRouterModel[], _providers: string[]) =>
-  models.map(model => ({ ...model, hasUserByokAvailable: model.id === 'provider/allowed' }))
+const mockCatalogModelIds = new Set(['provider/allowed']);
+const mockDirectByokCatalogModelIds = jest.fn(async (_owner: unknown) => mockCatalogModelIds);
+const mockAvailability = jest.fn(
+  async (models: OpenRouterModel[], _providers: string[], _catalogModelIds: ReadonlySet<string>) =>
+    models.map(model => ({ ...model, hasUserByokAvailable: model.id === 'provider/allowed' }))
 );
 const mockTagChatGpt = jest.fn(async (_owner: unknown, models: OpenRouterModel[]) => models);
 
@@ -74,6 +77,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlm
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForOrganization: mockByok,
+  getDirectByokCatalogModelIds: mockDirectByokCatalogModelIds,
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model', () => ({
   ORG_AUTO_MODEL: { id: 'kilo-auto/org' },
@@ -351,9 +355,14 @@ describe('organization model producer publication', () => {
     expect(mockCustom).toHaveBeenCalledWith('fixture-org', ['fixture-group'], null);
     expect(mockByok).toHaveBeenCalledWith('fixture-org');
     expect(mockProviderIds).toHaveBeenCalledWith(expect.anything(), 'fixture-org');
+    expect(mockDirectByokCatalogModelIds).toHaveBeenCalledWith({
+      type: 'organization',
+      id: 'fixture-org',
+    });
     expect(mockAvailability).toHaveBeenCalledWith(
       [mockCatalog.data[0], mockCatalog.data[2]],
-      ['openai']
+      ['openai'],
+      mockCatalogModelIds
     );
     expect(mockDecision.mock.calls.map(([policy, id]) => ({ policy, id }))).toEqual(
       expect.arrayContaining(mockCatalog.data.map(model => ({ policy: mockPolicy, id: model.id })))

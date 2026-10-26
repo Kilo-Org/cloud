@@ -21,7 +21,16 @@ import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import type { BYOKResult, Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
-import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  findDirectByokCatalogModels,
+  getDirectByokCatalogModelId,
+  getDirectByokModel,
+  supportsCatalogMode,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import type {
+  DirectByokModel,
+  DirectByokProvider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import { CustomLlmCredentialsSchema, type CustomLlmCredentials } from '@kilocode/db/schema-types';
 import {
@@ -54,8 +63,8 @@ export type GetProviderProviderResult = {
   userByok: BYOKResult[] | null;
   readonly isFree: boolean;
   /** Skip balance, paid-auth, and organization policy checks entirely. Used
-   *  by direct-byok and non-public custom_llm2 because both already require
-   *  explicit admin opt-in. */
+   *  by bespoke direct-byok ids and non-public custom_llm2 because both already
+   *  require explicit admin opt-in. */
   bypassAccessCheck: boolean;
   /** Skip only the zero-balance paid-model block. Set when a user credential
    *  outside Kilo credits pays for the request, such as the ChatGPT
@@ -63,34 +72,29 @@ export type GetProviderProviderResult = {
   skipBalanceCheck?: boolean;
 };
 
+/** A bespoke direct BYOK id whose key serves only catalog ids. */
+export type DirectByokCatalogOnlyResult = {
+  kind: 'direct-byok-catalog-only';
+  providerId: DirectByokProvider['id'];
+  /** The catalog id that serves the same model through the key, when one exists. */
+  catalogModelId: string | null;
+};
+
 export type GetProviderResult =
   | GetProviderProviderResult
   | { kind: 'chatgpt-reconnect'; message: string }
   /** The id is a custom LLM the caller may not use, or its stored credentials are unusable. */
-  | { kind: 'custom-llm-unavailable' };
+  | { kind: 'custom-llm-unavailable' }
+  | DirectByokCatalogOnlyResult;
 
-/**
- * Direct BYOK model IDs name their provider, such as `neuralwatt/...`, and the
- * request goes straight to that provider with the stored key, bypassing Kilo's
- * gateways.
- */
-async function resolveDirectByokProvider(
-  user: User | AnonymousUserContext,
+async function directByokProviderResult(
+  directByok: DirectByokProvider,
+  directByokModel: DirectByokModel,
+  credential: BYOKResult,
   requestedModel: string,
   request: GatewayRequest,
-  organizationId: string | undefined
-): Promise<GetProviderProviderResult | null> {
-  const { provider: directByok, model: directByokModel } = await getDirectByokModel(requestedModel);
-  if (!directByok || !directByokModel) {
-    return null;
-  }
-  const [credential] = await getByokCredentials(readDb, byokOwner(user.id, organizationId), [
-    directByok.id,
-  ]);
-  if (!credential) {
-    return null;
-  }
-
+  servesCatalogId: boolean
+): Promise<GetProviderProviderResult> {
   const upstream = await directByok.resolveUpstream({
     credential: credential.decryptedAPIKey,
     model: directByokModel,
@@ -110,8 +114,62 @@ async function resolveDirectByokProvider(
     } satisfies Provider,
     userByok: [{ decryptedAPIKey: credential.decryptedAPIKey, providerId: credential.providerId }],
     isFree: isFreeModelExcludingCustomLlms(requestedModel),
-    bypassAccessCheck: true,
+    // Organization model policies cover catalog ids. A bespoke id is only served by a key outside
+    // catalog mode, which stays exempt as before.
+    bypassAccessCheck: !servesCatalogId,
   };
+}
+
+/**
+ * Direct BYOK model IDs name their provider, such as `neuralwatt/...`, and the
+ * request goes straight to that provider with the stored key, bypassing Kilo's
+ * gateways. A key in catalog mode instead serves the catalog ids its provider maps.
+ */
+async function resolveDirectByokProvider(
+  user: User | AnonymousUserContext,
+  requestedModel: string,
+  request: GatewayRequest,
+  organizationId: string | undefined
+): Promise<GetProviderProviderResult | DirectByokCatalogOnlyResult | null> {
+  const owner = byokOwner(user.id, organizationId);
+  const { provider: directByok, model: directByokModel } = await getDirectByokModel(requestedModel);
+  if (directByok && directByokModel) {
+    const [credential] = await getByokCredentials(readDb, owner, [directByok.id]);
+    if (!credential) return null;
+    if (credential.serveCatalogModels && supportsCatalogMode(directByok.id)) {
+      return {
+        kind: 'direct-byok-catalog-only',
+        providerId: directByok.id,
+        catalogModelId: await getDirectByokCatalogModelId(directByokModel),
+      };
+    }
+    return directByokProviderResult(
+      directByok,
+      directByokModel,
+      credential,
+      requestedModel,
+      request,
+      false
+    );
+  }
+
+  if (isAnonymousContext(user)) return null;
+  const catalogModels = await findDirectByokCatalogModels(requestedModel);
+  if (catalogModels.length === 0) return null;
+  const credentials = await getByokCredentials(
+    readDb,
+    owner,
+    catalogModels.map(({ provider }) => provider.id)
+  );
+  for (const { provider, model } of catalogModels) {
+    const credential = credentials.find(
+      candidate => candidate.providerId === provider.id && candidate.serveCatalogModels
+    );
+    if (credential) {
+      return directByokProviderResult(provider, model, credential, requestedModel, request, true);
+    }
+  }
+  return null;
 }
 
 async function isEligibleForCustomLlm(

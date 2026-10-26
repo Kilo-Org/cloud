@@ -58,7 +58,11 @@ import {
 import { logMicrodollarUsage } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import { applyResolvedAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
 import type * as AutoModelResolution from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
-import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  createDirectByokReferenceResolver,
+  getDirectByokModel,
+  supportsCatalogMode,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { rewriteModelResponse } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
@@ -155,6 +159,8 @@ jest.mock('@kilocode/web-shared/lib/organizations/non-trial-enterprise', () => (
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/get-provider');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModel: jest.fn(async () => ({ provider: null, model: null })),
+  supportsCatalogMode: jest.fn(() => false),
+  createDirectByokReferenceResolver: jest.fn(async () => async (modelId: string) => modelId),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/upstream-request');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache');
@@ -250,6 +256,8 @@ const mockedCollectDataCollectionRequiredAutoRoutingModelIds = jest.mocked(
 const mockedLogMicrodollarUsage = jest.mocked(logMicrodollarUsage);
 const mockedApplyResolvedAutoModel = jest.mocked(applyResolvedAutoModel);
 const mockedGetDirectByokModel = jest.mocked(getDirectByokModel);
+const mockedSupportsCatalogMode = jest.mocked(supportsCatalogMode);
+const mockedCreateDirectByokReferenceResolver = jest.mocked(createDirectByokReferenceResolver);
 const mockedRewriteModelResponse = jest.mocked(rewriteModelResponse);
 const mockedIsFreeModelRateLimited = jest.mocked(isFreeModelRateLimited);
 const mockedIsCustomLlm = jest.mocked(isCustomLlm);
@@ -1795,6 +1803,8 @@ describe('kilo-auto/efficient classifier billing', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedGetDirectByokModel.mockResolvedValue({ provider: null, model: null });
+    mockedSupportsCatalogMode.mockReturnValue(false);
+    mockedCreateDirectByokReferenceResolver.mockResolvedValue(async modelId => modelId);
     setUserAuth();
 
     mockedGetProvider.mockResolvedValue({
@@ -2045,6 +2055,144 @@ describe('kilo-auto/efficient classifier billing', () => {
       error_type: 'organization_auto_configuration',
       message: expect.stringContaining('does not have an enabled BYOK credential for martian'),
     });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects a bespoke direct BYOK id whose key serves catalog ids, naming the catalog id', async () => {
+    mockedGetProvider.mockResolvedValue({
+      kind: 'direct-byok-catalog-only',
+      providerId: 'synthetic',
+      catalogModelId: 'moonshotai/kimi-k2.6',
+    });
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('synthetic/hf:moonshotai/kimi-k2.6')) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error_type: 'direct_byok_catalog_only',
+      message:
+        "'synthetic/hf:moonshotai/kimi-k2.6' is disabled because the Synthetic key uses Kilo catalog model IDs. Use 'moonshotai/kimi-k2.6' instead.",
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('explains an unmapped bespoke id when the key serves catalog ids', async () => {
+    mockedGetProvider.mockResolvedValue({
+      kind: 'direct-byok-catalog-only',
+      providerId: 'synthetic',
+      catalogModelId: null,
+    });
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('synthetic/hf:example/finetune')) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error_type: 'direct_byok_catalog_only',
+      message: expect.stringContaining('This model has no catalog ID'),
+    });
+  });
+
+  it('reports an unmapped Organization Auto target of a catalog-mode key as a configuration error', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-1',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: {
+        default_model: 'kilo-auto/org',
+        org_auto_model: { routes: {}, fallback_model: 'kilo-auto/balanced' },
+      },
+      plan: 'enterprise',
+    });
+    mockedApplyResolvedAutoModel.mockImplementation(async (_params, request) => {
+      request.body.model = 'synthetic/hf:example/finetune';
+      return {
+        kind: 'ok',
+        resolved: { model: 'synthetic/hf:example/finetune' },
+        routingTarget: 'synthetic/hf:example/finetune',
+      };
+    });
+    mockedGetProvider.mockResolvedValue({
+      kind: 'direct-byok-catalog-only',
+      providerId: 'synthetic',
+      catalogModelId: null,
+    });
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/org')) as never);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error_type: 'organization_auto_configuration',
+      message: expect.stringContaining(
+        "Organization Auto route target 'synthetic/hf:example/finetune' is unavailable"
+      ),
+    });
+  });
+
+  it('serves an auto-routed bespoke id of a catalog-mode key under its catalog id and policy', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-1',
+    });
+    mockedApplyResolvedAutoModel.mockImplementation(async (_params, request) => {
+      request.body.model = 'synthetic/hf:moonshotai/kimi-k2.6';
+      return { kind: 'ok', resolved: { model: 'synthetic/hf:moonshotai/kimi-k2.6' } };
+    });
+    mockedGetDirectByokModel.mockResolvedValue({
+      provider: { id: 'synthetic' } as never,
+      model: {} as never,
+    });
+    mockedSupportsCatalogMode.mockReturnValue(true);
+    mockedCreateDirectByokReferenceResolver.mockResolvedValue(async () => 'moonshotai/kimi-k2.6');
+    mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: false });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: {},
+      plan: 'enterprise',
+    });
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider: { ...provider, id: 'direct-byok' },
+      userByok: [{ decryptedAPIKey: 'key', providerId: 'synthetic' }],
+      isFree: false,
+      bypassAccessCheck: false,
+    });
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('kilo-auto/efficient')) as never
+    );
+
+    expect(mockedCreateDirectByokReferenceResolver).toHaveBeenCalledWith({
+      type: 'organization',
+      id: 'org-1',
+    });
+    expect(mockedGetProvider).toHaveBeenCalledWith(
+      expect.objectContaining({ requestedModel: 'moonshotai/kimi-k2.6' })
+    );
+    expect(mockedGetEffectiveModelDecision).toHaveBeenCalledWith(
+      expect.anything(),
+      'moonshotai/kimi-k2.6'
+    );
+    expect(response.status).toBe(503);
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 

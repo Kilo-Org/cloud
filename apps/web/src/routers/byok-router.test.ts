@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeAll, afterEach } from '@jest/globals';
+import { describe, test, expect, beforeAll, afterAll, afterEach } from '@jest/globals';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
@@ -8,10 +8,11 @@ import {
   byok_api_keys,
   coding_plan_key_inventory,
   coding_plan_subscriptions,
+  direct_byok_model_lists,
   modelsByProvider,
   organization_audit_logs,
 } from '@kilocode/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
@@ -587,6 +588,9 @@ describe('BYOK Router', () => {
           provider_name: 'bedrock',
           management_source: 'user',
           is_enabled: true,
+          serve_catalog_models: false,
+          supports_catalog_mode: false,
+          can_change_catalog_mode: false,
           created_by: ownerUser.id,
           created_at: expect.any(String),
           updated_at: expect.any(String),
@@ -722,6 +726,184 @@ describe('BYOK Router', () => {
         .where(eq(organization_audit_logs.organization_id, organizationA.id))
         .orderBy(organization_audit_logs.id);
       expect(logsAfter).toEqual(logsBefore);
+    });
+  });
+
+  describe('catalog mode', () => {
+    let billingManagerUser: User;
+
+    beforeAll(async () => {
+      billingManagerUser = await insertTestUser({
+        google_user_email: 'byok-billing-manager@example.com',
+        google_user_name: 'BYOK Billing Manager',
+      });
+      await addUserToOrganization(organizationA.id, billingManagerUser.id, 'billing_manager');
+      // Provider model lists are cached per process, so these rows must exist before the first
+      // lookup of each provider, which no earlier test performs.
+      const synced_at = new Date().toISOString();
+      await db
+        .insert(direct_byok_model_lists)
+        .values([
+          {
+            provider_id: 'zai-coding',
+            models: [
+              {
+                id: 'glm-5.2',
+                name: 'GLM-5.2',
+                context_length: 200000,
+                max_completion_tokens: 32000,
+                catalog_model_id: 'z-ai/glm-5.2',
+              },
+            ],
+            synced_at,
+          },
+          {
+            provider_id: 'morph-byok',
+            models: [
+              {
+                id: 'morph-v3-fast',
+                name: 'Morph v3 Fast',
+                context_length: 200000,
+                max_completion_tokens: 32000,
+              },
+            ],
+            synced_at,
+          },
+        ])
+        .onConflictDoUpdate({
+          target: direct_byok_model_lists.provider_id,
+          set: { models: sql`excluded.models` },
+        });
+    });
+
+    afterAll(async () => {
+      await db
+        .delete(direct_byok_model_lists)
+        .where(inArray(direct_byok_model_lists.provider_id, ['zai-coding', 'morph-byok']));
+    });
+
+    test('starts new keys outside catalog mode and offers it only with mapped models', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      const zai = await caller.byok.create({ provider_id: 'zai-coding', api_key: 'zai-key' });
+      const morph = await caller.byok.create({ provider_id: 'morph-byok', api_key: 'morph-key' });
+      const martian = await caller.byok.create({ provider_id: 'martian', api_key: 'martian-key' });
+      const vercel = await caller.byok.create({ provider_id: 'openai', api_key: 'sk-test-key' });
+
+      expect(zai).toMatchObject({
+        serve_catalog_models: false,
+        supports_catalog_mode: true,
+        can_change_catalog_mode: true,
+      });
+      for (const key of [morph, martian, vercel]) {
+        expect(key).toMatchObject({
+          serve_catalog_models: false,
+          supports_catalog_mode: false,
+          can_change_catalog_mode: false,
+        });
+      }
+      await expect(
+        caller.byok.setCatalogMode({ id: morph.id, serve_catalog_models: true })
+      ).rejects.toThrow('Provider morph-byok does not support Kilo catalog model IDs.');
+      await expect(
+        caller.byok.setCatalogMode({ id: vercel.id, serve_catalog_models: true })
+      ).rejects.toThrow('Provider openai does not support Kilo catalog model IDs.');
+    });
+
+    test('stores catalog mode in the key settings', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const created = await caller.byok.create({ provider_id: 'zai-coding', api_key: 'zai-key' });
+      await db
+        .update(byok_api_keys)
+        .set({ settings: sql`'{"future_setting": 1}'::jsonb` })
+        .where(eq(byok_api_keys.id, created.id));
+
+      const enabled = await caller.byok.setCatalogMode({
+        id: created.id,
+        serve_catalog_models: true,
+      });
+
+      expect(enabled.serve_catalog_models).toBe(true);
+      const [stored] = await db
+        .select({ settings: byok_api_keys.settings })
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, created.id));
+      expect(stored.settings).toEqual({ future_setting: 1, serve_catalog_models: true });
+      await expect(caller.byok.list({})).resolves.toEqual([
+        expect.objectContaining({ id: created.id, serve_catalog_models: true }),
+      ]);
+    });
+
+    test('keeps an enabled key changeable after its provider loses catalog mappings', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const created = await caller.byok.create({ provider_id: 'morph-byok', api_key: 'morph-key' });
+      await db
+        .update(byok_api_keys)
+        .set({ settings: { serve_catalog_models: true } })
+        .where(eq(byok_api_keys.id, created.id));
+
+      await expect(caller.byok.list({})).resolves.toEqual([
+        expect.objectContaining({
+          serve_catalog_models: true,
+          supports_catalog_mode: false,
+          can_change_catalog_mode: true,
+        }),
+      ]);
+      const disabled = await caller.byok.setCatalogMode({
+        id: created.id,
+        serve_catalog_models: false,
+      });
+      expect(disabled.serve_catalog_models).toBe(false);
+    });
+
+    test('lets organization billing managers create keys but not change catalog mode', async () => {
+      const billingCaller = await createCallerForUser(billingManagerUser.id);
+      const created = await billingCaller.byok.create({
+        organizationId: organizationA.id,
+        provider_id: 'zai-coding',
+        api_key: 'zai-key',
+      });
+
+      expect(created).toMatchObject({
+        serve_catalog_models: false,
+        can_change_catalog_mode: false,
+      });
+      await expect(
+        billingCaller.byok.setCatalogMode({
+          organizationId: organizationA.id,
+          id: created.id,
+          serve_catalog_models: true,
+        })
+      ).rejects.toThrow('You do not have the required organizational role to access this feature');
+
+      const ownerCaller = await createCallerForUser(ownerUser.id);
+      await expect(ownerCaller.byok.list({ organizationId: organizationA.id })).resolves.toEqual([
+        expect.objectContaining({ id: created.id, can_change_catalog_mode: true }),
+      ]);
+      const updated = await ownerCaller.byok.setCatalogMode({
+        organizationId: organizationA.id,
+        id: created.id,
+        serve_catalog_models: true,
+      });
+      expect(updated.serve_catalog_models).toBe(true);
+
+      const logs = await db
+        .select({ message: organization_audit_logs.message })
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, organizationA.id));
+      expect(logs.map(log => log.message)).toContain(
+        'Enabled Kilo catalog model IDs for BYOK key for provider: zai-coding'
+      );
+    });
+
+    test('rejects catalog mode changes for keys of others', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const zai = await caller.byok.create({ provider_id: 'zai-coding', api_key: 'zai-key' });
+
+      const otherCaller = await createCallerForUser(otherOrgOwner.id);
+      await expect(
+        otherCaller.byok.setCatalogMode({ id: zai.id, serve_catalog_models: true })
+      ).rejects.toThrow('BYOK key not found');
     });
   });
 

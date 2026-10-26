@@ -20,7 +20,11 @@ import {
   ReasoningDetailsTransform,
   type TransformRequestContext,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  findDirectByokCatalogModels,
+  getDirectByokCatalogModelId,
+  getDirectByokModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import {
   apiKeyUpstream,
   type DirectByokResolveUpstreamInput,
@@ -31,6 +35,9 @@ import type { User } from '@kilocode/db/schema';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModel: jest.fn().mockResolvedValue({ provider: null, model: null }),
+  findDirectByokCatalogModels: jest.fn().mockResolvedValue([]),
+  getDirectByokCatalogModelId: jest.fn().mockResolvedValue(null),
+  supportsCatalogMode: jest.fn(() => true),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   byokOwner: (userId: string, organizationId: string | undefined) =>
@@ -437,6 +444,8 @@ describe('getProvider ChatGPT connection routing order', () => {
 describe('getProvider direct BYOK routing', () => {
   afterEach(() => {
     jest.mocked(getDirectByokModel).mockReset().mockResolvedValue({ provider: null, model: null });
+    jest.mocked(findDirectByokCatalogModels).mockReset().mockResolvedValue([]);
+    jest.mocked(getDirectByokCatalogModelId).mockReset().mockResolvedValue(null);
     jest.mocked(getByokCredentials).mockReset().mockResolvedValue([]);
   });
 
@@ -565,5 +574,122 @@ describe('getProvider direct BYOK routing', () => {
       awsBedrock: { region: 'eu-west-1' },
     });
     expect(result.bypassAccessCheck).toBe(true);
+  });
+
+  function directByokProvider(id: 'synthetic' | 'zai-coding') {
+    return {
+      id,
+      models_dev_id: id,
+      resolveUpstream: apiKeyUpstream({
+        apiUrl: `https://${id}.example/v1`,
+        supportedChatApis: ['chat_completions'],
+        responseTransforms: null,
+      }),
+      transformRequest: jest.fn(),
+      models: async () => [],
+    };
+  }
+
+  function directByokModel(id: string, catalog_model_id?: string) {
+    return { id, name: id, context_length: 1000, max_completion_tokens: 1000, catalog_model_id };
+  }
+
+  test.each([
+    { catalogModelId: 'moonshotai/kimi-k2.6' as string | null },
+    { catalogModelId: null },
+  ])(
+    'rejects a bespoke id whose key serves catalog ids (catalog id $catalogModelId)',
+    async ({ catalogModelId }) => {
+      jest.mocked(getDirectByokModel).mockResolvedValue({
+        provider: directByokProvider('synthetic'),
+        model: directByokModel('hf:moonshotai/Kimi-K2.6', catalogModelId ?? undefined),
+      });
+      jest.mocked(getDirectByokCatalogModelId).mockResolvedValue(catalogModelId);
+      jest
+        .mocked(getByokCredentials)
+        .mockResolvedValue([
+          { decryptedAPIKey: 'synthetic-key', providerId: 'synthetic', serveCatalogModels: true },
+        ]);
+
+      const result = await getProvider(providerInput('synthetic/hf:moonshotai/kimi-k2.6'));
+
+      expect(result).toEqual({
+        kind: 'direct-byok-catalog-only',
+        providerId: 'synthetic',
+        catalogModelId,
+      });
+    }
+  );
+
+  test('serves a catalog id through the first catalog-mode key, subject to access checks', async () => {
+    const synthetic = directByokProvider('synthetic');
+    const zaiCoding = directByokProvider('zai-coding');
+    jest.mocked(findDirectByokCatalogModels).mockResolvedValue([
+      { provider: synthetic, model: directByokModel('hf:moonshotai/Kimi-K2.6') },
+      { provider: zaiCoding, model: directByokModel('kimi-k2.6') },
+    ]);
+    jest.mocked(getByokCredentials).mockResolvedValue([
+      { decryptedAPIKey: 'synthetic-key', providerId: 'synthetic', serveCatalogModels: false },
+      { decryptedAPIKey: 'zai-key', providerId: 'zai-coding', serveCatalogModels: true },
+    ]);
+
+    const result = await getProvider({
+      ...providerInput('moonshotai/kimi-k2.6'),
+      organizationId: ORG_ID,
+    });
+    if (result.kind !== 'provider') throw new Error('expected provider result');
+
+    expect(getByokCredentials).toHaveBeenCalledWith(
+      expect.anything(),
+      { type: 'organization', id: ORG_ID },
+      ['synthetic', 'zai-coding']
+    );
+    expect(result.provider).toMatchObject({
+      id: 'direct-byok',
+      apiUrl: 'https://zai-coding.example/v1',
+      apiKey: 'zai-key',
+    });
+    expect(result.userByok).toEqual([{ decryptedAPIKey: 'zai-key', providerId: 'zai-coding' }]);
+    expect(result.bypassAccessCheck).toBe(false);
+
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: { model: 'moonshotai/kimi-k2.6', messages: [], provider: { only: ['openai'] } },
+    };
+    await result.provider.transformRequest({
+      provider: result.provider,
+      model: 'moonshotai/kimi-k2.6',
+      request,
+      originalHeaders: getFraudDetectionHeaders(new Headers()),
+      extraHeaders: {},
+      userByok: result.userByok,
+      kilo_user_id: user.id,
+      organization_id: ORG_ID,
+      session_id: null,
+    });
+    expect(request.body.model).toBe('kimi-k2.6');
+    expect(request.body).not.toHaveProperty('provider');
+  });
+
+  test('keeps the Kilo route for a catalog id without a catalog-mode key', async () => {
+    jest.mocked(findDirectByokCatalogModels).mockResolvedValue([
+      {
+        provider: directByokProvider('synthetic'),
+        model: directByokModel('hf:moonshotai/Kimi-K2.6'),
+      },
+    ]);
+    jest
+      .mocked(getByokCredentials)
+      .mockResolvedValue([
+        { decryptedAPIKey: 'synthetic-key', providerId: 'synthetic', serveCatalogModels: false },
+      ]);
+
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
+    jest.mocked(getModelUserByokProviders).mockResolvedValue([]);
+    jest.mocked(getBYOKforUser).mockResolvedValue(null);
+
+    const result = await getProvider(providerInput('moonshotai/kimi-k2.6'));
+
+    expect(result).toMatchObject({ kind: 'provider', provider: OPENROUTER, userByok: null });
   });
 });

@@ -8,7 +8,10 @@ import {
   evaluateEffectiveModelAccessPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { listAvailableCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
-import { getDirectByokModelsForOrganization } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  getDirectByokCatalogModelIds,
+  getDirectByokModelsForOrganization,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { isOrganizationAutoEnabled } from '@kilocode/web-shared/lib/organizations/organization-auto-model';
 import {
@@ -76,9 +79,14 @@ export async function getAvailableModelsForOrganization(
     }
   }
 
+  const [byokProviderIds, directByokCatalogModelIds] = await Promise.all([
+    getOrganizationByokProviderIds(readDb, organizationId),
+    getDirectByokCatalogModelIds({ type: 'organization', id: organizationId }),
+  ]);
   let availableModels = await addUserByokAvailability(
     filteredModels,
-    await getOrganizationByokProviderIds(readDb, organizationId)
+    byokProviderIds,
+    directByokCatalogModelIds
   );
 
   if (organization.plan === 'teams' && organization.settings.data_collection === 'deny') {

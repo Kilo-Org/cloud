@@ -87,6 +87,18 @@ describe('addUserByokAvailability', () => {
     expect(mockedGetVercelModelsMetadata).toHaveBeenCalledTimes(1);
     expect(result.map(model => model.hasUserByokAvailable)).toEqual([false, false]);
   });
+
+  test('marks catalog models served by a catalog-mode direct BYOK key', async () => {
+    mockedGetVercelModelsMetadata.mockResolvedValue({});
+    const models = [makeModel('moonshotai/kimi-k2.6'), makeModel('openai/gpt-fixture')];
+
+    const result = await addUserByokAvailability(models, [], new Set(['moonshotai/kimi-k2.6']));
+
+    expect(result.map(model => [model.id, model.hasUserByokAvailable])).toEqual([
+      ['moonshotai/kimi-k2.6', true],
+      ['openai/gpt-fixture', false],
+    ]);
+  });
 });
 
 describe('getModelUserByokProviders', () => {

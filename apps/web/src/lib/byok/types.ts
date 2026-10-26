@@ -8,6 +8,11 @@ export type BYOKApiKeyResponse = {
   provider_name: string;
   management_source: 'user' | 'coding_plan';
   is_enabled: boolean;
+  serve_catalog_models: boolean;
+  /** The provider can map its models to Kilo catalog ids. */
+  supports_catalog_mode: boolean;
+  /** Organization keys need an owner or admin to change catalog mode. */
+  can_change_catalog_mode: boolean;
   created_at: string;
   updated_at: string;
   created_by: string;
@@ -40,6 +45,11 @@ export const SetBYOKKeyEnabledInputSchema = OptionalOrganizationIdSchema.extend(
   is_enabled: z.boolean(),
 });
 
+export const SetBYOKKeyCatalogModeInputSchema = OptionalOrganizationIdSchema.extend({
+  id: z.string().uuid(),
+  serve_catalog_models: z.boolean(),
+});
+
 // List schema with optional organizationId
 export const ListBYOKKeysInputSchema = OptionalOrganizationIdSchema;
 
@@ -53,6 +63,9 @@ export const BYOKApiKeyResponseSchema = z.object({
   provider_name: z.string(),
   management_source: z.enum(['user', 'coding_plan']),
   is_enabled: z.boolean(),
+  serve_catalog_models: z.boolean(),
+  supports_catalog_mode: z.boolean(),
+  can_change_catalog_mode: z.boolean(),
   created_at: z.string(),
   updated_at: z.string(),
   created_by: z.string(),

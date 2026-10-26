@@ -57,6 +57,10 @@ import {
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
+  DIRECT_BYOK_PROVIDERS_META,
+  type DirectByokProviderMetaId,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
+import {
   AUTO_DECISION_HEADER,
   CUSTOM_ROUTER_ERROR_HTTP_STATUS,
   type CustomRouterErrorCode,
@@ -571,6 +575,28 @@ export function noFreeModelsAvailableResponse() {
   return NextResponse.json(
     { error, error_type: ProxyErrorType.no_free_models_available, message: error },
     { status: 503 }
+  );
+}
+
+export function directByokCatalogOnlyMessage(params: {
+  model: string;
+  providerId: DirectByokProviderMetaId;
+  catalogModelId: string | null;
+}) {
+  const reason = `'${params.model}' is disabled because the ${DIRECT_BYOK_PROVIDERS_META[params.providerId]} key uses Kilo catalog model IDs.`;
+  return params.catalogModelId
+    ? `${reason} Use '${params.catalogModelId}' instead.`
+    : `${reason} This model has no catalog ID; turn off catalog mode for the key to use it.`;
+}
+
+export function directByokCatalogOnlyResponse(message: string) {
+  return NextResponse.json(
+    {
+      error: message,
+      error_type: ProxyErrorType.direct_byok_catalog_only,
+      message,
+    },
+    { status: 400 }
   );
 }
 

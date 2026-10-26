@@ -26,7 +26,12 @@ import {
   withIgnoredProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
-import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  createDirectByokReferenceResolver,
+  getDirectByokModel,
+  supportsCatalogMode,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { byokOwner } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
@@ -76,6 +81,8 @@ import {
   inferenceProvidersNotAllowedResponse,
   modelDoesNotExistOnOpenRouterResponse,
   chatGptReconnectResponse,
+  directByokCatalogOnlyMessage,
+  directByokCatalogOnlyResponse,
   lastUserPromptText,
   requestedLogprobs,
   requestedSamples,
@@ -228,6 +235,26 @@ async function resolveFreeModelRateLimitSubject(
   return user && !authFailedResponse
     ? { kind: 'account', kiloUserId: user.id }
     : { kind: 'ip', ipAddress };
+}
+
+/**
+ * The catalog id that replaces an auto-routed bespoke direct BYOK id when the caller's key for it
+ * is in catalog mode. Null when the id needs no replacement or has no catalog id; an unmapped id
+ * then gets the catalog-only error from `getProvider`.
+ */
+async function catalogModeModelForRoutedModel(
+  model: string,
+  authPromise: ReturnType<typeof getUserFromAuth>
+): Promise<string | null> {
+  const { provider } = await getDirectByokModel(model.toLowerCase());
+  if (!provider || !supportsCatalogMode(provider.id)) return null;
+  const { user, authFailedResponse, organizationId } = await authPromise;
+  if (!user || authFailedResponse) return null;
+  const resolveReference = await createDirectByokReferenceResolver(
+    byokOwner(user.id, organizationId)
+  );
+  const resolved = await resolveReference(model);
+  return resolved === model ? null : resolved;
 }
 
 export async function handleLlmProxyRequest(
@@ -624,6 +651,16 @@ export async function handleLlmProxyRequest(
     routingTarget = autoResult.kind === 'ok' ? (autoResult.routingTarget ?? null) : null;
   }
 
+  if (autoModel) {
+    // A router entry stored with a bespoke id keeps working when its key switches to catalog mode;
+    // the catalog id then goes through the organization policy check below.
+    const catalogModelId = await catalogModeModelForRoutedModel(
+      requestBodyParsed.body.model,
+      authPromise
+    );
+    if (catalogModelId) requestBodyParsed.body.model = catalogModelId;
+  }
+
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
   const customLlm = await findCustomLlm(effectiveModelIdLowerCased);
   const isPrivateCustomLlm = customLlm !== null && !isPublicCustomLlm(customLlm.definition);
@@ -890,6 +927,19 @@ export async function handleLlmProxyRequest(
   if (providerResult.kind === 'custom-llm-unavailable') {
     // Same response as an unknown model id, so callers cannot probe for custom LLMs.
     return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
+  }
+  if (providerResult.kind === 'direct-byok-catalog-only') {
+    // Falling through to the managed gateway would fail later with a misleading unknown-model error.
+    const message = directByokCatalogOnlyMessage({
+      model: effectiveModelIdLowerCased,
+      providerId: providerResult.providerId,
+      catalogModelId: providerResult.catalogModelId,
+    });
+    return autoModel === ORG_AUTO_MODEL.id && routingTarget
+      ? organizationAutoConfigurationResponse(
+          `Organization Auto route target '${routingTarget}' is unavailable: ${message}`
+        )
+      : directByokCatalogOnlyResponse(message);
   }
   const effectiveProviderContext = providerResult;
 

@@ -553,6 +553,27 @@ describe('SessionHistoryScreen', () => {
 
     expect(routerPush).toHaveBeenCalledTimes(2);
   });
+  it('opens a new session after history regains focus', async () => {
+    Object.assign(listState.organization, { organizationId: 'org-drain', isLoaded: true });
+    const now = Date.now();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
+    const renderer = await renderScreen();
+    const onCreateSession = findNodeByType(renderer, 'AgentSessionListContent').props
+      .onCreateSession as () => void;
+
+    act(() => {
+      onCreateSession();
+    });
+    expect(routerPush).toHaveBeenCalledTimes(1);
+
+    nowSpy.mockReturnValue(now + 50);
+    act(() => {
+      fireFocus();
+      onCreateSession();
+    });
+
+    expect(routerPush).toHaveBeenCalledTimes(2);
+  });
 
   it('keeps saved repository and platform selections after a successful history retry', async () => {
     readFilterRecord.mockImplementation(async storageKey => {

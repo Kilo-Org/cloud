@@ -70,6 +70,13 @@ vi.mock('react', async () => {
 // ── react-native and native bridges ────────────────────────────────────────
 vi.mock('@rn-primitives/slot', () => ({ Text: 'SlotText' }));
 
+// The composer reads the live system font scale; this suite calls it as a
+// plain function, so the provider's React context cannot answer a hook.
+vi.mock('@/lib/font-scale/system-font-scale-context', () => ({
+  useSystemFontScale: () => null,
+  useLiveFontScale: () => 1,
+}));
+
 vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
   AppState: {

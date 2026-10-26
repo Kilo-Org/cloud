@@ -132,7 +132,14 @@ jest.mock('@/components/ui/dialog', () => ({
   DialogHeader: ({ children }: { children: React.ReactNode }) => createElement('div', {}, children),
   DialogTitle: ({ children }: { children: React.ReactNode }) => createElement('h2', {}, children),
 }));
-jest.mock('@/components/cloud-agent/ProfileSelector', () => ({ ProfileSelector: () => null }));
+jest.mock('@/components/cloud-agent/ProfileSelector', () => ({
+  ProfileSelector: ({ onProfileSelect }: { onProfileSelect: (profileId: string) => void }) =>
+    createElement(
+      'button',
+      { type: 'button', onClick: () => onProfileSelect('replacement-profile') },
+      'select-profile'
+    ),
+}));
 jest.mock('@/components/cloud-agent/RepoProfileBindingsDialog', () => ({
   RepoProfileBindingsDialog: () => null,
 }));
@@ -428,6 +435,44 @@ describe('TriggerForm variants', () => {
     click(container, 'Organization bot');
     submit(container);
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ runAsCreator: true }));
+  });
+
+  it.each(['profile-1', undefined])(
+    'preserves another creators profile setting %s without offering replacement profiles',
+    profileId => {
+      const { container, onSubmit } = render({
+        organizationId: 'org-1',
+        initialData: {
+          ...initialData('high', 'scheduled'),
+          executionUserId: 'another-creator',
+          profileId,
+        },
+      });
+
+      expect(container.textContent).not.toContain('select-profile');
+      expect(container.textContent).toContain(
+        profileId ? 'Saved creator profile (unchanged)' : 'Use defaults'
+      );
+      expect(container.textContent).toContain('Only the trigger creator can change');
+      submit(container);
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ profileId: undefined }));
+    }
+  );
+
+  it('allows the creator to change their personal profile', () => {
+    const { container, onSubmit } = render({
+      organizationId: 'org-1',
+      initialData: {
+        ...initialData('high', 'scheduled'),
+        executionUserId: 'oauth/github/creator',
+      },
+    });
+
+    click(container, 'select-profile');
+    submit(container);
+    expect(onSubmit).toHaveBeenCalledWith(
+      expect.objectContaining({ profileId: 'replacement-profile' })
+    );
   });
 
   it.each(['webhook', 'scheduled'] as const)(

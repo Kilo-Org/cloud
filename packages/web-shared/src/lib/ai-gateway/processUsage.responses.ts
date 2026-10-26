@@ -14,11 +14,13 @@ import type {
 import type { GatewayResponsesRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   computeOpenRouterCostFields,
+  providerReportsIsByok,
   computeVercelCostMicrodollars,
   drainSseStream,
   extractVercelGenerationTime,
   extractVercelIsByok,
   extractVercelUpstreamId,
+  reportUpstreamStreamError,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 
@@ -50,7 +52,8 @@ type ResponsesApiStreamEvent = {
 export function processResponsesApiUsage(
   usage: ResponsesApiUsage | null | undefined,
   providerMetadata: VercelProviderMetaData | null | undefined,
-  coreProps: NotYetCostedUsageStats
+  coreProps: NotYetCostedUsageStats,
+  provider: ProviderId
 ): JustTheCostsUsageStats {
   // OpenAI-style input_tokens already includes cached and cache-write tokens.
   const inputTokens = usage?.input_tokens ?? 0;
@@ -63,7 +66,8 @@ export function processResponsesApiUsage(
     const { cost_mUsd, is_byok } = computeOpenRouterCostFields(
       usage,
       coreProps,
-      'responses_sse_processing'
+      'responses_sse_processing',
+      providerReportsIsByok(provider)
     );
     return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, cost_mUsd, is_byok };
   }
@@ -110,7 +114,8 @@ export async function parseResponsesMicrodollarUsageFromStream(
   kiloUserId: string,
   openrouterRequestSpan: Span | undefined,
   provider: ProviderId,
-  statusCode: number
+  statusCode: number,
+  usesUserCredentials: boolean
 ): Promise<MicrodollarUsageStats> {
   openrouterRequestSpan?.end();
   const streamProcessingSpan = startInactiveSpan({
@@ -159,9 +164,13 @@ export async function parseResponsesMicrodollarUsageFromStream(
 
       if ('error' in json && json.error) {
         reportedError = true;
-        captureException(new Error(`Responses API error: ${json.error.message}`), {
-          tags: { source: 'responses_sse_processing' },
-          extra: { json, event },
+        reportUpstreamStreamError({
+          label: 'Responses API error',
+          source: 'responses_sse_processing',
+          error: json.error,
+          usesUserCredentials,
+          logContext: { provider, inference_provider, messageId, model },
+          sentryExtra: { json, event },
         });
       }
 
@@ -223,13 +232,14 @@ export async function parseResponsesMicrodollarUsageFromStream(
     status_code: statusCode,
   } satisfies NotYetCostedUsageStats;
 
-  const costs = processResponsesApiUsage(usage, providerMetadata, coreProps);
+  const costs = processResponsesApiUsage(usage, providerMetadata, coreProps, provider);
   return { ...coreProps, ...costs };
 }
 
 export function parseResponsesMicrodollarUsageFromString(
   fullResponse: string,
-  statusCode: number
+  statusCode: number,
+  provider: ProviderId
 ): MicrodollarUsageStats {
   const responseJson = JSON.parse(fullResponse) as ResponsesApiResponse | null;
 
@@ -254,7 +264,7 @@ export function parseResponsesMicrodollarUsageFromString(
     status_code: statusCode,
   } satisfies NotYetCostedUsageStats;
 
-  const costs = processResponsesApiUsage(usage, providerMetadata, coreProps);
+  const costs = processResponsesApiUsage(usage, providerMetadata, coreProps, provider);
   return { ...coreProps, ...costs };
 }
 

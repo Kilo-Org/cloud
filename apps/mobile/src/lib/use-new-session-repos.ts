@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- One hook wires the GitHub, GitLab, and Bitbucket provider queries, recents resolution, and connect/refresh flows end-to-end. */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
@@ -398,10 +398,19 @@ function repoKey(repository: NewSessionRepository): string {
 
 // ── Branches of the selected repository ──────────────────────────────
 
+/**
+ * How long a branch request may look like progress before the row offers the
+ * retry instead. Long enough for a slow provider round trip, short enough that
+ * a stalled request never leaves a spinner that cannot end.
+ */
+const BRANCH_SETTLE_BOUND_MS = 15_000;
+
 export type RepositoryBranchesState = {
   /** The provider's default branch, or null when it reports none. */
   defaultBranch: string | null;
   branches: string[];
+  /** The provider holds more branches than `branches` includes. */
+  truncated: boolean;
   /** The query runs only for a selected repository in a scope that can serve it. */
   isEnabled: boolean;
   isLoading: boolean;
@@ -449,6 +458,10 @@ export function useRepositoryBranches(
   const personalInput = { platform, repository: { fullName } };
   const organizationInput = { organizationId: organizationId ?? '', ...personalInput };
   const identity = repository ? repositoryIdentityKey(repository) : 'none';
+  // Changes whenever the row asks about a different repository or scope, so the
+  // settle bound below re-arms for the new question instead of inheriting the
+  // previous one's deadline.
+  const settleKey = `${identity}\n${organizationId ?? ''}`;
 
   const branchQuery = useQuery({
     queryKey: [
@@ -479,18 +492,46 @@ export function useRepositoryBranches(
   // succeed.
   const permanentFailure = permanent || errorCode === 'PRECONDITION_FAILED';
 
+  // A request can stay pending forever — a stalled connection, a paused query,
+  // a provider that never answers. Loading is therefore a bounded state: after
+  // `BRANCH_SETTLE_BOUND_MS` the row stops presenting a request that may never
+  // land as progress and offers the retry instead. The expiry records the
+  // question it was armed for, so a repository or scope change starts loading
+  // again without a frame of the previous expiry. The query itself keeps
+  // running, and the retry cancels it before starting a fresh request.
+  const isPending = isEnabled && branchQuery.isPending;
+  const isFetching = isEnabled && branchQuery.isFetching;
+  const [expiredFor, setExpiredFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isPending && !isFetching) {
+      return undefined;
+    }
+    const timer = setTimeout(() => {
+      setExpiredFor(settleKey);
+    }, BRANCH_SETTLE_BOUND_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [settleKey, isPending, isFetching]);
+  const overBound = isPending && expiredFor === settleKey;
+
   const retry = useCallback(() => {
+    // A refetch cancels the request that is still running, so the retry works
+    // while the bounded request is stuck instead of waiting behind it.
     void branchQuery.refetch();
   }, [branchQuery]);
 
   return {
     defaultBranch: branchQuery.data?.defaultBranch ?? null,
     branches: branchQuery.data?.branches ?? [],
+    truncated: branchQuery.data?.truncated === true,
     isEnabled,
-    isLoading: isEnabled && branchQuery.isPending,
-    isRetryableError: branchQuery.isError && !permanentFailure,
+    isLoading: isPending && !overBound,
+    isRetryableError: (branchQuery.isError && !permanentFailure) || overBound,
     isPermanentError: branchQuery.isError && permanentFailure,
-    isRetrying: branchQuery.isFetching && branchQuery.isError,
+    // Only a retry after a real failure reports progress. A request that
+    // outlived the bound keeps the retry enabled, so it can replace it.
+    isRetrying: isFetching && branchQuery.isError,
     retry,
   };
 }

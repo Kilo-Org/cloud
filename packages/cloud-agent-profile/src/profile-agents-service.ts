@@ -1,6 +1,7 @@
 import type { WorkerDb } from '@kilocode/db';
 import {
   agent_environment_profile_agents,
+  agent_environment_profiles,
   type AgentEnvironmentProfileAgent,
 } from '@kilocode/db/schema';
 import { AgentConfigSchema, type AgentConfig } from '@kilocode/db/schema-types';
@@ -33,6 +34,8 @@ export {
 };
 export type { AgentCreateInput, AgentUpdateInput };
 
+type AgentWriteTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
+
 function toResponse(row: AgentEnvironmentProfileAgent): ProfileAgentResponse {
   // Parse rather than cast so a malformed stored row surfaces as a clear
   // validation error instead of crashing downstream consumers.
@@ -47,8 +50,8 @@ function toResponse(row: AgentEnvironmentProfileAgent): ProfileAgentResponse {
   };
 }
 
-async function assertAgentLimit(db: WorkerDb, profileId: string): Promise<void> {
-  const [row] = await db
+async function assertAgentLimit(tx: AgentWriteTransaction, profileId: string): Promise<void> {
+  const [row] = await tx
     .select({ n: count() })
     .from(agent_environment_profile_agents)
     .where(eq(agent_environment_profile_agents.profile_id, profileId));
@@ -104,19 +107,30 @@ export async function createAgent(
   owner: ProfileOwner
 ): Promise<{ id: string }> {
   await verifyProfileOwnership(db, profileId, owner);
-  await assertAgentLimit(db, profileId);
 
-  const [row] = await db
-    .insert(agent_environment_profile_agents)
-    .values({
-      profile_id: profileId,
-      slug: input.slug,
-      name: input.name,
-      config: input.config,
-    })
-    .returning({ id: agent_environment_profile_agents.id });
+  return await db.transaction(async tx => {
+    // Lock the owning profile row so the cap count and the insert are one
+    // serialized unit, keeping concurrent creates within the per-profile cap.
+    await tx
+      .select({ id: agent_environment_profiles.id })
+      .from(agent_environment_profiles)
+      .where(eq(agent_environment_profiles.id, profileId))
+      .for('update');
 
-  return { id: row.id };
+    await assertAgentLimit(tx, profileId);
+
+    const [row] = await tx
+      .insert(agent_environment_profile_agents)
+      .values({
+        profile_id: profileId,
+        slug: input.slug,
+        name: input.name,
+        config: input.config,
+      })
+      .returning({ id: agent_environment_profile_agents.id });
+
+    return { id: row.id };
+  });
 }
 
 export async function updateAgent(

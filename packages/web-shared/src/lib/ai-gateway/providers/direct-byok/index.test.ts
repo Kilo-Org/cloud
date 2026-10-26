@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { generateText } from 'ai';
-import { COMPATIBLE_USER_AGENT, type DirectByokModel } from './types';
+import {
+  COMPATIBLE_USER_AGENT,
+  type DirectByokModel,
+  type DirectByokProvider,
+  type DirectByokUpstream,
+} from './types';
+import type * as DirectByokTypes from './types';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   readDb: {},
@@ -30,12 +36,16 @@ jest.mock('./direct-byok-definitions', () => ({
   default: [
     {
       id: 'chutes-byok',
-      base_url: 'https://chutes.example.com/v1',
-      base_url_overrides: {},
+      resolveUpstream: jest.requireActual<typeof DirectByokTypes>('./types').apiKeyUpstream({
+        apiUrl: 'https://chutes.example.com/v1',
+        supportedChatApis: ['chat_completions'],
+        responseTransforms: 'reasoning-content',
+      }),
       models: jest.fn(async () => [
         {
           id: 'supported-model',
           name: 'Supported Model',
+          description: 'Curated provider copy.',
           flags: ['reasoning'],
           context_length: 4096,
           max_completion_tokens: 1024,
@@ -48,14 +58,15 @@ jest.mock('./direct-byok-definitions', () => ({
           max_completion_tokens: 1024,
         },
       ]),
-      supported_chat_apis: ['chat_completions'],
-      reasoning_details_transform: 'reasoning-content',
       transformRequest: jest.fn(),
     },
     {
       id: 'orcarouter',
-      base_url: 'https://orcarouter.example.com/v1',
-      base_url_overrides: {},
+      resolveUpstream: jest.requireActual<typeof DirectByokTypes>('./types').apiKeyUpstream({
+        apiUrl: 'https://orcarouter.example.com/v1',
+        supportedChatApis: ['chat_completions'],
+        responseTransforms: 'reasoning-content',
+      }),
       models: jest.fn(async () => [
         {
           id: 'other-model',
@@ -64,8 +75,6 @@ jest.mock('./direct-byok-definitions', () => ({
           max_completion_tokens: 1024,
         },
       ]),
-      supported_chat_apis: ['chat_completions'],
-      reasoning_details_transform: 'reasoning-content',
       transformRequest: jest.fn(),
     },
   ],
@@ -98,11 +107,11 @@ describe('createAiSdkProvider session headers', () => {
     const fetchMock = mockCompletions().mockResolvedValueOnce(
       new Response('Temporary failure', { status: 500 })
     );
-    const firstProbe = createAiSdkProvider(provider, 'test-key');
+    const firstProbe = await createAiSdkProvider(provider, 'test-key', 'test-model');
 
     await generateText({ model: firstProbe('test-model'), prompt: 'Say hi', maxRetries: 1 });
     await generateText({
-      model: createAiSdkProvider(provider, 'test-key')('test-model'),
+      model: (await createAiSdkProvider(provider, 'test-key', 'test-model'))('test-model'),
       prompt: 'Say hi',
       maxRetries: 0,
     });
@@ -126,13 +135,111 @@ describe('createAiSdkProvider session headers', () => {
     const fetchMock = mockCompletions();
 
     await generateText({
-      model: createAiSdkProvider(directByokProviders[0], 'test-key')('test-model'),
+      model: (await createAiSdkProvider(directByokProviders[0], 'test-key', 'test-model'))(
+        'test-model'
+      ),
       prompt: 'Say hi',
       maxRetries: 0,
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(new Headers(fetchMock.mock.calls[0][1]?.headers).has('x-opencode-session')).toBe(false);
+  });
+});
+
+describe('createAiSdkProvider resolved upstream', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  const baseUpstream: DirectByokUpstream = {
+    apiUrl: 'https://upstream.example/v1',
+    apiUrlOverrides: {},
+    disableUrlSuffix: false,
+    apiKey: 'resolved-key',
+    apiKeyHeader: null,
+    supportedChatApis: ['chat_completions'],
+    responseTransforms: null,
+  };
+
+  function providerWith(upstream: DirectByokUpstream): DirectByokProvider {
+    return {
+      id: 'chutes-byok',
+      resolveUpstream: async () => upstream,
+      transformRequest() {},
+      models: async () => [],
+    };
+  }
+
+  async function sendTestRequest(upstream: DirectByokUpstream) {
+    const fetchMock = jest.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+      Response.json({
+        id: 'test-completion',
+        object: 'chat.completion',
+        created: 0,
+        model: 'test-model',
+        choices: [
+          { index: 0, message: { role: 'assistant', content: 'Hi' }, finish_reason: 'stop' },
+        ],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      })
+    );
+    const { createAiSdkProvider } = await import('.');
+    const aiSdkProvider = await createAiSdkProvider(providerWith(upstream), 'stored', 'test-model');
+    await generateText({ model: aiSdkProvider('test-model'), prompt: 'Say hi', maxRetries: 0 });
+    const [url, init] = fetchMock.mock.calls[0];
+    return { url: String(url), headers: new Headers(init?.headers) };
+  }
+
+  test('uses the Chat Completions URL override and the x-api-key header', async () => {
+    const { url, headers } = await sendTestRequest({
+      ...baseUpstream,
+      apiUrlOverrides: { chat_completions: 'https://chat.upstream.example/v2' },
+      apiKeyHeader: 'x-api-key',
+    });
+
+    expect(url).toBe('https://chat.upstream.example/v2/chat/completions');
+    expect(headers.get('x-api-key')).toBe('resolved-key');
+    expect(headers.has('authorization')).toBe(false);
+  });
+
+  test('signs requests for AWS Bedrock credentials instead of sending a bearer key', async () => {
+    const { headers } = await sendTestRequest({
+      ...baseUpstream,
+      apiKey: '',
+      awsBedrock: {
+        type: 'aws_bedrock',
+        region: 'eu-west-1',
+        access_key_id: 'AKIDEXAMPLE',
+        secret_access_key: 'secret',
+      },
+    });
+
+    expect(headers.get('authorization')).toMatch(
+      /^AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE\/\d{8}\/eu-west-1\/bedrock\/aws4_request/
+    );
+  });
+
+  test('posts to the URL itself when the upstream disables the path suffix', async () => {
+    const { url } = await sendTestRequest({
+      ...baseUpstream,
+      apiUrl: 'https://upstream.example/models/test-model:predict',
+      disableUrlSuffix: true,
+    });
+
+    expect(url).toBe('https://upstream.example/models/test-model:predict');
+  });
+
+  test('rejects models the provider does not serve over Chat Completions', async () => {
+    const { createAiSdkProvider } = await import('.');
+
+    await expect(
+      createAiSdkProvider(
+        providerWith({ ...baseUpstream, supportedChatApis: ['messages'] }),
+        'stored',
+        'test-model'
+      )
+    ).rejects.toThrow('chutes-byok does not serve test-model over Chat Completions');
   });
 });
 
@@ -258,6 +365,19 @@ describe('getDirectByokModel', () => {
     expect(organizationModels.map(model => model.id)).toEqual(['orcarouter/other-model']);
     expect(getBYOKforUser).not.toHaveBeenCalled();
     expect(getBYOKforOrganization).not.toHaveBeenCalled();
+  });
+
+  test('carries a provider description into the catalog entry and leaves others empty', async () => {
+    const { getDirectByokModelsForUser } = await loadDirectByokModule();
+    const { getUserByokProviderIds } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    jest.mocked(getUserByokProviderIds).mockResolvedValueOnce(['chutes-byok']);
+
+    const models = await getDirectByokModelsForUser('user-id');
+
+    expect(models.map(model => ({ id: model.id, description: model.description }))).toEqual([
+      { id: 'chutes-byok/supported-model', description: 'Curated provider copy.' },
+      { id: 'chutes-byok/non-reasoning-model', description: '' },
+    ]);
   });
 });
 

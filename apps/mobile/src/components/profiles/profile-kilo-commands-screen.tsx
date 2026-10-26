@@ -28,6 +28,8 @@ import {
   useAgentProfile,
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_COMMANDS: AgentProfileDetail['kiloCommands'] = [];
@@ -62,6 +64,8 @@ export function ProfileKiloCommandsScreen({
     setKiloCommandEnabled,
     reorderKiloCommands,
   } = useAgentProfileSectionMutations(organizationId);
+
+  const canManage = useCanManageOrganizationProfiles(organizationId);
 
   const commands = profileQuery.data?.kiloCommands ?? NO_COMMANDS;
   const rows = kiloCommandRows(commands);
@@ -160,9 +164,11 @@ export function ProfileKiloCommandsScreen({
         description={null}
         placement="top"
         action={
-          <Button onPress={startAdd}>
-            <Text>{t('profiles.slashCommands.add')}</Text>
-          </Button>
+          canManage ? (
+            <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
+              <Text>{t('profiles.slashCommands.add')}</Text>
+            </Button>
+          ) : null
         }
       />
     );
@@ -186,36 +192,58 @@ export function ProfileKiloCommandsScreen({
               enabled={row.enabled}
               isFirst={index === 0}
               isLast={index === rows.length - 1}
-              onToggle={enabled => {
-                setKiloCommandEnabled.mutate(
-                  { profileId, commandId: source.id, enabled },
-                  {
-                    onError: error => {
-                      if (!hasUsableMessage(error)) {
-                        toast.error(t('profiles.slashCommands.saveFailed'));
-                      }
-                    },
-                  }
-                );
-              }}
-              onMoveUp={() => {
-                move(index, -1);
-              }}
-              onMoveDown={() => {
-                move(index, 1);
-              }}
-              onEdit={() => {
-                setForm({ source });
-              }}
-              onDelete={() => {
-                confirmDelete(source);
-              }}
+              onToggle={
+                canManage
+                  ? enabled => {
+                      setKiloCommandEnabled.mutate(
+                        { profileId, commandId: source.id, enabled },
+                        {
+                          onError: error => {
+                            if (!hasUsableMessage(error)) {
+                              toast.error(t('profiles.slashCommands.saveFailed'));
+                            }
+                          },
+                        }
+                      );
+                    }
+                  : undefined
+              }
+              onMoveUp={
+                canManage
+                  ? () => {
+                      move(index, -1);
+                    }
+                  : undefined
+              }
+              onMoveDown={
+                canManage
+                  ? () => {
+                      move(index, 1);
+                    }
+                  : undefined
+              }
+              onEdit={
+                canManage
+                  ? () => {
+                      setForm({ source });
+                    }
+                  : undefined
+              }
+              onDelete={
+                canManage
+                  ? () => {
+                      confirmDelete(source);
+                    }
+                  : undefined
+              }
             />
           );
         })}
-        <Button onPress={startAdd}>
-          <Text>{t('profiles.slashCommands.add')}</Text>
-        </Button>
+        {canManage ? (
+          <Button onPress={startAdd}>
+            <Text>{t('profiles.slashCommands.add')}</Text>
+          </Button>
+        ) : null}
       </>
     );
   }

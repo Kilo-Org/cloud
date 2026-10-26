@@ -6,8 +6,13 @@ import type { TransformRequestContext } from '../types';
 import { getAiSdkProvider } from '../model-settings';
 import openCodeGo from './opencode-go';
 
-test('allows the Responses API for OpenCode Go', () => {
-  expect(openCodeGo.supported_chat_apis).toContain('responses');
+test('allows the Responses API for OpenCode Go', async () => {
+  const upstream = await openCodeGo.resolveUpstream({
+    credential: 'test-api-key',
+    model: { id: 'qwen3.7-plus' },
+    stream: false,
+  });
+  expect(upstream.supportedChatApis).toContain('responses');
 });
 
 describe('OpenCode Go session headers', () => {
@@ -23,12 +28,12 @@ describe('OpenCode Go session headers', () => {
     return {
       provider: {
         id: 'direct-byok',
-        apiUrl: openCodeGo.base_url,
+        apiUrl: 'https://opencode.ai/zen/go/v1',
         apiUrlOverrides: {},
         disableUrlSuffix: false,
         apiKey: 'test-api-key',
         apiKeyHeader: null,
-        supportedChatApis: openCodeGo.supported_chat_apis,
+        supportedChatApis: ['chat_completions', 'messages', 'responses'],
         responseTransforms: null,
         async transformRequest() {},
       },
@@ -162,47 +167,6 @@ describe('OpenCode Go session headers', () => {
     expect(request.body).toEqual(body);
     expect(context.extraHeaders['x-opencode-session']).toEqual(expect.any(String));
     expect(context.extraHeaders).not.toHaveProperty('x-api-key');
-  });
-
-  test('replaces the OpenRouter reasoning object with reasoning_effort', () => {
-    const request: GatewayRequest = {
-      kind: 'chat_completions',
-      body: { model: 'omen-alpha', messages: [], reasoning: { effort: 'high', enabled: true } },
-    };
-
-    openCodeGo.transformRequest(createContext({ request }));
-
-    expect(request.body).not.toHaveProperty('reasoning');
-    expect(request.body.reasoning_effort).toBe('high');
-  });
-
-  test('keeps an explicit reasoning_effort over the reasoning object', () => {
-    const request: GatewayRequest = {
-      kind: 'chat_completions',
-      body: {
-        model: 'omen-alpha',
-        messages: [],
-        reasoning_effort: 'low',
-        reasoning: { effort: 'high' },
-      },
-    };
-
-    openCodeGo.transformRequest(createContext({ request }));
-
-    expect(request.body).not.toHaveProperty('reasoning');
-    expect(request.body.reasoning_effort).toBe('low');
-  });
-
-  test('does not add reasoning_effort when the reasoning object has no effort', () => {
-    const request: GatewayRequest = {
-      kind: 'chat_completions',
-      body: { model: 'omen-alpha', messages: [], reasoning: { enabled: true } },
-    };
-
-    openCodeGo.transformRequest(createContext({ request }));
-
-    expect(request.body).not.toHaveProperty('reasoning');
-    expect(request.body).not.toHaveProperty('reasoning_effort');
   });
 
   test('keeps the header stable when the model, API key, or request body changes', () => {

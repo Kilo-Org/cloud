@@ -211,7 +211,7 @@ function createHarness() {
     sessionExists: async () => true,
     seedRegistration: async () => undefined,
     runSetup: async () => ({ stdout: '', stderr: '', exitCode: 0 }),
-    homeRoot: HOME_ROOT,
+    homeRoots: { directory: HOME_ROOT, legacy: HOME_ROOT },
   });
   preparationRef.current = preparation;
 
@@ -219,7 +219,6 @@ function createHarness() {
     preparation: preparationRef,
     turns: turnsRef,
     terminals: terminalsRef,
-    capture: { current: undefined },
     worktreeChanges: { current: undefined },
     worktreeDeletion: { current: undefined },
     kiloRequests: { current: undefined },
@@ -270,12 +269,9 @@ describe('directory-key flip (production dispatcher)', () => {
 
       const runtime = h.runtimes.get(DIRECTORY);
       expect(runtime).toBeDefined();
-      // Siblings share one HOME keyed by the worktree scope and directory.
+      // Siblings share one HOME keyed by the directory alone.
       expect(runtime!.env.HOME).toBe(
-        path.join(
-          HOME_ROOT,
-          createHash('sha256').update(SCOPE_ID).update('\0').update(DIRECTORY).digest('hex')
-        )
+        path.join(HOME_ROOT, createHash('sha256').update(DIRECTORY).digest('hex'))
       );
       const client = runtime!.client as unknown as {
         sendPromptAsync: (opts: { sessionId: string }) => Promise<void>;
@@ -421,7 +417,7 @@ describe('directory-key flip (production dispatcher)', () => {
     }
   });
 
-  it('keys shared HOME by worktree scope and directory', async () => {
+  it('keys shared HOME by directory', async () => {
     const h = createHarness();
     try {
       const first = routeSpec('ses_a', 'ses_kilo_a', {
@@ -445,15 +441,12 @@ describe('directory-key flip (production dispatcher)', () => {
 
       // The two routes are distinct runtimes (distinct directories), so read each
       // HOME from the runtime the preparation built.
-      const homeFor = (key: string, directory: string): string =>
-        path.join(
-          HOME_ROOT,
-          createHash('sha256').update(key).update('\0').update(directory).digest('hex')
-        );
+      const homeFor = (directory: string): string =>
+        path.join(HOME_ROOT, createHash('sha256').update(directory).digest('hex'));
       const firstRuntime = h.runtimes.get(`${DIRECTORY}/one`);
       const secondRuntime = h.runtimes.get(`${DIRECTORY}/two`);
-      expect(firstRuntime?.env.HOME).toBe(homeFor(SCOPE_ID, `${DIRECTORY}/one`));
-      expect(secondRuntime?.env.HOME).toBe(homeFor(SCOPE_ID, `${DIRECTORY}/two`));
+      expect(firstRuntime?.env.HOME).toBe(homeFor(`${DIRECTORY}/one`));
+      expect(secondRuntime?.env.HOME).toBe(homeFor(`${DIRECTORY}/two`));
       // Same scope, different directory: HOME differs (directory is hashed in).
       expect(firstRuntime?.env.HOME).not.toBe(secondRuntime?.env.HOME);
     } finally {

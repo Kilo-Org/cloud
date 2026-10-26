@@ -108,7 +108,7 @@ timer or sandbox acceptance:
 
 ```bash
 cd services/cloud-agent-next/wrapper
-KILO_781_BINARY=/path/to/isolated/kilo-7.8.1 bun test --max-concurrency=1 src/control-plane/kilo-supervision-fixture.real.test.ts
+KILO_781_BINARY=/path/to/isolated/kilo-7.8.17 bun test --max-concurrency=1 src/control-plane/kilo-supervision-fixture.real.test.ts
 ```
 
 The local production-timer driver discovers this worktree's ports, uses the seeded
@@ -156,7 +156,7 @@ and post-Stop follow-ups.
 Private reports and transcripts are retained; chats and sandboxes are not deleted
 automatically. See the known CLI 7.4.20 limitation under Troubleshooting.
 
-Official SDK basic-chat acceptance (pinned `@kilocode/sdk/v2` `7.8.1`):
+Official SDK basic-chat acceptance (pinned `@kilocode/sdk/v2` `7.8.17`):
 
 ```bash
 pnpm --filter cloud-agent-next exec tsx test/e2e/sdk-basic-chat.ts
@@ -960,6 +960,11 @@ delivery sends no Kilo credential, so ingest authenticates with its unguessable
 path token. Mint (`POST /__e2e/callbacks`), read/delete (`GET`/`DELETE
 /__e2e/callbacks/:token`) and any extra or trailing path segment stay behind both
 gates.
+
+Callback URLs use the lowercase UUIDv4 format emitted by `crypto.randomUUID()`.
+Delivery records belong to an active minted token, with the sink's one-hour
+lifetime and per-token record cap. Owner-authenticated reads preserve arrival
+order; deletion completes the token's lifecycle.
 
 Security consequence, recorded honestly. Holding the e2e secret with no JWT lets
 a caller replace any sandbox's wrapper credential by id

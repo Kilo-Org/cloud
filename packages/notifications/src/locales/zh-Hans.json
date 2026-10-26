@@ -9,7 +9,7 @@
       "lowBalance": "您的余额需要关注",
       "spendAlert": "您的支出需要关注",
       "securityFinding": "安全发现需要关注",
-      "activeAgentsGlanceable": "活动代理有更新"
+      "activeAgentsGlanceable": "活跃代理有更新"
     }
   },
   "cloudAgentSession": {

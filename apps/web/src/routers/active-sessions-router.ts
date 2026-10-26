@@ -95,7 +95,10 @@ const listInputSchema = z
  * reached or does not answer inside the budget is SERVICE_UNAVAILABLE; a
  * non-2xx or malformed mint response is BAD_GATEWAY.
  */
-async function mintWebTicket(userId: string): Promise<{ token: string; expiresAt: number }> {
+async function mintWebTicket(
+  userId: string,
+  deviceSessionId?: string
+): Promise<{ token: string; expiresAt: number }> {
   if (!SESSION_INGEST_WORKER_URL) {
     throw new TRPCError({
       code: 'PRECONDITION_FAILED',
@@ -106,6 +109,7 @@ async function mintWebTicket(userId: string): Promise<{ token: string; expiresAt
   const token = generateBoundedInternalServiceToken(userId, {
     audience: SESSION_INGEST_AUDIENCE,
     expiresIn: 60 * 60,
+    ...(deviceSessionId ? { deviceSessionId } : {}),
   });
   const url = `${SESSION_INGEST_WORKER_URL}/api/user/web-ticket`;
 
@@ -150,7 +154,9 @@ export const activeSessionsRouter = createTRPCRouter({
    * Mint a web ticket. This is the path forward: minting is not idempotent,
    * so it belongs on a mutation.
    */
-  createWebTicket: baseProcedure.mutation(({ ctx }) => mintWebTicket(ctx.user.id)),
+  createWebTicket: baseProcedure.mutation(({ ctx }) =>
+    mintWebTicket(ctx.user.id, ctx.deviceSessionId)
+  ),
 
   /**
    * TODO: remove once no shipped client calls this. Superseded by
@@ -161,7 +167,7 @@ export const activeSessionsRouter = createTRPCRouter({
    * Drop it when the mobile and extension releases that call `createWebTicket`
    * have rolled out and the getToken traffic in Axiom reaches zero.
    */
-  getToken: baseProcedure.query(({ ctx }) => mintWebTicket(ctx.user.id)),
+  getToken: baseProcedure.query(({ ctx }) => mintWebTicket(ctx.user.id, ctx.deviceSessionId)),
 
   list: baseProcedure.input(listInputSchema).query(async ({ ctx, input }) => {
     const organizationId = input?.organizationId;

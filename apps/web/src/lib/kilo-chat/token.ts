@@ -7,10 +7,16 @@ import type { KiloChatTokenResponse } from './token-schema';
 
 const KILO_CHAT_TOKEN_TTL_SECONDS = 60 * 60;
 
-export function createKiloChatTokenResponse(user: User): KiloChatTokenResponse {
+export function createKiloChatTokenResponse(
+  user: User,
+  options?: { deviceSessionId?: string }
+): KiloChatTokenResponse {
   const token = generateApiToken(
     user,
-    { tokenSource: 'kilo-chat' },
+    {
+      tokenSource: 'kilo-chat',
+      ...(options?.deviceSessionId ? { deviceSessionId: options.deviceSessionId } : {}),
+    },
     { expiresIn: KILO_CHAT_TOKEN_TTL_SECONDS }
   );
   const expiresAt = new Date(Date.now() + KILO_CHAT_TOKEN_TTL_SECONDS * 1000).toISOString();

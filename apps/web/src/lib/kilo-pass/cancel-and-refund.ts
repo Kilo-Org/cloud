@@ -16,6 +16,7 @@ import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { blockUser } from '@/lib/user/block';
 import { retireCreditBalance } from '@kilocode/web-shared/lib/creditAdjustments';
+import { scheduleDeviceSessionRealtimeClose } from '@/lib/auth/device-session-realtime';
 
 type Db = typeof defaultDb;
 
@@ -241,6 +242,10 @@ export async function cancelAndRefundKiloPassForUser({
 
     return balanceReset;
   });
+
+  if (didBlock) {
+    await scheduleDeviceSessionRealtimeClose({ kiloUserId: userId });
+  }
 
   return {
     status: refundLatestPayment ? 'cancelled_and_refunded' : 'cancelled',

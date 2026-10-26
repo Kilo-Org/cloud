@@ -597,7 +597,11 @@ export async function retryBlockedPreflight(params: {
 }
 
 export type PersistPreflightOutcomeResult =
-  | { kind: 'applied'; outcome: DeletionPreflightOutcome }
+  | {
+      kind: 'applied';
+      outcome: DeletionPreflightOutcome;
+      accessDisabledUserId?: string;
+    }
   | { kind: 'skipped'; reason: 'not_found' | 'not_pending' | 'already_blocked' };
 
 export async function persistPreflightOutcomeTx(
@@ -668,7 +672,11 @@ export async function persistPreflightOutcomeTx(
     })
     .where(eq(user_deletion_requests.id, request.id));
 
-  return { kind: 'applied', outcome };
+  return {
+    kind: 'applied',
+    outcome,
+    ...(adoptedUserId ? { accessDisabledUserId: adoptedUserId } : {}),
+  };
 }
 
 export async function persistRejectedPreflight(requestId: string): Promise<boolean> {

@@ -1,8 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Hono, type Context } from 'hono';
 import { SignJWT } from 'jose';
 import { GASTOWN_AUDIENCE } from './internal-service-token-audiences';
-import { createKiloAuthMiddleware, type KiloAuthVariables } from './kilo-auth-middleware';
+import {
+  createKiloAuthMiddleware,
+  type KiloAuthMiddlewareOptions,
+  type KiloAuthVariables,
+} from './kilo-auth-middleware';
 
 const TEST_SECRET = 'test-secret-that-is-long-enough-for-hs256';
 
@@ -14,13 +18,14 @@ type TestEnv = {
   Variables: KiloAuthVariables;
 };
 
-function createApp() {
+function createApp(options: Partial<KiloAuthMiddlewareOptions<TestEnv>> = {}) {
   let downstreamCalls = 0;
   const authenticated: KiloAuthVariables[] = [];
   const app = new Hono<TestEnv>();
   const kiloAuthMiddleware = createKiloAuthMiddleware<TestEnv>({
     resolveSecret,
     audiencePolicy: { audience: GASTOWN_AUDIENCE, mode: 'allow-legacy' },
+    ...options,
   });
   app.use('/api/*', kiloAuthMiddleware);
   app.use('/trpc/*', kiloAuthMiddleware);
@@ -187,7 +192,7 @@ describe('createKiloAuthMiddleware', () => {
   });
 
   it('preserves claim values and defaults', async () => {
-    const { app } = createApp();
+    const { app } = createApp({ isActiveDeviceSession: async () => true });
     const responses = await request(
       app,
       await signToken({
@@ -196,7 +201,7 @@ describe('createKiloAuthMiddleware', () => {
         apiTokenPepper: 'pepper',
         gastownAccess: true,
         orgMemberships: [{ orgId: 'org-a', role: 'owner' }],
-        deviceSessionId: 'session-gastown-test',
+        deviceSessionId: '11111111-1111-4111-8111-111111111111',
       })
     );
 
@@ -247,5 +252,68 @@ describe('createKiloAuthMiddleware', () => {
 
     expect(responses.map(response => response.status)).toEqual([500, 500]);
     expect(downstreamCalls()).toBe(0);
+  });
+});
+
+describe('createKiloAuthMiddleware device sessions', () => {
+  const deviceSessionId = '11111111-1111-4111-8111-111111111111';
+
+  it('refuses a claimed device session when no validator is configured', async () => {
+    const { app, downstreamCalls } = createApp();
+    const responses = await request(app, await signToken({ deviceSessionId }));
+
+    expect(responses.map(response => response.status)).toEqual([401, 401]);
+    expect(downstreamCalls()).toBe(0);
+  });
+
+  it('accepts a claimed device session only when the validator approves it', async () => {
+    const validator = vi.fn(async () => true);
+    const { app, downstreamCalls } = createApp({ isActiveDeviceSession: validator });
+    const responses = await request(app, await signToken({ deviceSessionId }));
+
+    expect(responses.map(response => response.status)).toEqual([200, 200]);
+    expect(downstreamCalls()).toBe(2);
+    expect(validator).toHaveBeenCalledWith(expect.anything(), deviceSessionId, 'user-abc');
+  });
+
+  it('rejects a claimed device session when the validator refuses it', async () => {
+    const { app, downstreamCalls } = createApp({
+      isActiveDeviceSession: async () => false,
+    });
+    const responses = await request(app, await signToken({ deviceSessionId }));
+
+    expect(responses.map(response => response.status)).toEqual([401, 401]);
+    expect(downstreamCalls()).toBe(0);
+  });
+
+  it('returns a retryable 503 when the device session lookup fails', async () => {
+    const { app, downstreamCalls } = createApp({
+      isActiveDeviceSession: async () => Promise.reject(new Error('connection refused')),
+    });
+    const responses = await request(app, await signToken({ deviceSessionId }));
+
+    expect(responses.map(response => response.status)).toEqual([503, 503]);
+    expect(downstreamCalls()).toBe(0);
+  });
+
+  it('leaves tokens without a device session unchanged', async () => {
+    const validator = vi.fn(async () => false);
+    const { app } = createApp({ isActiveDeviceSession: validator });
+    const responses = await request(app, await signToken());
+
+    expect(responses.map(response => response.status)).toEqual([200, 200]);
+    expect(validator).not.toHaveBeenCalled();
+  });
+});
+
+describe('createKiloAuthMiddleware malformed device session', () => {
+  it('rejects a malformed device session id without calling the validator', async () => {
+    const validator = vi.fn(async () => true);
+    const { app, downstreamCalls } = createApp({ isActiveDeviceSession: validator });
+    const responses = await request(app, await signToken({ deviceSessionId: 'not-a-uuid' }));
+
+    expect(responses.map(response => response.status)).toEqual([401, 401]);
+    expect(downstreamCalls()).toBe(0);
+    expect(validator).not.toHaveBeenCalled();
   });
 });

@@ -57,6 +57,7 @@ import { eq, and, isNull, inArray, or, sql, gte, gt, desc, isNotNull, ne } from 
 import crypto from 'crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
 import { AuthProviderIdSchema } from '@/lib/auth/provider-metadata';
+import { scheduleDeviceSessionRealtimeClose } from '@/lib/auth/device-session-realtime';
 import { AUTOCOMPLETE_MODEL } from '@kilocode/web-shared/lib/constants';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { createAutoTopUpSetupCheckoutSession } from '@/lib/stripe';
@@ -139,7 +140,7 @@ async function revokeOwnedDeviceSession(
   userId: string,
   reason: 'user_revoked' | 'logout'
 ): Promise<void> {
-  await db
+  const revoked = await db
     .update(device_sessions)
     .set({ revoked_at: sql`now()`, revoked_reason: reason })
     .where(
@@ -148,7 +149,12 @@ async function revokeOwnedDeviceSession(
         eq(device_sessions.kilo_user_id, userId),
         isNull(device_sessions.revoked_at)
       )
-    );
+    )
+    .returning({ id: device_sessions.id });
+
+  if (revoked.length > 0) {
+    await scheduleDeviceSessionRealtimeClose({ kiloUserId: userId, deviceSessionId: sessionId });
+  }
   invalidateDeviceSession(sessionId);
 }
 

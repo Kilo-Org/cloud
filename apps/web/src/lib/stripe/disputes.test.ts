@@ -1,6 +1,8 @@
+import '@/tests/setup/mock-device-session-realtime';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import type Stripe from 'stripe';
+
 import type * as StripeDisputesModule from '@/lib/stripe/disputes';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';

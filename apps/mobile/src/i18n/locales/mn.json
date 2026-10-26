@@ -4022,6 +4022,7 @@
       "startNewSessionHint": "Шинэ сесс эхлүүлэхийн тулд удаан дарна уу.",
       "linkSession": "Сесс холбох",
       "linkFailed": "Сессийг хийх ажилтай холбож чадсангүй",
+      "moveToAnotherTodo": "Өөр хийх ажилд шилжүүлэх",
       "startRefreshFailed": "Сесс эхэлсэн ч энэ жагсаалт шинэчлэгдсэнгүй."
     },
     "linkSession": {
@@ -4031,6 +4032,7 @@
     },
     "upNext": "Дараагийнх",
     "sessionTodo": "Хийх ажил: {{title}}",
+    "openTodoHint": "Хийх ажлыг нээнэ.",
     "linkToTodo": "Хийх ажилтай холбох",
     "candidates": {
       "empty": "Нээлттэй хийх ажил алга"

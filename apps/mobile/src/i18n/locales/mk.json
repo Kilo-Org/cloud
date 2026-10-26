@@ -4022,6 +4022,7 @@
       "startNewSessionHint": "Притиснете долго за да започнете нова сесија.",
       "linkSession": "Поврзи сесија",
       "linkFailed": "Не можеше да се поврзе сесијата со задачата",
+      "moveToAnotherTodo": "Премести во друга задача",
       "startRefreshFailed": "Сесијата започна, но овој список не се ажурираше."
     },
     "linkSession": {
@@ -4031,6 +4032,7 @@
     },
     "upNext": "Следно",
     "sessionTodo": "Задача: {{title}}",
+    "openTodoHint": "Ја отвора задачата.",
     "linkToTodo": "Поврзи со задача",
     "candidates": {
       "empty": "Нема отворени задачи"

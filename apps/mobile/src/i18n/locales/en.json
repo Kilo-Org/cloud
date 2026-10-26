@@ -4122,6 +4122,7 @@
       "startNewSessionHint": "Long-press to start a new session.",
       "linkSession": "Link session",
       "linkFailed": "Couldn’t link the session to the to-do",
+      "moveToAnotherTodo": "Move to another to-do",
       "startRefreshFailed": "The session started, but this list didn’t update."
     },
     "linkSession": {
@@ -4131,6 +4132,7 @@
     },
     "upNext": "Up next",
     "sessionTodo": "To-do: {{title}}",
+    "openTodoHint": "Opens the to-do.",
     "linkToTodo": "Link to to-do",
     "candidates": {
       "empty": "No open to-dos"

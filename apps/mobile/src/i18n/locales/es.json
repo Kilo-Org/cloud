@@ -4077,6 +4077,7 @@
       "startNewSessionHint": "Mantén pulsado para iniciar una nueva sesión.",
       "linkSession": "Vincular sesión",
       "linkFailed": "No se pudo vincular la sesión a la tarea",
+      "moveToAnotherTodo": "Mover a otra tarea",
       "startRefreshFailed": "La sesión se inició, pero esta lista no se actualizó."
     },
     "linkSession": {
@@ -4086,6 +4087,7 @@
     },
     "upNext": "A continuación",
     "sessionTodo": "Tarea: {{title}}",
+    "openTodoHint": "Abre la tarea.",
     "linkToTodo": "Vincular a una tarea",
     "candidates": {
       "empty": "No hay tareas abiertas"

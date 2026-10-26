@@ -4022,6 +4022,7 @@
       "startNewSessionHint": "Tekan lama untuk memulakan sesi baharu.",
       "linkSession": "Pautkan sesi",
       "linkFailed": "Tidak dapat memautkan sesi pada tugasan",
+      "moveToAnotherTodo": "Alihkan ke tugasan lain",
       "startRefreshFailed": "Sesi telah dimulakan, tetapi senarai ini tidak dikemas kini."
     },
     "linkSession": {
@@ -4031,6 +4032,7 @@
     },
     "upNext": "Seterusnya",
     "sessionTodo": "Tugasan: {{title}}",
+    "openTodoHint": "Membuka tugasan.",
     "linkToTodo": "Pautkan pada tugasan",
     "candidates": {
       "empty": "Tiada tugasan terbuka"

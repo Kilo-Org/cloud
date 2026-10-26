@@ -4022,6 +4022,7 @@
       "startNewSessionHint": "ახალი სესიის დასაწყებად გრძლად დააჭირე.",
       "linkSession": "სესიის მიბმა",
       "linkFailed": "სესიის დავალებასთან დაკავშირება ვერ მოხერხდა",
+      "moveToAnotherTodo": "გადატანა სხვა დავალებაში",
       "startRefreshFailed": "სესია დაიწყო, მაგრამ ეს სია არ განახლდა."
     },
     "linkSession": {
@@ -4031,6 +4032,7 @@
     },
     "upNext": "შემდეგი",
     "sessionTodo": "დავალება: {{title}}",
+    "openTodoHint": "ხსნის დავალებას.",
     "linkToTodo": "დავალებასთან დაკავშირება",
     "candidates": {
       "empty": "ღია დავალებები არ არის"

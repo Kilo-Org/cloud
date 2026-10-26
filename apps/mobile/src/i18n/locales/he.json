@@ -4077,6 +4077,7 @@
       "startNewSessionHint": "לחץ לחיצה ארוכה כדי להתחיל סשן חדש.",
       "linkSession": "קישור סשן",
       "linkFailed": "לא הצלחנו לקשר את הסשן למשימה",
+      "moveToAnotherTodo": "העבר למשימה אחרת",
       "startRefreshFailed": "הסשן התחיל, אבל הרשימה לא עודכנה."
     },
     "linkSession": {
@@ -4086,6 +4087,7 @@
     },
     "upNext": "הבא בתור",
     "sessionTodo": "משימה: {{title}}",
+    "openTodoHint": "פותח את המשימה.",
     "linkToTodo": "קישור למשימה",
     "candidates": {
       "empty": "אין משימות פתוחות"

@@ -4022,6 +4022,7 @@
       "startNewSessionHint": "Shtyp gjatë për të nisur një sesion të ri.",
       "linkSession": "Lidh seancën",
       "linkFailed": "Seanca nuk u lidh me detyrën",
+      "moveToAnotherTodo": "Zhvendos në një detyrë tjetër",
       "startRefreshFailed": "Seanca nisi, por kjo listë nuk u përditësua."
     },
     "linkSession": {
@@ -4031,6 +4032,7 @@
     },
     "upNext": "Në vazhdim",
     "sessionTodo": "Detyrë: {{title}}",
+    "openTodoHint": "Hap detyrën.",
     "linkToTodo": "Lidh me detyrën",
     "candidates": {
       "empty": "Pa detyra të hapura"

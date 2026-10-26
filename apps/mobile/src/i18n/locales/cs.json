@@ -4132,6 +4132,7 @@
       "startNewSessionHint": "Dlouhým stisknutím zahájíš novou relaci.",
       "linkSession": "Připojit relaci",
       "linkFailed": "Relaci se nepodařilo připojit k úkolu",
+      "moveToAnotherTodo": "Přesunout do jiného úkolu",
       "startRefreshFailed": "Relace byla spuštěna, ale tento seznam se neaktualizoval."
     },
     "linkSession": {
@@ -4141,6 +4142,7 @@
     },
     "upNext": "Následuje",
     "sessionTodo": "Úkol: {{title}}",
+    "openTodoHint": "Otevře úkol.",
     "linkToTodo": "Připojit k úkolu",
     "candidates": {
       "empty": "Žádné otevřené úkoly"

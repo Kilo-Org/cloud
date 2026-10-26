@@ -248,12 +248,21 @@ export async function resolveEffectiveSessionConfiguration(
 
   const resolvedRequest = applyProfileResolution(input, resolved);
   assertResolvedConfigurationWithinSessionLimits(resolvedRequest.profile?.resolved);
-  // The allocation travels beside the merged configuration; a client cannot
-  // set it.
-  const { environmentSandboxAllocation: _clientAllocation, ...withoutEnvironment } =
-    resolvedRequest;
-  if (!environment?.sandboxAllocation) return withoutEnvironment;
-  return { ...withoutEnvironment, environmentSandboxAllocation: environment.sandboxAllocation };
+  // The reference and the allocation travel beside the merged configuration;
+  // a client cannot set them.
+  const {
+    environment: _clientEnvironment,
+    environmentSandboxAllocation: _clientAllocation,
+    ...withoutEnvironment
+  } = resolvedRequest;
+  if (!environment) return withoutEnvironment;
+  return {
+    ...withoutEnvironment,
+    environment: environment.reference,
+    ...(environment.sandboxAllocation
+      ? { environmentSandboxAllocation: environment.sandboxAllocation }
+      : {}),
+  };
 }
 
 export function assertModeAvailableForProfile(mode: string, profile: SessionProfileBundle): void {

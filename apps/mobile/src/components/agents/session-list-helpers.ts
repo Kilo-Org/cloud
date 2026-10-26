@@ -136,8 +136,11 @@ export function projectOptionKey(gitUrl: string): string {
  * reading `Date.now()` behind the memo (see `useNowTicker`); omitted, the
  * formatter reads the current time.
  */
-export function formatMeta(timestamp: string, nowMs?: number): string {
-  return timeAgo(parseTimestamp(timestamp), undefined, nowMs).toLocaleUpperCase(i18n.language);
+export function formatMeta(timestamp: string | null | undefined, nowMs?: number): string {
+  const date = parseTimestamp(timestamp);
+  return Number.isNaN(date.getTime())
+    ? ''
+    : timeAgo(date, undefined, nowMs).toLocaleUpperCase(i18n.language);
 }
 
 /**
@@ -217,7 +220,7 @@ export function selectSessionCostInputs(
  * in-progress, old, or zero-cost sessions).
  */
 export function composeStoredSessionVisibleMeta(cost: string | null, timeMeta: string): string {
-  return cost ? `${cost} · ${timeMeta}` : timeMeta;
+  return composeActiveSessionVisibleMeta(cost, timeMeta) ?? '';
 }
 
 /**
@@ -227,9 +230,7 @@ export function composeStoredSessionVisibleMeta(cost: string | null, timeMeta: s
  * the visible "$0.12 · 5M AGO" order.
  */
 export function composeStoredSessionSpokenMeta(cost: string | null, timeSpoken: string): string {
-  return cost
-    ? i18n.t('agents.sessionRow.costSpokenWithTime', { cost, time: timeSpoken })
-    : timeSpoken;
+  return composeActiveSessionSpokenMeta(cost, timeSpoken) ?? '';
 }
 
 /**

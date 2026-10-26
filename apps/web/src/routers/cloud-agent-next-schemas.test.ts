@@ -672,6 +672,7 @@ describe('send-time attachment filenames', () => {
   };
   const sendInput = {
     cloudAgentSessionId: 'agent_12345678-1234-4234-9234-123456789abc',
+    messageId: 'msg_123456789abc123456789ABCDE',
     payload: { type: 'prompt', prompt: '', mode: 'code', model: 'kilo/test-model' },
   };
   const attachmentsWith = (extension: string) => ({
@@ -889,8 +890,8 @@ describe('prepare session sandbox selection', () => {
     { vcpus: 4 },
     { provider: { id: 'cloudflare', account: 'byoc' }, instanceType: 'single' },
     { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'small' },
-    { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'single' },
-    { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'single' },
+    { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'default' },
     { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'devcontainer' },
   ])('rejects an invalid sandbox allocation: %j', sandboxAllocation => {
     expect(

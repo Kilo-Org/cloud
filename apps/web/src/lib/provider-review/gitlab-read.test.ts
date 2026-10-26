@@ -5,7 +5,11 @@ import { PassThrough } from 'stream';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import type { Owner } from '@/lib/integrations/core/types';
 import { GitLabInstanceUrlError } from '@/lib/integrations/platforms/gitlab/instance-url';
-import { FILE_LINES_MAX } from '@/lib/github-pr-review/dtos';
+import {
+  FILE_LINES_MAX,
+  FILE_READ_MAX_BYTES,
+  FILE_READ_TOO_LARGE_MESSAGE,
+} from '@/lib/github-pr-review/dtos';
 import {
   getFileLines,
   getMergeRequest,
@@ -14,8 +18,8 @@ import {
   listChecks,
   listDiscussions,
   listInbox,
-  requestGitLabJson,
 } from './gitlab-read';
+import { requestGitLabJson } from './gitlab-http';
 import { GitLabApiStatusError, GitLabReviewError } from './gitlab-authorization';
 
 // The bound transport runs through Node https.request; mirror adapter.test.ts.
@@ -43,6 +47,7 @@ jest.mock('@/lib/integrations/gitlab-service', () => ({
 }));
 
 jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
+  ...jest.requireActual('@/lib/integrations/platforms/gitlab/adapter'),
   fetchGitLabMergeRequest: (params: unknown) => mockFetchGitLabMergeRequest(params),
   getMRHeadCommit: (...args: unknown[]) => mockGetMRHeadCommit(...args),
   getMRDiffRefs: (...args: unknown[]) => mockGetMRDiffRefs(...args),
@@ -143,6 +148,70 @@ const diffFixture = [
     diff: '@@ -1,2 +1,2 @@\n-old\n+new\n',
   },
 ];
+
+const discussionStateCases = [
+  {
+    name: 'resolved first resolvable note after a non-resolvable note',
+    flags: [
+      { resolvable: false, resolved: false },
+      { resolvable: true, resolved: true },
+      { resolvable: true, resolved: false },
+    ],
+    resolvable: true,
+    resolved: true,
+  },
+  {
+    name: 'unresolved first resolvable note after a non-resolvable note',
+    flags: [
+      { resolvable: false, resolved: true },
+      { resolvable: true, resolved: false },
+      { resolvable: true, resolved: true },
+    ],
+    resolvable: true,
+    resolved: false,
+  },
+  {
+    name: 'missing resolved flag on the first resolvable note',
+    flags: [
+      { resolvable: false, resolved: true },
+      { resolvable: true },
+      { resolvable: true, resolved: true },
+    ],
+    resolvable: true,
+    resolved: false,
+  },
+  {
+    name: 'no resolvable notes despite a resolved flag',
+    flags: [{ resolvable: false, resolved: true }],
+    resolvable: false,
+    resolved: false,
+  },
+  {
+    name: 'no notes',
+    flags: [],
+    resolvable: false,
+    resolved: false,
+  },
+];
+
+function discussionWithState(flags: { resolvable: boolean; resolved?: boolean }[]) {
+  return {
+    id: 'disc-state',
+    individual_note: false,
+    notes: flags.map((flag, index) => ({
+      id: index + 1,
+      body: `Note ${index + 1}`,
+      author: { id: 1, username: 'alice', name: 'Alice' },
+      created_at: '2026-01-02T00:00:00Z',
+      updated_at: '2026-01-02T00:00:00Z',
+      system: false,
+      noteable_id: 100,
+      noteable_type: 'MergeRequest',
+      noteable_iid: 12,
+      ...flag,
+    })),
+  };
+}
 
 let fetchMock: jest.Mock;
 
@@ -386,23 +455,32 @@ describe('listChangedFiles', () => {
 });
 
 describe('getFileLines', () => {
+  function serveFileBody(body: string) {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/repository/files/file.txt/raw')) {
+        return new Response(body, { status: 200, headers: { 'content-type': 'text/plain' } });
+      }
+      return jsonResponse([]);
+    });
+  }
+
   it('returns the 1-based inclusive slice with the total line count', async () => {
-    mockFetchGitLabRootTextFileAtRef.mockResolvedValue('a\nb\nc\nd\ne');
+    serveFileBody('a\nb\nc\nd\ne');
 
     const result = await getFileLines(OWNER, PROJECT_PATH, 'sha-head', 'file.txt', 2, 4);
 
     expect(result).toEqual({ lines: ['b', 'c', 'd'], totalLines: 5 });
-    expect(mockFetchGitLabRootTextFileAtRef).toHaveBeenCalledWith(
-      'glpat-mock-token',
-      PROJECT_PATH,
-      'file.txt',
-      'sha-head',
-      INSTANCE_URL
-    );
+    const requested = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(requested.pathname).toContain(encodeURIComponent(PROJECT_PATH));
+    expect(
+      requested.pathname.endsWith(`/repository/files/${encodeURIComponent('file.txt')}/raw`)
+    ).toBe(true);
+    expect(requested.searchParams.get('ref')).toBe('sha-head');
+    expect(mockFetchGitLabRootTextFileAtRef).not.toHaveBeenCalled();
   });
 
   it('refuses a missing file as non-retryable not_found', async () => {
-    mockFetchGitLabRootTextFileAtRef.mockResolvedValue(null);
+    fetchMock.mockImplementation(async () => new Response(null, { status: 404 }));
 
     await expect(
       getFileLines(OWNER, PROJECT_PATH, 'sha-head', 'gone.txt', 1, 5)
@@ -411,7 +489,7 @@ describe('getFileLines', () => {
 
   it('caps the returned window at the shared FILE_LINES_MAX', async () => {
     const content = Array.from({ length: 600 }, (_, index) => `line ${index + 1}`).join('\n');
-    mockFetchGitLabRootTextFileAtRef.mockResolvedValue(content);
+    serveFileBody(content);
 
     const result = await getFileLines(OWNER, PROJECT_PATH, 'sha-head', 'file.txt', 1, 600);
 
@@ -419,6 +497,65 @@ describe('getFileLines', () => {
     expect(result.lines).toHaveLength(FILE_LINES_MAX);
     expect(result.lines[0]).toBe('line 1');
     expect(result.lines.at(-1)).toBe(`line ${FILE_LINES_MAX}`);
+  });
+
+  it('reads the file body inside the byte budget', async () => {
+    // Three chunks of half the budget: the third one passes the budget, so the
+    // reader stops there and never pulls the remaining chunks.
+    let pulled = 0;
+    const chunk = 'x'.repeat(FILE_READ_MAX_BYTES / 2);
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (pulled >= 6) {
+          controller.close();
+          return;
+        }
+        pulled += 1;
+        controller.enqueue(new TextEncoder().encode(chunk));
+      },
+    });
+    fetchMock.mockImplementation(async () => new Response(stream, { status: 200 }));
+
+    const error = await captureRejection(
+      getFileLines(OWNER, PROJECT_PATH, 'sha-head', 'file.txt', 1, 2)
+    );
+
+    expect(error.kind).toBe('too_large');
+    expect(error.retryable).toBe(false);
+    expect(error.message).toBe(FILE_READ_TOO_LARGE_MESSAGE);
+    // The stream prefetches at most one chunk past the read that crosses the
+    // budget, so the body is abandoned well before its six chunks are pulled.
+    expect(pulled).toBeLessThan(6);
+  });
+
+  it('rejects a declared oversized body without reading it', async () => {
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          controller.enqueue(new Uint8Array(FILE_READ_MAX_BYTES + 1));
+        },
+        cancel() {
+          cancelled = true;
+        },
+      },
+      { highWaterMark: 0 }
+    );
+    fetchMock.mockImplementation(
+      async () =>
+        new Response(stream, {
+          status: 200,
+          headers: { 'content-length': String(FILE_READ_MAX_BYTES + 1) },
+        })
+    );
+
+    const error = await captureRejection(
+      getFileLines(OWNER, PROJECT_PATH, 'sha-head', 'file.txt', 1, 2)
+    );
+
+    expect(error.kind).toBe('too_large');
+    expect(error.message).toBe(FILE_READ_TOO_LARGE_MESSAGE);
+    expect(cancelled).toBe(true);
   });
 });
 
@@ -541,6 +678,19 @@ describe('listDiscussions', () => {
     expect(page.threads[2]).toMatchObject({ threadId: 'disc-3', resolved: true });
     // System notes never appear as comments.
     expect(page.threads[2]?.comments.map(comment => comment.commentId)).toEqual(['14']);
+  });
+
+  it.each(discussionStateCases)('maps discussion state for $name', async testCase => {
+    fetchMock.mockResolvedValue(jsonResponse([discussionWithState(testCase.flags)]));
+
+    const page = await listDiscussions(OWNER, PROJECT_PATH, 12);
+
+    expect(page.threads).toHaveLength(1);
+    expect(page.threads[0]).toMatchObject({
+      threadId: 'disc-state',
+      resolvable: testCase.resolvable,
+      resolved: testCase.resolved,
+    });
   });
 
   it('reuses the same cursor rule: foreign identity restarts at page 1', async () => {
@@ -845,6 +995,21 @@ describe('getMergeState', () => {
     });
   });
 
+  it.each(discussionStateCases)('applies the discussion merge gate for $name', async testCase => {
+    routeResponses({
+      settings: { only_allow_merge_if_all_discussions_are_resolved: true },
+      discussions: [discussionWithState(testCase.flags)],
+    });
+
+    const state = await getMergeState(OWNER, PROJECT_PATH, 12);
+
+    const blocked = testCase.resolvable && !testCase.resolved;
+    expect(state.canMerge).toBe(!blocked);
+    expect(state.blockedReasons).toEqual(
+      blocked ? [{ code: 'other', message: 'Resolve all discussions before merging.' }] : []
+    );
+  });
+
   it('treats a 404 approvals endpoint (no approval rules) as no approval gate', async () => {
     routeResponses({ settings: {}, approvals: undefined });
 
@@ -1080,6 +1245,19 @@ describe('request transport binds to the resolved address (no DNS rebinding)', (
       kind: 'retryable',
       retryable: true,
     });
+  });
+
+  it('stops a bound file read at the shared read budget', async () => {
+    mockBoundResponse({ status: 200, body: Buffer.alloc(FILE_READ_MAX_BYTES + 1, 0x61) });
+
+    const error = await captureRejection(
+      getFileLines(OWNER, PROJECT_PATH, 'sha-head', 'file.txt', 1, 2)
+    );
+
+    expect(error.kind).toBe('too_large');
+    expect(error.retryable).toBe(false);
+    expect(error.message).toBe(FILE_READ_TOO_LARGE_MESSAGE);
+    expect(mockHttpsRequest).toHaveBeenCalledTimes(1);
   });
 
   it('classifies a bound 404 as not_found without leaking the instance URL', async () => {

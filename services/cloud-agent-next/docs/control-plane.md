@@ -610,14 +610,27 @@ text, not route state. A route already prepared in this process (checkout presen
 open) returns `session.ready` at once. A `session.prepare` for a failed route starts fresh,
 including a new Kilo restart budget.
 
+Every in-sandbox git process authenticates through the platform's read-only credential helper
+(`scripts/kilo-git-credential`, pinned by `SYSTEM_GIT_CONFIG_ENV`), which reads the per-session
+credential record in the runtime home. That covers the wrapper's own clone and fetch, the Kilo CLI
+and the workspace terminal, including a token a route is given without a platform. `origin` is
+therefore always the canonical credential-free URL: a copy of a worktree never carries the
+credential, and a credential-bearing `origin` (from an older workspace or chosen by the agent) is
+rewritten to the same URL without userinfo. A credential refresh rewrites the record; the next git
+command picks it up.
+
+Environment builds use the same pinned helper and a record in their fixed HOME during clone and
+setup. Pre-capture cleanup verifies removal of that record before the build can report ready;
+caches and toolchains remain available to sessions restored from the environment.
+
 Eligible managed GitHub HTTPS preparation clone and fetch, and only those invocations, pass two
 invocation-scoped options together: `proactiveAuth=basic` so the first request carries the existing
-URL-bound control alias, and `followRedirects=false` so every redirect fails instead of letting Git
-reattach the alias to a redirected request. The credential remains the existing control alias; the
-only credential flow is contained resolution, repository-authorized redemption, and the bounded
-Retry-After handler. Every redirect fails the operation, including a same-origin redirect from a
-renamed or transferred repository, so the caller must use the current direct repository URL. The
-options are command arguments, not Git config.
+control alias from the helper, and `followRedirects=false` so every redirect fails instead of
+letting Git reattach the alias to a redirected request. The credential remains the existing control
+alias; the only credential flow is contained resolution, repository-authorized redemption, and the
+bounded Retry-After handler. Every redirect fails the operation, including a same-origin redirect
+from a renamed or transferred repository, so the caller must use the current direct repository URL.
+The options are command arguments, not Git config.
 
 #### Workspace stamp
 
@@ -634,7 +647,7 @@ directory when there is no repository). The reader also accepts the older `captu
 
 Adopt makes the snapshot equal to a fresh clone, then runs the ordinary steps:
 
-1. Point `origin` at this route's credential.
+1. Point `origin` at this route's canonical, credential-free URL.
 2. `fetch --prune`, then refresh the remote default branch.
 3. Detach at the remote default branch, so a new branch starts from its tip.
 4. Delete every local branch. The builder's default branch would otherwise shadow a newer

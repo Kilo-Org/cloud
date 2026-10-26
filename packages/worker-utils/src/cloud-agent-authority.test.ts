@@ -152,7 +152,6 @@ describe('Cloud Agent authority contract', () => {
     { setupCommands: [] },
     { cloudAgentSpawn: {} },
     { attachments: {} },
-    { images: {} },
     { initialPayload: {} },
     { cloneFromKiloSessionId: 'fixture' },
     { runtimeAgents: [] },

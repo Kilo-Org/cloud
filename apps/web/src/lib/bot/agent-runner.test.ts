@@ -77,6 +77,7 @@ jest.mock('@/lib/cloud-agent-next/session-url', () => ({
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: jest.fn(),
   createCloudAgentNextClientForModel: jest.fn(),
+  InsufficientCreditsError: class InsufficientCreditsError extends Error {},
 }));
 jest.mock('@/lib/cloud-agent-next/balance-check-eligibility', () => ({
   computeCloudAgentNextBalanceCheckEligibility: jest.fn(),

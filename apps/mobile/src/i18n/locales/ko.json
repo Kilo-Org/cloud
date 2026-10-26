@@ -227,7 +227,6 @@
     "hideBalance": "잔액 숨기기",
     "showBalance": "잔액 표시",
     "balanceHidden": "잔액이 숨겨짐",
-    "bonusCreditsExpiring": "{{date}}에 만료되는 크레딧은 {{amount}}입니다.",
     "signOutTitle": "로그아웃할까요?",
     "signOutMessage": "작업 영역을 이용하려면 다시 로그인해야 합니다.",
     "deleteAccountTitle": "계정을 삭제할까요?",
@@ -3151,7 +3150,7 @@
     "creditActivity": {
       "emptyDescription": "이 조직의 크레딧 구매, 사용 및 조정 내역이 여기에 표시됩니다.",
       "emptyTitle": "크레딧 내역 없음",
-      "expires": "{{date}}에 만료",
+      "expiresUtc": "{{date}} (UTC)에 만료",
       "title": "크레딧 내역",
       "transactionFallback": "크레딧 거래",
       "category": {
@@ -3746,6 +3745,7 @@
     "title": "프로필",
     "entrySubtitle": "세션 전체에서 환경 설정 재사용",
     "newProfile": "새 프로필",
+    "openHint": "프로필을 엽니다",
     "emptyTitle": "아직 프로필이 없습니다.",
     "emptyDescription": "세션 전체에서 환경 변수, 설정 명령 및 기술을 재사용하기 위한 프로필을 만듭니다.",
     "loadFailed": "프로필을 로드할 수 없습니다.",
@@ -3937,6 +3937,10 @@
   "credits": {
     "title": "크레딧 구매",
     "description": "크레딧은 Kilo 앱에서 AI 코딩 세션을 실행하기 위해 Kilo 잔액에 추가되는 일회성 구매입니다. 스토어가 계정에 요금을 청구하고 스토어가 결제를 확인한 후 크레딧이 추가됩니다.",
+    "nextExpiry": "{{date}}(UTC)에 만료되는 크레딧은 {{amount}}입니다. 만료일이 가장 빠른 크레딧부터 사용됩니다.",
+    "appStoreExpiry": "App Store에서 구매한 크레딧은 만료되지 않습니다.",
+    "playOneYearExpiry": "이 크레딧은 구매일로부터 1년 후에 만료됩니다.",
+    "playNonexpiring": "이 크레딧은 만료되지 않습니다.",
     "packLabel": "{{amount}} 상당의 크레딧 추가",
     "priceUnavailable": "가격을 사용할 수 없음",
     "purchased": "크레딧이 잔액에 추가되었습니다.",
@@ -3977,11 +3981,13 @@
       "namePlaceholder": "버그, 아이디어, 릴리스…",
       "emoji": "이모지",
       "mode": "모드",
-      "defaultsHint": "이 목록에서 시작한 세션은 이 기본값을 사용합니다."
+      "defaultsHint": "이 목록에서 시작한 세션은 이 기본값을 사용합니다.",
+      "saveFailed": "목록을 저장할 수 없습니다. 연결을 확인한 후 다시 시도해 주세요."
     },
     "list": {
       "addPlaceholder": "할 일 추가",
       "add": "할 일 추가하기",
+      "addFailed": "할 일을 추가할 수 없습니다. 연결을 확인한 후 다시 시도해 주세요.",
       "empty": "아직 할 일이 없습니다",
       "setDefaults": "저장소, 모드 및 모델 설정",
       "completed_one": "완료 ({{count}})",
@@ -4018,7 +4024,9 @@
       "startNewSession": "새 세션 시작",
       "startNewSessionHint": "길게 눌러 새 세션을 시작하세요.",
       "linkSession": "세션 연결",
-      "linkFailed": "세션을 할 일에 연결할 수 없습니다"
+      "linkFailed": "세션을 할 일에 연결할 수 없습니다",
+      "moveToAnotherTodo": "다른 할 일로 이동",
+      "startRefreshFailed": "세션이 시작되었지만 이 목록은 업데이트되지 않았습니다."
     },
     "linkSession": {
       "title": "세션 연결하기",
@@ -4027,6 +4035,7 @@
     },
     "upNext": "다음",
     "sessionTodo": "할 일: {{title}}",
+    "openTodoHint": "할 일을 엽니다.",
     "linkToTodo": "할 일에 연결",
     "candidates": {
       "empty": "열린 할 일 없음"

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { credit_transactions, kilocode_users, organizations } from '@kilocode/db/schema';
+import { reconcileCreditExpirationsInTransaction } from '@kilocode/db/credit-expiration';
 import { db, pool } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
@@ -10,6 +11,11 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { processLocalExpirations, processOrganizationExpirations } from './creditExpiration';
 import { and, eq, isNull, sql } from 'drizzle-orm';
+import { after } from 'next/server';
+import {
+  maybePerformAutoTopUp,
+  maybePerformOrganizationAutoTopUp,
+} from '@kilocode/web-shared/lib/autoTopUp';
 
 jest.mock('next/server', () => ({
   ...jest.requireActual('next/server'),
@@ -32,7 +38,7 @@ async function waitForBlockedExpiration(blockerPid: number) {
         SELECT 1 FROM pg_stat_activity
         WHERE $1::int = ANY(pg_blocking_pids(pid))
           AND wait_event_type = 'Lock'
-          AND query ILIKE '%for update%'
+          AND (query ILIKE '%for update%' OR query ILIKE '%for no key update%')
       ) AS blocked`,
       [blockerPid]
     );
@@ -280,6 +286,27 @@ describe.each(['personal', 'organization'] as const)('%s locked credit expiratio
     expect(await account.closures()).toHaveLength(1);
   });
 
+  test('canonical reconciliation defaults to scanning due lots even with a cleared hint', async () => {
+    const account = await fixture();
+    await pool.query(`UPDATE ${tableName} SET next_credit_expiration_at = NULL WHERE id = $1`, [
+      account.id,
+    ]);
+    expect((await account.expire()).total_microdollars_acquired).toBe(2_000);
+    expect(await account.closures()).toHaveLength(0);
+
+    const state = await db.transaction(tx =>
+      reconcileCreditExpirationsInTransaction(
+        { type: account.org ? 'organization' : 'user', id: account.id },
+        tx,
+        now
+      )
+    );
+    expect(state.microdollars_used).toBe(300);
+    expect(state.total_microdollars_acquired).toBe(1_300);
+    expect(new Date(state.next_credit_expiration_at ?? '').toISOString()).toBe(futureAt);
+    expect(await account.closures()).toHaveLength(1);
+  });
+
   test('bounds inserts for histories larger than PostgreSQL parameter limits', async () => {
     const account = await fixture();
     await db.delete(credit_transactions).where(account.ownerFilter);
@@ -304,6 +331,40 @@ describe.each(['personal', 'organization'] as const)('%s locked credit expiratio
     expect(closures).toHaveLength(8_000);
     expect(closures.reduce((sum, closure) => sum + closure.amount_microdollars, 0)).toBe(-8_000);
     expect(await account.expire()).toEqual(state);
+  });
+
+  test('schedules funding only for usage and passes coherent fresh owner state', async () => {
+    const account = await fixture();
+    account.user.auto_top_up_enabled = true;
+    await pool.query(
+      `UPDATE ${tableName} SET auto_top_up_enabled = true, ${currentUsageUpdate} WHERE id = $1`,
+      [account.id]
+    );
+
+    const ordinaryBalance = await getBalanceAndOrgSettings(account.org?.id, account.user);
+    expect(ordinaryBalance.balance).toBe(0.001);
+    expect(after).not.toHaveBeenCalled();
+
+    const usageBalance = await getBalanceAndOrgSettings(
+      account.org?.id,
+      account.user,
+      db,
+      'usage'
+    );
+    expect(usageBalance).toEqual(ordinaryBalance);
+    const callbacks = jest.mocked(after).mock.calls;
+    expect(callbacks).toHaveLength(1);
+    const callback = callbacks[0][0];
+    if (typeof callback !== 'function') throw new Error('Expected scheduled funding callback');
+    await callback();
+    const topUp = account.org ? maybePerformOrganizationAutoTopUp : maybePerformAutoTopUp;
+    expect(topUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: account.id,
+        microdollars_used: 900,
+        total_microdollars_acquired: 1_900,
+      })
+    );
   });
 
   test('uses current owner state for balance, payer, and allowance after a held-row race', async () => {

@@ -227,7 +227,6 @@
     "hideBalance": "Saldo verbergen",
     "showBalance": "Saldo tonen",
     "balanceHidden": "Saldo verborgen",
-    "bonusCreditsExpiring": "{{amount}} aan tegoed verloopt op {{date}}.",
     "signOutTitle": "Afmelden?",
     "signOutMessage": "Je moet je opnieuw aanmelden om toegang te krijgen tot je werkruimte.",
     "deleteAccountTitle": "Account verwijderen?",
@@ -3151,7 +3150,7 @@
     "creditActivity": {
       "emptyDescription": "Hier verschijnen aankopen, verbruik en aanpassingen van het tegoed van deze organisatie zodra ze plaatsvinden.",
       "emptyTitle": "Geen tegoedtransacties",
-      "expires": "Verloopt op {{date}}",
+      "expiresUtc": "Verloopt op {{date}} (UTC)",
       "title": "Tegoedtransacties",
       "transactionFallback": "Tegoedtransactie",
       "category": {
@@ -3746,6 +3745,7 @@
     "title": "Profielen",
     "entrySubtitle": "Hergebruik omgevingsinstellingen tussen sessies",
     "newProfile": "Nieuw profiel",
+    "openHint": "Opent het profiel",
     "emptyTitle": "Nog geen profielen",
     "emptyDescription": "Maak een profiel aan om omgevingsvariabelen, installatieopdrachten en vaardigheden tijdens sessies opnieuw te gebruiken.",
     "loadFailed": "Kan profielen niet laden",
@@ -3937,6 +3937,10 @@
   "credits": {
     "title": "Credits kopen",
     "description": "Credits zijn een eenmalige aankoop die aan je Kilo-saldo wordt toegevoegd voor AI-coderingssessies in Kilo App. De store belast je account en de credits worden toegevoegd nadat de store de betaling bevestigt.",
+    "nextExpiry": "{{amount}} aan credits verloopt op {{date}} (UTC). Credits die het eerst verlopen, worden eerst gebruikt.",
+    "appStoreExpiry": "Credits die via de App Store zijn gekocht, verlopen niet.",
+    "playOneYearExpiry": "Deze credits verlopen één kalenderjaar na aankoop.",
+    "playNonexpiring": "Deze credits verlopen niet.",
     "packLabel": "{{amount}} aan credits toevoegen",
     "priceUnavailable": "Prijs niet beschikbaar",
     "purchased": "Er zijn credits aan je saldo toegevoegd.",
@@ -3977,11 +3981,13 @@
       "namePlaceholder": "Fouten, ideeën, releases…",
       "emoji": "Emoji",
       "mode": "Modus",
-      "defaultsHint": "Sessies die je vanaf deze lijst start, gebruiken deze standaardwaarden."
+      "defaultsHint": "Sessies die je vanaf deze lijst start, gebruiken deze standaardwaarden.",
+      "saveFailed": "Kon de lijst niet opslaan. Controleer je verbinding en probeer het opnieuw."
     },
     "list": {
       "addPlaceholder": "Een taak toevoegen",
       "add": "Taak toevoegen",
+      "addFailed": "Kon de taak niet toevoegen. Controleer je verbinding en probeer het opnieuw.",
       "empty": "Nog geen taken",
       "setDefaults": "Coderepository, modus en model instellen",
       "completed_one": "Voltooid ({{count}})",
@@ -4018,7 +4024,9 @@
       "startNewSession": "Nieuwe sessie starten",
       "startNewSessionHint": "Houd ingedrukt om een nieuwe sessie te starten.",
       "linkSession": "Sessie koppelen",
-      "linkFailed": "De sessie kon niet aan de taak worden gekoppeld"
+      "linkFailed": "De sessie kon niet aan de taak worden gekoppeld",
+      "moveToAnotherTodo": "Naar een andere taak verplaatsen",
+      "startRefreshFailed": "De sessie is gestart, maar deze lijst is niet bijgewerkt."
     },
     "linkSession": {
       "title": "Een sessie koppelen",
@@ -4027,6 +4035,7 @@
     },
     "upNext": "Hierna",
     "sessionTodo": "Taak: {{title}}",
+    "openTodoHint": "Opent de taak.",
     "linkToTodo": "Aan een taak koppelen",
     "candidates": {
       "empty": "Geen open taken"

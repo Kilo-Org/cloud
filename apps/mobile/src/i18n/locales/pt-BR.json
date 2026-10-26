@@ -227,7 +227,6 @@
     "hideBalance": "Ocultar saldo",
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
-    "bonusCreditsExpiring": "{{amount}} em créditos expiram em {{date}}.",
     "signOutTitle": "Sair?",
     "signOutMessage": "Você precisará entrar novamente para acessar seu espaço de trabalho.",
     "deleteAccountTitle": "Excluir conta?",
@@ -3195,7 +3194,7 @@
     "creditActivity": {
       "emptyDescription": "As compras, o uso e os ajustes de créditos desta organização aparecerão aqui conforme ocorrerem.",
       "emptyTitle": "Nenhuma movimentação de créditos",
-      "expires": "Expira em {{date}}",
+      "expiresUtc": "Expira em {{date}} (UTC)",
       "title": "Movimentação de créditos",
       "transactionFallback": "Transação de créditos",
       "category": {
@@ -3792,6 +3791,7 @@
     "title": "Perfis",
     "entrySubtitle": "Reutilizar configurações de ambiente entre sessões",
     "newProfile": "Novo perfil",
+    "openHint": "Abre o perfil",
     "emptyTitle": "Ainda não há perfis",
     "emptyDescription": "Crie um perfil para reutilizar variáveis de ambiente, comandos de configuração e habilidades entre sessões.",
     "loadFailed": "Não foi possível carregar perfis",
@@ -3988,6 +3988,10 @@
   "credits": {
     "title": "Comprar créditos",
     "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de codificação com IA no Kilo App. A loja cobra na sua conta e os créditos são adicionados depois que a loja confirma o pagamento.",
+    "nextExpiry": "{{amount}} em créditos expiram em {{date}} (UTC). Os créditos com vencimento mais próximo são usados primeiro.",
+    "appStoreExpiry": "Créditos comprados pela App Store não expiram.",
+    "playOneYearExpiry": "Estes créditos expiram um ano-calendário após a compra.",
+    "playNonexpiring": "Estes créditos não expiram.",
     "packLabel": "Adicionar {{amount}} em créditos",
     "priceUnavailable": "Preço indisponível",
     "purchased": "Créditos adicionados ao seu saldo.",
@@ -4030,11 +4034,13 @@
       "namePlaceholder": "Bugs, Ideias, Versão…",
       "emoji": "Emoji",
       "mode": "Modo",
-      "defaultsHint": "As sessões iniciadas a partir desta lista usam estes padrões."
+      "defaultsHint": "As sessões iniciadas a partir desta lista usam estes padrões.",
+      "saveFailed": "Não foi possível salvar a lista. Verifique sua conexão e tente novamente."
     },
     "list": {
       "addPlaceholder": "Adicionar uma tarefa",
       "add": "Adicionar tarefa",
+      "addFailed": "Não foi possível adicionar a tarefa. Verifique sua conexão e tente novamente.",
       "empty": "Ainda não há tarefas",
       "setDefaults": "Definir repositório, modo e modelo",
       "completed_one": "Concluídas ({{count}})",
@@ -4073,7 +4079,9 @@
       "startNewSession": "Iniciar nova sessão",
       "startNewSessionHint": "Toque e segure para iniciar uma nova sessão.",
       "linkSession": "Vincular sessão",
-      "linkFailed": "Não foi possível vincular a sessão à tarefa"
+      "linkFailed": "Não foi possível vincular a sessão à tarefa",
+      "moveToAnotherTodo": "Mover para outra tarefa",
+      "startRefreshFailed": "A sessão foi iniciada, mas esta lista não foi atualizada."
     },
     "linkSession": {
       "title": "Vincular uma sessão",
@@ -4082,6 +4090,7 @@
     },
     "upNext": "A seguir",
     "sessionTodo": "Tarefa: {{title}}",
+    "openTodoHint": "Abre a tarefa.",
     "linkToTodo": "Vincular a uma tarefa",
     "candidates": {
       "empty": "Não há tarefas abertas"

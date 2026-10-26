@@ -32,6 +32,7 @@ describe('buildPublicCustomLlmSnapshotModels', () => {
   test('lists a public custom LLM once under each declared provider as a free model', () => {
     const models = buildPublicCustomLlmSnapshotModels(
       [publicCustomLlm, privateCustomLlm],
+      new Set(),
       '2026-10-08T00:00:00.000Z'
     );
 
@@ -56,5 +57,15 @@ describe('buildPublicCustomLlmSnapshotModels', () => {
         data_policy: { training: true, retainsPrompts: true },
       },
     });
+  });
+
+  test('omits a public custom LLM listed as unavailable', () => {
+    const models = buildPublicCustomLlmSnapshotModels(
+      [{ ...publicCustomLlm, public_id: 'Acme/Model' }],
+      new Set(['acme/model']),
+      '2026-10-08T00:00:00.000Z'
+    );
+
+    expect(models).toEqual([]);
   });
 });

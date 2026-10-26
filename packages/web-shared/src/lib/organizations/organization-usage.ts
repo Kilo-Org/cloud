@@ -30,7 +30,12 @@ import { sendBalanceAlertEmail } from '@kilocode/web-shared/lib/email';
 import { dispatchLowBalancePush } from '@kilocode/web-shared/lib/notifications-worker-client';
 import { after } from 'next/server';
 import { subHours } from 'date-fns';
-import { maybePerformOrganizationAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
+
+import {
+  maybePerformAutoTopUp,
+  maybePerformOrganizationAutoTopUp,
+  type AutoTopUpOrganization,
+} from '@kilocode/web-shared/lib/autoTopUp';
 import {
   accountBalanceMicrodollars,
   findOrganizationMemberBalanceRow,
@@ -48,7 +53,7 @@ export type BalancePayer = {
   totalMicrodollarsAcquired: number;
 };
 
-type BalanceAndOrgSettings = {
+export type BalanceAndOrgSettings = {
   balance: number;
   settings?: OrganizationSettings;
   plan?: OrganizationPlan;
@@ -63,12 +68,13 @@ type BalanceAndOrgSettings = {
 export async function getBalanceAndOrgSettings(
   organizationId: string | undefined,
   user: User,
-  fromDb: typeof db = db
+  fromDb: typeof db = db,
+  funding?: 'usage'
 ): Promise<BalanceAndOrgSettings> {
   const balanceSpan = startInactiveSpan({ name: 'balance-check' });
   let result: BalanceAndOrgSettings;
   if (organizationId) {
-    result = await getBalanceForOrganizationUser(organizationId, user.id, { fromDb });
+    result = await getBalanceForOrganizationUser(organizationId, user.id, { fromDb, funding });
   } else {
     const { balance, microdollars_used, total_microdollars_acquired } =
       await getBalanceForUser(user);
@@ -81,6 +87,11 @@ export async function getBalanceAndOrgSettings(
         totalMicrodollarsAcquired: total_microdollars_acquired,
       },
     };
+    if (funding === 'usage' && user.auto_top_up_enabled) {
+      after(() =>
+        maybePerformAutoTopUp({ ...user, microdollars_used, total_microdollars_acquired })
+      );
+    }
   }
   balanceSpan.end();
   return result;
@@ -94,17 +105,19 @@ export async function getBalanceForOrganizationUser(
     limitType?: OrganizationUserLimitType;
     /** Database instance to use (defaults to primary db, pass readDb for replica) */
     fromDb?: typeof db;
+    funding?: 'usage';
     /** Instant the expiry cut-off is measured from. Defaults to the current time. */
     now?: Date;
-    /** How many hours the cut-off trails `now` by. Defaults to a random 0-1 draw. */
+    /** How many hours the cut-off trails `now` by. Defaults to no jitter. */
     expiryJitterHours?: number;
   } = {}
 ): Promise<BalanceAndOrgSettings> {
   const {
     limitType = 'daily',
     fromDb = db,
+    funding,
     now = new Date(),
-    expiryJitterHours = Math.random(),
+    expiryJitterHours = 0,
   } = options;
   const startTime = performance.now();
   logExceptInTest(
@@ -147,15 +160,20 @@ export async function getBalanceForOrganizationUser(
     total_microdollars_acquired = expiryResult.total_microdollars_acquired;
   }
 
-  // Trigger org auto-top-up after expiration check so it receives post-expiry values
-  after(() =>
-    maybePerformOrganizationAutoTopUp({
-      id: organizationId,
-      auto_top_up_enabled,
-      total_microdollars_acquired,
-      microdollars_used,
-    })
-  );
+  if (
+    funding === 'usage' &&
+    auto_top_up_enabled &&
+    (require_seats || microdollar_limit == null || microdollar_limit > (microdollar_usage || 0))
+  ) {
+    after(() =>
+      maybePerformOrganizationAutoTopUp({
+        id: organizationId,
+        auto_top_up_enabled,
+        total_microdollars_acquired,
+        microdollars_used,
+      })
+    );
+  }
 
   const payer: BalancePayer = {
     createdAt: created_at,
@@ -197,6 +215,7 @@ export type OrganizationUsageMutationResult = {
   crossedMinimumBalance: boolean;
   recipients: string[];
   minimumBalanceMicrodollars: number | null;
+  autoTopUpOrganization?: AutoTopUpOrganization;
 };
 
 const NO_ORGANIZATION_BALANCE_ALERT: OrganizationUsageMutationResult = {
@@ -258,6 +277,7 @@ export async function mutateOrganizationUsage(
     previous_microdollars_used: number;
     new_microdollars_used: number;
     settings: OrganizationSettings | null;
+    auto_top_up_enabled: boolean;
   };
   const balanceRows: OrganizationBalanceRow[] = await tx
     .update(organizations)
@@ -273,6 +293,7 @@ export async function mutateOrganizationUsage(
       ),
       new_microdollars_used: organizations.microdollars_used,
       settings: organizations.settings,
+      auto_top_up_enabled: organizations.auto_top_up_enabled,
     });
 
   const [orgData] = balanceRows;
@@ -293,6 +314,16 @@ export async function mutateOrganizationUsage(
     crossedMinimumBalance,
     recipients,
     minimumBalanceMicrodollars: minimumBalance,
+    ...(cost > 0 && orgData.auto_top_up_enabled
+      ? {
+          autoTopUpOrganization: {
+            id: organization_id,
+            auto_top_up_enabled: orgData.auto_top_up_enabled,
+            total_microdollars_acquired: orgData.total_microdollars_acquired,
+            microdollars_used: orgData.new_microdollars_used,
+          },
+        }
+      : {}),
   };
 }
 
@@ -360,10 +391,18 @@ export function scheduleOrganizationLowBalanceAlert(
   });
 }
 
+export function scheduleOrganizationUsageAutoTopUp(result: OrganizationUsageMutationResult): void {
+  const organization = result.autoTopUpOrganization;
+  if (organization) {
+    after(() => maybePerformOrganizationAutoTopUp(organization));
+  }
+}
+
 export async function ingestOrganizationTokenUsage(usage: MicrodollarUsage): Promise<void> {
   if (!usage.organization_id) return;
   const result = await db.transaction(tx => mutateOrganizationUsage(tx, usage));
   scheduleOrganizationLowBalanceAlert(usage.organization_id, result);
+  scheduleOrganizationUsageAutoTopUp(result);
 }
 
 const MAX_DAILY_LIMIT_USD = 2000;

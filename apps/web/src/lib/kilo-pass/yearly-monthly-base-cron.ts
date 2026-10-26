@@ -140,6 +140,7 @@ async function issueYearlyCadenceMonthlyBaseOnce(
     amountUsd: baseAmountUsd,
     stripeInvoiceId: syntheticStripeInvoiceId,
     description: `Kilo Pass base credits (${tier}, yearly, ${issueMonth})`,
+    issuedAt: nextYearlyIssueAt,
   });
 
   if (baseResult.wasIssued) {

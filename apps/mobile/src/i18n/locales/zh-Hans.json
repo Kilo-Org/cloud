@@ -227,7 +227,6 @@
     "hideBalance": "隐藏余额",
     "showBalance": "显示余额",
     "balanceHidden": "余额已隐藏",
-    "bonusCreditsExpiring": "{{amount}} 的额度将于 {{date}} 到期。",
     "signOutTitle": "退出登录？",
     "signOutMessage": "退出后，需要重新登录才能访问工作区。",
     "deleteAccountTitle": "删除账户？",
@@ -3151,7 +3150,7 @@
     "creditActivity": {
       "emptyDescription": "此组织的充值、用量和额度调整记录将在这里显示。",
       "emptyTitle": "暂无额度变动记录",
-      "expires": "{{date}} 到期",
+      "expiresUtc": "{{date}}（UTC） 到期",
       "title": "额度明细",
       "transactionFallback": "额度交易",
       "category": {
@@ -3746,6 +3745,7 @@
     "title": "配置文件",
     "entrySubtitle": "跨会话重用环境设置",
     "newProfile": "新建配置文件",
+    "openHint": "打开配置文件",
     "emptyTitle": "还没有配置文件",
     "emptyDescription": "创建配置文件以跨会话重复使用环境变量、设置命令和技能。",
     "loadFailed": "无法加载配置文件",
@@ -3937,6 +3937,10 @@
   "credits": {
     "title": "购买额度",
     "description": "额度是一次性购买，会添加到你的 Kilo 余额中，用于在 Kilo App 中运行 AI 编程会话。商店会向你的账户收费，商店确认付款后额度才会到账。",
+    "nextExpiry": "{{amount}} 的额度将于 {{date}}（UTC）到期。最早到期的额度会优先使用。",
+    "appStoreExpiry": "通过 App Store 购买的额度不会过期。",
+    "playOneYearExpiry": "这些额度将在购买一个日历年后过期。",
+    "playNonexpiring": "这些额度不会过期。",
     "packLabel": "添加 {{amount}} 额度",
     "priceUnavailable": "价格不可用",
     "purchased": "额度已添加到你的余额。",
@@ -3977,11 +3981,13 @@
       "namePlaceholder": "缺陷、想法、发布…",
       "emoji": "表情符号",
       "mode": "模式",
-      "defaultsHint": "从此列表启动的会话将使用这些默认设置。"
+      "defaultsHint": "从此列表启动的会话将使用这些默认设置。",
+      "saveFailed": "无法保存列表。请检查网络连接后重试。"
     },
     "list": {
       "addPlaceholder": "添加待办事项",
       "add": "添加待办",
+      "addFailed": "无法添加待办事项。请检查网络连接后重试。",
       "empty": "暂无待办事项",
       "setDefaults": "设置仓库、模式和模型",
       "completed_one": "已完成 ({{count}})",
@@ -4018,7 +4024,9 @@
       "startNewSession": "开始新会话",
       "startNewSessionHint": "长按以开始新会话。",
       "linkSession": "关联会话",
-      "linkFailed": "无法将会话关联到该待办事项"
+      "linkFailed": "无法将会话关联到该待办事项",
+      "moveToAnotherTodo": "移至其他待办事项",
+      "startRefreshFailed": "会话已启动，但此列表未更新。"
     },
     "linkSession": {
       "title": "关联会话",
@@ -4027,6 +4035,7 @@
     },
     "upNext": "接下来",
     "sessionTodo": "待办事项：{{title}}",
+    "openTodoHint": "打开该待办事项。",
     "linkToTodo": "关联到待办事项",
     "candidates": {
       "empty": "暂无未完成的待办事项"

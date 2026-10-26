@@ -227,7 +227,6 @@
     "hideBalance": "Fihla ibhalansi",
     "showBalance": "Bonisa ibhalansi",
     "balanceHidden": "Ibhalansi ifihliwe",
-    "bonusCreditsExpiring": "Amakhredithi angu-{{amount}} aphelelwa yisikhathi ngo-{{date}}.",
     "signOutTitle": "Uyafuna ukuphuma ngemvume?",
     "signOutMessage": "Uzodinga ukungena futhi ukuze ufinyelele indawo yakho yokusebenza.",
     "deleteAccountTitle": "Uyafuna ukususa i-akhawunti?",
@@ -3159,7 +3158,7 @@
     "creditActivity": {
       "emptyDescription": "Ukuthengwa, ukusetshenziswa nokulungiswa kwamakhredithi ale nhlangano kuzovela lapha njengoba kwenzeka.",
       "emptyTitle": "Akukho mnyakazo wamakhredithi",
-      "expires": "Aphelelwa yisikhathi: {{date}}",
+      "expiresUtc": "Aphelelwa yisikhathi: {{date}} (UTC)",
       "title": "Umnyakazo wamakhredithi",
       "transactionFallback": "Ukuthengiselana ngamakhredithi",
       "category": {
@@ -3746,6 +3745,7 @@
     "title": "Amaphrofayili",
     "entrySubtitle": "Sebenzisa kabusha izilungiselelo zendawo kuzo zonke izikhathi",
     "newProfile": "Iphrofayela entsha",
+    "openHint": "Ivula iphrofayela",
     "emptyTitle": "Awekho amaphrofayela okwamanje",
     "emptyDescription": "Dala iphrofayela ukuze usebenzise kabusha okuguquguqukayo kwendawo, imiyalo yokusetha, namakhono kuzo zonke izikhathi.",
     "loadFailed": "Ayikwazanga ukulayisha amaphrofayela",
@@ -3937,6 +3937,10 @@
   "credits": {
     "title": "Thenga amakhredithi",
     "description": "Amakhredithi ukuthenga kwesikhathi esisodwa okwengezwa kubhalansi yakho ye-Kilo ukuze usebenzise amaseshini okubhala ikhodi e-AI ku-Kilo App. Isitolo sikhokhisa i-akhawunti yakho futhi amakhredithi engezwa ngemva kokuba isitolo siqinisekise inkokhelo.",
+    "nextExpiry": "Amakhredithi angu-{{amount}} aphelelwa yisikhathi ngo-{{date}} (UTC). Amakhredithi aphelelwa yisikhathi kuqala asetshenziswa kuqala.",
+    "appStoreExpiry": "Amakhredithi athengwe nge-App Store awaphelelwa yisikhathi.",
+    "playOneYearExpiry": "La makhredithi aphelelwa yisikhathi ngemuva konyaka owodwa wekhalenda kusukela ekuthengeni.",
+    "playNonexpiring": "La makhredithi awaphelelwa yisikhathi.",
     "packLabel": "Engeza amakhredithi angu-{{amount}}",
     "priceUnavailable": "Intengo ayitholakali",
     "purchased": "Amakhredithi engeziwe kubhalansi yakho.",
@@ -3977,11 +3981,13 @@
       "namePlaceholder": "Amaphutha, Imibono, Ukukhishwa…",
       "emoji": "Emoji",
       "mode": "Imodi",
-      "defaultsHint": "Amaseshini aqalwa kulolu hlu asebenzisa lezi zilungiselelo ezizenzakalelayo."
+      "defaultsHint": "Amaseshini aqalwa kulolu hlu asebenzisa lezi zilungiselelo ezizenzakalelayo.",
+      "saveFailed": "Ayikwazanga ukulondoloza uhlu. Hlola uxhumano lwakho bese uzama futhi."
     },
     "list": {
       "addPlaceholder": "Engeza umsebenzi",
       "add": "Engeza umsebenzi",
+      "addFailed": "Awukwazanga ukungeza umsebenzi. Hlola uxhumano lwakho bese uzama futhi.",
       "empty": "Ayikho imisebenzi okwamanje",
       "setDefaults": "Setha inqolobane yekhodi, imodi nemodeli",
       "completed_one": "Kuqediwe ({{count}})",
@@ -4018,7 +4024,9 @@
       "startNewSession": "Qala iseshini entsha",
       "startNewSessionHint": "Cindezela isikhathi eside ukuqala iseshini entsha.",
       "linkSession": "Xhumanisa iseshini",
-      "linkFailed": "Ayikwazanga ukuxhumanisa iseshini nomsebenzi"
+      "linkFailed": "Ayikwazanga ukuxhumanisa iseshini nomsebenzi",
+      "moveToAnotherTodo": "Hambisa kwelinye umsebenzi",
+      "startRefreshFailed": "Iseshini siqalile, kodwa lolu hlu aluvuselelwa."
     },
     "linkSession": {
       "title": "Ukuxhumanisa iseshini",
@@ -4027,6 +4035,7 @@
     },
     "upNext": "Okulandelayo",
     "sessionTodo": "Umsebenzi: {{title}}",
+    "openTodoHint": "Ivula umsebenzi.",
     "linkToTodo": "Xhumanisa nomsebenzi",
     "candidates": {
       "empty": "Ayikho imisebenzi evuliwe"

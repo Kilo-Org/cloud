@@ -20,7 +20,6 @@
  * them are exempt.
  */
 
-import { subHours } from 'date-fns';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, organizations, type User } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
@@ -75,7 +74,7 @@ async function loadEffectiveBalanceMicrodollars(params: {
   owner: Owner;
   user: User;
 }): Promise<number> {
-  const expireBefore = subHours(new Date(), Math.random());
+  const expireBefore = new Date();
 
   if (params.owner.type === 'org') {
     const row = await findOrganizationMemberBalanceRow(

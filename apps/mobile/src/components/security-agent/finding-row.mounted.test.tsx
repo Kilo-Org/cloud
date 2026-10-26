@@ -1,6 +1,10 @@
-// The row's quick action is the only place the findings list offers Analyze.
-// These cases pin the enablement contract: available runs, every unavailable
-// capacity state keeps it disabled and names the reason for assistive tech.
+// The row's quick action is the only place the findings list offers Analyze,
+// and it is also where an opened remediation PR is offered. These cases pin the
+// enablement contract for Analyze — available runs, every unavailable capacity
+// state keeps it disabled and names the reason for assistive tech — and the
+// link route it shares with the remediation panel: a supported review link
+// navigates in-app, everything else goes through the shared external-link
+// helper.
 
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -11,14 +15,22 @@ import { FindingRow } from './finding-row';
 import { type SecurityFinding } from '@/lib/security-agent';
 import { type SecurityAnalysisCapacityState } from '@/lib/security-analysis-capacity';
 
-const startAnalysis = vi.hoisted(() => ({ mutate: vi.fn(), isPending: false }));
+const mocks = vi.hoisted(() => ({
+  routerPush: vi.fn(),
+  openBrowser: vi.fn(),
+  linkingOpenUrl: vi.fn(),
+  toastError: vi.fn(),
+  startAnalysis: { mutate: vi.fn(), isPending: false },
+}));
 
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
-  Linking: { openURL: vi.fn() },
+  Linking: { openURL: mocks.linkingOpenUrl },
 }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('expo-web-browser', () => ({ openBrowserAsync: mocks.openBrowser }));
+vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
+vi.mock('expo-router', () => ({ useRouter: () => ({ push: mocks.routerPush }) }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -31,7 +43,7 @@ vi.mock('@/components/security-agent/finding-tone', () => ({
   findingToneColor: () => '#000',
 }));
 vi.mock('@/lib/hooks/use-security-findings', () => ({
-  useStartSecurityAnalysis: () => startAnalysis,
+  useStartSecurityAnalysis: () => mocks.startAnalysis,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#000', mutedForeground: '#666' }),
@@ -44,6 +56,8 @@ vi.mock('@kilocode/app-shared/security-agent', () => ({
 }));
 
 type R = TestRenderer.ReactTestRenderer;
+
+const PR_OPENED = { status: 'pr_opened' } as const;
 
 function findingFixture(overrides: Record<string, unknown> = {}): SecurityFinding {
   return {
@@ -77,10 +91,15 @@ function renderRow(
   return renderer;
 }
 
+function pressQuickAction(tree: R): void {
+  const button = tree.root.findByType(Button);
+  act(button.props.onPress as () => void);
+}
+
 describe('FindingRow quick Analyze action', () => {
   beforeEach(() => {
-    startAnalysis.isPending = false;
-    startAnalysis.mutate.mockClear();
+    mocks.startAnalysis.isPending = false;
+    mocks.startAnalysis.mutate.mockClear();
   });
 
   it('starts the analysis while capacity is available', () => {
@@ -90,7 +109,7 @@ describe('FindingRow quick Analyze action', () => {
     expect(button.props.loading).toBe(false);
     expect(button.props.accessibilityHint).toBeUndefined();
     act(button.props.onPress as () => void);
-    expect(startAnalysis.mutate).toHaveBeenCalledWith({
+    expect(mocks.startAnalysis.mutate).toHaveBeenCalledWith({
       findingId: 'finding-1',
       retrySandboxOnly: false,
     });
@@ -111,7 +130,7 @@ describe('FindingRow quick Analyze action', () => {
   });
 
   it('reads as busy while the start request is in flight', () => {
-    startAnalysis.isPending = true;
+    mocks.startAnalysis.isPending = true;
     const tree = renderRow('available');
     expect(tree.root.findByType(Button).props.loading).toBe(true);
   });
@@ -125,11 +144,56 @@ describe('FindingRow quick Analyze action', () => {
     const tree = renderRow(
       'available',
       findingFixture({
-        remediationSummary: { status: 'pr_opened', prUrl: 'https://example.com/pr/1' },
+        remediationSummary: { ...PR_OPENED, prUrl: 'https://example.com/pr/1' },
       })
     );
     const button = tree.root.findByType(Button);
     expect(button.props.disabled).toBeUndefined();
     expect(button.props.accessibilityHint).toBeUndefined();
+  });
+});
+
+function prOpened(prUrl: string): Record<string, unknown> {
+  return { remediationSummary: { ...PR_OPENED, prUrl } };
+}
+
+describe('FindingRow quick action link routing', () => {
+  beforeEach(() => {
+    mocks.routerPush.mockReset();
+    mocks.openBrowser.mockReset();
+    mocks.linkingOpenUrl.mockReset();
+    mocks.toastError.mockReset();
+  });
+
+  it('opens a supported review link on the in-app review route', () => {
+    pressQuickAction(
+      renderRow('available', findingFixture(prOpened('https://github.com/kilo/demo/pull/123')))
+    );
+
+    expect(mocks.routerPush).toHaveBeenCalledWith('/(app)/pr-review/kilo/demo/123');
+    expect(mocks.openBrowser).not.toHaveBeenCalled();
+    expect(mocks.linkingOpenUrl).not.toHaveBeenCalled();
+  });
+
+  it('opens a review link its provider does not serve in the browser', async () => {
+    const url = 'https://github.example.com/kilo/demo/pull/123';
+    pressQuickAction(renderRow('available', findingFixture(prOpened(url))));
+
+    await vi.waitFor(() => {
+      expect(mocks.openBrowser).toHaveBeenCalledWith(url);
+    });
+    expect(mocks.routerPush).not.toHaveBeenCalled();
+    expect(mocks.linkingOpenUrl).not.toHaveBeenCalled();
+  });
+
+  it('keeps an unsupported destination out of the OS opener', async () => {
+    pressQuickAction(renderRow('available', findingFixture(prOpened('ftp://example.com/pr/123'))));
+
+    await vi.waitFor(() => {
+      expect(mocks.toastError).toHaveBeenCalledWith('common.couldNotOpen');
+    });
+    expect(mocks.routerPush).not.toHaveBeenCalled();
+    expect(mocks.openBrowser).not.toHaveBeenCalled();
+    expect(mocks.linkingOpenUrl).not.toHaveBeenCalled();
   });
 });

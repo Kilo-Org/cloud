@@ -227,7 +227,6 @@
     "hideBalance": "Qari hadhaaga",
     "showBalance": "Muuji hadhaaga",
     "balanceHidden": "Hadhaaga waa la qariyay",
-    "bonusCreditsExpiring": "Lacag dhan {{amount}} ayaa dhacaysa {{date}}.",
     "signOutTitle": "Ma ka baxaysaa?",
     "signOutMessage": "Si aad goobtaada shaqada u isticmaasho, waa inaad mar kale soo gashaa.",
     "deleteAccountTitle": "Ma tirtiraysaa akoonka?",
@@ -3159,7 +3158,7 @@
     "creditActivity": {
       "emptyDescription": "Iibsiyada, isticmaalka iyo wax ka beddelka lacagta isticmaalka ee ururkan ayaa halkan ka soo muuqan doona marka ay dhacaan.",
       "emptyTitle": "Wax dhaqdhaqaaq ah kuma jiro lacagta isticmaalka",
-      "expires": "Waxay dhacaysaa {{date}}",
+      "expiresUtc": "Waxay dhacaysaa {{date}} (UTC)",
       "title": "Dhaqdhaqaaqa lacagta isticmaalka",
       "transactionFallback": "Macaamilka lacagta isticmaalka",
       "category": {
@@ -3746,6 +3745,7 @@
     "title": "Profile-yada",
     "entrySubtitle": "Dib u isticmaal jaangooyooyinka deegaanka ee fadhiyada oo dhan",
     "newProfile": "profile cusub",
+    "openHint": "Wuxuu furayaa profile-ka",
     "emptyTitle": "Weli profiles ma jiraan",
     "emptyDescription": "Abuur profile si dib loogu isticmaalo doorsoomayaasha deegaanka, amarrada dejinta, iyo xirfadaha kalfadhiyada oo dhan.",
     "loadFailed": "Waa la rari waayay muuqaallada",
@@ -3937,6 +3937,10 @@
   "credits": {
     "title": "Iibso lacag adeeg",
     "description": "Lacagta adeeg waa iib hal mar ah oo lagu daraa dheelitirkaaga Kilo si loogu shaqeeyo kalfadhiyada codeynta AI ee app-ka Kilo. Dukaanku wuxuu ka qaadaa akoonkaaga, lacagta adeegna waxaa lagu daraa ka dib marka dukaanku xaqiijiyo lacag bixinta.",
+    "nextExpiry": "Lacag adeeg ah oo dhan {{amount}} ayaa dhacaysa {{date}} (UTC). Lacagta adeegga ee ugu horreysa ee dhacaysa ayaa marka hore la isticmaalaa.",
+    "appStoreExpiry": "Lacagta adeegga ee laga iibsaday App Store ma dhacdo.",
+    "playOneYearExpiry": "Lacagtan adeeggu waxay dhacaysaa hal sano oo kalandar ah kadib iibsashada.",
+    "playNonexpiring": "Lacagtan adeeggu ma dhacdo.",
     "packLabel": "Ku dar {{amount}} oo lacag adeeg ah",
     "priceUnavailable": "Qiimaha lama heli karo",
     "purchased": "Lacag adeeg ayaa lagu daray dheelitirkaaga.",
@@ -3977,11 +3981,13 @@
       "namePlaceholder": "Cilado, Fikrado, Siideyn…",
       "emoji": "Calaamad",
       "mode": "Qaab",
-      "defaultsHint": "Kalfadhiyada laga bilaabo liiskan waxay isticmaalaan kuwan caadiga ah."
+      "defaultsHint": "Kalfadhiyada laga bilaabo liiskan waxay isticmaalaan kuwan caadiga ah.",
+      "saveFailed": "Liiska lama kaydin karin. Hubi xiriirkaaga oo mar kale isku day."
     },
     "list": {
       "addPlaceholder": "Ku dar hawl",
       "add": "Ku dar",
+      "addFailed": "Hawsha lama darin karin. Hubi xiriirkaaga oo mar kale isku day.",
       "empty": "Weli ma jiraan hawlo",
       "setDefaults": "Deji kaydka, qaabka iyo moodeelka",
       "completed_one": "La dhammeeyay ({{count}})",
@@ -4018,7 +4024,9 @@
       "startNewSession": "Bilow fadhi cusub",
       "startNewSessionHint": "Riix muddo dheer si aad u bilowdo fadhi cusub.",
       "linkSession": "Ku xidh kalfadhi",
-      "linkFailed": "Lama xidhi karin kalfadhiga hawsha"
+      "linkFailed": "Lama xidhi karin kalfadhiga hawsha",
+      "moveToAnotherTodo": "U guuri hawl kale",
+      "startRefreshFailed": "Cashurka waa la bilaabiyay, laakiin liiskan lama cusbooneysiiyin."
     },
     "linkSession": {
       "title": "Ku xidh kalfadhi",
@@ -4027,6 +4035,7 @@
     },
     "upNext": "Xiga",
     "sessionTodo": "Hawl: {{title}}",
+    "openTodoHint": "Wuxuu furaa hawsha.",
     "linkToTodo": "Ku xidh hawl",
     "candidates": {
       "empty": "Ma jiraan hawlo furan"

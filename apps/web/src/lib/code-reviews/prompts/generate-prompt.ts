@@ -8,7 +8,10 @@
 
 import { z } from 'zod';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
-import { DEFAULT_CODE_REVIEW_MODEL } from '@/lib/code-reviews/core/constants';
+import {
+  DEFAULT_CODE_REVIEW_MODEL,
+  MAX_INLINE_COMMENT_BODY_CHARS,
+} from '@/lib/code-reviews/core/constants';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import DEFAULT_PROMPT_TEMPLATE_BITBUCKET from '@/lib/code-reviews/prompts/default-prompt-template-bitbucket.json';
 import DEFAULT_PROMPT_TEMPLATE_GITHUB from '@/lib/code-reviews/prompts/default-prompt-template.json';
@@ -101,7 +104,6 @@ function getPromptTemplate(platform: CodeReviewPlatform): PromptTemplate {
 }
 
 const MAX_PROMPT_INLINE_COMMENTS = 20;
-const INLINE_COMMENT_PREVIEW_LENGTH = 60;
 
 /**
  * Renders provider-supplied text as one inert data value. Control and line-separator
@@ -367,7 +369,7 @@ export async function generateReviewPrompt(
 
     for (const c of activeInlineComments.slice(0, MAX_PROMPT_INLINE_COMMENTS)) {
       const firstLine = sanitizePromptDataValue(
-        c.body.split('\n')[0].substring(0, INLINE_COMMENT_PREVIEW_LENGTH)
+        c.body.split('\n')[0].slice(0, MAX_INLINE_COMMENT_BODY_CHARS)
       );
       prompt += `| ${sanitizePromptDataValue(c.path)} | ${c.line ?? 'N/A'} | ${firstLine} |\n`;
     }

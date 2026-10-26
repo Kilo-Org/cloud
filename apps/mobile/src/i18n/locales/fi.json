@@ -227,7 +227,6 @@
     "hideBalance": "Piilota saldo",
     "showBalance": "Näytä saldo",
     "balanceHidden": "Saldo piilotettu",
-    "bonusCreditsExpiring": "Krediittejä vanhenee {{date}}: {{amount}}.",
     "signOutTitle": "Kirjaudutaanko ulos?",
     "signOutMessage": "Pääset takaisin työtilaasi kirjautumalla uudelleen sisään.",
     "deleteAccountTitle": "Poistetaanko tili?",
@@ -3159,7 +3158,7 @@
     "creditActivity": {
       "emptyDescription": "Organisaation ostot, käyttö ja krediittien muutokset näkyvät tässä sitä mukaa kuin niitä kertyy.",
       "emptyTitle": "Ei krediittitapahtumia",
-      "expires": "Vanhenee {{date}}",
+      "expiresUtc": "Vanhenee {{date}} (UTC)",
       "title": "Krediittitapahtumat",
       "transactionFallback": "Krediittitapahtuma",
       "category": {
@@ -3746,6 +3745,7 @@
     "title": "Profiilit",
     "entrySubtitle": "Käytä ympäristöasetuksia uudelleen istuntojen aikana",
     "newProfile": "Uusi profiili",
+    "openHint": "Avaa profiilin",
     "emptyTitle": "Ei vielä profiileja",
     "emptyDescription": "Luo profiili käyttääksesi uudelleen ympäristömuuttujia, asetuskomentoja ja taitoja istuntojen aikana.",
     "loadFailed": "Profiilien lataaminen epäonnistui",
@@ -3937,6 +3937,10 @@
   "credits": {
     "title": "Osta krediittejä",
     "description": "Krediitit ovat kertaostos, joka lisätään Kilo-saldoosi AI-koodausistuntojen ajamista varten Kilo-sovelluksessa. Kauppa veloittaa tiliäsi ja krediitit lisätään, kun kauppa vahvistaa maksun.",
+    "nextExpiry": "Krediittejä vanhenee {{date}} (UTC): {{amount}}. Aikaisimmin vanhenevat krediitit käytetään ensin.",
+    "appStoreExpiry": "App Storen kautta ostetut krediitit eivät vanhene.",
+    "playOneYearExpiry": "Nämä krediitit vanhenevat yhden kalenterivuoden kuluttua ostosta.",
+    "playNonexpiring": "Nämä krediitit eivät vanhene.",
     "packLabel": "Lisää {{amount}} krediittejä",
     "priceUnavailable": "Hinta ei saatavilla",
     "purchased": "Krediitit on lisätty saldoosi.",
@@ -3977,11 +3981,13 @@
       "namePlaceholder": "Virheet, ideat, julkaisu…",
       "emoji": "Emoji",
       "mode": "Tila",
-      "defaultsHint": "Tästä listasta aloitetut istunnot käyttävät näitä oletusasetuksia."
+      "defaultsHint": "Tästä listasta aloitetut istunnot käyttävät näitä oletusasetuksia.",
+      "saveFailed": "Listaa ei voitu tallentaa. Tarkista yhteytesi ja yritä uudelleen."
     },
     "list": {
       "addPlaceholder": "Lisää uusi tehtävä",
       "add": "Lisää tehtävä",
+      "addFailed": "Tehtävää ei voitu lisätä. Tarkista yhteytesi ja yritä uudelleen.",
       "empty": "Ei vielä tehtäviä",
       "setDefaults": "Aseta koodivarasto, tila ja malli",
       "completed_one": "Valmis ({{count}})",
@@ -4018,7 +4024,9 @@
       "startNewSession": "Aloita uusi istunto",
       "startNewSessionHint": "Aloita uusi istunto pitämällä painettuna.",
       "linkSession": "Linkitä istunto",
-      "linkFailed": "Istunnon linkittäminen tehtävään ei onnistunut"
+      "linkFailed": "Istunnon linkittäminen tehtävään ei onnistunut",
+      "moveToAnotherTodo": "Siirrä toiseen tehtävään",
+      "startRefreshFailed": "Istunto aloitettiin, mutta tätä listaa ei päivitetty."
     },
     "linkSession": {
       "title": "Istunnon linkittäminen",
@@ -4027,6 +4035,7 @@
     },
     "upNext": "Seuraavaksi",
     "sessionTodo": "Tehtävä: {{title}}",
+    "openTodoHint": "Avaa tehtävän.",
     "linkToTodo": "Linkitä tehtävään",
     "candidates": {
       "empty": "Ei avoimia tehtäviä"

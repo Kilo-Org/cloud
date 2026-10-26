@@ -227,7 +227,6 @@
     "hideBalance": "Ẩn số dư",
     "showBalance": "Hiện số dư",
     "balanceHidden": "Số dư đã ẩn",
-    "bonusCreditsExpiring": "Khoản tiền {{amount}} sẽ hết hạn vào {{date}}.",
     "signOutTitle": "Đăng xuất?",
     "signOutMessage": "Bạn cần đăng nhập lại để truy cập không gian làm việc của mình.",
     "deleteAccountTitle": "Xóa tài khoản?",
@@ -3151,7 +3150,7 @@
     "creditActivity": {
       "emptyDescription": "Các khoản nạp tiền, chi phí sử dụng và điều chỉnh số dư của tổ chức sẽ xuất hiện tại đây khi phát sinh.",
       "emptyTitle": "Chưa có biến động số dư",
-      "expires": "Hết hạn vào {{date}}",
+      "expiresUtc": "Hết hạn vào {{date}} (UTC)",
       "title": "Biến động số dư",
       "transactionFallback": "Giao dịch số dư",
       "category": {
@@ -3746,6 +3745,7 @@
     "title": "Hồ sơ",
     "entrySubtitle": "Sử dụng lại cài đặt môi trường qua các phiên",
     "newProfile": "Hồ sơ mới",
+    "openHint": "Mở hồ sơ",
     "emptyTitle": "Chưa có hồ sơ nào",
     "emptyDescription": "Tạo hồ sơ để sử dụng lại các biến môi trường, lệnh thiết lập và kỹ năng trong các phiên.",
     "loadFailed": "Không thể tải hồ sơ",
@@ -3937,6 +3937,10 @@
   "credits": {
     "title": "Mua tín dụng",
     "description": "Tín dụng là giao dịch mua một lần được thêm vào số dư Kilo của bạn để chạy các phiên lập trình AI trong Kilo App. Cửa hàng tính phí vào tài khoản của bạn và tín dụng được thêm sau khi cửa hàng xác nhận thanh toán.",
+    "nextExpiry": "Khoản tín dụng {{amount}} sẽ hết hạn vào {{date}} (UTC). Tín dụng hết hạn sớm nhất sẽ được dùng trước.",
+    "appStoreExpiry": "Tín dụng mua qua App Store không hết hạn.",
+    "playOneYearExpiry": "Số tín dụng này hết hạn sau một năm dương lịch kể từ ngày mua.",
+    "playNonexpiring": "Số tín dụng này không hết hạn.",
     "packLabel": "Thêm {{amount}} tín dụng",
     "priceUnavailable": "Không có giá",
     "purchased": "Đã thêm tín dụng vào số dư của bạn.",
@@ -3977,11 +3981,13 @@
       "namePlaceholder": "Lỗi, Ý tưởng, Bản phát hành…",
       "emoji": "Biểu tượng cảm xúc",
       "mode": "Chế độ",
-      "defaultsHint": "Các phiên bắt đầu từ danh sách này dùng các giá trị mặc định này."
+      "defaultsHint": "Các phiên bắt đầu từ danh sách này dùng các giá trị mặc định này.",
+      "saveFailed": "Không thể lưu danh sách. Kiểm tra kết nối của bạn và thử lại."
     },
     "list": {
       "addPlaceholder": "Thêm việc cần làm",
       "add": "Thêm",
+      "addFailed": "Không thể thêm việc cần làm. Kiểm tra kết nối của bạn và thử lại.",
       "empty": "Chưa có việc cần làm nào",
       "setDefaults": "Đặt kho mã nguồn, chế độ và mô hình",
       "completed_one": "Đã hoàn tất ({{count}})",
@@ -4018,7 +4024,9 @@
       "startNewSession": "Bắt đầu phiên mới",
       "startNewSessionHint": "Nhấn giữ để bắt đầu phiên mới.",
       "linkSession": "Liên kết phiên",
-      "linkFailed": "Không thể liên kết phiên với việc cần làm"
+      "linkFailed": "Không thể liên kết phiên với việc cần làm",
+      "moveToAnotherTodo": "Chuyển sang việc cần làm khác",
+      "startRefreshFailed": "Phiên đã bắt đầu, nhưng danh sách này chưa được cập nhật."
     },
     "linkSession": {
       "title": "Liên kết một phiên",
@@ -4027,6 +4035,7 @@
     },
     "upNext": "Tiếp theo",
     "sessionTodo": "Việc cần làm: {{title}}",
+    "openTodoHint": "Mở việc cần làm.",
     "linkToTodo": "Liên kết với việc cần làm",
     "candidates": {
       "empty": "Không có việc cần làm đang mở"

@@ -227,7 +227,6 @@
     "hideBalance": "Fi owó tó kù pamọ́",
     "showBalance": "Fi owó tó kù hàn",
     "balanceHidden": "Owó tó kù ti pamọ́",
-    "bonusCreditsExpiring": "Kirẹ́dítì {{amount}} yóò dópin {{date}}.",
     "signOutTitle": "Jáde?",
     "signOutMessage": "O máa nílò láti tún wọlé kí o lè lo àyè iṣẹ́ rẹ.",
     "deleteAccountTitle": "Pa àkọọ́lẹ̀ rẹ́?",
@@ -3159,7 +3158,7 @@
     "creditActivity": {
       "emptyDescription": "Àwọn ìrà, lílo àti àtúnṣe kirẹ́dítì àjọ yìí yóò hàn níbí bí wọ́n ṣe ń ṣẹlẹ̀.",
       "emptyTitle": "Kò sí ìṣe kirẹ́dítì",
-      "expires": "Yóò dópin {{date}}",
+      "expiresUtc": "Yóò dópin {{date}} (UTC)",
       "title": "Àwọn ìṣe kirẹ́dítì",
       "transactionFallback": "Ìdúnàádúrà kirẹ́dítì",
       "category": {
@@ -3746,6 +3745,7 @@
     "title": "Awọn profaili",
     "entrySubtitle": "Tun lo awọn eto ayika kọja awọn akoko",
     "newProfile": "Profaili tuntun",
+    "openHint": "Ó ń ṣí profaili náà",
     "emptyTitle": "Ko si awọn profaili sibẹsibẹ",
     "emptyDescription": "Ṣẹda profaili kan lati tun lo awọn oniyipada ayika, awọn pipaṣẹ iṣeto, ati awọn ọgbọn kọja awọn akoko.",
     "loadFailed": "Ko le kojọpọ awọn profaili",
@@ -3937,6 +3937,10 @@
   "credits": {
     "title": "Ra kírẹ́dítì",
     "description": "Kírẹ́dítì jẹ́ rírà ẹ̀ẹ̀kan tí a fi kún iwọntunwọnsi Kilo rẹ fún ṣíṣe àwọn ìpàdé kíkọ kóòdù AI nínú Kilo App. Ṣọ́ọ̀bù gba owó láti inú àkọọ́lẹ̀ rẹ, a sì fi kírẹ́dítì kún un lẹ́yìn tí ṣọ́ọ̀bù bá fọwọ́sí ìsanwó.",
+    "nextExpiry": "Kírẹ́dítì {{amount}} yóò dópin {{date}} (UTC). A máa kọ́kọ́ lo kírẹ́dítì tí yóò tètè dópin.",
+    "appStoreExpiry": "Kírẹ́dítì tí a rà nípasẹ̀ App Store kì í dópin.",
+    "playOneYearExpiry": "Àwọn kírẹ́dítì wọ̀nyí yóò dópin ní ọdún kàlẹ́ńdà kan lẹ́yìn ríra.",
+    "playNonexpiring": "Àwọn kírẹ́dítì wọ̀nyí kì í dópin.",
     "packLabel": "Fi kírẹ́dítì tó tó {{amount}} kún un",
     "priceUnavailable": "Owó kò sí",
     "purchased": "A ti fi kírẹ́dítì kún iwọntunwọnsi rẹ.",
@@ -3977,11 +3981,13 @@
       "namePlaceholder": "Àwọn àṣìṣe, Àwọn èrò, Àwọn ìtúsílẹ̀…",
       "emoji": "Emoji",
       "mode": "Ipò",
-      "defaultsHint": "Àwọn ìgbà iṣẹ́ tí ó bẹ̀rẹ̀ láti inú àkójọ yìí máa ń lo àwọn ìpìlẹ̀ wọ̀nyí."
+      "defaultsHint": "Àwọn ìgbà iṣẹ́ tí ó bẹ̀rẹ̀ láti inú àkójọ yìí máa ń lo àwọn ìpìlẹ̀ wọ̀nyí.",
+      "saveFailed": "A kò lè fi àkójọ náà pamọ́. Ṣàyẹ̀wò ìdarapọ̀ rẹ kí o sì tún gbiyanjú."
     },
     "list": {
       "addPlaceholder": "Fi iṣẹ́ kún un",
       "add": "Ṣàfikún iṣẹ́",
+      "addFailed": "A kò lè ṣàfikún iṣẹ́ náà. Ṣàyẹ̀wò ìdarapọ̀ rẹ kí o sì tún gbiyanjú.",
       "empty": "Kò sí iṣẹ́ síbẹ̀",
       "setDefaults": "Ṣètò ibi ìpamọ́ kóòdù, ipò àti àwòṣe",
       "completed_one": "A ti parí ({{count}})",
@@ -4018,7 +4024,9 @@
       "startNewSession": "Bẹ̀rẹ̀ ìpàdé tuntun",
       "startNewSessionHint": "Tẹ̀ pẹ́ láti bẹ̀rẹ̀ ìpàdé tuntun.",
       "linkSession": "So ìgbà iṣẹ́ pọ̀",
-      "linkFailed": "A kò lè so ìgbà iṣẹ́ pọ̀ mọ́ iṣẹ́ náà"
+      "linkFailed": "A kò lè so ìgbà iṣẹ́ pọ̀ mọ́ iṣẹ́ náà",
+      "moveToAnotherTodo": "Gbe lọ sí iṣẹ́ míràn",
+      "startRefreshFailed": "Ìgbà iṣẹ́ ti bẹ̀rẹ̀, ṣùgbọ́n àkójọ yìí kò ṣe àgbéga."
     },
     "linkSession": {
       "title": "So ìgbà iṣẹ́ kan pọ̀",
@@ -4027,6 +4035,7 @@
     },
     "upNext": "Tó ń bọ̀",
     "sessionTodo": "Iṣẹ́: {{title}}",
+    "openTodoHint": "Ó ń ṣí iṣẹ́.",
     "linkToTodo": "So pọ̀ mọ́ iṣẹ́",
     "candidates": {
       "empty": "Kò sí iṣẹ́ tí ó ṣí"

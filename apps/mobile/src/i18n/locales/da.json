@@ -227,7 +227,6 @@
     "hideBalance": "Skjul saldo",
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
-    "bonusCreditsExpiring": "{{amount}} i kreditter udløber {{date}}.",
     "signOutTitle": "Log ud?",
     "signOutMessage": "Du skal logge ind igen for at få adgang til dit arbejdsområde.",
     "deleteAccountTitle": "Slet konto?",
@@ -3159,7 +3158,7 @@
     "creditActivity": {
       "emptyDescription": "Her vises organisationens køb, forbrug og justeringer af kreditter løbende.",
       "emptyTitle": "Ingen bevægelser på kreditsaldoen",
-      "expires": "Udløber {{date}}",
+      "expiresUtc": "Udløber {{date}} (UTC)",
       "title": "Bevægelser på kreditsaldoen",
       "transactionFallback": "Kredittransaktion",
       "category": {
@@ -3746,6 +3745,7 @@
     "title": "Profiler",
     "entrySubtitle": "Genbrug miljøindstillinger på tværs af sessioner",
     "newProfile": "Ny profil",
+    "openHint": "Åbner profilen",
     "emptyTitle": "Ingen profiler endnu",
     "emptyDescription": "Opret en profil for at genbruge miljøvariabler, opsætningskommandoer og færdigheder på tværs af sessioner.",
     "loadFailed": "Kunne ikke indlæse profiler",
@@ -3937,6 +3937,10 @@
   "credits": {
     "title": "Køb kreditter",
     "description": "Kreditter er et engangskøb, der lægges til din Kilo-saldo til at køre AI-kodningssessioner i Kilo App. Butikken opkræver betaling på din konto, og kreditterne tilføjes, når butikken bekræfter betalingen.",
+    "nextExpiry": "{{amount}} i kreditter udløber {{date}} (UTC). Kreditter med den tidligste udløbsdato bruges først.",
+    "appStoreExpiry": "Kreditter købt via App Store udløber ikke.",
+    "playOneYearExpiry": "Disse kreditter udløber ét kalenderår efter købet.",
+    "playNonexpiring": "Disse kreditter udløber ikke.",
     "packLabel": "Tilføj {{amount}} i kreditter",
     "priceUnavailable": "Pris ikke tilgængelig",
     "purchased": "Kreditter er føjet til din saldo.",
@@ -3977,11 +3981,13 @@
       "namePlaceholder": "Fejl, Idéer, Udgivelse…",
       "emoji": "Emoji",
       "mode": "Tilstand",
-      "defaultsHint": "Sessioner, der startes fra denne liste, bruger disse standardindstillinger."
+      "defaultsHint": "Sessioner, der startes fra denne liste, bruger disse standardindstillinger.",
+      "saveFailed": "Kunne ikke gemme listen. Tjek din forbindelse, og prøv igen."
     },
     "list": {
       "addPlaceholder": "Tilføj en opgave",
       "add": "Tilføj opgave",
+      "addFailed": "Kunne ikke tilføje opgaven. Tjek din forbindelse, og prøv igen.",
       "empty": "Ingen opgaver endnu",
       "setDefaults": "Angiv kodelager, tilstand og model",
       "completed_one": "Afsluttet ({{count}})",
@@ -4018,7 +4024,9 @@
       "startNewSession": "Start ny session",
       "startNewSessionHint": "Langt tryk for at starte en ny session.",
       "linkSession": "Tilknyt session",
-      "linkFailed": "Kunne ikke tilknytte sessionen til opgaven"
+      "linkFailed": "Kunne ikke tilknytte sessionen til opgaven",
+      "moveToAnotherTodo": "Flyt til en anden opgave",
+      "startRefreshFailed": "Sessionen startede, men listen blev ikke opdateret."
     },
     "linkSession": {
       "title": "Tilknyt en session",
@@ -4027,6 +4035,7 @@
     },
     "upNext": "Næste",
     "sessionTodo": "Opgave: {{title}}",
+    "openTodoHint": "Åbner opgaven.",
     "linkToTodo": "Tilknyt til opgave",
     "candidates": {
       "empty": "Ingen åbne opgaver"

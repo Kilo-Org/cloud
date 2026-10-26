@@ -124,7 +124,7 @@ describe('getBalanceForUser credit expiry cut-off', () => {
   test('processes a credit that expired before the cut-off and reports the reduced balance', async () => {
     const user = await insertUserWithDueCredit();
 
-    const result = await getBalanceForUser(user, { now, expiryJitterHours: 0 });
+    const result = await getBalanceForUser(user, { now });
 
     expect(result.balance).toBe(0);
     expect(await readExpirationState(user.id)).toEqual({

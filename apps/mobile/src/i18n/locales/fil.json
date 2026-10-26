@@ -227,7 +227,6 @@
     "hideBalance": "Itago ang balanse",
     "showBalance": "Ipakita ang balanse",
     "balanceHidden": "Nakatago ang balanse",
-    "bonusCreditsExpiring": "Mawawalan ng bisa sa {{date}} ang {{amount}} na kredito.",
     "signOutTitle": "Mag-sign out?",
     "signOutMessage": "Kailangan mong mag-sign in muli para mabuksan ang workspace mo.",
     "deleteAccountTitle": "Burahin ang akawnt?",
@@ -3159,7 +3158,7 @@
     "creditActivity": {
       "emptyDescription": "Lalabas dito ang mga pagbili, paggamit, at pagsasaayos ng kredito para sa organisasyong ito habang nangyayari ang mga ito.",
       "emptyTitle": "Walang aktibidad sa kredito",
-      "expires": "Mawawalan ng bisa sa {{date}}",
+      "expiresUtc": "Mawawalan ng bisa sa {{date}} (UTC)",
       "title": "Aktibidad sa kredito",
       "transactionFallback": "Transaksyon sa kredito",
       "category": {
@@ -3746,6 +3745,7 @@
     "title": "Mga profile",
     "entrySubtitle": "Muling gamitin ang mga setting ng kapaligiran sa mga session",
     "newProfile": "Bagong profile",
+    "openHint": "Binubuksan ang profile",
     "emptyTitle": "Wala pang mga profile",
     "emptyDescription": "Gumawa ng profile para magamit muli ang mga variable ng kapaligiran, mga command sa pag-setup, at mga kasanayan sa mga session.",
     "loadFailed": "Hindi ma-load ang mga profile",
@@ -3937,6 +3937,10 @@
   "credits": {
     "title": "Bumili ng kredito",
     "description": "Ang kredito ay isang besesang pagbili na idinaragdag sa iyong Kilo balance para sa pagpapatakbo ng mga AI coding session sa Kilo App. Sinisingil ng store ang iyong account at idinaragdag ang kredito pagkatapos kumpirmahin ng store ang bayad.",
+    "nextExpiry": "Mawawalan ng bisa sa {{date}} (UTC) ang {{amount}} na kredito. Unang ginagamit ang mga kreditong pinakamaagang mawawalan ng bisa.",
+    "appStoreExpiry": "Hindi nawawalan ng bisa ang mga kreditong binili sa App Store.",
+    "playOneYearExpiry": "Mawawalan ng bisa ang mga kreditong ito isang taon ng kalendaryo pagkatapos ng pagbili.",
+    "playNonexpiring": "Hindi nawawalan ng bisa ang mga kreditong ito.",
     "packLabel": "Magdagdag ng {{amount}} na kredito",
     "priceUnavailable": "Hindi available ang presyo",
     "purchased": "Naidagdag na ang kredito sa iyong balance.",
@@ -3977,11 +3981,13 @@
       "namePlaceholder": "Mga bug, ideya, release…",
       "emoji": "Emoji",
       "mode": "Mode",
-      "defaultsHint": "Gagamitin ng mga sesyong sisimulan mula sa listahang ito ang mga default na ito."
+      "defaultsHint": "Gagamitin ng mga sesyong sisimulan mula sa listahang ito ang mga default na ito.",
+      "saveFailed": "Hindi ma-save ang listahan. I-check ang iyong koneksyon at subukang muli."
     },
     "list": {
       "addPlaceholder": "Magdagdag ng gagawin",
       "add": "Idagdag ang gagawin",
+      "addFailed": "Hindi maidagdag ang gagawin. I-check ang iyong koneksyon at subukang muli.",
       "empty": "Wala pang gagawin",
       "setDefaults": "Itakda ang repositoryo, mode at modelo",
       "completed_one": "Nakumpleto ({{count}})",
@@ -4018,7 +4024,9 @@
       "startNewSession": "Magsimula ng bagong session",
       "startNewSessionHint": "Mahabang pindot para magsimula ng bagong session.",
       "linkSession": "I-link ang sesyon",
-      "linkFailed": "Hindi na-link ang sesyon sa gagawin"
+      "linkFailed": "Hindi na-link ang sesyon sa gagawin",
+      "moveToAnotherTodo": "Ilipat sa ibang gagawin",
+      "startRefreshFailed": "Nagsimula na ang sesyon, pero hindi na-update ang listahang ito."
     },
     "linkSession": {
       "title": "Mag-link ng sesyon",
@@ -4027,6 +4035,7 @@
     },
     "upNext": "Susunod",
     "sessionTodo": "Gagawin: {{title}}",
+    "openTodoHint": "Binubuksan ang gagawin.",
     "linkToTodo": "I-link sa gagawin",
     "candidates": {
       "empty": "Walang bukas na gagawin"

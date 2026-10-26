@@ -227,7 +227,6 @@
     "hideBalance": "Sakrij saldo",
     "showBalance": "Prikaži saldo",
     "balanceHidden": "Saldo je sakriven",
-    "bonusCreditsExpiring": "Krediti u iznosu od {{amount}} ističu {{date}}.",
     "signOutTitle": "Odjaviti se?",
     "signOutMessage": "Moraćeš ponovo da se prijaviš da bi pristupio svom radnom prostoru.",
     "deleteAccountTitle": "Obrisati nalog?",
@@ -3203,7 +3202,7 @@
     "creditActivity": {
       "emptyDescription": "Ovde će se prikazivati kupovine, potrošnja i korekcije kredita ove organizacije čim se evidentiraju.",
       "emptyTitle": "Nema promena kredita",
-      "expires": "Ističe {{date}}",
+      "expiresUtc": "Ističe {{date}} (UTC)",
       "title": "Istorija kredita",
       "transactionFallback": "Transakcija kredita",
       "category": {
@@ -3792,6 +3791,7 @@
     "title": "Profili",
     "entrySubtitle": "Ponovo koristite podešavanja okruženja u svim sesijama",
     "newProfile": "Novi profil",
+    "openHint": "Otvara profil",
     "emptyTitle": "Još nema profila",
     "emptyDescription": "Napravite profil da biste ponovo koristili promenljive okruženja, komande za podešavanje i veštine u svim sesijama.",
     "loadFailed": "Učitavanje profila nije uspelo",
@@ -3988,6 +3988,10 @@
   "credits": {
     "title": "Kupi kredite",
     "description": "Krediti su jednokratna kupovina koja se dodaje na tvoj Kilo saldo za pokretanje AI sesija kodiranja u Kilo aplikaciji. Prodavnica tereti tvoj račun, a krediti se dodaju nakon što prodavnica potvrdi plaćanje.",
+    "nextExpiry": "Krediti u iznosu od {{amount}} ističu {{date}} (UTC). Prvo se troše krediti sa najranijim rokom isteka.",
+    "appStoreExpiry": "Krediti kupljeni preko App Store-a ne ističu.",
+    "playOneYearExpiry": "Ovi krediti ističu jednu kalendarsku godinu nakon kupovine.",
+    "playNonexpiring": "Ovi krediti ne ističu.",
     "packLabel": "Dodaj {{amount}} u kreditima",
     "priceUnavailable": "Cena nije dostupna",
     "purchased": "Krediti su dodati na tvoj saldo.",
@@ -4030,11 +4034,13 @@
       "namePlaceholder": "Greške, Ideje, Izdanje…",
       "emoji": "Emoji",
       "mode": "Režim",
-      "defaultsHint": "Sesije pokrenute sa ovog spiska koriste ove podrazumevane vrednosti."
+      "defaultsHint": "Sesije pokrenute sa ovog spiska koriste ove podrazumevane vrednosti.",
+      "saveFailed": "Nije bilo moguće sačuvati spisak. Proverite internet vezu i pokušajte ponovo."
     },
     "list": {
       "addPlaceholder": "Dodaj zadatak",
       "add": "Dodaj zadatak",
+      "addFailed": "Nije bilo moguće dodati zadatak. Proverite internet vezu i pokušajte ponovo.",
       "empty": "Još nema zadataka",
       "setDefaults": "Podesi repozitorijum, režim i model",
       "completed_one": "Završeno ({{count}})",
@@ -4073,7 +4079,9 @@
       "startNewSession": "Pokreni novu sesiju",
       "startNewSessionHint": "Pritisni i drži da pokreneš novu sesiju.",
       "linkSession": "Poveži sesiju",
-      "linkFailed": "Sesija nije mogla da se poveže sa zadatkom"
+      "linkFailed": "Sesija nije mogla da se poveže sa zadatkom",
+      "moveToAnotherTodo": "Premesti u drugi zadatak",
+      "startRefreshFailed": "Sesija je pokrenuta, ali ovaj spisak nije ažuriran."
     },
     "linkSession": {
       "title": "Poveži sesiju",
@@ -4082,6 +4090,7 @@
     },
     "upNext": "Sledeće",
     "sessionTodo": "Zadatak: {{title}}",
+    "openTodoHint": "Otvara zadatak.",
     "linkToTodo": "Poveži sa zadatkom",
     "candidates": {
       "empty": "Nema otvorenih zadataka"

@@ -1,10 +1,8 @@
 import { createTimer } from '@kilocode/web-shared/lib/timer';
 import { processLocalExpirations } from '@kilocode/web-shared/lib/creditExpiration';
-import { after } from 'next/server';
-import { maybePerformAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
 import type { UserForBalance } from '@kilocode/web-shared/lib/user/balance-types';
-import { subHours } from 'date-fns';
 import { accountBalanceMicrodollars } from '@kilocode/worker-utils/account-access';
+import { subHours } from 'date-fns';
 
 export type BalanceForUser = { balance: number };
 export async function getBalanceForUser(
@@ -14,16 +12,11 @@ export async function getBalanceForUser(
     quiet?: boolean;
     /** Instant the expiry cut-off is measured from. Defaults to the current time. */
     now?: Date;
-    /** How many hours the cut-off trails `now` by. Defaults to a random 0-1 draw. */
+    /** How many hours the cut-off trails `now` by. Defaults to no jitter. */
     expiryJitterHours?: number;
   } = {}
 ) {
-  const {
-    forceRefresh = false,
-    quiet = false,
-    now = new Date(),
-    expiryJitterHours = Math.random(),
-  } = options;
+  const { forceRefresh = false, quiet = false, now = new Date(), expiryJitterHours = 0 } = options;
   const expireBefore = subHours(now, expiryJitterHours);
 
   const needsExpirationComputation =
@@ -37,7 +30,6 @@ export async function getBalanceForUser(
     user = { ...user, ...result };
   }
 
-  after(() => maybePerformAutoTopUp(user));
   const balance = accountBalanceMicrodollars(user) / 1_000_000;
   return {
     balance,

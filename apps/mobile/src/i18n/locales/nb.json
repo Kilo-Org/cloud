@@ -227,7 +227,6 @@
     "hideBalance": "Skjul saldo",
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
-    "bonusCreditsExpiring": "{{amount}} i kreditter utløper {{date}}.",
     "signOutTitle": "Logge ut?",
     "signOutMessage": "Du må logge inn igjen for å få tilgang til arbeidsområdet ditt.",
     "deleteAccountTitle": "Slette kontoen?",
@@ -3159,7 +3158,7 @@
     "creditActivity": {
       "emptyDescription": "Kjøp, forbruk og justeringer av kreditter for denne organisasjonen vises her etter hvert.",
       "emptyTitle": "Ingen kredittbevegelser",
-      "expires": "Utløper {{date}}",
+      "expiresUtc": "Utløper {{date}} (UTC)",
       "title": "Kredittbevegelser",
       "transactionFallback": "Kreditttransaksjon",
       "category": {
@@ -3746,6 +3745,7 @@
     "title": "Profiler",
     "entrySubtitle": "Gjenbruk miljøinnstillinger på tvers av økter",
     "newProfile": "Ny profil",
+    "openHint": "Åpner profilen",
     "emptyTitle": "Ingen profiler ennå",
     "emptyDescription": "Opprett en profil for å gjenbruke miljøvariabler, oppsettkommandoer og ferdigheter på tvers av økter.",
     "loadFailed": "Kunne ikke laste inn profiler",
@@ -3937,6 +3937,10 @@
   "credits": {
     "title": "Kjøp kreditter",
     "description": "Kreditter er et engangskjøp som legges til Kilo-saldoen din for å kjøre AI-kodeøkter i Kilo App. Butikken belaster kontoen din, og kredittene legges til etter at butikken bekrefter betalingen.",
+    "nextExpiry": "{{amount}} i kreditter utløper {{date}} (UTC). Kreditter med tidligst utløpsdato brukes først.",
+    "appStoreExpiry": "Kreditter kjøpt via App Store utløper ikke.",
+    "playOneYearExpiry": "Disse kredittene utløper ett kalenderår etter kjøpet.",
+    "playNonexpiring": "Disse kredittene utløper ikke.",
     "packLabel": "Legg til {{amount}} i kreditter",
     "priceUnavailable": "Prisen er ikke tilgjengelig",
     "purchased": "Kreditter er lagt til saldoen din.",
@@ -3977,11 +3981,13 @@
       "namePlaceholder": "Feil, ideer, utgivelse…",
       "emoji": "Emoji",
       "mode": "Modus",
-      "defaultsHint": "Økter som startes fra denne listen, bruker disse standardverdiene."
+      "defaultsHint": "Økter som startes fra denne listen, bruker disse standardverdiene.",
+      "saveFailed": "Kunne ikke lagre listen. Sjekk tilkoblingen og prøv igjen."
     },
     "list": {
       "addPlaceholder": "Legg inn et gjøremål",
       "add": "Legg til gjøremål",
+      "addFailed": "Kunne ikke legge til gjøremålet. Sjekk tilkoblingen og prøv igjen.",
       "empty": "Ingen gjøremål ennå",
       "setDefaults": "Angi kodelager, modus og modell",
       "completed_one": "Fullført ({{count}})",
@@ -4018,7 +4024,9 @@
       "startNewSession": "Start ny økt",
       "startNewSessionHint": "Langtrykk for å starte en ny økt.",
       "linkSession": "Koble til økt",
-      "linkFailed": "Kunne ikke koble økten til gjøremålet."
+      "linkFailed": "Kunne ikke koble økten til gjøremålet.",
+      "moveToAnotherTodo": "Flytt til et annet gjøremål",
+      "startRefreshFailed": "Økten startet, men listen ble ikke oppdatert."
     },
     "linkSession": {
       "title": "Koble til en økt",
@@ -4027,6 +4035,7 @@
     },
     "upNext": "Neste",
     "sessionTodo": "Gjøremål: {{title}}",
+    "openTodoHint": "Åpner gjøremålet.",
     "linkToTodo": "Koble til gjøremål",
     "candidates": {
       "empty": "Ingen åpne gjøremål"

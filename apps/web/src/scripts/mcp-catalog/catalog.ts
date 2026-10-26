@@ -46,6 +46,19 @@ export const ROOT_ROUTER_PATH = join(__dirname, '..', '..', 'routers', 'root-rou
  * agent could otherwise mint the estimate token itself and bypass that consent.
  */
 const NATIVE_ONLY_PATHS: Record<string, true> = {
+  // Vercel connection uses raw credentials; teardown and builds require app confirmation.
+  'vercelCompute.add': true,
+  'vercelCompute.discoverProjects': true,
+  'vercelCompute.discoverTeams': true,
+  'vercelCompute.remove': true,
+  'vercelCompute.retrySetup': true,
+  'vercelCompute.upgradeRuntime': true,
+  'organizations.vercelCompute.add': true,
+  'organizations.vercelCompute.discoverProjects': true,
+  'organizations.vercelCompute.discoverTeams': true,
+  'organizations.vercelCompute.remove': true,
+  'organizations.vercelCompute.retrySetup': true,
+  'organizations.vercelCompute.upgradeRuntime': true,
   'activeSessions.widgetCredential': true,
   'agentBriefing.createOneOff': true,
   'agentBriefing.generateSummary': true,

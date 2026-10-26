@@ -238,7 +238,7 @@ async function syncProviders(params: {
       };
     });
   const mappedExtraModels = mappedKiloExclusiveModels.concat(
-    buildPublicCustomLlmSnapshotModels(customLlms, new Date().toISOString())
+    buildPublicCustomLlmSnapshotModels(customLlms, unavailableModelIds, new Date().toISOString())
   );
 
   for (const extraModel of mappedExtraModels) {

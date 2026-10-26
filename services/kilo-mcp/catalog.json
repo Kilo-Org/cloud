@@ -4850,7 +4850,8 @@
         },
         "cursor": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 140
         }
       },
       "required": [
@@ -5708,56 +5709,6 @@
     ],
     "searchBlob": "cloudAgentNext.getAttachmentUploadUrl Get a presigned URL to upload a file attachment for a cloud agent message. cloudagentnext getattachmentuploadurl messageuuid attachmentid contenttype contentlength extension messageUuid attachmentId contentType contentLength extension"
   },
-  "cloudAgentNext.getImageUploadUrl": {
-    "path": "cloudAgentNext.getImageUploadUrl",
-    "kind": "mutation",
-    "summary": "Get a presigned URL to upload an image for a cloud agent message.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "messageUuid": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "imageId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "contentType": {
-          "type": "string",
-          "enum": [
-            "image/png",
-            "image/jpeg",
-            "image/webp",
-            "image/gif"
-          ]
-        },
-        "contentLength": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "maximum": 5242880
-        }
-      },
-      "required": [
-        "messageUuid",
-        "imageId",
-        "contentType",
-        "contentLength"
-      ]
-    },
-    "tags": [
-      "cloudagentnext",
-      "getimageuploadurl",
-      "messageuuid",
-      "imageid",
-      "contenttype",
-      "contentlength"
-    ],
-    "searchBlob": "cloudAgentNext.getImageUploadUrl Get a presigned URL to upload an image for a cloud agent message. cloudagentnext getimageuploadurl messageuuid imageid contenttype contentlength messageUuid imageId contentType contentLength"
-  },
   "cloudAgentNext.getMessageResult": {
     "path": "cloudAgentNext.getMessageResult",
     "kind": "query",
@@ -6216,10 +6167,7 @@
                             },
                             "account": {
                               "type": "string",
-                              "enum": [
-                                "kilo",
-                                "byoc"
-                              ]
+                              "const": "byoc"
                             }
                           },
                           "required": [
@@ -6828,29 +6776,6 @@
                 "files"
               ]
             },
-            "images": {
-              "type": "object",
-              "properties": {
-                "path": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                },
-                "files": {
-                  "minItems": 1,
-                  "maxItems": 5,
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|webp|gif)$"
-                  }
-                }
-              },
-              "required": [
-                "path",
-                "files"
-              ]
-            },
             "devcontainer": {
               "type": "boolean"
             }
@@ -6933,10 +6858,7 @@
                             },
                             "account": {
                               "type": "string",
-                              "enum": [
-                                "kilo",
-                                "byoc"
-                              ]
+                              "const": "byoc"
                             }
                           },
                           "required": [
@@ -7484,29 +7406,6 @@
                 "files"
               ]
             },
-            "images": {
-              "type": "object",
-              "properties": {
-                "path": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                },
-                "files": {
-                  "minItems": 1,
-                  "maxItems": 5,
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|webp|gif)$"
-                  }
-                }
-              },
-              "required": [
-                "path",
-                "files"
-              ]
-            },
             "devcontainer": {
               "type": "boolean"
             }
@@ -7790,29 +7689,6 @@
             "path",
             "files"
           ]
-        },
-        "images": {
-          "type": "object",
-          "properties": {
-            "path": {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            },
-            "files": {
-              "minItems": 1,
-              "maxItems": 5,
-              "type": "array",
-              "items": {
-                "type": "string",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|webp|gif)$"
-              }
-            }
-          },
-          "required": [
-            "path",
-            "files"
-          ]
         }
       },
       "required": [
@@ -7829,10 +7705,9 @@
       "expectedworktreeid",
       "autocommit",
       "messageid",
-      "attachments",
-      "images"
+      "attachments"
     ],
-    "searchBlob": "cloudAgentNext.sendMessage Send a follow-up prompt, command, or attachment to an existing cloud agent session. cloudagentnext sendmessage cloudagentsessionid payload expectedworktreeid autocommit messageid attachments images cloudAgentSessionId payload expectedWorktreeId autoCommit messageId attachments images"
+    "searchBlob": "cloudAgentNext.sendMessage Send a follow-up prompt, command, or attachment to an existing cloud agent session. cloudagentnext sendmessage cloudagentsessionid payload expectedworktreeid autocommit messageid attachments cloudAgentSessionId payload expectedWorktreeId autoCommit messageId attachments"
   },
   "cloudAgentNextFeedback.create": {
     "path": "cloudAgentNextFeedback.create",
@@ -9628,12 +9503,21 @@
     "path": "credits.getMobileStoreProducts",
     "kind": "query",
     "summary": "List the one-off credit packs the mobile app can sell, with the account token and the App Store and Google Play product id for each preset amount.",
-    "inputSchema": {},
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "supportsCreditExpiry": {
+          "type": "boolean"
+        }
+      }
+    },
     "tags": [
       "credits",
-      "getmobilestoreproducts"
+      "getmobilestoreproducts",
+      "supportscreditexpiry"
     ],
-    "searchBlob": "credits.getMobileStoreProducts List the one-off credit packs the mobile app can sell, with the account token and the App Store and Google Play product id for each preset amount. credits getmobilestoreproducts"
+    "searchBlob": "credits.getMobileStoreProducts List the one-off credit packs the mobile app can sell, with the account token and the App Store and Google Play product id for each preset amount. credits getmobilestoreproducts supportscreditexpiry supportsCreditExpiry"
   },
   "debug.badInputError": {
     "path": "debug.badInputError",
@@ -16604,64 +16488,6 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.getAttachmentUploadUrl Get a presigned URL to upload a file attachment for a cloud agent message. Use to attach a file. organizations cloudagentnext getattachmentuploadurl organizationid messageuuid attachmentid contenttype contentlength extension organizationId messageUuid attachmentId contentType contentLength extension"
   },
-  "organizations.cloudAgentNext.getImageUploadUrl": {
-    "path": "organizations.cloudAgentNext.getImageUploadUrl",
-    "kind": "mutation",
-    "summary": "Get a presigned URL to upload an image for a cloud agent message. Use to attach an image.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "messageUuid": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "imageId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "contentType": {
-          "type": "string",
-          "enum": [
-            "image/png",
-            "image/jpeg",
-            "image/webp",
-            "image/gif"
-          ]
-        },
-        "contentLength": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "maximum": 5242880
-        }
-      },
-      "required": [
-        "organizationId",
-        "messageUuid",
-        "imageId",
-        "contentType",
-        "contentLength"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "cloudagentnext",
-      "getimageuploadurl",
-      "organizationid",
-      "messageuuid",
-      "imageid",
-      "contenttype",
-      "contentlength"
-    ],
-    "searchBlob": "organizations.cloudAgentNext.getImageUploadUrl Get a presigned URL to upload an image for a cloud agent message. Use to attach an image. organizations cloudagentnext getimageuploadurl organizationid messageuuid imageid contenttype contentlength organizationId messageUuid imageId contentType contentLength"
-  },
   "organizations.cloudAgentNext.getMessageResult": {
     "path": "organizations.cloudAgentNext.getMessageResult",
     "kind": "query",
@@ -17311,10 +17137,7 @@
                                 },
                                 "account": {
                                   "type": "string",
-                                  "enum": [
-                                    "kilo",
-                                    "byoc"
-                                  ]
+                                  "const": "byoc"
                                 }
                               },
                               "required": [
@@ -17923,29 +17746,6 @@
                     "files"
                   ]
                 },
-                "images": {
-                  "type": "object",
-                  "properties": {
-                    "path": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                    },
-                    "files": {
-                      "minItems": 1,
-                      "maxItems": 5,
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|webp|gif)$"
-                      }
-                    }
-                  },
-                  "required": [
-                    "path",
-                    "files"
-                  ]
-                },
                 "devcontainer": {
                   "type": "boolean"
                 }
@@ -18034,10 +17834,7 @@
                                 },
                                 "account": {
                                   "type": "string",
-                                  "enum": [
-                                    "kilo",
-                                    "byoc"
-                                  ]
+                                  "const": "byoc"
                                 }
                               },
                               "required": [
@@ -18585,29 +18382,6 @@
                     "files"
                   ]
                 },
-                "images": {
-                  "type": "object",
-                  "properties": {
-                    "path": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                    },
-                    "files": {
-                      "minItems": 1,
-                      "maxItems": 5,
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|webp|gif)$"
-                      }
-                    }
-                  },
-                  "required": [
-                    "path",
-                    "files"
-                  ]
-                },
                 "devcontainer": {
                   "type": "boolean"
                 }
@@ -18958,29 +18732,6 @@
             "path",
             "files"
           ]
-        },
-        "images": {
-          "type": "object",
-          "properties": {
-            "path": {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            },
-            "files": {
-              "minItems": 1,
-              "maxItems": 5,
-              "type": "array",
-              "items": {
-                "type": "string",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|webp|gif)$"
-              }
-            }
-          },
-          "required": [
-            "path",
-            "files"
-          ]
         }
       },
       "required": [
@@ -19000,10 +18751,9 @@
       "expectedworktreeid",
       "autocommit",
       "messageid",
-      "attachments",
-      "images"
+      "attachments"
     ],
-    "searchBlob": "organizations.cloudAgentNext.sendMessage Send a prompt or command to a running cloud agent session. Use to continue the conversation with the agent. organizations cloudagentnext sendmessage organizationid cloudagentsessionid payload expectedworktreeid autocommit messageid attachments images organizationId cloudAgentSessionId payload expectedWorktreeId autoCommit messageId attachments images"
+    "searchBlob": "organizations.cloudAgentNext.sendMessage Send a prompt or command to a running cloud agent session. Use to continue the conversation with the agent. organizations cloudagentnext sendmessage organizationid cloudagentsessionid payload expectedworktreeid autocommit messageid attachments organizationId cloudAgentSessionId payload expectedWorktreeId autoCommit messageId attachments"
   },
   "organizations.create": {
     "path": "organizations.create",
@@ -27901,6 +27651,58 @@
     ],
     "searchBlob": "organizations.usageStats Get an organization's usage totals (cost, requests, tokens) over the last 30 days. organizations usagestats organizationid organizationId"
   },
+  "organizations.vercelCompute.getEnrollment": {
+    "path": "organizations.vercelCompute.getEnrollment",
+    "kind": "query",
+    "summary": "Get the organization's BYOC Vercel compute enrollment state, including whether the organization is enrolled.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "vercelcompute",
+      "getenrollment",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.vercelCompute.getEnrollment Get the organization's BYOC Vercel compute enrollment state, including whether the organization is enrolled. organizations vercelcompute getenrollment organizationid organizationId"
+  },
+  "organizations.vercelCompute.getStatus": {
+    "path": "organizations.vercelCompute.getStatus",
+    "kind": "query",
+    "summary": "Get the organization's BYOC Vercel compute status: setup progress, setup and upgrade errors, runtime build and snapshot identity, and whether a newer runtime is available.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "vercelcompute",
+      "getstatus",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.vercelCompute.getStatus Get the organization's BYOC Vercel compute status: setup progress, setup and upgrade errors, runtime build and snapshot identity, and whether a newer runtime is available. organizations vercelcompute getstatus organizationid organizationId"
+  },
   "organizations.withMembers": {
     "path": "organizations.withMembers",
     "kind": "query",
@@ -34063,6 +33865,11 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       },
       "required": [
@@ -34072,9 +33879,10 @@
     "tags": [
       "user",
       "getcreditpurchaseconfirmation",
-      "transactionid"
+      "transactionid",
+      "organizationid"
     ],
-    "searchBlob": "user.getCreditPurchaseConfirmation Get confirmation details for a specific personal credit purchase transaction by ID, including amount and purchase time. user getcreditpurchaseconfirmation transactionid transactionId"
+    "searchBlob": "user.getCreditPurchaseConfirmation Get confirmation details for a specific personal credit purchase transaction by ID, including amount and purchase time. user getcreditpurchaseconfirmation transactionid organizationid transactionId organizationId"
   },
   "user.getCreditPurchaseHistory": {
     "path": "user.getCreditPurchaseHistory",
@@ -34089,15 +33897,21 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 9007199254740991
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       }
     },
     "tags": [
       "user",
       "getcreditpurchasehistory",
-      "cursor"
+      "cursor",
+      "organizationid"
     ],
-    "searchBlob": "user.getCreditPurchaseHistory Fetch a paginated history of the user's personal credit purchases and automatic top-ups with amounts and dates. user getcreditpurchasehistory cursor cursor"
+    "searchBlob": "user.getCreditPurchaseHistory Fetch a paginated history of the user's personal credit purchases and automatic top-ups with amounts and dates. user getcreditpurchasehistory cursor organizationid cursor organizationId"
   },
   "user.getCreditPurchaseReceipt": {
     "path": "user.getCreditPurchaseReceipt",
@@ -34111,6 +33925,11 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       },
       "required": [
@@ -34120,9 +33939,10 @@
     "tags": [
       "user",
       "getcreditpurchasereceipt",
-      "transactionid"
+      "transactionid",
+      "organizationid"
     ],
-    "searchBlob": "user.getCreditPurchaseReceipt Get the receipt URL for a Stripe credit purchase. user getcreditpurchasereceipt transactionid transactionId"
+    "searchBlob": "user.getCreditPurchaseReceipt Get the receipt URL for a Stripe credit purchase. user getcreditpurchasereceipt transactionid organizationid transactionId organizationId"
   },
   "user.getDiscordGuildStatus": {
     "path": "user.getDiscordGuildStatus",
@@ -34201,6 +34021,17 @@
       "getnotificationpreferences"
     ],
     "searchBlob": "user.getNotificationPreferences Get the current user's notification preferences for push notifications, chat messages, balance alerts, security findings, and more. user getnotificationpreferences"
+  },
+  "user.getPaidCreditPolicy": {
+    "path": "user.getPaidCreditPolicy",
+    "kind": "query",
+    "summary": "Check whether paid credits and Kilo Pass credits currently expire after one year, returning the current policy and its effective date so an agent can tell if expiry rules are active for users.",
+    "inputSchema": {},
+    "tags": [
+      "user",
+      "getpaidcreditpolicy"
+    ],
+    "searchBlob": "user.getPaidCreditPolicy Check whether paid credits and Kilo Pass credits currently expire after one year, returning the current policy and its effective date so an agent can tell if expiry rules are active for users. user getpaidcreditpolicy"
   },
   "user.getPasskeys": {
     "path": "user.getPasskeys",
@@ -35046,6 +34877,28 @@
       "context_json"
     ],
     "searchBlob": "userFeedback.create Submit user feedback or a bug report to the Kilo team along with context about the app area and source it came from. userfeedback create feedback_text feedback_for feedback_batch source context_json feedback_text feedback_for feedback_batch source context_json"
+  },
+  "vercelCompute.getEnrollment": {
+    "path": "vercelCompute.getEnrollment",
+    "kind": "query",
+    "summary": "Check whether an organization is enrolled in customer-paid Vercel compute (bring your own Vercel account) and can use the integration.",
+    "inputSchema": {},
+    "tags": [
+      "vercelcompute",
+      "getenrollment"
+    ],
+    "searchBlob": "vercelCompute.getEnrollment Check whether an organization is enrolled in customer-paid Vercel compute (bring your own Vercel account) and can use the integration. vercelcompute getenrollment"
+  },
+  "vercelCompute.getStatus": {
+    "path": "vercelCompute.getStatus",
+    "kind": "query",
+    "summary": "Get the current Vercel compute setup status for an organization, including setup progress, errors, connected team and project, runtime version, and whether a runtime upgrade is available.",
+    "inputSchema": {},
+    "tags": [
+      "vercelcompute",
+      "getstatus"
+    ],
+    "searchBlob": "vercelCompute.getStatus Get the current Vercel compute setup status for an organization, including setup progress, errors, connected team and project, runtime version, and whether a runtime upgrade is available. vercelcompute getstatus"
   },
   "webhookTriggers.capabilities": {
     "path": "webhookTriggers.capabilities",

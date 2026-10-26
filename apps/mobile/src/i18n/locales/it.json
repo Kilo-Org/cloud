@@ -227,7 +227,6 @@
     "hideBalance": "Nascondi saldo",
     "showBalance": "Mostra saldo",
     "balanceHidden": "Saldo nascosto",
-    "bonusCreditsExpiring": "{{amount}} di crediti scadono il {{date}}.",
     "signOutTitle": "Uscire?",
     "signOutMessage": "Per tornare al tuo spazio di lavoro, dovrai effettuare di nuovo l'accesso.",
     "deleteAccountTitle": "Eliminare l'account?",
@@ -3195,7 +3194,7 @@
     "creditActivity": {
       "emptyDescription": "Qui vedrai gli acquisti, i consumi e le rettifiche dei crediti dell'organizzazione man mano che avvengono.",
       "emptyTitle": "Nessun movimento dei crediti",
-      "expires": "Scade il {{date}}",
+      "expiresUtc": "Scade il {{date}} (UTC)",
       "title": "Movimenti dei crediti",
       "transactionFallback": "Movimento dei crediti",
       "category": {
@@ -3792,6 +3791,7 @@
     "title": "Profili",
     "entrySubtitle": "Riutilizza le impostazioni dell'ambiente tra le sessioni",
     "newProfile": "Nuovo profilo",
+    "openHint": "Apre il profilo",
     "emptyTitle": "Nessun profilo ancora",
     "emptyDescription": "Crea un profilo per riutilizzare variabili di ambiente, comandi di configurazione e competenze tra le sessioni.",
     "loadFailed": "Impossibile caricare i profili",
@@ -3988,6 +3988,10 @@
   "credits": {
     "title": "Acquista crediti",
     "description": "I crediti sono un acquisto una tantum che viene aggiunto al tuo saldo Kilo per eseguire sessioni di coding AI in Kilo App. Lo store addebita il tuo account e i crediti vengono aggiunti dopo che lo store conferma il pagamento.",
+    "nextExpiry": "{{amount}} di crediti scadono il {{date}} (UTC). I crediti con la scadenza più vicina vengono usati per primi.",
+    "appStoreExpiry": "I crediti acquistati tramite l'App Store non scadono.",
+    "playOneYearExpiry": "Questi crediti scadono un anno solare dopo l'acquisto.",
+    "playNonexpiring": "Questi crediti non scadono.",
     "packLabel": "Aggiungi {{amount}} in crediti",
     "priceUnavailable": "Prezzo non disponibile",
     "purchased": "I crediti sono stati aggiunti al tuo saldo.",
@@ -4030,11 +4034,13 @@
       "namePlaceholder": "Bug, Idee, Release…",
       "emoji": "Emoji",
       "mode": "Modalità",
-      "defaultsHint": "Le sessioni avviate da questo elenco usano questi valori predefiniti."
+      "defaultsHint": "Le sessioni avviate da questo elenco usano questi valori predefiniti.",
+      "saveFailed": "Impossibile salvare l’elenco. Controlla la connessione e riprova."
     },
     "list": {
       "addPlaceholder": "Aggiungi un'attività",
       "add": "Aggiungi attività",
+      "addFailed": "Impossibile aggiungere l’attività. Controlla la connessione e riprova.",
       "empty": "Ancora nessuna attività",
       "setDefaults": "Imposta repository, modalità e modello",
       "completed_one": "Completate ({{count}})",
@@ -4073,7 +4079,9 @@
       "startNewSession": "Avvia nuova sessione",
       "startNewSessionHint": "Tieni premuto per avviare una nuova sessione.",
       "linkSession": "Collega sessione",
-      "linkFailed": "Impossibile collegare la sessione all'attività"
+      "linkFailed": "Impossibile collegare la sessione all'attività",
+      "moveToAnotherTodo": "Sposta in un'altra attività",
+      "startRefreshFailed": "La sessione è stata avviata, ma questo elenco non è stato aggiornato."
     },
     "linkSession": {
       "title": "Collega una sessione",
@@ -4082,6 +4090,7 @@
     },
     "upNext": "Prossimo",
     "sessionTodo": "Attività: {{title}}",
+    "openTodoHint": "Apre l'attività.",
     "linkToTodo": "Collega all'attività",
     "candidates": {
       "empty": "Nessuna attività aperta"

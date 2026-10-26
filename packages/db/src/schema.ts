@@ -136,6 +136,7 @@ import type {
   KiloClawScheduledActionNotificationChannel,
   KiloClawScheduledActionNotificationKind,
   DirectByokModel,
+  ByokApiKeySettings,
 } from './schema-types';
 import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-pricing-catalog';
 import type {
@@ -6945,6 +6946,7 @@ export const byok_api_keys = pgTable(
     encrypted_api_key: jsonb().$type<EncryptedData>().notNull(),
     management_source: text().$type<BYOKManagementSource>().notNull().default('user'),
     is_enabled: boolean().default(true).notNull(),
+    settings: jsonb().$type<ByokApiKeySettings>().default({}).notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()

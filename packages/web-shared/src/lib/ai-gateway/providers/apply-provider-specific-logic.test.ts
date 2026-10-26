@@ -391,6 +391,32 @@ describe('applyReasoningDetailsTransform', () => {
     expect(request.body.reasoning_effort).toBe('high');
   });
 
+  it('folds reasoning_details into a reasoning string for reasoning upstreams', () => {
+    const request = makeReasoningRequest();
+    request.body.reasoning = { effort: 'high', enabled: true };
+
+    applyReasoningDetailsTransform(makeProvider(ReasoningDetailsTransform.Reasoning), request);
+
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    expect('reasoning_details' in assistant).toBe(false);
+    expect(assistant).not.toHaveProperty('reasoning_content');
+    expect(assistant.reasoning).toBe('thinking hard');
+    expect(request.body).not.toHaveProperty('reasoning');
+    expect(request.body.reasoning_effort).toBe('high');
+  });
+
+  it('keeps a legacy reasoning string for reasoning upstreams without reasoning_details', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    delete assistant.reasoning_details;
+    assistant.reasoning = 'legacy thinking';
+
+    applyReasoningDetailsTransform(makeProvider(ReasoningDetailsTransform.Reasoning), request);
+
+    expect(assistant.reasoning).toBe('legacy thinking');
+    expect(assistant).not.toHaveProperty('reasoning_content');
+  });
+
   it('keeps the reasoning object without a transform', () => {
     const request = makeReasoningRequest();
     request.body.reasoning = { effort: 'high' };

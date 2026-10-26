@@ -2229,7 +2229,10 @@ export type CustomLlmMetadata = z.infer<typeof CustomLlmMetadataSchema>;
 
 export const ReasoningDetailsTransform = {
   GeminiThought: 'gemini-thought',
+  /** The upstream sends reasoning as a DeepSeek-style `reasoning_content` string. */
   ReasoningContent: 'reasoning-content',
+  /** The upstream sends reasoning as a plain `reasoning` string, without `reasoning_details`. */
+  Reasoning: 'reasoning',
 } as const;
 
 export const ReasoningDetailsTransformSchema = z.enum(ReasoningDetailsTransform);

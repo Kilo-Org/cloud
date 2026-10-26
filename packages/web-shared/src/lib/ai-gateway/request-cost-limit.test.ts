@@ -187,6 +187,20 @@ describe('request cost admission', () => {
 
     expect(decision).toEqual({ refusal: null, providerConfig: null });
   });
+  it('caps a free OpenRouter-served model at zero route prices', async () => {
+    const decision = await enforceRequestCostLimitDecision(
+      '2000000',
+      'google/gemma-4-26b-a4b-it:free',
+      body,
+      2_000_000,
+      { id: 'openrouter', userFunded: false }
+    );
+
+    expect(decision).toEqual({
+      refusal: null,
+      providerConfig: { max_price: { prompt: 0, completion: 0, request: 0 } },
+    });
+  });
   it('caps provider prices while preserving provider exclusions and organization allow-lists', async () => {
     const provider = {
       order: ['first-route', 'second-route'],

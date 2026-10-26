@@ -1170,6 +1170,8 @@ export async function handleLlmProxyRequest(
     model: effectiveModelIdLowerCased,
     providerId: effectiveProviderContext.provider.id,
     kind: requestBodyParsed.kind,
+    isFree: usageContext.is_free,
+    userByok: usageContext.user_byok,
     logging: requestLogging,
     responseTransforms: effectiveProviderContext.provider.responseTransforms,
   });

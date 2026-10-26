@@ -8,6 +8,8 @@ import {
   readResponseText,
   rewriteSseStream,
   rewriteUsage,
+  rewriteResponseMetadata,
+  type ResponseMetadata,
   type RewriteResponseParams,
 } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse.shared';
 import type { EventSourceMessage } from 'eventsource-parser';
@@ -18,12 +20,12 @@ import type OpenAI from 'openai';
 type ResponsesApiEvent = {
   type: string;
   sequence_number?: number;
-  response?: OpenAI.Responses.Response & { usage?: OpenRouterUsage | null };
-};
+  response?: OpenAI.Responses.Response & ResponseMetadata & { usage?: OpenRouterUsage | null };
+} & ResponseMetadata;
 
 export async function rewriteModelResponse_Responses({
   response,
-  removeCost,
+  usageContext,
   capture,
   reasoningEffort,
   vercelRequestId,
@@ -44,11 +46,12 @@ export async function rewriteModelResponse_Responses({
     }
     capture?.setBody(textResult.text);
     const { text } = textResult;
-    let json: OpenAI.Responses.Response & { usage?: OpenRouterUsage | null };
+    let json: OpenAI.Responses.Response & ResponseMetadata & { usage?: OpenRouterUsage | null };
     try {
-      json = JSON.parse(text) as OpenAI.Responses.Response & {
-        usage?: OpenRouterUsage | null;
-      };
+      json = JSON.parse(text) as OpenAI.Responses.Response &
+        ResponseMetadata & {
+          usage?: OpenRouterUsage | null;
+        };
     } catch {
       // Upstream returned invalid/empty JSON body — pass through as-is
       return new NextResponse(text, {
@@ -58,8 +61,9 @@ export async function rewriteModelResponse_Responses({
       });
     }
     if (json.usage) {
-      rewriteUsage(json.usage, removeCost);
+      rewriteUsage(json.usage, usageContext, json.provider_metadata ?? json.providerMetadata);
     }
+    rewriteResponseMetadata(json, usageContext);
     return NextResponse.json(json, {
       status: response.status,
       statusText: response.statusText,
@@ -84,6 +88,7 @@ export async function rewriteModelResponse_Responses({
       let doneReceived = false;
       let terminalEventReceived = false;
       let generationId: string | undefined;
+      let providerMetadata: ResponseMetadata['provider_metadata'];
       let nextSequenceNumber = 0;
       const progress = createStreamProgressLogger();
       const parser = createParser({
@@ -102,6 +107,8 @@ export async function rewriteModelResponse_Responses({
             nextSequenceNumber = Math.max(nextSequenceNumber, json.sequence_number + 1);
           }
           if (json.response) {
+            providerMetadata =
+              json.response.provider_metadata ?? json.response.providerMetadata ?? providerMetadata;
             if (generationId === undefined && json.response.id) {
               generationId = json.response.id;
               logExceptInTest('[rewriteModelResponse] received generation ID', {
@@ -110,9 +117,11 @@ export async function rewriteModelResponse_Responses({
               });
             }
             if (json.response.usage) {
-              rewriteUsage(json.response.usage, removeCost);
+              rewriteUsage(json.response.usage, usageContext, providerMetadata);
             }
+            rewriteResponseMetadata(json.response, usageContext);
           }
+          rewriteResponseMetadata(json, usageContext);
           const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
           controller.enqueue(eventLine + 'data: ' + JSON.stringify(json) + '\n\n');
           terminalEventReceived =

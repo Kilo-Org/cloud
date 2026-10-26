@@ -43,6 +43,7 @@ import { applyMetadataChanges } from '../ingest/metadata';
 import { notifyUserSessionEvent } from '../session-events';
 import { resolveAccessibleKiloSession } from '../services/session-access';
 import { verifySessionShareToken } from '../services/session-share-token';
+import { WORKSPACE_REQUIRES_ROOT_SESSION } from '../services/hosted-root-guard';
 import type * as SessionEvents from '../session-events';
 
 vi.mock('../session-events', async importOriginal => {
@@ -2261,7 +2262,17 @@ describe('api routes', () => {
     });
     fns.selectResult
       .mockResolvedValueOnce([{ worktreeId: null, scopeId: 'cloud-agent-session-scope-1' }])
-      .mockResolvedValueOnce([{ worktreeId: null }]);
+      .mockResolvedValueOnce([{ worktreeId: null }])
+      // Hosted-root guard target lookup, then a surviving sibling.
+      .mockResolvedValueOnce([
+        {
+          session_id: parentSessionId,
+          cloud_agent_session_id: 'cloud-agent-session-scope-1',
+          cloud_agent_worktree_id: null,
+          cloud_agent_session_scope_id: 'cloud-agent-session-scope-1',
+        },
+      ])
+      .mockResolvedValueOnce([{ session_id: childSessionId }]);
     // Rows selected for session.deleted events
     fns.selectResult.mockResolvedValueOnce([
       {
@@ -2441,6 +2452,45 @@ describe('api routes', () => {
       sessionId,
     });
     expect(ingestStub.clear).toHaveBeenCalledTimes(1);
+  });
+
+  it('DELETE /session/:sessionId rejects deleting the final hosted root of a workspace', async () => {
+    const sessionId = 'ses_12345678901234567890123456';
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    vi.mocked(resolveAccessibleKiloSession).mockResolvedValue({
+      kiloSessionId: sessionId,
+      organizationId: null,
+      cloudAgentSessionScopeId: 'workspace_final_root',
+    });
+    fns.executeResult.mockResolvedValueOnce({
+      rows: [{ session_id: sessionId, has_access: true }],
+    });
+    fns.selectResult
+      .mockResolvedValueOnce([{ worktreeId: 'worktree_11111111-1111-4111-8111-111111111111' }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          session_id: sessionId,
+          cloud_agent_session_id: 'workspace_final_root',
+          cloud_agent_worktree_id: 'worktree_11111111-1111-4111-8111-111111111111',
+          cloud_agent_session_scope_id: 'workspace_final_root',
+        },
+      ])
+      .mockResolvedValueOnce([]);
+
+    const env = makeTestEnv();
+    const res = await makeApiApp().fetch(
+      new Request(`http://local/session/${sessionId}`, { method: 'DELETE' }),
+      env
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({
+      success: false,
+      error: WORKSPACE_REQUIRES_ROOT_SESSION,
+    });
+    expect(fns.deleteWhere).not.toHaveBeenCalled();
   });
 
   it('DELETE /session/:sessionId service audience deletes an org session without membership', async () => {

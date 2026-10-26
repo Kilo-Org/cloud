@@ -15,6 +15,7 @@ import {
   deleteSession,
   shareSession,
   SessionShareTooLargeError,
+  SessionIngestConflictError,
   unshareSession,
   fetchSharedSessionMetadata,
   fetchSharedSessionSnapshot,
@@ -287,6 +288,24 @@ describe('deleteSession', () => {
         extra: { sessionId: 'ses_abc123', status: 500 },
       })
     );
+  });
+
+  it('surfaces the final hosted root guard as a typed conflict without reporting it', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 409,
+      statusText: 'Conflict',
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({ success: false, error: 'workspace_requires_root_session' })
+        ),
+    });
+
+    const error = await deleteSession('ses_abc123', 'user_123').catch(caught => caught);
+
+    expect(error).toBeInstanceOf(SessionIngestConflictError);
+    expect(error).toMatchObject({ code: 'workspace_requires_root_session' });
+    expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
   it('resolves successfully on 404 (idempotent delete)', async () => {

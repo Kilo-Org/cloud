@@ -43,6 +43,7 @@ import {
   deleteSession as deleteSessionIngest,
   shareSession as shareSessionIngest,
   SessionShareTooLargeError,
+  SessionIngestConflictError,
   unshareSession as unshareSessionIngest,
 } from '@/lib/session-ingest-client';
 import {
@@ -2270,7 +2271,14 @@ export const cliSessionsV2Router = createTRPCRouter({
 
     // Delegate DB deletion (including child sessions) and ingest DO/cache cleanup
     // to the session-ingest worker.
-    await deleteSessionIngest(session_id, ctx.user.id);
+    try {
+      await deleteSessionIngest(session_id, ctx.user.id);
+    } catch (error) {
+      if (error instanceof SessionIngestConflictError) {
+        throw new TRPCError({ code: 'CONFLICT', message: error.code });
+      }
+      throw error;
+    }
 
     return { success: true, session_id };
   }),

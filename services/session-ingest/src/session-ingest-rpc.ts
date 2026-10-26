@@ -105,6 +105,11 @@ import {
   isWorktreeSessionDeleting,
   WORKTREE_DELETING,
 } from './services/worktree-deletion';
+import {
+  hasSurvivingHostedRoot,
+  hostedRootIdentity,
+  WORKSPACE_REQUIRES_ROOT_SESSION,
+} from './services/hosted-root-guard';
 
 const MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS = 512;
 const CLOUD_AGENT_ROOT_SESSION_IDENTITY_CONFLICT_ERROR =
@@ -1087,14 +1092,29 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
    */
   async deleteSessionForCloudAgent(params: DeleteSessionForCloudAgentParams): Promise<void> {
     const parsed = deleteSessionForCloudAgentSchema.parse(params);
-    if (
-      await isWorktreeSessionDeleting(
-        getWorkerDb(this.env.HYPERDRIVE.connectionString),
-        parsed.kiloUserId,
-        parsed.sessionId
-      )
-    ) {
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    if (await isWorktreeSessionDeleting(db, parsed.kiloUserId, parsed.sessionId)) {
       throw new Error(WORKTREE_DELETING);
+    }
+    if (parsed.cloneSourceSessionId === undefined && !parsed.onlyIfEmpty) {
+      const [target] = await db
+        .select({
+          cloud_agent_session_id: cli_sessions_v2.cloud_agent_session_id,
+          cloud_agent_worktree_id: cli_sessions_v2.cloud_agent_worktree_id,
+          cloud_agent_session_scope_id: cli_sessions_v2.cloud_agent_session_scope_id,
+        })
+        .from(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, parsed.sessionId),
+            eq(cli_sessions_v2.kilo_user_id, parsed.kiloUserId)
+          )
+        )
+        .limit(1);
+      const identity = target ? hostedRootIdentity(target) : null;
+      if (identity && !(await hasSurvivingHostedRoot(db, parsed.kiloUserId, identity))) {
+        throw new Error(WORKSPACE_REQUIRES_ROOT_SESSION);
+      }
     }
 
     if (parsed.cloneSourceSessionId !== undefined) {

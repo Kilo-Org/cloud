@@ -17,7 +17,15 @@ import {
   type SessionShareOptions,
   type KiloSdkMessageHistory,
   type SessionDiffRead,
+  WORKSPACE_REQUIRES_ROOT_SESSION,
 } from '@kilocode/session-ingest-contracts';
+
+export class SessionIngestConflictError extends Error {
+  constructor(readonly code: typeof WORKSPACE_REQUIRES_ROOT_SESSION) {
+    super(code);
+    this.name = 'SessionIngestConflictError';
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Zod schema (mirrors cloudflare-session-ingest SharedSessionSnapshotSchema)
@@ -669,6 +677,9 @@ export async function deleteSession(sessionId: string, userId: string): Promise<
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => '');
+    if (response.status === 409 && errorText.includes(WORKSPACE_REQUIRES_ROOT_SESSION)) {
+      throw new SessionIngestConflictError(WORKSPACE_REQUIRES_ROOT_SESSION);
+    }
     const error = new Error(
       `Session ingest delete failed: ${response.status} ${response.statusText}${errorText ? ` - ${errorText}` : ''}`
     );

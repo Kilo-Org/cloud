@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { cloudAgentChildSessionLineageSchema } from './cloud-agent-session-scope';
 
+export const WORKSPACE_REQUIRES_ROOT_SESSION = 'workspace_requires_root_session';
+
 export const sessionIdSchema = z.string().startsWith('ses_').length(30);
 export const cloudAgentWorktreeIdSchema = z.templateLiteral(['worktree_', z.uuid()]);
 export type CloudAgentWorktreeId = z.infer<typeof cloudAgentWorktreeIdSchema>;

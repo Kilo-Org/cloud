@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
-import { sql, eq, and, inArray, isNull } from 'drizzle-orm';
+import { sql, eq, and, inArray, isNull, isNotNull } from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
 import { cli_sessions_v2, organization_memberships, organizations } from '@kilocode/db/schema';
 import {
@@ -42,6 +42,11 @@ import { applyReportedSessionTitle, reportSessionTitleSchema } from '../services
 import { signSessionShareToken } from '../services/session-share-token';
 import { canCreateCliSessionForUser } from '../services/user-session-admission';
 import { isWorktreeSessionDeleting } from '../services/worktree-deletion';
+import {
+  hasSurvivingHostedRoot,
+  hostedRootIdentity,
+  WORKSPACE_REQUIRES_ROOT_SESSION,
+} from '../services/hosted-root-guard';
 
 export type ApiContext = {
   Bindings: Env;
@@ -409,6 +414,30 @@ api.delete('/session/:sessionId', async c => {
     return c.json({ success: false, error: 'session_not_found' }, 404);
   }
   const orderedSessionIds = treeRows.length > 0 ? treeRows.map(r => r.session_id) : [parsed.data];
+  const rootRows = await db
+    .select({
+      session_id: cli_sessions_v2.session_id,
+      cloud_agent_session_id: cli_sessions_v2.cloud_agent_session_id,
+      cloud_agent_worktree_id: cli_sessions_v2.cloud_agent_worktree_id,
+      cloud_agent_session_scope_id: cli_sessions_v2.cloud_agent_session_scope_id,
+    })
+    .from(cli_sessions_v2)
+    .where(
+      and(
+        eq(cli_sessions_v2.session_id, parsed.data),
+        eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+        isNull(cli_sessions_v2.parent_session_id),
+        isNotNull(cli_sessions_v2.cloud_agent_session_id)
+      )
+    )
+    .limit(1);
+  const rootRow = rootRows[0];
+  if (rootRow) {
+    const identity = hostedRootIdentity(rootRow);
+    if (identity && !(await hasSurvivingHostedRoot(db, kiloUserId, identity))) {
+      return c.json({ success: false, error: WORKSPACE_REQUIRES_ROOT_SESSION }, 409);
+    }
+  }
   const deletedRows = await db
     .select()
     .from(cli_sessions_v2)

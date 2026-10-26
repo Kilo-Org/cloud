@@ -8,6 +8,7 @@ import {
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
 import { isPublicRepoUrlEnabled } from '@/lib/cloud-agent-next/public-repo-url';
+import { releaseRefusedSend } from '@/lib/cloud-agent-next/release-refused-send';
 import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
 import { createWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import { assertSessionWorktree } from '@/lib/cloud-agent-next/worktree-review-access';
@@ -62,16 +63,17 @@ import {
   basePreviewOptionsNextOutputSchema,
   basePreviewOptionsNextSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
-  cloudAgentGetImageUploadUrlSchema,
   cloudAgentGetAttachmentDownloadUrlSchema,
   cloudAgentReleasePendingUploadsSchema,
 } from './cloud-agent-next-schemas';
 import {
   generateCloudAgentAttachmentUploadUrl,
   generateCloudAgentAttachmentDownloadUrl,
-  generateImageUploadUrl,
 } from '@/lib/r2/cloud-agent-attachments';
-import { linkPendingUploads, releasePendingUploads } from '@/lib/r2/cloud-agent-pending-uploads';
+import {
+  linkAttachmentsForDispatch,
+  releasePendingUploads,
+} from '@/lib/r2/cloud-agent-pending-uploads';
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { signPreviewTicket, signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
@@ -79,7 +81,6 @@ import { buildPreviewOpenUrl, buildPreviewUrlTemplate } from '@/lib/cloud-agent/
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import { TRPCError } from '@trpc/server';
-import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
 import { isMobileClient } from '@kilocode/web-shared/lib/trpc/min-version';
 import { buildCloudAgentNextEligibility } from './cloud-agent-next-eligibility';
@@ -215,7 +216,6 @@ export const cloudAgentNextRouter = createTRPCRouter({
         githubIntegrationId,
         publicRepoUrl,
         attachments,
-        images,
         ...restInput
       } = input;
 
@@ -264,29 +264,20 @@ export const cloudAgentNextRouter = createTRPCRouter({
       }
 
       try {
-        const result = await client.prepareSession({
+        // New-session flows (mobile, continue-cloud-create) call prepareSession
+        // without a follow-up sendMessage, so the attachment rows must be
+        // linked before prepare can accept the session; otherwise the reaper
+        // deletes new-session objects.
+        await linkAttachmentsForDispatch(ctx.user.id, attachments);
+
+        return await client.prepareSession({
           ...restInput,
           ...gitParams,
-          attachments: attachments ?? images,
+          attachments,
           createdOnPlatform: 'cloud-agent-web',
           githubAccessPurpose: 'agent',
           clientProvenance: isMobileClient(ctx.headersList) ? 'mobile' : 'browser',
         });
-
-        // New-session flows (mobile, continue-cloud-create) call prepareSession
-        // without a follow-up sendMessage, so the server must link the admitted
-        // attachment rows here too; otherwise the reaper deletes new-session
-        // objects. Only ATTACHMENT rows are admitted (images are never admitted;
-        // only generateCloudAgentAttachmentUploadUrl admits).
-        if (attachments && attachments.files.length > 0) {
-          await linkPendingUploads(
-            ctx.user.id,
-            attachments.path,
-            attachments.files.map(file => `${ctx.user.id}/cloud-agent/${attachments.path}/${file}`)
-          );
-        }
-
-        return result;
       } catch (error) {
         rethrowCloudAgentError(error);
       }
@@ -374,32 +365,36 @@ export const cloudAgentNextRouter = createTRPCRouter({
 
       // Tokens are refreshed inside cloud-agent-next (GitHub App installation
       // for GitHub, GIT_TOKEN_SERVICE for managed GitLab).
+      const { attachments } = input;
+      let linkedObjectKeys: string[] = [];
       try {
-        const { attachments, images } = input;
-        const result = await client.sendMessage({
+        // Link the attachment rows before the worker can accept the turn: the
+        // link is what keeps their objects out of the abandoned-upload reaper,
+        // and once the worker has answered there is no ledger work left that
+        // could report an accepted send as failed.
+        linkedObjectKeys = await linkAttachmentsForDispatch(ctx.user.id, attachments);
+      } catch (error) {
+        rethrowCloudAgentError(error);
+      }
+
+      try {
+        return await client.sendMessage({
           cloudAgentSessionId: input.cloudAgentSessionId,
           payload: input.payload,
           autoCommit: input.autoCommit,
-          attachments: attachments ?? images,
-          messageId: input.messageId ?? generateMessageId(),
+          attachments,
+          messageId: input.messageId,
         });
-
-        // Compatibility: the server links authoritatively so any client whose
-        // send goes through sendMessage keeps its objects (mobile, old tabs).
-        // The client does not link pre-send, so a failed or abandoned send
-        // leaves rows 'pending' for the reaper. Only ATTACHMENT rows are
-        // admitted (images are never admitted; only
-        // generateCloudAgentAttachmentUploadUrl admits).
-        if (attachments && attachments.files.length > 0) {
-          await linkPendingUploads(
-            ctx.user.id,
-            attachments.path,
-            attachments.files.map(file => `${ctx.user.id}/cloud-agent/${attachments.path}/${file}`)
-          );
-        }
-
-        return result;
       } catch (error) {
+        // A send can fail after the worker accepted the turn, so only the rows
+        // this dispatch linked are handed back, and only when the worker itself
+        // refused the turn.
+        await releaseRefusedSend({
+          attachments,
+          error,
+          kiloUserId: ctx.user.id,
+          linkedObjectKeys,
+        });
         rethrowCloudAgentError(error);
       }
     }),
@@ -554,21 +549,6 @@ export const cloudAgentNextRouter = createTRPCRouter({
       } catch (error) {
         rethrowAsTerminalError(error);
       }
-    }),
-
-  /**
-   * Generate a presigned URL for uploading an image attachment.
-   */
-  getImageUploadUrl: baseProcedure
-    .input(cloudAgentGetImageUploadUrlSchema)
-    .mutation(async ({ ctx, input }) => {
-      return generateImageUploadUrl({
-        userId: ctx.user.id,
-        messageUuid: input.messageUuid,
-        imageId: input.imageId,
-        contentType: input.contentType,
-        contentLength: input.contentLength,
-      });
     }),
 
   /**

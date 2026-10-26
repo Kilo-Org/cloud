@@ -167,7 +167,10 @@ describe('egress policy registration', () => {
 
   it.each([
     { provider: 'cloudflare' },
-    { provider: 'vercel' },
+    {
+      provider: 'vercel',
+      byoc: { userId: 'owner-1', credentialId: '22222222-2222-4222-8222-222222222222' },
+    },
     { provider: 'cloudflare-containers', sandboxKind: 'shared' },
     { provider: 'cloudflare-containers', sandboxKind: 'code-review' },
   ])('restricts only allowlist mode to isolated containers: %j', placement => {

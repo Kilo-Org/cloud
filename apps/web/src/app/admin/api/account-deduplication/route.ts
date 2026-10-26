@@ -62,7 +62,6 @@ export async function GET(
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const offset = (page - 1) * limit;
 
-  // Get the paginated set of duplicate normalized_email values
   const duplicateEmailRows = await db
     .select({ normalized_email: kilocode_users.normalized_email })
     .from(kilocode_users)
@@ -84,7 +83,6 @@ export async function GET(
     .map(row => row.normalized_email)
     .filter((e): e is string => e !== null);
 
-  // Fetch all users for those normalized emails
   const users = await db
     .select({
       id: kilocode_users.id,
@@ -101,7 +99,6 @@ export async function GET(
     .where(inArray(kilocode_users.normalized_email, emailValues))
     .orderBy(kilocode_users.normalized_email, kilocode_users.created_at);
 
-  // Group users by normalized_email
   const groupMap = new Map<string, DuplicateUser[]>();
   for (const user of users) {
     const key = user.normalized_email;

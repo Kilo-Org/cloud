@@ -1484,6 +1484,22 @@
       "loadingProposals": "Ladataan ehdotuksia",
       "couldNotLoadProposals": "Ehdotuksia ei voitu ladata.",
       "noProposals": "Ei ehdotuksia",
+      "proposalDetails": "Ehdotuksen tiedot",
+      "proposalTitle": "Ehdotuksen otsikko",
+      "rationale": "Perustelut",
+      "saveFirst": "Tallenna muutoksesi ennen pull requestin avaamista.",
+      "proposalSaved": "Ehdotus tallennettu",
+      "proposalDismissed": "Ehdotus hylätty",
+      "dismissProposalTitle": "Hylätäänkö ehdotus?",
+      "dismissProposalMessage": "Tämä ehdotus poistetaan aktiivisten ehdotusten luettelosta, eikä sitä voi palauttaa.",
+      "prOpened": "REVIEW.md-tiedoston pull request avattu",
+      "alreadyPresent": "Ohjeet ovat jo REVIEW.md-tiedostossa",
+      "status": {
+        "edited": "Muokattu",
+        "opening_change_request": "Avataan PR:ää",
+        "change_request_failed": "PR:n avaaminen epäonnistui",
+        "superseded": "Jo olemassa"
+      },
       "noProposalsDescription": "Katselmointimuistin ehdotukset näkyvät tässä, kun Kilo on analysoinut ylläpitäjien vastaukset."
     },
     "manualReview": {
@@ -3730,6 +3746,7 @@
     "title": "Profiilit",
     "entrySubtitle": "Käytä ympäristöasetuksia uudelleen istuntojen aikana",
     "newProfile": "Uusi profiili",
+    "openHint": "Avaa profiilin",
     "emptyTitle": "Ei vielä profiileja",
     "emptyDescription": "Luo profiili käyttääksesi uudelleen ympäristömuuttujia, asetuskomentoja ja taitoja istuntojen aikana.",
     "loadFailed": "Profiilien lataaminen epäonnistui",
@@ -3961,11 +3978,13 @@
       "namePlaceholder": "Virheet, ideat, julkaisu…",
       "emoji": "Emoji",
       "mode": "Tila",
-      "defaultsHint": "Tästä listasta aloitetut istunnot käyttävät näitä oletusasetuksia."
+      "defaultsHint": "Tästä listasta aloitetut istunnot käyttävät näitä oletusasetuksia.",
+      "saveFailed": "Listaa ei voitu tallentaa. Tarkista yhteytesi ja yritä uudelleen."
     },
     "list": {
       "addPlaceholder": "Lisää uusi tehtävä",
       "add": "Lisää tehtävä",
+      "addFailed": "Tehtävää ei voitu lisätä. Tarkista yhteytesi ja yritä uudelleen.",
       "empty": "Ei vielä tehtäviä",
       "setDefaults": "Aseta koodivarasto, tila ja malli",
       "completed_one": "Valmis ({{count}})",
@@ -4002,7 +4021,9 @@
       "startNewSession": "Aloita uusi istunto",
       "startNewSessionHint": "Aloita uusi istunto pitämällä painettuna.",
       "linkSession": "Linkitä istunto",
-      "linkFailed": "Istunnon linkittäminen tehtävään ei onnistunut"
+      "linkFailed": "Istunnon linkittäminen tehtävään ei onnistunut",
+      "moveToAnotherTodo": "Siirrä toiseen tehtävään",
+      "startRefreshFailed": "Istunto aloitettiin, mutta tätä listaa ei päivitetty."
     },
     "linkSession": {
       "title": "Istunnon linkittäminen",
@@ -4011,6 +4032,7 @@
     },
     "upNext": "Seuraavaksi",
     "sessionTodo": "Tehtävä: {{title}}",
+    "openTodoHint": "Avaa tehtävän.",
     "linkToTodo": "Linkitä tehtävään",
     "candidates": {
       "empty": "Ei avoimia tehtäviä"

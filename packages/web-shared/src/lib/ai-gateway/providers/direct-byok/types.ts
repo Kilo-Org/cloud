@@ -42,7 +42,7 @@ export type DirectByokUpstream = Pick<
 export type DirectByokResolveUpstreamInput = {
   /** The decrypted credential stored for the provider. */
   credential: string;
-  model: Pick<DirectByokModel, 'id' | 'endpoint'>;
+  model: Pick<DirectByokModel, 'id'>;
   stream: boolean;
 };
 

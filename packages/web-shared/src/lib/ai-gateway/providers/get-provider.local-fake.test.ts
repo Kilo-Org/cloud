@@ -512,7 +512,6 @@ describe('getProvider direct BYOK routing', () => {
         name: 'GLM-5',
         context_length: 1000,
         max_completion_tokens: 1000,
-        endpoint: 'runtime-openai',
       },
     });
     jest
@@ -530,7 +529,7 @@ describe('getProvider direct BYOK routing', () => {
 
     expect(resolveUpstream).toHaveBeenCalledWith({
       credential: '{"stored":"credential"}',
-      model: expect.objectContaining({ id: 'zai.glm-5', endpoint: 'runtime-openai' }),
+      model: expect.objectContaining({ id: 'zai.glm-5' }),
       stream: true,
     });
     expect(result.provider).toMatchObject({

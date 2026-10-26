@@ -42,11 +42,11 @@ import {
 } from './session-config';
 import { useCombinedProfiles, useProfiles, useProfile } from '@/hooks/useCloudAgentProfiles';
 import {
-  formatSessionCost,
+  formatSessionTotalCost,
   getSessionCostBreakdown,
   getSessionTotalCostUsd,
-  isRenderableSessionCost,
 } from './session-cost-breakdown';
+import { getSessionUsage } from './session-token-usage';
 import { ConversationMessages } from './ConversationMessages';
 import { useSessionSwitch } from './use-session-switch';
 import { useCachedTranscriptPage } from './use-cached-transcript-page';
@@ -353,6 +353,11 @@ export default function CloudChatPage({
       liveTotalCostUsd,
       staticMessages,
     ]
+  );
+
+  const getCurrentSessionUsage = useCallback(
+    () => getSessionUsage(isCurrentSession ? [...staticMessages, ...dynamicMessages] : []),
+    [isCurrentSession, staticMessages, dynamicMessages]
   );
 
   useCliSessionPresence(fetchedSessionData?.kiloSessionId ?? null);
@@ -1741,7 +1746,19 @@ export default function CloudChatPage({
       gitUrl={workspaceControlSession ? undefined : fetchedSessionData?.gitUrl}
       model={workspaceControlSession?.model ?? sessionConfig?.model}
       modelDisplayName={workspaceControlSession ? undefined : modelDisplayName}
-      getSessionCostBreakdown={workspaceControlSession ? undefined : getCurrentSessionCostBreakdown}
+      getSessionCostBreakdown={
+        !workspaceControlSession && isCurrentSession && fetchedSessionData
+          ? getCurrentSessionCostBreakdown
+          : undefined
+      }
+      getSessionUsage={
+        !workspaceControlSession && isCurrentSession && transcriptReady
+          ? getCurrentSessionUsage
+          : undefined
+      }
+      hasIncompleteHistory={
+        isCurrentSession && (hasOlderMessages || olderMessagesOmittedItemCount > 0)
+      }
       sessionInfoOpen={sessionInfoOpen}
       onSessionInfoOpenChange={setSessionInfoOpen}
       sessionInfoTriggerRef={sessionInfoTriggerRef}
@@ -1802,7 +1819,7 @@ export default function CloudChatPage({
                     : 'Cloud Agent'
               }
             >
-              {sessionIdFromParams && isRenderableSessionCost(totalCostUsd) && (
+              {sessionIdFromParams && isCurrentSession && fetchedSessionData && (
                 <Button
                   type="button"
                   variant="ghost"
@@ -1810,13 +1827,16 @@ export default function CloudChatPage({
                   className="text-muted-foreground h-11 gap-1 px-2 text-sm font-normal"
                   aria-haspopup="dialog"
                   aria-expanded={sessionInfoOpen}
+                  aria-label={`Session cost ${formatSessionTotalCost(totalCostUsd)}. View cost and token usage`}
                   onClick={event => {
                     sessionInfoTriggerRef.current = event.currentTarget;
                     setSessionInfoOpen(true);
                   }}
                 >
-                  Token Usage{' '}
-                  <span className="font-mono tabular-nums">{formatSessionCost(totalCostUsd)}</span>
+                  Cost{' '}
+                  <span className="font-mono tabular-nums">
+                    {formatSessionTotalCost(totalCostUsd)}
+                  </span>
                 </Button>
               )}
             </SetPageTitle>

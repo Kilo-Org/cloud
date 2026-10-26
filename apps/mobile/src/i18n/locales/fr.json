@@ -985,6 +985,22 @@
       "loading": "Chargement de la mémoire de revue",
       "loadingProposals": "Chargement des propositions",
       "noProposals": "Aucune proposition",
+      "proposalDetails": "Détails de la proposition",
+      "proposalTitle": "Titre de la proposition",
+      "rationale": "Justification",
+      "saveFirst": "Enregistrez vos modifications avant d’ouvrir une pull request.",
+      "proposalSaved": "Proposition enregistrée",
+      "proposalDismissed": "Proposition rejetée",
+      "dismissProposalTitle": "Rejeter la proposition ?",
+      "dismissProposalMessage": "Cette proposition sera retirée de la liste active et ne pourra pas être restaurée.",
+      "prOpened": "Pull request pour REVIEW.md ouverte",
+      "alreadyPresent": "Les consignes figurent déjà dans REVIEW.md",
+      "status": {
+        "edited": "Modifiée",
+        "opening_change_request": "Ouverture de la PR",
+        "change_request_failed": "Échec de l’ouverture de la PR",
+        "superseded": "Déjà présent"
+      },
       "noProposalsDescription": "Les propositions de la mémoire de revue apparaissent ici après l'analyse des réponses des responsables du dépôt par Kilo.",
       "off": "La mémoire de revue est désactivée.",
       "on": "La mémoire de revue est activée.",
@@ -1065,8 +1081,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Aucun filtre disponible",
-      "noFiltersDescription": "Revenez en arrière et rouvrez les filtres depuis la liste des signalements.",
       "title": "Filtrer les signalements",
       "fixed": "Corrigé",
       "outcome": "Résultat",
@@ -1561,8 +1575,8 @@
       "title": "Session de travail",
       "copyErrorDetails": "Copier les détails de l'erreur",
       "backToSessions": "Retour aux sessions",
-      "follow": "Suivre sur l’écran verrouillé",
-      "unfollow": "Ne plus suivre sur l’écran verrouillé",
+      "follow": "Suivre la session",
+      "unfollow": "Ne plus suivre la session",
       "couldNotLoad": "Impossible de charger la session.",
       "failedToLoadDetails": "Impossible de charger les détails de la session.",
       "failedToStopExecution": "Impossible d'arrêter l'exécution.",
@@ -2384,7 +2398,6 @@
     "allow": "Autoriser",
     "onlineMessage": "Cet appareil ne peut pas transcrire hors ligne. Votre enregistrement est envoyé à {{provider}} pour le convertir en texte. Kilo ne conserve pas l'audio.",
     "onlineTitle": "Transcription vocale en ligne",
-    "staysOff": "La saisie vocale reste désactivée tant que vous n'autorisez pas la transcription en ligne.",
     "start": "Démarrer la saisie vocale",
     "stop": "Arrêter la saisie vocale",
     "restricted": "La saisie vocale est restreinte sur cet appareil.",
@@ -3404,7 +3417,7 @@
     "activityKitDisabledBody": "Activez les activités en direct dans les paramètres pour voir les agents actifs sur l'écran verrouillé.",
     "openSession": "Ouvrir",
     "finished": "Terminé",
-    "followFailed": "Impossible d’afficher cet agent sur l’écran verrouillé.",
+    "followFailed": "Impossible de suivre cette session.",
     "approveFailed": "Impossible d'approuver. Touchez $t(common.approve) pour réessayer.",
     "checked": "Vérifié",
     "lastKnown": "Dernier état connu",
@@ -4017,11 +4030,13 @@
       "namePlaceholder": "Bugs, Idées, Version…",
       "emoji": "Émoji",
       "mode": "Mode",
-      "defaultsHint": "Les sessions lancées depuis cette liste utilisent ces valeurs par défaut."
+      "defaultsHint": "Les sessions lancées depuis cette liste utilisent ces valeurs par défaut.",
+      "saveFailed": "Impossible d’enregistrer la liste. Vérifiez votre connexion et réessayez."
     },
     "list": {
       "addPlaceholder": "Ajouter une tâche",
       "add": "Ajouter la tâche",
+      "addFailed": "Impossible d’ajouter la tâche. Vérifiez votre connexion et réessayez.",
       "empty": "Aucune tâche pour l'instant",
       "setDefaults": "Définir le dépôt, le mode et le modèle",
       "completed_one": "Terminées ({{count}})",
@@ -4060,7 +4075,8 @@
       "startNewSession": "Démarrer une nouvelle session",
       "startNewSessionHint": "Appuyez longuement pour démarrer une nouvelle session.",
       "linkSession": "Lier une session",
-      "linkFailed": "Impossible de lier la session à la tâche"
+      "linkFailed": "Impossible de lier la session à la tâche",
+      "startRefreshFailed": "La session a démarré, mais cette liste ne s’est pas mise à jour."
     },
     "linkSession": {
       "title": "Lier une session",
@@ -4090,7 +4106,7 @@
     "emptyHint": "Vos sessions de code cloud et CLI apparaissent ici lorsqu’un briefing planifié a de l’activité.",
     "loadError": "Impossible de charger les briefings",
     "sessions": "Actives dans la fenêtre",
-    "pullRequests": "PRs ouvertes",
+    "pullRequests": "PRs ouvertes pendant la période",
     "blockers": "Nouveaux blocages",
     "spend": "Dépenses dans la fenêtre",
     "view": "Lire le briefing",
@@ -4123,7 +4139,7 @@
     "notificationsHint": "Une notification générique par briefing planifié. Indépendante des résumés AI payants.",
     "notificationPermission": "Activez les notifications de l’appareil dans $t(common.notifications) pour recevoir votre briefing.",
     "aiOptIn": "Résumés AI payants",
-    "aiHint": "Facultatif, pour ce contexte uniquement. Des extraits choisis et masqués ainsi que des faits structurés sont envoyés à votre modèle dans la langue de l’app. Les frais sont débités du solde de ce contexte.",
+    "aiHint": "Facultatif, pour ce contexte uniquement. Des extraits choisis dont les données sensibles ont été masquées ainsi que des faits structurés sont envoyés à votre modèle dans la langue de l’app. Les frais sont débités du solde de ce contexte.",
     "defaultModel": "Utiliser le modèle par défaut de Kilo",
     "duration": "Limite de temps (minutes)",
     "spendLimit": "Limite de dépense (USD)",
@@ -4170,6 +4186,12 @@
     "estimatePermissionUnavailable": "Vous n’avez pas l’autorisation d’utiliser le solde de ce contexte.",
     "createFailed": "Impossible de créer ce briefing.",
     "reviewFailed": "Impossible d'examiner ce briefing.",
-    "saved": "Paramètres du briefing enregistrés"
+    "saved": "Paramètres du briefing enregistrés",
+    "preparing": "Préparation de votre briefing…",
+    "preparationHint": "Vous pouvez quitter cette page et y revenir pendant la collecte de l’activité. Aucun traitement AI ne démarre et aucuns frais ne sont facturés tant que vous n’avez pas consulté l’aperçu et confirmé l’estimation.",
+    "resumeReview": "Continuer l’examen",
+    "preparationFailed": "Impossible de collecter l’activité pour ce briefing. Réessayez.",
+    "preparationTimedOut": "La collecte de l’activité a pris trop de temps. Réessayez.",
+    "preparationDrafts": "Briefings en attente de confirmation"
   }
 }

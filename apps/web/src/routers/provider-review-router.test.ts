@@ -18,6 +18,7 @@ import {
   BITBUCKET_PR_REVIEW_CAPABILITIES,
 } from '@/lib/provider-review/bitbucket-write';
 import { GITLAB_MR_REVIEW_CAPABILITIES } from '@/lib/provider-review/gitlab-write';
+import { createSignedToken } from '@/lib/signed-token';
 import { providerLedgerResourceKey, providerReviewRouter } from './provider-review-router';
 
 const ORG_ID = '2b1d4c8e-9f3a-4e5d-8c7b-6a5948372615';
@@ -275,6 +276,33 @@ describe('providerReviewRouter inputs', () => {
       7,
       'c1',
       undefined
+    );
+  });
+  it('round-trips a maximum-size signed inbox cursor through the router', async () => {
+    const base = {
+      kind: 'bitbucket-inbox-cursor',
+      identity: 'bitbucket-inbox:acme',
+      ceiling: '2026-09-02T00:00:00.000000+00:00',
+      served: [],
+      pages: [],
+    };
+    let cursor = createSignedToken({ ...base, padding: '' });
+    for (let length = 0; length < 2048; length += 1) {
+      const candidate = createSignedToken({ ...base, padding: 'x'.repeat(length) });
+      if (candidate.length > 2048) break;
+      cursor = candidate;
+    }
+    expect(cursor.length).toBeLessThanOrEqual(2048);
+    bitbucketRead.listInbox.mockResolvedValueOnce({ items: [], nextCursor: cursor });
+    await caller.listInbox({ platform: 'bitbucket', organizationId: ORG_ID });
+    bitbucketRead.listInbox.mockResolvedValueOnce({ items: [], nextCursor: null });
+
+    await caller.listInbox({ platform: 'bitbucket', organizationId: ORG_ID, cursor });
+    expect(cursor.length).toBeGreaterThan(2000);
+
+    expect(bitbucketRead.listInbox).toHaveBeenLastCalledWith(
+      { type: 'organization', organizationId: ORG_ID, userId: USER_ID },
+      cursor
     );
   });
 });
@@ -625,6 +653,44 @@ describe('providerReviewRouter ledger', () => {
     await caller.addComment({ ...gitlabBase, body: 'hello' });
     expect(mockAdmitOperation).not.toHaveBeenCalled();
     expect(gitlabWrite.addComment).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ----- failed-row ledger outcomes --------------------------------------------------
+
+describe('providerReviewRouter failed-row outcome codes', () => {
+  it('records an unclassified write failure as internal_error, never a client rejection', async () => {
+    gitlabWrite.addComment.mockRejectedValueOnce(new Error('unexpected provider-layer failure'));
+    await expect(
+      caller.addComment({
+        ...gitlabBase,
+        body: 'hello',
+        operationKey: 'key-internal',
+      })
+    ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+    expect(mockSettleOperation).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({ rowId: 'row-1', status: 'failed', outcomeCode: 'internal_error' })
+    );
+    // A server failure is deterministic, not ambiguous: the row settles.
+    expect(mockMarkReconcilePending).not.toHaveBeenCalled();
+  });
+
+  it('keeps bad_request reserved for a BAD_REQUEST rejection', async () => {
+    gitlabWrite.addComment.mockRejectedValueOnce(
+      new GitLabReviewError('bad_request', 'GitLab rejected this request.')
+    );
+    await expect(
+      caller.addComment({
+        ...gitlabBase,
+        body: 'hello',
+        operationKey: 'key-rejected',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockSettleOperation).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({ status: 'failed', outcomeCode: 'bad_request' })
+    );
   });
 });
 

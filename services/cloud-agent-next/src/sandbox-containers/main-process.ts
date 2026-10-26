@@ -1,8 +1,20 @@
-import { CONTROL_SUPERVISOR_PATH } from '../sandbox-control/container-paths.js';
+import {
+  CONTROL_SUPERVISOR_PATH,
+  ENVIRONMENT_BUILDER_PATH,
+} from '../sandbox-control/container-paths.js';
 import { diagnosticCause, type ControlDiagnosticFields } from '../sandbox-control/diagnostics.js';
 import type { ProviderStartupCommand } from '../sandbox-control/provider.js';
+import { RUNTIME_BUN_PATH } from '../shared/runtime-distribution.js';
 
-export type MainProcessIdentity = 'sleep' | 'supervisor' | 'startup' | 'ambiguous';
+export type MainProcessIdentity =
+  | 'sleep'
+  | 'supervisor'
+  | 'environment-builder'
+  | 'startup'
+  | 'ambiguous';
+
+/** The main processes a native start can issue; the image default `sleep` is not one. */
+export type NativeMainProcess = Extract<MainProcessIdentity, 'supervisor' | 'environment-builder'>;
 
 /**
  * One read of `/proc/1/cmdline` and the identity it decided. Everything except a
@@ -19,6 +31,15 @@ const MAIN_PROCESS_SLEEP_CMDLINE = new TextEncoder().encode('sleep\0infinity');
 const MAIN_PROCESS_SUPERVISOR_CMDLINE = new TextEncoder().encode(
   `/bin/sh\0${CONTROL_SUPERVISOR_PATH}`
 );
+const MAIN_PROCESS_BUILDER_CMDLINE = new TextEncoder().encode(
+  `${RUNTIME_BUN_PATH}\0${ENVIRONMENT_BUILDER_PATH}`
+);
+
+/** The argv a native start issues for each main process, matching its identity bytes. */
+export const NATIVE_MAIN_PROCESS_ARGV: Record<NativeMainProcess, readonly string[]> = {
+  supervisor: ['/bin/sh', CONTROL_SUPERVISOR_PATH],
+  'environment-builder': [RUNTIME_BUN_PATH, ENVIRONMENT_BUILDER_PATH],
+};
 
 function bytesEqual(left: Uint8Array, right: Uint8Array): boolean {
   if (left.byteLength !== right.byteLength) return false;
@@ -35,9 +56,11 @@ function withoutTrailingNul(cmdline: Uint8Array): Uint8Array {
 }
 
 /**
- * Classify PID 1 from its exact argv bytes, allowing a trailing NUL. The supplied
- * startup command and stable supervisor confirm issuance. The image default
- * `sleep infinity` leaves the existing exec path available.
+ * Classify PID 1 from its `/proc/1/cmdline` bytes. The known main processes are
+ * the image default `sleep infinity`, the native supervisor entrypoint and the
+ * environment builder; a trailing NUL is tolerated. Timeout, non-zero, empty,
+ * and anything else (including a runtime installer that has not handed off
+ * yet) is ambiguous and must fail the launch rather than guess.
  */
 export function classifyMainProcess(
   cmdline: Uint8Array,
@@ -45,6 +68,7 @@ export function classifyMainProcess(
 ): MainProcessIdentity {
   const trimmed = withoutTrailingNul(cmdline);
   if (bytesEqual(trimmed, MAIN_PROCESS_SUPERVISOR_CMDLINE)) return 'supervisor';
+  if (bytesEqual(trimmed, MAIN_PROCESS_BUILDER_CMDLINE)) return 'environment-builder';
   if (command && bytesEqual(trimmed, new TextEncoder().encode(command.argv.join('\0'))))
     return 'startup';
   if (bytesEqual(trimmed, MAIN_PROCESS_SLEEP_CMDLINE)) return 'sleep';

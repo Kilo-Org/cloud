@@ -2,24 +2,29 @@ import { afterAll, afterEach, beforeAll, describe, expect, test } from '@jest/gl
 import { custom_llm2 } from '@kilocode/db/schema';
 import {
   findCustomLlm,
+  getPublicCustomLlmInferenceProviders,
   isCustomLlm,
   requireCustomLlmsById,
   resetCustomLlmCacheForTest,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   customLlmDefinition,
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
+  publicCustomLlmDefinition,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 
 describe('custom LLM catalog', () => {
   beforeAll(async () => {
-    await insertCustomLlmForTest('Acme/Model');
+    await insertCustomLlmForTest('Acme/Public-Model', publicCustomLlmDefinition(['acme']));
+    await insertCustomLlmForTest('acme/private-model');
   });
 
   afterAll(async () => {
-    await deleteCustomLlmForTest('Acme/Model');
+    await deleteCustomLlmForTest('Acme/Public-Model');
+    await deleteCustomLlmForTest('acme/private-model');
   });
 
   afterEach(() => {
@@ -27,9 +32,11 @@ describe('custom LLM catalog', () => {
     resetCustomLlmCacheForTest();
   });
 
-  test('finds custom LLMs by id regardless of case or prefix', async () => {
-    await expect(findCustomLlm('acme/model')).resolves.toMatchObject({ public_id: 'Acme/Model' });
-    await expect(isCustomLlm('ACME/MODEL')).resolves.toBe(true);
+  test('finds custom LLMs by id regardless of case', async () => {
+    await expect(findCustomLlm('acme/public-model')).resolves.toMatchObject({
+      public_id: 'Acme/Public-Model',
+    });
+    await expect(isCustomLlm('ACME/PRIVATE-MODEL')).resolves.toBe(true);
     await expect(isCustomLlm('kilo-internal/unknown')).resolves.toBe(false);
   });
 
@@ -59,12 +66,25 @@ describe('custom LLM catalog', () => {
       throw new Error('database unavailable');
     });
 
-    await expect(isCustomLlm('acme/model')).resolves.toBe(false);
+    await expect(isCustomLlm('acme/public-model')).resolves.toBe(false);
     await expect(requireCustomLlmsById()).rejects.toThrow('custom LLM catalog could not be read');
     expect(select).toHaveBeenCalledTimes(1);
 
     clock.mockReturnValue(now + 5_000);
-    await expect(isCustomLlm('acme/model')).resolves.toBe(true);
+    await expect(isCustomLlm('acme/public-model')).resolves.toBe(true);
     expect(select).toHaveBeenCalledTimes(2);
+  });
+
+  test('treats every custom LLM as free', async () => {
+    await expect(isFreeModel('acme/public-model')).resolves.toBe(true);
+    await expect(isFreeModel('acme/private-model')).resolves.toBe(true);
+  });
+
+  test('pins only public custom LLMs to their declared providers', async () => {
+    await expect(getPublicCustomLlmInferenceProviders('acme/public-model')).resolves.toEqual(
+      new Set(['acme'])
+    );
+    await expect(getPublicCustomLlmInferenceProviders('acme/private-model')).resolves.toBeNull();
+    await expect(getPublicCustomLlmInferenceProviders('openai/gpt-4o')).resolves.toBeNull();
   });
 });

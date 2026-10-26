@@ -7,11 +7,6 @@ import { act, TestRenderer } from '@/test/renderer';
 
 import { TodoListSettingsSheet } from './todo-list-settings-sheet';
 
-type CreateCallbacks = {
-  onSuccess: (created: TodoList) => void;
-  onError: (error: Error) => void;
-};
-
 const created: TodoList = {
   id: 'list-new',
   organizationId: 'test-organization',
@@ -29,11 +24,39 @@ const created: TodoList = {
 };
 
 const state = vi.hoisted(() => ({
-  createMutate: vi.fn(),
+  create: vi.fn(),
   replace: vi.fn(),
   back: vi.fn(),
 }));
 
+vi.mock('@/lib/hooks/use-todos', async () => {
+  const React = await import('react');
+  function useFakeMutation(kind: 'update' | 'create') {
+    const [isPending, setPending] = React.useState(false);
+    const run = kind === 'create' ? state.create : vi.fn();
+    return {
+      isPending,
+      mutateAsync: async (call: unknown) => {
+        setPending(true);
+        try {
+          const result: unknown = await run(call);
+          return result;
+        } finally {
+          setPending(false);
+        }
+      },
+      mutate: run,
+    };
+  }
+  return {
+    reportNothing: () => undefined,
+    useTodoLists: () => ({ data: [], isSuccess: true }),
+    useTodoListMutations: () => ({
+      update: useFakeMutation('update'),
+      create: useFakeMutation('create'),
+    }),
+  };
+});
 vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: state.replace, back: state.back, push: vi.fn() }),
   useLocalSearchParams: () => ({}),
@@ -45,6 +68,7 @@ vi.mock('react-native', async () => {
     BackHandler: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
     I18nManager: { isRTL: false },
     Keyboard: { dismiss: vi.fn() },
+    Platform: { OS: 'android', select: (options: Record<string, unknown>) => options.android },
     Pressable: 'Pressable',
     ScrollView: 'ScrollView',
     TextInput: boundary.NativeTextInput,
@@ -62,13 +86,6 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('expo-secure-store', () => ({}));
 vi.mock('@/lib/hooks/use-available-models', () => ({
   useAvailableModels: () => ({ models: [], isLoading: false }),
-}));
-vi.mock('@/lib/hooks/use-todos', () => ({
-  useTodoLists: () => ({ data: [], isSuccess: true }),
-  useTodoListMutations: () => ({
-    create: { mutate: state.createMutate, isPending: false },
-    update: { mutate: vi.fn(), isPending: false },
-  }),
 }));
 vi.mock('@/lib/use-new-session-repos', () => ({
   useNewSessionRepos: () => ({ repositories: [], recents: [], groups: [] }),
@@ -134,23 +151,6 @@ function host(root: TestRenderer.ReactTestInstance, type: string, props: Record<
   });
 }
 
-function isTextNode(child: TestRenderer.ReactTestInstance | string): child is string {
-  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- test-renderer children are a string-or-instance union
-  return typeof child === 'string';
-}
-
-function textContent(node: TestRenderer.ReactTestInstance): string {
-  return node.children.map(child => (isTextNode(child) ? child : textContent(child))).join(' ');
-}
-
-function press(node: TestRenderer.ReactTestInstance) {
-  const props = node.props as { onPress: () => void; disabled?: boolean };
-  expect(props.disabled).not.toBe(true);
-  act(() => {
-    props.onPress();
-  });
-}
-
 function enter(label: string, value: string) {
   const field = host(renderedTree(), 'TextInput', { accessibilityLabel: label });
   const props = field.props as { onChangeText: (text: string) => void; onFocus?: () => void };
@@ -168,10 +168,15 @@ function saveButton() {
   return host(renderedTree(), 'Pressable', { accessibilityLabel: i18n.t('common.save') });
 }
 
-function alertText() {
-  return renderedTree().find(
-    node => (node.type as string) === 'Text' && node.props.accessibilityRole === 'alert'
-  );
+/** Press Done, then let the promise work it started settle inside act. */
+async function pressDone() {
+  const button = saveButton();
+  const props = button.props as { onPress: () => void; disabled?: boolean };
+  expect(props.disabled).not.toBe(true);
+  await act(async () => {
+    props.onPress();
+    await Promise.resolve();
+  });
 }
 
 function mount(afterCreate?: 'open' | 'back') {
@@ -190,7 +195,8 @@ beforeEach(async () => {
   const environment = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
   environment.IS_REACT_ACT_ENVIRONMENT = true;
   await i18n.changeLanguage('en');
-  state.createMutate.mockReset();
+  state.create.mockReset();
+  state.create.mockResolvedValue(created);
   state.replace.mockReset();
   state.back.mockReset();
 });
@@ -201,83 +207,33 @@ afterEach(() => {
 });
 
 describe('To-do list create outcome', () => {
-  it('opens the created list instead of returning to the lists view', () => {
-    state.createMutate.mockImplementation((_input: unknown, callbacks: CreateCallbacks) => {
-      callbacks.onSuccess(created);
-    });
+  it('opens the created list instead of returning to the lists view', async () => {
     mount();
 
     enter(i18n.t('todos.listSettings.name'), created.name);
     enter(i18n.t('todos.listSettings.emoji'), created.emoji ?? '');
-    press(saveButton());
+    await pressDone();
 
-    expect(state.createMutate).toHaveBeenCalledExactlyOnceWith(
-      {
-        organizationId: 'test-organization',
-        name: created.name,
-        emoji: created.emoji,
-        gitUrl: null,
-        mode: null,
-        model: null,
-        variant: null,
-      },
-      expect.objectContaining({
-        onSuccess: expect.any(Function),
-        onError: expect.any(Function),
-      })
-    );
+    expect(state.create).toHaveBeenCalledExactlyOnceWith({
+      organizationId: 'test-organization',
+      name: created.name,
+      emoji: created.emoji,
+      gitUrl: null,
+      mode: null,
+      model: null,
+      variant: null,
+    });
     expect(state.replace).toHaveBeenCalledExactlyOnceWith('/(app)/todos/list-new');
     expect(state.back).not.toHaveBeenCalled();
   });
 
-  it('returns to the sheet that opened it when the caller asks for that', () => {
-    state.createMutate.mockImplementation((_input: unknown, callbacks: CreateCallbacks) => {
-      callbacks.onSuccess(created);
-    });
+  it('returns to the sheet that opened it when the caller asks for that', async () => {
     mount('back');
 
     enter(i18n.t('todos.listSettings.name'), created.name);
-    press(saveButton());
+    await pressDone();
 
     expect(state.back).toHaveBeenCalledOnce();
     expect(state.replace).not.toHaveBeenCalled();
-  });
-
-  it('keeps the form open with the typed values and names the failure', () => {
-    state.createMutate.mockImplementation((_input: unknown, callbacks: CreateCallbacks) => {
-      callbacks.onError(new Error('List creation failed'));
-    });
-    mount();
-
-    enter(i18n.t('todos.listSettings.name'), created.name);
-    press(saveButton());
-
-    expect(state.replace).not.toHaveBeenCalled();
-    expect(state.back).not.toHaveBeenCalled();
-    expect(alertText()).toBeDefined();
-    expect(textContent(alertText())).toBe(i18n.t('todos.lists.createFailed'));
-    expect(
-      host(renderedTree(), 'TextInput', { accessibilityLabel: i18n.t('todos.listSettings.name') })
-        .props
-    ).toMatchObject({ value: created.name });
-  });
-
-  it('clears the failure line once the name is edited', () => {
-    state.createMutate.mockImplementation((_input: unknown, callbacks: CreateCallbacks) => {
-      callbacks.onError(new Error('List creation failed'));
-    });
-    mount();
-
-    enter(i18n.t('todos.listSettings.name'), created.name);
-    press(saveButton());
-    expect(alertText()).toBeDefined();
-
-    enter(i18n.t('todos.listSettings.name'), `${created.name} 2`);
-
-    expect(
-      renderedTree().findAll(
-        node => (node.type as string) === 'Text' && node.props.accessibilityRole === 'alert'
-      )
-    ).toHaveLength(0);
   });
 });

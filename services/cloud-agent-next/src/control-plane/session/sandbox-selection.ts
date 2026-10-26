@@ -5,6 +5,7 @@ import { sandboxProviderConfigurationSchema } from '../../sandbox-control/provid
 import { sandboxBillingInputEnvelopeSchema } from '../../container-usage-context.js';
 import { credentialContainmentSchema } from '../../sandbox-control/credential-containment.js';
 import { sandboxKindSchema } from '../../sandbox-placement.js';
+import { environmentReferenceSchema } from '../../environment-build/reference.js';
 import {
   controlPlaneCredentialSourceSchema,
   controlPlaneRouteSpecSchema,
@@ -47,6 +48,8 @@ export const controlPlanePrepareInputWithSelectionSchema = z
     spec: controlPlaneRouteSpecSchema,
     credentials: controlPlaneCredentialSourceSchema,
     sandboxSelection: controlPlaneSandboxSelectionSchema.optional(),
+    /** The admitted repository environment; DO-private like `credentials`. */
+    environment: environmentReferenceSchema.optional(),
   })
   .strict();
 

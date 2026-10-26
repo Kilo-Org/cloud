@@ -16,7 +16,6 @@ export default async function UserHeuristicAbusePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  // Check authentication first
   const { authFailedResponse } = await getUserFromAuth({ adminOnly: true });
   if (authFailedResponse) {
     redirect('/admin/unauthorized');

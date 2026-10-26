@@ -20,6 +20,7 @@ import type {
 import { BITBUCKET_REVIEW_CAPABILITIES } from '@kilocode/app-shared/provider-review';
 import {
   authorizeRepository,
+  BITBUCKET_STALE_HEAD_REASON,
   classifyBitbucketError,
   BitbucketReviewError,
   type BitbucketRepositoryAccess,
@@ -52,13 +53,6 @@ export const BITBUCKET_REACTIONS_UNSUPPORTED_REASON =
  */
 export const BITBUCKET_THREAD_RESOLUTION_UNSUPPORTED_REASON =
   'Bitbucket Cloud does not expose thread resolution for inline threads without tasks';
-
-/**
- * The stale-head fence reason, shared with classifyBitbucketStatus so a
- * locally detected moved head and a provider 409 read identically on mobile.
- */
-export const BITBUCKET_STALE_HEAD_REASON =
-  'The pull request changed since it was loaded. Reload the pull request and try again.';
 
 /** The PR a write acts on. */
 export type BitbucketPrTarget = {
@@ -345,50 +339,72 @@ function threadRootCommentId(threadId: string): number | null {
   return Number.isInteger(root) && root > 0 ? root : null;
 }
 
+/** The two thread-task transitions this layer performs on a comment's task. */
+type ThreadTaskMode = 'resolve' | 'unresolve';
+
+const THREAD_TASK_MODES: Record<
+  ThreadTaskMode,
+  {
+    /** Which task on the comment the mode mutates; the rest is the replay. */
+    matches: (task: z.infer<typeof BitbucketTaskWriteSchema>) => boolean;
+    /** The reason a bounded walk could not find that task. */
+    tooLargeMessage: string;
+    /** The provider enum `PUT .../tasks/{id}` reads. */
+    state: 'RESOLVED' | 'UNRESOLVED';
+  }
+> = {
+  resolve: {
+    matches: candidate => candidate.resolved_on == null,
+    tooLargeMessage: 'The Bitbucket task list is too large to resolve this thread. Try again.',
+    state: 'RESOLVED',
+  },
+  unresolve: {
+    matches: candidate => candidate.resolved_on != null,
+    tooLargeMessage: 'The Bitbucket task list is too large to reopen this thread. Try again.',
+    state: 'UNRESOLVED',
+  },
+};
+
 /**
- * Resolve a thread by resolving the root comment's task. Bitbucket comments
- * carry no task count, so the decision comes from the task-collection walk
- * alone: an unresolved task on the comment is resolved, a fully resolved set
- * of tasks reports the replay, and a thread without any task is refused with
- * the explicit capability reason — never a silent fallback.
+ * Move the root comment's task into the mode's target state. Bitbucket
+ * comments carry no task count, so the decision comes from the
+ * task-collection walk alone: a task the mode matches is PUT into its state,
+ * a comment whose tasks all sit in that state reports the replay, and a
+ * thread without any task is refused with the explicit capability reason —
+ * never a silent fallback.
  */
-export async function resolveThread(
-  target: BitbucketPrTarget & { threadId: string } & BitbucketMutationInput
+async function setThreadTaskState(
+  target: BitbucketPrTarget & { threadId: string } & BitbucketMutationInput,
+  mode: ThreadTaskMode
 ): Promise<BitbucketMutationResult> {
   const commentId = threadRootCommentId(target.threadId);
   if (commentId === null) {
     throw new BitbucketReviewError('not_found', 'This discussion thread could not be found.');
   }
+  const { matches, tooLargeMessage, state } = THREAD_TASK_MODES[mode];
   const access = await targetAccess(target);
   try {
     // The comment fetch is an existence check only: a missing comment 404s
     // into a non-retryable not_found before the task walk runs.
     BitbucketCommentWriteSchema.parse(
-      await requestBitbucketJson<unknown>(
-        access,
-        `${prPath(access, target.prId)}/comments/${commentId}`
-      )
+      await requestBitbucketJson(access, `${prPath(access, target.prId)}/comments/${commentId}`)
     );
 
     const { task, sawTaskForComment, exhausted } = await findCommentTask(
       access,
       target.prId,
       commentId,
-      candidate => candidate.resolved_on == null
+      matches
     );
     if (!task) {
       if (!exhausted) {
         // The collection paginated past the walk bound without ever showing
-        // the comment's unresolved task: report a retryable failure instead
-        // of claiming an unverified state.
-        throw new BitbucketReviewError(
-          'retryable',
-          'The Bitbucket task list is too large to resolve this thread. Try again.'
-        );
+        // a task in the mode's target state: report a retryable failure
+        // instead of claiming an unverified state.
+        throw new BitbucketReviewError('retryable', tooLargeMessage);
       }
       if (sawTaskForComment) {
-        // Every one of the comment's tasks is already resolved: the target
-        // state already holds.
+        // Every one of the comment's tasks already sits in the target state.
         return { done: true, replayed: true };
       }
       // No task exists for this comment, so the provider exposes no
@@ -400,8 +416,9 @@ export async function resolveThread(
       // Bitbucket expresses task resolution through the `state` enum, not a
       // boolean: `PUT .../tasks/{id}` silently ignores an unknown `resolved`
       // key and still answers 200, so `{ resolved: true }` was a no-op that
-      // reported success while the task stayed open.
-      body: { state: 'RESOLVED' },
+      // reported success while the task stayed open. Reopening is the mirror:
+      // `{ resolved: false }` left the task resolved while reporting done.
+      body: { state },
     });
     return { done: true, replayed: false };
   } catch (error) {
@@ -410,56 +427,25 @@ export async function resolveThread(
 }
 
 /**
+ * Resolve a thread by resolving the root comment's task: an unresolved task
+ * on the comment is resolved, a fully resolved set of tasks reports the
+ * replay, and a thread without any task is refused with the capability
+ * reason.
+ */
+export async function resolveThread(
+  target: BitbucketPrTarget & { threadId: string } & BitbucketMutationInput
+): Promise<BitbucketMutationResult> {
+  return setThreadTaskState(target, 'resolve');
+}
+
+/**
  * Un-resolve a thread by reopening the root comment's resolved task — the
- * mirror of resolveThread: a resolved task on the comment is reopened, a
- * fully unresolved set reports the replay, and a thread without any task is
- * refused with the explicit capability reason.
+ * mirror of resolveThread.
  */
 export async function unresolveThread(
   target: BitbucketPrTarget & { threadId: string } & BitbucketMutationInput
 ): Promise<BitbucketMutationResult> {
-  const commentId = threadRootCommentId(target.threadId);
-  if (commentId === null) {
-    throw new BitbucketReviewError('not_found', 'This discussion thread could not be found.');
-  }
-  const access = await targetAccess(target);
-  try {
-    BitbucketCommentWriteSchema.parse(
-      await requestBitbucketJson<unknown>(
-        access,
-        `${prPath(access, target.prId)}/comments/${commentId}`
-      )
-    );
-
-    const { task, sawTaskForComment, exhausted } = await findCommentTask(
-      access,
-      target.prId,
-      commentId,
-      candidate => candidate.resolved_on != null
-    );
-    if (!task) {
-      if (!exhausted) {
-        throw new BitbucketReviewError(
-          'retryable',
-          'The Bitbucket task list is too large to reopen this thread. Try again.'
-        );
-      }
-      if (sawTaskForComment) {
-        // No task of the comment is resolved: the target state already holds.
-        return { done: true, replayed: true };
-      }
-      throw new BitbucketReviewError('bad_request', BITBUCKET_THREAD_RESOLUTION_UNSUPPORTED_REASON);
-    }
-    await requestBitbucketJson(access, `${prPath(access, target.prId)}/tasks/${task.id}`, {
-      method: 'PUT',
-      // Reopening is the mirror of resolution: Bitbucket only reads `state`,
-      // so `{ resolved: false }` left the task resolved while reporting done.
-      body: { state: 'UNRESOLVED' },
-    });
-    return { done: true, replayed: false };
-  } catch (error) {
-    throw classifyBitbucketError(error);
-  }
+  return setThreadTaskState(target, 'unresolve');
 }
 
 /**
@@ -508,7 +494,7 @@ export async function mergePullRequest(
   const access = await targetAccess(target);
   try {
     const pr = BitbucketPullRequestWriteSchema.parse(
-      await requestBitbucketJson<unknown>(access, prPath(access, target.prId))
+      await requestBitbucketJson(access, prPath(access, target.prId))
     );
     if (pr.state === 'MERGED') {
       // The target state already holds: report the replay, run no effect.

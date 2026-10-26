@@ -16,7 +16,7 @@ import { Search, SearchX } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { applyLanguagePreference } from '@/i18n/apply-language';
-import { languagePickerItems } from '@/i18n/language-rows';
+import { type LanguagePickerItem, languagePickerItems } from '@/i18n/language-rows';
 import { LANGUAGE_ENDONYMS, type SupportedLanguage } from '@/i18n/languages';
 import { resolveDeviceLanguage } from '@/i18n/resolve-language';
 import { isRtlLanguage } from '@/i18n/rtl';
@@ -38,6 +38,8 @@ const listContentContainerStyle = {
   paddingBottom: 16,
 } satisfies ViewStyle;
 
+type RestartFailure = 'reload-failed' | 'restart-skipped';
+
 export function LanguagePickerSheet({
   onClose,
   onApplied,
@@ -57,7 +59,11 @@ export function LanguagePickerSheet({
   const [appliedLanguage, setAppliedLanguage] = useState<SupportedLanguage>('en');
   const [busy, setBusy] = useState(false);
   const [restarting, setRestarting] = useState(false);
-  const [reloadFailed, setReloadFailed] = useState(false);
+  // Which step of the restart failed. `reload-failed` got as far as forcing the
+  // direction and only the reload threw; `restart-skipped` never forced it
+  // because the attempt record could not be written. The Retry control has to
+  // resume from the step that failed, not blindly reload.
+  const [restartFailure, setRestartFailure] = useState<RestartFailure | null>(null);
   const [query, setQuery] = useState('');
   // The search field is uncontrolled (iOS drops keystrokes when state drives
   // `value`), so an emptied field is cleared through this ref rather than by
@@ -65,7 +71,9 @@ export function LanguagePickerSheet({
   const searchInputRef = useRef<TextInput>(null);
   const [closing, setClosing] = useState(false);
   const closeRequestedRef = useRef(false);
-  const disablePrevention = usePreventRemove((busy || restarting || reloadFailed) && !closing);
+  const disablePrevention = usePreventRemove(
+    (busy || restarting || restartFailure !== null) && !closing
+  );
   const closePicker = useCallback(() => {
     if (closeRequestedRef.current) {
       return;
@@ -95,7 +103,7 @@ export function LanguagePickerSheet({
       setAppliedLanguage(getResolvedLanguage());
       setBusy(false);
       setRestarting(false);
-      setReloadFailed(false);
+      setRestartFailure(null);
     }, [])
   );
 
@@ -105,11 +113,39 @@ export function LanguagePickerSheet({
   const isRtl = I18nManager.isRTL;
   // The copy/fold/collate of the whole language table and the fresh row objects
   // are only valid while the query and the applied language stand. Keyed the
-  // same way so a `selected` or `busy` change keeps the list identity and does
-  // not re-render every mounted row.
+  // same way so a `selected` or `busy` change keeps the list identity and
+  // leaves the rows' props comparable.
   const items = useMemo(
     () => languagePickerItems(query, appliedLanguage, applied === 'device'),
     [query, appliedLanguage, applied]
+  );
+  // The list's memoized cells compare `renderItem` and `extraData` by identity
+  // before re-rendering a row (see the security-agent finding list). `selected`
+  // and the in-flight `busy` state therefore have to travel through `extraData`:
+  // without it a tapped row keeps the `checked` state and the check mark of the
+  // selection the sheet opened with, and the picker reads as inert.
+  const rowExtraData = useMemo(() => ({ selected, disabled: busy }), [selected, busy]);
+  // Hoisted so the cell keeps one renderer identity while only the selection or
+  // the busy state change, and memoized `LanguagePickerRow`s re-render only
+  // when their own flag moved.
+  const renderItem = useCallback(
+    ({ item, index }: { item: LanguagePickerItem; index: number }) => (
+      <LanguagePickerRow
+        item={item}
+        first={index === 0}
+        showDivider={items[index + 1]?.kind !== 'section'}
+        selected={
+          item.kind === 'device'
+            ? selected === 'device'
+            : item.kind === 'language' && selected === item.row.tag
+        }
+        disabled={busy}
+        deviceEndonym={deviceEndonym}
+        isRtl={isRtl}
+        onSelect={setSelected}
+      />
+    ),
+    [items, selected, busy, deviceEndonym, isRtl]
   );
 
   const handleDone = async () => {
@@ -136,10 +172,14 @@ export function LanguagePickerSheet({
         // reloadAppAsync succeeded; the native reload wipes this state.
         break;
       }
-      case 'reload-failed': {
+      case 'reload-failed':
+      case 'restart-skipped': {
+        // Both leave the language saved without a relaunch; offer the sheet's
+        // retry so the user can ask for the restart again. The outcome names
+        // the step that failed, so Retry resumes from there.
         setBusy(false);
         setRestarting(false);
-        setReloadFailed(true);
+        setRestartFailure(outcome.kind);
         break;
       }
       case 'persist-failed': {
@@ -161,12 +201,23 @@ export function LanguagePickerSheet({
   // Clearing the failed state first keeps the normal sheet from re-arming the
   // guard, and `closePicker` releases the guard the failed state still holds.
   const handleContinue = () => {
-    setReloadFailed(false);
+    setRestartFailure(null);
     closePicker();
   };
 
-  const retryReload = async () => {
+  // A failed reload already forced the direction, so Retry only reloads again.
+  // A skipped restart never forced it: the attempt record could not be
+  // written, which is exactly the state the automatic relaunch refuses to run
+  // from. Reloading there would come back in the previous direction with no
+  // record, so Retry re-runs the apply path instead and the record write is
+  // retried before anything reloads.
+  const retryRestart = async () => {
     if (busy) {
+      return;
+    }
+    if (restartFailure === 'restart-skipped') {
+      setRestartFailure(null);
+      await handleDone();
       return;
     }
     setBusy(true);
@@ -177,12 +228,12 @@ export function LanguagePickerSheet({
     }
   };
 
-  if (reloadFailed) {
+  if (restartFailure !== null) {
     return (
       <PickerSheet
         title={t('language.couldNotRestart')}
         onDone={() => {
-          void retryReload();
+          void retryRestart();
         }}
         doneLabel={t('common.retry')}
         onCancel={handleContinue}
@@ -278,22 +329,12 @@ export function LanguagePickerSheet({
           style={listStyle}
           contentContainerStyle={listContentContainerStyle}
           data={items}
+          extraData={rowExtraData}
           keyExtractor={item => item.key}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           ListFooterComponent={<View style={{ height: insets.bottom }} pointerEvents="none" />}
-          renderItem={({ item, index }) => (
-            <LanguagePickerRow
-              item={item}
-              first={index === 0}
-              showDivider={items[index + 1]?.kind !== 'section'}
-              selected={selected}
-              disabled={busy}
-              deviceEndonym={deviceEndonym}
-              isRtl={isRtl}
-              onSelect={setSelected}
-            />
-          )}
+          renderItem={renderItem}
         />
       )}
     </PickerSheet>

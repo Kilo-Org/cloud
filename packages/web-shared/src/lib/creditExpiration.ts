@@ -103,10 +103,24 @@ export function computeExpiration(
 }
 
 export async function fetchExpiringTransactions(userId: string, fromDb: DbOrTx = db) {
-  const expiredCredits = alias(creditTransactionsTable, 'expired_credits');
-
-  // Fetch ALL transactions with expiry dates (including future ones) for baseline adjustment
-  // Use LEFT JOIN to exclude transactions that have already been processed (have a credits_expired entry)
+  // DISTINCT preserves a query-planning boundary for the owner-scoped closure lookup.
+  const expiredCredits = fromDb
+    .selectDistinct({
+      original_transaction_id: creditTransactionsTable.original_transaction_id,
+    })
+    .from(creditTransactionsTable)
+    .where(
+      and(
+        eq(creditTransactionsTable.kilo_user_id, userId),
+        isNotNull(creditTransactionsTable.original_transaction_id),
+        inArray(creditTransactionsTable.credit_category, [
+          'credits_expired',
+          'orb_credit_expired',
+          'orb_credit_voided',
+        ])
+      )
+    )
+    .as('expired_credits');
   return await fromDb
     .select({
       id: creditTransactionsTable.id,
@@ -120,15 +134,7 @@ export async function fetchExpiringTransactions(userId: string, fromDb: DbOrTx =
     .from(creditTransactionsTable)
     .leftJoin(
       expiredCredits,
-      and(
-        eq(expiredCredits.kilo_user_id, userId),
-        inArray(expiredCredits.credit_category, [
-          'credits_expired',
-          'orb_credit_expired',
-          'orb_credit_voided',
-        ]),
-        eq(expiredCredits.original_transaction_id, creditTransactionsTable.id)
-      )
+      eq(expiredCredits.original_transaction_id, creditTransactionsTable.id)
     )
     .where(
       and(
@@ -261,7 +267,19 @@ export async function fetchExpiringTransactionsForOrganization(
   organizationId: string,
   fromDb: DbOrTx = db
 ) {
-  const expiredCredits = alias(creditTransactionsTable, 'expired_credits');
+  const expiredCredits = fromDb
+    .selectDistinct({
+      original_transaction_id: creditTransactionsTable.original_transaction_id,
+    })
+    .from(creditTransactionsTable)
+    .where(
+      and(
+        eq(creditTransactionsTable.organization_id, organizationId),
+        isNotNull(creditTransactionsTable.original_transaction_id),
+        eq(creditTransactionsTable.credit_category, 'credits_expired')
+      )
+    )
+    .as('expired_credits');
 
   return await fromDb
     .select({
@@ -277,11 +295,7 @@ export async function fetchExpiringTransactionsForOrganization(
     .from(creditTransactionsTable)
     .leftJoin(
       expiredCredits,
-      and(
-        eq(expiredCredits.organization_id, organizationId),
-        eq(expiredCredits.credit_category, 'credits_expired'),
-        eq(expiredCredits.original_transaction_id, creditTransactionsTable.id)
-      )
+      eq(expiredCredits.original_transaction_id, creditTransactionsTable.id)
     )
     .where(
       and(

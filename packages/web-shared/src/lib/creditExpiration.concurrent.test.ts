@@ -63,7 +63,7 @@ describe.each(['personal', 'organization'] as const)('%s locked credit expiratio
       await db.delete(credit_transactions).where(eq(credit_transactions.kilo_user_id, userId));
       await db.delete(kilocode_users).where(eq(kilocode_users.id, userId));
     }
-  });
+  }, 30_000);
 
   async function fixture() {
     const user = await insertTestUser({

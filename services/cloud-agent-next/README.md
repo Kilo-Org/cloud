@@ -63,8 +63,11 @@ By default, the script looks for kilo-cli at `$HOME/projects/kilo-cli`. Override
 - Wrapper bundle built inside the container
 
 Both sandbox Dockerfiles configure the [Git stable PPA](https://launchpad.net/~git-core/+archive/ubuntu/ppa) directly.
-APT verifies the repository with its signing key in a dedicated `signed-by` keyring.
-This retains current Git packages without calling the Launchpad API through `add-apt-repository`.
+APT verifies the repository with the checked-in `scripts/git-core-ppa.asc` key in a dedicated `signed-by` keyring.
+Image builds do not contact the Ubuntu keyserver or the Launchpad API.
+When the PPA rotates its key, replace the file with its ASCII-armored public key.
+Verify the fingerprint with `gpg --show-keys --with-fingerprint scripts/git-core-ppa.asc`
+against the `signing_key_fingerprint` in the [Launchpad archive metadata](https://api.launchpad.net/1.0/~git-core/+archive/ubuntu/ppa).
 
 ### Managed GitLab requests
 

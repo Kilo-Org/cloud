@@ -16,13 +16,13 @@ ARG PNPM_VERSION="12.14.0"
 ARG GLAB_VERSION="1.124.0"
 ARG GH_VERSION="2.102.0"
 
+COPY scripts/git-core-ppa.asc /usr/share/keyrings/git-core-ppa.asc
+
 RUN set -eux; \
 	apt-get update; \
 	apt-get install -y --no-install-recommends \
 		ca-certificates \
 		wget; \
-	wget -nv -O /usr/share/keyrings/git-core-ppa.asc \
-		"https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xF911AB184317630C59970973E363C90F8F1B6217"; \
 	. /etc/os-release; \
 	printf 'deb [signed-by=/usr/share/keyrings/git-core-ppa.asc] https://ppa.launchpadcontent.net/git-core/ppa/ubuntu %s main\n' \
 		"$VERSION_CODENAME" > /etc/apt/sources.list.d/git-core-ppa.list; \

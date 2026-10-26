@@ -38,6 +38,9 @@ import {
 import { getDiscordBotAuthTokenForOwner } from '@/lib/discord/auth';
 import { buildDiscordMessageLink } from '@/lib/discord-bot/discord-utils';
 import type { PlatformIntegration } from '@kilocode/db';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { generateCloudAgentWorkflowToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { prepareCloudAgentWorkflowUser } from '@/lib/auth/cloud-agent-workflow-user';
 
 // Version string for API requests
 const DISCORD_BOT_VERSION = '5.0.0';
@@ -168,7 +171,6 @@ async function spawnCloudAgentSession(
   args: { githubRepo: string; prompt: string; mode?: string },
   owner: Owner,
   model: string,
-  authToken: string,
   ticketUserId: string,
   sessionRequester: { discordUserId: string; kiloUserId: string },
   requesterInfo?: DiscordRequesterInfo
@@ -208,6 +210,18 @@ async function spawnCloudAgentSession(
   } else {
     githubToken = await getGitHubTokenForUser(owner.id);
   }
+
+  const user = await findUserById(ticketUserId);
+  if (!user) {
+    return { response: 'Error: The Discord integration account is unavailable.' };
+  }
+  const authToken = generateCloudAgentWorkflowToken(await prepareCloudAgentWorkflowUser(user), {
+    organizationId: kilocodeOrganizationId,
+    tokenSource: 'discord-bot',
+    botId: owner.type === 'org' ? 'discord-bot' : undefined,
+    createdOnPlatform: 'discord',
+    expiresIn: TOKEN_EXPIRY.oneHour,
+  });
 
   const promptWithSignature = requesterInfo
     ? args.prompt + buildPrSignature(requesterInfo)
@@ -388,7 +402,6 @@ export async function processDiscordBotMessage(
         args,
         owner,
         selectedModel,
-        authToken,
         authUserId,
         { discordUserId: authorization.discordUserId, kiloUserId: authorization.kiloUserId },
         requesterInfo

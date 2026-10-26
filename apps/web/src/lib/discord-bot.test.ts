@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   github_app_installations,
@@ -12,6 +12,8 @@ import type { BotRunInput, BotRunResult } from '@/lib/bots/core/run-bot';
 import type { RunSessionInput, RunSessionResult } from '@/lib/cloud-agent-next/run-session';
 import type { DiscordBotMessageResult } from './discord-bot';
 import type { DiscordEventContext } from './discord-bot/discord-channel-context';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { verifyKiloTokenForPolicy } from '@kilocode/worker-utils/kilo-token-policy';
 
 const mockRunBot = jest.fn<(input: BotRunInput) => Promise<BotRunResult>>();
 const mockRunSessionToCompletion = jest.fn<(input: RunSessionInput) => Promise<RunSessionResult>>();
@@ -24,18 +26,9 @@ jest.mock('@/lib/bots/core/run-bot', () => ({
   runBot: (input: BotRunInput) => mockRunBot(input),
 }));
 
-jest.mock('@/lib/discord/auth', () => ({
-  getDiscordBotAuthTokenForOwner: () =>
-    Promise.resolve({ authToken: 'discord-bot-token', userId: 'discord-bot-user' }),
-}));
-
 jest.mock('@/lib/discord-bot/discord-channel-context', () => ({
   getDiscordConversationContext: () => Promise.resolve({}),
   formatDiscordConversationContextForPrompt: () => '',
-}));
-
-jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
-  createCloudAgentNextClient: () => ({}),
 }));
 
 jest.mock('@/lib/cloud-agent-next/run-session', () => ({
@@ -144,6 +137,10 @@ describe('processDiscordBotMessage session start authorization', () => {
     ({ processDiscordBotMessage } = await import('./discord-bot'));
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   beforeEach(async () => {
     jest.clearAllMocks();
     modelRequestedRepository = CONNECTED_REPOSITORY;
@@ -240,6 +237,54 @@ describe('processDiscordBotMessage session start authorization', () => {
       githubToken: 'github-installation-token',
       createdOnPlatform: 'discord',
     });
+    expect(result.cloudAgentSessionId).toBe('cloud-session-1');
+  });
+
+  it('authenticates session operations with bounded workflow authority', async () => {
+    jest.replaceProperty(process, 'env', {
+      ...process.env,
+      SHARED_RESOURCE_TOKENS_ENABLED: 'true',
+      CLOUD_AGENT_RESOURCE_TOKENS_ENABLED: 'true',
+    });
+    const discordUserId = nextSnowflake();
+    await linkDiscordAccount(installationOwner.id, discordUserId);
+    jest.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
+      const bearer = new Headers(init?.headers).get('authorization')?.replace(/^Bearer /, '');
+      if (!bearer) throw new Error('Session credential required');
+      const verified = await verifyKiloTokenForPolicy(bearer, NEXTAUTH_SECRET, {
+        audience: 'cloud-agent-next',
+        mode: 'required',
+      });
+      expect(verified.userId).toBe(installationOwner.id);
+      expect(verified.claims.runtimeAdmission).toMatchObject({
+        source: 'automation',
+        authorizationUserId: installationOwner.id,
+      });
+      expect(verified.claims.credentialExchange).toBe(false);
+      expect(verified.claims.exp - verified.claims.iat).toBeLessThanOrEqual(3600);
+      return Response.json({
+        result: {
+          data: { cloudAgentSessionId: 'cloud-session-1', kiloSessionId: 'kilo-session-1' },
+        },
+      });
+    });
+    mockRunSessionToCompletion.mockImplementationOnce(async input => {
+      const prepared = await input.client.prepareSession(input.prepareInput);
+      return {
+        response: 'The session finished.',
+        sessionId: prepared.cloudAgentSessionId,
+        hasError: false,
+        statusMessages: [],
+      };
+    });
+
+    const result = await processDiscordBotMessage(
+      `Inspect ${CONNECTED_REPOSITORY}`,
+      guildId,
+      eventContext(discordUserId)
+    );
+
+    expect(result.response).toBe('The session finished.');
     expect(result.cloudAgentSessionId).toBe('cloud-session-1');
   });
 

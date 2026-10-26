@@ -259,6 +259,14 @@ The blob URL columns identify the current copy folder. `pending_copy_ids`
 records folders awaiting deletion; later publication and deletion lifecycle
 calls retry that work before admitting another copy.
 
+For migration verification, run `pnpm drizzle:verify-bootstrap` to apply the
+complete chain to a disposable empty database. Also verify an upgrade from the
+base branch's migration chain with existing session and share rows: `is_fork`
+is backfilled from `forked_from`, `pending_copy_ids` defaults to an empty list,
+and `IDX_shared_cli_sessions_kilo_user_id` must be valid after the concurrent
+index build. Run `pnpm drizzle check` and `pnpm drizzle generate` to confirm the
+journal and schema agree after synchronizing the branch with `main`.
+
 
 ## Common Development Commands
 

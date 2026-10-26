@@ -24,8 +24,8 @@ const invite = vi.hoisted(() => ({
   reset: vi.fn(),
   isPending: false,
   isError: false,
-  // A taken address, as the procedure rejects it: the sheet renders localized
-  // copy for the code, not the server's sentence.
+  // An address with an outstanding invitation, as the procedure rejects it: the
+  // sheet renders its own line for that rejection, not the server's sentence.
   error: { data: { code: 'CONFLICT', message: 'This email already has a pending invitation' } },
 }));
 // The route's focus effects: the sheet registers its form reset and its Back
@@ -283,7 +283,7 @@ describe('InviteMemberSheet reopen', () => {
       fieldProps(rendered).onChangeText('dev@example.com');
     });
 
-    expect(inviteMessage(rendered)).toBe(i18n.t('organization.inviteMember.alreadyInvited'));
+    expect(inviteMessage(rendered)).toBe(i18n.t('organization.inviteMember.pendingInvitation'));
     rendered.unmount();
   });
 

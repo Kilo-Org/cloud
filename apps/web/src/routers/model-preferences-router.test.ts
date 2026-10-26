@@ -253,7 +253,7 @@ describe('modelPreferences', () => {
         kilo_user_id: testUser.id,
         provider_id: 'synthetic',
         encrypted_api_key: encryptApiKey('synthetic-key', BYOK_ENCRYPTION_KEY),
-        serve_catalog_models: true,
+        settings: { serve_catalog_models: true },
         created_by: testUser.id,
       });
     });

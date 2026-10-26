@@ -3909,17 +3909,6 @@
     ],
     "searchBlob": "byok.list List all saved bring-your-own-key (BYOK) API keys for the current user or a specified organization, including provider, enabled status, and management source. byok list organizationid organizationId"
   },
-  "byok.listCatalogModeDefaultProviders": {
-    "path": "byok.listCatalogModeDefaultProviders",
-    "kind": "query",
-    "summary": "List BYOK providers whose keys default to routing Kilo catalog model IDs, so you can tell which providers start with catalog mode enabled.",
-    "inputSchema": {},
-    "tags": [
-      "byok",
-      "listcatalogmodedefaultproviders"
-    ],
-    "searchBlob": "byok.listCatalogModeDefaultProviders List BYOK providers whose keys default to routing Kilo catalog model IDs, so you can tell which providers start with catalog mode enabled. byok listcatalogmodedefaultproviders"
-  },
   "byok.listSupportedModels": {
     "path": "byok.listSupportedModels",
     "kind": "query",

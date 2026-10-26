@@ -5,7 +5,7 @@ import { getEnabledByokProviders } from '@kilocode/web-shared/lib/ai-gateway/byo
 import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   createDirectByokReferenceResolver,
-  defaultsToCatalogMode,
+  offersCatalogMode,
   findDirectByokCatalogModels,
   getDirectByokCatalogModelIds,
   getDirectByokModelsForUser,
@@ -85,12 +85,12 @@ beforeEach(() => {
 });
 
 describe('catalog mode support', () => {
-  test('requires a models.dev id, and defaults on only when the provider maps a model', async () => {
+  test('requires a models.dev id and at least one mapped model', async () => {
     expect(supportsCatalogMode('synthetic')).toBe(true);
     expect(supportsCatalogMode('martian')).toBe(false);
-    await expect(defaultsToCatalogMode('synthetic')).resolves.toBe(true);
-    await expect(defaultsToCatalogMode('morph-byok')).resolves.toBe(false);
-    await expect(defaultsToCatalogMode('martian')).resolves.toBe(false);
+    await expect(offersCatalogMode('synthetic')).resolves.toBe(true);
+    await expect(offersCatalogMode('morph-byok')).resolves.toBe(false);
+    await expect(offersCatalogMode('martian')).resolves.toBe(false);
   });
 });
 

@@ -9,7 +9,7 @@ export type BYOKApiKeyResponse = {
   management_source: 'user' | 'coding_plan';
   is_enabled: boolean;
   serve_catalog_models: boolean;
-  /** The provider can map its models to Kilo catalog ids. */
+  /** The provider maps at least one model to a Kilo catalog id. */
   supports_catalog_mode: boolean;
   /** Organization keys need an owner or admin to change catalog mode. */
   can_change_catalog_mode: boolean;

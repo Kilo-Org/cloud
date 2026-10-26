@@ -113,6 +113,13 @@ describe('Home-only widget policy', () => {
     ).toBe(joined);
   });
 
+  it('keeps widget titles on one line', () => {
+    const details = buildHomeWidgetDetails([
+      { status: 'permission', title: 'Build\u2028\u2029 assets\u0000 now' },
+    ]);
+    expect(details.waitingAgents[0]?.title).toBe('Build   assets  now');
+  });
+
   it('keeps the details payload printable across every row', () => {
     const data = buildHomeWidgetData({
       ...scope,

@@ -212,6 +212,7 @@ describe('modelPreferences', () => {
 
   describe('catalog-mode BYOK keys', () => {
     const mappedOriginal = 'synthetic/hf:moonshotai/kimi-k2.6';
+    const mappedVariant = 'synthetic/hf:moonshotai/kimi-k2.6-fast';
     const unmappedOriginal = 'synthetic/hf:example/finetune';
 
     beforeAll(async () => {
@@ -224,6 +225,13 @@ describe('modelPreferences', () => {
             {
               id: 'hf:moonshotai/Kimi-K2.6',
               name: 'Kimi-K2.6',
+              context_length: 262144,
+              max_completion_tokens: 65535,
+              catalog_model_id: 'moonshotai/kimi-k2.6',
+            },
+            {
+              id: 'hf:moonshotai/Kimi-K2.6-fast',
+              name: 'Kimi-K2.6 fast',
               context_length: 262144,
               max_completion_tokens: 65535,
               catalog_model_id: 'moonshotai/kimi-k2.6',
@@ -287,8 +295,8 @@ describe('modelPreferences', () => {
       ]);
     });
 
-    it('removes the stored original of a translated favorite', async () => {
-      await storeFavorites([mappedOriginal, unmappedOriginal, 'openai/gpt-4o']);
+    it('removes the stored originals of a translated favorite', async () => {
+      await storeFavorites([mappedOriginal, unmappedOriginal, mappedVariant, 'openai/gpt-4o']);
       const caller = await createCallerForUser(testUser.id);
 
       await caller.modelPreferences.removeFavorite({ model: 'moonshotai/kimi-k2.6' });
@@ -297,7 +305,7 @@ describe('modelPreferences', () => {
     });
 
     it('keeps stored originals when replacing favorites', async () => {
-      await storeFavorites([mappedOriginal, unmappedOriginal]);
+      await storeFavorites([mappedOriginal, unmappedOriginal, mappedVariant]);
       const caller = await createCallerForUser(testUser.id);
 
       await caller.modelPreferences.setFavorites({
@@ -307,6 +315,7 @@ describe('modelPreferences', () => {
       await expect(storedFavorites()).resolves.toEqual([
         'openai/gpt-4o',
         mappedOriginal,
+        mappedVariant,
         unmappedOriginal,
       ]);
     });

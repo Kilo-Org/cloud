@@ -99,15 +99,15 @@ async function withStoredOriginals(
   stored: string[],
   resolveReference: ReferenceResolver
 ): Promise<string[]> {
-  const originals = new Map<string, string>();
+  const originals = new Map<string, string[]>();
   const hidden: string[] = [];
   for (const { id, resolved } of await resolveAll(stored, resolveReference)) {
     if (resolved === null) hidden.push(id);
-    else if (resolved !== id && !favorites.includes(id) && !originals.has(resolved)) {
-      originals.set(resolved, id);
+    else if (resolved !== id && !favorites.includes(id)) {
+      originals.set(resolved, [...(originals.get(resolved) ?? []), id]);
     }
   }
-  return [...new Set([...favorites.map(id => originals.get(id) ?? id), ...hidden])];
+  return [...new Set([...favorites.flatMap(id => originals.get(id) ?? [id]), ...hidden])];
 }
 
 export const modelPreferencesRouter = createTRPCRouter({

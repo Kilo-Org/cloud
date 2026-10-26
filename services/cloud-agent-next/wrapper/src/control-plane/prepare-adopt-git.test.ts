@@ -10,7 +10,7 @@ import type {
   ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
-import { createPreparationManager } from './prepare.js';
+import { createPreparationManager, type PrepareDeps } from './prepare.js';
 import { readWorkspaceStamp } from './workspace-stamp.js';
 
 // These tests run real git against a local origin. A mocked git proves the command
@@ -52,6 +52,7 @@ beforeEach(async () => {
   execFileSync('git', ['clone', '-q', origin, author], { env: GIT_ENV });
   git(author, 'checkout', '-q', '-b', 'main');
   commitFile('README', 'one', 'first');
+  commitFile('.gitignore', 'node_modules/\n.env.local\n', 'setup artifacts');
   git(author, 'push', '-q', 'origin', 'main');
 });
 
@@ -80,7 +81,7 @@ function spec(overrides: Partial<ControlPlaneRouteSpec> = {}): ControlPlaneRoute
   };
 }
 
-function manager(allocationId: string) {
+function manager(allocationId: string, options: Pick<PrepareDeps, 'recoverWorktree'> = {}) {
   const frames: ControlPlaneWrapperFrame[] = [];
   const gitCalls: string[][] = [];
   const prepared = createPreparationManager({
@@ -105,6 +106,7 @@ function manager(allocationId: string) {
     seedRegistration: async () => undefined,
     sessionExists: async () => true,
     sleep: async () => undefined,
+    recoverWorktree: options.recoverWorktree,
   });
   return { prepared, frames, gitCalls };
 }
@@ -116,6 +118,53 @@ function ready(frames: ControlPlaneWrapperFrame[]) {
 // The first manager stands in for the environment builder: another allocation
 // prepared the workspace, so the second classifies it as a snapshot to adopt.
 describe('adopting an environment snapshot against a real repository', () => {
+  it('keeps the environment snapshot reusable while A recovers edits and B adopts another branch', async () => {
+    commitFile('staged.txt', 'base\n', 'staged file');
+    git(author, 'push', '-q', 'origin', 'main');
+    git(author, 'checkout', '-q', '-b', 'feature');
+    git(author, 'push', '-q', 'origin', 'feature');
+    const snapshot = path.join(root, 'snapshot');
+    const builder = manager('alloc-builder');
+    await builder.prepared.prepare(spec());
+    expect(ready(builder.frames)).toMatchObject({ workspace: 'cloned' });
+    expect(git(directory, 'status', '--porcelain')).toBe('');
+    await fs.cp(directory, snapshot, { recursive: true });
+    const first = manager('alloc-a', {
+      recoverWorktree: async () => {
+        await fs.writeFile(path.join(directory, 'README'), 'workspace A edit');
+        await fs.writeFile(path.join(directory, 'staged.txt'), 'workspace A staged edit');
+        git(directory, 'add', 'staged.txt');
+        await fs.writeFile(path.join(directory, 'new.txt'), 'workspace A untracked file');
+        return { applied: 3, skipped: 0, total: 3, skippedDiffs: [] };
+      },
+    });
+    await first.prepared.prepare(spec({ worktreeRecovery: { files: [] } }));
+
+    expect(ready(first.frames)).toMatchObject({ workspace: 'adopted' });
+    expect(first.frames.some(frame => frame.type === 'workspace.capture')).toBe(false);
+    expect(git(snapshot, 'status', '--porcelain')).toBe('');
+    expect(git(directory, 'diff', '--name-only')).toBe('README');
+    expect(git(directory, 'diff', '--cached', '--name-only')).toBe('staged.txt');
+    expect(await fs.readFile(path.join(directory, 'new.txt'), 'utf8')).toBe(
+      'workspace A untracked file'
+    );
+
+    const workspaceB = path.join(root, 'workspace-b');
+    await fs.cp(snapshot, workspaceB, { recursive: true });
+    const restored = manager('alloc-restored');
+    await restored.prepared.prepare(
+      spec({ directory: workspaceB, sessionId: 'ses_b', branch: 'feature', branchMode: 'working' })
+    );
+
+    expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
+    expect(git(workspaceB, 'status', '--porcelain')).toBe('');
+    expect(git(workspaceB, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('feature');
+    expect(git(workspaceB, 'rev-parse', '--abbrev-ref', '@{upstream}')).toBe('origin/feature');
+    expect(await fs.readFile(path.join(workspaceB, 'README'), 'utf8')).toBe('one');
+    expect(await fs.readdir(workspaceB)).not.toContain('new.txt');
+    expect(git(directory, 'status', '--porcelain')).toContain('?? new.txt');
+  });
+
   it('starts a new session branch from the current origin tip, not the snapshot commit', async () => {
     const first = manager('alloc-image');
     await first.prepared.prepare(spec());
@@ -177,6 +226,44 @@ describe('adopting an environment snapshot against a real repository', () => {
     expect(git(directory, 'rev-parse', 'HEAD')).toBe(featureTip);
   });
 
+  it('removes inherited tracked, staged and untracked edits before adopting another branch', async () => {
+    commitFile('staged.txt', 'base\n', 'staged file');
+    git(author, 'push', '-q', 'origin', 'main');
+    const first = manager('alloc-image');
+    await first.prepared.prepare(spec());
+    await fs.writeFile(path.join(directory, 'README'), 'workspace A edit');
+    await fs.writeFile(path.join(directory, 'staged.txt'), 'workspace A staged edit');
+    git(directory, 'add', 'staged.txt');
+    await fs.writeFile(path.join(directory, 'new.txt'), 'workspace A untracked file');
+    git(directory, 'init', '-q', 'nested-repo');
+    await fs.mkdir(path.join(directory, 'node_modules'), { recursive: true });
+    await fs.writeFile(path.join(directory, 'node_modules', 'dep.js'), 'dependency');
+    await fs.writeFile(path.join(directory, '.env.local'), 'setup artifact');
+    git(author, 'checkout', '-q', '-b', 'feature');
+    const tip = commitFile('feature.txt', 'workspace B branch', 'feature');
+    git(author, 'push', '-q', 'origin', 'feature');
+
+    const restored = manager('alloc-restored');
+    await restored.prepared.prepare(
+      spec({ sessionId: 'ses_b', branch: 'feature', branchMode: 'working' })
+    );
+
+    expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
+    expect(restored.gitCalls.some(args => args[0] === 'clone')).toBe(false);
+    expect(git(directory, 'status', '--porcelain')).toBe('');
+    expect(await fs.readFile(path.join(directory, 'README'), 'utf8')).toBe('one');
+    expect(await fs.readFile(path.join(directory, 'staged.txt'), 'utf8')).toBe('base\n');
+    expect(await fs.readdir(directory)).not.toContain('new.txt');
+    expect(await fs.readdir(directory)).not.toContain('nested-repo');
+    expect(await fs.readFile(path.join(directory, 'node_modules', 'dep.js'), 'utf8')).toBe(
+      'dependency'
+    );
+    expect(await fs.readFile(path.join(directory, '.env.local'), 'utf8')).toBe('setup artifact');
+    expect(git(directory, 'rev-parse', 'HEAD')).toBe(tip);
+    expect(git(directory, 'rev-parse', '--abbrev-ref', 'HEAD')).toBe('feature');
+    expect(git(directory, 'rev-parse', '--abbrev-ref', '@{upstream}')).toBe('origin/feature');
+  });
+
   it('keeps installed dependencies, which is what makes the setup incremental', async () => {
     const first = manager('alloc-image');
     await first.prepared.prepare(spec());
@@ -197,6 +284,7 @@ describe('adopting an environment snapshot against a real repository', () => {
     await first.prepared.prepare(spec());
     const localEdit = path.join(directory, 'README');
     await fs.writeFile(localEdit, 'edited by setup');
+    git(directory, 'remote', 'remove', 'origin');
 
     commitFile('README', 'two', 'second');
     git(author, 'push', '-q', 'origin', 'main');
@@ -229,16 +317,30 @@ describe('adopting an environment snapshot against a real repository', () => {
     );
   });
 
-  it('retains local workspace state', async () => {
+  it('preserves tracked, staged and untracked edits for a second route on the same allocation', async () => {
     const first = manager('alloc-image');
     await first.prepared.prepare(spec());
     await fs.writeFile(path.join(directory, 'local.txt'), 'local changes');
     const commit = git(directory, 'rev-parse', 'HEAD');
+    await fs.writeFile(path.join(directory, 'README'), 'live edit');
+    await fs.writeFile(path.join(directory, 'staged.txt'), 'live staged file');
+    git(directory, 'add', 'staged.txt');
+    await fs.writeFile(path.join(directory, 'new.txt'), 'live untracked file');
+    const status = git(directory, 'status', '--porcelain');
     const second = manager('alloc-image');
     await second.prepared.prepare(spec({ sessionId: 'ses_b' }));
 
     expect(ready(second.frames)).toMatchObject({ workspace: 'same' });
     expect(git(directory, 'rev-parse', 'HEAD')).toBe(commit);
     expect(await fs.readFile(path.join(directory, 'local.txt'), 'utf8')).toBe('local changes');
+    expect(
+      second.gitCalls.some(args =>
+        ['clone', 'fetch', 'checkout', 'reset', 'clean'].includes(args[0] ?? '')
+      )
+    ).toBe(false);
+    expect(git(directory, 'status', '--porcelain')).toBe(status);
+    expect(await fs.readFile(path.join(directory, 'README'), 'utf8')).toBe('live edit');
+    expect(await fs.readFile(path.join(directory, 'staged.txt'), 'utf8')).toBe('live staged file');
+    expect(await fs.readFile(path.join(directory, 'new.txt'), 'utf8')).toBe('live untracked file');
   });
 });

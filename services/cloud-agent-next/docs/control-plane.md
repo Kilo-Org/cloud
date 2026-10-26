@@ -645,16 +645,27 @@ directory when there is no repository). The reader also accepts the older `captu
 | Stamp from this allocation | A sibling session or a wrapper restart | Nothing |
 | Stamp from another allocation | A restored environment snapshot | **Adopt** |
 
-Adopt makes the snapshot equal to a fresh clone, then runs the ordinary steps:
+Adopt refreshes the top-level repository, then runs the ordinary checkout and setup steps:
 
 1. Point `origin` at this route's canonical, credential-free URL.
 2. `fetch --prune`, then refresh the remote default branch.
-3. Detach at the remote default branch, so a new branch starts from its tip.
-4. Delete every local branch. The builder's default branch would otherwise shadow a newer
+3. `git reset --hard` discards inherited tracked and staged changes.
+4. `git clean -ffd` removes inherited untracked files and untracked nested repositories, preserving
+   ignored dependency and setup artifacts. These cleanup steps run only for a foreign stamp, never
+   for a surviving live workspace.
+5. Detach at the remote default branch, so a new branch starts from its tip.
+6. Delete every local branch. The builder's default branch would otherwise shadow a newer
    `origin/<branch>`.
-5. Check out this route's branch (working branch, explicit branch or review ref) and set the git
+7. Check out this route's branch (working branch, explicit branch or review ref) and set the git
    author, as after a clone.
-6. Run the setup commands, then write the stamp.
+8. Run the setup commands, then write the stamp.
+
+Cleanup does not recurse into tracked submodule working trees. Preparation does not initialize
+submodules automatically: a plain clone leaves them empty. If environment setup populates a
+submodule, its checkout, modified files and untracked files can survive adoption. Submodule
+initialization and any required reconciliation with the selected branch belong in setup commands;
+adoption alone does not guarantee clean submodules. This is inherited environment setup state:
+only dedicated builders publish snapshots, never live user workspaces.
 
 Any failure empties the directory and clones. The Kilo session step is unchanged: the builder
 starts no Kilo runtime, so nothing stale shadows the restore from session-ingest. HOME of a

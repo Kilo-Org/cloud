@@ -18,14 +18,16 @@ function failure(
 }
 
 /**
- * Bring a repository restored from a snapshot to the state a fresh clone has, so
- * the ordinary branch logic then behaves the same on both paths:
+ * Refresh a snapshot's top-level repository before ordinary branch selection.
+ * Cleanup does not recurse into tracked submodule working trees (see the
+ * control-plane spec).
  *
  * 1. point `origin` at this route's canonical, credential-free URL. Git
  *    authenticates through the platform's credential helper, never the remote URL;
  * 2. fetch, pruning refs the remote dropped, and refresh the remote default;
- * 3. detach at the remote default branch, so a new branch starts from its tip;
- * 4. drop every local branch. The builder's default branch would otherwise shadow
+ * 3. discard top-level repository edits and untracked files, keeping ignored setup caches;
+ * 4. detach at the remote default branch, so a new branch starts from its tip;
+ * 5. drop every local branch. The builder's default branch would otherwise shadow
  *    a newer `origin/<branch>`.
  *
  * Any failure throws and the caller falls back to a clone.
@@ -40,6 +42,8 @@ export async function refreshAdoptedRepository(input: {
     { args: ['remote', 'set-url', 'origin', remoteUrl] },
     { args: ['fetch', '--prune', 'origin'], network: true },
     { args: ['remote', 'set-head', 'origin', '--auto'], network: true },
+    { args: ['reset', '--hard'] },
+    { args: ['clean', '-ffd'] },
     { args: ['checkout', '--detach', 'origin/HEAD'] },
   ];
   for (const step of steps) {

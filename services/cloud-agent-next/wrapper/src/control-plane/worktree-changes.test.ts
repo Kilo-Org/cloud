@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test';
+import { resolve } from 'node:path';
 import type { ControlPlaneWrapperFrame } from '../../../src/shared/control-plane-protocol.js';
+import { WRAPPER_BUNDLES } from '../../../src/shared/runtime-distribution.js';
 import type {
   SessionGitSummaryPayload,
   SessionGitSummaryResult,
@@ -39,6 +41,30 @@ function harness(
 }
 
 describe('control-plane wrapper worktree changes', () => {
+  it.each(WRAPPER_BUNDLES)(
+    'bundles $entry without private workspace packages',
+    async ({ entry }) => {
+      const result = await Bun.build({
+        entrypoints: [resolve(import.meta.dir, '../..', entry)],
+        target: 'bun',
+        plugins: [
+          {
+            name: 'wrapper-image-dependencies',
+            setup(build) {
+              build.onResolve({ filter: /^@kilocode\// }, ({ path }) => {
+                if (path !== '@kilocode/sdk' && !path.startsWith('@kilocode/sdk/')) {
+                  throw new Error(`${path} is not installed in the wrapper image`);
+                }
+              });
+            },
+          },
+        ],
+      });
+
+      expect(result.success).toBe(true);
+    }
+  );
+
   it('refuses a capture for a route that is not prepared', async () => {
     let captured = 0;
     const { adapter, frames } = harness({

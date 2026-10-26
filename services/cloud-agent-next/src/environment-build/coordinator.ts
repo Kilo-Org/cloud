@@ -162,7 +162,8 @@ export type SnapshotResolution = {
     | 'incompatible'
     | 'newer_than_session'
     | 'expired'
-    | 'deleted';
+    | 'deleted'
+    | 'unsupported';
   admission: SnapshotAdmission;
 };
 
@@ -309,6 +310,13 @@ export class EnvironmentBuildCoordinator {
     reference: SessionEnvironmentReference;
     actorUserId: string;
   }): Promise<SnapshotResolution> {
+    if (this.deps.unsupportedReason(request.reference.owner) !== null) {
+      return {
+        snapshot: null,
+        reason: 'unsupported',
+        admission: { status: 'skipped', reason: 'unsupported' },
+      };
+    }
     const { store } = this.deps;
     store.bindEnvironment(this.environmentId);
     const now = this.deps.now();
@@ -674,6 +682,17 @@ export class EnvironmentBuildCoordinator {
   }
 
   private async advance(build: BuildRow): Promise<void> {
+    if (
+      build.state !== 'stopping' &&
+      this.deps.unsupportedReason(parseBuildInput(build).reference.owner) !== null
+    ) {
+      if (build.state === 'queued') {
+        this.terminalWithoutAllocation(build, 'obsolete', 'snapshots_disabled');
+      } else {
+        this.beginStopping(build.id, [build.state], 'obsolete', { reason: 'snapshots_disabled' });
+      }
+      return;
+    }
     switch (build.state) {
       case 'queued':
         return this.advanceQueued(build);

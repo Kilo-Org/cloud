@@ -85,6 +85,8 @@ VERCEL_SANDBOX_ORG_IDS=
 # Cloudflare containers enrollment (optional). Comma-separated organization IDs, or `*` for
 # every organization and personal accounts. Empty is off.
 CLOUDFLARE_CONTAINERS_ORG_IDS=
+# Explicit organization IDs allowed to build and restore snapshots. Empty is off; no wildcard.
+ENVIRONMENT_SNAPSHOT_ORG_IDS=
 
 # GitHub App credentials for git commit attribution
 # These identify commits as coming from the Kilo Code GitHub App

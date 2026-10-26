@@ -646,6 +646,8 @@ export type Env = {
   VERCEL_SANDBOX_ORG_IDS?: string;
   /** Comma-separated org IDs routed to DO-managed Cloudflare containers. Empty is off. `*` includes personal. */
   CLOUDFLARE_CONTAINERS_ORG_IDS?: string;
+  /** Explicit organization IDs allowed to build and restore environment snapshots. Empty is off. */
+  ENVIRONMENT_SNAPSHOT_ORG_IDS?: string;
   /** R2 endpoint for S3-compatible API access (presigned URL generation) */
   R2_ENDPOINT?: string;
   /** R2 read-only access key ID for downloading image attachments */

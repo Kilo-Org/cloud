@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
+import { isEnvironmentSnapshotsEnabled } from './enrollment.js';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { timingSafeEqual } from '@kilocode/encryption';
@@ -178,6 +179,9 @@ export class EnvironmentBuild extends DurableObject<Env> {
       },
       builderSandboxId: sandboxId,
       unsupportedReason: owner => {
+        if (!isEnvironmentSnapshotsEnabled(env, owner)) {
+          return 'Snapshots are not enabled for this organization';
+        }
         if (!env.SANDBOX_CONTAINERS) return 'Native containers are not configured';
         if (
           !isCloudflareContainersEnrolled(

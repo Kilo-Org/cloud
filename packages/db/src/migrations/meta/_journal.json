@@ -2122,6 +2122,13 @@
       "when": 1792878599267,
       "tag": "0302_loud_victor_mancha",
       "breakpoints": true
+    },
+    {
+      "idx": 303,
+      "version": "7",
+      "when": 1793014328423,
+      "tag": "0303_native_code_state",
+      "breakpoints": true
     }
   ]
 }

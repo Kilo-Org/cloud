@@ -21,6 +21,7 @@ import { CustomRouterError } from './caller-auth';
 import type { CustomRouterOwner } from './custom-router-store';
 import { customRouterDecisionScope } from './decision-cache';
 import type { DecisionRun, DecisionTarget } from './decide';
+import { contextProvablyTooSmall, satisfiesRequiredModalities } from './decision-engine';
 import { getModelCapabilities, type ModelCapabilities } from './model-capabilities';
 
 const CUSTOM_ROUTER_TABLE_CACHE_TTL_MS = 60_000;
@@ -175,7 +176,7 @@ function fallbackVariant(entry: CustomRouterEntry): string | null {
 }
 
 // A custom router never routes outside its pool: a null decision takes the default entry, then
-// the first entry this client can serve (ADR 0005).
+// the first entry this client can serve that fits the request (ADR 0005).
 export function customRouterDecision(
   routing: CustomRouting,
   run: DecisionRun
@@ -191,7 +192,7 @@ export function customRouterDecision(
   const fallback = [
     ...entries.filter(entry => customRouterEntryKey(entry) === defaultEntryKey),
     ...entries,
-  ].find(entry => routing.isServable(entry));
+  ].find(entry => routing.isServable(entry) && fitsRequest(entry, run));
   if (!fallback) {
     throw new CustomRouterError(
       'custom_router_unavailable',
@@ -213,6 +214,18 @@ export function customRouterDecision(
     stale: false,
     fallback: true,
   };
+}
+
+// Same capability rules as the decision engine, without its largest-context rescue: a
+// fallback entry that is inactive, lacks a required modality, or is provably too small fails.
+function fitsRequest(entry: CustomRouterEntry, run: DecisionRun): boolean {
+  const caps = run.capabilities.get(customRouterCandidateModel(entry));
+  if (caps?.isActive === false) return false;
+  if (run.constraints === undefined) return true;
+  return (
+    satisfiesRequiredModalities(caps, run.constraints) &&
+    !contextProvablyTooSmall(caps, run.constraints)
+  );
 }
 
 export function publicCustomRouterDecision(decision: AutoRoutingDecision): CustomRouterDecision {

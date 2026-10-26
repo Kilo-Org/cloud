@@ -752,20 +752,90 @@ describe('buildCouncilReviewSection', () => {
     expect(section).not.toContain('report only — report only');
   });
 
-  it('escapes pipe characters in specialist model/name cells', () => {
+  it('renders pipe characters in specialist model/name cells literally', () => {
     const result = councilResult('pass', ['pass']);
     result.specialists[0].model = 'vendor|weird';
     const section = buildCouncilReviewSection(result, { gates: true });
     expect(section).toContain('vendor\\|weird');
   });
 
-  it('escapes backslashes before pipes so a pre-existing backslash cannot break the cell', () => {
+  it('renders the escaped backslash-before-pipe pair as in the existing expectation', () => {
     const result = councilResult('pass', ['pass']);
-    // Raw `a\|b`: the `\` must be escaped first (→ `\\`) so the `|` we escape stays escaped.
+    // Raw `a\|b` renders as `\\` (literal backslash) followed by `\|` (escaped pipe).
     result.specialists[0].model = 'a\\|b';
     const section = buildCouncilReviewSection(result, { gates: true });
     expect(section).toContain('a\\\\\\|b'); // `\\` (literal backslash) + `\|` (escaped pipe)
     expect(section).not.toContain('a\\\\|b'); // the broken form (backslash + bare pipe)
+  });
+
+  it('renders link markup in the model cell as literal text', () => {
+    const result = councilResult('pass', ['pass']);
+    result.specialists[0].model = '[review here](https://example.invalid/x)';
+    const section = buildCouncilReviewSection(result, { gates: true });
+    expect(section).not.toContain('[review here](https://example.invalid/x)');
+    expect(section).toContain('\\[review here\\]');
+    expect(section).toContain('\\(https://example\\.invalid/x\\)');
+  });
+
+  it('renders image markup in the model cell as literal text', () => {
+    const result = councilResult('pass', ['pass']);
+    result.specialists[0].model = '![x](https://example.invalid/pixel)';
+    const section = buildCouncilReviewSection(result, { gates: true });
+    expect(section).not.toContain('![x](https://example.invalid/pixel)');
+    expect(section).toContain('\\!\\[x\\]');
+  });
+
+  it('renders html markup in the model cell as literal text', () => {
+    const result = councilResult('pass', ['pass']);
+    result.specialists[0].model = '<img src=https://example.invalid/pixel>';
+    const section = buildCouncilReviewSection(result, { gates: true });
+    expect(section).not.toContain('<img');
+    expect(section).toContain('&lt;img src=https://example\\.invalid/pixel&gt;');
+    // An existing entity in the value must not gain a second layer of entity text.
+    result.specialists[0].model = 'a&gt;b';
+    const entitySection = buildCouncilReviewSection(result, { gates: true });
+    expect(entitySection).not.toContain('&amp;amp;');
+    expect(entitySection).toContain('a&amp;gt;b');
+  });
+
+  it('renders backticks in the model cell as literal text', () => {
+    const result = councilResult('pass', ['pass']);
+    result.specialists[0].model = 'a`b`c';
+    const section = buildCouncilReviewSection(result, { gates: true });
+    expect(section).toContain('a\\`b\\`c');
+    expect(section).not.toContain('`b`');
+  });
+
+  it('collapses line terminators and control characters in the model cell to spaces', () => {
+    const result = councilResult('pass', ['pass']);
+    result.specialists[0].model = 'a\rb\u2028c\u2029d\u0000e\u001ff\ng';
+    const section = buildCouncilReviewSection(result, { gates: true });
+    expect(section).toContain('a b c d e f g');
+    expect(section.split('\n').some(row => row.includes('| a b c d e f g'))).toBe(true);
+  });
+
+  it('renders the verdict block delimiter text in a cell as literal escaped text', () => {
+    const result = councilResult('pass', ['pass']);
+    result.specialists[0].model = `x ${COUNCIL_VERDICT_BLOCK_END} y`;
+    const section = buildCouncilReviewSection(result, { gates: true });
+    // The delimiter cannot appear verbatim anywhere in the generated section.
+    expect(section).not.toContain(COUNCIL_VERDICT_BLOCK_END);
+    expect(section).toContain('&lt;\\!\\-\\- kilo\\-council\\-verdict:end \\-\\-&gt;');
+    // A re-run must still replace exactly one managed block, with the old section inside it.
+    const body = upsertCouncilVerdictInBody('<!-- kilo-review -->\nbody', section);
+    const updated = upsertCouncilVerdictInBody(body, 'fresh section');
+    expect(updated).toContain('fresh section');
+    // The old section content (with its escaped delimiter text) must be fully replaced.
+    expect(updated).not.toContain('&lt;');
+    expect(updated.match(new RegExp(COUNCIL_VERDICT_BLOCK_START, 'g'))).toHaveLength(1);
+  });
+
+  it('renders markup characters in the severity cell as literal text', () => {
+    const result = councilResult('pass', ['pass']);
+    result.specialists[0].highestSeverity = '<crit>[ical](x)';
+    const section = buildCouncilReviewSection(result, { gates: true });
+    expect(section).not.toContain('<crit>');
+    expect(section).toContain('&lt;crit&gt;\\[ical\\]\\(x\\)');
   });
 });
 

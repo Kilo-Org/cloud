@@ -321,6 +321,7 @@ describe('sign-in touch targets', () => {
       'SIGNUP-RATE-LIMITED',
       'SIGNUP-STEP-UP',
       'EMAIL-ALREADY-USED',
+      'EMAIL-INVALID-FORMAT',
       'EMAIL-MUST-BE-LOWERCASE',
       'EMAIL-CANNOT-CONTAIN-PLUS',
       'untrusted-query-error',
@@ -355,6 +356,7 @@ describe('sign-in touch targets', () => {
         code: 'ABCD-1234',
         viewerToken: 'viewer-token',
         isAppMode: true,
+        requestingClient: null,
         user: { name: 'Ada Lovelace', email: 'ada@kilo.ai', imageUrl: '' },
       })
     );

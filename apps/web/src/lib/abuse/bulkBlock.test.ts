@@ -153,6 +153,7 @@ describe('bulkBlockUsers (integration)', () => {
     const result = await unblockBulkBlockedUsers(reason, targetDate, admin.id);
 
     expect(result.updatedCount).toBe(2);
+    expect([...result.unblockedUserIds].sort()).toEqual([targetUser1.id, targetUser2.id].sort());
 
     const rows = await db
       .select({

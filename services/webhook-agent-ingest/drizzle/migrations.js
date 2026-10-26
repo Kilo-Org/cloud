@@ -4,6 +4,8 @@ import m0001 from './0001_dear_tombstone.sql';
 import m0002 from './0002_first_mephisto.sql';
 import m0003 from './0003_sparkling_kate_bishop.sql';
 import m0004 from './0004_bumpy_firebird.sql';
+import m0005 from './0005_open_morph.sql';
+import m0006 from './0006_noisy_daredevil.sql';
 
 export default {
   journal,
@@ -13,5 +15,7 @@ export default {
     m0002,
     m0003,
     m0004,
+    m0005,
+    m0006,
   },
 };

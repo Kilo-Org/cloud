@@ -68,6 +68,14 @@ export async function deliverCallbackJob(
 ): Promise<DeliveryResult> {
   const result = await deliverToTarget(target, payload);
 
+  return classifyCallbackDelivery(result, payload, attempts);
+}
+
+export function classifyCallbackDelivery(
+  result: { ok: boolean; status?: number; error?: string },
+  payload: ExecutionCallbackPayload,
+  attempts: number
+): DeliveryResult {
   if (result.ok) {
     return { type: 'success' };
   }

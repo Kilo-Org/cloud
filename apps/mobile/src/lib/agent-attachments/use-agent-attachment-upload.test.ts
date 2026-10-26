@@ -452,13 +452,9 @@ describe('addCandidates uploads documents at selection (Step 2)', () => {
 
   it('never uploads a strip-failed image and marks it a terminal chip', async () => {
     hoisted.manipulateAsync.mockReset();
-    // A strip failure returns the original URI, which the hook reads as
-    // metadataStripFailed.
-    hoisted.manipulateAsync.mockResolvedValue({
-      uri: 'file:///cache/IMG_0001.HEIC',
-      width: 100,
-      height: 100,
-    });
+    // Every re-encode attempt fails, so the strip result is not ok and the
+    // hook reads metadataStripFailed.
+    hoisted.manipulateAsync.mockRejectedValue(new Error('re-encode failed'));
     const renderer = await mountHook();
     await act(async () => {
       await hookApi().addCandidates([

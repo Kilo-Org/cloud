@@ -66,10 +66,12 @@ export async function handleModelsRequest(): Promise<
   try {
     const result =
       auth?.organizationId && auth.user
-        ? await getAvailableModelsForOrganization(auth.organizationId, {
-            type: 'member',
-            kiloUserId: auth.user.id,
-          })
+        ? await getAvailableModelsForOrganization(
+            auth.organizationId,
+            { type: 'member', kiloUserId: auth.user.id },
+            'member',
+            readDb
+          )
         : null;
     if (result && auth.user && auth.organizationId) {
       const [models, customRouters] = await Promise.all([

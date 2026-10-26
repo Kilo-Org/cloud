@@ -25,6 +25,7 @@
     "error": "грешка: {{error}}",
     "back": "Назад",
     "somethingWentWrong": "Възникна грешка.",
+    "actionNotRecorded": "Не можахме да запишем това действие. Опитай отново по-късно.",
     "couldNotOpen": "Не можахме да отворим {{label}}.",
     "link": "връзка",
     "takingLonger": "Това отнема повече време от очакваното. Можеш да затвориш този екран и да провериш отново.",
@@ -35,6 +36,8 @@
     "connectGithub": "Свържи GitHub",
     "cost": "Разход",
     "discard": "Отхвърли",
+    "discardChangesMessage": "Промените ви ще бъдат загубени.",
+    "discardChangesTitle": "Отхвърли промените?",
     "findings": "Открити проблеми",
     "mergeRequest": "merge заявка",
     "notConnected": "Не е свързан",
@@ -50,6 +53,7 @@
     "connected": "Свързан",
     "couldNotLoadModels": "Моделите не се заредиха.",
     "couldNotLoadRepositories": "Хранилищата не се заредиха.",
+    "noRepositoriesFound": "Не са намерени хранилища",
     "critical": "Критично",
     "delete": "Изтрий",
     "deleted": "Изтрито",
@@ -84,6 +88,7 @@
     "connect": "Свържи",
     "connectBitbucket": "Свържи Bitbucket",
     "connectGitlab": "Свържи GitLab",
+    "connectProvider": "Свържи доставчик",
     "contentTruncated": "Съдържанието е съкратено",
     "copyLink": "Копирай връзката",
     "couldNotLoadOrganizations": "Организациите не се заредиха.",
@@ -109,7 +114,9 @@
     "online": "Онлайн",
     "open": "Отвори {{name}}",
     "openPullRequest": "Отваряне на заявка за сливане",
+    "completed": "Завършено",
     "pending": "В изчакване",
+    "running": "Изпълнява се",
     "performance": "Производителност",
     "preferences": "Предпочитания",
     "privacyPolicy": "Политика за поверителност",
@@ -140,7 +147,8 @@
     "agent": "агент",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Промени"
+    "changes": "Промени",
+    "organizationTrialEnded": "Пробният период на организацията е приключил и тя няма активен план. Собственик на организацията може да актуализира фактурирането на kilo.ai и след това да опита отново."
   },
   "language": {
     "restarting": "Рестартиране за смяна на езика",
@@ -177,7 +185,7 @@
     "codeArrivalHint": "Ако адресът отговаря на условията, ще получиш кода до една минута.",
     "verifyCode": "Провери кода",
     "resendCode": "Изпрати кода отново",
-    "termsPrefix": "Като продължиш, приемаш нашите",
+    "termsPrefix": "Като продължиш, приемаш нашите ",
     "terms": "Условия",
     "termsConnector": " и ",
     "termsSuffix": ".",
@@ -219,7 +227,7 @@
     "hideBalance": "Скрий наличността",
     "showBalance": "Покажи наличността",
     "balanceHidden": "Наличността е скрита",
-    "bonusCreditsExpiring": "Срокът на {{amount}} бонус кредити изтича на {{date}}.",
+    "bonusCreditsExpiring": "Срокът на {{amount}} кредити изтича на {{date}}.",
     "signOutTitle": "Да се излезе ли от акаунта?",
     "signOutMessage": "Ще трябва да влезеш отново, за да имаш достъп до работното си пространство.",
     "deleteAccountTitle": "Да се изтрие ли акаунтът?",
@@ -288,7 +296,8 @@
     "condenseToolCallsSubtitle": "Групирайте последователни извиквания на инструменти в един ред, който можете да отворите.",
     "toolSummaryTranslation": "Преведи обобщенията на инструментите",
     "toolSummaryTranslationSubtitle": "Изпращай всяко обобщение на инструмент към модел, за да го преведе на езика на приложението ти. Ако преводът се провали, се показва оригиналът.",
-    "toolSummaryTranslationModelUnavailableNotice": "Този модел вече не се предлага. Докосни $t(common.model), за да избереш друг."
+    "toolSummaryTranslationModelUnavailableNotice": "Този модел вече не се предлага. Докосни $t(common.model), за да избереш друг.",
+    "autoExpandThinkingInactiveSubtitle": "Няма ефект, докато подробностите за разсъжденията са скрити."
   },
   "prReview": {
     "pullRequestUnavailable": "Недостъпна заявка за обединяване",
@@ -586,6 +595,8 @@
     "installKiloGitHubApp": "Инсталирай приложението Kilo за GitHub",
     "checkConnection": "Провери връзката",
     "couldNotLoadPullRequest": "Не можахме да заредим заявката за обединяване.",
+    "reviewServiceUnavailable": "Услугата е временно недостъпна",
+    "reviewServiceUnavailableDescription": "Услугата е временно недостъпна. Опитайте отново след малко.",
     "description": "Описание",
     "noDescriptionProvided": "Няма описание.",
     "review": "Преглед",
@@ -615,9 +626,15 @@
       "viewOnGitHub": "Прегледай PR в GitHub",
       "noChecksReported": "Няма данни за проверки",
       "passed": "успешни: {{displayCount}}",
+      "passed_one": "успешни: {{displayCount}}",
+      "passed_other": "успешни: {{displayCount}}",
       "failed": "неуспешни: {{displayCount}}",
+      "failed_one": "неуспешни: {{displayCount}}",
+      "failed_other": "неуспешни: {{displayCount}}",
       "pending": "изчакващи: {{displayCount}}",
       "skipped": "пропуснати: {{displayCount}}",
+      "skipped_one": "пропуснати: {{displayCount}}",
+      "skipped_other": "пропуснати: {{displayCount}}",
       "checksCount": "{{displayCount}} проверки",
       "checksCount_one": "{{displayCount}} проверка",
       "checksCount_other": "{{displayCount}} проверки",
@@ -661,7 +678,9 @@
       "description": "Свържи акаунта си в GitHub, за да преглеждаш заявки за обединяване от телефона си.",
       "gitlabDescription": "Свържете акаунта си в GitLab, за да преглеждате merge заявки на мобилно устройство.",
       "bitbucketDescription": "Свържете Bitbucket с тази организация, за да преглеждате заявки за сливане на мобилно устройство.",
-      "bitbucketOrgOnlyDescription": "Изберете организация в профила си, за да преглеждате нейните Bitbucket заявки за сливане."
+      "bitbucketOrgOnlyDescription": "Превключете акаунта горе към организация, за да преглеждате нейните заявки за сливане в Bitbucket.",
+      "contextLine": "За {{organization}}",
+      "contextLinePersonal": "За личния профил"
     },
     "screen": {
       "title": "#{{number}}",
@@ -756,6 +775,7 @@
       "truncationBanner_other": "Показват се първите {{limit}} от {{total}} променени файла поради ограничение на API на GitHub."
     },
     "linkPasteClipboardEmpty": "Клипбордът е празен.",
+    "linkPasteDenied": "Достъпът за поставяне е отказан. Разрешете поставянето и опитайте отново.",
     "linkPasteNotAPullRequest": "Това не е връзка към заявка за сливане или merge заявка",
     "announce": {
       "commentPosted": "Коментарът е публикуван",
@@ -769,7 +789,9 @@
       "reviewNotSubmitted": "Този преглед не може да се изпрати в сегашния си вид. Възможно е този PR да е променен или да се опитваш да прегледаш собствената си заявка за обединяване.",
       "reviewNotSubmittedTerm": "Този преглед не може да бъде изпратен такъв. {{term}} може да се е променил или не можете да преглеждате собствения си {{term}}.",
       "couldNotPostComment": "Не можахме да публикуваме коментара.",
-      "couldNotSubmitReview": "Не можахме да изпратим прегледа. Провери връзката си и опитай отново."
+      "couldNotSubmitReview": "Не можахме да изпратим прегледа. Провери връзката си и опитай отново.",
+      "rateLimited": "Твърде много заявки. Опитай отново по-късно.",
+      "conflict": "Това се промени, докато работехте по него. Презаредете го и опитайте отново."
     },
     "operation": {
       "couldNotReply": "Отговорът не беше изпратен.",
@@ -777,7 +799,6 @@
       "mergeResultDefaultError": "GitHub не завърши обединяването.",
       "mergeResultNotCompleted": "{{term}} не беше обединен. Проверете състоянието му и опитайте отново.",
       "ambiguous": "Не можахме да потвърдим резултата. Провери този PR, преди да опиташ отново.",
-      "persistenceFailed": "Не можахме да запишем това действие. Опитай отново по-късно.",
       "forbidden": "Действието не е разрешено."
     },
     "capabilities": {
@@ -1389,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Може да се наложи да предоставиш достъп до повече групи или проекти в GitLab.",
       "installGithubApp": "Инсталирай приложението за GitHub в хранилищата",
       "installGithubAppDescription": "Предостави на приложението на Kilo за GitHub достъп до хранилищата, които искаш да бъдат преглеждани.",
-      "noRepositoriesFound": "Не са намерени хранилища",
       "repositoryAccess": "достъп до хранилища"
     },
     "style": {
@@ -1413,9 +1433,14 @@
       "couldNotGetLatest": "Не успяхме да получим актуалните данни.",
       "byline": "{{repo}} #{{number}} от {{author}}",
       "noFindings": "Няма открити проблеми.",
+      "findingsUnavailable": "Резултатите не са налични, защото този преглед беше неуспешен.",
+      "serviceUnavailable": "Не успяхме да се свържем с услугата за преглед на код. Повтори прегледа, когато услугата е достъпна.",
+      "reviewFailed": "Прегледът беше неуспешен. Моля, опитай отново.",
       "showMore": "Покажи още",
       "created": "Създаден",
       "started": "Започнат",
+      "reviewEnded": "Прекратен",
+      "severityNitpick": "Забележка",
       "tokens": "Токени",
       "tokensInOut": "{{input}} входящи / {{output}} изходящи",
       "council": "Съвет",
@@ -1439,15 +1464,22 @@
       "sessionError": "Възникна грешка в сесията: {{error}}.",
       "statusWithValue": "Състояние: {{status}}",
       "toolName": "Инструмент: {{name}}",
-      "toolNameError": "Инструментът {{name}} върна грешка."
+      "toolNameError": "Инструментът {{name}} върна грешка.",
+      "cancelReasonSuperseded": "Беше качен нов commit, затова този преглед беше заменен.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} е изключен, затова този преглед беше отменен. Свържи го отново, след което изпълни прегледа повторно.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer беше изключен за Bitbucket, затова този преглед беше отменен. Включи го отново, след което изпълни прегледа повторно.",
+      "cancelReasonBitbucketPullRequestChanged": "Заявката за изтегляне в Bitbucket беше променена, затова този преглед беше заменен.",
+      "cancelReasonCancelled": "Този преглед беше отменен.",
+      "cancelReasonInterrupted": "Този преглед беше прекъснат."
     },
     "reviewMemory": {
       "title": "Памет от прегледите",
       "loading": "Зареждане на паметта за прегледи",
       "couldNotLoad": "Не успяхме да заредим паметта за прегледи.",
       "off": "Паметта за прегледи е изключена.",
+      "on": "Паметта за прегледи е включена.",
       "offDescription": "Активирай я, за да може Kilo да се учи от отговорите на отговорниците за проекта и да предлага насоки за REVIEW.md.",
-      "readOnlyDescription": "Само собствениците на организацията и отговорниците за фактурирането могат да активират паметта за прегледи.",
+      "readOnlyDescription": "Само собствениците на организацията, администраторите и отговорниците за плащанията могат да променят паметта за прегледи.",
       "enable": "Активирай паметта за прегледи",
       "loadingProposals": "Зареждане на предложенията",
       "couldNotLoadProposals": "Не успяхме да заредим предложенията.",
@@ -1459,15 +1491,25 @@
       "invalidUrl": "Въведи валиден URL адрес на заявка за сливане.",
       "couldNotCheckProviderStatus": "Не успяхме да проверим състоянието на доставчика.",
       "couldNotLoadProviders": "Не успяхме да заредим свързаните доставчици. Моля, опитай отново.",
-      "connectProvider": "Свържи доставчик",
       "connectProviderDescription": "Свържи GitHub, за да започнеш ръчен преглед на заявка за сливане.",
       "pullRequestUrl": "URL адрес на заявка за сливане",
       "instructions": "Инструкции (по желание)",
       "instructionsPlaceholder": "Конкретни неща, на които да се обърне внимание при прегледа…",
       "starting": "Стартиране на прегледа…",
-      "start": "Започни прегледа"
+      "start": "Започни прегледа",
+      "startNotFound": "Не успяхме да прочетем тази {{requestNoun}} от {{provider}}. Провери URL адреса и дали хранилището е достъпно.",
+      "startRateLimited": "{{provider}} ограничава заявките в момента. Опитай отново след няколко минути.",
+      "startNotAllowed": "Нямаш достъп, за да започнеш преглед на тази {{requestNoun}}. Провери правата си и плана на организацията си.",
+      "startProviderNeedsAttention": "Ръчните прегледи изискват стандартната връзка с {{provider}}. Свържи го и опитай отново.",
+      "startAlreadyRunning": "Прегледът на тази {{requestNoun}} вече се изпълнява.",
+      "startRejected": "Тази {{requestNoun}} не може да бъде прегледана. Увери се, че е отворена, не е чернова и че URL адресът е правилен.",
+      "startProviderUnavailable": "Не успяхме да се свържем с {{provider}}, за да прочетем тази {{requestNoun}}. Опитай отново.",
+      "startFailed": "Не успяхме да стартираме прегледа. Провери връзката си и опитай отново."
     },
-    "notConnectedReadOnly": "Няма връзка с {{platform}}. Само собствениците на организацията и отговорниците за фактурирането могат да я установят.",
+    "notConnectedReadOnly": "Няма връзка с {{platform}}. Само собствениците на организацията и администраторите могат да я установят.",
+    "gitlab": {
+      "notConnectedReadOnly": "Няма връзка с {{platform}}. Поискайте от собственик, администратор или отговорник за плащанията на организацията да я свържат."
+    },
     "webhookSetup": "Настройката на уебкука не е завършена.",
     "webhookSetupDescription": "Някои хранилища може да не получават автоматични прегледи.",
     "autoReviews": "Автоматични прегледи",
@@ -1475,7 +1517,7 @@
     "followReviewMd": "Следвай REVIEW.md",
     "followReviewMdSubtitle": "Спазвай инструкциите във файла REVIEW.md на всяко хранилище",
     "bitbucket": {
-      "notConnectedReadOnly": "Няма връзка с Bitbucket. Само собствениците на организацията и отговорниците за фактурирането могат да я установят.",
+      "notConnectedReadOnly": "Няма връзка с Bitbucket. Само собствениците на организацията, администраторите и отговорниците за плащанията могат да я установят.",
       "setupIncomplete": "Настройката не е завършена. Завърши я в kilo.ai.",
       "setup": "Настройка на Bitbucket"
     },
@@ -1528,8 +1570,6 @@
     "updateFailed": "Не успяхме да актуализираме агента за преглед на код.",
     "configSaveFailed": "Не успяхме да запазим настройките за преглед.",
     "status": {
-      "running": "Изпълнява се",
-      "completed": "Завършено",
       "interrupted": "Прекъснато"
     },
     "reviewStyle": {
@@ -1542,7 +1582,8 @@
       "bugs": "Грешки",
       "style": "Стил",
       "testing": "Тестване",
-      "documentation": "Документация"
+      "documentation": "Документация",
+      "unknown": "Друго ({{area}})"
     },
     "gateThreshold": {
       "warning": "Предупреждение"
@@ -1577,8 +1618,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Няма налични филтри",
-      "noFiltersDescription": "Върни се назад и отвори отново филтрите от списъка с проблеми.",
       "title": "Филтриране на проблеми",
       "reset": "Нулирай",
       "severity": "Сериозност",
@@ -1654,7 +1693,14 @@
       "whereFound": "Къде е открито ({{displayCount}})",
       "fullReport": "Пълен генериран доклад",
       "yes": "Да",
-      "no": "Не"
+      "no": "Не",
+      "action": {
+        "analyzeCodebase": "Анализирай кодовата база",
+        "dismiss": "Отхвърли",
+        "manualReview": "Ръчен преглед",
+        "monitor": "Наблюдавай",
+        "openPr": "Отвори заявка за сливане"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} проблема",
@@ -1708,7 +1754,7 @@
       "deadlinePassed": "Крайният срок изтече",
       "deadlinePassedDetail": "{{critical}} критични, {{high}} с висока тежест",
       "dueThisWeek": "С краен срок тази седмица",
-      "dueThisWeekDetail": "{{exploitable}} с потвърдена възможност за атака",
+      "dueThisWeekDetail": "От тях {{exploitable}} с потвърдена възможност за атака",
       "noDeadline": "Няма краен срок",
       "reviewSlaAssignment": "Прегледай зададените срокове по SLA",
       "allOpenFindingsTracked": "Всички отворени проблеми се проследяват"
@@ -1729,7 +1775,7 @@
       "couldNotLoad": "Данните за този проблем не се заредиха.",
       "couldNotCheckPermissions": "Не успяхме да проверим правата за отхвърляне.",
       "cannotDismissTitle": "Този проблем не може да бъде отхвърлен",
-      "cannotDismissDescription": "Само собствениците на организацията и отговорниците за фактурирането могат да отхвърлят проблеми.",
+      "cannotDismissDescription": "Само собствениците на организацията, администраторите и отговорниците за плащанията могат да отхвърлят проблеми.",
       "alreadyResolvedDescription": "Този проблем вече е решен и не може да бъде отхвърлен."
     },
     "findingDetails": {
@@ -1771,7 +1817,7 @@
       "automationAllOff": "Всички са изключени",
       "automationCount": "{{displayCount}} от 3 активирани",
       "notificationsCount": "{{displayCount}} от 2 активирани",
-      "disabledNoManage": "Агентът за сигурност е деактивиран. Само собствениците на организацията и отговорниците за фактурирането могат да го активират.",
+      "disabledNoManage": "Агентът за сигурност е деактивиран. Само собствениците на организацията, администраторите и отговорниците за плащанията могат да го активират.",
       "disabledNoRepo": "Избери поне едно хранилище, преди да активираш агента за сигурност.",
       "disabledPrompt": "Активирай агента за сигурност, за да синхронизираш сигналите от Dependabot, да избереш хранилища и да настроиш автоматизацията."
     },
@@ -1820,7 +1866,7 @@
       "invalidDayCount": "въведи брой дни от 1 до 365 като цяло число.",
       "remediationDeadlineA11y": "Краен срок за отстраняване в дни — {{label}}",
       "enterWholeNumber": "Въведи цяло число между 1 и 365",
-      "permissionNote": "Само собствениците на организацията и отговорниците за фактурирането могат да променят тези настройки.",
+      "permissionNote": "Само собствениците на организацията, администраторите и отговорниците за плащанията могат да променят тези настройки.",
       "enableTracking": "Активирай проследяване по SLA",
       "enableTrackingSubtitle": "Задава крайни срокове за отстраняване според сериозността на проблема.",
       "deadlinesHeading": "Крайни срокове за отстраняване (дни)"
@@ -1856,24 +1902,51 @@
     "settingsSave": {
       "saveChanges": "Запази промените",
       "unsavedTitle": "Незапазени промени",
-      "unsavedMessage": "Да се запазят ли промените, преди да напуснеш този екран?"
+      "unsavedMessage": "Да се запазят ли промените, преди да напуснеш този екран?",
+      "unsavedInvalidMessage": "Тези промени все още не могат да се запазят. Коригирай ги, за да запазиш, или ги отхвърли, за да напуснеш."
     },
     "auditReportButton": {
       "viewA11y": "Прегледай одитния доклад"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Администратор на Kilo",
+      "actorMaskedUser": "Маскиран потребител",
+      "actorSystem": "Система Kilo",
       "couldNotLoad": "Не успяхме да заредим одитния доклад.",
       "events": "Събития",
+      "eventConfidence": "Увереност: {{confidence}}",
+      "eventReason": "Причина: {{reason}}",
+      "eventsCount_one": "{{displayCount}} събитие",
+      "eventsCount_other": "{{displayCount}} събития",
       "generated": "Докладът е генериран на {{generatedAt}}.",
       "noActivity": "Няма записана активност",
       "noActivityDescription": "В Kilo няма действия по проблеми със сигурността за включване в доклада за периода от {{start}} до {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Хранилището не е записано",
+      "reasonUnknown": "Неразпозната причина",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Резюме на доклада",
       "title": "Одитен доклад",
       "unavailable": "Одитният доклад не е достъпен",
-      "unavailableDescription": "Само собствениците на организацията и отговорниците за фактурирането могат да преглеждат одитни доклади. Помоли собственик или отговорник за фактурирането да ти предостави достъп.",
-      "queryFailed": "Заявката за доклада не приключи. Опитай отново."
+      "unavailableDescription": "Само собствениците на организацията, администраторите и отговорниците за плащанията могат да преглеждат одитни доклади. Помоли собственик, администратор или отговорник за плащанията да ти предостави достъп.",
+      "queryFailed": "Заявката за доклада не приключи. Опитай отново.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Анализът е завършен",
+        "findingAnalysisFailed": "Неуспешен анализ",
+        "findingAutoDismissed": "Автоматично отхвърлено",
+        "findingCreated": "Импортирано",
+        "findingDeleted": "Изтрито",
+        "findingDismissed": "Отхвърлено",
+        "findingSeverityChanged": "Сериозността е променена",
+        "findingStatusChange": "Статусът е променен",
+        "findingSuperseded": "Заменено",
+        "remediationBlocked": "Отстраняването е блокирано",
+        "remediationCancelled": "Отменено",
+        "remediationFailed": "Неуспешно отстраняване",
+        "remediationNoChangesNeeded": "Не са нужни промени",
+        "remediationPrOpened": "Създаден PR",
+        "remediationQueued": "Отстраняването е заявено"
+      }
     },
     "notifications": {
       "couldNotLoad": "Не успяхме да заредим настройките за известия.",
@@ -1904,9 +1977,9 @@
       "couldNotLoad": "Не успяхме да заредим агента за сигурност.",
       "installApp": "Инсталирай приложението за GitHub",
       "reauthorizeButton": "Поднови правата на приложението за GitHub",
-      "reauthorizeDescription": "Агентът за сигурност изисква правото vulnerability_alerts за достъп до сигналите от Dependabot. Поднови правата на приложението за GitHub, за да предоставиш това право.",
-      "reauthorizeFailed": "Не успяхме да започнем подновяването на правата. Опитай отново.",
+      "reauthorizeDescription": "Агентът за сигурност се нуждае от разрешение да чете сигналите от Dependabot. Поднови правата на приложението за GitHub, за да предоставиш това разрешение.",
       "reauthorizeTitle": "Изискват се допълнителни права",
+      "retryFailed": "Все още не успяхме да заредим агента за сигурност. Провери връзката си и опитай отново.",
       "setupFailed": "Не може да се започне настройката на GitHub. Моля, опитай отново."
     },
     "queuedActionUntracked": "Действие в опашката вече не може да се проследи. Опресни, за да видиш актуалното състояние.",
@@ -1924,7 +1997,12 @@
       "syncMayNotHaveCompleted": "Синхронизацията може да не е завършила. Опитай отново, за да провериш и обновиш състоянието ѝ, или я отхвърли.",
       "syncInProgress": "Вече се изпълнява синхронизация на данните за сигурност. Опитай отново.",
       "dismissalInProgress": "Това отхвърляне вече се изпълнява. Опитай отново.",
-      "couldNotReadPendingSyncs": "Не успяхме да прочетем чакащите синхронизации. Опитай отново."
+      "couldNotReadPendingSyncs": "Не успяхме да прочетем чакащите синхронизации. Опитай отново.",
+      "ambiguous": "Не можахме да потвърдим резултата. Провери прегледа на сигурността, преди да опиташ отново.",
+      "settleFailed": "Действието завърши, но не успяхме да запишем резултата. Опитай отново.",
+      "replayFailed": "Това действие не завърши. Опитай отново.",
+      "actionFailed": "Не можахме да завършим това действие. Опитай отново.",
+      "actionBlocked": "Не можахме да завършим това действие. Проблемът трябва да бъде отстранен, преди да опиташ отново."
     },
     "analysisState": {
       "queued": "Анализът е на опашка",
@@ -2064,7 +2142,8 @@
       "dollar_other": "долара",
       "costSpoken": "разход {{cost}}",
       "costSpokenWithTime": "разход {{cost}}, {{time}}",
-      "pullRequest": "заявка за обединяване {{number}}"
+      "pullRequest": "заявка за обединяване {{number}}",
+      "spokenJoiner": "и"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Неуспешно отваряне на GitHub",
@@ -2092,8 +2171,8 @@
       "title": "Сесия",
       "copyErrorDetails": "Копирай подробностите за грешката",
       "backToSessions": "Обратно към сесиите",
-      "follow": "Следи на заключения екран",
-      "unfollow": "Спри следенето на заключения екран",
+      "follow": "Следи сесията",
+      "unfollow": "Спри следенето на сесията",
       "couldNotLoad": "Не успяхме да заредим сесията.",
       "failedToLoadDetails": "Не успяхме да заредим подробностите за сесията.",
       "failedToStopExecution": "Не успяхме да спрем изпълнението.",
@@ -2183,6 +2262,9 @@
       "noRepositoriesVisibleGitlab": "Няма видими хранилища. Провери достъпа до хранилищата в GitLab, след което опресни списъка.",
       "noRepositoriesVisibleBitbucket": "Няма видими хранилища. Провери достъпа до хранилищата в Bitbucket, след което опресни списъка.",
       "bitbucketOrganizationsOnly": "Bitbucket е наличен само за организации.",
+      "githubNeedsAttention": "GitHub трябва да бъде свързан отново",
+      "githubNeedsAttentionDescription": "Свържи отново GitHub приложението Kilo, след което опресни, за да заредиш хранилищата му.",
+      "partialRepositories": "Някои хранилища в GitHub не се заредиха.",
       "branchPickerTitle": "Избери клон",
       "branchDefault": "По подразбиране",
       "branchAccessibility": "Клон: {{label}}",
@@ -2190,17 +2272,19 @@
       "branchLoadError": "Клоновете не можаха да се заредят",
       "branchUnavailable": "Клоновете не са налични за това хранилище. Проверете достъпа си при доставчика и изберете друго хранилище.",
       "branchEmpty": "Няма налични клонове",
+      "branchListIncomplete": "Показани са само някои клонове. Хранилището има повече клонове, отколкото този списък може да включи.",
       "branchPlaceholder": "Изберете клон",
       "runOnWithTarget": "Изпълнение в: {{target}}",
       "environment": "Среда",
       "couldNotLoadEnvironment": "Не успяхме да заредим средата ти.",
       "retryLoadingEnvironment": "Опитай отново да заредиш средата",
       "defaultEnvironment": "Среда по подразбиране",
-      "environmentSummary": "{{commands}} команди · {{mcp}} MCP · {{skills}} умения · {{agents}} агенти",
       "leaveChanges": "Остави промените",
       "commitAndPush": "Комитни и изпрати",
       "startSession": "Започни сесия",
       "selectRepositoryToStart": "Избери хранилище, за да започнеш.",
+      "enterPromptToStart": "Добави заявка, за да започнеш.",
+      "enterPromptOrFileToStart": "Добави заявка или файл, за да започнеш.",
       "connectProviderToStart": "Свържи доставчик, за да започнеш.",
       "promptPlaceholder": "Върху какво искаш да работиш?",
       "couldNotLoadModels": "Не успяхме да заредим моделите.",
@@ -2209,6 +2293,7 @@
       "prefillModelUnavailable": "{{model}} вече не е наличен. Използва се твоят модел по подразбиране.",
       "couldNotReadPendingSessions": "Не успяхме да прочетем чакащите сесии. Опитай отново.",
       "failedToCreate": "Не успяхме да създадем сесия.",
+      "checkOrganizationAccess": "Провери достъпа си до тази организация и опитай отново.",
       "couldNotRefreshRepositories": "Не успяхме да опресним хранилищата. Опитай отново.",
       "discardDraftTitle": "Да се изтрие ли черновата?",
       "discardDraftMessage": "Подканата ти ще се загуби.",
@@ -2278,7 +2363,8 @@
       "linesBadge_other": "{{displayCount}} реда",
       "matchesBadge_one": "{{displayCount}} съвпадение",
       "matchesBadge_other": "{{displayCount}} съвпадения",
-      "noOutput": "Няма изход."
+      "noOutput": "Няма изход.",
+      "translationFailed": "Преводът не бе успешен"
     },
     "readToolMarkdown": {
       "linesTruncated": "редове {{start}}–{{end}} (съкратено)",
@@ -2411,7 +2497,71 @@
       "preparationComplete": "Подготовката приключи",
       "preparationFailed": "Неуспешна подготовка",
       "setupCommand": "Команда за настройка {{index}}",
-      "setupCommandOf": "Команда за настройка {{index}} от {{displayCount}}"
+      "setupCommandOf": "Команда за настройка {{index}} от {{displayCount}}",
+      "stepWorkspaceSetup": "Настройка на работното пространство",
+      "stepDiskCheck": "Проверка на диска",
+      "stepCloning": "Клониране на хранилището",
+      "stepBranch": "Настройка на клон",
+      "stepDevcontainerSetup": "Настройка на Dev контейнер",
+      "stepWorkspaceRestore": "Възстановяване на работното пространство",
+      "stepWorkspaceBackup": "Запазване на работното пространство",
+      "stepSandboxProvision": "Осигуряване на пясъчник",
+      "stepSandboxBoot": "Стартиране на пясъчник",
+      "stepSnapshotFallback": "Нов опит без снимка",
+      "stepKiloServer": "Стартиране на Kilo",
+      "stepKiloSession": "Подготовка на сесия",
+      "stepRestoreIncomplete": "Непълно възстановяване на сесията",
+      "stepReady": "Средата е готова",
+      "stepFailed": "Неуспешна настройка на средата",
+      "stepUnknown": "Настройка на средата",
+      "detailCreatingSandbox": "Създаване на пясъчник",
+      "detailUpdatingRepository": "Обновяване на хранилището",
+      "detailCheckingOutBranch": "Изтегляне на клона",
+      "detailRunningSetupCommands": "Изпълнение на команди за настройка",
+      "detailSavingRepository": "Запазване на хранилището за по-бързо стартиране",
+      "detailStartingKiloRuntime": "Стартиране на средата на Kilo",
+      "detailPreparingKiloSession": "Подготовка на сесия на Kilo",
+      "detailWaitingForPreviousSandbox": "Изчакване предишният пясъчник да спре",
+      "detailRetryingSandboxCreation": "Нов опит за създаване на пясъчник",
+      "detailPreviousSnapshotFailed": "Стартирането с предишна снимка не успя. Опит без снимка.",
+      "detailSnapshotStartupFailed": "Стартирането със снимка не успя. Опит без снимка.",
+      "detailStartingSandboxWithoutSnapshot": "Стартиране на пясъчник без снимка",
+      "detailSettingUpWorkspace": "Настройка на работното пространство",
+      "detailRestoringSession": "Възстановяване на сесията",
+      "detailWarmWorkspaceReused": "Използвано е затоплено работно пространство",
+      "detailRetryingClone": "Нов опит за клониране (опит {{attempt}} от {{total}})",
+      "detailSetupCommandFailed": "Командата за настройка {{index}} не успя",
+      "detailSetupCommandTimedOut": "Командата за настройка {{index}} изтече по време",
+      "detailColdRestore": "Студено възстановяване, снимката е приложена, {{applied}} от {{total}} файла са възстановени",
+      "detailProgressPercent": "{{percent}}% завършено",
+      "detailRestoreIncompleteReport": "Възстановяването на сесията е непълно: {{skipped}} от {{total}} файла не бяха възстановени ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Липсват: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} и още {{omitted}}",
+      "detailReasonPatchFailed": "кръпката не беше приложена",
+      "detailReasonOutsideWorkspace": "пътят е извън работното пространство",
+      "detailReasonMissingContent": "снимката не съдържала данни за файла",
+      "detailReasonIndexResetFailed": "индексът не можа да бъде нулиран след неуспешно прилагане",
+      "detailReasonUnlinkFailed": "файлът не можа да бъде изтрит",
+      "detailReasonWriteFailed": "файлът не можа да бъде записан",
+      "detailReasonUnknown": "неизвестна причина",
+      "detailUnknown": "Още се подготвя",
+      "errorPreparationTimeout": "Времето за подготовка на средата изтече",
+      "errorWorkspaceSetupFailed": "Настройката на работното пространство не успя",
+      "errorCredentialUpgradeRequired": "Тази сесия не може да продължи без задължително надграждане на идентификационни данни. Стартирайте нова сесия.",
+      "errorAgentUnavailable": "Агентът стана недостъпен",
+      "errorBillingBlocked": "Таксуването на пясъчника изисква допълнителни кредити",
+      "errorBillingUnavailable": "Проверката на таксуването или капацитета на пясъчника е недостъпна. Опитайте отново скоро.",
+      "errorContainerLimitReached": "Достигнат лимит на контейнери. Спрете съществуващ контейнер, преди да стартирате нов.",
+      "errorInvalidConfiguration": "Конфигурацията на пясъчника е невалидна или неподдържана",
+      "errorRuntimeArtifactUnauthorized": "Изтеглянето на средата не беше разрешено",
+      "errorRuntimeArtifactInvalid": "Проверката на артефакта на средата не успя",
+      "errorRuntimeCliProbeFailed": "Валидацията на CLI на средата не успя",
+      "errorRuntimeSupervisorMissing": "Супервайзорът на средата липсва",
+      "errorConnectionLost": "Връзката с пясъчника прекъсна",
+      "errorSandboxLost": "Пясъчникът беше загубен",
+      "errorAgentRestarted": "Агентът се рестартира",
+      "errorSandboxOutOfMemory": "Пясъчникът свърши паметта",
+      "errorPreparationDidNotComplete": "Подготовката не завърши"
     },
     "permissionCard": {
       "title": "Нужно разрешение",
@@ -2423,7 +2573,10 @@
       "allowOnceAccessibility": "Разреши веднъж",
       "alwaysAllow": "Винаги разрешавай",
       "alwaysAllowAccessibility": "Винаги разрешавай",
-      "retrying": "Повторен опит…"
+      "retrying": "Повторен опит…",
+      "retryDeny": "Опитай да откажеш отново",
+      "retryAllowOnce": "Опитай да разрешиш веднъж отново",
+      "retryAlwaysAllow": "Опитай да разрешаваш винаги отново"
     },
     "questionCard": {
       "title": "Агентът очаква отговор",
@@ -2729,6 +2882,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Активните ти сесии ще са достъпни след зареждането на данните.",
     "currentDeviceUnidentified": "Не успяхме да разпознаем текущото устройство.",
+    "kiloApp": "Приложение Kilo",
     "noSessions": "Няма активни сесии",
     "noSessionsDescription": "Влез в приложението Kilo на друго устройство и то ще се появи тук.",
     "onlyKiloAppSignIns": "Тук се показват само влизанията в приложението Kilo. Влизанията през редактора и CLI не са включени.",
@@ -2737,7 +2891,7 @@
     "webBrowser": "Уеб браузър",
     "viewProfile": "Прегледай профила",
     "signOutThisDevice": "Излез от акаунта на това устройство",
-    "signOutThisSession": "Прекрати тази сесия",
+    "signOutSessionLabel": "Излез от акаунта на {{device}}, Влизане: {{signedIn}}",
     "sessionSignedOut": "Сесията е прекратена.",
     "signOutThisDeviceTitle": "Да се излезе ли от акаунта на това устройство?",
     "signOutThisSessionTitle": "Да се прекрати ли тази сесия?",
@@ -2798,7 +2952,6 @@
   },
   "voiceInput": {
     "listening": "Слушам…",
-    "staysOff": "Гласовото въвеждане остава изключено, докато не разрешиш онлайн преобразуването на реч в текст.",
     "onlineTitle": "Речта се обработва онлайн",
     "onlineMessage": "Това устройство не може да преобразува реч в текст офлайн. Записът ти се изпраща до {{provider}} за преобразуване в текст. Kilo не съхранява аудиозаписа.",
     "allow": "Разреши",
@@ -2881,6 +3034,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Преди да започнем",
+    "summaryTitle": "Предпочитания за споделяне на данни",
     "introDescription": "Kilo изпраща съобщенията ти до доставчици на AI модели, за да генерират отговори. Ето какви данни се споделят и с кого.",
     "required": "Задължително за използване на Kilo",
     "promptsTitle": "Твоите подкани и разговори",
@@ -2889,7 +3043,6 @@
     "accountDescription": "Идентификаторът на акаунта ти в Kilo и метаданните на заявките се използват за удостоверяване и отчитане на потреблението.",
     "diagnosticsTitle": "Диагностика на приложението",
     "diagnosticsDescription": "Докладите за сривове и грешки помагат за стабилната работа на приложението. Съдържанието на приложението се премахва от тях.",
-    "optional": "По избор",
     "helpImprove": "Помогни за подобряването на Kilo",
     "helpImproveDescription": "Споделяй анонимни данни за използването на приложението и източника на инсталацията. Можеш да промениш избора си по всяко време в настройките.",
     "seeFullDetails": "Виж всички подробности",
@@ -2974,11 +3127,17 @@
     "boundary": {
       "backToProfile": "Обратно към профила",
       "loadErrorMessage": "Провери връзката си и опитай отново.",
+      "chooseAccount": "Избери акаунт",
       "loadErrorTitle": "Не успяхме да заредим организациите ти.",
+      "membershipLostNotice": "Вече нямаш достъп до тази организация. Превключено към {{target}}.",
+      "noOrganization": "Няма организация",
+      "noOrganizationDescription": "Този акаунт не е част от организация. Създай или се присъедини към организация в сайта, за да използваш функции на организацията като покани за членове и известия за нисък баланс.",
+      "openWebOrganizations": "Отвори организациите в сайта",
       "organizationUnavailable": "Организацията е недостъпна.",
-      "selectDescription": "Избери организация от профила си, за да продължиш.",
+      "selectDescriptionWithOrganizations": "Ти принадлежиш към една или повече организации. Избери акаунта, който този екран да използва.",
       "selectOrganization": "Избор на организация",
       "unavailableDescription": "Тази организация вече не е достъпна. Избери друга от профила си, за да продължиш.",
+      "unavailableSessionsDescription": "Тази организация вече не е достъпна. Сесиите ѝ не могат да бъдат заредени.",
       "accessDeniedDescription": "Нямаш достъп до тази организация."
     },
     "creditActivity": {
@@ -3005,7 +3164,11 @@
       "permissionDenied": "Нямаш разрешение да каниш членове.",
       "roleMember": "Роля: член",
       "sendInvite": "Изпрати покана",
-      "title": "Покани член"
+      "title": "Покани член",
+      "alreadyInvited": "Вече е поканен или вече е член.",
+      "sendError": "Не можахме да изпратим поканата.",
+      "pendingInvitation": "За този имейл вече има чакаща покана.",
+      "alreadyMember": "Този човек вече е член на тази организация."
     },
     "invoices": {
       "downloadA11y": "Изтегли фактура {{number}}",
@@ -3030,7 +3193,11 @@
       "separateEmailsHint": "Ако въвеждаш няколко имейл адреса, раздели ги със запетаи.",
       "thresholdLabel": "Праг за предупреждение (USD)",
       "title": "Предупреждение за ниска наличност",
-      "emailsError": "Въведи поне един валиден имейл адрес. Раздели адресите със запетаи.",
+      "emailsInvalid": "Един или повече имейл адреси са невалидни.",
+      "emailsRequired": "Въведи поне един имейл адрес.",
+      "saveEmailsError": "Някои имейл адреси не бяха приети. Провери ги и опитай отново.",
+      "saveError": "Предупреждението за ниска наличност не беше запазено.",
+      "thresholdPlaceholder": "Въведи сума",
       "thresholdError": "Въведи сума, по-голяма от 0."
     },
     "memberLimit": {
@@ -3041,12 +3208,13 @@
       "removeLimit": "Премахни лимита",
       "title": "Дневен лимит на разходите",
       "blankError": "Въведи сума или използвай „Премахни лимита“ по-долу.",
+      "blankWithoutLimitError": "Въведи дневен лимит между 0 и {{max}}.",
       "rangeError": "Въведи сума между 0 и {{max}}."
     },
     "members": {
       "changeRole": "Промени ролята",
       "emptyDescriptionCanInvite": "Покани колеги, за да работите заедно в тази организация.",
-      "emptyDescriptionCannotInvite": "Помоли собственик или отговорник за плащанията да покани колеги.",
+      "emptyDescriptionCannotInvite": "Помоли собственик, администратор или отговорник за плащанията да покани колеги.",
       "emptyTitle": "Все още няма членове",
       "invitedDate": "Дата на поканата: {{date}}",
       "limitPerDay": "{{amount}}/ден",
@@ -3069,7 +3237,13 @@
       "inviteCreated": "Поканата е създадена",
       "pendingInvitations": "Покани в изчакване",
       "resendInvite": "Изпрати поканата отново",
-      "shareInviteLink": "Сподели връзката за покана"
+      "shareInviteLink": "Сподели връзката за покана",
+      "resendInviteError": "Не можахме да изпратим поканата отново.",
+      "inviteNotResendable": "Тази покана вече не може да бъде изпратена отново.",
+      "ownerAuthority": "Само собственик на организация може да управлява собственици.",
+      "ownRoleChange": "Не можете да промените собствената си роля.",
+      "inviteExpired": "Тази покана е изтекла.",
+      "inviteAccepted": "Тази покана вече е приета."
     },
     "usageStats": {
       "inputTokens": "Входни токени",
@@ -3182,7 +3356,7 @@
     "activityKitDisabledBody": "Включи дейностите на живо в настройките, за да виждаш активните агенти на заключения екран.",
     "openSession": "Отвори",
     "finished": "Завършено",
-    "followFailed": "Агентът не може да се покаже на заключения екран.",
+    "followFailed": "Сесията не може да се следи.",
     "approveFailed": "Не успяхме да одобрим. Докосни $t(common.approve), за да опиташ отново.",
     "checked": "Проверено",
     "lastKnown": "Последно известно",
@@ -3217,7 +3391,8 @@
     "noneChosen": "Не е избран",
     "emptyTitle": "Няма модели за транскрипция",
     "emptyDescription": "Kilo Gateway в момента не предлага модели за транскрипция.",
-    "loadFailed": "Моделите за транскрипция не се заредиха."
+    "loadFailed": "Моделите за транскрипция не се заредиха.",
+    "choose": "Избери модел"
   },
   "voiceLanguage": {
     "title": "Език на гласовото въвеждане",
@@ -3310,9 +3485,15 @@
       "settingsToolsOn": "Включено — инструментите за настройки се изпращат на модела",
       "settingsToolsOff": "Изключено — нито един инструмент за настройки не се изпраща на модела",
       "serverChecking": "Проверка на този сървър…",
-      "serverToolCount": "{{count}} инструмента",
+      "serverToolCount_one": "{{count}} инструмент",
+      "serverToolCount_other": "{{count}} инструмента",
       "serverUnreachable": "Неуспешно свързване с този сървър",
-      "serverOff": "Този сървър е изключен"
+      "serverOff": "Този сървър е изключен",
+      "app": {
+        "label": "Интерфейс на инструмента",
+        "failed": "Интерфейсът на този инструмент не успя да се зареди.",
+        "empty": "Интерфейсът на този инструмент няма нищо за показване."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Удостоверяване",
@@ -3426,6 +3607,7 @@
       "fromHuggingFace": "От Hugging Face",
       "loading": "Зареждане на модели",
       "noResults": "Няма намерени модели",
+      "noResultsForQuery": "Не са намерени модели за \"{{query}}\"",
       "noFits": "Няма модели, подходящи за това устройство",
       "noFitsDescription": "По-големите модели са в раздела „$t(common.all)“.",
       "fit": {
@@ -3456,7 +3638,7 @@
       "quantizations": "Квантизации",
       "quantizationsHelp": "По-малките файлове използват по-малко памет и място. По-големите файлове обикновено дават по-добри отговори.",
       "quantDetail": "Изтегляне: {{size}} · около {{memory}} памет",
-      "downloadQuant": "Изтегли {{quant}}",
+      "detailsA11y": "Подробности: {{name}}",
       "loadingModel": "Зареждане на данни за модела",
       "couldNotLoadModel": "Този модел не може да се зареди",
       "noFiles": "Няма файлове, които приложението може да изпълни",
@@ -3468,6 +3650,9 @@
     "localModels": {
       "title": "Модели на устройството",
       "help": "Моделите на устройството работят на този телефон. Вашите заявки и отговори остават на устройството.",
+      "switchTitle": "Да се превключи ли към модел на устройството?",
+      "switchMessage": "При превключване към {{name}} подканите и контекстът на този разговор ще се обработват на този телефон, а не на отдалечен сървър.",
+      "switchConfirm": "Смяна на модела",
       "systemPurpose": "Моделът, вграден в системата на това устройство. Работи на устройството.",
       "apple": "Apple Intelligence (на устройството)",
       "checking": "Проверка на наличността…",
@@ -3497,14 +3682,19 @@
     },
     "reasoningEffort": {
       "modelFlag": "Този модел поддържа усилие за разсъждение"
-    }
+    },
+    "creditsRequired": "Нямате достатъчно кредити, за да изпратите това съобщение. Добавете кредити и опитайте отново."
   },
   "settingsTools": {
     "confirmTitle": "Да се потвърди ли тази промяна?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "най-скорошното ти хранилище",
+      "confirmMessage": "Хранилище: {{repository}}. Подкана: {{prompt}}",
+      "confirmTitle": "Да стартираш ли този агент?",
       "promptRequired": "За да стартираш агент, е нужна подкана. Добави подкана и го стартирай отново.",
+      "repositoryRequired": "За да стартираш агент, е нужно хранилище. Отвори Kilo и избери едно, после го стартирай отново.",
       "repositoryUnknown": "Kilo не разпознава {{repository}} като хранилище в GitHub или GitLab. Избери друго хранилище в Kilo.",
       "repositoryUnsupported": "{{repository}} е хранилище в Bitbucket — Стартирай агент още не може да го използва. Избери друго хранилище в Kilo."
     }
@@ -3532,7 +3722,9 @@
     "spend24h": "Разходи през последните 24 часа",
     "multiplierError": "Въведи множител 1 или повече",
     "permissionDenied": "Нямаш разрешение да управляваш известията за разходи.",
-    "pushOffByCategory": "Изключено в „Известия“"
+    "pushOffByCategory": "Изключено в „Известия“",
+    "multiplierMaxError": "Въведи множител {{max}} или по-малко",
+    "thresholdMaxError": "Въведи сума {{max}} или по-малко."
   },
   "profiles": {
     "title": "Профили",
@@ -3542,13 +3734,17 @@
     "emptyDescription": "Създайте профил за повторно използване на променливи на средата, команди за настройка и умения в сесиите.",
     "loadFailed": "Профилите не можаха да се заредят",
     "counts": {
-      "vars": "{{count}} променливи",
+      "vars_one": "{{count}} променлива",
+      "vars_other": "{{count}} променливи",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} умения",
-      "commands": "{{count}} команди",
-      "varsShort": "{{count}}п",
-      "skillsShort": "{{count}}у",
-      "commandsShort": "{{count}}к"
+      "skills_one": "{{count}} умение",
+      "skills_other": "{{count}} умения",
+      "commands_one": "{{count}} команда",
+      "commands_other": "{{count}} команди",
+      "setupCommands_one": "{{count}} команда за настройка",
+      "setupCommands_other": "{{count}} команди за настройка",
+      "agents_one": "{{count}} агент",
+      "agents_other": "{{count}} агенти"
     },
     "nameLabel": "Име на профила",
     "namePlaceholder": "напр. Отстраняване на грешки в задната част",
@@ -3564,7 +3760,6 @@
     "personalDefaultDescription": "Зарежда се автоматично, когато нито едно хранилище няма фиксиран профил.",
     "organizationDefaultDescription": "Зарежда се автоматично за членове, които нямат персонални настройки по подразбиране.",
     "setAsDefault": "Задайте по подразбиране",
-    "removeDefault": "Премахване по подразбиране",
     "saveFailed": "Профилът не можа да бъде запазен",
     "deleteTitle": "Изтриване на профил",
     "deleteMessage": "Това премахва завинаги профила и неговите настройки. Това не може да бъде отменено.",
@@ -3577,7 +3772,8 @@
     "keyTooLong": "Ключът трябва да е 256 знака или по-малко",
     "keyDuplicate": "Този ключ вече съществува в профила",
     "valueLabel": "Стойност",
-    "secretLabel": "Тайна",
+    "valueRequired": "Въведете стойност",
+    "tooLong": "Използвайте не повече от {{max}} знака",
     "secrets": {
       "markSecret": "Маркирайте като секретно",
       "masked": "Скрита стойност",
@@ -3590,11 +3786,13 @@
     "commandsTitle": "Команди за настройка",
     "addCommand": "Добавете команда",
     "commandLabel": "командване",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "напр. pnpm install",
     "commandsEmpty": "Все още няма команди за настройка",
     "commandsSaveFailed": "Командите за настройка не можаха да бъдат запазени",
     "moveUp": "Придвижете се нагоре",
     "moveDown": "Придвижете се надолу",
+    "moveCommandUp": "Преместете команда {{position}} нагоре",
+    "moveCommandDown": "Преместете команда {{position}} надолу",
     "skillsTitle": "Умения",
     "addSkill": "Добавете умение",
     "skillNameLabel": "Име на умението",
@@ -3604,6 +3802,8 @@
     "skillNameInvalid": "Името на умението трябва да започва с буква или цифра и да се използват само малки букви, цифри и тирета",
     "skillContentRequired": "Изисква се съдържание за умения",
     "skillSaveFailed": "Умението не можа да бъде запазено",
+    "skillSourceCustom": "Персонализирано",
+    "skillSourceMarketplace": "Магазин",
     "skillsHint": "Поставете SKILL.md и името му се попълва; добавете умение от телефона си без плъзгане и пускане.",
     "skillEditTitle": "Умение за редактиране",
     "mcp": {
@@ -3612,19 +3812,19 @@
       "empty": "Все още няма MCP сървъри",
       "name": "Име на сървъра",
       "type": "Тип сървър",
-      "localType": "Местен",
+      "localType": "Локален",
       "remoteType": "Дистанционно",
       "command": "Команден ред",
       "url": "URL адрес",
       "environment": "Околна среда (JSON)",
       "headers": "Заглавки (JSON)",
       "timeout": "Време за изчакване",
-      "secretCount": "Тайно броене",
+      "secretCount": "Тайно броене: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Въведете име на сървър",
-      "nameInvalid": "Името може да съдържа само букви, цифри, долна черта и тирета",
+      "nameInvalid": "Името може да съдържа само ASCII букви, цифри, долна черта и тирета, до 100 знака",
       "commandRequired": "Въведете команда",
       "commandTooLong": "Използвайте най-много 50 аргумента от по 500 знака всеки",
       "urlRequired": "Въведете URL",
@@ -3634,7 +3834,9 @@
       "jsonTooLarge": "Използвайте най-много 50 записа, ключове до 128 и стойности до 4096 знака",
       "timeoutInvalid": "Времето за изчакване трябва да бъде цял брой милисекунди",
       "edit": "Редактиране на MCP сървър",
-      "saveFailed": "MCP сървърът не можа да бъде запазен"
+      "saveFailed": "MCP сървърът не можа да бъде запазен",
+      "deleteFailed": "MCP сървърът не можа да бъде изтрит",
+      "updateFailed": "MCP сървърът не можа да бъде актуализиран"
     },
     "agents": {
       "title": "Профилни агенти",
@@ -3650,7 +3852,7 @@
       "stepsPlaceholder": "напр. 50",
       "temperature": "Температура",
       "temperaturePlaceholder": "напр. 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "напр. 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Моят агент",
@@ -3659,12 +3861,16 @@
       "visibility": "Видимост",
       "visibilityPrimary": "Основен — показва се в инструмента за избор",
       "visibilitySubagent": "Субагент — може да се извиква само от други",
-      "visibilityAll": "Всички - и двете",
+      "visibilityAll": "Всички — и двете",
+      "modePrimary": "Само основен",
+      "modeSubagent": "Само субагент",
+      "modeAll": "Всички",
       "saveFailed": "Агентът не можа да бъде запазен",
+      "deleteFailed": "Агентът не можа да бъде изтрит",
       "nameRequired": "Въведете име на агент",
       "slugRequired": "Въведете агент slug",
-      "slugInvalid": "Slug трябва да започва с буква и да използва само малки букви, цифри и тирета",
-      "slugConflict": "Този охлюв е запазен от вграден агент",
+      "slugInvalid": "Slug трябва да започва с ASCII малка буква и да използва само ASCII малки букви, цифри и тирета, до 50 знака",
+      "slugConflict": "Този slug вече се използва от вграден агент или друг агент в този профил",
       "edit": "Редактиране на агент"
     },
     "slashCommands": {
@@ -3675,10 +3881,12 @@
       "description": "Описание на командата",
       "template": "Шаблон",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Обяснете $ARGUMENTS",
       "subtask": "Изпълнение като подзадача",
       "edit": "Команда за редактиране на наклонена черта",
       "saveFailed": "Командата не можа да бъде запазена",
+      "deleteFailed": "Командата не можа да бъде изтрита",
       "nameRequired": "Въведете име на команда",
       "nameInvalid": "Името трябва да започва с малка буква и да се използват само малки букви, цифри и тирета",
       "templateRequired": "Въведете шаблон за команда",
@@ -3706,7 +3914,9 @@
       "pinFailed": "Репото не можа да бъде фиксирано",
       "unboundToast": "Репо без обвързване",
       "unbindFailed": "Не можа да се откачи репото"
-    }
+    },
+    "variablesDeleteFailed": "Променливата не можа да бъде изтрита",
+    "deleteCommand": "Изтрийте команда {{position}}"
   },
   "credits": {
     "title": "Купи кредити",
@@ -3717,6 +3927,8 @@
     "empty": "Пакетите с кредити в момента не са налични.",
     "noMatchingProducts": "App Store не върна съвпадащи пакети с кредити.",
     "noMatchingProductsPlay": "Google Play не върна съвпадащи пакети с кредити.",
+    "storeTimedOut": "App Store не отговори навреме. Опитай отново.",
+    "storeTimedOutPlay": "Google Play не отговори навреме. Опитай отново.",
     "purchaseOwnedByAnotherAccount": "Кредитите в този Apple Account принадлежат на друг акаунт в Kilo. Влез в съответния акаунт в Kilo, за да ги използваш.",
     "purchaseOwnedByAnotherAccountPlay": "Кредитите на този Google Play акаунт принадлежат на друг Kilo акаунт. Влезте в този Kilo акаунт, за да ги използвате."
   },
@@ -3740,7 +3952,8 @@
       "archive": "Архивирай",
       "unarchive": "Разархивирай",
       "deleteTitle": "Да се изтрие ли {{name}}?",
-      "deleteMessage": "Задачите в него също се изтриват. Сесиите им остават."
+      "deleteMessage": "Задачите в него също се изтриват. Сесиите им остават.",
+      "createFailed": "Не успяхме да създадем списъка"
     },
     "listSettings": {
       "title": "Настройки на списъка",
@@ -3806,5 +4019,105 @@
       "title": "Запази в списък",
       "saved": "Запазено в {{list}}"
     }
+  },
+  "agentBriefing": {
+    "title": "Агентски брифинг",
+    "atLeast": "≥{{value}}",
+    "coverageHint": "Част от историческата активност може да липсва. ≥ означава поне толкова; неизвестно не е нула.",
+    "available": "Налични брифинги",
+    "history": "История на брифингите",
+    "historyHint": "Брифингите се пазят 30 дни, включително отхвърлените.",
+    "settings": "Настройки на брифинга",
+    "empty": "Няма активност в този период на брифинга",
+    "emptyHint": "Вашите облачни и CLI сесии за програмиране се появяват тук, когато планиран брифинг има активност.",
+    "loadError": "Брифингите не могат да се заредят",
+    "sessions": "Активни в периода",
+    "pullRequests": "PR-и, отворени през периода",
+    "blockers": "Нови блокери",
+    "spend": "Разходи в периода",
+    "view": "Прочети брифинга",
+    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scheduleTimeLabel": "{{label}}, {{time}}",
+    "dismiss": "Отхвърли брифинга",
+    "offline": "Офлайн · запазен брифинг",
+    "cached": "Запазен отчет · опресняването не е налично",
+    "revised": "Редактиран · {{revision}}",
+    "window": "{{start}} – {{end}}",
+    "summary": "AI обобщение",
+    "summaryDisabled": "Структуриран отчет · AI е изключен за този контекст",
+    "summaryPending": "AI обобщението се изготвя. Ще се появи тук, когато е готово.",
+    "summaryFailed": "AI обобщението не успя. Повторният опит може да доведе до ново таксуване.",
+    "summaryUnavailable": "AI обобщението не е налично. Структурираният отчет все още е достъпен.",
+    "summaryOutdated": "Това обобщение е по-старо от последната редакция на отчета.",
+    "summaryCharge": "AI таксуване: {{cost}}",
+    "summaryChargePending": "AI таксуването очаква уравняване",
+    "generate": "Генерирай обобщение",
+    "retrySummary": "Повтори платеното обобщение",
+    "sources": "Доказателства и артефакти",
+    "timezone": "Часова зона на брифинга",
+    "deviceTimezone": "Използвай часовата зона на устройството",
+    "timezoneHint": "IANA часова зона, например Europe/Berlin. Промените в графика важат за следващите брифинги.",
+    "nightStart": "Начало на периода на брифинга",
+    "morningStart": "Брифингът е готов в",
+    "morningEnd": "Брифингът е наличен до",
+    "timeHint": "Картата на началния екран възстановява текущия статус, когато периодът на брифинга приключи, дори офлайн.",
+    "invalidSchedule": "Изберете валидна часова зона и непразен период на брифинга.",
+    "notificationsHint": "Едно общо известие за всеки планиран брифинг. Независимо от платените AI обобщения.",
+    "notificationPermission": "Включете известията на устройството в $t(common.notifications), за да получавате брифинга си.",
+    "aiOptIn": "Платени AI обобщения",
+    "aiHint": "Включва се по избор за всеки контекст поотделно. Избрани откъси със заличена чувствителна информация и структурирани факти се изпращат към вашия модел на езика на приложението. Таксуването е от баланса на този контекст.",
+    "defaultModel": "Използвай модела по подразбиране на Kilo",
+    "duration": "Времево ограничение (минути)",
+    "spendLimit": "Ограничение на разходите (USD)",
+    "safeguardHint": "Крайни ограничения за всяко обобщение, а не дневен бюджет. По подразбиране: 10 минути и $2. Отчетът се публикува след най-много пет минути, докато генерирането продължава в тези граници.",
+    "invalidSafeguards": "Въведете положителни, крайни ограничения за време и разходи.",
+    "estimate": "Прогноза {{estimate}} · максимум {{maximum}}",
+    "estimateUnavailable": "Платено обобщение не е налично за тези настройки.",
+    "estimatePricingUnavailable": "Ценообразуването за този модел не е налично.",
+    "estimateBalanceUnavailable": "Недостатъчен баланс за платено резюме.",
+    "estimateModelNotAllowed": "Този модел не е разрешен тук.",
+    "estimateSpendLimitTooLow": "Повишете лимита за разходи, за да разрешите това резюме.",
+    "confirmPaid": "Включване на платени обобщения за {{context}}?",
+    "confirmGeneration": "Генериране на платено обобщение?",
+    "paidDisclosure": "Прогноза {{estimate}}, до {{maximum}}, с ограничение от {{minutes}} минути. Таксува се дори при неуспешно генериране.",
+    "enable": "Включи платени обобщения",
+    "contextSettings": "AI настройки · {{context}}",
+    "allContexts": "Личните и организационните брифинги остават отделни.",
+    "create": "Създай брифинг",
+    "oneOff": "При поискване",
+    "createdAt": "Създаден {{time}}",
+    "chooseContext": "Избери един контекст",
+    "period": "Период на брифинга",
+    "last24Hours": "Последните 24 часа",
+    "last7Days": "Последните 7 дни",
+    "customPeriod": "Персонализиран период",
+    "periodStart": "Начало на периода",
+    "periodEnd": "Край на периода",
+    "periodHint": "Избери до 31 дни. Историческите данни може да са непълни.",
+    "periodSessions": "Активни през периода",
+    "periodSpend": "Разходи за периода",
+    "invalidPeriod": "Избери начало преди края.",
+    "futurePeriod": "Периодът не може да завършва в бъдещето.",
+    "periodTooLong": "Избери период от 31 дни или по-малко.",
+    "invalidLocalTime": "Това местно време не съществува в часовата зона на брифинга. Избери друго време.",
+    "reviewBriefing": "Прегледай брифинга",
+    "reviewAgain": "Подготви нов преглед",
+    "payer": "За сметка на {{context}}",
+    "emptyPeriod": "Няма намерена активност през този период. Няма AI обобщение или такса.",
+    "emptyHistory": "Няма запазени брифинги",
+    "historicalStateHint": "Състоянието на сесията отразява края на избрания период, а не текущото състояние в реално време.",
+    "oneOffHint": "AI получава избрани данни със заличена чувствителна информация на езика на приложението ти. Този брифинг при поискване не променя планирания ти брифинг или предпочитанията ти за AI.",
+    "createOffline": "Свържи се с интернет, за да прегледаш или създадеш брифинг. Платените заявки никога не се добавят в опашката без връзка с интернет.",
+    "estimateInputTooLarge": "Този период съдържа твърде много данни за избрания модел.",
+    "estimatePermissionUnavailable": "Нямаш разрешение да използваш баланса на този контекст.",
+    "createFailed": "Този брифинг не може да се създаде.",
+    "reviewFailed": "Този брифинг не може да се прегледа.",
+    "saved": "Настройките на брифинга са запазени",
+    "preparing": "Брифингът ти се подготвя…",
+    "preparationHint": "Можеш да излезеш и да се върнеш, докато се събират данни за активността. Работата на AI и таксуването започват едва след като прегледаш брифинга и потвърдиш прогнозната сума.",
+    "resumeReview": "Продължи прегледа",
+    "preparationFailed": "Неуспешно събиране на данни за активността за този брифинг. Опитай отново.",
+    "preparationTimedOut": "Събирането на данни за активността отне твърде много време. Опитай отново.",
+    "preparationDrafts": "Непотвърдени брифинги"
   }
 }

@@ -5,6 +5,7 @@ import { getItem, removeItem, setItem } from '@/lib/persist/encrypted-kv';
 import { EFFORTS } from './effort';
 import { type ChatTarget, type Question } from './state';
 import { type ChatSummary } from './store';
+import { derivedChatText } from './title';
 
 /**
  * The question a chat is waiting on an answer to.
@@ -74,6 +75,10 @@ export async function moveAsked(from: string, to: string): Promise<void> {
  * Names each row that has no name yet with the question it waits on. A chat
  * whose only question failed has no stored turn to take a title from, and it
  * read as untitled although the person can see what they asked.
+ *
+ * The question stands in for a name, so it is reduced to one short line: the
+ * header draws it in one row and reads it out as the rename control's name, and
+ * a long question is not a name.
  */
 export async function titledByAsked(chats: readonly ChatSummary[]): Promise<ChatSummary[]> {
   const titled = await Promise.all(
@@ -82,7 +87,7 @@ export async function titledByAsked(chats: readonly ChatSummary[]): Promise<Chat
         return chat;
       }
       const asked = await askedIn(chat.sessionId);
-      return { ...chat, title: asked?.text ?? '' };
+      return { ...chat, title: derivedChatText(asked?.text ?? '') };
     })
   );
   return titled;

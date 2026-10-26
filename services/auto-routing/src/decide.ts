@@ -361,6 +361,8 @@ export type DecisionTarget = {
 export type DecisionRun = {
   response: AutoRoutingDecisionResponse;
   routingTable: RoutingTable | null;
+  capabilities: ModelCapabilitiesMap;
+  constraints: RoutingConstraints | undefined;
 };
 
 function platformTarget(c: Context<HonoEnv>, payload: MirrorPayload): DecisionTarget {
@@ -678,6 +680,8 @@ export async function runDecision(
     return {
       response: { cost: 0, decision: outcome.decision, classifierResult: null },
       routingTable,
+      capabilities,
+      constraints,
     };
   }
   if (outcome.kind === 'cache_hit') {
@@ -745,7 +749,12 @@ export async function runDecision(
         shadow
       );
     }
-    return { response: decisionResponse(cached, payload.input, decision), routingTable };
+    return {
+      response: decisionResponse(cached, payload.input, decision),
+      routingTable,
+      capabilities,
+      constraints,
+    };
   }
 
   try {
@@ -808,6 +817,8 @@ export async function runDecision(
     return {
       response: decisionResponse(classifier.classification, payload.input, decision),
       routingTable,
+      capabilities,
+      constraints,
     };
   } catch (error) {
     recordDecision(
@@ -820,7 +831,7 @@ export async function runDecision(
       sticky,
       speculative ? 'speculative' : 'sync'
     );
-    return { response: emptyDecisionResponse(), routingTable };
+    return { response: emptyDecisionResponse(), routingTable, capabilities, constraints };
   }
 }
 
@@ -833,9 +844,8 @@ async function decideCustomRouter(
     const owner = customRouterOwner(reference, payload);
     const stored = owner ? await findCustomRouter(c.env, owner, reference.slug) : null;
     if (!stored) throw new CustomRouterError('router_not_found', 'Custom router not found');
-    const router = stored;
     const routing = customRouting(
-      router,
+      stored,
       payload.clientEntries ?? [],
       new Set(payload.routingPolicy?.deniedModelIds ?? [])
     );

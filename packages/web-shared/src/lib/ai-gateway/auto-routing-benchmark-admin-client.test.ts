@@ -281,6 +281,7 @@ describe('auto routing benchmark admin client', () => {
       ownerId: 'org-1',
       entries: [{ model: 'anthropic/claude-sonnet-4' }],
     });
+    expect(init.signal).toBeInstanceOf(AbortSignal);
   });
 
   it('keeps the worker error for a rejected profile registration', async () => {
@@ -302,5 +303,70 @@ describe('auto routing benchmark admin client', () => {
       status: 400,
       error: { error: 'Custom profiles are only supported by the efficient router' },
     });
+  });
+
+  it('applies an abort deadline to profile registration', async () => {
+    const controller = new AbortController();
+    const timeout = jest.spyOn(AbortSignal, 'timeout').mockReturnValue(controller.signal);
+    mockFetch.mockImplementation(
+      (_url: string, init: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => reject(init.signal?.reason), {
+            once: true,
+          });
+        })
+    );
+
+    try {
+      const pending = registerOwnerBenchmarkProfiles({
+        router: 'efficient',
+        ownerType: 'user',
+        ownerId: 'user-1',
+        entries: [{ model: 'anthropic/claude-sonnet-4' }],
+      });
+      const rejection = expect(pending).rejects.toThrow('Benchmark admission timed out');
+      controller.abort(new DOMException('Benchmark admission timed out', 'TimeoutError'));
+
+      await rejection;
+      expect(timeout).toHaveBeenCalledWith(5_000);
+      expect(mockFetch.mock.calls[0]?.[1].signal).toBe(controller.signal);
+    } finally {
+      timeout.mockRestore();
+    }
+  });
+
+  it('keeps the caller deadline active while reading the registration response body', async () => {
+    const controller = new AbortController();
+    const bodyStarted = Promise.withResolvers<void>();
+    mockFetch.mockImplementation(async (_url: string, init: RequestInit) => ({
+      ok: true,
+      status: 200,
+      json: () =>
+        new Promise<never>((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () => reject(init.signal?.reason), {
+            once: true,
+          });
+          bodyStarted.resolve();
+        }),
+    }));
+
+    const pending = registerOwnerBenchmarkProfiles(
+      {
+        router: 'efficient',
+        ownerType: 'user',
+        ownerId: 'user-1',
+        entries: [{ model: 'anthropic/claude-sonnet-4' }],
+      },
+      controller.signal
+    );
+    await bodyStarted.promise;
+    controller.abort(new DOMException('Benchmark admission timed out', 'TimeoutError'));
+
+    await expect(pending).resolves.toEqual({
+      ok: false,
+      status: 502,
+      error: { error: 'Request failed: 200' },
+    });
+    expect(mockFetch.mock.calls[0]?.[1].signal).toBe(controller.signal);
   });
 });

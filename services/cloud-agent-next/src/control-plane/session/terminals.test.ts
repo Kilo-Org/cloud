@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { parseSessionMetadata } from '../../persistence/session-metadata.js';
 import type { ControlPlaneControlResult } from '../../shared/control-plane-protocol.js';
+import {
+  SANDBOX_STATUS_DETAIL_MESSAGES,
+  type SandboxStatusSnapshot,
+} from '../../shared/sandbox-status.js';
 import { createControlPlaneTerminals } from './terminals.js';
 
 vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
@@ -62,6 +66,17 @@ function pty(id: string) {
   };
 }
 
+function sandboxStatus(status: 'active' | 'sleeping'): SandboxStatusSnapshot {
+  return {
+    status,
+    provider: 'Cloudflare',
+    observedAt: 1,
+    detailCode: status === 'sleeping' ? 'sandbox_stopped' : 'sandbox_ready',
+    inactivityTimeoutMs: 600_000,
+    estimatedSleepAt: null,
+  };
+}
+
 function record(wrapperId: string, ptyId: string) {
   return {
     ptyId,
@@ -75,27 +90,121 @@ function record(wrapperId: string, ptyId: string) {
   };
 }
 
-function fixture() {
-  const { storage, values } = fakeStorage();
-  const request = vi.fn(
-    async (): Promise<ControlPlaneControlResult> => ({
-      ok: true,
-      result: { pty: pty('pty_new') },
-    })
-  );
+const BRIDGE_GENERATION = '1f0c6d9a-2b3c-4d5e-8f90-123456789abc';
+
+type FakeSocket = {
+  readyState: number;
+  close: ReturnType<typeof vi.fn>;
+  serializeAttachment: (value: unknown) => void;
+  deserializeAttachment: () => unknown;
+  tags: string[];
+};
+
+function socket(tags: string[], attachment: unknown): FakeSocket {
+  let current = attachment;
+  return {
+    readyState: 1,
+    close: vi.fn(),
+    serializeAttachment: (value: unknown) => {
+      current = value;
+    },
+    deserializeAttachment: () => current,
+    tags,
+  };
+}
+
+function fakeState(values: Map<string, unknown>, sockets: FakeSocket[]): DurableObjectState {
+  return {
+    storage: {
+      async get<T = unknown>(key: string): Promise<T | undefined> {
+        return structuredClone(values.get(key)) as T | undefined;
+      },
+      async put<T = unknown>(key: string, value: T): Promise<void> {
+        values.set(key, structuredClone(value));
+      },
+      async delete(keys: string | string[]): Promise<void> {
+        for (const key of Array.isArray(keys) ? keys : [keys]) values.delete(key);
+      },
+      async list<T = unknown>(options?: { prefix?: string }): Promise<Map<string, T>> {
+        const listed = new Map<string, T>();
+        for (const [key, value] of values) {
+          if (!options?.prefix || key.startsWith(options.prefix)) {
+            listed.set(key, structuredClone(value) as T);
+          }
+        }
+        return listed;
+      },
+    },
+    getWebSockets: (tag: string) =>
+      tag === undefined ? sockets : sockets.filter(candidate => candidate.tags.includes(tag)),
+  } as unknown as DurableObjectState;
+}
+
+function fixture(
+  overrides: {
+    isRouteReady?: boolean;
+    getSandboxStatus?: () => Promise<SandboxStatusSnapshot>;
+    sockets?: FakeSocket[];
+  } = {}
+) {
+  const { values } = fakeStorage();
+  const request = vi.fn(async (): Promise<ControlPlaneControlResult> => ({
+    ok: true,
+    result: { pty: pty('pty_new') },
+  }));
   const terminals = createControlPlaneTerminals({
-    state: { storage } as unknown as DurableObjectState,
+    state: fakeState(values, overrides.sockets ?? []),
     sessionId: SESSION_ID,
     getMetadata: () => metadata(),
     getDirectory: () => DIRECTORY,
     getWrapperId: async () => CURRENT_WRAPPER,
-    isRouteReady: () => true,
+    isRouteReady: () => overrides.isRouteReady ?? true,
+    getSandboxStatus: overrides.getSandboxStatus ?? (async () => sandboxStatus('active')),
     request,
   });
   return { terminals, values, request };
 }
 
 describe('V2 control-plane terminals projection', () => {
+  it('reports a sleeping sandbox without forwarding a terminal request', async () => {
+    const { terminals, request } = fixture({
+      isRouteReady: false,
+      getSandboxStatus: async () => sandboxStatus('sleeping'),
+    });
+
+    await expect(
+      terminals.create({ operationId: '66666666-6666-4666-8666-666666666666' })
+    ).resolves.toEqual({
+      success: false,
+      error: SANDBOX_STATUS_DETAIL_MESSAGES.sandbox_stopped,
+    });
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('keeps the workspace message for a sandbox that is not asleep', async () => {
+    const { terminals, request } = fixture({
+      isRouteReady: false,
+      getSandboxStatus: async () => sandboxStatus('active'),
+    });
+
+    await expect(
+      terminals.create({ operationId: '77777777-7777-4777-8777-777777777777' })
+    ).resolves.toEqual({
+      success: false,
+      error: 'Terminal unavailable until the workspace is prepared',
+    });
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a real terminal RPC failure instead of the workspace message', async () => {
+    const { terminals, request } = fixture();
+    request.mockRejectedValueOnce(new Error('PTY allocation failed'));
+
+    await expect(
+      terminals.create({ operationId: '88888888-8888-4888-8888-888888888888' })
+    ).resolves.toEqual({ success: false, error: 'PTY allocation failed' });
+  });
+
   it('ends running records and clears completions for a replaced wrapper', async () => {
     const { terminals, values, request } = fixture();
     const operationId = '44444444-4444-4444-8444-444444444444';
@@ -117,5 +226,38 @@ describe('V2 control-plane terminals projection', () => {
       wrapperId: CURRENT_WRAPPER,
       state: 'running',
     });
+  });
+
+  it('closes browser terminal sockets and leaves wrapper sockets open', () => {
+    const browser = socket(['terminal', 'terminal:browser:pty_1'], {
+      role: 'browser',
+      ptyId: 'pty_1',
+      bridgeGeneration: BRIDGE_GENERATION,
+      wrapperInstanceId: CURRENT_WRAPPER,
+      capabilityHash: 'a'.repeat(64),
+      capabilityExpiresAt: Date.now() + 30_000,
+    });
+    const otherBrowser = socket(['terminal', 'terminal:browser:pty_2'], {
+      role: 'browser',
+      ptyId: 'pty_2',
+      bridgeGeneration: BRIDGE_GENERATION,
+      wrapperInstanceId: CURRENT_WRAPPER,
+    });
+    const wrapperSocket = socket(['terminal', 'terminal:wrapper:pty_1'], {
+      role: 'wrapper',
+      ptyId: 'pty_1',
+      bridgeGeneration: BRIDGE_GENERATION,
+      wrapperInstanceId: CURRENT_WRAPPER,
+    });
+    const { terminals } = fixture({ sockets: [browser, otherBrowser, wrapperSocket] });
+
+    expect(terminals.closeBrowserSockets(1000, 'session access revoked')).toBe(2);
+
+    expect(browser.close).toHaveBeenCalledWith(1000, 'session access revoked');
+    expect(otherBrowser.close).toHaveBeenCalledWith(1000, 'session access revoked');
+    expect(wrapperSocket.close).not.toHaveBeenCalled();
+    expect(browser.deserializeAttachment() as Record<string, unknown>).not.toHaveProperty(
+      'capabilityHash'
+    );
   });
 });

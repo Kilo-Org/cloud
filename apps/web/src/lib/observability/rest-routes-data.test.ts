@@ -111,10 +111,11 @@ function expectSingleTimingLine(route: string, method: string, ok = true) {
 describe('REST data routes emit one api_timing line', () => {
   test('POST /api/device-auth/codes', async () => {
     mockCreateDeviceAuthRequest.mockResolvedValue({
-      code: 'ABCD-EFGH',
+      code: 'poll-value-for-the-requesting-client',
       userCode: 'ABCD-EFGH',
       deviceCode: 'device-secret',
       expiresAt: new Date(Date.now() + 600_000),
+      requestingClient: null,
     });
 
     const response = await codesRoute.POST(

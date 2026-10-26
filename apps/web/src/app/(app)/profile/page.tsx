@@ -30,7 +30,6 @@ import { UserProfileCard } from '@/components/profile/UserProfileCard';
 import { getContributorChampionProfileBadgeForUser } from '@/lib/contributor-champions/service';
 import { CustomRoutersCard } from '@/components/auto-routing/CustomRoutersCard';
 import { AutoRoutingModeCard } from '@/components/auto-routing/AutoRoutingModeCard';
-
 import { smartAppBannerItunes } from '@/lib/smart-app-banner';
 import { DeleteAccountDialog } from '@/components/profile/DeleteAccountDialog';
 

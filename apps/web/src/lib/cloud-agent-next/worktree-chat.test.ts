@@ -3,6 +3,7 @@ import type { User } from '@kilocode/db/schema';
 import { TRPCClientError } from '@trpc/client';
 import type { SQL } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
+import { z } from 'zod';
 import type { CreateWorktreeChatInput, CreateWorktreeChatOutput } from './cloud-agent-client';
 import type { createWorktreeChat as CreateWorktreeChat } from './worktree-chat';
 
@@ -20,6 +21,7 @@ type SourceSession = {
 const mockLimit = jest.fn<(limit: number) => Promise<SourceSession[]>>();
 const mockWhere = jest.fn((condition: SQL | undefined) => ({ limit: mockLimit, condition }));
 const mockLeftJoin = jest.fn((_table: unknown, condition: SQL | undefined) => ({
+  leftJoin: mockLeftJoin,
   where: mockWhere,
   condition,
 }));
@@ -106,10 +108,15 @@ describe('createWorktreeChat', () => {
     ).resolves.toEqual(result);
 
     const membership = compileCondition(mockLeftJoin.mock.calls[0]?.[1]);
+    const organization = compileCondition(mockLeftJoin.mock.calls[1]?.[1]);
     const where = compileCondition(mockWhere.mock.calls[0]?.[0]);
+    expect(mockLeftJoin).toHaveBeenCalledTimes(2);
     expect(membership.sql).toContain('"organization_memberships"."organization_id"');
     expect(membership.params).toEqual([user.id]);
+    expect(organization.sql).toContain('"organizations"."deleted_at" is null');
     expect(where.sql).toContain('"organization_memberships"."id" is not null');
+    expect(where.sql).toContain('"organizations"."id" is not null');
+    expect(where.sql).not.toContain('parent_organization');
     expect(where.params).toEqual([SOURCE_KILO_SESSION_ID, user.id, ORGANIZATION_ID]);
     expect(mockWorkerCreateWorktreeChat).toHaveBeenCalledWith({
       sourceKiloSessionId: SOURCE_KILO_SESSION_ID,
@@ -119,6 +126,64 @@ describe('createWorktreeChat', () => {
       clientProvenance: 'browser',
     });
   });
+
+  it('retries without the proposed id only when an older Worker rejects that field', async () => {
+    const oldInput = z
+      .object({
+        sourceKiloSessionId: z.string(),
+        sourceCloudAgentSessionId: z.string(),
+        operationKey: z.uuid(),
+        clientProvenance: z.literal('browser'),
+      })
+      .strict();
+    const created: string[] = [];
+    mockWorkerCreateWorktreeChat.mockImplementation(async input => {
+      const parsed = oldInput.safeParse(input);
+      if (!parsed.success) {
+        const message = parsed.error.message;
+        throw new TRPCClientError(message, {
+          result: { error: { code: -32600, message, data: { code: 'BAD_REQUEST' } } },
+        });
+      }
+      created.push(parsed.data.operationKey);
+      return result;
+    });
+
+    await expect(
+      createWorktreeChat({
+        user,
+        sourceKiloSessionId: SOURCE_KILO_SESSION_ID,
+        operationKey: UUID,
+        kiloSessionId: 'ses_0123456789abABCDEFGHIJKLMN',
+      })
+    ).resolves.toEqual(result);
+
+    expect(created).toEqual([UUID]);
+    expect(mockWorkerCreateWorktreeChat).toHaveBeenCalledTimes(2);
+    expect(mockWorkerCreateWorktreeChat.mock.calls[1]?.[0]).not.toHaveProperty('kiloSessionId');
+  });
+
+  it.each(['BAD_REQUEST', 'SERVICE_UNAVAILABLE'])(
+    'does not drop the proposed id after a generic %s failure',
+    async code => {
+      const message = 'Worktree request failed';
+      mockWorkerCreateWorktreeChat.mockRejectedValueOnce(
+        new TRPCClientError(message, {
+          result: { error: { code: -32000, message, data: { code } } },
+        })
+      );
+
+      await expect(
+        createWorktreeChat({
+          user,
+          sourceKiloSessionId: SOURCE_KILO_SESSION_ID,
+          operationKey: UUID,
+          kiloSessionId: 'ses_0123456789abABCDEFGHIJKLMN',
+        })
+      ).rejects.toMatchObject({ code });
+      expect(mockWorkerCreateWorktreeChat).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it.each([
     {

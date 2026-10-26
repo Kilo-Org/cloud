@@ -245,6 +245,12 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
       consecutiveFailed: 0,
       notPosted: [],
     });
+    expect(console.log).toHaveBeenCalledWith(
+      expect.stringContaining('"readFailedOwners":["user:u4"]')
+    );
+    expect(console.log).toHaveBeenCalledWith(
+      expect.stringContaining('"invalidPoolOwners":["user:u5"]')
+    );
     expect([...marked.keys()]).toEqual([withMode, withoutMode]);
     expect(dbFrom).toHaveBeenCalledWith(kilocode_users);
     expect(dbLimit).toHaveBeenCalledWith(5);
@@ -254,7 +260,7 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
       'https://web.example.test/api/internal/auto-routing/owner-pool-conversions'
     );
     expect(new Headers(init?.headers).get('authorization')).toBe('Bearer internal-secret');
-    expect(init?.redirect).toBe('error');
+    expect(init?.redirect).toBe('manual');
     expect(init?.signal).toBeInstanceOf(AbortSignal);
     expect(webRequests()).toEqual([
       {
@@ -398,6 +404,11 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
 
   it.each([
     ['a non-2xx response', async () => new Response('boom', { status: 502 })],
+    [
+      'a redirect',
+      async () =>
+        new Response(null, { status: 307, headers: { location: 'https://elsewhere.test/' } }),
+    ],
     ['an invalid response', async () => Response.json({ results: [] })],
     ['a network error', async () => Promise.reject(new Error('connection reset'))],
     [
@@ -437,6 +448,9 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
         needsAttention: [],
         outcomes: NO_OUTCOMES,
       });
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining('"notPostedOwners":["user:u1"]')
+      );
       expect(marked.size).toBe(0);
     }
   );
@@ -800,6 +814,9 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
 
     await expect(response.json()).resolves.toMatchObject({ invalidMode: ['user:u1'] });
     expect(webRequests()[0]?.conversions[0]?.mode).toBe('cost_per_accuracy');
+    expect(console.log).toHaveBeenCalledWith(
+      expect.stringContaining('"invalidModeOwners":["user:u1"]')
+    );
   });
 
   it('lists owners whose settled marker could not be stored', async () => {
@@ -824,6 +841,9 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
     await expect(response.json()).resolves.toMatchObject({
       needsAttention: ['mark_failed user:u1'],
     });
+    expect(console.log).toHaveBeenCalledWith(
+      expect.stringContaining('"needsAttentionOwners":["mark_failed user:u1"]')
+    );
   });
 
   it('does not report a lost failure marker, since the owner is already listed as failed', async () => {

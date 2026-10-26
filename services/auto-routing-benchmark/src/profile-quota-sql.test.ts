@@ -71,4 +71,26 @@ describe('platform-paid admission quota (real SQLite)', () => {
       n: 0,
     });
   });
+
+  it('admits only the remaining capacity when concurrent requests race at the limit', async () => {
+    const filled = models('filled', PROFILE_ADMISSION_LIMIT - 1);
+    for (let offset = 0; offset < filled.length; offset += MAX_POOL_ENTRIES) {
+      await admit('efficient', filled.slice(offset, offset + MAX_POOL_ENTRIES));
+    }
+
+    const results = await Promise.allSettled([
+      admit('efficient', ['race/a']),
+      admit('efficient', ['race/b']),
+    ]);
+
+    expect(results.map(result => result.status).toSorted()).toEqual(['fulfilled', 'rejected']);
+    const rejected = results.find(result => result.status === 'rejected');
+    expect(rejected?.reason).toBeInstanceOf(ProfileQuotaExceededError);
+    expect(sqlite.prepare('SELECT COUNT(*) AS n FROM profile_request_events').get()).toEqual({
+      n: PROFILE_ADMISSION_LIMIT,
+    });
+    expect(
+      sqlite.prepare("SELECT COUNT(*) AS n FROM benchmark_profiles WHERE model LIKE 'race/%'").get()
+    ).toEqual({ n: 1 });
+  });
 });

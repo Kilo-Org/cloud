@@ -13,7 +13,6 @@ import {
 import { normalizeGitLabInstanceUrl } from '@/lib/integrations/platforms/gitlab/instance-url';
 import { resetCodeReviewConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
-import { createHash } from 'crypto';
 import {
   type VerifiedGitLabOAuthState,
   verifyGitLabOAuthState,
@@ -24,6 +23,7 @@ import {
   organizationAccessDenialErrorCode,
 } from '@/lib/integrations/oauth/common';
 import { storeGitLabOAuthIntegration } from '@/lib/integrations/platforms/gitlab/oauth-integration-writer';
+import { oauthStateHash } from '@/lib/integrations/oauth/callback-safety';
 import { getIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 
@@ -57,7 +57,7 @@ function gitLabOAuthSentryContext(searchParams: URLSearchParams): {
   return {
     hasCode: !!searchParams.get('code'),
     hasState: !!state,
-    stateHash: state ? createHash('sha256').update(state).digest('hex').slice(0, 8) : null,
+    stateHash: oauthStateHash(state),
     error: searchParams.get('error'),
     errorDescription: searchParams.get('error_description'),
   };

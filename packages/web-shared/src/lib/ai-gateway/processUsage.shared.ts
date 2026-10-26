@@ -1,8 +1,9 @@
-import { captureMessage } from '@sentry/nextjs';
+import { captureException, captureMessage } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gateway/processUsage.constants';
+import type { ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type {
   NotYetCostedUsageStats,
   VercelProviderAttempt,
@@ -16,13 +17,28 @@ type OpenRouterCostFields = {
 };
 
 /**
+ * Whether the provider reports `usage.is_byok` next to `usage.cost`. OpenRouter
+ * does on chat completions, Messages, Responses and embeddings, and Vercel AI
+ * Gateway does on chat completions. Martian reports `cost` in the same shape but
+ * never `is_byok`.
+ */
+export function providerReportsIsByok(provider: ProviderId): boolean {
+  return provider === 'openrouter' || provider === 'vercel';
+}
+
+/**
  * Computes cost_mUsd and is_byok from OpenRouter usage cost fields, and emits a
  * Sentry warning when the accounting looks suspicious.
+ *
+ * With BYOK, OpenRouter's `cost` is only its 5% fee and the real cost is
+ * `cost_details.upstream_inference_cost`, so a cost without a BYOK status cannot
+ * be trusted. `requireIsByok` says whether that is suspicious for this response.
  */
 export function computeOpenRouterCostFields(
   usage: OpenRouterCostFields,
   coreProps: NotYetCostedUsageStats,
-  source: string
+  source: string,
+  requireIsByok: boolean
 ): { cost_mUsd: number; is_byok: boolean | null } {
   const is_byok = usage.is_byok ?? null;
   const openrouterCost_USD = usage.cost ?? 0;
@@ -31,7 +47,7 @@ export function computeOpenRouterCostFields(
   const inferredUpstream_USD = openrouterCost_USD * OPENROUTER_BYOK_COST_MULTIPLIER;
   const microdollar_error = (inferredUpstream_USD - upstream_inference_cost_USD) * 1000000;
   if (
-    (is_byok == null && (openrouterCost_USD || upstream_inference_cost_USD)) || // unknown byok status but known non-zero costs? We're borked!
+    (requireIsByok && is_byok == null && (openrouterCost_USD || upstream_inference_cost_USD)) || // unknown byok status but known non-zero costs? We're borked!
     (is_byok && usage.cost !== 0 && 1.1 < Math.abs(microdollar_error)) // byok and cost is not 5% of upstream? Weird, EXCEPT sometimes cost is 0 due to openrouter promo.
   ) {
     const { responseContent: _ignore, ...corePropsCopy } = coreProps;
@@ -128,9 +144,95 @@ export function extractVercelGenerationTime(
   return Number.isFinite(generationTime) && generationTime >= 0 ? generationTime : null;
 }
 
+/**
+ * Node's fetch (undici) fails a body read with `TypeError: terminated` when the
+ * upstream connection breaks mid-body. The cause tells an idle body timeout
+ * apart from a closed or reset socket.
+ */
+export function getUpstreamBodyTermination(error: unknown): 'timeout' | 'disconnect' | null {
+  if (
+    typeof error !== 'object' ||
+    error === null ||
+    !('name' in error) ||
+    !('message' in error) ||
+    error.name !== 'TypeError' ||
+    error.message !== 'terminated'
+  ) {
+    return null;
+  }
+  const cause = 'cause' in error ? error.cause : undefined;
+  const causeCode =
+    typeof cause === 'object' && cause !== null && 'code' in cause ? cause.code : undefined;
+  return causeCode === 'UND_ERR_BODY_TIMEOUT' ? 'timeout' : 'disconnect';
+}
+
 export function isResponseInterruptedError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null || !('name' in error)) return false;
-  return error.name === 'ResponseAborted' || error.name === 'TimeoutError';
+  return (
+    error.name === 'ResponseAborted' ||
+    error.name === 'TimeoutError' ||
+    getUpstreamBodyTermination(error) !== null
+  );
+}
+
+const ACCOUNT_ERROR_CODES = new Set<unknown>([401, 402, 403, '401', '402', '403']);
+const ACCOUNT_ERROR_TYPES = new Set<unknown>([
+  'authentication_error',
+  'permission_error',
+  'billing_error',
+  'invalid_api_key',
+  'insufficient_quota',
+  'billing_hard_limit_reached',
+]);
+
+type UpstreamStreamError = {
+  message?: string | null;
+  code?: number | string | null;
+  type?: string | null;
+  error_type?: string | null;
+  metadata?: Record<string, unknown>;
+};
+
+function isAccountError(error: UpstreamStreamError): boolean {
+  return (
+    ACCOUNT_ERROR_CODES.has(error.code) ||
+    ACCOUNT_ERROR_TYPES.has(error.code) ||
+    ACCOUNT_ERROR_TYPES.has(error.type) ||
+    ACCOUNT_ERROR_TYPES.has(error.error_type) ||
+    ACCOUNT_ERROR_TYPES.has(error.metadata?.error_type)
+  );
+}
+
+/**
+ * Reports an error event received inside an upstream SSE stream. Transient
+ * upstream failures (timeouts, overloads, dropped streams) are only logged, since
+ * they are frequent and not actionable. Authentication, permission, and billing
+ * failures on Kilo-owned credentials, including organization custom LLM keys,
+ * are sent to Sentry, since Kilo's provider keys or upstream account need
+ * attention. On user credentials (BYOK keys, ChatGPT subscriptions) they are
+ * logged.
+ */
+export function reportUpstreamStreamError(params: {
+  label: string;
+  source: string;
+  error: UpstreamStreamError;
+  usesUserCredentials: boolean;
+  logContext: Record<string, unknown>;
+  sentryExtra: Record<string, unknown>;
+}) {
+  const { label, source, error, usesUserCredentials, logContext, sentryExtra } = params;
+  const message = `${label}: ${error.message ?? 'unknown'}`;
+  if (!usesUserCredentials && isAccountError(error)) {
+    captureException(new Error(message), { tags: { source }, extra: sentryExtra });
+    return;
+  }
+  console.warn(message, {
+    source,
+    code: error.code,
+    error_type: error.error_type ?? error.metadata?.error_type ?? error.type,
+    uses_user_credentials: usesUserCredentials,
+    ...logContext,
+  });
 }
 
 /**

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   AUTO_DECISION_HEADER,
+  AUTO_DECISION_TTL_MS,
   CUSTOM_ROUTER_ERROR_HTTP_STATUS,
   ClientCustomRouterEntrySchema,
   ClientEvalPlanResponseSchema,
@@ -14,7 +15,18 @@ import {
   CustomRouterEntriesSchema,
   CustomRouterErrorCodeSchema,
   CustomRouterErrorResponseSchema,
+  CustomRouterSummarySchema,
   GatewayCustomRouterEntrySchema,
+  MAX_CLIENT_CONTEXT_LENGTH,
+  MAX_CLIENT_INPUT_MODALITIES,
+  MAX_CLIENT_INPUT_MODALITY_LENGTH,
+  MAX_CLIENT_PRICE_PER_MTOK_USD,
+  MAX_CLIENT_VARIANTS,
+  MAX_CLIENT_VARIANT_LENGTH,
+  MAX_CUSTOM_ROUTER_ENTRY_KEY_LENGTH,
+  MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH,
+  MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH,
+  RegisterClientEntryRequestSchema,
   UpdateCustomRouterRequestSchema,
   customRouterCandidateModel,
   customRouterClientEntriesPath,
@@ -152,6 +164,153 @@ describe('custom router entries', () => {
   });
 });
 
+describe('custom router entry budget', () => {
+  const atModelLimit = 'a'.repeat(MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH);
+  const client = (overrides: Record<string, unknown> = {}) => ({ ...clientEntry, ...overrides });
+  const registration = (overrides: Record<string, unknown> = {}) =>
+    RegisterClientEntryRequestSchema.safeParse({ entry: client(overrides) });
+
+  it('accepts a maximal realistic client entry and refuses one unit past each bound', () => {
+    expect(
+      registration({
+        provider: 'p'.repeat(MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH),
+        model: atModelLimit,
+        variants: ['v'.repeat(MAX_CLIENT_VARIANT_LENGTH)],
+        capabilities: {
+          contextLength: MAX_CLIENT_CONTEXT_LENGTH,
+          inputModalities: ['m'.repeat(MAX_CLIENT_INPUT_MODALITY_LENGTH)],
+          toolCall: true,
+          reasoning: true,
+        },
+        pricing: {
+          inputPerMTokUsd: MAX_CLIENT_PRICE_PER_MTOK_USD,
+          outputPerMTokUsd: MAX_CLIENT_PRICE_PER_MTOK_USD,
+          cacheReadPerMTokUsd: MAX_CLIENT_PRICE_PER_MTOK_USD,
+        },
+      }).success
+    ).toBe(true);
+
+    expect(registration({ model: `${atModelLimit}a` }).success).toBe(false);
+    expect(
+      registration({ provider: 'p'.repeat(MAX_CUSTOM_ROUTER_PROVIDER_ID_LENGTH + 1) }).success
+    ).toBe(false);
+  });
+
+  it('names the bounded field in the issue path', () => {
+    const result = registration({ model: `${atModelLimit}a` });
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.path).toEqual(['entry', 'model']);
+  });
+
+  it('bounds the variant and modality collections', () => {
+    const variants = Array.from({ length: MAX_CLIENT_VARIANTS }, (_, index) => `variant-${index}`);
+    expect(registration({ variants }).success).toBe(true);
+    expect(registration({ variants: [...variants, 'extra'] }).success).toBe(false);
+    expect(registration({ variants: ['v'.repeat(MAX_CLIENT_VARIANT_LENGTH + 1)] }).success).toBe(
+      false
+    );
+
+    const modalities = Array.from(
+      { length: MAX_CLIENT_INPUT_MODALITIES },
+      (_, index) => `modality-${index}`
+    );
+    expect(
+      registration({
+        capabilities: { ...clientEntry.capabilities, inputModalities: modalities },
+      }).success
+    ).toBe(true);
+    expect(
+      registration({
+        capabilities: { ...clientEntry.capabilities, inputModalities: [...modalities, 'extra'] },
+      }).success
+    ).toBe(false);
+    expect(
+      registration({
+        capabilities: {
+          ...clientEntry.capabilities,
+          inputModalities: ['m'.repeat(MAX_CLIENT_INPUT_MODALITY_LENGTH + 1)],
+        },
+      }).success
+    ).toBe(false);
+  });
+
+  it('requires finite, bounded context lengths and prices', () => {
+    const withCapabilities = (overrides: Record<string, unknown>) =>
+      registration({ capabilities: { ...clientEntry.capabilities, ...overrides } }).success;
+    const withPricing = (pricing: null | Record<string, unknown>) =>
+      registration({ pricing }).success;
+
+    expect(withCapabilities({ contextLength: null })).toBe(true);
+    expect(withCapabilities({ contextLength: MAX_CLIENT_CONTEXT_LENGTH + 1 })).toBe(false);
+    expect(withCapabilities({ contextLength: Number.POSITIVE_INFINITY })).toBe(false);
+    expect(withPricing(null)).toBe(true);
+    expect(withPricing({ inputPerMTokUsd: 0, outputPerMTokUsd: 0 })).toBe(true);
+    expect(
+      withPricing({ inputPerMTokUsd: MAX_CLIENT_PRICE_PER_MTOK_USD + 1, outputPerMTokUsd: 0 })
+    ).toBe(false);
+    expect(withPricing({ inputPerMTokUsd: Number.POSITIVE_INFINITY, outputPerMTokUsd: 0 })).toBe(
+      false
+    );
+    expect(withPricing({ inputPerMTokUsd: 0, outputPerMTokUsd: Number.NaN })).toBe(false);
+  });
+
+  it('accepts a maximal realistic pool and bounds the default entry key on create', () => {
+    const entries = Array.from({ length: 20 }, (_, index) =>
+      client({ model: `${'m'.repeat(MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH - 4)}${index}` })
+    );
+    const create = {
+      scope: 'user' as const,
+      slug: 'maximal',
+      name: 'Maximal',
+      baseRouter: 'efficient' as const,
+      mode: 'cost_per_accuracy' as const,
+      entries,
+      defaultEntryKey: customRouterEntryKey(entries[0]),
+    };
+
+    expect(CreateCustomRouterRequestSchema.safeParse(create).success).toBe(true);
+    expect(
+      CreateCustomRouterRequestSchema.safeParse({
+        ...create,
+        entries: [gatewayEntry],
+        defaultEntryKey: `gateway:${'a'.repeat(MAX_CUSTOM_ROUTER_ENTRY_KEY_LENGTH)}`,
+      }).success
+    ).toBe(false);
+  });
+
+  it('keeps parsing stored definitions and summaries outside the budget', () => {
+    const stored = client({
+      model: `${atModelLimit}a`,
+      variants: ['v'.repeat(MAX_CLIENT_VARIANT_LENGTH + 1)],
+    });
+    const key = `client:ollama/${stored.model}`;
+
+    expect(ClientCustomRouterEntrySchema.safeParse(stored).success).toBe(true);
+    expect(
+      CustomRouterDefinitionSchema.safeParse({
+        ...definition,
+        entries: [stored],
+        defaultEntryKey: key,
+      }).success
+    ).toBe(true);
+    expect(
+      CustomRouterSummarySchema.safeParse({
+        id: definition.id,
+        scope: 'user',
+        slug: 'my-router',
+        name: 'My Router',
+        modelId: 'kilo-auto/custom/my-router',
+        baseRouter: 'efficient',
+        mode: 'cost_per_accuracy',
+        defaultEntryKey: key,
+        canEdit: true,
+        entries: [{ key, entry: stored, needsClientEval: true, variants: [] }],
+      }).success
+    ).toBe(true);
+  });
+});
+
 const definition = {
   id: '3f0d6b1c-9c1e-4b6a-8e4d-2a0f7f5a1b2c',
   ownerType: 'user' as const,
@@ -279,6 +438,23 @@ describe('public decide API', () => {
     ).toBe(true);
   });
 
+  it('keeps the classification on a fallback decision', () => {
+    const decision = {
+      entry: { kind: 'gateway', model: 'anthropic/claude-sonnet-4' },
+      model: 'anthropic/claude-sonnet-4',
+      variant: null,
+      stale: false,
+      fallback: true,
+      sticky: false,
+      taskType: 'debugging',
+      subtaskType: 'bug_fixing',
+      tableVersion: null,
+    };
+    expect(
+      CustomRouterDecideResponseSchema.parse({ decision, decisionId: 'v1.abc.def' }).decision
+    ).toMatchObject({ fallback: true, taskType: 'debugging', subtaskType: 'bug_fixing' });
+  });
+
   it('maps every error code to a status', () => {
     for (const code of CustomRouterErrorCodeSchema.options) {
       expect(CUSTOM_ROUTER_ERROR_HTTP_STATUS[code]).toBeGreaterThanOrEqual(400);
@@ -337,6 +513,25 @@ describe('auto decision tokens', () => {
     await expect(verifyAutoDecision(token, DECISION_SECRET, 1_000)).resolves.toEqual({
       ok: false,
       reason: 'bad_signature',
+    });
+  });
+
+  it('rejects a token whose expiry exceeds the decision lifetime', async () => {
+    const nowMs = 1_000;
+    const longLived = await signAutoDecision(
+      { ...decisionPayload, expiresAt: nowMs + AUTO_DECISION_TTL_MS + 60_000 },
+      DECISION_SECRET
+    );
+    await expect(verifyAutoDecision(longLived, DECISION_SECRET, nowMs)).resolves.toEqual({
+      ok: false,
+      reason: 'malformed',
+    });
+    const fullLifetime = await signAutoDecision(
+      { ...decisionPayload, expiresAt: nowMs + AUTO_DECISION_TTL_MS },
+      DECISION_SECRET
+    );
+    await expect(verifyAutoDecision(fullLifetime, DECISION_SECRET, nowMs)).resolves.toMatchObject({
+      ok: true,
     });
   });
 

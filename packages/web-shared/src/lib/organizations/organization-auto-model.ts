@@ -5,10 +5,8 @@ import {
   createAllowPredicateFromRestrictions,
   hasActiveModelRestrictions,
 } from '@kilocode/web-shared/lib/model-allow.server';
-import {
-  CUSTOM_LLM_PREFIX,
-  normalizeModelId,
-} from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   formatDirectByokModelId,
   getDirectByokModel,
@@ -119,7 +117,7 @@ export async function validateOrganizationAutoTarget(
     return { kind: 'error', message: 'Organization Auto cannot target itself.' };
   }
 
-  if (rawModelId.startsWith(CUSTOM_LLM_PREFIX)) {
+  if (await isCustomLlm(rawModelId)) {
     return {
       kind: 'error',
       message: `Organization Auto route target '${targetModelId}' must be a Kilo-hosted model, supported auto tier, or organization-owned BYOK model.`,

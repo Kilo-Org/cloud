@@ -22,12 +22,28 @@ export type RepositoryProviderStatus =
   | 'error'
   | 'connect'
   | 'connected-empty'
+  | 'unavailable'
   | 'repos';
+
+/**
+ * Why a provider's stored installation cannot list repositories. The provider
+ * is connected in principle, so the card asks for the reconnect step instead of
+ * offering to connect it for the first time.
+ */
+export type RepositoryUnavailableReason =
+  | 'suspended'
+  | 'disconnected'
+  | 'reauth_required'
+  | 'not_configured';
+
+export type RepositoryGroupNotice = 'partial';
 
 export type RepositoryGroup = {
   key: RepositoryPlatform;
   status: RepositoryProviderStatus;
   repositories: NewSessionRepository[];
+  /** Set when the provider answered with only some of its installations' repositories. */
+  notice?: RepositoryGroupNotice;
 };
 
 export type RepositoryGroups = {
@@ -48,11 +64,13 @@ export function resolveProviderStatus({
   isError,
   integrationInstalled,
   repositoryCount,
+  unavailableReason,
 }: {
   isLoading: boolean;
   isError: boolean;
   integrationInstalled: boolean | undefined;
   repositoryCount: number;
+  unavailableReason?: RepositoryUnavailableReason;
 }): RepositoryProviderStatus {
   if (isLoading) {
     return 'loading';
@@ -69,7 +87,9 @@ export function resolveProviderStatus({
     return 'loading';
   }
   if (!integrationInstalled) {
-    return 'connect';
+    // An installation exists but cannot list anything: the person fixes it by
+    // reconnecting, not by connecting the provider for the first time.
+    return unavailableReason ? 'unavailable' : 'connect';
   }
   if (repositoryCount === 0) {
     return 'connected-empty';
@@ -146,14 +166,25 @@ export function resolveRepositoryGroups(input: {
   recents: NewSessionRepository[];
 }): RepositoryGroups {
   const groups: RepositoryGroup[] = [
-    { key: 'github', status: input.github.status, repositories: input.github.repositories },
-    { key: 'gitlab', status: input.gitlab.status, repositories: input.gitlab.repositories },
+    {
+      key: 'github',
+      status: input.github.status,
+      repositories: input.github.repositories,
+      notice: input.github.notice,
+    },
+    {
+      key: 'gitlab',
+      status: input.gitlab.status,
+      repositories: input.gitlab.repositories,
+      notice: input.gitlab.notice,
+    },
   ];
   if (input.organizationId) {
     groups.push({
       key: 'bitbucket',
       status: input.bitbucket.status,
       repositories: input.bitbucket.repositories,
+      notice: input.bitbucket.notice,
     });
   }
   return { recents: input.recents, groups };
@@ -170,6 +201,9 @@ export function detectRepositoryPlatform(
   if (!gitUrl) {
     return undefined;
   }
+  // An scp-style value keeps its host exactly as written, and the URL parser
+  // preserves it for non-special schemes (`ssh://`), so both forms meet here
+  // and are compared in one case.
   let hostname: string | undefined = /^git@([^:]+):/.exec(gitUrl)?.[1];
   if (hostname === undefined) {
     try {
@@ -178,13 +212,14 @@ export function detectRepositoryPlatform(
       return undefined;
     }
   }
-  if (hostname === 'github.com') {
+  const host = hostname.toLowerCase();
+  if (host === 'github.com') {
     return 'github';
   }
-  if (hostname === 'gitlab.com') {
+  if (host === 'gitlab.com') {
     return 'gitlab';
   }
-  if (hostname === 'bitbucket.org') {
+  if (host === 'bitbucket.org') {
     return 'bitbucket';
   }
   return undefined;
@@ -296,4 +331,70 @@ export function resetSelectedBranchOverrides(): void {
     return;
   }
   publishBranchSnapshot({ ...branchSnapshot, overrides: EMPTY_OVERRIDES });
+}
+
+/**
+ * The one state the branch row shows, as a single discriminant. The row renders
+ * from this value alone, so "loading" and a message can never be on screen
+ * together: there is no second node to keep in sync, and no flag combination
+ * that renders two of them.
+ */
+export type BranchSectionState =
+  /** Bitbucket is organization-only: a personal row never queries branches. */
+  | { kind: 'bitbucket-organizations-only' }
+  /** The request is still in flight (bounded by the hook's settle bound). */
+  | { kind: 'loading' }
+  /** A refusal a retry cannot fix (no access, repository gone). */
+  | { kind: 'unavailable' }
+  /** A transient failure, or a request that outlived the settle bound. */
+  | { kind: 'retryable'; isRetrying: boolean }
+  /** The provider listed no branches. */
+  | { kind: 'empty' }
+  /** The provider's branches, with the default the create checks out. */
+  | {
+      kind: 'list';
+      branches: readonly string[];
+      defaultBranch: string | null;
+      truncated: boolean;
+    };
+
+export type BranchSectionInput = {
+  platform: RepositoryPlatform;
+  isEnabled: boolean;
+  isLoading: boolean;
+  isPermanentError: boolean;
+  isRetryableError: boolean;
+  isRetrying: boolean;
+  branches: readonly string[];
+  defaultBranch: string | null;
+  truncated: boolean;
+};
+
+/**
+ * Resolve the branch row's single state. The order is the priority: a provider
+ * that cannot be queried at all is explained before any request state, a
+ * running request beats a stale result, and a refusal beats an empty list.
+ */
+export function resolveBranchSectionState(input: BranchSectionInput): BranchSectionState {
+  if (!input.isEnabled && input.platform === 'bitbucket') {
+    return { kind: 'bitbucket-organizations-only' };
+  }
+  if (input.isLoading || !input.isEnabled) {
+    return { kind: 'loading' };
+  }
+  if (input.isPermanentError) {
+    return { kind: 'unavailable' };
+  }
+  if (input.isRetryableError) {
+    return { kind: 'retryable', isRetrying: input.isRetrying };
+  }
+  if (input.branches.length === 0) {
+    return { kind: 'empty' };
+  }
+  return {
+    kind: 'list',
+    branches: input.branches,
+    defaultBranch: input.defaultBranch,
+    truncated: input.truncated,
+  };
 }

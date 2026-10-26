@@ -4,6 +4,8 @@ import { useCallback } from 'react';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
+import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { type TodoItem, type TodoList } from '@/lib/todos/todo-types';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
@@ -21,7 +23,7 @@ const TODO_UNDO_WINDOW_MS = 5000;
 export const PENDING_TODO_ID_PREFIX = 'pending:';
 let pendingTodoSequence = 0;
 
-/** To-dos whose delete is held for the undo toast; every read hides them. */
+/** To-dos whose delete is held for the undo toast; the item-list read hides them. */
 const heldDeletes = new Set<string>();
 
 function showMutationError(error: { message: string }) {
@@ -117,13 +119,19 @@ export function useTodoLists(organizationId: string | null, enabled = true) {
 export function useTodoListMutations(organizationId: string | null) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const optimistic = useOptimisticArray<TodoList>(
-    trpc.todos.lists.list.queryKey({ organizationId, includeArchived: true })
-  );
+  const listsKey = trpc.todos.lists.list.queryKey({ organizationId, includeArchived: true });
+  const optimistic = useOptimisticArray<TodoList>(listsKey);
 
   const create = useMutation(
     trpc.todos.lists.create.mutationOptions({
       onError: showMutationError,
+      onSuccess: created => {
+        // The created list's screen reads this cache as it mounts, before the
+        // invalidation below lands; without the row it renders its not-found state.
+        queryClient.setQueryData<TodoList[]>(listsKey, lists =>
+          lists ? [...lists.filter(list => list.id !== created.id), created] : [created]
+        );
+      },
       onSettled: async () => {
         await invalidateTodoQueries(queryClient, trpc);
       },
@@ -259,7 +267,10 @@ export function useTodoItemMutations(listId: string) {
   /**
    * Hide the to-do now and send the delete only once the undo toast expires,
    * so Undo never has to recreate it. The timer is module-owned: leaving the
-   * screen still commits the delete.
+   * screen still commits the delete. The delete belongs to the account that
+   * scheduled it: once that account is gone the request, the failure toast, and
+   * the cache refresh are skipped, and the held row is released so the list
+   * keeps showing what the server still holds.
    */
   const removeWithUndo = useCallback(
     (item: TodoItem) => {
@@ -269,16 +280,27 @@ export function useTodoItemMutations(listId: string) {
       };
       refreshItems();
       let settled = false;
+      const epoch = currentAuthEpoch();
+      const isCurrentSession = () => isCurrentAuthEpoch(epoch) && !isSignOutActive();
       const commit = async () => {
+        if (!isCurrentSession()) {
+          heldDeletes.delete(item.id);
+          refreshItems();
+          return;
+        }
         try {
           await trpcClient.todos.items.delete.mutate({ id: item.id });
         } catch (error) {
-          showMutationError(
-            error instanceof Error ? error : { message: i18n.t('common.somethingWentWrong') }
-          );
+          if (isCurrentSession()) {
+            showMutationError(
+              error instanceof Error ? error : { message: i18n.t('common.somethingWentWrong') }
+            );
+          }
         } finally {
           heldDeletes.delete(item.id);
-          await invalidateTodoQueries(queryClient, trpc);
+          if (isCurrentSession()) {
+            await invalidateTodoQueries(queryClient, trpc);
+          }
         }
       };
       const timer = setTimeout(() => {

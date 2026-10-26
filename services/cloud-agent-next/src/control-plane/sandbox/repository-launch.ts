@@ -1,3 +1,4 @@
+import type { StartupMode } from '../../sandbox-control/startup-selection.js';
 import type {
   ProviderAdapter,
   ProviderLaunchOptions,
@@ -16,6 +17,8 @@ export type RepositoryPreparationFailure = {
 
 export type RepositoryLaunchRecord = {
   allocationId: string;
+  /** Legacy records used the preinstalled runtime. */
+  startupMode?: StartupMode;
   /** Absent in the placeholder written before `launch` reports the source. */
   startSource?: ProviderStartSource;
   skipRepository?: true;
@@ -40,10 +43,12 @@ export async function recordRepositoryLaunch(
 export async function beginRepositoryLaunch(
   storage: Pick<DurableObjectStorage, 'put'>,
   allocationId: string,
-  skipRepository: boolean
+  skipRepository: boolean,
+  startupMode: StartupMode = 'preinstalled'
 ): Promise<void> {
   await recordRepositoryLaunch(storage, {
     allocationId,
+    startupMode,
     ...(skipRepository ? { skipRepository: true } : {}),
     confirmed: false,
   });

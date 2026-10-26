@@ -30,30 +30,40 @@ export function useCheckProviderConnection() {
   const queryClient = useQueryClient();
   const trpc = useTRPC();
 
+  const fetchProviderStatus = async (
+    input: CheckProviderConnectionInput
+  ): Promise<{ connected: boolean }> => {
+    if (input.platform === 'gitlab') {
+      if (input.organizationId) {
+        const status = await queryClient.query({
+          ...trpc.organizations.reviewAgent.getGitLabStatus.queryOptions({
+            organizationId: input.organizationId,
+          }),
+          staleTime: 0,
+        });
+        return { connected: status.connected };
+      }
+      const status = await queryClient.query({
+        ...trpc.personalReviewAgent.getGitLabStatus.queryOptions(),
+        staleTime: 0,
+      });
+      return { connected: status.connected };
+    }
+    if (!input.organizationId) {
+      return { connected: false };
+    }
+    const status = await queryClient.query({
+      ...trpc.organizations.reviewAgent.getBitbucketReadiness.queryOptions({
+        organizationId: input.organizationId,
+      }),
+      staleTime: 0,
+    });
+    return { connected: status.connected };
+  };
+
   return useMutation({
     mutationFn: async (input: CheckProviderConnectionInput) => {
-      if (input.platform === 'bitbucket' && !input.organizationId) {
-        return { connected: false };
-      }
-      // The two providers answer with different status shapes, so each arm
-      // fetches its own options — a union of the two queryOptions types is
-      // not assignable to a single fetchQuery call.
-      const status =
-        input.platform === 'gitlab'
-          ? await queryClient.fetchQuery({
-              ...(input.organizationId
-                ? trpc.organizations.reviewAgent.getGitLabStatus.queryOptions({
-                    organizationId: input.organizationId,
-                  })
-                : trpc.personalReviewAgent.getGitLabStatus.queryOptions()),
-              staleTime: 0,
-            })
-          : await queryClient.fetchQuery({
-              ...trpc.organizations.reviewAgent.getBitbucketReadiness.queryOptions({
-                organizationId: input.organizationId ?? '',
-              }),
-              staleTime: 0,
-            });
+      const status = await fetchProviderStatus(input);
       if (status.connected) {
         await queryClient.invalidateQueries(trpc.providerReview.pathFilter());
       }

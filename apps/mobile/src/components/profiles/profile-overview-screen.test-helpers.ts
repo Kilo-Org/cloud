@@ -1,5 +1,7 @@
 import { createElement } from 'react';
 import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { afterEach } from 'vitest';
+import * as z from 'zod';
 
 import { ProfileOverviewScreen } from '@/components/profiles/profile-overview-screen';
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
@@ -49,6 +51,26 @@ export function testProfile(overrides: Partial<TestProfileDetail> = {}): TestPro
   };
 }
 
+/** Return the state the overview reads to its idle values before each test. */
+export function resetOverviewState(state: {
+  query: {
+    data: TestProfileDetail | undefined;
+    isError: boolean;
+    isPending: boolean;
+    isRefetching: boolean;
+  };
+  mutations: { update: { isPending: boolean }; deleteProfile: { isPending: boolean } };
+}): void {
+  Object.assign(state.query, {
+    data: undefined,
+    isError: false,
+    isPending: true,
+    isRefetching: false,
+  });
+  Object.assign(state.mutations.update, { isPending: false });
+  Object.assign(state.mutations.deleteProfile, { isPending: false });
+}
+
 export function findAll(root: ReactTestInstance, type: string): ReactTestInstance[] {
   return root.findAll(node => typeof node.type === 'string' && node.type === type);
 }
@@ -59,6 +81,31 @@ export function findOne(root: ReactTestInstance, type: string): ReactTestInstanc
     throw new Error(`${type} was not rendered`);
   }
   return node;
+}
+
+/** A button element's props, as the screen composed them. */
+const ActionButtonSchema = z.object({
+  props: z.object({
+    onPress: z.custom<() => void>(value => typeof value === 'function'),
+    children: z.object({ props: z.object({ children: z.string() }) }),
+  }),
+});
+
+/** The props the screen hands the mocked `QueryError`. */
+const QueryErrorPropsSchema = z.object({
+  variant: z.string().optional(),
+  title: z.string().optional(),
+  onRetry: z.custom<() => void>(value => typeof value === 'function').optional(),
+  action: ActionButtonSchema.optional(),
+});
+
+/**
+ * Read the mocked `QueryError`'s props. Parsed rather than cast because the
+ * test renderer types every node's props as `any`, and an assertion about a
+ * recovery action must fail loudly when the screen stops composing one.
+ */
+export function queryErrorProps(root: ReactTestInstance) {
+  return QueryErrorPropsSchema.parse(findOne(root, 'QueryError').props);
 }
 
 export function findField(root: ReactTestInstance, label: string): ReactTestInstance {
@@ -102,11 +149,38 @@ function confirmRequest(confirm: TestConfirmMock): void {
   request.onConfirm();
 }
 
-// eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
-export function mountScreen(organizationId?: string) {
-  return renderWithProviders(
-    createElement(ProfileOverviewScreen, { profileId: 'profile-1', organizationId })
+/**
+ * Renderers each test left open. A test that fails mid-assertion still releases
+ * its tree, and `mountScreen`'s `unmount` stays safe to call twice so a test can
+ * unmount as early as it likes.
+ */
+const openRenderers = new Set<() => void>();
+
+afterEach(() => {
+  for (const unmount of openRenderers) {
+    unmount();
+  }
+  openRenderers.clear();
+});
+
+export async function mountScreen(
+  organizationId?: string,
+  stack: 'app' | 'profileTab' = 'profileTab'
+) {
+  const mounted = await renderWithProviders(
+    createElement(ProfileOverviewScreen, { profileId: 'profile-1', organizationId, stack })
   );
+  let open = true;
+  const unmount = () => {
+    if (!open) {
+      return;
+    }
+    open = false;
+    openRenderers.delete(unmount);
+    mounted.unmount();
+  };
+  openRenderers.add(unmount);
+  return { ...mounted, unmount };
 }
 
 /** Re-render the mounted screen against fresh mock data, keeping the providers. */
@@ -119,7 +193,13 @@ export function rerenderScreen(
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(ProfileOverviewScreen, { profileId: 'profile-1', organizationId })
+      // The rerender helpers serve the Profile tab stack; an app-stack mount is
+      // a single-shot read, so it never needs one.
+      createElement(ProfileOverviewScreen, {
+        profileId: 'profile-1',
+        organizationId,
+        stack: 'profileTab',
+      })
     )
   );
 }

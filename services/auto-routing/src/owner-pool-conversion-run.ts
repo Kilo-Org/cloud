@@ -1,15 +1,15 @@
 import {
   OwnerPoolConversionOutcomeSchema,
   OwnerPoolConversionScanResponseSchema,
-  type CustomRouterScope,
+  type OwnerType,
   type OwnerPoolConversionOutcome,
   type OwnerPoolConversionScanResponse,
 } from '@kilocode/auto-routing-contracts';
 
-export const OWNER_TYPES = ['user', 'org'] as const satisfies readonly CustomRouterScope[];
+export const OWNER_TYPES = ['user', 'org'] as const satisfies readonly OwnerType[];
 
 export type ScanPageRequest = {
-  ownerType: CustomRouterScope;
+  ownerType: OwnerType;
   after: string | null;
   consecutiveFailed: number;
 };
@@ -26,7 +26,7 @@ export type ConversionRunResult = {
 
 export async function runOwnerPoolConversion(params: {
   objectIds: readonly string[];
-  resume: { ownerType: CustomRouterScope; cursor: string | null } | null;
+  resume: { ownerType: OwnerType; cursor: string | null } | null;
   dryRun: boolean;
   scan: ScanPage;
   log: (line: string) => void;
@@ -85,18 +85,22 @@ export async function runOwnerPoolConversion(params: {
       let consecutiveFailed = 0;
       do {
         const retryHint = `retry with --resume ${ownerType}:${after ?? ''}`;
+        const auditHint =
+          'Inspect auto_routing_owner_pool_conversion_scan logs for this ownerType and cursor; owner-key arrays preserve findings if the response was lost.';
         let response: { status: number; body: unknown };
         try {
           response = await scan({ ownerType, after, consecutiveFailed });
         } catch (cause) {
           const reason = cause instanceof Error ? cause.message : 'scan failed';
           throw new Error(
-            `${reason}; ${retryHint}. Owners on the interrupted page whose router already exists come back as \`exists\`; migration does not send notices.`
+            `${reason}; ${retryHint}. Owners on the interrupted page whose router already exists come back as \`exists\`; migration does not send notices. ${auditHint}`
           );
         }
         const page = OwnerPoolConversionScanResponseSchema.safeParse(response.body);
         if (!page.success) {
-          throw new Error(`scan responded ${response.status} without a summary; ${retryHint}`);
+          throw new Error(
+            `scan responded ${response.status} without a summary; ${retryHint}. ${auditHint}`
+          );
         }
         add(page.data);
         consecutiveFailed = page.data.consecutiveFailed;

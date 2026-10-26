@@ -4,7 +4,7 @@ import {
   CustomPricingConfigSchema,
   type CustomPricingModelConfig,
 } from '@kilocode/db/schema-types';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import type {
   ConfiguredCustomPricing,
@@ -21,7 +21,7 @@ function toCustomPricing(config: CustomPricingModelConfig): CustomPricing {
 
 /** Throws on an invalid stored config, so the cached getter keeps its last valid value. */
 export async function readConfiguredCustomPricing(): Promise<ConfiguredCustomPricing> {
-  const [row] = await db
+  const [row] = await readDb
     .select({ custom_pricing: ai_gateway_config.custom_pricing })
     .from(ai_gateway_config)
     .where(eq(ai_gateway_config.id, 1))

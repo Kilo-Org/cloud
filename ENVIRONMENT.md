@@ -25,7 +25,8 @@ The monitor must send `Authorization: Bearer <configured value>`. An unset or em
 value disables access. Each running instance shares its cached health response
 across authorized callers for 60 seconds; simultaneous refreshes share one evaluation.
 
-Apply the database migration before deploying the application.
+Apply `packages/db/src/migrations/0303_review_window_index.sql` before deploying
+the application.
 For initial deployment or rotation, the owner runs
 `pnpm web:env set CODE_REVIEW_HEALTH_SECRET`, supplies a newly generated secret, and
 coordinates the application deployment with the external monitor's header update.
@@ -413,6 +414,7 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `IMPACT_ADVOCATE_TENANT_ALIAS` - Impact.com Advocate tenant alias. [SERVER]
 - `IMPACT_ADVOCATE_API_BASE_URL` - Impact.com Advocate API base URL. Defaults to `https://app.referralsaasquatch.com`. [SERVER]
 - `IMPACT_CAMPAIGN_ID` - Impact.com campaign ID for event tracking. [SERVER]
+
 ### Cloudflare Analytics
 
 - `CLOUDFLARE_ACCOUNT_ID` - Cloudflare account ID used as the GraphQL `accountTag` for Containers Analytics queries and admin dashboard deep links; used in `packages/web-shared/src/lib/config.server.ts` and `apps/web/src/lib/cloudflare/container-usage-analytics.ts`. [SERVER]

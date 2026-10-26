@@ -27,11 +27,22 @@ import {
 } from '@/hooks/useCloudAgentEnvironments';
 import { useEnvironmentProfiles } from '@/hooks/useEnvironmentProfiles';
 import {
+<<<<<<< 0193c81970e48a3312b6f0f5f2b2e6014ad23a1a
   hasEnvironmentFormChanges,
   toEnvironmentCommands,
   toEnvironmentScript,
 } from './environment-form';
 import { EnvironmentBuildPanel } from './EnvironmentBuildPanel';
+||||||| b63e3f2b12ee2b8876dc266edd1e260553936f92
+import { toEnvironmentCommands, toEnvironmentScript } from './environment-form';
+=======
+  buildEgressPolicy,
+  toEnvironmentCommands,
+  toEnvironmentScript,
+  toNetworkAccessDraft,
+} from './environment-form';
+import { EnvironmentNetworkField } from './EnvironmentNetworkField';
+>>>>>>> 0fd5178900beee5cf9f6ade89d4b56c5b16eedf9
 import {
   buildEnvironmentVariableChanges,
   formatEnvironmentVariables,
@@ -123,7 +134,17 @@ function EnvironmentForm({
   const [initialSandboxAllocation] = useState(() =>
     toSelectableAllocation(existing?.sandboxAllocation ?? null)
   );
+<<<<<<< 0193c81970e48a3312b6f0f5f2b2e6014ad23a1a
   const [sandboxAllocation, setSandboxAllocation] = useState(initialSandboxAllocation);
+||||||| b63e3f2b12ee2b8876dc266edd1e260553936f92
+=======
+  // Retain the baseline shown when editing starts, even if queries refresh in the background.
+  const [initialNetworkAccess] = useState(() =>
+    toNetworkAccessDraft(existing?.egressMode ?? null, existing?.egressAllowlist ?? null)
+  );
+  const [networkAccess, setNetworkAccess] = useState(initialNetworkAccess);
+  const [networkAccessError, setNetworkAccessError] = useState<string | null>(null);
+>>>>>>> 0fd5178900beee5cf9f6ade89d4b56c5b16eedf9
   const sandboxRepository = existing
     ? { platform: existing.platform, fullName }
     : repository
@@ -180,6 +201,13 @@ function EnvironmentForm({
       setPage('variables');
       return;
     }
+    const egress = buildEgressPolicy(networkAccess, initialNetworkAccess);
+    if (egress.error) {
+      setNetworkAccessError(egress.error);
+      setPage('overview');
+      return;
+    }
+    setNetworkAccessError(null);
     setError(null);
     try {
       validateEnvironmentName(name);
@@ -192,6 +220,7 @@ function EnvironmentForm({
           secrets: variables.secrets,
           commands,
           sandboxAllocation,
+          ...egress.policy,
         });
         onSaved(existing.id);
       } else {
@@ -212,6 +241,7 @@ function EnvironmentForm({
           secrets,
           commands,
           sandboxAllocation,
+          ...egress.policy,
         });
         onSaved(created.id);
       }
@@ -272,6 +302,16 @@ function EnvironmentForm({
                   onChange={setSandboxAllocation}
                 />
               )}
+              <EnvironmentNetworkField
+                value={networkAccess}
+                sandboxAllocation={sandboxAllocation}
+                error={networkAccessError}
+                disabled={isSaving}
+                onChange={next => {
+                  setNetworkAccessError(null);
+                  setNetworkAccess(next);
+                }}
+              />
               <div className="space-y-3">
                 <EditorRow
                   icon={<Terminal className="size-4" />}

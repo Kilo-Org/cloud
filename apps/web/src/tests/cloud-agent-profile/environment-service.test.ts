@@ -723,6 +723,189 @@ describe('repository environment service', () => {
     });
   });
 
+  describe('network policy', () => {
+    async function storedPolicy(environmentId: string) {
+      const [row] = await db
+        .select({
+          mode: cloud_agent_environments.egress_mode,
+          allowlist: cloud_agent_environments.egress_allowlist,
+        })
+        .from(cloud_agent_environments)
+        .where(eq(cloud_agent_environments.id, environmentId));
+      return row;
+    }
+
+    test('stores None as an empty allowlist and reloads it for the session', async () => {
+      const user = await insertTestUser();
+      const owner = userOwner(user.id);
+      const id = await createEnv({
+        owner,
+        createdByUserId: user.id,
+        name: 'none',
+        platform: 'github',
+        repoFullName: 'acme/widgets',
+        egressMode: 'allowlist',
+      });
+
+      expect(await storedPolicy(id)).toEqual({ mode: 'allowlist', allowlist: [] });
+
+      const environment = await getEnvironment(db, id, owner);
+      expect(environment.egressMode).toBe('allowlist');
+      expect(environment.egressAllowlist).toEqual([]);
+
+      const session = await loadEnvironmentForSession(db, {
+        owner,
+        repository: { platform: 'github', repoFullName: 'acme/widgets' },
+      });
+      expect(session).toMatchObject({ egressMode: 'allowlist', egressAllowlist: [] });
+    });
+
+    test('stores Limited with normalized domains and Full as unrestricted without a list', async () => {
+      const user = await insertTestUser();
+      const owner = userOwner(user.id);
+      const limitedId = await createEnv({
+        owner,
+        createdByUserId: user.id,
+        name: 'limited',
+        platform: 'github',
+        repoFullName: 'acme/limited',
+        egressMode: 'allowlist',
+        egressAllowlist: ['Z.Example.COM.', 'example.com'],
+      });
+      const fullId = await createEnv({
+        owner,
+        createdByUserId: user.id,
+        name: 'full',
+        platform: 'github',
+        repoFullName: 'acme/full',
+        egressMode: 'unrestricted',
+      });
+      const absentId = await createEnv({
+        owner,
+        createdByUserId: user.id,
+        name: 'absent',
+        platform: 'github',
+        repoFullName: 'acme/absent',
+      });
+
+      expect(await storedPolicy(limitedId)).toEqual({
+        mode: 'allowlist',
+        allowlist: ['example.com', 'z.example.com'],
+      });
+      expect(await storedPolicy(fullId)).toEqual({ mode: 'unrestricted', allowlist: null });
+      expect(await storedPolicy(absentId)).toEqual({ mode: null, allowlist: null });
+
+      const limited = await getEnvironment(db, limitedId, owner);
+      expect(limited.egressAllowlist).toEqual(['example.com', 'z.example.com']);
+      expect((await getEnvironment(db, fullId, owner)).egressMode).toBe('unrestricted');
+      const absent = await getEnvironment(db, absentId, owner);
+      expect(absent).toMatchObject({ egressMode: null, egressAllowlist: null });
+    });
+
+    test('rejects an allowlist without a mode and invalid hostnames', async () => {
+      const user = await insertTestUser();
+      const base = {
+        owner: userOwner(user.id),
+        createdByUserId: user.id,
+        platform: 'github' as const,
+      };
+
+      await expect(
+        createEnv({ ...base, name: 'no-mode', repoFullName: 'acme/one', egressAllowlist: [] })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+      for (const [name, repoFullName, domain] of [
+        ['wildcard', 'acme/two', '*.example.com'],
+        ['url', 'acme/three', 'https://example.com'],
+        ['ip', 'acme/four', '127.0.0.1'],
+      ] as const) {
+        await expect(
+          createEnv({
+            ...base,
+            name,
+            repoFullName,
+            egressMode: 'allowlist',
+            egressAllowlist: [domain],
+          })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      }
+
+      await expect(
+        createEnv({
+          ...base,
+          name: 'too-many',
+          repoFullName: 'acme/five',
+          egressMode: 'allowlist',
+          egressAllowlist: Array.from({ length: 101 }, (_, index) => `host${index}.example.com`),
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
+    test('a policy-only update keeps commands, variables, secrets, and the allocation', async () => {
+      const user = await insertTestUser();
+      const owner = userOwner(user.id);
+      const id = await createEnv({
+        owner,
+        createdByUserId: user.id,
+        name: 'limited',
+        platform: 'github',
+        repoFullName: 'acme/widgets',
+        plainVars: { PLAIN: 'plain-value' },
+        secrets: { API_KEY: SECRET_PLAINTEXT },
+        commands: ['npm ci'],
+        sandboxAllocation: 'cloudflare-single',
+        egressMode: 'allowlist',
+        egressAllowlist: ['api.example.com'],
+      });
+
+      await updateEnv({
+        owner,
+        environmentId: id,
+        egressMode: 'allowlist',
+        egressAllowlist: ['Z.Example.COM.'],
+      });
+      await updateEnv({ owner, environmentId: id, name: 'renamed' });
+
+      const environment = await getEnvironment(db, id, owner);
+      expect(environment).toMatchObject({
+        name: 'renamed',
+        commands: ['npm ci'],
+        sandboxAllocation: 'cloudflare-single',
+        egressMode: 'allowlist',
+        egressAllowlist: ['z.example.com'],
+        secretKeys: ['API_KEY'],
+      });
+      expect(environment.plainVars).toEqual([
+        expect.objectContaining({ key: 'PLAIN', value: 'plain-value' }),
+      ]);
+      expect(await storedSecretValue(id, 'API_KEY')).not.toContain(SECRET_PLAINTEXT);
+
+      await updateEnv({ owner, environmentId: id, egressMode: 'unrestricted' });
+      expect(await storedPolicy(id)).toEqual({ mode: 'unrestricted', allowlist: null });
+
+      await updateEnv({ owner, environmentId: id, egressMode: 'allowlist' });
+      expect(await storedPolicy(id)).toEqual({ mode: 'allowlist', allowlist: [] });
+    });
+
+    test('rejects a policy list on update without a mode', async () => {
+      const user = await insertTestUser();
+      const owner = userOwner(user.id);
+      const id = await createEnv({
+        owner,
+        createdByUserId: user.id,
+        name: 'full',
+        platform: 'github',
+        repoFullName: 'acme/widgets',
+        egressMode: 'unrestricted',
+      });
+
+      await expect(
+        updateEnv({ owner, environmentId: id, egressAllowlist: ['api.example.com'] })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(await storedPolicy(id)).toEqual({ mode: 'unrestricted', allowlist: null });
+    });
+  });
+
   describe('loadEnvironmentForSession', () => {
     test('does not mix variable values with a concurrent configuration revision', async () => {
       const user = await insertTestUser();

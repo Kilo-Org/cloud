@@ -62,7 +62,7 @@ export function RepositoryEnvironmentChip({
           title={
             environment
               ? 'Edit environment'
-              : 'Save setup commands, variables, secrets, and a sandbox size for this repository.'
+              : 'Save setup commands, variables, secrets, a sandbox size, and network access for this repository.'
           }
           onClick={() => setDialogOpen(true)}
         >

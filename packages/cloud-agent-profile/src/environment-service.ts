@@ -8,6 +8,7 @@ import {
 import { and, count, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { encryptWithPublicKey } from '@kilocode/encryption';
+import { egressPolicySchema, type EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import type { EnvironmentPlatform } from './environment-contracts';
 import {
   encryptedEnvelopeSchema,
@@ -87,6 +88,43 @@ function encryptValue(publicKeyBase64: string, value: string): string {
   }
   const publicKey = Buffer.from(publicKeyBase64, 'base64');
   return JSON.stringify(encryptWithPublicKey(value, publicKey));
+}
+
+type EnvironmentEgressColumns = {
+  egress_mode: EgressMode;
+  egress_allowlist: string[] | null;
+};
+
+/**
+ * Validates a supplied network policy with the shared egress contract and
+ * converts it to the stored columns. Absent mode retains the stored policy.
+ * Allowlist mode always stores a list, so the "None" choice is an empty one.
+ */
+function resolveEnvironmentEgressPolicy(input: {
+  egressMode?: EgressMode;
+  egressAllowlist?: string[];
+}): EnvironmentEgressColumns | undefined {
+  if (input.egressMode === undefined) {
+    if (input.egressAllowlist !== undefined) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'egressAllowlist requires egressMode to be allowlist',
+      });
+    }
+    return undefined;
+  }
+
+  const parsed = egressPolicySchema.safeParse({
+    egressMode: input.egressMode,
+    egressAllowlist: input.egressAllowlist,
+  });
+  if (!parsed.success) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid egress policy' });
+  }
+
+  return parsed.data.egressMode === 'allowlist'
+    ? { egress_mode: 'allowlist', egress_allowlist: parsed.data.egressAllowlist ?? [] }
+    : { egress_mode: 'unrestricted', egress_allowlist: null };
 }
 
 /**
@@ -350,6 +388,7 @@ export async function createEnvironment(
   const commands = validateEnvironmentCommands(input.commands);
   assertNoPlainSecretCollision(plainVars, Object.keys(secrets));
   validateEnvironmentVarCount(Object.keys(plainVars).length + Object.keys(secrets).length);
+  const egress = resolveEnvironmentEgressPolicy(input);
 
   if (input.owner.type === 'organization') {
     await lockActiveOrganization(tx, input.owner.id);
@@ -366,6 +405,8 @@ export async function createEnvironment(
       ...identity,
       commands,
       sandbox_allocation: input.sandboxAllocation ?? null,
+      egress_mode: egress?.egress_mode ?? null,
+      egress_allowlist: egress?.egress_allowlist ?? null,
     })
     .returning({ id: cloud_agent_environments.id });
 
@@ -409,6 +450,7 @@ export async function updateEnvironment(
   const commands =
     input.commands === undefined ? undefined : validateEnvironmentCommands(input.commands);
   const secretChanges = input.secrets;
+  const egress = resolveEnvironmentEgressPolicy(input);
 
   if (input.owner.type === 'organization') {
     await lockActiveOrganization(tx, input.owner.id);
@@ -430,14 +472,23 @@ export async function updateEnvironment(
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Environment not found' });
   }
 
+<<<<<<< 0193c81970e48a3312b6f0f5f2b2e6014ad23a1a
   // Name and allocation are not build inputs; they never advance the revision.
   if (name !== undefined || input.sandboxAllocation !== undefined) {
+||||||| b63e3f2b12ee2b8876dc266edd1e260553936f92
+  if (name !== undefined || input.sandboxAllocation !== undefined) {
+=======
+  if (name !== undefined || input.sandboxAllocation !== undefined || egress !== undefined) {
+>>>>>>> 0fd5178900beee5cf9f6ade89d4b56c5b16eedf9
     await tx
       .update(cloud_agent_environments)
       .set({
         ...(name !== undefined ? { name } : {}),
         ...(input.sandboxAllocation !== undefined
           ? { sandbox_allocation: input.sandboxAllocation }
+          : {}),
+        ...(egress !== undefined
+          ? { egress_mode: egress.egress_mode, egress_allowlist: egress.egress_allowlist }
           : {}),
       })
       .where(eq(cloud_agent_environments.id, input.environmentId));
@@ -593,6 +644,8 @@ export async function getEnvironment(
     ...toResponseColumns(environment),
     plainVars,
     commands: environment.commands,
+    egressMode: environment.egress_mode,
+    egressAllowlist: environment.egress_allowlist,
     secretKeys: secretKeys.map(row => row.key),
   };
 }
@@ -687,6 +740,7 @@ async function readActiveEnvironment(
     )
     .where(and(condition, isNull(organizations.deleted_at)))
     .limit(1);
+<<<<<<< 0193c81970e48a3312b6f0f5f2b2e6014ad23a1a
   return row?.environment ?? null;
 }
 
@@ -772,4 +826,59 @@ export async function loadEnvironmentBuildInput(
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' }
   );
+||||||| b63e3f2b12ee2b8876dc266edd1e260553936f92
+  if (!row) return null;
+
+  const vars = await db
+    .select({
+      key: cloud_agent_environment_vars.key,
+      value: cloud_agent_environment_vars.value,
+      isSecret: cloud_agent_environment_vars.is_secret,
+    })
+    .from(cloud_agent_environment_vars)
+    .where(eq(cloud_agent_environment_vars.environment_id, row.environment.id));
+
+  const envVars: Record<string, string> = {};
+  const encryptedSecrets: EnvironmentSessionLayer['encryptedSecrets'] = {};
+  for (const variable of vars) {
+    if (variable.isSecret) {
+      encryptedSecrets[variable.key] = encryptedEnvelopeSchema.parse(JSON.parse(variable.value));
+    } else {
+      envVars[variable.key] = variable.value;
+    }
+  }
+
+  return {
+    layer: { envVars, encryptedSecrets, setupCommands: row.environment.commands },
+    sandboxAllocation: row.environment.sandbox_allocation,
+  };
+=======
+  if (!row) return null;
+
+  const vars = await db
+    .select({
+      key: cloud_agent_environment_vars.key,
+      value: cloud_agent_environment_vars.value,
+      isSecret: cloud_agent_environment_vars.is_secret,
+    })
+    .from(cloud_agent_environment_vars)
+    .where(eq(cloud_agent_environment_vars.environment_id, row.environment.id));
+
+  const envVars: Record<string, string> = {};
+  const encryptedSecrets: EnvironmentSessionLayer['encryptedSecrets'] = {};
+  for (const variable of vars) {
+    if (variable.isSecret) {
+      encryptedSecrets[variable.key] = encryptedEnvelopeSchema.parse(JSON.parse(variable.value));
+    } else {
+      envVars[variable.key] = variable.value;
+    }
+  }
+
+  return {
+    layer: { envVars, encryptedSecrets, setupCommands: row.environment.commands },
+    sandboxAllocation: row.environment.sandbox_allocation,
+    egressMode: row.environment.egress_mode,
+    egressAllowlist: row.environment.egress_allowlist,
+  };
+>>>>>>> 0fd5178900beee5cf9f6ade89d4b56c5b16eedf9
 }

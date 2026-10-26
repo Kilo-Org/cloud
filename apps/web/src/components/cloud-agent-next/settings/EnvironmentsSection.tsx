@@ -242,7 +242,8 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
         <div className="rounded-lg border border-dashed px-4 py-8 text-center">
           <p className="text-muted-foreground text-sm">No environments</p>
           <p className="text-muted-foreground mt-1 text-xs">
-            Add one to give a repository setup commands, variables, secrets, and a sandbox size.
+            Add one to give a repository setup commands, variables, secrets, a sandbox size, and
+            network access.
           </p>
         </div>
       ) : (

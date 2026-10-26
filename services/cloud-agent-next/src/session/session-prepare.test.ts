@@ -527,6 +527,23 @@ describe('explicit sandbox session creation', () => {
     }
   );
 
+  it('rejects an inherited allowlist when no saved allocation selects containers', async () => {
+    const doStub = makeDoStub();
+    const request = makeRequest({
+      repository: { type: 'github', repo: 'acme/repo' },
+      options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+      runtime: { egressMode: 'allowlist', egressAllowlist: [] },
+    });
+
+    await expect(runCreate(selectedContext(doStub), request)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message:
+        'Deny-by-default egress requires an isolated control-plane Cloudflare containers sandbox',
+    });
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+  });
+
   it('accepts a supported resolved native replacement of cloudflare-single', async () => {
     const doStub = makeDoStub();
     const request = requestForPreset('cloudflare-single');
@@ -694,6 +711,170 @@ describe('explicit sandbox session creation', () => {
     ).rejects.toMatchObject({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(1);
     expect(doStub.getMetadata).not.toHaveBeenCalled();
+  });
+
+  describe.each(['duplicate_settled', 'takeover', 'duplicate_reconcile_pending'] as const)(
+    '%s changed network policy',
+    admission => {
+      it('conflicts before allocation, registration, or settlement', async () => {
+        const doStub = makeDoStub();
+        const ctx = selectedContext(doStub);
+        const request = {
+          ...requestForPreset('cloudflare-containers-standard-3'),
+          runtime: {
+            sandboxAllocation: 'cloudflare-containers-standard-3' as const,
+            egressMode: 'allowlist' as const,
+            egressAllowlist: ['api.example.com'],
+          },
+        };
+        await runCreate(ctx, request);
+        const progress = Object.assign(
+          {},
+          ...recordOperationProgressMock.mock.calls.map(call => call[2])
+        );
+        const creates = doStub.createSessionWithInitialAdmission.mock.calls.length;
+        const settles = settleOperationMock.mock.calls.length;
+        const progressWrites = recordOperationProgressMock.mock.calls.length;
+        getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }]]));
+        admitOperationMock.mockResolvedValueOnce({
+          admission,
+          row: makeLedgerRow({
+            organization_id: orgId,
+            status: admission === 'duplicate_settled' ? 'completed' : 'reconcile_pending',
+            canonical_result: progress,
+          }),
+        });
+
+        await expect(
+          runCreate(ctx, {
+            ...request,
+            runtime: { ...request.runtime, egressAllowlist: ['other.example.com'] },
+          })
+        ).rejects.toMatchObject({
+          code: 'CONFLICT',
+          message: 'session_create_intent_conflict',
+        });
+
+        expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(creates);
+        expect(doStub.getMetadata).not.toHaveBeenCalled();
+        expect(settleOperationMock).toHaveBeenCalledTimes(settles);
+        expect(recordOperationProgressMock).toHaveBeenCalledTimes(progressWrites);
+      });
+    }
+  );
+
+  it('conflicts a changed policy against an in-flight admitted fingerprint before effects', async () => {
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    const request = {
+      ...requestForPreset('cloudflare-containers-standard-3'),
+      runtime: {
+        sandboxAllocation: 'cloudflare-containers-standard-3' as const,
+        egressMode: 'allowlist' as const,
+        egressAllowlist: ['api.example.com'],
+      },
+    };
+    await runCreate(ctx, request);
+    const admission = admitOperationMock.mock.calls[0][1] as {
+      initialCanonicalResult: Record<string, unknown>;
+    };
+    const allocations = selectControlPlaneSandboxMock.mock.calls.length;
+    const creates = doStub.createSessionWithInitialAdmission.mock.calls.length;
+    const settles = settleOperationMock.mock.calls.length;
+    const progressWrites = recordOperationProgressMock.mock.calls.length;
+    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }]]));
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_in_flight',
+      row: makeLedgerRow({
+        organization_id: orgId,
+        status: 'admitted',
+        canonical_result: admission.initialCanonicalResult,
+      }),
+    });
+
+    await expect(
+      runCreate(ctx, {
+        ...request,
+        runtime: { ...request.runtime, egressAllowlist: ['other.example.com'] },
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
+
+    expect(selectControlPlaneSandboxMock).toHaveBeenCalledTimes(allocations);
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(creates);
+    expect(doStub.getMetadata).not.toHaveBeenCalled();
+    expect(settleOperationMock).toHaveBeenCalledTimes(settles);
+    expect(recordOperationProgressMock).toHaveBeenCalledTimes(progressWrites);
+  });
+
+  it('keeps the in-flight bound for an admitted row without recorded progress', async () => {
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    const request = requestForPreset('cloudflare-containers-standard-3');
+    request.runtime = {
+      sandboxAllocation: 'cloudflare-containers-standard-3',
+      egressMode: 'allowlist',
+      egressAllowlist: ['api.example.com'],
+    };
+    await runCreate(ctx, request);
+    const creates = doStub.createSessionWithInitialAdmission.mock.calls.length;
+    const settles = settleOperationMock.mock.calls.length;
+    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }]]));
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_in_flight',
+      row: makeLedgerRow({ organization_id: orgId, status: 'admitted' }),
+    });
+
+    await expect(
+      runCreate(ctx, {
+        ...request,
+        runtime: { ...request.runtime, egressAllowlist: ['other.example.com'] },
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'creation_in_progress' });
+
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(creates);
+    expect(settleOperationMock).toHaveBeenCalledTimes(settles);
+  });
+
+  it('conflicts a restricted retry against an unrestricted Vercel creation before recovery', async () => {
+    const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    const request = requestForPreset('vercel-small');
+    await runCreate(ctx, request);
+    const admission = admitOperationMock.mock.calls[0][1] as {
+      initialCanonicalResult: Record<string, unknown>;
+    };
+    const allocations = selectControlPlaneSandboxMock.mock.calls.length;
+    const dispatches = createCliSessionMock.mock.calls.length;
+    const creates = doStub.createSessionWithInitialAdmission.mock.calls.length;
+    const settles = settleOperationMock.mock.calls.length;
+    const progressWrites = recordOperationProgressMock.mock.calls.length;
+    getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }]]));
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'takeover',
+      row: makeLedgerRow({
+        organization_id: orgId,
+        status: 'reconcile_pending',
+        canonical_result: admission.initialCanonicalResult,
+      }),
+    });
+
+    await expect(
+      runCreate(ctx, {
+        ...request,
+        runtime: {
+          sandboxAllocation: 'vercel-small',
+          egressMode: 'allowlist',
+          egressAllowlist: ['api.example.com'],
+        },
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
+
+    expect(selectControlPlaneSandboxMock).toHaveBeenCalledTimes(allocations);
+    expect(createCliSessionMock).toHaveBeenCalledTimes(dispatches);
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(creates);
+    expect(doStub.getMetadata).not.toHaveBeenCalled();
+    expect(settleOperationMock).toHaveBeenCalledTimes(settles);
+    expect(recordOperationProgressMock).toHaveBeenCalledTimes(progressWrites);
   });
 
   it.each([

@@ -1,9 +1,19 @@
 import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from '@jest/globals';
 import {
+<<<<<<< 0193c81970e48a3312b6f0f5f2b2e6014ad23a1a
   hasEnvironmentFormChanges,
   toEnvironmentCommands,
   toEnvironmentScript,
+||||||| b63e3f2b12ee2b8876dc266edd1e260553936f92
+import { toEnvironmentCommands, toEnvironmentScript } from './environment-form';
+=======
+  buildEgressPolicy,
+  toEnvironmentCommands,
+  toEnvironmentScript,
+  toNetworkAccessDraft,
+  type NetworkAccessDraft,
+>>>>>>> 0fd5178900beee5cf9f6ade89d4b56c5b16eedf9
 } from './environment-form';
 
 describe('single environment script', () => {
@@ -38,6 +48,7 @@ describe('single environment script', () => {
   });
 });
 
+<<<<<<< 0193c81970e48a3312b6f0f5f2b2e6014ad23a1a
 describe('hasEnvironmentFormChanges', () => {
   const saved = {
     script: toEnvironmentScript(['export A=1', 'echo "$A"']),
@@ -65,5 +76,96 @@ describe('hasEnvironmentFormChanges', () => {
     expect(hasEnvironmentFormChanges(saved, draft)).toBe(true);
     draft.script = saved.script;
     expect(hasEnvironmentFormChanges(saved, draft)).toBe(false);
+||||||| b63e3f2b12ee2b8876dc266edd1e260553936f92
+=======
+describe('environment network access', () => {
+  const full: NetworkAccessDraft = { mode: 'full', domains: '' };
+  const none: NetworkAccessDraft = { mode: 'none', domains: '' };
+
+  it('reads legacy and saved policies into compact choices', () => {
+    expect(toNetworkAccessDraft(null, null)).toEqual(full);
+    expect(toNetworkAccessDraft('unrestricted', null)).toEqual(full);
+    expect(toNetworkAccessDraft('allowlist', [])).toEqual(none);
+    expect(toNetworkAccessDraft('allowlist', ['registry.npmjs.org', 'api.example.com'])).toEqual({
+      mode: 'limited',
+      domains: 'registry.npmjs.org\napi.example.com',
+    });
+  });
+
+  it('maps None, Limited, and Full to the shared policy', () => {
+    expect(buildEgressPolicy(none, full)).toEqual({
+      policy: { egressMode: 'allowlist', egressAllowlist: [] },
+      error: null,
+    });
+    expect(buildEgressPolicy({ mode: 'limited', domains: 'registry.npmjs.org' }, full)).toEqual({
+      policy: { egressMode: 'allowlist', egressAllowlist: ['registry.npmjs.org'] },
+      error: null,
+    });
+    expect(buildEgressPolicy(full, none)).toEqual({
+      policy: { egressMode: 'unrestricted' },
+      error: null,
+    });
+  });
+
+  it('normalizes domains with the shared schema and ignores blank lines', () => {
+    const result = buildEgressPolicy(
+      {
+        mode: 'limited',
+        domains: '  API.Example.com. \n\n registry.npmjs.org \napi.example.com',
+      },
+      full
+    );
+    expect(result.error).toBeNull();
+    expect(result.policy).toEqual({
+      egressMode: 'allowlist',
+      egressAllowlist: ['api.example.com', 'registry.npmjs.org'],
+    });
+  });
+
+  it('requires a domain for Limited access', () => {
+    expect(buildEgressPolicy({ mode: 'limited', domains: ' \n ' }, full).error).toMatch(
+      /at least one domain/
+    );
+  });
+
+  it('rejects invalid hostnames and lists above the submitted limit', () => {
+    expect(
+      buildEgressPolicy({ mode: 'limited', domains: 'https://example.com/path' }, full).error
+    ).toMatch(/exact ASCII hostname/);
+
+    const atLimit = Array.from({ length: 100 }, () => 'example.com').join('\n');
+    expect(buildEgressPolicy({ mode: 'limited', domains: atLimit }, full).policy).toEqual({
+      egressMode: 'allowlist',
+      egressAllowlist: ['example.com'],
+    });
+
+    const overLimit = Array.from({ length: 101 }, () => 'example.com').join('\n');
+    expect(buildEgressPolicy({ mode: 'limited', domains: overLimit }, full).error).toMatch(
+      /^Check the domains\./
+    );
+  });
+
+  it('omits untouched policies and hidden domain text', () => {
+    expect(buildEgressPolicy(full, full)).toEqual({ error: null });
+    expect(buildEgressPolicy(none, none)).toEqual({ error: null });
+    expect(buildEgressPolicy({ mode: 'none', domains: 'hidden.example.com' }, none)).toEqual({
+      error: null,
+    });
+    expect(buildEgressPolicy({ mode: 'full', domains: 'hidden.example.com' }, full)).toEqual({
+      error: null,
+    });
+
+    const saved = toNetworkAccessDraft('allowlist', ['api.example.com', 'registry.npmjs.org']);
+    expect(
+      buildEgressPolicy(
+        { mode: 'limited', domains: ' registry.npmjs.org \napi.example.com' },
+        saved
+      )
+    ).toEqual({ error: null });
+    expect(buildEgressPolicy({ mode: 'none', domains: saved.domains }, saved)).toEqual({
+      policy: { egressMode: 'allowlist', egressAllowlist: [] },
+      error: null,
+    });
+>>>>>>> 0fd5178900beee5cf9f6ade89d4b56c5b16eedf9
   });
 });

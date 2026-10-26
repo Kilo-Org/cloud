@@ -49,10 +49,20 @@ const {
   startNewSessionMock,
   createSessionWithLedgerMock,
   parentRuntimeTokenMock,
+  parentMetadataMock,
 } = vi.hoisted(() => ({
   mergeProfileConfigurationMock: vi.fn().mockResolvedValue({}),
   loadEnvironmentForSessionMock: vi.fn().mockResolvedValue(null),
   parentRuntimeTokenMock: vi.fn().mockResolvedValue('trusted-parent-model-token'),
+  parentMetadataMock: vi.fn().mockResolvedValue({
+    metadataSchemaVersion: 2,
+    identity: {
+      sessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
+      userId: 'test-user-123',
+    },
+    auth: {},
+    lifecycle: { version: 1, timestamp: 1 },
+  }),
   assertKiloModelAvailableMock: vi.fn().mockResolvedValue(undefined),
   assertBitbucketRepositoryAccessMock: vi.fn().mockResolvedValue(undefined),
   assertOrganizationMembershipMock: vi.fn().mockResolvedValue(undefined),
@@ -117,7 +127,10 @@ vi.mock('../../session/session-registration.js', () => ({
 }));
 
 vi.mock('../../sandbox-session/session-stub.js', () => ({
-  getSandboxSessionStub: () => ({ getCloudAgentSpawnRuntimeToken: parentRuntimeTokenMock }),
+  getSandboxSessionStub: () => ({
+    getCloudAgentSpawnRuntimeToken: parentRuntimeTokenMock,
+    getMetadata: parentMetadataMock,
+  }),
 }));
 vi.mock('../../balance-validation.js', () => ({
   validateBalanceOnly: vi.fn(async () => ({ success: true })),
@@ -294,6 +307,178 @@ describe('prepareSession operation-ledger admission gate', () => {
       allowSubagentSessions: true,
       parentCloudAgentSessionId: authority.parentSessionId,
     });
+  });
+
+  it('inherits an environment allowlist when prepare supplies only an allocation', async () => {
+    loadEnvironmentForSessionMock.mockResolvedValueOnce({
+      layer: {},
+      sandboxAllocation: null,
+      egressMode: 'allowlist',
+      egressAllowlist: ['api.example.com'],
+    });
+    const caller = router.createCaller(createContext());
+
+    await caller.prepareSession({
+      prompt: 'child',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+      sandboxAllocation: 'cloudflare-containers-standard-3',
+      autoInitiate: true,
+      createdOnPlatform: 'cloud-agent-web',
+    });
+
+    expect(startNewSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runtime: {
+          sandboxAllocation: 'cloudflare-containers-standard-3',
+          egressMode: 'allowlist',
+          egressAllowlist: ['api.example.com'],
+        },
+      }),
+      expect.anything(),
+      expect.anything()
+    );
+  });
+
+  it('inherits the recorded parent policy for a scoped child', async () => {
+    const context = createContext();
+    context.authToken = jwt.sign({ aud: 'cloud-agent-next' }, 'fixture');
+    const authority = {
+      version: 1,
+      ownerId: context.userId ?? 'user-123',
+      parentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
+      organizationId: null,
+      authorizationId: '12345678-1234-4234-8234-123456789abc',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+    } satisfies NonNullable<TRPCContext['cloudAgentAuthority']>;
+    context.cloudAgentAuthority = authority;
+    parentMetadataMock.mockResolvedValueOnce({
+      metadataSchemaVersion: 2,
+      identity: { sessionId: authority.parentSessionId, userId: context.userId },
+      auth: {},
+      workspace: {
+        sandboxProvider: 'cloudflare-containers',
+        sandboxId: 'ses-0123456789abcdef',
+        egressMode: 'allowlist',
+        egressAllowlist: ['api.example.com'],
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+
+    await router.createCaller(context).prepareSession({
+      prompt: 'child',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+    });
+
+    expect(startNewSessionMock.mock.calls[0][0].runtime).toEqual({
+      egressMode: 'allowlist',
+      egressAllowlist: ['api.example.com'],
+    });
+    expect(loadEnvironmentForSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('uses a recorded policy for a grandchild after the repository policy changes', async () => {
+    const context = createContext();
+    const caller = router.createCaller(context);
+    const childSessionId = 'workspace_87654321-4321-4321-8321-210987654321';
+    loadEnvironmentForSessionMock.mockResolvedValueOnce({
+      layer: {},
+      sandboxAllocation: 'cloudflare-containers-standard-3',
+      egressMode: 'allowlist',
+      egressAllowlist: ['api.example.com'],
+    });
+    startNewSessionMock.mockResolvedValueOnce({
+      cloudAgentSessionId: childSessionId,
+      kiloSessionId: 'cli-child',
+    });
+
+    await caller.prepareSession({
+      prompt: 'child',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+      createdOnPlatform: 'cloud-agent-web',
+    });
+
+    const childRequest = startNewSessionMock.mock.calls[0][0];
+    expect(childRequest.runtime).toEqual({
+      egressMode: 'allowlist',
+      egressAllowlist: ['api.example.com'],
+    });
+
+    const childMetadata = {
+      metadataSchemaVersion: 2,
+      allowSubagentSessions: true,
+      identity: { sessionId: childSessionId, userId: context.userId },
+      auth: {},
+      profile: {
+        envVars: { PARENT_ONLY: '1' },
+        setupCommands: ['echo parent'],
+        encryptedSecrets: {
+          PARENT_SECRET: {
+            encryptedData: 'ciphertext',
+            encryptedDEK: 'dek',
+            algorithm: 'rsa-aes-256-gcm',
+            version: 1,
+          },
+        },
+      },
+      workspace: {
+        sandboxProvider: 'cloudflare-containers',
+        sandboxId: 'ses-fedcba9876543210',
+        sandboxAllocation: 'cloudflare-containers-standard-3',
+        egressMode: 'allowlist',
+        egressAllowlist: childRequest.runtime?.egressAllowlist,
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    };
+
+    loadEnvironmentForSessionMock.mockResolvedValueOnce({
+      layer: {},
+      sandboxAllocation: 'cloudflare-containers-standard-4',
+      egressMode: 'allowlist',
+      egressAllowlist: ['changed.example.com'],
+    });
+    context.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '*';
+    context.authToken = jwt.sign({ aud: 'cloud-agent-next' }, 'fixture');
+    context.cloudAgentAuthority = {
+      version: 1,
+      ownerId: context.userId ?? 'test-user-123',
+      parentSessionId: childSessionId,
+      organizationId: null,
+      authorizationId: '12345678-1234-4234-8234-123456789abc',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+    };
+    parentMetadataMock.mockResolvedValueOnce(childMetadata);
+
+    await caller.prepareSession({
+      prompt: 'grandchild',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+    });
+
+    const grandchildRequest = startNewSessionMock.mock.calls[1][0];
+    expect(grandchildRequest).toMatchObject({
+      parentCloudAgentSessionId: childSessionId,
+      allowSubagentSessions: false,
+      runtime: {
+        egressMode: 'allowlist',
+        egressAllowlist: ['api.example.com'],
+      },
+    });
+    expect(grandchildRequest.runtime).not.toHaveProperty('sandboxAllocation');
+    expect(grandchildRequest.environmentSandboxAllocation).toBeUndefined();
+    expect(grandchildRequest.profile?.resolved?.envVars).toBeUndefined();
+    expect(grandchildRequest.profile?.resolved?.setupCommands).toBeUndefined();
+    expect(grandchildRequest.profile?.resolved?.encryptedSecrets).toBeUndefined();
+    expect(loadEnvironmentForSessionMock).toHaveBeenCalledTimes(1);
   });
 
   it('permits normal parent preparation inputs without requiring auto-initiation or GitHub', async () => {

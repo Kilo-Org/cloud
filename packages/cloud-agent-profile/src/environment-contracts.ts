@@ -2,6 +2,7 @@ import { SETUP_SCRIPT_LIMITS } from './setup-script';
 import * as z from 'zod';
 import { TRPCError } from '@trpc/server';
 import type { EncryptedEnvelope } from '@kilocode/encryption';
+import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import { MASKED_SECRET_VALUE, type ProfileOwner } from './types';
 
 export const ENVIRONMENT_SECRET_PLACEHOLDER = '<unchanged>';
@@ -95,6 +96,10 @@ export type EnvironmentCreateInput = {
   commands?: string[];
   /** Saved sandbox allocation key; null or absent uses the owner's default. */
   sandboxAllocation?: string | null;
+  /** Saved network policy; absent keeps the legacy unrestricted behavior. */
+  egressMode?: EgressMode;
+  /** Additional allowed exact hostnames; requires allowlist mode. */
+  egressAllowlist?: string[];
 };
 
 export type EnvironmentSecretChange =
@@ -110,6 +115,9 @@ export type EnvironmentUpdateInput = {
   commands?: string[];
   /** Absent keeps the stored allocation; null clears it. */
   sandboxAllocation?: string | null;
+  /** Absent keeps the stored policy; a supplied mode replaces it. */
+  egressMode?: EgressMode;
+  egressAllowlist?: string[];
 };
 
 /** The primitives a repository environment contributes to a session. */
@@ -139,6 +147,9 @@ export type EnvironmentForSession = {
   reference: EnvironmentReference;
   /** Saved allocation key, unvalidated; the Worker checks eligibility. */
   sandboxAllocation: string | null;
+  /** Saved policy; both null means the legacy unrestricted default. */
+  egressMode: EgressMode | null;
+  egressAllowlist: string[] | null;
 };
 
 /**
@@ -176,6 +187,9 @@ export type EnvironmentResponse = {
   commands: string[];
   configurationRevision: number;
   sandboxAllocation: string | null;
+  /** Saved policy; both null means the legacy unrestricted default. */
+  egressMode: EgressMode | null;
+  egressAllowlist: string[] | null;
   /** Secret key names only. Values and envelopes are never returned. */
   secretKeys: string[];
 };

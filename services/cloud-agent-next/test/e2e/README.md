@@ -464,7 +464,11 @@ is never printed.
 Exact run command, from `services/cloud-agent-next`:
 
 ```bash
-E2E_PROFILE=deployed pnpm exec tsx test/e2e/run.ts cold-hot echo:hi
+E2E_PROFILE=deployed \
+WORKER_URL=https://cloud-agent-e2e-test.engineering-e11.workers.dev \
+FAKE_LLM_URL=https://fake-llm.engineering-e11.workers.dev \
+E2E_BACKEND_URL=https://api.kilo.ai \
+pnpm exec tsx test/e2e/run.ts cold-hot echo:hi
 ```
 
 Every runnable scenario is a shared definition in `scenarios-shared*.ts`.

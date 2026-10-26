@@ -38,7 +38,6 @@ export function UserAdminCreditGrant({
   const queryClient = useQueryClient();
   const { canManageCredits } = useAdminCreditManagementPermission();
 
-  // Credit form state
   const [selectedCredit, setSelectedCredit] = useState<string>('custom');
   const [showSelfServe, setShowSelfServe] = useState(false);
   const [includeNonSupport, setIncludeNonSupport] = useState(false);
@@ -49,7 +48,6 @@ export function UserAdminCreditGrant({
   const [neverExpire, setNeverExpire] = useState(false);
   const [creditKind, setCreditKind] = useState<'paid' | 'promotional'>('promotional');
 
-  // API state
   const [isGrantingCredit, setIsGrantingCredit] = useState(false);
   const [creditMessage, setCreditMessage] = useState<CreditMessage | null>(null);
 
@@ -58,7 +56,6 @@ export function UserAdminCreditGrant({
   );
   const expectNegative = selectedCreditCategory?.expect_negative_amount ?? false;
 
-  // Check if expiration is provided (either via date, hours, or category default)
   const hasExpirationFromCategory =
     selectedCreditCategory?.expiry_hours != null ||
     selectedCreditCategory?.credit_expiry_date != null;

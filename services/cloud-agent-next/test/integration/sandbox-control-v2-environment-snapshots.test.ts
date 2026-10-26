@@ -1,17 +1,16 @@
 import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
-import { eq } from 'drizzle-orm';
-import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
-import { resolveSecret } from '../../src/auth.js';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { sessionDoName } from '../../src/session-identity.js';
-import { verifySandboxLaunchCredential } from '../../src/sandbox-control/credential.js';
-import { validateControlLogUploadGrant } from '../../src/sandbox-control/log-upload-grant.js';
 import {
   allocation as allocationTable,
   routes as routesTable,
 } from '../../src/control-plane/sandbox/sqlite-schema.js';
+import { eq } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/durable-sqlite';
+import type { SnapshotResolution } from '../../src/environment-build/coordinator.js';
+import type { SessionEnvironmentReference } from '../../src/environment-build/reference.js';
 import type {
   ProviderAdapter,
   ProviderCreateIntent,
@@ -24,6 +23,7 @@ import type { ControlPlaneRouteSpec } from '../../src/shared/control-plane-proto
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import {
   createFakeCredentialBroker,
+  FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
@@ -37,21 +37,58 @@ import { waitFor } from './wait-for.js';
 
 const SESSION = 'workspace_11111111-1111-1111-1111-111111111111';
 const KILO_SESSION = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
+const sessionIdentities = new Map<string, { userId: string; kiloSessionId: string }>();
 const REPO_URL = 'https://github.com/acme/widgets.git';
 const ISOLATED_DIRECTORY = '/workspace/app';
 const LAUNCH_KEY = 'repository_launch';
-const ENROLLED = { CONTAINER_REPO_SNAPSHOT_IDS: '*' };
-const NOT_ENROLLED = { CONTAINER_REPO_SNAPSHOT_IDS: '' };
+const REFERENCE: SessionEnvironmentReference = {
+  environmentId: '44444444-4444-4444-8444-444444444444',
+  owner: { type: 'organization', id: '55555555-5555-4555-8555-555555555555' },
+  configurationRevision: 2,
+  repository: { platform: 'github', repoFullName: 'acme/widgets' },
+};
+const SNAPSHOT = { snapshotId: 'snap-env', baseImage: 'registry.example/app:1' };
+const RESOLVED: SnapshotResolution = {
+  snapshot: {
+    ...SNAPSHOT,
+    revision: 1,
+    capturedAt: 1,
+    buildId: '66666666-6666-4666-8666-666666666666',
+    stale: 'revision',
+  },
+  reason: 'eligible',
+  admission: { status: 'admitted', buildId: '77777777-7777-4777-8777-777777777777' },
+};
+const MISSING: SnapshotResolution = {
+  snapshot: null,
+  reason: 'missing',
+  admission: { status: 'active', buildId: '77777777-7777-4777-8777-777777777777' },
+};
+
+/** A coordinator namespace that answers every lookup with one resolution and records it. */
+function fakeEnvironmentBuild(resolution: SnapshotResolution = RESOLVED) {
+  const lookups: unknown[] = [];
+  return {
+    lookups,
+    namespace: {
+      getByName: () => ({
+        resolveSnapshot: async (input: unknown) => {
+          lookups.push(input);
+          return resolution;
+        },
+      }),
+    },
+  };
+}
+const WITH_SNAPSHOT = { ENVIRONMENT_BUILD: fakeEnvironmentBuild().namespace };
+const WITHOUT_SNAPSHOT = { ENVIRONMENT_BUILD: fakeEnvironmentBuild(MISSING).namespace };
 // The Durable Object shares one env object across tests, so every test states the env it
 // needs and the Worker secret a previous test removed is put back.
 const WORKER_SECRET = (env as unknown as { NEXTAUTH_SECRET: unknown }).NEXTAUTH_SECRET;
-const WORKER_URL = (env as unknown as { WORKER_URL?: string }).WORKER_URL;
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
 const sandboxNamespace = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace })
   .SANDBOX_CONTROL;
-
-type Capture = { ref: string; repoKey: string; commit: string | undefined };
 
 type FakeProvider = {
   adapter: ProviderAdapter;
@@ -60,9 +97,6 @@ type FakeProvider = {
   launchDeadlines: Array<number | undefined>;
   launchRefs: string[];
   stopRefs: Array<string | null>;
-  captures: Capture[];
-  captureResult: boolean | 'throw' | 'hang';
-  releaseCapture: () => void;
   launchHold: boolean;
   releaseLaunch: () => void;
   stopHold: boolean;
@@ -71,7 +105,7 @@ type FakeProvider = {
 
 function createFakeProvider(
   options: {
-    capture?: boolean;
+    snapshots?: boolean;
     startSource?: ProviderStartSource;
     holdLaunch?: boolean;
     holdStop?: boolean;
@@ -81,7 +115,6 @@ function createFakeProvider(
     stopDelayMs?: number;
   } = {}
 ): FakeProvider {
-  let release: () => void = () => undefined;
   let releaseLaunch: () => void = () => undefined;
   let releaseStop: () => void = () => undefined;
   const provider: FakeProvider = {
@@ -91,9 +124,6 @@ function createFakeProvider(
     launchDeadlines: [],
     launchRefs: [],
     stopRefs: [],
-    captures: [],
-    captureResult: true,
-    releaseCapture: () => release(),
     launchHold: options.holdLaunch ?? false,
     releaseLaunch: () => releaseLaunch(),
     stopHold: options.holdStop ?? false,
@@ -140,21 +170,7 @@ function createFakeProvider(
     async logs() {
       return '';
     },
-    ...(options.capture === false
-      ? {}
-      : {
-          async captureRepository(ref: string, repoKey: string, commit?: string) {
-            provider.captures.push({ ref, repoKey, commit });
-            if (provider.captureResult === 'throw') throw new Error('capture failed');
-            if (provider.captureResult === 'hang') {
-              await new Promise<void>(resolve => {
-                release = resolve;
-              });
-              return true;
-            }
-            return provider.captureResult;
-          },
-        }),
+    ...(options.snapshots === false ? {} : { environmentSnapshots: true as const }),
   };
   return provider;
 }
@@ -168,14 +184,13 @@ type RouteOverrides = {
   orgId?: string | null;
   sessionId?: string;
   kiloSessionId?: string;
+  environment?: SessionEnvironmentReference | null;
 };
-
-const preparedIdentities = new Map<string, { userId: string; kiloSessionId: string }>();
 
 function prepareInput(overrides: RouteOverrides = {}) {
   const sessionId = overrides.sessionId ?? SESSION;
   const kiloSessionId = overrides.kiloSessionId ?? KILO_SESSION;
-  preparedIdentities.set(sessionId, { userId: overrides.userId ?? 'user_123', kiloSessionId });
+  sessionIdentities.set(sessionId, { userId: overrides.userId ?? 'user_123', kiloSessionId });
   const git = overrides.git === null ? undefined : (overrides.git ?? { url: REPO_URL });
   const spec: ControlPlaneRouteSpec = {
     sessionId,
@@ -188,10 +203,11 @@ function prepareInput(overrides: RouteOverrides = {}) {
   };
   return {
     spec,
+    ...(overrides.environment === null ? {} : { environment: overrides.environment ?? REFERENCE }),
     credentials: {
       userId: overrides.userId ?? 'user_123',
       kiloSessionId,
-      kiloToken: 'eyJhbGciOiJub25lIn0.eyJydW50aW1lQXV0aG9yaXphdGlvbiI6eyJpZCI6InJhXzEifX0.c2ln',
+      kiloToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
       orgId: overrides.orgId === null ? undefined : (overrides.orgId ?? 'org_123'),
       repository: { type: 'github' as const, repo: 'acme/widgets' },
       scopeId: sessionId,
@@ -202,21 +218,26 @@ function prepareInput(overrides: RouteOverrides = {}) {
 async function setup(
   sandboxId: string,
   provider: FakeProvider,
-  extraEnv: Record<string, unknown> = ENROLLED,
+  extraEnv: Record<string, unknown> = WITH_SNAPSHOT,
   peer = new FakeSessionPeer()
 ): Promise<{ stub: DurableObjectStub<SandboxControlV2>; peer: FakeSessionPeer }> {
   const stub = sandboxNamespace.getByName(sandboxId);
-  peer.runtimeProxyForSession = createRuntimeProxyMintingPeer(env, sessionId => {
-    const identity = preparedIdentities.get(sessionId);
-    if (!identity) throw new Error('Missing prepared identity');
-    return identity;
-  });
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
     installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
       NEXTAUTH_SECRET: WORKER_SECRET,
-      WORKER_URL,
+      // Credential grants require the runtime proxy facade, independent of local settings.
+      WORKER_URL: 'https://worker.example.com',
+      // These tests use fake providers, independently of local runtime deployment settings.
+      RUNTIME_STARTUP_MODE: 'preinstalled',
+      NATIVE_RUNTIME_IMAGE: 'all-in-one',
+      RUNTIME_RELEASE_DESCRIPTOR: undefined,
       ...extraEnv,
+    });
+    peer.runtimeProxyForSession = createRuntimeProxyMintingPeer(instance.env, sessionId => {
+      const identity = sessionIdentities.get(sessionId);
+      if (!identity) throw new Error('Missing session fixture identity');
+      return identity;
     });
     Object.assign(instance, {
       createProviderAdapter: () => provider.adapter,
@@ -225,14 +246,6 @@ async function setup(
     });
   });
   return { stub, peer };
-}
-
-function repoKeyOf(stub: DurableObjectStub<SandboxControlV2>, sessionId = SESSION) {
-  return runInDurableObject(stub, async (_instance, state) => {
-    const db = drizzle(state.storage, { logger: false });
-    const rows = await db.select().from(routesTable).where(eq(routesTable.session_id, sessionId));
-    return rows[0]?.repo_key ?? null;
-  });
 }
 
 function readLaunchRecord(stub: DurableObjectStub<SandboxControlV2>) {
@@ -252,17 +265,6 @@ async function connect(sandboxId: string, provider: FakeProvider, launchCount = 
   const wrapper = await FakeWrapper.connect({ sandboxId, credential });
   await wrapper.hello({ wrapperId: 'wr_1', allocationId });
   return { wrapper, allocationId };
-}
-
-/** Releases a hung capture from inside the Durable Object that is awaiting it. */
-async function releaseCapture(
-  stub: DurableObjectStub<SandboxControlV2>,
-  provider: FakeProvider
-): Promise<void> {
-  await runInDurableObject(stub, async () => {
-    provider.releaseCapture();
-    await new Promise(resolve => setTimeout(resolve, 25));
-  });
 }
 
 /** Releases a hung launch or stop from inside the Durable Object awaiting it. */
@@ -286,150 +288,18 @@ afterEach(async () => {
   await reset();
 });
 
-describe('repository snapshot key', () => {
-  it('names an eligible route and is stable across sandboxes, sessions and credential grants', async () => {
-    const first = createFakeProvider();
-    const second = createFakeProvider();
-    const { stub: a } = await setup('sbx__repo_key_a', first);
-    const { stub: b } = await setup('sbx__repo_key_b', second);
-
-    await a.prepare(prepareInput({ env: { NPM_TOKEN: 'secret-1', A: '1' } }));
-    await b.prepare(
-      prepareInput({
-        sessionId: 'workspace_22222222-2222-2222-2222-222222222222',
-        env: { A: '1', NPM_TOKEN: 'secret-1' },
-      })
-    );
-
-    const keyA = await repoKeyOf(a);
-    const keyB = await repoKeyOf(b, 'workspace_22222222-2222-2222-2222-222222222222');
-    expect(keyA).toMatch(/^[0-9a-f]{64}$/);
-    expect(keyB).toBe(keyA);
-  });
-
-  it('changes with the user and the repository, not with env', async () => {
-    const keys = new Set<string | null>();
-    const variants: RouteOverrides[] = [
-      {},
-      { userId: 'user_other' },
-      { git: { url: 'https://github.com/acme/other.git' } },
-    ];
-    for (const [index, variant] of variants.entries()) {
-      const { stub } = await setup(`sbx__repo_key_variant_${index}`, createFakeProvider());
-      await stub.prepare(prepareInput(variant));
-      keys.add(await repoKeyOf(stub));
-    }
-    expect(keys.size).toBe(variants.length);
-    expect(keys.has(null)).toBe(false);
-  });
-
-  it('is the same for different env values', async () => {
-    const keys = new Set<string | null>();
-    for (const [index, env] of [{}, { FOO: 'bar' }, { FOO: 'baz' }].entries()) {
-      const { stub } = await setup(`sbx__repo_key_env_${index}`, createFakeProvider());
-      await stub.prepare(prepareInput({ env }));
-      keys.add(await repoKeyOf(stub));
-    }
-    expect(keys.size).toBe(1);
-    expect(keys.has(null)).toBe(false);
-  });
-
+describe('environment snapshot launch', () => {
   it.each([
-    ['a per-session directory', { directory: '/workspace/org/user/sessions/s1' }, undefined],
-    ['no repository', { git: null }, undefined],
-    ['an owner that is not enrolled', {}, NOT_ENROLLED],
-    ['no enrollment setting', {}, { CONTAINER_REPO_SNAPSHOT_IDS: undefined }],
-  ] as const)('gives no key for %s', async (_name, overrides, extraEnv) => {
-    const { stub } = await setup('sbx__repo_key_none', createFakeProvider(), extraEnv ?? ENROLLED);
-    await stub.prepare(prepareInput(overrides));
-    expect(await repoKeyOf(stub)).toBeNull();
-  });
-
-  it('gives no key when the provider cannot capture', async () => {
-    const { stub } = await setup('sbx__repo_key_nocap', createFakeProvider({ capture: false }));
-    await stub.prepare(prepareInput());
-    expect(await repoKeyOf(stub)).toBeNull();
-  });
-
-  it('gives no key when the Worker secret is unavailable', async () => {
-    const { stub } = await setup('sbx__repo_key_nosecret', createFakeProvider(), {
-      ...ENROLLED,
-      NEXTAUTH_SECRET: undefined,
-    });
-    await stub.prepare(prepareInput());
-    expect(await repoKeyOf(stub)).toBeNull();
-  });
-});
-
-describe('repository snapshot enrollment', () => {
-  it('enrolls a personal user by user ID and drives both capture and restore', async () => {
-    const provider = createFakeProvider({ startSource: 'repository' });
-    const { stub } = await setup('sbx__repo_elig_user', provider, {
-      CONTAINER_REPO_SNAPSHOT_IDS: 'user_123',
-    });
-    await stub.prepare(prepareInput({ orgId: null }));
-    const key = await repoKeyOf(stub);
-    expect(key).toMatch(/^[0-9a-f]{64}$/);
-
-    const { wrapper } = await connect('sbx__repo_elig_user', provider);
-
-    expect(provider.launchOptions).toEqual([{ repoKey: key }]);
-    const frame = await prepareFrameOf(wrapper);
-    expect(frame.spec.capture).toBe(true);
-
-    wrapper.send({ type: 'workspace.capture', sessionId: SESSION, commit: 'abc123' });
-    expect(await wrapper.next()).toEqual({
-      type: 'workspace.captured',
-      sessionId: SESSION,
-      ok: true,
-    });
-    expect(provider.captures).toEqual([
-      { ref: expect.stringMatching(/^mem_/), repoKey: key, commit: 'abc123' },
-    ]);
-  });
-
-  it('enrolls an org owner by org ID', async () => {
-    const { stub } = await setup('sbx__repo_elig_org', createFakeProvider(), {
-      CONTAINER_REPO_SNAPSHOT_IDS: 'org_123',
-    });
-    await stub.prepare(prepareInput());
-    expect(await repoKeyOf(stub)).toMatch(/^[0-9a-f]{64}$/);
-  });
-
-  it('gives no key and no capture to a non-matching personal owner', async () => {
-    const provider = createFakeProvider();
-    const { stub } = await setup('sbx__repo_elig_none', provider, {
-      CONTAINER_REPO_SNAPSHOT_IDS: 'user_other,org_other',
-    });
-    await stub.prepare(prepareInput({ orgId: null }));
-    expect(await repoKeyOf(stub)).toBeNull();
-
-    const { wrapper } = await connect('sbx__repo_elig_none', provider);
-    expect(provider.launchOptions).toEqual([{}]);
-    await prepareFrameOf(wrapper);
-
-    wrapper.send({ type: 'workspace.capture', sessionId: SESSION });
-    expect(await wrapper.next()).toEqual({
-      type: 'workspace.captured',
-      sessionId: SESSION,
-      ok: false,
-    });
-    expect(provider.captures).toEqual([]);
-  });
-});
-
-describe('repository snapshot launch', () => {
-  it.each([
-    { enrolled: true, skipped: false, budget: 300_000 },
-    { enrolled: false, skipped: false, budget: 120_000 },
-    { enrolled: true, skipped: true, budget: 120_000 },
+    { environment: true, skipped: false, budget: 300_000 },
+    { environment: false, skipped: false, budget: 120_000 },
+    { environment: true, skipped: true, budget: 120_000 },
   ])(
-    'uses creation budget $budget for enrolled=$enrolled skipped=$skipped',
-    async ({ enrolled, skipped, budget }) => {
-      const sandboxId = `sbx__repo_create_budget_${enrolled}_${skipped}`;
+    'uses creation budget $budget for environment=$environment skipped=$skipped',
+    async ({ environment, skipped, budget }) => {
+      const sandboxId = `sbx__repo_create_budget_${environment}_${skipped}`;
       const provider = createFakeProvider({ holdLaunch: true });
       const { stub } = await setup(sandboxId, provider, {
-        ...(enrolled ? ENROLLED : NOT_ENROLLED),
+        ...WITH_SNAPSHOT,
         SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
       });
       if (skipped) {
@@ -441,7 +311,7 @@ describe('repository snapshot launch', () => {
       }
       const before = Date.now();
       await stub.prepare({
-        ...prepareInput(),
+        ...prepareInput(environment ? {} : { environment: null }),
         sandboxSelection: { provider: 'cloudflare-containers' },
       });
       await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
@@ -455,73 +325,39 @@ describe('repository snapshot launch', () => {
   );
 
   it('cleans up a failed snapshot and launches the image on the same allocation and deadline', async () => {
-    const workerUrl = 'https://worker.example.test/';
     const sandboxId = 'sbx__repo_launch_fallback';
     const provider = createFakeProvider({
       launches: [{ startSource: 'repository', snapshotFailed: true }, { startSource: 'image' }],
     });
     const { stub } = await setup(sandboxId, provider, {
-      ...ENROLLED,
+      ...WITH_SNAPSHOT,
       SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
-      WORKER_URL: workerUrl,
     });
     await stub.prepare({
       ...prepareInput(),
       sandboxSelection: { provider: 'cloudflare-containers' },
     });
-    const key = await repoKeyOf(stub);
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
     const launchDeadline = (await stub.getAllocationState()).createDeadlineAt;
     const { wrapper, allocationId } = await connect(sandboxId, provider, 2);
 
-    expect(provider.launchOptions).toEqual([
-      { repoKey: key },
-      { repoKey: key, skipRepository: true },
-    ]);
+    expect(provider.launchOptions).toEqual([{ snapshot: SNAPSHOT }, {}]);
     expect(provider.launchRefs[1]).toBe(provider.launchRefs[0]);
     expect(provider.stopRefs).toEqual([provider.launchRefs[0]]);
-    const signingSecret = await runInDurableObject(stub, instance =>
-      resolveSecret(instance.env.NEXTAUTH_SECRET)
-    );
-    if (!signingSecret) throw new Error('Test signing secret unavailable');
-    const launches = provider.launchEnvs.map(
-      ({
-        SANDBOX_CONTROL_CREDENTIAL: credential,
-        CONTROL_LOG_UPLOAD_GRANT: uploadGrant,
-        CONTROL_WRAPPER_INSTANCE_ID: wrapperInstanceId,
-        CONTROL_LOG_UPLOAD_URL: uploadUrl,
-        ...stableEnv
-      }) => {
-        const launchClaims = verifySandboxLaunchCredential(credential, signingSecret);
-        if (!launchClaims) throw new Error('Invalid wrapper launch credential');
-        expect({
-          sandboxId: launchClaims.sandboxId,
-          allocationId: launchClaims.allocationId,
-        }).toEqual({
-          sandboxId,
-          allocationId,
-        });
-        expect(validateControlLogUploadGrant(`Bearer ${uploadGrant}`, signingSecret)).toEqual({
-          sandboxId,
-          allocationId,
-          wrapperInstanceId,
-        });
-        expect(uploadUrl).toBe(
-          `${workerUrl.replace(/\/$/, '')}/sandbox-logs/${sandboxId}/${allocationId}/${wrapperInstanceId}`
-        );
-        return { credential, uploadGrant, wrapperInstanceId, uploadUrl, stableEnv };
-      }
-    );
-    expect(launches[1].stableEnv).toEqual(launches[0].stableEnv);
-    expect(launches[0].stableEnv).toMatchObject({
-      CONTROL_PLANE_ALLOCATION_ID: allocationId,
-      PROVIDER_INSTANCE_ID: sandboxId,
-      CONTROL_SANDBOX_PROVIDER: 'cloudflare-containers',
+    // Diagnostic upload identities are per launch when a Worker URL is configured.
+    const withoutDiagnostics = (launchEnv: Record<string, string> | undefined) =>
+      Object.fromEntries(
+        Object.entries(launchEnv ?? {}).filter(
+          ([key]) => !key.startsWith('CONTROL_LOG_UPLOAD_') && key !== 'CONTROL_WRAPPER_INSTANCE_ID'
+        )
+      );
+    expect(withoutDiagnostics(provider.launchEnvs[1])).toEqual({
+      ...withoutDiagnostics(provider.launchEnvs[0]),
+      SANDBOX_CONTROL_CREDENTIAL: expect.any(String),
     });
-    expect(launches[1].credential !== launches[0].credential).toBe(true);
-    expect(launches[1].uploadGrant !== launches[0].uploadGrant).toBe(true);
-    expect(launches[1].wrapperInstanceId).not.toBe(launches[0].wrapperInstanceId);
-    expect(launches[1].uploadUrl).not.toBe(launches[0].uploadUrl);
+    expect(provider.launchEnvs[1].SANDBOX_CONTROL_CREDENTIAL).not.toBe(
+      provider.launchEnvs[0].SANDBOX_CONTROL_CREDENTIAL
+    );
     expect(provider.launchDeadlines[0]).toEqual(expect.any(Number));
     expect(provider.launchDeadlines[0]).toBe(launchDeadline);
     expect(provider.launchDeadlines[1]).toBe(launchDeadline);
@@ -573,10 +409,9 @@ describe('repository snapshot launch', () => {
       confirmed: false,
     });
     await stub.prepare(prepareInput());
-    const key = await repoKeyOf(stub);
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
 
-    expect(provider.launchOptions).toEqual([{ repoKey: key, skipRepository: true }]);
+    expect(provider.launchOptions).toEqual([{}]);
     await waitFor(() =>
       expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
         state: 'preparing',
@@ -677,7 +512,7 @@ describe('repository snapshot launch', () => {
     await waitFor(async () =>
       expect((await stub.getAllocationState()).allocationId).not.toBe(allocationId)
     );
-    expect(provider.launchOptions[1]).toMatchObject({ skipRepository: true });
+    expect(provider.launchOptions[1]).toEqual({});
     expect(provider.launchEnvs).toHaveLength(2);
   });
 
@@ -744,67 +579,91 @@ describe('repository snapshot launch', () => {
     expect(provider.launchEnvs).toHaveLength(1);
   });
 
-  it('passes the route key to the provider launch and asks the wrapper to capture', async () => {
+  it('starts from the selected snapshot and never asks the wrapper to capture', async () => {
+    const lookups = fakeEnvironmentBuild();
     const provider = createFakeProvider({ startSource: 'repository' });
-    const { stub } = await setup('sbx__repo_launch', provider);
-    await stub.prepare(prepareInput());
-    const key = await repoKeyOf(stub);
-
-    const { wrapper, allocationId } = await connect('sbx__repo_launch', provider);
-
-    expect(provider.launchOptions).toEqual([{ repoKey: key }]);
-    const frame = await prepareFrameOf(wrapper);
-    expect(frame.spec.capture).toBe(true);
-    expect(await readLaunchRecord(stub)).toEqual({
-      allocationId,
-      startupMode: 'preinstalled',
-      startSource: 'repository',
-      confirmed: true,
+    const { stub, peer } = await setup('sbx__env_launch_selected', provider, {
+      ENVIRONMENT_BUILD: lookups.namespace,
     });
+    await stub.prepare(prepareInput({ setupCommands: ['npm install'] }));
+    const { wrapper } = await connect('sbx__env_launch_selected', provider);
+    const frame = await prepareFrameOf(wrapper);
+
+    expect(provider.launchOptions).toEqual([{ snapshot: SNAPSHOT }]);
+    expect(lookups.lookups).toEqual([{ reference: REFERENCE, actorUserId: 'user_123' }]);
+    expect(frame.spec.capture).toBeUndefined();
+    expect(frame.spec).not.toHaveProperty('environment');
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
+        state: 'preparing',
+        attemptId: expect.any(String),
+        step: 'environment_snapshot',
+        detail:
+          'Using snapshot · 01 Jan 1970, 00:00:00 UTC; environment settings have changed; cached files may retain earlier values; a replacement build was started',
+      })
+    );
   });
 
-  it('launches without a key and never asks for a capture when no key applies', async () => {
+  it('starts from the image without a lookup when the session has no environment', async () => {
+    const lookups = fakeEnvironmentBuild();
     const provider = createFakeProvider();
-    const { stub } = await setup('sbx__repo_launch_none', provider, NOT_ENROLLED);
-    await stub.prepare(prepareInput());
-
-    const { wrapper } = await connect('sbx__repo_launch_none', provider);
+    const { stub } = await setup('sbx__env_launch_none', provider, {
+      ENVIRONMENT_BUILD: lookups.namespace,
+    });
+    await stub.prepare(prepareInput({ environment: null }));
+    const { wrapper } = await connect('sbx__env_launch_none', provider);
+    const frame = await prepareFrameOf(wrapper);
 
     expect(provider.launchOptions).toEqual([{}]);
-    const frame = await prepareFrameOf(wrapper);
+    expect(lookups.lookups).toEqual([]);
     expect(frame.spec.capture).toBeUndefined();
   });
 
-  it('uses a key and asks the wrapper to capture when setup commands are present', async () => {
-    const provider = createFakeProvider({ startSource: 'repository' });
-    const { stub } = await setup('sbx__repo_launch_setup', provider);
-    await stub.prepare(prepareInput({ setupCommands: ['pnpm install'] }));
-    const key = await repoKeyOf(stub);
-    expect(key).not.toBeNull();
+  it('starts from the image when no snapshot is eligible and reports the real build status', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup('sbx__env_launch_missing', provider, WITHOUT_SNAPSHOT);
+    await stub.prepare(prepareInput());
+    await connect('sbx__env_launch_missing', provider);
 
-    const { wrapper } = await connect('sbx__repo_launch_setup', provider);
-
-    expect(provider.launchOptions).toEqual([{ repoKey: key }]);
-    const frame = await prepareFrameOf(wrapper);
-    expect(frame.spec.capture).toBe(true);
+    expect(provider.launchOptions).toEqual([{}]);
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
+        state: 'preparing',
+        attemptId: expect.any(String),
+        step: 'environment_snapshot',
+        detail: 'Starting without an environment snapshot; a replacement build is running',
+      })
+    );
   });
 
-  it('gives different keys to different setup commands for one repository', async () => {
-    const setupA = 'workspace_aaaa1111-1111-1111-1111-111111111111';
-    const setupB = 'workspace_bbbb2222-2222-2222-2222-222222222222';
-    const providerA = createFakeProvider();
-    const { stub: stubA } = await setup('sbx__repo_setup_a', providerA);
-    await stubA.prepare(prepareInput({ sessionId: setupA, setupCommands: ['pnpm install'] }));
+  it('starts from the image for a shared worktree path and for a provider without snapshots', async () => {
+    const shared = createFakeProvider();
+    const { stub: sharedStub } = await setup('sbx__env_launch_shared', shared);
+    await sharedStub.prepare(prepareInput({ directory: '/workspace/org/user/sessions/s1' }));
+    await waitFor(() => expect(shared.launchEnvs).toHaveLength(1));
+    expect(shared.launchOptions).toEqual([{}]);
 
-    const providerB = createFakeProvider();
-    const { stub: stubB } = await setup('sbx__repo_setup_b', providerB);
-    await stubB.prepare(prepareInput({ sessionId: setupB, setupCommands: ['pnpm build'] }));
+    const unsupported = createFakeProvider({ snapshots: false });
+    const { stub } = await setup('sbx__env_launch_unsupported', unsupported);
+    await stub.prepare(prepareInput());
+    await waitFor(() => expect(unsupported.launchEnvs).toHaveLength(1));
+    expect(unsupported.launchOptions).toEqual([{}]);
+  });
 
-    const keyA = await repoKeyOf(stubA, setupA);
-    const keyB = await repoKeyOf(stubB, setupB);
-    expect(keyA).not.toBeNull();
-    expect(keyB).not.toBeNull();
-    expect(keyA).not.toBe(keyB);
+  it('answers a capture request from a pre-change wrapper at once without the provider', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup('sbx__env_capture_declined', provider);
+    await stub.prepare(prepareInput());
+    const { wrapper } = await connect('sbx__env_capture_declined', provider);
+    await prepareFrameOf(wrapper);
+
+    wrapper.send({ type: 'workspace.capture', sessionId: SESSION, commit: 'abc' });
+    expect(await wrapper.next()).toEqual({
+      type: 'workspace.captured',
+      sessionId: SESSION,
+      ok: false,
+    });
+    expect(provider.stopRefs).toEqual([]);
   });
 
   it('skips a snapshot whose start never connected and starts from the image', async () => {
@@ -816,11 +675,10 @@ describe('repository snapshot launch', () => {
       confirmed: false,
     });
     await stub.prepare(prepareInput());
-    const key = await repoKeyOf(stub);
 
     await connect('sbx__repo_launch_discard', provider);
 
-    expect(provider.launchOptions).toEqual([{ repoKey: key, skipRepository: true }]);
+    expect(provider.launchOptions).toEqual([{}]);
   });
 
   it.each([
@@ -831,11 +689,10 @@ describe('repository snapshot launch', () => {
     const { stub } = await setup('sbx__repo_launch_keep', provider);
     await putLaunchRecord(stub, { allocationId: 'previous-allocation', ...previous });
     await stub.prepare(prepareInput());
-    const key = await repoKeyOf(stub);
 
     await connect('sbx__repo_launch_keep', provider);
 
-    expect(provider.launchOptions).toEqual([{ repoKey: key }]);
+    expect(provider.launchOptions).toEqual([{ snapshot: SNAPSHOT }]);
   });
 
   it('keeps the failed-snapshot skip when a launch fails before it completes', async () => {
@@ -892,7 +749,6 @@ describe('repository snapshot launch', () => {
     });
     const { stub } = await setup(sandboxId, provider);
     await stub.prepare(prepareInput());
-    const key = await repoKeyOf(stub);
     const { allocationId } = await connect(sandboxId, provider);
 
     // The launch is still held when the wrapper connects. Stop the allocation
@@ -902,7 +758,7 @@ describe('repository snapshot launch', () => {
       await db
         .update(allocationTable)
         .set({ last_frame_at: Date.now(), last_activity_at: Date.now() - 60 * 60_000 })
-        .where(eq(allocationTable.id, 'current'));
+        .where(eq(allocationTable.allocation_id, allocationId));
       await instance.alarm();
       expect((await instance.getAllocationState()).kind).toBe('stopping');
     });
@@ -919,7 +775,7 @@ describe('repository snapshot launch', () => {
     // Completing the stop starts the next allocation, which must keep the snapshot.
     await releaseHeld(stub, () => provider.releaseStop());
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
-    expect(provider.launchOptions[1]).toEqual({ repoKey: key });
+    expect(provider.launchOptions[1]).toEqual({ snapshot: SNAPSHOT });
   });
 
   it('marks the launch confirmed only for the allocation whose wrapper connected', async () => {
@@ -949,7 +805,7 @@ describe('repository snapshot launch', () => {
   });
 });
 
-describe('repository snapshot preparation fallback', () => {
+describe('environment snapshot preparation fallback', () => {
   it('keeps queued messages through fallback and delivers their original identities once', async () => {
     const sandboxId = 'sbx__repo_prepare_queued_messages';
     const provider = createFakeProvider({
@@ -973,10 +829,10 @@ describe('repository snapshot preparation fallback', () => {
         sessionPeerFor: (ownerId: string, sessionId: string) =>
           namespace.getByName(sessionDoName(ownerId, sessionId)),
       });
-      installFakeRuntimeProxyPeer(instance, async () => ({
-        userId: 'user_123',
-        kiloSessionId: KILO_SESSION,
-      }));
+      installFakeRuntimeProxyPeer(
+        instance,
+        async (_ownerId, sessionId) => sessionIdentities.get(sessionId) ?? null
+      );
     });
     for (const messageId of ['m1', 'm2']) {
       await session.send({
@@ -1035,7 +891,7 @@ describe('repository snapshot preparation fallback', () => {
         launches: [{ startSource: 'repository' }, { startSource: 'image' }],
       });
       const peer = new FakeSessionPeer();
-      const { stub } = await setup(sandboxId, provider, ENROLLED, peer);
+      const { stub } = await setup(sandboxId, provider, WITH_SNAPSHOT, peer);
       const input = prepareInput({ setupCommands: ['pnpm install'] });
       const worktreeRecovery = {
         files: [{ path: 'changed.ts', status: 'modified' as const, patch: 'saved diff' }],
@@ -1064,10 +920,7 @@ describe('repository snapshot preparation fallback', () => {
       const replacement = await prepareFrameOf(fresh.wrapper);
       expect(fresh.allocationId).not.toBe(allocationId);
       expect(provider.stopRefs).toEqual([provider.launchRefs[0]]);
-      expect(provider.launchOptions[1]).toEqual({
-        repoKey: await repoKeyOf(stub),
-        skipRepository: true,
-      });
+      expect(provider.launchOptions[1]).toEqual({});
       expect(provider.launchEnvs[1].SANDBOX_CONTROL_CREDENTIAL).not.toBe(
         provider.launchEnvs[0].SANDBOX_CONTROL_CREDENTIAL
       );
@@ -1106,7 +959,7 @@ describe('repository snapshot preparation fallback', () => {
         launches: [{ startSource: 'repository' }, { startSource: 'image' }],
       });
       const peer = new FakeSessionPeer();
-      const { stub } = await setup(sandboxId, provider, ENROLLED, peer);
+      const { stub } = await setup(sandboxId, provider, WITH_SNAPSHOT, peer);
       await stub.prepare(prepareInput());
       const { wrapper } = await connect(sandboxId, provider);
       await prepareFrameOf(wrapper);
@@ -1177,7 +1030,7 @@ describe('repository snapshot preparation fallback', () => {
       if (startSource === 'repository') {
         const fresh = await connect(sandboxId, provider, 2);
         await prepareFrameOf(fresh.wrapper);
-        expect(provider.launchOptions[1]).toMatchObject({ skipRepository: true });
+        expect(provider.launchOptions[1]).toEqual({});
       } else {
         await waitFor(async () =>
           expect((await stub.status({ sessionId: SESSION })).view.state).toBe('failed')
@@ -1212,7 +1065,7 @@ describe('repository snapshot preparation fallback', () => {
     const sandboxId = 'sbx__repo_prepare_multiple_failures';
     const provider = createFakeProvider({ holdLaunch: true });
     const peer = new FakeSessionPeer();
-    const { stub } = await setup(sandboxId, provider, ENROLLED, peer);
+    const { stub } = await setup(sandboxId, provider, WITH_SNAPSHOT, peer);
     await stub.prepare(prepareInput());
     const { wrapper } = await connect(sandboxId, provider);
     await prepareFrameOf(wrapper);
@@ -1303,7 +1156,7 @@ describe('repository snapshot preparation fallback', () => {
         const fresh = await connect(sandboxId, provider, 2);
         const frame = await prepareFrameOf(fresh.wrapper);
         expect(frame.spec.attemptId).toBe(view.attemptId);
-        expect(provider.launchOptions[1]).toMatchObject({ skipRepository: true });
+        expect(provider.launchOptions[1]).toEqual({});
       } else {
         expect((await reconstructed.status({ sessionId: SESSION })).view.state).toBe('failed');
         expect(provider.launchEnvs).toHaveLength(1);
@@ -1387,7 +1240,7 @@ describe('repository snapshot preparation fallback', () => {
         holdStop: true,
       });
       const peer = new FakeSessionPeer();
-      const { stub } = await setup(sandboxId, provider, ENROLLED, peer);
+      const { stub } = await setup(sandboxId, provider, WITH_SNAPSHOT, peer);
       await runInDurableObject(stub, instance => {
         Object.assign(instance, {
           sandboxTimers: () => ({ ...CONTROL_PLANE_TIMERS.sandbox, providerStopLadderMs: [] }),
@@ -1447,255 +1300,4 @@ describe('repository snapshot preparation fallback', () => {
       expect(provider.launchEnvs).toHaveLength(1);
     }
   );
-});
-
-describe('repository capture request', () => {
-  async function preparing(provider: FakeProvider, sandboxId: string) {
-    const { stub } = await setup(sandboxId, provider);
-    await stub.prepare(prepareInput());
-    const { wrapper, allocationId } = await connect(sandboxId, provider);
-    await prepareFrameOf(wrapper);
-    return { stub, wrapper, allocationId, key: await repoKeyOf(stub) };
-  }
-
-  it('captures through the provider with the route key and answers the wrapper', async () => {
-    const provider = createFakeProvider();
-    const { wrapper, key } = await preparing(provider, 'sbx__repo_capture_ok');
-
-    wrapper.send({ type: 'workspace.capture', sessionId: SESSION, commit: 'abc123' });
-
-    expect(await wrapper.next()).toEqual({
-      type: 'workspace.captured',
-      sessionId: SESSION,
-      ok: true,
-    });
-    expect(provider.captures).toEqual([
-      { ref: expect.stringMatching(/^mem_/), repoKey: key, commit: 'abc123' },
-    ]);
-  });
-
-  it.each([
-    ['the provider reports nothing saved', false],
-    ['the provider throws', 'throw'],
-  ] as const)('answers ok:false when %s', async (_name, result) => {
-    const provider = createFakeProvider();
-    provider.captureResult = result;
-    const { wrapper } = await preparing(provider, `sbx__repo_capture_fail_${String(result)}`);
-
-    wrapper.send({ type: 'workspace.capture', sessionId: SESSION });
-
-    expect(await wrapper.next()).toEqual({
-      type: 'workspace.captured',
-      sessionId: SESSION,
-      ok: false,
-    });
-  });
-
-  it('answers ok:false at once, without the provider, for a session with no key', async () => {
-    const provider = createFakeProvider();
-    const { stub } = await setup('sbx__repo_capture_nokey', provider, NOT_ENROLLED);
-    await stub.prepare(prepareInput());
-    const { wrapper } = await connect('sbx__repo_capture_nokey', provider);
-    await prepareFrameOf(wrapper);
-
-    wrapper.send({ type: 'workspace.capture', sessionId: SESSION });
-
-    expect(await wrapper.next()).toEqual({
-      type: 'workspace.captured',
-      sessionId: SESSION,
-      ok: false,
-    });
-    expect(provider.captures).toEqual([]);
-  });
-
-  it.each([4 * 60_000, 9 * 60_000])(
-    'skips capture with %s ms left and keeps the original preparation deadline',
-    async remainingMs => {
-      const provider = createFakeProvider();
-      provider.captureResult = 'hang';
-      const { stub, wrapper } = await preparing(
-        provider,
-        `sbx__repo_capture_budget_${remainingMs}`
-      );
-      const deadlineAt = Date.now() + remainingMs;
-      await runInDurableObject(stub, async (_instance, state) => {
-        const db = drizzle(state.storage, { logger: false });
-        await db
-          .update(routesTable)
-          .set({ attempt_deadline_at: deadlineAt })
-          .where(eq(routesTable.session_id, SESSION));
-      });
-
-      wrapper.send({ type: 'workspace.capture', sessionId: SESSION });
-
-      expect(await wrapper.next()).toEqual({
-        type: 'workspace.captured',
-        sessionId: SESSION,
-        ok: false,
-      });
-      expect(provider.captures).toEqual([]);
-      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('preparing');
-      await runInDurableObject(stub, async (_instance, state) => {
-        const db = drizzle(state.storage, { logger: false });
-        const rows = await db.select().from(routesTable).where(eq(routesTable.session_id, SESSION));
-        expect(rows[0]?.attempt_deadline_at).toBe(deadlineAt);
-      });
-
-      wrapper.send({ type: 'session.ready', sessionId: SESSION });
-      await waitFor(async () =>
-        expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready')
-      );
-    }
-  );
-
-  it('answers ok:false for an unknown session and a route that is no longer preparing', async () => {
-    const provider = createFakeProvider();
-    const { wrapper } = await preparing(provider, 'sbx__repo_capture_state');
-
-    wrapper.send({ type: 'workspace.capture', sessionId: 'workspace_unknown' });
-    expect(await wrapper.next()).toMatchObject({ type: 'workspace.captured', ok: false });
-
-    wrapper.send({ type: 'session.ready', sessionId: SESSION });
-    await waitFor(async () => expect(await readRouteState(SESSION)).toBe('ready'));
-    wrapper.send({ type: 'workspace.capture', sessionId: SESSION });
-    expect(await wrapper.next()).toMatchObject({ type: 'workspace.captured', ok: false });
-    expect(provider.captures).toEqual([]);
-  });
-
-  it('runs one capture for a request replayed while it is in flight', async () => {
-    const provider = createFakeProvider();
-    provider.captureResult = 'hang';
-    const { wrapper, stub } = await preparing(provider, 'sbx__repo_capture_replay');
-
-    wrapper.send({ type: 'workspace.capture', sessionId: SESSION });
-    await waitFor(() => expect(provider.captures).toHaveLength(1));
-    wrapper.send({ type: 'workspace.capture', sessionId: SESSION });
-    await new Promise(resolve => setTimeout(resolve, 50));
-    expect(provider.captures).toHaveLength(1);
-
-    await releaseCapture(stub, provider);
-    expect(await wrapper.next()).toMatchObject({ type: 'workspace.captured', ok: true });
-  });
-
-  it('ignores socket close during capture and resumes disconnect handling afterwards', async () => {
-    const provider = createFakeProvider();
-    provider.captureResult = 'hang';
-    const { wrapper, stub } = await preparing(provider, 'sbx__repo_capture_close');
-    wrapper.send({ type: 'workspace.capture', sessionId: SESSION });
-    await waitFor(() => expect(provider.captures).toHaveLength(1));
-
-    await runInDurableObject(stub, async (instance, state) => {
-      await instance.webSocketClose(state.getWebSockets()[0]);
-      expect((await instance.getAllocationState()).kind).toBe('connected');
-    });
-    await releaseCapture(stub, provider);
-    expect(await wrapper.next()).toMatchObject({ type: 'workspace.captured', ok: true });
-    await runInDurableObject(stub, async (instance, state) => {
-      await instance.webSocketClose(state.getWebSockets()[0]);
-      expect((await instance.getAllocationState()).kind).toBe('disconnected');
-    });
-  });
-
-  it('keeps an overdue heartbeat socket alive only while capture runs', async () => {
-    const provider = createFakeProvider();
-    provider.captureResult = 'hang';
-    const { wrapper, stub } = await preparing(provider, 'sbx__repo_capture_heartbeat');
-    wrapper.send({ type: 'workspace.capture', sessionId: SESSION });
-    await waitFor(() => expect(provider.captures).toHaveLength(1));
-
-    await runInDurableObject(stub, async (instance, state) => {
-      const db = drizzle(state.storage, { logger: false });
-      await db
-        .update(allocationTable)
-        .set({ last_frame_at: Date.now() - 60_000 })
-        .where(eq(allocationTable.id, 'current'));
-      await instance.alarm();
-      expect((await instance.getAllocationState()).kind).toBe('connected');
-      expect(await state.storage.getAlarm()).toBeGreaterThan(Date.now());
-    });
-    await releaseCapture(stub, provider);
-    expect(await wrapper.next()).toMatchObject({ type: 'workspace.captured', ok: true });
-    await runInDurableObject(stub, async instance => {
-      await instance.alarm();
-      expect((await instance.getAllocationState()).kind).toBe('disconnected');
-    });
-  });
-
-  it.each([true, false])(
-    'delivers capture across reconnect (completed first: %s)',
-    async completedFirst => {
-      const provider = createFakeProvider();
-      provider.captureResult = 'hang';
-      const sandboxId = `sbx__repo_capture_reply_reconnect_${completedFirst}`;
-      const { wrapper, stub } = await preparing(provider, sandboxId);
-      wrapper.send({ type: 'workspace.capture', sessionId: SESSION });
-      await waitFor(() => expect(provider.captures).toHaveLength(1));
-      wrapper.close();
-      await wrapper.waitForClose();
-      if (completedFirst) await releaseCapture(stub, provider);
-
-      const { wrapper: reconnected } = await connect(sandboxId, provider);
-      if (!completedFirst) await releaseCapture(stub, provider);
-      expect(await reconnected.nextSkipping(['session.prepare'])).toEqual({
-        type: 'workspace.captured',
-        sessionId: SESSION,
-        ok: true,
-      });
-      expect(provider.captures).toHaveLength(1);
-
-      reconnected.send({ type: 'session.ready', sessionId: SESSION });
-      await waitFor(async () =>
-        expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready')
-      );
-      const { wrapper: readyReconnect } = await connect(sandboxId, provider);
-      expect(await readyReconnect.next(50)).toBeNull();
-    }
-  );
-
-  it('does not replay a completed capture into a replacement allocation', async () => {
-    const provider = createFakeProvider();
-    provider.captureResult = 'hang';
-    const sandboxId = 'sbx__repo_capture_reply_replaced';
-    const { wrapper, stub } = await preparing(provider, sandboxId);
-    wrapper.send({ type: 'workspace.capture', sessionId: SESSION });
-    await waitFor(() => expect(provider.captures).toHaveLength(1));
-    await releaseCapture(stub, provider);
-    expect(await wrapper.next()).toMatchObject({ type: 'workspace.captured', ok: true });
-
-    const replacement = crypto.randomUUID();
-    await runInDurableObject(stub, async (_instance, state) => {
-      const db = drizzle(state.storage, { logger: false });
-      await db
-        .update(allocationTable)
-        .set({ allocation_id: replacement })
-        .where(eq(allocationTable.id, 'current'));
-    });
-    provider.launchEnvs[0].CONTROL_PLANE_ALLOCATION_ID = replacement;
-    const { wrapper: replaced } = await connect(sandboxId, provider);
-    expect(await replaced.nextSkipping(['session.prepare'], 50)).toBeNull();
-  });
-
-  it('does not block other frames while a capture runs', async () => {
-    const provider = createFakeProvider();
-    provider.captureResult = 'hang';
-    const { wrapper, stub } = await preparing(provider, 'sbx__repo_capture_async');
-
-    wrapper.send({ type: 'workspace.capture', sessionId: SESSION });
-    await waitFor(() => expect(provider.captures).toHaveLength(1));
-    wrapper.send({ type: 'session.ready', sessionId: SESSION });
-
-    await waitFor(async () =>
-      expect((await stub.status({ sessionId: SESSION })).view.state).toBe('ready')
-    );
-    await releaseCapture(stub, provider);
-  });
-
-  async function readRouteState(sessionId: string): Promise<string | undefined> {
-    const stub = sandboxNamespace.getByName('sbx__repo_capture_state');
-    return runInDurableObject(stub, async (_instance, state) => {
-      const db = drizzle(state.storage, { logger: false });
-      const rows = await db.select().from(routesTable).where(eq(routesTable.session_id, sessionId));
-      return rows[0]?.state;
-    });
-  }
 });

@@ -27,11 +27,19 @@ import {
   getGitLabInstanceUrlForOrganization,
   getGitLabInstanceUrlForUser,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
+import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
+import { createEnvironmentBuildClient } from '@/lib/cloud-agent-next/environment-build-client';
 import {
   assertAllocationOffered,
   loadSandboxCapabilities,
 } from '@/lib/cloud-agent-next/sandbox-allocation-offers';
 import type { User } from '@kilocode/db/schema';
+import {
+  environmentBuildCancelResultSchema,
+  environmentBuildLogsSchema,
+  environmentBuildRequestResultSchema,
+  environmentBuildStatusSchema,
+} from '../../../../services/cloud-agent-next/src/shared/environment-build-status';
 
 const environmentNameSchema = z.string().trim().min(1).max(ENVIRONMENT_LIMITS.MAX_NAME_LENGTH);
 const environmentKeySchema = z
@@ -97,6 +105,7 @@ const environmentSummarySchema = z.object({
   plainVarCount: z.number(),
   secretCount: z.number(),
   commandCount: z.number(),
+  configurationRevision: z.number(),
   sandboxAllocation: z.string().nullable(),
 });
 
@@ -120,6 +129,7 @@ const environmentResponseSchema = z.object({
   ),
   commands: z.array(z.string()),
   secretKeys: z.array(z.string()),
+  configurationRevision: z.number(),
   sandboxAllocation: z.string().nullable(),
 });
 
@@ -131,6 +141,20 @@ function getOwner(organizationId: string | undefined, userId: string): Environme
   return organizationId
     ? { type: 'organization', id: organizationId }
     : { type: 'user', id: userId };
+}
+
+/** A Worker client acting as the caller, scoped to the organization when one is given. */
+async function environmentBuildClientFor(
+  user: User,
+  headersList: Headers | undefined,
+  organizationId: string | undefined
+) {
+  const { token } = await createControlTokenForRequest(user, 'cloud-agent-next', {
+    headers: headersList,
+    ...(organizationId ? { organizationId } : {}),
+    tokenSource: 'cloud-agent',
+  });
+  return createEnvironmentBuildClient(token);
 }
 
 /**
@@ -148,6 +172,11 @@ async function assertEnvironmentAllocationOffered(
   const capabilities = await loadSandboxCapabilities(user, headersList, organizationId, platform);
   assertAllocationOffered(capabilities, allocation, platform);
 }
+
+const environmentBuildScopeSchema = z.object({
+  organizationId: z.uuid().optional(),
+  environmentId: z.uuid(),
+});
 
 async function requireActiveOrganization(organizationId: string): Promise<void> {
   if (!(await getOrganizationById(organizationId))) {
@@ -343,7 +372,7 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
         sandboxAllocation: environmentSandboxAllocationSchema.optional(),
       })
     )
-    .output(z.object({ success: z.boolean() }))
+    .output(z.object({ success: z.boolean(), configurationRevision: z.number() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
         await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_MANAGE_ROLES);
@@ -361,7 +390,7 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
           );
         }
       }
-      await db.transaction(tx =>
+      const { configurationRevision } = await db.transaction(tx =>
         updateEnvironment(tx, publicKey, {
           owner,
           environmentId: input.environmentId,
@@ -372,7 +401,7 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
           sandboxAllocation: input.sandboxAllocation,
         })
       );
-      return { success: true };
+      return { success: true, configurationRevision };
     }),
 
   delete: baseProcedure
@@ -384,6 +413,112 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await deleteEnvironment(db, input.environmentId, owner);
+      // Prompt build cleanup. Best effort: the coordinator also notices the
+      // deletion on its own, so a failed notice changes nothing.
+      try {
+        const builds = await environmentBuildClientFor(
+          ctx.user,
+          ctx.headersList,
+          input.organizationId
+        );
+        await builds.environmentDeleted(input.environmentId);
+      } catch {
+        // Ignored; see above.
+      }
       return { success: true };
+    }),
+
+  /** Snapshot build status. Members may read it; it carries no values or handles. */
+  buildStatus: baseProcedure
+    .input(environmentBuildScopeSchema)
+    .output(environmentBuildStatusSchema)
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+        await requireActiveOrganization(input.organizationId);
+      }
+      const builds = await environmentBuildClientFor(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      return builds.status({
+        environmentId: input.environmentId,
+        ...(input.organizationId ? { kilocodeOrganizationId: input.organizationId } : {}),
+      });
+    }),
+
+  /**
+   * Build or refresh the environment snapshot from the base image. A retried
+   * request after a lost response reuses its `requestId`.
+   */
+  build: baseProcedure
+    .input(
+      environmentBuildScopeSchema.extend({
+        expectedRevision: z.number().int().positive(),
+        requestId: z.uuid(),
+      })
+    )
+    .output(environmentBuildRequestResultSchema)
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_MANAGE_ROLES);
+      }
+      const builds = await environmentBuildClientFor(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      return builds.build({
+        environmentId: input.environmentId,
+        expectedRevision: input.expectedRevision,
+        requestId: input.requestId,
+        ...(input.organizationId ? { kilocodeOrganizationId: input.organizationId } : {}),
+      });
+    }),
+
+  buildLogs: baseProcedure
+    .input(
+      environmentBuildScopeSchema.extend({
+        buildId: z.uuid(),
+        cursor: z.number().int().nonnegative().optional(),
+      })
+    )
+    .output(environmentBuildLogsSchema)
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_MANAGE_ROLES);
+      }
+      const builds = await environmentBuildClientFor(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      return builds.logs({
+        environmentId: input.environmentId,
+        buildId: input.buildId,
+        cursor: input.cursor,
+        limit: 500,
+        ...(input.organizationId ? { kilocodeOrganizationId: input.organizationId } : {}),
+      });
+    }),
+
+  cancelBuild: baseProcedure
+    .input(environmentBuildScopeSchema.extend({ buildId: z.uuid() }))
+    .output(environmentBuildCancelResultSchema)
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId, ORGANIZATION_MANAGE_ROLES);
+      }
+      const builds = await environmentBuildClientFor(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      return builds.cancel({
+        environmentId: input.environmentId,
+        buildId: input.buildId,
+        ...(input.organizationId ? { kilocodeOrganizationId: input.organizationId } : {}),
+      });
     }),
 });

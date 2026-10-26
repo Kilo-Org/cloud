@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { Plus, Loader2, Trash2, Terminal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { EnvironmentSnapshotNotice } from '@/components/cloud-agent-next/EnvironmentSnapshotNotice';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type {
@@ -74,6 +75,7 @@ export function CommandsTab({
         <Terminal className="text-muted-foreground h-3.5 w-3.5" />
         <span className="text-xs font-medium">Setup Commands</span>
       </div>
+      <EnvironmentSnapshotNotice />
 
       {commands.map((cmd, i) => (
         <div

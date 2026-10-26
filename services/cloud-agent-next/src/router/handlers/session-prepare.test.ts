@@ -22,8 +22,21 @@ import {
 } from './session-prepare.js';
 import { createSessionStartHandlers } from './session-start.js';
 
-function environmentLoad(layer: Record<string, unknown>, sandboxAllocation: string | null = null) {
-  return { layer, sandboxAllocation };
+function environmentLoad(
+  layer: Record<string, unknown>,
+  environmentId: string,
+  sandboxAllocation: string | null = null
+) {
+  return {
+    layer,
+    sandboxAllocation,
+    reference: {
+      environmentId,
+      owner: { type: 'user' as const, id: 'user-123' },
+      configurationRevision: 3,
+      repository: { platform: 'github' as const, repoFullName: 'acme/repo' },
+    },
+  };
 }
 
 const {
@@ -852,8 +865,9 @@ describe('prepareSession operation-ledger admission gate', () => {
 
   it('carries the repository environment and its merged configuration in the registration-only create request', async () => {
     const caller = router.createCaller(createContext());
+    const environmentId = '123e4567-e89b-12d3-a456-426614174099';
     const layer = { envVars: { ENV_ONLY: 'from-environment' }, setupCommands: ['env-setup'] };
-    loadEnvironmentForSessionMock.mockResolvedValueOnce(environmentLoad(layer));
+    loadEnvironmentForSessionMock.mockResolvedValueOnce(environmentLoad(layer, environmentId));
     mergeProfileConfigurationMock.mockResolvedValueOnce(layer);
 
     await caller.prepareSession({
@@ -871,6 +885,7 @@ describe('prepareSession operation-ledger admission gate', () => {
     );
     expect(registerNewSessionMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        environment: environmentLoad({}, environmentId).reference,
         profile: expect.objectContaining({
           resolved: expect.objectContaining({
             envVars: { ENV_ONLY: 'from-environment' },

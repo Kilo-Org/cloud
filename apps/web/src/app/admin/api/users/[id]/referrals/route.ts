@@ -35,11 +35,9 @@ export async function GET(
 
   const userId = (await params).id;
 
-  // Existence check
   const user = await findUserById(userId);
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-  // Code owned by the user (normalize unlimited to 0 if absent)
   const refCode = await getReferralCodeForUser(userId);
   const code =
     refCode != null
@@ -49,13 +47,11 @@ export async function GET(
         }
       : null;
 
-  // All usages where this user is the redeemer => determines referrers
   const referrerRows = await db
     .select()
     .from(referral_code_usages)
     .where(eq(referral_code_usages.redeeming_kilo_user_id, userId));
 
-  // Usages where this user is the referrer => referred users
   const redemptions = await getReferralCodeUsages(userId);
   const referredIdsSet = redemptions.map(r => r.redeeming_kilo_user_id);
 

@@ -9,6 +9,7 @@ import {
 import type { User } from '@kilocode/db/schema';
 import { eq, and, isNull, gt, sql, getTableColumns } from 'drizzle-orm';
 import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { invalidateDeviceSession } from '@kilocode/web-shared/lib/auth/device-session-cache';
 import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
 import { createHash, randomBytes } from 'node:crypto';
 import { persistAttestedKey, type VerifyAdmissionOk } from './native-admission';
@@ -34,6 +35,7 @@ async function revokeForReuse(deviceSessionId: string, revokedAt: string): Promi
     .update(device_sessions)
     .set({ revoked_at: revokedAt, revoked_reason: 'refresh_reuse_detected' })
     .where(eq(device_sessions.id, deviceSessionId));
+  invalidateDeviceSession(deviceSessionId);
   console.warn('[native-refresh] refresh token reuse detected; session revoked', {
     deviceSessionId,
   });
@@ -477,4 +479,5 @@ export async function revokeDeviceSession(sessionId: string, reason: string): Pr
       revoked_reason: reason,
     })
     .where(eq(device_sessions.id, sessionId));
+  invalidateDeviceSession(sessionId);
 }

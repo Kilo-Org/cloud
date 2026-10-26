@@ -143,6 +143,7 @@ jest.mock('@/hooks/useCloudAgentProfiles', () => ({
   useProfiles: () => ({ data: [] }),
   useCombinedProfiles: () => ({ data: undefined }),
   useProfile: () => ({ data: undefined }),
+  useRepoBindings: () => ({ data: [] }),
 }));
 
 jest.mock('@/hooks/useRefreshRepositories', () => ({

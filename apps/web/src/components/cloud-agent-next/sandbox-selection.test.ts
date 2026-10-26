@@ -30,7 +30,7 @@ describe('formatSandboxCapacity', () => {
     [getSandboxAllocationRequest('isolated-standard'), '4 vCPU / 12 GiB'],
     [getSandboxAllocationRequest('vercel-small'), '2 vCPU / 4 GiB'],
     [byocLarge, '4 vCPU / 8 GiB'],
-    [{ provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' }, 'Provider default'],
+    [{ provider: { id: 'vercel', account: 'byoc' }, instanceType: 'default' }, 'Provider default'],
   ] satisfies Array<[SandboxDestination, string]>)(
     'reports the vCPU and memory a destination runs with: %j',
     (destination, label) => {
@@ -47,7 +47,7 @@ describe('formatSandboxInstance', () => {
     [getSandboxAllocationRequest('cloudflare-containers-standard-4'), '4 vCPU / 12 GiB · Large'],
     [getSandboxAllocationRequest('vercel-small'), '2 vCPU / 4 GiB · Small'],
     [byocLarge, '4 vCPU / 8 GiB · Medium'],
-    [{ provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' }, 'Provider default'],
+    [{ provider: { id: 'vercel', account: 'byoc' }, instanceType: 'default' }, 'Provider default'],
   ] satisfies Array<[SandboxDestination, string]>)(
     'formats an instance without repeating its account/provider heading: %j',
     (destination, label) => {
@@ -75,17 +75,17 @@ describe('getSandboxSelectionOptions', () => {
     ];
     const originalOrder = [...options];
     expect(getSandboxSelectionOptions({ enabled: true, options })).toEqual([
+      options[0],
       options[1],
       options[3],
+      options[4],
       options[2],
       options[5],
-      options[0],
-      options[4],
     ]);
     expect(options).toEqual(originalOrder);
   });
 
-  it('does not invent BYOC options when the Worker only offers Kilo', () => {
+  it('uses only the options offered by the Worker', () => {
     expect(getSandboxSelectionOptions(capabilities)).toEqual(capabilities.options);
     expect(getSandboxSelectionOptions(undefined)).toEqual([]);
     expect(getSandboxSelectionOptions({ enabled: false, options: [] })).toEqual([]);

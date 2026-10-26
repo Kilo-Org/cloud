@@ -22,8 +22,8 @@ const GITLAB_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.GITLAB);
 
 const DEFAULT_GITLAB_URL = DEFAULT_GITLAB_INSTANCE_URL;
 const MAX_GITLAB_REDIRECTS = 5;
-const MAX_GITLAB_RESPONSE_BYTES = 10 * 1024 * 1024;
-const GITLAB_REQUEST_TIMEOUT_MS = 30_000;
+export const MAX_GITLAB_RESPONSE_BYTES = 10 * 1024 * 1024;
+export const GITLAB_REQUEST_TIMEOUT_MS = 30_000;
 const MAX_GITLAB_PAGINATION_PAGES = 100;
 const MAX_GITLAB_PAGINATION_ITEMS = 10_000;
 
@@ -167,9 +167,10 @@ function buildRedirectRequestInit(
   return { ...init, headers };
 }
 
-function fetchGitLabBoundToAddress(
+export function fetchGitLabBoundToAddress(
   { url, address, family }: GitLabResolvedUrl & { address: string },
-  init?: RequestInit
+  init?: RequestInit,
+  maxResponseBytes = MAX_GITLAB_RESPONSE_BYTES
 ): Promise<Response> {
   const request = url.protocol === 'https:' ? https.request : http.request;
   const headers = headersInitToRecord(init?.headers);
@@ -198,7 +199,7 @@ function fetchGitLabBoundToAddress(
         response.on('data', chunk => {
           const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
           responseBytes += buffer.byteLength;
-          if (responseBytes > MAX_GITLAB_RESPONSE_BYTES) {
+          if (responseBytes > maxResponseBytes) {
             const error = new Error('GitLab response exceeded size limit');
             response.destroy(error);
             req.destroy(error);
@@ -1128,12 +1129,28 @@ export type GitLabMergeRequest = {
   };
 };
 
+export type GitLabMergeRequestDetail = Omit<GitLabMergeRequest, 'diff_refs'> & {
+  created_at?: string;
+  updated_at?: string;
+  project_id?: number;
+  has_conflicts?: boolean;
+  merge_status?: string;
+  merge_when_pipeline_succeeds?: boolean;
+  force_remove_source_branch?: boolean;
+  head_pipeline?: { id: number; sha: string; ref: string; status: string; web_url: string } | null;
+  references?: { full?: string };
+  // Empty while computing; capped totals have a trailing `+` (for example `1000+`).
+  changes_count?: string | null;
+  // GitLab can omit or null these when the merge request has no diff.
+  diff_refs?: GitLabMergeRequest['diff_refs'] | null;
+};
+
 export async function fetchGitLabMergeRequest(params: {
   accessToken: string;
   projectId: string | number;
   mrIid: number;
   instanceUrl?: string;
-}): Promise<GitLabMergeRequest> {
+}): Promise<GitLabMergeRequestDetail> {
   const encodedProjectId =
     typeof params.projectId === 'string' ? encodeURIComponent(params.projectId) : params.projectId;
   const instanceUrl = params.instanceUrl ?? DEFAULT_GITLAB_URL;
@@ -1156,7 +1173,7 @@ export async function fetchGitLabMergeRequest(params: {
     throw new Error(`GitLab MR fetch failed: ${response.status}`);
   }
 
-  return (await response.json()) as GitLabMergeRequest;
+  return (await response.json()) as GitLabMergeRequestDetail;
 }
 
 /**
@@ -1510,6 +1527,9 @@ export async function getMRDiffRefs(
   instanceUrl: string = DEFAULT_GITLAB_URL
 ): Promise<{ baseSha: string; headSha: string; startSha: string }> {
   const mr = await fetchGitLabMergeRequest({ accessToken, projectId, mrIid, instanceUrl });
+  if (!mr.diff_refs?.base_sha || !mr.diff_refs.head_sha || !mr.diff_refs.start_sha) {
+    throw new Error('GitLab merge request has no diff refs');
+  }
 
   logExceptInTest('[getMRDiffRefs] Got diff refs', {
     projectId,

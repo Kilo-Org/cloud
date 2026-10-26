@@ -1550,6 +1550,22 @@
       "loadingProposals": "Ag lódáil moltaí",
       "couldNotLoadProposals": "Níorbh fhéidir na moltaí a lódáil.",
       "noProposals": "Níl aon mholadh ann",
+      "proposalDetails": "Sonraí an mholta",
+      "proposalTitle": "Teideal an mholta",
+      "rationale": "Réasúnaíocht",
+      "saveFirst": "Sábháil do chuid athruithe sula n-osclaíonn tú iarratas tarraingthe.",
+      "proposalSaved": "Moladh sábháilte",
+      "proposalDismissed": "Moladh diúltaithe",
+      "dismissProposalTitle": "An moladh a dhiúltú?",
+      "dismissProposalMessage": "Bainfear an moladh seo den liosta gníomhach agus ní bheifear in ann é a chur ar ais.",
+      "prOpened": "Osclaíodh iarratas tarraingthe do REVIEW.md",
+      "alreadyPresent": "Tá an treoir in REVIEW.md cheana féin",
+      "status": {
+        "edited": "Curtha in eagar",
+        "opening_change_request": "PR á oscailt",
+        "change_request_failed": "Theip ar an PR",
+        "superseded": "Ann cheana féin"
+      },
       "noProposalsDescription": "Beidh moltaí ón gcuimhne athbhreithnithe le feiceáil anseo tar éis do Kilo anailís a dhéanamh ar fhreagraí na gcothaitheoirí."
     },
     "manualReview": {
@@ -3868,6 +3884,7 @@
     "title": "Próifílí",
     "entrySubtitle": "Athúsáid socruithe timpeallachta ar fud na seisiún",
     "newProfile": "Próifíl nua",
+    "openHint": "Osclaíonn sé an phróifíl",
     "emptyTitle": "Níl próifílí ann fós",
     "emptyDescription": "Cruthaigh próifíl chun athróga timpeallachta, orduithe socraithe, agus scileanna a athúsáid thar seisiúin.",
     "loadFailed": "Níorbh fhéidir próifílí a lódáil",
@@ -4120,11 +4137,13 @@
       "namePlaceholder": "Fabhtanna, Smaointe, Eisiúintí…",
       "emoji": "Emoji",
       "mode": "Mód",
-      "defaultsHint": "Úsáideann seisiúin a thosaítear ón liosta seo na réamhshocruithe seo."
+      "defaultsHint": "Úsáideann seisiúin a thosaítear ón liosta seo na réamhshocruithe seo.",
+      "saveFailed": "Níorbh fhéidir an liosta a shábháil. Seiceáil do cheangal agus bain triail eile as."
     },
     "list": {
       "addPlaceholder": "Cuir tasc leis",
       "add": "Cuir leis",
+      "addFailed": "Níorbh fhéidir an tasc a chur leis. Seiceáil do cheangal agus bain triail eile as.",
       "empty": "Níl aon tasc ann fós",
       "setDefaults": "Socraigh stór, mód agus samhail",
       "completed_one": "Críochnaithe ({{count}})",
@@ -4167,7 +4186,9 @@
       "startNewSession": "Tosaigh seisiún nua",
       "startNewSessionHint": "Brúigh go fada chun seisiún nua a thosú.",
       "linkSession": "Nasc seisiún",
-      "linkFailed": "Níorbh fhéidir an seisiún a nascadh leis an tasc"
+      "linkFailed": "Níorbh fhéidir an seisiún a nascadh leis an tasc",
+      "moveToAnotherTodo": "Bog go tasc eile",
+      "startRefreshFailed": "Thosaigh an seisiún, ach níor nuashonraíodh an liosta seo."
     },
     "linkSession": {
       "title": "Nasc le seisiún",
@@ -4176,6 +4197,7 @@
     },
     "upNext": "An chéad rud eile",
     "sessionTodo": "Tasc: {{title}}",
+    "openTodoHint": "Osclaíonn sé an tasc.",
     "linkToTodo": "Nasc le tasc",
     "candidates": {
       "empty": "Gan aon tasc oscailte"

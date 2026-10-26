@@ -1017,6 +1017,22 @@
       "loading": "זיכרון הסקירה בטעינה",
       "loadingProposals": "ההצעות בטעינה",
       "noProposals": "אין הצעות",
+      "proposalDetails": "פרטי ההצעה",
+      "proposalTitle": "כותרת ההצעה",
+      "rationale": "נימוק",
+      "saveFirst": "יש לשמור את השינויים לפני פתיחת בקשת משיכה.",
+      "proposalSaved": "ההצעה נשמרה",
+      "proposalDismissed": "ההצעה נדחתה",
+      "dismissProposalTitle": "לדחות את ההצעה?",
+      "dismissProposalMessage": "ההצעה תוסר מהרשימה הפעילה ולא יהיה ניתן לשחזר אותה.",
+      "prOpened": "נפתחה בקשת משיכה עבור REVIEW.md",
+      "alreadyPresent": "ההנחיות כבר קיימות בקובץ REVIEW.md",
+      "status": {
+        "edited": "נערכה",
+        "opening_change_request": "פתיחת PR מתבצעת",
+        "change_request_failed": "פתיחת PR נכשלה",
+        "superseded": "כבר קיים"
+      },
       "noProposalsDescription": "הצעות המבוססות על זיכרון הסקירה יופיעו כאן לאחר ש-Kilo ינתח תשובות של מתחזקים.",
       "off": "זיכרון הסקירה כבוי.",
       "on": "זיכרון הסקירה דלוק.",
@@ -3776,6 +3792,7 @@
     "title": "פרופילים",
     "entrySubtitle": "שימוש חוזר בהגדרות הסביבה בין הפעלות",
     "newProfile": "פרופיל חדש",
+    "openHint": "פותח את הפרופיל",
     "emptyTitle": "עדיין אין פרופילים",
     "emptyDescription": "צור פרופיל לשימוש חוזר במשתני סביבה, פקודות הגדרה ומיומנויות בפעילויות שונות.",
     "loadFailed": "לא ניתן היה לטעון פרופילים",
@@ -4014,11 +4031,13 @@
       "namePlaceholder": "באגים, רעיונות, גרסה…",
       "emoji": "אמוג׳י",
       "mode": "מצב",
-      "defaultsHint": "סשנים שמתחילים מהרשימה הזו משתמשים בברירות המחדל האלה."
+      "defaultsHint": "סשנים שמתחילים מהרשימה הזו משתמשים בברירות המחדל האלה.",
+      "saveFailed": "לא הצלחנו לשמור את הרשימה. בדקו את החיבור ונסו שוב."
     },
     "list": {
       "addPlaceholder": "הוסף משימה",
       "add": "הוספת משימה",
+      "addFailed": "לא הצלחנו להוסיף את המשימה. בדקו את החיבור ונסו שוב.",
       "empty": "אין משימות עדיין",
       "setDefaults": "הגדרת מאגר, מצב ומודל",
       "completed_one": "הושלמו ({{count}})",
@@ -4057,7 +4076,9 @@
       "startNewSession": "התחל סשן חדש",
       "startNewSessionHint": "לחץ לחיצה ארוכה כדי להתחיל סשן חדש.",
       "linkSession": "קישור סשן",
-      "linkFailed": "לא הצלחנו לקשר את הסשן למשימה"
+      "linkFailed": "לא הצלחנו לקשר את הסשן למשימה",
+      "moveToAnotherTodo": "העבר למשימה אחרת",
+      "startRefreshFailed": "הסשן התחיל, אבל הרשימה לא עודכנה."
     },
     "linkSession": {
       "title": "קישור לסשן",
@@ -4066,6 +4087,7 @@
     },
     "upNext": "הבא בתור",
     "sessionTodo": "משימה: {{title}}",
+    "openTodoHint": "פותח את המשימה.",
     "linkToTodo": "קישור למשימה",
     "candidates": {
       "empty": "אין משימות פתוחות"

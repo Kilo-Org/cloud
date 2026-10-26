@@ -17,6 +17,7 @@ function summary(partial: Partial<EnvironmentSummary>): EnvironmentSummary {
     secretCount: 0,
     commandCount: 0,
     sandboxAllocation: null,
+    configurationRevision: 1,
     ...partial,
   };
 }

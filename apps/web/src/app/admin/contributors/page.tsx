@@ -344,9 +344,7 @@ export default function ContributorChampionsAdminPage() {
   const [drillInState, setDrillInState] = useState<DrillInState | null>(null);
   const [enrollmentState, setEnrollmentState] = useState<EnrollmentState | null>(null);
   const [upgradeState, setUpgradeState] = useState<UpgradeState | null>(null);
-  // Per-row selected upgrade tier, keyed by contributorId
   const [upgradeSelections, setUpgradeSelections] = useState<Record<string, ContributorTier>>({});
-  // Enrolled table state
   const [enrolledPage, setEnrolledPage] = useState(1);
   const [enrolledFilters, setEnrolledFilters] = useState<EnrolledFilters>({
     githubLogin: '',
@@ -356,7 +354,6 @@ export default function ContributorChampionsAdminPage() {
   });
   const enrolledSort = useTableSort<EnrolledSortField>('contributionsAllTime');
 
-  // Review table state
   const [reviewPage, setReviewPage] = useState(1);
   const [reviewFilters, setReviewFilters] = useState<ReviewFilters>({
     githubLogin: '',
@@ -366,7 +363,6 @@ export default function ContributorChampionsAdminPage() {
   });
   const reviewSort = useTableSort<ReviewSortField>('contributionsAllTime');
 
-  // Manual enrollment state
   const [manualEnrollOpen, setManualEnrollOpen] = useState(false);
   const [manualEmail, setManualEmail] = useState('');
   const [manualGithub, setManualGithub] = useState('');
@@ -479,7 +475,6 @@ export default function ContributorChampionsAdminPage() {
 
   const isLoadingTables = reviewQuery.isLoading || enrolledQuery.isLoading;
 
-  // Enrolled: filter -> sort -> paginate
   const enrolledFiltered = useMemo(() => {
     const rows: LeaderboardRow[] = enrolledQuery.data ?? [];
     return rows.filter(
@@ -521,12 +516,10 @@ export default function ContributorChampionsAdminPage() {
     [enrolledSorted, enrolledPage]
   );
 
-  // Reset enrolled page when filters/sort change
   useEffect(() => {
     setEnrolledPage(1);
   }, [enrolledFilters, enrolledSort.sortConfig]);
 
-  // Review: filter -> sort -> paginate
   const reviewFiltered = useMemo(() => {
     const rows: LeaderboardRow[] = reviewQuery.data ?? [];
     return rows.filter(row => {
@@ -567,7 +560,6 @@ export default function ContributorChampionsAdminPage() {
     [reviewSorted, reviewPage]
   );
 
-  // Reset review page when filters/sort change
   useEffect(() => {
     setReviewPage(1);
   }, [reviewFilters, reviewSort.sortConfig]);

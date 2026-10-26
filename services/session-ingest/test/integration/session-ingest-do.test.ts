@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   decodeKiloSdkMessagesCursor,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES,
   MAX_SESSION_DIFF_READ_BYTES,
   getSessionShareExpiresAt,
   sessionShareDurationSchema,
@@ -1649,6 +1650,44 @@ describe('SessionIngestDO integration', () => {
 
       const earlier = await stub.readKiloSdkMessages({ limit: 2, before: latest.nextCursor });
       expect(earlier.messages.map(message => message.info.id)).toEqual(['msg_100', 'msg_200']);
+      expect(earlier.nextCursor).toBeNull();
+    });
+
+    it('omits a message identity outside the cursor contract from a bounded page', async () => {
+      const sessionId = 'ses_sdk_page_cursor_fit_0001';
+      const stub = getStub(kiloUserId, sessionId);
+      const longId = `msg${'z'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES)}`;
+      const message = (id: string, created: number) => ({
+        id,
+        sessionID: sessionId,
+        role: 'user' as const,
+        time: { created },
+        agent: 'build',
+        model: { providerID: 'provider', modelID: 'model' },
+      });
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        for (const info of [
+          message('msg_1_old', 100),
+          message('msg_2_mid', 200),
+          message(longId, 300),
+        ]) {
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data) VALUES (?, ?, ?)',
+            `message/${info.id}`,
+            'message',
+            JSON.stringify(info)
+          );
+        }
+      });
+
+      const latest = await stub.readKiloSdkMessages({ limit: 1 });
+      expect(latest.messages.map(entry => entry.info.id)).toEqual(['msg_2_mid']);
+      expect(latest.omittedItemCount).toBe(1);
+      expect(latest.nextCursor).toBeTruthy();
+
+      const earlier = await stub.readKiloSdkMessages({ limit: 1, before: latest.nextCursor! });
+      expect(earlier.messages.map(entry => entry.info.id)).toEqual(['msg_1_old']);
       expect(earlier.nextCursor).toBeNull();
     });
 

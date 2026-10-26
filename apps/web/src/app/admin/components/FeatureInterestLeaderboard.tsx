@@ -16,12 +16,10 @@ type FeatureInterestLeaderboardProps = {
   bySlugQuery?: string;
 };
 
-// Generate URL-safe slug from feature name
 function getSlugForFeature(featureName: string): string {
   return featureName.toLowerCase().replace(/\s+/g, '-');
 }
 
-// Build URL with feature name as query parameter for reliable lookup
 function getFeatureUrl(featureName: string): string {
   const slug = getSlugForFeature(featureName);
   const encodedName = encodeURIComponent(featureName);

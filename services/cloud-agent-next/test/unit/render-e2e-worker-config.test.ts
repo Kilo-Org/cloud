@@ -210,6 +210,28 @@ describe('buildE2eWorkerConfig', () => {
     expect([...migratedClasses].sort()).toEqual([...bindingClasses].sort());
   });
 
+  it('exports every migrated Durable Object class from the e2e entrypoint', () => {
+    const { config } = render();
+    const entrySource = readFileSync(join(process.cwd(), 'src/e2e-entry.ts'), 'utf8');
+    const exportedNames = new Set<string>();
+    for (const match of entrySource.matchAll(/export\s*\{([^}]*)\}/g)) {
+      const block = match[1];
+      if (block === undefined) continue;
+      for (const specifier of block.split(',')) {
+        const [local, alias] = specifier.trim().split(/\s+as\s+/);
+        if (local === undefined || local === '') continue;
+        exportedNames.add((alias ?? local).trim());
+      }
+    }
+    const migratedClasses = config.migrations.flatMap(
+      (migration: { new_sqlite_classes?: string[] }) => migration.new_sqlite_classes ?? []
+    );
+    expect(migratedClasses.length).toBeGreaterThan(0);
+    for (const className of migratedClasses) {
+      expect(exportedNames).toContain(className);
+    }
+  });
+
   it('keeps and filters non-SQLite new_classes migrations', () => {
     const source = {
       containers: [{ class_name: 'Sandbox' }, { class_name: 'SandboxSmall' }],

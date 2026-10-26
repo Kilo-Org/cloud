@@ -5,8 +5,7 @@ import {
   type DirectByokModel,
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
-import type { CustomLlmProvider, OpenRouterProvider } from '@kilocode/db/schema-types';
-import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { OpenRouterProvider } from '@kilocode/db/schema-types';
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import DIRECT_BYOK_PROVIDERS from './direct-byok-definitions';
 import {
@@ -33,22 +32,6 @@ export function getDirectByokProviderListings(): OpenRouterProvider[] {
 
 export function formatDirectByokModelId(provider: DirectByokProvider, model: DirectByokModel) {
   return (provider.id + '/' + model.id).toLowerCase();
-}
-
-const AI_SDK_PROVIDER_FOR_CHAT_API = {
-  chat_completions: undefined,
-  messages: 'anthropic',
-  responses: 'openai',
-} as const satisfies Record<GatewayChatApiKind, CustomLlmProvider | undefined>;
-
-function getDirectByokAiSdkProvider(
-  provider: DirectByokProvider,
-  model: DirectByokModel,
-  id: string
-) {
-  return provider.getModelChatApi
-    ? AI_SDK_PROVIDER_FOR_CHAT_API[provider.getModelChatApi(model)]
-    : getAiSdkProvider(id, provider.id);
 }
 
 function convertModel(
@@ -95,7 +78,7 @@ function convertModel(
     preferredIndex: model.flags?.includes('recommended') ? preferredIndex : undefined,
     hasUserByokAvailable: true,
     opencode: withLegacyVariants({
-      ai_sdk_provider: getDirectByokAiSdkProvider(provider, model, id),
+      ai_sdk_provider: getAiSdkProvider(id, provider.id),
       reasoning_options:
         model.reasoning_options ??
         (model.flags?.includes('reasoning') ? getFallbackReasoningOptions(id) : undefined),

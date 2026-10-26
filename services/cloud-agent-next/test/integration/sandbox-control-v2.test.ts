@@ -416,6 +416,50 @@ afterEach(async () => {
 });
 
 describe('SandboxControlV2 allocation lifecycle', () => {
+  it.each([
+    { stage: 'create', failure: { failFirstCreate: true } },
+    { stage: 'launch', failure: { failFirstLaunch: 'transient launch failure' } },
+  ])(
+    'refreshes the durable Vercel name after a $stage failure and retry tick',
+    async ({ failure }) => {
+      const provider = createFakeProvider(failure);
+      const stub = await startAllocation(provider, {
+        provider: 'vercel',
+        preparingRoute: 'workspace_vercel_retry',
+      });
+      await waitFor(() => expect(provider.createInputs).toHaveLength(1));
+      const first = provider.createInputs[0];
+      if (!first) throw new Error('Missing first Vercel create');
+      await waitFor(async () => {
+        const state = await readState(stub);
+        expect(state.kind).toBe('creating');
+        expect(state.allocationId).not.toBe(first.intentId);
+        expect(state.providerRef).toBeNull();
+      });
+      const waiting = await readState(stub);
+      expect(JSON.parse((await readProviderPin(stub)) ?? '{}').allocationName).toBe(
+        `sbx-${waiting.allocationId?.replaceAll('-', '')}`
+      );
+
+      await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
+      await runAlarm(stub);
+      await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
+      expect(provider.createInputs).toHaveLength(2);
+      const second = provider.createInputs[1];
+      if (!second) throw new Error('Missing retried Vercel create');
+      expect(second.intentId).not.toBe(waiting.allocationId);
+      expect(second.allocationName).toBe(`sbx-${second.intentId.replaceAll('-', '')}`);
+      expect(second.allocationName).not.toBe(first.allocationName);
+      expect((await stub.status({ sessionId: 'workspace_vercel_retry' })).view.state).not.toBe(
+        'failed'
+      );
+      await evictAllDurableObjects();
+      expect(JSON.parse((await readProviderPin(stub)) ?? '{}').allocationName).toBe(
+        second.allocationName
+      );
+    }
+  );
+
   it('uses a new durable Vercel sandbox name for each allocation', async () => {
     const provider = createFakeProvider();
     const stub = await startAllocation(provider, { provider: 'vercel' });

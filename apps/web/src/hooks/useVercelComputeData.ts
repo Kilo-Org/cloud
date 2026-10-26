@@ -176,10 +176,6 @@ export function useVercelComputeData(
     },
     onSettled: () => void invalidateStatus(),
   });
-  const mutationSuccess = (message: string) => () => {
-    toast.success(message);
-    void invalidateStatus();
-  };
   const retryMutation = useMutation<VercelComputeStatus, Error, VercelComputeRetryMutationInput>({
     mutationKey: organizationOwner
       ? trpc.organizations.vercelCompute.retrySetup.mutationKey()
@@ -190,8 +186,9 @@ export function useVercelComputeData(
       }
       return trpcClient.vercelCompute.retrySetup.mutate();
     },
-    onSuccess: mutationSuccess('Vercel compute setup restarted'),
+    onSuccess: () => toast.success('Vercel compute setup restarted'),
     onError: error => toast.error(error.message || 'Could not retry setup'),
+    onSettled: () => void invalidateStatus(),
   });
   const upgradeMutation = useMutation<VercelComputeStatus, Error, VercelComputeRetryMutationInput>({
     mutationKey: organizationOwner
@@ -203,8 +200,9 @@ export function useVercelComputeData(
       }
       return trpcClient.vercelCompute.upgradeRuntime.mutate();
     },
-    onSuccess: mutationSuccess('Runtime upgrade started'),
+    onSuccess: () => toast.success('Runtime upgrade started'),
     onError: error => toast.error(error.message || 'Could not start runtime upgrade'),
+    onSettled: () => void invalidateStatus(),
   });
   const removeMutation = useMutation<{ success: true }, Error, VercelComputeRemoveMutationInput>({
     mutationKey: organizationOwner

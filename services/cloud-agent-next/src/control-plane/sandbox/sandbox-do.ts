@@ -2176,9 +2176,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
     const { state, effects, stopReason } = reduceAllocation(previous, event, timers);
     if (
-      previous.kind === 'stopped' &&
       state.kind === 'creating' &&
       state.allocationId !== null &&
+      state.allocationId !== previous.allocationId &&
       this.providerPin?.provider === 'vercel'
     ) {
       // Vercel retains stopped names. Pin a unique physical name before create,

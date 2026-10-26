@@ -13,6 +13,7 @@ const {
   assertRepositoryAccessMock,
   assertOrganizationMembershipMock,
   parentRuntimeTokenMock,
+  parentMetadataMock,
   balanceMock,
 } = vi.hoisted(() => ({
   db: { mockedDb: true },
@@ -22,6 +23,7 @@ const {
   assertRepositoryAccessMock: vi.fn(),
   assertOrganizationMembershipMock: vi.fn(),
   parentRuntimeTokenMock: vi.fn(),
+  parentMetadataMock: vi.fn(),
   balanceMock: vi.fn(),
 }));
 
@@ -51,7 +53,10 @@ vi.mock('./organization-membership.js', () => ({
 }));
 
 vi.mock('../../sandbox-session/session-stub.js', () => ({
-  getSandboxSessionStub: () => ({ getCloudAgentSpawnRuntimeToken: parentRuntimeTokenMock }),
+  getSandboxSessionStub: () => ({
+    getCloudAgentSpawnRuntimeToken: parentRuntimeTokenMock,
+    getMetadata: parentMetadataMock,
+  }),
 }));
 vi.mock('../../balance-validation.js', () => ({ validateBalanceOnly: balanceMock }));
 
@@ -68,12 +73,26 @@ function environmentLoad(
   return {
     layer,
     sandboxAllocation,
+    egressMode: null,
+    egressAllowlist: null,
     reference: {
       environmentId,
       owner: { type: 'user' as const, id: 'user-123' },
       configurationRevision: 3,
       repository: { platform: 'github' as const, repoFullName: 'acme/repo' },
     },
+  };
+}
+
+const PARENT_SESSION_ID = 'workspace_12345678-1234-4234-8234-123456789abc';
+
+function parentMetadata(workspace?: Record<string, unknown>, identity?: Record<string, unknown>) {
+  return {
+    metadataSchemaVersion: 2,
+    identity: { sessionId: PARENT_SESSION_ID, userId: 'user-123', ...identity },
+    auth: {},
+    ...(workspace ? { workspace } : {}),
+    lifecycle: { version: 1, timestamp: 1 },
   };
 }
 
@@ -103,6 +122,7 @@ describe('session creation preflight', () => {
     assertRepositoryAccessMock.mockResolvedValue(undefined);
     assertOrganizationMembershipMock.mockResolvedValue(undefined);
     parentRuntimeTokenMock.mockResolvedValue('trusted-parent-model-token');
+    parentMetadataMock.mockResolvedValue(parentMetadata());
     balanceMock.mockResolvedValue({ success: true });
   });
 
@@ -669,6 +689,303 @@ describe('session creation preflight', () => {
         message: 'resolved configuration exceeds session limits',
       });
     });
+  });
+
+  describe('repository environment network policy', () => {
+    const githubRepository = { type: 'github' as const, repo: 'acme/repo' };
+    const webOptions = { createdOnPlatform: 'cloud-agent-web' };
+
+    function policyEnvironment(
+      egressMode: 'allowlist' | 'unrestricted' | null,
+      egressAllowlist: string[] | null,
+      sandboxAllocation: string | null = null
+    ) {
+      return { layer: {}, sandboxAllocation, egressMode, egressAllowlist };
+    }
+
+    it('applies None and Limited before admission, with or without a saved allocation', async () => {
+      loadEnvironmentForSessionMock.mockResolvedValueOnce(policyEnvironment('allowlist', [], null));
+      const none = await preflightSessionCreation(
+        request({ repository: githubRepository, options: webOptions }),
+        context,
+        'start'
+      );
+      expect(none.runtime).toEqual({ egressMode: 'allowlist', egressAllowlist: [] });
+      expect(none).not.toHaveProperty('environmentSandboxAllocation');
+
+      loadEnvironmentForSessionMock.mockResolvedValueOnce(
+        policyEnvironment('allowlist', ['api.example.com'], 'cloudflare-containers-standard-3')
+      );
+      const limited = await preflightSessionCreation(
+        request({ repository: githubRepository, options: webOptions }),
+        context,
+        'start'
+      );
+      expect(limited.runtime).toEqual({
+        egressMode: 'allowlist',
+        egressAllowlist: ['api.example.com'],
+      });
+      expect(limited.environmentSandboxAllocation).toBe('cloudflare-containers-standard-3');
+    });
+
+    it.each([
+      { name: 'Full', egressMode: 'unrestricted' as const, egressAllowlist: null },
+      { name: 'legacy absent', egressMode: null, egressAllowlist: null },
+    ])(
+      'leaves an unspecified runtime unchanged for $name',
+      async ({ egressMode, egressAllowlist }) => {
+        loadEnvironmentForSessionMock.mockResolvedValueOnce(
+          policyEnvironment(egressMode, egressAllowlist, 'cloudflare-containers-standard-3')
+        );
+
+        const resolved = await preflightSessionCreation(
+          request({ repository: githubRepository, options: webOptions }),
+          context,
+          'start'
+        );
+
+        expect(resolved).not.toHaveProperty('runtime');
+        expect(resolved.environmentSandboxAllocation).toBe('cloudflare-containers-standard-3');
+      }
+    );
+
+    it('keeps explicit unrestricted and allowlist input over the saved policy', async () => {
+      loadEnvironmentForSessionMock.mockResolvedValue(
+        policyEnvironment('allowlist', ['saved.example.com'])
+      );
+
+      const unrestricted = await preflightSessionCreation(
+        request({
+          repository: githubRepository,
+          options: webOptions,
+          runtime: { egressMode: 'unrestricted' },
+        }),
+        context,
+        'start'
+      );
+      expect(unrestricted.runtime).toEqual({ egressMode: 'unrestricted' });
+
+      const allowlist = await preflightSessionCreation(
+        request({
+          repository: githubRepository,
+          options: webOptions,
+          runtime: { egressMode: 'allowlist', egressAllowlist: ['explicit.example.com'] },
+        }),
+        context,
+        'start'
+      );
+      expect(allowlist.runtime).toEqual({
+        egressMode: 'allowlist',
+        egressAllowlist: ['explicit.example.com'],
+      });
+    });
+
+    it('inherits when only an allocation is supplied with undefined egress values', async () => {
+      loadEnvironmentForSessionMock.mockResolvedValueOnce(
+        policyEnvironment('allowlist', ['api.example.com'], null)
+      );
+
+      const resolved = await preflightSessionCreation(
+        request({
+          repository: githubRepository,
+          options: webOptions,
+          runtime: {
+            sandboxAllocation: 'cloudflare-containers-standard-3',
+            egressMode: undefined,
+            egressAllowlist: undefined,
+          },
+        }),
+        context,
+        'start'
+      );
+
+      expect(resolved.runtime).toEqual({
+        sandboxAllocation: 'cloudflare-containers-standard-3',
+        egressMode: 'allowlist',
+        egressAllowlist: ['api.example.com'],
+      });
+    });
+  });
+});
+
+describe('scoped child network policy', () => {
+  const authority = {
+    version: 1 as const,
+    ownerId: context.userId,
+    parentSessionId: PARENT_SESSION_ID,
+    organizationId: null,
+    authorizationId: '12345678-1234-4234-8234-123456789abc',
+    expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+  };
+  const scopedContext = {
+    ...context,
+    authToken: jwt.sign({ aud: 'cloud-agent-next' }, 'fixture'),
+    cloudAgentAuthority: authority,
+  };
+
+  function childRequest(overrides: Partial<SessionCreateRequest> = {}): SessionCreateRequest {
+    return request({
+      parentCloudAgentSessionId: PARENT_SESSION_ID,
+      options: { createdOnPlatform: 'cloud-agent' },
+      ...overrides,
+    });
+  }
+
+  function allowlistMetadata(egressAllowlist: string[]) {
+    return parentMetadata({
+      sandboxProvider: 'cloudflare-containers',
+      sandboxId: 'ses-0123456789abcdef',
+      egressMode: 'allowlist',
+      egressAllowlist,
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mergeProfileConfigurationMock.mockResolvedValue({});
+    loadEnvironmentForSessionMock.mockResolvedValue(null);
+    assertRepositoryAccessMock.mockResolvedValue(undefined);
+    assertOrganizationMembershipMock.mockResolvedValue(undefined);
+    parentRuntimeTokenMock.mockResolvedValue('trusted-parent-model-token');
+    parentMetadataMock.mockResolvedValue(parentMetadata());
+    balanceMock.mockResolvedValue({ success: true });
+  });
+
+  it('inherits None as an empty additional-domain allowlist without repository defaults', async () => {
+    parentMetadataMock.mockResolvedValue(allowlistMetadata([]));
+
+    const resolved = await preflightSessionCreation(
+      childRequest(),
+      scopedContext,
+      'prepareSession'
+    );
+
+    expect(resolved.runtime).toEqual({ egressMode: 'allowlist', egressAllowlist: [] });
+    expect(loadEnvironmentForSessionMock).not.toHaveBeenCalled();
+    expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
+  });
+
+  it('inherits Limited domains normalized from the parent record', async () => {
+    parentMetadataMock.mockResolvedValue(allowlistMetadata(['Z.Example.COM.', 'example.com']));
+
+    const resolved = await preflightSessionCreation(
+      childRequest(),
+      scopedContext,
+      'prepareSession'
+    );
+
+    expect(resolved.runtime).toEqual({
+      egressMode: 'allowlist',
+      egressAllowlist: ['example.com', 'z.example.com'],
+    });
+  });
+
+  it.each([
+    {
+      name: 'unrestricted',
+      metadata: () =>
+        parentMetadata({
+          sandboxProvider: 'cloudflare-containers',
+          sandboxId: 'ses-0123456789abcdef',
+          egressMode: 'unrestricted',
+        }),
+    },
+    { name: 'legacy without workspace', metadata: () => parentMetadata() },
+  ])('keeps a $name parent unrestricted without a runtime write', async ({ metadata }) => {
+    parentMetadataMock.mockResolvedValue(metadata());
+
+    const resolved = await preflightSessionCreation(
+      childRequest(),
+      scopedContext,
+      'prepareSession'
+    );
+
+    expect(resolved).not.toHaveProperty('runtime');
+  });
+
+  it('keeps an explicit child policy', async () => {
+    parentMetadataMock.mockResolvedValue(allowlistMetadata(['api.example.com']));
+
+    const resolved = await preflightSessionCreation(
+      childRequest({ runtime: { egressMode: 'unrestricted' } }),
+      scopedContext,
+      'prepareSession'
+    );
+
+    expect(resolved.runtime).toEqual({ egressMode: 'unrestricted' });
+  });
+
+  it.each([
+    { name: 'missing metadata', configure: () => parentMetadataMock.mockResolvedValue(null) },
+    {
+      name: 'malformed metadata',
+      configure: () => parentMetadataMock.mockResolvedValue({ metadataSchemaVersion: 2 }),
+    },
+    {
+      name: 'unavailable metadata read',
+      configure: () => parentMetadataMock.mockRejectedValue(new Error('DO unavailable')),
+    },
+    {
+      name: 'session binding mismatch',
+      configure: () =>
+        parentMetadataMock.mockResolvedValue(
+          parentMetadata(undefined, { sessionId: 'workspace_other' })
+        ),
+    },
+    {
+      name: 'user binding mismatch',
+      configure: () =>
+        parentMetadataMock.mockResolvedValue(
+          parentMetadata(undefined, { userId: 'oauth/another-user' })
+        ),
+    },
+  ])('fails closed for $name', async ({ configure }) => {
+    configure();
+
+    const error: unknown = await preflightSessionCreation(
+      childRequest(),
+      scopedContext,
+      'prepareSession'
+    ).catch(caught => caught);
+
+    expect(error).toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Cloud Agent parent policy unavailable',
+    });
+    expect((error as Error).message).not.toContain('workspace_');
+  });
+
+  it('rejects parent metadata bound to another organization', async () => {
+    const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+    parentMetadataMock.mockResolvedValue(
+      parentMetadata(undefined, { orgId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479-other' })
+    );
+
+    await expect(
+      preflightSessionCreation(
+        request({
+          parentCloudAgentSessionId: PARENT_SESSION_ID,
+          options: { createdOnPlatform: 'cloud-agent', kilocodeOrganizationId: organizationId },
+        }),
+        {
+          ...scopedContext,
+          cloudAgentAuthority: { ...authority, organizationId },
+        },
+        'prepareSession'
+      )
+    ).rejects.toMatchObject({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Cloud Agent parent policy unavailable',
+    });
+  });
+
+  it('stops before reading parent policy when authority is revoked', async () => {
+    parentRuntimeTokenMock.mockRejectedValueOnce(new Error('authority revoked'));
+
+    await expect(
+      preflightSessionCreation(childRequest(), scopedContext, 'prepareSession')
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(parentMetadataMock).not.toHaveBeenCalled();
   });
 });
 

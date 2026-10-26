@@ -5,8 +5,15 @@ import { t } from '../auth.js';
 import type { TRPCContext } from '../../types.js';
 import { createSessionStartHandlers } from './session-start.js';
 
-function environmentLoad(layer: Record<string, unknown>, sandboxAllocation: string | null = null) {
-  return { layer, sandboxAllocation };
+function environmentLoad(
+  layer: Record<string, unknown>,
+  sandboxAllocation: string | null = null,
+  egress: {
+    egressMode: 'allowlist' | 'unrestricted' | null;
+    egressAllowlist: string[] | null;
+  } = { egressMode: null, egressAllowlist: null }
+) {
+  return { layer, sandboxAllocation, ...egress };
 }
 
 const {
@@ -132,6 +139,31 @@ describe('startSession environment propagation', () => {
             setupCommands: ['env-setup'],
           }),
         }),
+      }),
+      expect.objectContaining({ userId: 'test-user-123' }),
+      { billingOrigin: 'cloud-agent' }
+    );
+  });
+
+  it('carries a saved allowlist into the grouped create', async () => {
+    loadEnvironmentForSessionMock.mockResolvedValueOnce(
+      environmentLoad({}, null, {
+        egressMode: 'allowlist',
+        egressAllowlist: ['api.example.com'],
+      })
+    );
+    const caller = router.createCaller(createContext());
+
+    await caller.start({
+      message: { prompt: 'Restricted network' },
+      agent: { mode: 'code', model: 'kilo/test-model' },
+      repository: { type: 'github', repo: 'acme/repo' },
+      options: { createdOnPlatform: 'cloud-agent-web' },
+    });
+
+    expect(startNewSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runtime: { egressMode: 'allowlist', egressAllowlist: ['api.example.com'] },
       }),
       expect.objectContaining({ userId: 'test-user-123' }),
       { billingOrigin: 'cloud-agent' }

@@ -163,6 +163,10 @@ describe('Cloud Agent authority contract', () => {
     { callbackTarget: { url: 'session:parent', headers: { Authorization: 'private' } } },
     { callbackTarget: { url: 'session:parent', sessionId: 'workspace_sibling' } },
     { sandboxAllocation: {} },
+    { egressMode: 'allowlist' },
+    { egressMode: 'unrestricted' },
+    { egressAllowlist: [] },
+    { runtime: {} },
     { futureEscapeField: true },
   ])('rejects widened raw launch %j', overrides => {
     expect(() =>

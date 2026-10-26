@@ -3839,6 +3839,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Gildi sem birtast sem •••• varðveita geymt leyndarmál sitt; skiptu um gildi til að endurnýja það. Breyting á skipanalínu krefst þess að öll gildi séu slegin inn aftur",
+      "headersHint": "Gildi sem birtast sem •••• varðveita geymt leyndarmál sitt; skiptu um gildi til að endurnýja það. Breyting á URL krefst þess að öll gildi séu slegin inn aftur",
       "nameRequired": "Sláðu inn nafn netþjóns",
       "nameInvalid": "Nafn má aðeins innihalda ASCII-bókstafi, tölustafi, undirstrik og strik, allt að 100 stafir",
       "commandRequired": "Sláðu inn skipun",

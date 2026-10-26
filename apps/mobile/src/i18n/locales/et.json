@@ -3839,6 +3839,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Väärtused, mis on kuvatud kujul ••••, säilitavad oma salvestatud saladuse; väärtuse asendamisega saab selle vahetada. Käsurea muutmine nõuab kõiki väärtusi uuesti",
+      "headersHint": "Väärtused, mis on kuvatud kujul ••••, säilitavad oma salvestatud saladuse; väärtuse asendamisega saab selle vahetada. URL-i muutmine nõuab kõiki väärtusi uuesti",
       "nameRequired": "Sisestage serveri nimi",
       "nameInvalid": "Nimes võib kasutada ainult ASCII tähti, numbreid, allkriipse ja sidekriipse, kuni 100 tähemärki",
       "commandRequired": "Sisestage käsk",

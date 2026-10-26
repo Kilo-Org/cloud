@@ -3839,6 +3839,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Waardes wat as •••• vertoon word, behou hul gestoorde geheim; vervang 'n waarde om dit te roteer. Wanneer die opdragreël verander word, word elke waarde weer vereis",
+      "headersHint": "Waardes wat as •••• vertoon word, behou hul gestoorde geheim; vervang 'n waarde om dit te roteer. Wanneer die URL verander word, word elke waarde weer vereis",
       "nameRequired": "Voer 'n bedienernaam in",
       "nameInvalid": "Naam kan slegs ASCII-letters, syfers, onderstrepe en strepe tot 100 karakters gebruik",
       "commandRequired": "Voer 'n opdrag in",

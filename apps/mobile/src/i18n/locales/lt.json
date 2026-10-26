@@ -3941,6 +3941,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Reikšmės, rodomos kaip ••••, išlaiko savo saugomą paslaptį; pakeiskite reikšmę, kad ją rotuotumėte. Pakeitus komandinę eilutę, visos reikšmės vėl yra būtinos",
+      "headersHint": "Reikšmės, rodomos kaip ••••, išlaiko savo saugomą paslaptį; pakeiskite reikšmę, kad ją rotuotumėte. Pakeitus URL, visos reikšmės vėl yra būtinos",
       "nameRequired": "Įveskite serverio pavadinimą",
       "nameInvalid": "Varde gali būti naudojamos tik ASCII raidės, skaičiai, apatiniai brūkšniai ir brūkšniai, iki 100 simbolių",
       "commandRequired": "Įveskite komandą",

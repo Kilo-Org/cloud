@@ -3839,6 +3839,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Nilai yang dipaparkan sebagai •••• mengekalkan rahsia tersimpan; gantikan nilai untuk memutarkannya. Menukar baris perintah memerlukan setiap nilai sekali lagi",
+      "headersHint": "Nilai yang dipaparkan sebagai •••• mengekalkan rahsia tersimpan; gantikan nilai untuk memutarkannya. Menukar URL memerlukan setiap nilai sekali lagi",
       "nameRequired": "Masukkan nama pelayan",
       "nameInvalid": "Nama hanya boleh menggunakan huruf ASCII, nombor, garis bawah dan sempang, sehingga 100 aksara",
       "commandRequired": "Masukkan arahan",

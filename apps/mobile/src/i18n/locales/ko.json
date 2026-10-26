@@ -3839,6 +3839,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "••••로 표시된 값은 저장된 비밀을 유지하고 값을 바꾸면 비밀이 교체되며, 명령줄을 변경하려면 모든 값이 다시 필요합니다",
+      "headersHint": "••••로 표시된 값은 저장된 비밀을 유지하고 값을 바꾸면 비밀이 교체되며, URL을 변경하려면 모든 값이 다시 필요합니다",
       "nameRequired": "서버 이름을 입력하세요.",
       "nameInvalid": "이름에는 ASCII 문자, 숫자, 밑줄, 대시만 사용할 수 있습니다(최대 100자).",
       "commandRequired": "명령을 입력하세요",

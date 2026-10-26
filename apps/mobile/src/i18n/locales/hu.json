@@ -3839,6 +3839,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "A ••••-ként megjelenő értékek megőrzik a tárolt titkot; egy érték cseréjével rotálhatja azt. A parancssor módosítása minden érték ismételt megadását igényli",
+      "headersHint": "A ••••-ként megjelenő értékek megőrzik a tárolt titkot; egy érték cseréjével rotálhatja azt. Az URL módosítása minden érték ismételt megadását igényli",
       "nameRequired": "Adja meg a szerver nevét",
       "nameInvalid": "A név csak ASCII betűket, számokat, aláhúzásjeleket és kötőjeleket tartalmazhat, legfeljebb 100 karakter lehet",
       "commandRequired": "Írjon be egy parancsot",

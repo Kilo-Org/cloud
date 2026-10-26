@@ -3890,6 +3890,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Vērtības, kas parādītas kā ••••, saglabā savu esošo noslēpumu; aizstājiet vērtību, lai to nomainītu. Mainot komandrindu, atkal ir nepieciešamas visas vērtības",
+      "headersHint": "Vērtības, kas parādītas kā ••••, saglabā savu esošo noslēpumu; aizstājiet vērtību, lai to nomainītu. Mainot URL, atkal ir nepieciešamas visas vērtības",
       "nameRequired": "Ievadiet servera nosaukumu",
       "nameInvalid": "Nosaukumā var izmantot tikai ASCII burtus, ciparus, pasvītras un domuzīmes, līdz 100 rakstzīmēm",
       "commandRequired": "Ievadiet komandu",

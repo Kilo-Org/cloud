@@ -3839,6 +3839,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "•••• kimi göstərilən dəyərlər öz saxlanılan gizlisini qoruyur; yeniləmək üçün dəyəri dəyişin. Komanda xəttini dəyişdikdə bütün dəyərlər yenidən tələb olunur",
+      "headersHint": "•••• kimi göstərilən dəyərlər öz saxlanılan gizlisini qoruyur; yeniləmək üçün dəyəri dəyişin. URL-i dəyişdikdə bütün dəyərlər yenidən tələb olunur",
       "nameRequired": "Server adını daxil edin",
       "nameInvalid": "Ad yalnız ASCII hərflərindən, rəqəmlərdən, alt xəttlərindən və tirelərdən istifadə edə bilər, maksimum 100 simvol",
       "commandRequired": "Komanda daxil edin",

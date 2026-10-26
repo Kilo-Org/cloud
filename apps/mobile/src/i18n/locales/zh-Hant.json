@@ -3839,6 +3839,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "顯示為 •••• 的值會保留已儲存的密鑰；替換值即可輪換。變更命令列時必須重新輸入所有值",
+      "headersHint": "顯示為 •••• 的值會保留已儲存的密鑰；替換值即可輪換。變更網址時必須重新輸入所有值",
       "nameRequired": "輸入伺服器名稱",
       "nameInvalid": "名稱只能使用 ASCII 字母、數字、底線和連字符，最多 100 個字元",
       "commandRequired": "輸入命令",

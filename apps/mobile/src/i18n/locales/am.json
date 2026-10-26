@@ -3839,6 +3839,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "እንደ •••• የሚታዩ እሴቶች የተከማቸውን ሚስጥራቸውን ይይዛሉ፤ ሚስጥሩን ለማሽከረከር እሴቱን በአዲስ ይተኩ። የትእዛዝ መስመሩን መቀየር ሁሉንም እሴቶች እንደገና ያስፈልጋል",
+      "headersHint": "እንደ •••• የሚታዩ እሴቶች የተከማቸውን ሚስጥራቸውን ይይዛሉ፤ ሚስጥሩን ለማሽከረከር እሴቱን በአዲስ ይተኩ። URLን መቀየር ሁሉንም እሴቶች እንደገና ያስፈልጋል",
       "nameRequired": "የአገልጋይ ስም አስገባ",
       "nameInvalid": "ስም የASCII ፊደላትን፣ አሃዞችን፣ የስር መስመሮችን እና ሰረዞችን ብቻ መጠቀም ይችላል፣ እስከ 100 ቁምፊዎች።",
       "commandRequired": "ትእዛዝ አስገባ",

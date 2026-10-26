@@ -4043,6 +4043,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "القيم المعروضة كـ •••• تحتفظ بسرها المخزن؛ استبدل قيمة لتدوير السر. يتطلب تغيير سطر الأوامر إعادة إدخال كل القيم",
+      "headersHint": "القيم المعروضة كـ •••• تحتفظ بسرها المخزن؛ استبدل قيمة لتدوير السر. يتطلب تغيير عنوان URL إعادة إدخال كل القيم",
       "nameRequired": "أدخل اسم الخادم",
       "nameInvalid": "يمكن أن يستخدم الاسم حروف ASCII والأرقام والشرطات السفلية والشرطات فقط، بحد أقصى 100 حرف",
       "commandRequired": "أدخل أمرًا",

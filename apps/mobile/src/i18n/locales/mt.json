@@ -3992,6 +3992,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Il-valuri murija bħala •••• iżommu s-sigriet maħżun tagħhom; sostitwixxi valur biex iddawru. Il-bdil tal-linja tal-kmand jeħtieġ kull valur mill-ġdid",
+      "headersHint": "Il-valuri murija bħala •••• iżommu s-sigriet maħżun tagħhom; sostitwixxi valur biex iddawru. Il-bdil tal-URL jeħtieġ kull valur mill-ġdid",
       "nameRequired": "Daħħal isem server",
       "nameInvalid": "Isem jista' juża biss ittri ASCII, numri, underscores, u sings, sa 100 karattru",
       "commandRequired": "Daħħal kmand",

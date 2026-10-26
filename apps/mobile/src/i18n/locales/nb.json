@@ -3839,6 +3839,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Verdier som vises som •••• beholder den lagrede hemmeligheten; erstatt en verdi for å rotere den. Hvis du endrer kommandolinjen, må alle verdier angis på nytt",
+      "headersHint": "Verdier som vises som •••• beholder den lagrede hemmeligheten; erstatt en verdi for å rotere den. Hvis du endrer URL-en, må alle verdier angis på nytt",
       "nameRequired": "Skriv inn et servernavn",
       "nameInvalid": "Navn kan bare bruke ASCII-bokstaver, tall, understreker og bindestreker, med høyst 100 tegn",
       "commandRequired": "Skriv inn en kommando",

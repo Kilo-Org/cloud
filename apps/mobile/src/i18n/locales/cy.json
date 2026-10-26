@@ -4043,6 +4043,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Mae gwerthoedd a ddangosir fel •••• yn cadw eu cyfrinach storio; disodlwch werth i'w gylchdroi. Mae newid y llinell orchymyn yn gofyn am bob gwerth eto",
+      "headersHint": "Mae gwerthoedd a ddangosir fel •••• yn cadw eu cyfrinach storio; disodlwch werth i'w gylchdroi. Mae newid yr URL yn gofyn am bob gwerth eto",
       "nameRequired": "Rhowch enw gweinydd",
       "nameInvalid": "Dim ond llythrennau ASCII, rhifau, tanlinellau a llinellau toriad y gall enw eu defnyddio, hyd at 100 nod",
       "commandRequired": "Rhowch orchymyn",

@@ -38,13 +38,20 @@ jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
 jest.mock('@/lib/slack-bot/model-allow-list', () => ({
   getDefaultAllowedModel: jest.fn(async () => 'test/default-model'),
 }));
-jest.mock('@kilocode/web-shared/lib/config.server', () => ({
-  ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
-  LINEAR_CLIENT_ID: 'test-linear-client-id',
-  LINEAR_CLIENT_SECRET: 'test-linear-client-secret',
-  SLACK_CLIENT_ID: 'test-slack-client-id',
-  SLACK_CLIENT_SECRET: 'test-slack-client-secret',
-}));
+jest.mock('@kilocode/web-shared/lib/config.server', () => {
+  // Test-only envelope keyset; a jest factory cannot import the module above.
+  const slackTestKeyset = jest.requireActual(
+    '@/lib/integrations/platforms/slack/credential-test-keyset'
+  ) as { TEST_SLACK_CREDENTIAL_KEYSET_JSON: string };
+  return {
+    ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
+    LINEAR_CLIENT_ID: 'test-linear-client-id',
+    LINEAR_CLIENT_SECRET: 'test-linear-client-secret',
+    SLACK_CLIENT_ID: 'test-slack-client-id',
+    SLACK_CLIENT_SECRET: 'test-slack-client-secret',
+    SLACK_CREDENTIAL_KEYSET_JSON: slackTestKeyset.TEST_SLACK_CREDENTIAL_KEYSET_JSON,
+  };
+});
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
   captureMessage: jest.fn(),

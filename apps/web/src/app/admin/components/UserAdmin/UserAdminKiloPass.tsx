@@ -120,7 +120,6 @@ export function UserAdminKiloPass({ userId }: { userId: string }) {
         ? 'bg-red-900/20 text-red-400'
         : 'bg-yellow-900/20 text-yellow-400';
 
-  // Group issuances by issue_month
   const issuancesByMonth = new Map<string, typeof issuances>();
   for (const row of issuances) {
     const existing = issuancesByMonth.get(row.issueMonth) ?? [];
@@ -128,7 +127,6 @@ export function UserAdminKiloPass({ userId }: { userId: string }) {
     issuancesByMonth.set(row.issueMonth, existing);
   }
 
-  // Latest month's base credits for the progress display
   const latestBase = issuances.find(r => r.itemKind === KiloPassIssuanceItemKind.Base);
   const latestBonus = issuances.find(
     r =>

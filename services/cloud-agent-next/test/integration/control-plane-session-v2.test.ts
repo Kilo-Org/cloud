@@ -905,6 +905,31 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     stream.close();
   });
 
+  it('keeps the environment snapshot detail after the sandbox starts', async () => {
+    const { sessionId, stub, peer } = await setup();
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    const detail = 'Starting from the environment snapshot (revision 2)';
+    await stub.onRoute({ state: 'preparing', step: 'sandbox_create', attemptId: peer.attemptId });
+    await stub.onRoute({
+      state: 'preparing',
+      step: 'environment_snapshot',
+      detail,
+      attemptId: peer.attemptId,
+    });
+    await stub.onRoute({ state: 'preparing', step: 'sandbox_start', attemptId: peer.attemptId });
+
+    const stream = await connectStream(sessionId);
+    await waitForStreamEvent(stream, 'connected');
+    const replayed = preparingRows(await drainStream(stream));
+    expect(
+      replayed.find(
+        row => row.action === 'step_snapshot' && row.stepSnapshot?.key === 'environment_snapshot'
+      )?.stepSnapshot
+    ).toMatchObject({ status: 'completed', latestDetail: detail });
+    stream.close();
+  });
+
   it('preserves ordered phase occurrences and original starts across retries in one attempt', async () => {
     const { sessionId, stub, peer } = await setup();
     const stream = await connectStream(sessionId);

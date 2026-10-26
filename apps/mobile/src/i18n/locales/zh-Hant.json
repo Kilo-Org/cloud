@@ -53,6 +53,7 @@
     "connected": "已連結",
     "couldNotLoadModels": "無法載入模型。",
     "couldNotLoadRepositories": "無法載入存放庫。",
+    "noRepositoriesFound": "找不到存放庫",
     "critical": "嚴重",
     "delete": "刪除",
     "deleted": "已刪除",
@@ -87,6 +88,7 @@
     "connect": "連結",
     "connectBitbucket": "連結 Bitbucket",
     "connectGitlab": "連結 GitLab",
+    "connectProvider": "連結平台",
     "contentTruncated": "內容已截斷",
     "copyLink": "複製連結",
     "couldNotLoadOrganizations": "無法載入組織。",
@@ -145,7 +147,8 @@
     "agent": "代理人",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "變更"
+    "changes": "變更",
+    "organizationTrialEnded": "組織的試用期已結束，且沒有使用中的方案。組織擁有者可以在 kilo.ai 更新帳單資訊，然後再試一次。"
   },
   "language": {
     "restarting": "正在重新啟動以套用語言",
@@ -883,7 +886,6 @@
       "gitlabNoRepositoriesDescription": "你可能需要授權存取 GitLab 上的更多群組或專案。",
       "installGithubApp": "為存放庫安裝 GitHub App",
       "installGithubAppDescription": "請授權 Kilo GitHub App 存取要審查的存放庫。",
-      "noRepositoriesFound": "找不到存放庫",
       "repositoryAccess": "存放庫存取權限"
     },
     "style": {
@@ -907,7 +909,6 @@
     "followReviewMd": "遵循 REVIEW.md",
     "followReviewMdSubtitle": "遵循每個存放庫的 REVIEW.md 指示檔案",
     "manualReview": {
-      "connectProvider": "連結平台",
       "connectProviderDescription": "連結 GitHub，即可手動開始審查 PR。",
       "couldNotCheckProviderStatus": "無法檢查平台狀態。",
       "couldNotLoadProviders": "無法載入已連結的平台。請再試一次。",
@@ -1093,8 +1094,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "沒有可用的篩選條件",
-      "noFiltersDescription": "請返回資安問題清單，再重新開啟篩選設定。",
       "title": "篩選資安問題",
       "fixed": "已修復",
       "outcome": "結果",
@@ -1648,8 +1647,8 @@
       "title": "工作階段",
       "copyErrorDetails": "複製錯誤詳細資料",
       "backToSessions": "返回工作階段清單",
-      "follow": "在鎖定畫面上追蹤",
-      "unfollow": "停止在鎖定畫面上追蹤",
+      "follow": "追蹤工作階段",
+      "unfollow": "停止追蹤工作階段",
       "couldNotLoad": "無法載入工作階段。",
       "failedToLoadDetails": "無法載入工作階段詳細資料。",
       "failedToStopExecution": "無法停止執行。",
@@ -2432,7 +2431,6 @@
     "allow": "允許",
     "onlineMessage": "此裝置無法離線將語音轉成文字。你的錄音會傳送至 {{provider}} 以轉換為文字。Kilo 不會儲存音訊。",
     "onlineTitle": "語音會在線上處理",
-    "staysOff": "允許線上語音轉文字後，才能啟用語音輸入。",
     "start": "開始語音輸入",
     "stop": "停止語音輸入",
     "restricted": "此裝置上的語音輸入受到限制。",
@@ -2444,7 +2442,7 @@
     "busy": "語音輸入忙碌中。請再試一次。",
     "stopped": "語音輸入已停止。點按麥克風圖示再試一次。",
     "unavailableDevice": "此裝置上無法使用語音輸入。",
-    "unavailableLanguage": "語音輸入不支援此裝置目前使用的語言。",
+    "unavailableLanguage": "語音輸入不支援此裝置目前使用的語言。請安裝該語言的離線語音檔案，或改用應用程式語言。",
     "languageNotInstalledTitle": "{{language}} 的語音輸入尚未就緒",
     "languageNotInstalledMessage": "此手機尚未安裝 {{language}} 的離線語音檔案。請下載這些檔案，然後再試一次語音輸入。",
     "downloadOfflineModel": "下載",
@@ -3167,7 +3165,9 @@
       "sendInvite": "傳送邀請",
       "title": "邀請成員",
       "alreadyInvited": "該電子郵件地址已有待處理的邀請，或已是成員。",
-      "sendError": "無法傳送邀請。"
+      "sendError": "無法傳送邀請。",
+      "pendingInvitation": "這個電子郵件地址已有待處理的邀請。",
+      "alreadyMember": "這個人已經是此組織的成員。"
     },
     "invoices": {
       "downloadA11y": "下載發票 {{number}}",
@@ -3237,7 +3237,12 @@
       "pendingInvitations": "待處理的邀請",
       "resendInvite": "重新傳送邀請",
       "shareInviteLink": "分享邀請連結",
-      "resendInviteError": "無法重新傳送邀請。"
+      "resendInviteError": "無法重新傳送邀請。",
+      "inviteNotResendable": "此邀請已無法重新傳送。",
+      "ownerAuthority": "只有組織擁有者可以管理擁有者。",
+      "ownRoleChange": "您無法變更自己的角色。",
+      "inviteExpired": "此邀請已過期。",
+      "inviteAccepted": "此邀請已被接受。"
     },
     "usageStats": {
       "inputTokens": "輸入詞元",
@@ -3324,7 +3329,7 @@
     "title": "信任的主機",
     "subtitle": "已信任的主機，開啟連結時不再詢問",
     "emptyTitle": "沒有信任的主機",
-    "emptyDescription": "信任連結的主機後，開啟該主機的連結時就不會再詢問。",
+    "emptyDescription": "信任連結的主機或圖片主機後，開啟時就不會再詢問。",
     "imagesSectionTitle": "信任的圖片主機",
     "imagesSectionDescription": "來自這些主機的圖片將不再詢問即可載入。",
     "imagesSectionEmpty": "沒有信任的圖片主機",
@@ -3351,7 +3356,7 @@
     "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，即可在鎖定畫面查看執行中的代理程式。",
     "openSession": "開啟",
     "finished": "已完成",
-    "followFailed": "無法在鎖定畫面上顯示此代理程式。",
+    "followFailed": "無法追蹤此工作階段。",
     "approveFailed": "無法核准。點一下$t(common.approve)再試一次。",
     "checked": "上次確認",
     "lastKnown": "最後已知",
@@ -3700,9 +3705,9 @@
   "spendAlerts": {
     "subtitle": "當此範圍的支出超過限額或高於其平時每小時速率時，透過電子郵件或推播向帳單聯絡人發送提醒。",
     "thresholdTitle": "門檻突破",
-    "thresholdSubtitle": "累計支出超過你的限額",
+    "thresholdSubtitle": "此範圍在所選時間視窗內的滾動支出超過你的限額",
     "anomalyTitle": "每小時激增",
-    "anomalySubtitle": "某一小時的支出遠高於此範圍的平時速率",
+    "anomalySubtitle": "此範圍的每小時支出遠高於其自身的 p95 基準",
     "limitLabel": "限額 (USD)",
     "windowLabel": "時間視窗",
     "window24h": "24 小時",
@@ -4026,8 +4031,8 @@
     "empty": "此簡報時段無活動",
     "emptyHint": "當排定的簡報有活動時，你的雲端與 CLI 程式設計工作階段會顯示在這裡。",
     "loadError": "無法載入簡報",
-    "sessions": "時段內執行",
-    "pullRequests": "已開啟的 PRs",
+    "sessions": "時段內有活動的工作階段",
+    "pullRequests": "時段內新開啟的 PRs",
     "blockers": "新的阻礙",
     "spend": "時段內花費",
     "view": "閱讀簡報",
@@ -4060,7 +4065,7 @@
     "notificationsHint": "每個排定的簡報會傳送一則一般通知。與付費 AI 摘要無關。",
     "notificationPermission": "請在$t(common.notifications)中啟用裝置通知以接收簡報。",
     "aiOptIn": "付費 AI 摘要",
-    "aiHint": "僅適用於此情境，可選擇啟用。經挑選並遮蔽敏感資訊的摘錄與結構化資料會以你的 App 語言傳送至你的模型。費用從此情境的餘額扣除。",
+    "aiHint": "可為此情境單獨選擇啟用。經挑選並遮蔽敏感資訊的摘錄與結構化資料會以你的 App 語言傳送至你的模型。費用從此情境的餘額扣除。",
     "defaultModel": "使用 Kilo 的預設模型",
     "duration": "時間上限（分鐘）",
     "spendLimit": "花費上限（USD）",
@@ -4106,7 +4111,13 @@
     "estimatePricingUnavailable": "此模型的定價無法取得。",
     "estimateBalanceUnavailable": "餘額不足以產生付費摘要。",
     "estimateModelNotAllowed": "此模型在此不受允許。",
-    "estimateSpendLimitTooLow": "請提高消費保障上限，才能允許此摘要。",
-    "saved": "簡報設定已儲存"
+    "estimateSpendLimitTooLow": "請提高花費上限，才能產生此摘要。",
+    "saved": "簡報設定已儲存",
+    "preparing": "正在準備你的簡報…",
+    "preparationHint": "收集活動資料期間，你可以離開並稍後返回。在你檢視並確認預估費用之前，不會開始 AI 作業或收費。",
+    "resumeReview": "繼續檢視",
+    "preparationFailed": "無法收集此簡報的活動資料。請再試一次。",
+    "preparationTimedOut": "收集活動資料耗時過長。請再試一次。",
+    "preparationDrafts": "待確認的簡報"
   }
 }

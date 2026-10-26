@@ -90,19 +90,70 @@ function record(wrapperId: string, ptyId: string) {
   };
 }
 
+const BRIDGE_GENERATION = '1f0c6d9a-2b3c-4d5e-8f90-123456789abc';
+
+type FakeSocket = {
+  readyState: number;
+  close: ReturnType<typeof vi.fn>;
+  serializeAttachment: (value: unknown) => void;
+  deserializeAttachment: () => unknown;
+  tags: string[];
+};
+
+function socket(tags: string[], attachment: unknown): FakeSocket {
+  let current = attachment;
+  return {
+    readyState: 1,
+    close: vi.fn(),
+    serializeAttachment: (value: unknown) => {
+      current = value;
+    },
+    deserializeAttachment: () => current,
+    tags,
+  };
+}
+
+function fakeState(values: Map<string, unknown>, sockets: FakeSocket[]): DurableObjectState {
+  return {
+    storage: {
+      async get<T = unknown>(key: string): Promise<T | undefined> {
+        return structuredClone(values.get(key)) as T | undefined;
+      },
+      async put<T = unknown>(key: string, value: T): Promise<void> {
+        values.set(key, structuredClone(value));
+      },
+      async delete(keys: string | string[]): Promise<void> {
+        for (const key of Array.isArray(keys) ? keys : [keys]) values.delete(key);
+      },
+      async list<T = unknown>(options?: { prefix?: string }): Promise<Map<string, T>> {
+        const listed = new Map<string, T>();
+        for (const [key, value] of values) {
+          if (!options?.prefix || key.startsWith(options.prefix)) {
+            listed.set(key, structuredClone(value) as T);
+          }
+        }
+        return listed;
+      },
+    },
+    getWebSockets: (tag: string) =>
+      tag === undefined ? sockets : sockets.filter(candidate => candidate.tags.includes(tag)),
+  } as unknown as DurableObjectState;
+}
+
 function fixture(
   overrides: {
     isRouteReady?: boolean;
     getSandboxStatus?: () => Promise<SandboxStatusSnapshot>;
+    sockets?: FakeSocket[];
   } = {}
 ) {
-  const { storage, values } = fakeStorage();
+  const { values } = fakeStorage();
   const request = vi.fn(async (): Promise<ControlPlaneControlResult> => ({
     ok: true,
     result: { pty: pty('pty_new') },
   }));
   const terminals = createControlPlaneTerminals({
-    state: { storage } as unknown as DurableObjectState,
+    state: fakeState(values, overrides.sockets ?? []),
     sessionId: SESSION_ID,
     getMetadata: () => metadata(),
     getDirectory: () => DIRECTORY,
@@ -175,5 +226,38 @@ describe('V2 control-plane terminals projection', () => {
       wrapperId: CURRENT_WRAPPER,
       state: 'running',
     });
+  });
+
+  it('closes browser terminal sockets and leaves wrapper sockets open', () => {
+    const browser = socket(['terminal', 'terminal:browser:pty_1'], {
+      role: 'browser',
+      ptyId: 'pty_1',
+      bridgeGeneration: BRIDGE_GENERATION,
+      wrapperInstanceId: CURRENT_WRAPPER,
+      capabilityHash: 'a'.repeat(64),
+      capabilityExpiresAt: Date.now() + 30_000,
+    });
+    const otherBrowser = socket(['terminal', 'terminal:browser:pty_2'], {
+      role: 'browser',
+      ptyId: 'pty_2',
+      bridgeGeneration: BRIDGE_GENERATION,
+      wrapperInstanceId: CURRENT_WRAPPER,
+    });
+    const wrapperSocket = socket(['terminal', 'terminal:wrapper:pty_1'], {
+      role: 'wrapper',
+      ptyId: 'pty_1',
+      bridgeGeneration: BRIDGE_GENERATION,
+      wrapperInstanceId: CURRENT_WRAPPER,
+    });
+    const { terminals } = fixture({ sockets: [browser, otherBrowser, wrapperSocket] });
+
+    expect(terminals.closeBrowserSockets(1000, 'session access revoked')).toBe(2);
+
+    expect(browser.close).toHaveBeenCalledWith(1000, 'session access revoked');
+    expect(otherBrowser.close).toHaveBeenCalledWith(1000, 'session access revoked');
+    expect(wrapperSocket.close).not.toHaveBeenCalled();
+    expect(browser.deserializeAttachment() as Record<string, unknown>).not.toHaveProperty(
+      'capabilityHash'
+    );
   });
 });

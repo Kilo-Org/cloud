@@ -150,7 +150,9 @@ function SessionTodoCandidatesSheet({
     >
       <View className="flex-1 pt-4">
         <SheetTitleRow title={t('todos.linkToTodo')} onClose={onClose} />
-        <ScrollView contentContainerStyle={{ paddingBottom: bottom + 16 }}>{body}</ScrollView>
+        <ScrollView nestedScrollEnabled contentContainerStyle={{ paddingBottom: bottom + 16 }}>
+          {body}
+        </ScrollView>
       </View>
     </Sheet>
   );

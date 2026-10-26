@@ -472,14 +472,8 @@ export async function updateEnvironment(
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Environment not found' });
   }
 
-<<<<<<< 0193c81970e48a3312b6f0f5f2b2e6014ad23a1a
-  // Name and allocation are not build inputs; they never advance the revision.
-  if (name !== undefined || input.sandboxAllocation !== undefined) {
-||||||| b63e3f2b12ee2b8876dc266edd1e260553936f92
-  if (name !== undefined || input.sandboxAllocation !== undefined) {
-=======
+  // Name, allocation and network policy are not build inputs; they never advance the revision.
   if (name !== undefined || input.sandboxAllocation !== undefined || egress !== undefined) {
->>>>>>> 0fd5178900beee5cf9f6ade89d4b56c5b16eedf9
     await tx
       .update(cloud_agent_environments)
       .set({
@@ -740,7 +734,6 @@ async function readActiveEnvironment(
     )
     .where(and(condition, isNull(organizations.deleted_at)))
     .limit(1);
-<<<<<<< 0193c81970e48a3312b6f0f5f2b2e6014ad23a1a
   return row?.environment ?? null;
 }
 
@@ -774,6 +767,8 @@ export async function loadEnvironmentForSession(
         },
         reference: referenceOf(environment),
         sandboxAllocation: environment.sandbox_allocation,
+        egressMode: environment.egress_mode,
+        egressAllowlist: environment.egress_allowlist,
       };
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' }
@@ -826,59 +821,4 @@ export async function loadEnvironmentBuildInput(
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' }
   );
-||||||| b63e3f2b12ee2b8876dc266edd1e260553936f92
-  if (!row) return null;
-
-  const vars = await db
-    .select({
-      key: cloud_agent_environment_vars.key,
-      value: cloud_agent_environment_vars.value,
-      isSecret: cloud_agent_environment_vars.is_secret,
-    })
-    .from(cloud_agent_environment_vars)
-    .where(eq(cloud_agent_environment_vars.environment_id, row.environment.id));
-
-  const envVars: Record<string, string> = {};
-  const encryptedSecrets: EnvironmentSessionLayer['encryptedSecrets'] = {};
-  for (const variable of vars) {
-    if (variable.isSecret) {
-      encryptedSecrets[variable.key] = encryptedEnvelopeSchema.parse(JSON.parse(variable.value));
-    } else {
-      envVars[variable.key] = variable.value;
-    }
-  }
-
-  return {
-    layer: { envVars, encryptedSecrets, setupCommands: row.environment.commands },
-    sandboxAllocation: row.environment.sandbox_allocation,
-  };
-=======
-  if (!row) return null;
-
-  const vars = await db
-    .select({
-      key: cloud_agent_environment_vars.key,
-      value: cloud_agent_environment_vars.value,
-      isSecret: cloud_agent_environment_vars.is_secret,
-    })
-    .from(cloud_agent_environment_vars)
-    .where(eq(cloud_agent_environment_vars.environment_id, row.environment.id));
-
-  const envVars: Record<string, string> = {};
-  const encryptedSecrets: EnvironmentSessionLayer['encryptedSecrets'] = {};
-  for (const variable of vars) {
-    if (variable.isSecret) {
-      encryptedSecrets[variable.key] = encryptedEnvelopeSchema.parse(JSON.parse(variable.value));
-    } else {
-      envVars[variable.key] = variable.value;
-    }
-  }
-
-  return {
-    layer: { envVars, encryptedSecrets, setupCommands: row.environment.commands },
-    sandboxAllocation: row.environment.sandbox_allocation,
-    egressMode: row.environment.egress_mode,
-    egressAllowlist: row.environment.egress_allowlist,
-  };
->>>>>>> 0fd5178900beee5cf9f6ade89d4b56c5b16eedf9
 }

@@ -65,7 +65,6 @@ import {
   profileResolutionPolicyForSessionCreateOrigin,
 } from './session-creation-preflight.js';
 
-<<<<<<< 0193c81970e48a3312b6f0f5f2b2e6014ad23a1a
 function environmentLoad(
   layer: Record<string, unknown>,
   environmentId: string,
@@ -74,18 +73,15 @@ function environmentLoad(
   return {
     layer,
     sandboxAllocation,
+    egressMode: null,
+    egressAllowlist: null,
     reference: {
       environmentId,
       owner: { type: 'user' as const, id: 'user-123' },
       configurationRevision: 3,
       repository: { platform: 'github' as const, repoFullName: 'acme/repo' },
     },
-||||||| b63e3f2b12ee2b8876dc266edd1e260553936f92
-function environmentLoad(layer: Record<string, unknown>, sandboxAllocation: string | null = null) {
-  return { layer, sandboxAllocation };
-=======
-function environmentLoad(layer: Record<string, unknown>, sandboxAllocation: string | null = null) {
-  return { layer, sandboxAllocation, egressMode: null, egressAllowlist: null };
+  };
 }
 
 const PARENT_SESSION_ID = 'workspace_12345678-1234-4234-8234-123456789abc';
@@ -97,7 +93,6 @@ function parentMetadata(workspace?: Record<string, unknown>, identity?: Record<s
     auth: {},
     ...(workspace ? { workspace } : {}),
     lifecycle: { version: 1, timestamp: 1 },
->>>>>>> 0fd5178900beee5cf9f6ade89d4b56c5b16eedf9
   };
 }
 

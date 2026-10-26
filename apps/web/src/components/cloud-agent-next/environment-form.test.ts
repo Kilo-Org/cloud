@@ -1,19 +1,12 @@
 import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from '@jest/globals';
 import {
-<<<<<<< 0193c81970e48a3312b6f0f5f2b2e6014ad23a1a
   hasEnvironmentFormChanges,
-  toEnvironmentCommands,
-  toEnvironmentScript,
-||||||| b63e3f2b12ee2b8876dc266edd1e260553936f92
-import { toEnvironmentCommands, toEnvironmentScript } from './environment-form';
-=======
   buildEgressPolicy,
   toEnvironmentCommands,
   toEnvironmentScript,
   toNetworkAccessDraft,
   type NetworkAccessDraft,
->>>>>>> 0fd5178900beee5cf9f6ade89d4b56c5b16eedf9
 } from './environment-form';
 
 describe('single environment script', () => {
@@ -48,12 +41,12 @@ describe('single environment script', () => {
   });
 });
 
-<<<<<<< 0193c81970e48a3312b6f0f5f2b2e6014ad23a1a
 describe('hasEnvironmentFormChanges', () => {
   const saved = {
     script: toEnvironmentScript(['export A=1', 'echo "$A"']),
     variablesText: 'TOKEN=<unchanged>\nPLAIN="saved"',
     sandboxAllocation: 'cloudflare-single',
+    networkAccess: { mode: 'full', domains: '' } satisfies NetworkAccessDraft,
   };
 
   test('allows a build when the legacy script and secret markers stay untouched', () => {
@@ -67,6 +60,13 @@ describe('hasEnvironmentFormChanges', () => {
     { variablesText: 'TOKEN=<unchanged>\nPLAIN="changed"' },
     { variablesText: 'TOKEN="unterminated' },
     { sandboxAllocation: null },
+    { networkAccess: { mode: 'none', domains: '' } satisfies NetworkAccessDraft },
+    {
+      networkAccess: {
+        mode: 'limited',
+        domains: 'registry.npmjs.org',
+      } satisfies NetworkAccessDraft,
+    },
   ])('blocks a build while the editor contains unsaved changes: %j', change => {
     expect(hasEnvironmentFormChanges(saved, { ...saved, ...change })).toBe(true);
   });
@@ -76,8 +76,9 @@ describe('hasEnvironmentFormChanges', () => {
     expect(hasEnvironmentFormChanges(saved, draft)).toBe(true);
     draft.script = saved.script;
     expect(hasEnvironmentFormChanges(saved, draft)).toBe(false);
-||||||| b63e3f2b12ee2b8876dc266edd1e260553936f92
-=======
+  });
+});
+
 describe('environment network access', () => {
   const full: NetworkAccessDraft = { mode: 'full', domains: '' };
   const none: NetworkAccessDraft = { mode: 'none', domains: '' };
@@ -166,6 +167,5 @@ describe('environment network access', () => {
       policy: { egressMode: 'allowlist', egressAllowlist: [] },
       error: null,
     });
->>>>>>> 0fd5178900beee5cf9f6ade89d4b56c5b16eedf9
   });
 });

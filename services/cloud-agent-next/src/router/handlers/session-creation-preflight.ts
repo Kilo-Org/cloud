@@ -251,7 +251,6 @@ export async function resolveEffectiveSessionConfiguration(
 
   const resolvedRequest = applyProfileResolution(input, resolved);
   assertResolvedConfigurationWithinSessionLimits(resolvedRequest.profile?.resolved);
-<<<<<<< 0193c81970e48a3312b6f0f5f2b2e6014ad23a1a
   // The reference and the allocation travel beside the merged configuration;
   // a client cannot set them.
   const {
@@ -259,32 +258,13 @@ export async function resolveEffectiveSessionConfiguration(
     environmentSandboxAllocation: _clientAllocation,
     ...withoutEnvironment
   } = resolvedRequest;
-  if (!environment) return withoutEnvironment;
-  return {
+  let effectiveRequest: SessionCreateRequest = {
     ...withoutEnvironment,
-    environment: environment.reference,
-    ...(environment.sandboxAllocation
+    ...(environment ? { environment: environment.reference } : {}),
+    ...(environment?.sandboxAllocation
       ? { environmentSandboxAllocation: environment.sandboxAllocation }
       : {}),
-||||||| b63e3f2b12ee2b8876dc266edd1e260553936f92
-  // The allocation travels beside the merged configuration; a client cannot
-  // set it.
-  const { environmentSandboxAllocation: _clientAllocation, ...withoutEnvironment } =
-    resolvedRequest;
-  if (!environment?.sandboxAllocation) return withoutEnvironment;
-  return { ...withoutEnvironment, environmentSandboxAllocation: environment.sandboxAllocation };
-=======
-  // The allocation travels beside the merged configuration; a client cannot
-  // set it.
-  const { environmentSandboxAllocation: _clientAllocation, ...withoutEnvironment } =
-    resolvedRequest;
-  let effectiveRequest: SessionCreateRequest = withoutEnvironment;
-  if (environment?.sandboxAllocation) {
-    effectiveRequest = {
-      ...effectiveRequest,
-      environmentSandboxAllocation: environment.sandboxAllocation,
-    };
-  }
+  };
   // A saved allowlist enters the same runtime slot as explicit input, but only
   // when the request named no policy. Full and legacy null policies are already
   // the unrestricted default, so they need no write.
@@ -349,7 +329,6 @@ async function readParentEgressPolicy(
   return {
     egressMode: 'allowlist',
     egressAllowlist: metadata.workspace.egressAllowlist ?? [],
->>>>>>> 0fd5178900beee5cf9f6ade89d4b56c5b16eedf9
   };
 }
 

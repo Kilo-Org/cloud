@@ -13,19 +13,30 @@ export function toEnvironmentCommands(script: string): string[] {
   return trimmed ? [trimmed] : [];
 }
 
-<<<<<<< 0193c81970e48a3312b6f0f5f2b2e6014ad23a1a
 /** Builds use saved configuration. Keep the editor baseline stable during status polling. */
 export function hasEnvironmentFormChanges(
-  saved: { script: string; variablesText: string; sandboxAllocation: string | null },
-  draft: { script: string; variablesText: string; sandboxAllocation: string | null }
+  saved: {
+    script: string;
+    variablesText: string;
+    sandboxAllocation: string | null;
+    networkAccess: NetworkAccessDraft;
+  },
+  draft: {
+    script: string;
+    variablesText: string;
+    sandboxAllocation: string | null;
+    networkAccess: NetworkAccessDraft;
+  }
 ): boolean {
   return (
     saved.script !== draft.script ||
     saved.variablesText !== draft.variablesText ||
-    saved.sandboxAllocation !== draft.sandboxAllocation
+    saved.sandboxAllocation !== draft.sandboxAllocation ||
+    saved.networkAccess.mode !== draft.networkAccess.mode ||
+    saved.networkAccess.domains !== draft.networkAccess.domains
   );
-||||||| b63e3f2b12ee2b8876dc266edd1e260553936f92
-=======
+}
+
 /** UI choices. The API stores an unrestricted or allowlist mode. */
 export type NetworkAccessMode = 'none' | 'limited' | 'full';
 
@@ -106,5 +117,4 @@ export function buildEgressPolicy(
     return { error: null };
   }
   return next;
->>>>>>> 0fd5178900beee5cf9f6ade89d4b56c5b16eedf9
 }

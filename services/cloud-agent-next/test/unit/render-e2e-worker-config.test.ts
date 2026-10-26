@@ -367,6 +367,12 @@ describe('buildE2eWorkerConfig', () => {
       'https://app.kilo.ai,https://api.kilo.ai,http://localhost:3000'
     );
     expect(config.vars.PER_SESSION_SANDBOX_ORG_IDS).toBe('*');
+    expect(config.vars.CLOUDFLARE_CONTAINERS_ORG_IDS).toBe('');
+    expect(
+      config.durable_objects.bindings.some(
+        (binding: { name: string }) => binding.name === 'SANDBOX_CONTAINERS'
+      )
+    ).toBe(false);
     expect(config.vars.TOOL_CGROUP_ORG_IDS).toBe('*');
     expect(config.vars.TOOL_CGROUP_MODE).toBe('enforce');
     expect(config.vars.TOOL_CGROUP_RESERVE_MB).toBe('1024');

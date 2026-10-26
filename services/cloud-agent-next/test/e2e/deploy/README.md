@@ -224,7 +224,10 @@ All other container classes (`SandboxSmall`, `SandboxDIND`, `SandboxCodeReview`,
 `SandboxContainment`, `SandboxSmallContainment`, `SandboxCodeReviewContainment`,
 `SandboxContainers`)
 are removed from `containers`, `durable_objects.bindings` and `migrations`, so
-those bindings do not exist on `cloud-agent-e2e-test`. The migration list keeps
+those bindings do not exist on `cloud-agent-e2e-test`. Because the DO-managed
+container provider needs `SANDBOX_CONTAINERS`, the renderer also sets
+`CLOUDFLARE_CONTAINERS_ORG_IDS` to an empty value; sessions use the `cloudflare`
+provider with the single `Sandbox` class. The migration list keeps
 each surviving SQLite Durable Object class on its original production tag
 (`Sandbox` `v1`, `CloudAgentSession` `v2`, `UserKiloFacade` `v5`,
 `StreamTicketNonceDO` `v8`, `SandboxControl` `v9`, `SandboxSession` `v10`);

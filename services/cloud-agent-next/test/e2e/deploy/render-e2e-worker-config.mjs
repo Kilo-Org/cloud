@@ -162,6 +162,10 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     KILO_OPENROUTER_BASE: kiloOpenRouterBase,
     WS_ALLOWED_ORIGINS: 'https://app.kilo.ai,https://api.kilo.ai,http://localhost:3000',
     PER_SESSION_SANDBOX_ORG_IDS: '*',
+    // This Worker provisions only the `Sandbox` class. The DO-managed container
+    // provider needs the removed `SANDBOX_CONTAINERS` class, so keep every owner
+    // unenrolled and let sessions use the `cloudflare` provider.
+    CLOUDFLARE_CONTAINERS_ORG_IDS: '',
     TOOL_CGROUP_ORG_IDS: '*',
     TOOL_CGROUP_MODE: 'enforce',
     TOOL_CGROUP_RESERVE_MB: '1024',

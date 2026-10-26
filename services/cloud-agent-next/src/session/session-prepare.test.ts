@@ -555,16 +555,25 @@ describe('explicit sandbox session creation', () => {
 
   it('rejects an inherited allowlist when no saved allocation selects containers', async () => {
     const doStub = makeDoStub();
+    const ctx = selectedContext(doStub);
+    ctx.env.CLOUDFLARE_CONTAINERS_ORG_IDS = '';
+    ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'false';
     const request = makeRequest({
       repository: { type: 'github', repo: 'acme/repo' },
       options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
       runtime: { egressMode: 'allowlist', egressAllowlist: [] },
     });
 
-    await expect(runCreate(selectedContext(doStub), request)).rejects.toMatchObject({
+    await expect(runCreate(ctx, request)).rejects.toMatchObject({
       code: 'BAD_REQUEST',
       message:
         'Deny-by-default egress requires an isolated control-plane Cloudflare containers sandbox',
+    });
+    expect(selectControlPlaneSandboxMock).toHaveBeenCalledOnce();
+    expect(selectControlPlaneSandboxMock.mock.calls[0][0].sandboxAllocation).toBeUndefined();
+    await expect(selectControlPlaneSandboxMock.mock.results[0].value).resolves.toMatchObject({
+      provider: 'cloudflare',
+      sandboxKind: 'isolated',
     });
     expect(createCliSessionMock).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
@@ -864,8 +873,20 @@ describe('explicit sandbox session creation', () => {
   it('conflicts a restricted retry against an unrestricted Vercel creation before recovery', async () => {
     const doStub = makeDoStub();
     const ctx = selectedContext(doStub);
+    ctx.env.BYOC_VERCEL_IDS = orgId;
+    fetchByocVercelEnrollmentMock.mockResolvedValueOnce({
+      organizationId: orgId,
+      credentialId: 'f47ac10b-58cc-4372-a567-0e02b2c3d480',
+      setupStatus: 'ready',
+    });
     const request = requestForPreset('vercel-small');
     await runCreate(ctx, request);
+    expect(createdMetadata(doStub)?.workspace).toMatchObject({
+      sandboxProvider: 'vercel',
+      sandboxAllocation: 'vercel-small',
+    });
+    expect(createdMetadata(doStub)?.workspace?.egressAllowlist).toBeUndefined();
+    expect(fetchByocVercelEnrollmentMock).toHaveBeenCalledOnce();
     const admission = admitOperationMock.mock.calls[0][1] as {
       initialCanonicalResult: Record<string, unknown>;
     };
@@ -896,6 +917,7 @@ describe('explicit sandbox session creation', () => {
     ).rejects.toMatchObject({ code: 'CONFLICT', message: 'session_create_intent_conflict' });
 
     expect(selectControlPlaneSandboxMock).toHaveBeenCalledTimes(allocations);
+    expect(fetchByocVercelEnrollmentMock).toHaveBeenCalledOnce();
     expect(createCliSessionMock).toHaveBeenCalledTimes(dispatches);
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledTimes(creates);
     expect(doStub.getMetadata).not.toHaveBeenCalled();

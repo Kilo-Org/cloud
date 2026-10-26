@@ -261,6 +261,14 @@ describe('reorderKiloCommands', () => {
     expect(state.updateSets).toHaveLength(0);
   });
 
+  test('treats an empty order as a no-op', async () => {
+    const { db, state } = createReorderServiceDb({ ownedIds: [] });
+
+    await reorderKiloCommands(db, PROFILE_ID, [], OWNER);
+
+    expect(state.updateSets).toHaveLength(0);
+  });
+
   test('rejects a repeated id before writing', async () => {
     const ids = [commandId(1), commandId(2)];
     const { db, state } = createReorderServiceDb({ ownedIds: ids });

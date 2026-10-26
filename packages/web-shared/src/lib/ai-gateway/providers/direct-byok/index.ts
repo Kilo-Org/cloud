@@ -19,6 +19,7 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import { getFallbackReasoningOptions } from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
 import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
+import { signBedrockRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/aws-bedrock-signing';
 
 /** Providers for `/api/v1/providers` that the general provider list lacks. */
 export function getDirectByokProviderListings(): OpenRouterProvider[] {
@@ -147,7 +148,12 @@ export async function getDirectByokModelsForUser(userId: string) {
   return byokProviderIds.length === 0 ? [] : await getDirectByokModels(byokProviderIds);
 }
 
-/** An AI SDK provider for calling `modelId` with a stored credential, such as for key tests. */
+/**
+ * An AI SDK provider for calling `modelId` with a stored credential, such as for
+ * key tests. It applies the resolved upstream's Chat Completions URL and auth;
+ * the model is resolved by id alone, so it must be one the provider serves over
+ * Chat Completions.
+ */
 export async function createAiSdkProvider(
   directByokProvider: DirectByokProvider,
   credential: string,
@@ -158,16 +164,34 @@ export async function createAiSdkProvider(
     model: { id: modelId },
     stream: false,
   });
+  if (!upstream.supportedChatApis.includes('chat_completions')) {
+    throw new Error(`${directByokProvider.id} does not serve ${modelId} over Chat Completions`);
+  }
+  const chatCompletionsUrl = upstream.apiUrlOverrides.chat_completions ?? upstream.apiUrl;
+  const { awsBedrock, apiKeyHeader, apiKey, disableUrlSuffix } = upstream;
   return createOpenAICompatible({
-    baseURL: upstream.apiUrl,
-    apiKey: upstream.apiKey,
+    baseURL: chatCompletionsUrl,
+    apiKey: awsBedrock || apiKeyHeader ? undefined : apiKey,
     name: 'openaiCompatible',
-    headers:
-      directByokProvider.id === 'opencode-go' ? { 'x-opencode-session': randomUUID() } : undefined,
-    fetch: (url, init) => {
+    headers: {
+      ...(apiKeyHeader === 'x-api-key' && { 'x-api-key': apiKey }),
+      ...(directByokProvider.id === 'opencode-go' && { 'x-opencode-session': randomUUID() }),
+    },
+    fetch: async (url, init) => {
+      const requestUrl = disableUrlSuffix ? chatCompletionsUrl : String(url);
       const headers = new Headers(init?.headers);
       headers.set('user-agent', COMPATIBLE_USER_AGENT);
-      return fetch(url, init ? { ...init, headers } : { headers });
+      if (!awsBedrock || typeof init?.body !== 'string') {
+        return fetch(requestUrl, init ? { ...init, headers } : { headers });
+      }
+      const signedHeaders = await signBedrockRequest({
+        url: requestUrl,
+        method: init.method ?? 'POST',
+        headers,
+        body: init.body,
+        credentials: awsBedrock,
+      });
+      return fetch(requestUrl, { ...init, headers: signedHeaders });
     },
   });
 }

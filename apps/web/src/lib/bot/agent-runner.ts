@@ -124,7 +124,11 @@ async function buildSystemPrompt(
     documentationUrl: botPlatform.documentationUrl,
     hasGitHubRepositories: Boolean(githubContext?.repositories),
     hasGitLabProjects: Boolean(gitlabContext?.repositories),
-    githubRepositoryContext: githubContext ? formatGitHubRepositoriesForPrompt(githubContext) : '',
+    githubRepositoryContext: githubRepo
+      ? `Cloud Agent sessions are bound to this thread's GitHub repository: ${githubRepo}.`
+      : githubContext
+        ? formatGitHubRepositoriesForPrompt(githubContext)
+        : '',
     gitlabProjectContext: gitlabContext ? formatGitLabRepositoriesForPrompt(gitlabContext) : '',
     conversationContext,
   });

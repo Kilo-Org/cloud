@@ -179,7 +179,7 @@ describe('request cost admission', () => {
   it('admits a free model on a managed provider without a route price cap', async () => {
     const decision = await enforceRequestCostLimitDecision(
       '2000000',
-      'stealth/glyph-cluster',
+      'google/gemma-4-26b-a4b-it:free',
       body,
       2_000_000,
       { id: 'vercel', userFunded: false }

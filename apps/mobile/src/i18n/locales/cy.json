@@ -53,6 +53,7 @@
     "connected": "Wedi cysylltu",
     "couldNotLoadModels": "Doedd dim modd llwytho'r modelau.",
     "couldNotLoadRepositories": "Doedd dim modd llwytho'r ystorfeydd.",
+    "noRepositoriesFound": "Heb ddod o hyd i unrhyw ystorfeydd",
     "critical": "Critigol",
     "delete": "Dileu",
     "deleted": "Dilëwyd",
@@ -87,6 +88,7 @@
     "connect": "Cysylltu",
     "connectBitbucket": "Cysylltu â Bitbucket",
     "connectGitlab": "Cysylltu â GitLab",
+    "connectProvider": "Cysylltu darparwr",
     "contentTruncated": "Cynnwys wedi'i gwtogi",
     "copyLink": "Copïo dolen",
     "couldNotLoadOrganizations": "Doedd dim modd llwytho'r sefydliadau.",
@@ -145,7 +147,8 @@
     "agent": "Asiant",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Newidiadau"
+    "changes": "Newidiadau",
+    "organizationTrialEnded": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gall perchennog sefydliad ddiweddaru bilio ar kilo.ai, ac yna rhoi cynnig arall arni."
   },
   "language": {
     "restarting": "Yn ailgychwyn i newid yr iaith",
@@ -1494,7 +1497,6 @@
       "gitlabNoRepositoriesDescription": "Efallai y bydd angen i chi ganiatáu mynediad i fwy o grwpiau neu brosiectau ar GitLab.",
       "installGithubApp": "Gosod yr ap GitHub ar ystorfeydd",
       "installGithubAppDescription": "Rhowch fynediad i ap GitHub Kilo at yr ystorfeydd rydych am eu hadolygu.",
-      "noRepositoriesFound": "Heb ddod o hyd i unrhyw ystorfeydd",
       "repositoryAccess": "mynediad i ystorfa"
     },
     "style": {
@@ -1576,7 +1578,6 @@
       "invalidUrl": "Rhowch URL dilys ar gyfer cais tynnu.",
       "couldNotCheckProviderStatus": "Ni ellid gwirio statws y darparwr.",
       "couldNotLoadProviders": "Ni allem lwytho'r darparwyr rydych wedi'u cysylltu. Ceisiwch eto.",
-      "connectProvider": "Cysylltu darparwr",
       "connectProviderDescription": "Cysylltwch GitHub i ddechrau adolygiad â llaw o gais tynnu.",
       "pullRequestUrl": "URL cais tynnu",
       "instructions": "Cyfarwyddiadau (dewisol)",
@@ -1704,8 +1705,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Dim hidlwyr ar gael",
-      "noFiltersDescription": "Ewch yn ôl ac agorwch yr hidlwyr eto o'r rhestr canfyddiadau.",
       "title": "Hidlo canfyddiadau",
       "reset": "Ailosod",
       "severity": "Difrifoldeb",
@@ -2299,8 +2298,8 @@
       "title": "Sesiwn",
       "copyErrorDetails": "Copïo manylion gwall",
       "backToSessions": "Yn ôl i sesiynau",
-      "follow": "Dilyn ar y sgrin glo",
-      "unfollow": "Peidio â dilyn ar y sgrin glo",
+      "follow": "Dilyn y sesiwn",
+      "unfollow": "Peidio â dilyn y sesiwn",
       "couldNotLoad": "Methu llwytho'r sesiwn.",
       "failedToLoadDetails": "Methu llwytho manylion y sesiwn.",
       "failedToStopExecution": "Methu atal y gweithrediad.",
@@ -3124,7 +3123,6 @@
   },
   "voiceInput": {
     "listening": "Yn gwrando...",
-    "staysOff": "Bydd mewnbwn llais yn aros wedi'i ddiffodd nes i chi ganiatáu trawsgrifio ar-lein.",
     "onlineTitle": "Prosesir lleferydd ar-lein",
     "onlineMessage": "Ni all y ddyfais hon drawsgrifio all-lein. Anfonir eich recordiad at {{provider}} i'w droi'n destun. Nid yw Kilo yn storio'r sain.",
     "allow": "Caniatáu",
@@ -3343,7 +3341,9 @@
       "sendInvite": "Anfon gwahoddiad",
       "title": "Gwahodd aelod",
       "alreadyInvited": "Mae'r cyfeiriad e-bost hwn eisoes wedi cael gwahoddiad neu'n eisoes yn perthyn i aelod.",
-      "sendError": "Ni lwyddwyd i anfon y gwahoddiad."
+      "sendError": "Ni lwyddwyd i anfon y gwahoddiad.",
+      "pendingInvitation": "Mae gwahoddiad ar y gweill eisoes ar gyfer yr e-bost hwn.",
+      "alreadyMember": "Mae'r person hwn eisoes yn aelod o'r sefydliad hwn."
     },
     "invoices": {
       "downloadA11y": "Lawrlwytho anfoneb {{number}}",
@@ -3413,7 +3413,12 @@
       "pendingInvitations": "Gwahoddiadau sy'n aros",
       "resendInvite": "Ailanfon y gwahoddiad",
       "shareInviteLink": "Rhannu dolen gwahoddiad",
-      "resendInviteError": "Ni lwyddwyd i ailanfon y gwahoddiad."
+      "resendInviteError": "Ni lwyddwyd i ailanfon y gwahoddiad.",
+      "inviteNotResendable": "Ni ellir ailanfon y gwahoddiad hwn mwyach.",
+      "ownerAuthority": "Dim ond perchennog sefydliad sy'n gallu rheoli perchnogion.",
+      "ownRoleChange": "Ni allwch newid eich rôl eich hun.",
+      "inviteExpired": "Mae'r gwahoddiad hwn wedi dod i ben.",
+      "inviteAccepted": "Mae'r gwahoddiad hwn eisoes wedi'i dderbyn."
     },
     "usageStats": {
       "inputTokens": "Tocynnau mewnbwn",
@@ -3530,7 +3535,7 @@
     "activityKitDisabledBody": "Trowch weithgareddau byw ymlaen yn y gosodiadau i weld asiantau gweithredol ar y sgrin glo.",
     "openSession": "Agor",
     "finished": "Wedi gorffen",
-    "followFailed": "Methu dangos yr asiant hwn ar y sgrin glo.",
+    "followFailed": "Methu dilyn y sesiwn hon.",
     "approveFailed": "Methu cymeradwyo. Tapiwch $t(common.approve) i geisio eto.",
     "checked": "Gwiriwyd",
     "lastKnown": "Hysbys diwethaf",
@@ -4265,7 +4270,7 @@
     "summaryDisabled": "Adroddiad strwythuredig · mae AI wedi'i ddiffodd ar gyfer y cyd-destun hwn",
     "summaryPending": "Mae'r crynodeb AI ar y gweill. Bydd yn ymddangos yma pan fydd yn barod.",
     "summaryFailed": "Methodd y crynodeb AI. Gall rhoi cynnig eto arwain at dâl arall.",
-    "summaryUnavailable": "Crynodeb AI ddim ar gael. Mae eich adroddiad strwythuredig dal ar gael.",
+    "summaryUnavailable": "Crynodeb AI ddim ar gael. Mae eich adroddiad strwythuredig yn dal ar gael.",
     "summaryOutdated": "Mae'r crynodeb hwn yn hŷn na'r diwygiad diweddaraf o'r adroddiad.",
     "summaryCharge": "Tâl AI: {{cost}}",
     "summaryChargePending": "Tâl AI yn aros i'w gysoni",
@@ -4283,18 +4288,18 @@
     "notificationsHint": "Un hysbysiad cyffredinol fesul briff a drefnwyd. Ar wahân i grynodebau AI taledig.",
     "notificationPermission": "Galluogwch hysbysiadau'r ddyfais yn $t(common.notifications) i dderbyn eich briff.",
     "aiOptIn": "Crynodebau AI taledig",
-    "aiHint": "Dewisol ar gyfer y cyd-destun hwn yn unig. Anfonir dyfyniadau dethol wedi'u golygu a ffeithiau strwythuredig i'ch model yn iaith eich ap. Codir tâl ar falans y cyd-destun hwn.",
+    "aiHint": "Dewisol ar gyfer y cyd-destun hwn yn unig. Anfonir dyfyniadau dethol, gyda gwybodaeth sensitif wedi'i chuddio, a ffeithiau strwythuredig i'ch model yn iaith eich ap. Codir tâl ar falans y cyd-destun hwn.",
     "defaultModel": "Defnyddio model diofyn Kilo",
     "duration": "Terfyn amser (munudau)",
     "spendLimit": "Terfyn gwariant (USD)",
-    "safeguardHint": "Terfynau penodol fesul crynodeb, nid cyllideb ddyddiol. Diofyn: 10 munud a $2. Cyhoeddir adroddiad ar ôl pum munud fan bellaf tra bo'r creu'n parhau o fewn y terfynau hyn.",
-    "invalidSafeguards": "Rhowch derfynau amser a gwariant positif a phenodol.",
+    "safeguardHint": "Terfynau meidraidd fesul crynodeb, nid cyllideb ddyddiol. Diofyn: 10 munud a $2. Cyhoeddir adroddiad ar ôl pum munud fan bellaf tra bo'r creu'n parhau o fewn y terfynau hyn.",
+    "invalidSafeguards": "Rhowch derfynau amser a gwariant positif a meidraidd.",
     "estimate": "Amcangyfrif {{estimate}} · uchafswm {{maximum}}",
     "estimateUnavailable": "Nid oes crynodeb taledig ar gael ar gyfer y gosodiadau hyn.",
     "estimatePricingUnavailable": "Nid yw prisio'r model hwn ar gael.",
-    "estimateBalanceUnavailable": "Does dim digon o gydbwysedd ar gyfer crynodeb â thâl.",
+    "estimateBalanceUnavailable": "Does dim digon o falans ar gyfer crynodeb â thâl.",
     "estimateModelNotAllowed": "Nid yw'r model hwn yn cael ei ganiatáu yma.",
-    "estimateSpendLimitTooLow": "Cynyddwch y diogelwch gwariant i ganiatáu'r crynodeb hwn.",
+    "estimateSpendLimitTooLow": "Cynyddwch y terfyn gwariant i ganiatáu'r crynodeb hwn.",
     "confirmPaid": "Galluogi crynodebau taledig ar gyfer {{context}}?",
     "confirmGeneration": "Creu crynodeb taledig?",
     "paidDisclosure": "Amcangyfrif {{estimate}}, hyd at {{maximum}}, gyda therfyn o {{minutes}} munud. Codir tâl hyd yn oed os bydd y creu'n methu.",
@@ -4330,6 +4335,12 @@
     "estimatePermissionUnavailable": "Nid oes gennych ganiatâd i ddefnyddio balans y cyd-destun hwn.",
     "createFailed": "Methu creu'r briff hwn.",
     "reviewFailed": "Methu adolygu'r briff hwn.",
-    "saved": "Mae gosodiadau briffio wedi'u cadw"
+    "saved": "Mae gosodiadau briff wedi'u cadw",
+    "preparing": "Wrthi'n paratoi eich briff…",
+    "preparationHint": "Gallwch adael a dychwelyd tra bo gweithgarwch yn cael ei gasglu. Ni fydd unrhyw waith AI yn dechrau ac ni chodir unrhyw dâl nes i chi adolygu a chadarnhau'r amcangyfrif.",
+    "resumeReview": "Parhau â'r adolygiad",
+    "preparationFailed": "Methu casglu gweithgarwch ar gyfer y briff hwn. Rhowch gynnig arall arni.",
+    "preparationTimedOut": "Cymerodd casglu'r gweithgarwch ormod o amser. Rhowch gynnig arall arni.",
+    "preparationDrafts": "Briffiau heb eu cadarnhau"
   }
 }

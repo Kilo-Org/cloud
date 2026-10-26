@@ -1,7 +1,7 @@
 'use client';
 
 import { useId } from 'react';
-import { TriangleAlert } from 'lucide-react';
+import { Box, TriangleAlert } from 'lucide-react';
 import type { SelectableSandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   Select,
@@ -35,6 +35,7 @@ type SandboxSelectProps = {
   labelledBy: string;
   disabled: boolean;
   className?: string;
+  layout?: 'compact' | 'detailed';
   onChange: (allocation: SelectableSandboxAllocation | null) => void;
 };
 
@@ -47,6 +48,7 @@ export function SandboxSelect({
   labelledBy,
   disabled,
   className,
+  layout = 'detailed',
   onChange,
 }: SandboxSelectProps) {
   const noteId = useId();
@@ -70,19 +72,45 @@ export function SandboxSelect({
         disabled={disabled}
       >
         <SelectTrigger
-          className="w-full pointer-coarse:min-h-11"
+          className={cn(
+            'text-foreground w-full text-left *:data-[slot=select-value]:min-w-0 *:data-[slot=select-value]:line-clamp-none *:data-[slot=select-value]:block',
+            layout === 'detailed' && 'py-2 whitespace-normal data-[size=default]:h-auto'
+          )}
+          title={layout === 'compact' ? selected?.provider : undefined}
           aria-labelledby={labelledBy}
           aria-describedby={warning ? noteId : undefined}
         >
           <SelectValue className="min-w-0">
-            <span className={cn('truncate tabular-nums', !selected && 'text-muted-foreground')}>
-              {selected?.summary ?? noneText(noneLabel, noneDescription)}
+            <span className="flex min-w-0 items-center gap-3">
+              <Box className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+              <span className="block min-w-0 space-y-1">
+                <span
+                  className={cn(
+                    'block font-medium tabular-nums',
+                    layout === 'compact' && 'truncate'
+                  )}
+                >
+                  {selected?.instance ?? noneLabel}
+                </span>
+                {layout === 'detailed' && (selected?.provider || noneDescription) && (
+                  <span className="text-muted-foreground block text-xs leading-5">
+                    {selected?.provider ?? noneDescription?.summary}
+                  </span>
+                )}
+              </span>
             </span>
           </SelectValue>
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent className="max-w-[calc(100vw-2rem)]">
           <SelectItem value={NONE} textValue={noneLabel}>
-            <span className="tabular-nums">{noneText(noneLabel, noneDescription)}</span>
+            <span className="block min-w-0 py-1">
+              <span className="block">{noneLabel}</span>
+              {noneDescription && (
+                <span className="text-muted-foreground block text-xs tabular-nums">
+                  {noneDescription.summary}
+                </span>
+              )}
+            </span>
           </SelectItem>
           {options.length > 0 && <SelectSeparator />}
           {groupChoicesByProvider(options).map(group => (
@@ -113,8 +141,4 @@ export function SandboxSelect({
       )}
     </div>
   );
-}
-
-function noneText(label: string, description: DefaultSandboxDescription | undefined): string {
-  return description ? `${label} · ${description.summary}` : label;
 }

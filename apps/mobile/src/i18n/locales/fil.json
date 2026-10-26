@@ -53,6 +53,7 @@
     "connected": "Nakakonekta",
     "couldNotLoadModels": "Hindi ma-load ang mga modelo.",
     "couldNotLoadRepositories": "Hindi ma-load ang mga repositoryo.",
+    "noRepositoriesFound": "Walang nahanap na repository",
     "critical": "Kritikal",
     "delete": "Burahin",
     "deleted": "Nabura",
@@ -87,6 +88,7 @@
     "connect": "Kumonekta",
     "connectBitbucket": "Ikonekta ang Bitbucket",
     "connectGitlab": "Ikonekta ang GitLab",
+    "connectProvider": "Ikonekta ang isang provider",
     "contentTruncated": "Pinaikli ang nilalaman",
     "copyLink": "Kopyahin ang link",
     "couldNotLoadOrganizations": "Hindi ma-load ang mga organisasyon.",
@@ -145,7 +147,8 @@
     "agent": "Ahente",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Mga pagbabago"
+    "changes": "Mga pagbabago",
+    "organizationTrialEnded": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update ng may-ari ng organisasyon ang billing sa kilo.ai, pagkatapos ay subukan muli."
   },
   "language": {
     "restarting": "Ini-restart para ilapat ang wika",
@@ -1406,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "Maaaring kailangan mong magbigay ng access sa mas maraming grupo o proyekto sa GitLab.",
       "installGithubApp": "I-install ang GitHub app sa mga repository",
       "installGithubAppDescription": "Bigyan ang Kilo GitHub App ng access sa mga repository na gusto mong suriin.",
-      "noRepositoriesFound": "Walang nahanap na repository",
       "repositoryAccess": "access sa repository"
     },
     "style": {
@@ -1488,7 +1490,6 @@
       "invalidUrl": "Maglagay ng wastong URL ng pull request.",
       "couldNotCheckProviderStatus": "Hindi masuri ang katayuan ng provider.",
       "couldNotLoadProviders": "Hindi namin ma-load ang mga nakakonektang provider mo. Pakisubukang muli.",
-      "connectProvider": "Ikonekta ang isang provider",
       "connectProviderDescription": "Ikonekta ang GitHub para magsimula ng manu-manong pagsusuri ng isang pull request.",
       "pullRequestUrl": "URL ng pull request",
       "instructions": "Mga tagubilin (opsyonal)",
@@ -1616,8 +1617,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Walang magagamit na filter",
-      "noFiltersDescription": "Bumalik at buksan muli ang mga filter mula sa listahan ng mga natukoy na isyu.",
       "title": "Mga filter ng natukoy na isyu",
       "reset": "Ibalik sa dati",
       "severity": "Kalubhaan",
@@ -2171,8 +2170,8 @@
       "title": "Sesyon",
       "copyErrorDetails": "Kopyahin ang mga detalye ng error",
       "backToSessions": "Bumalik sa mga sesyon",
-      "follow": "Subaybayan sa naka-lock na screen",
-      "unfollow": "Ihinto ang pagsubaybay sa naka-lock na screen",
+      "follow": "Subaybayan ang sesyon",
+      "unfollow": "Ihinto ang pagsubaybay sa sesyon",
       "couldNotLoad": "Hindi ma-load ang sesyon.",
       "failedToLoadDetails": "Hindi ma-load ang mga detalye ng sesyon.",
       "failedToStopExecution": "Hindi maihinto ang pagpapatakbo.",
@@ -2952,7 +2951,6 @@
   },
   "voiceInput": {
     "listening": "Nakikinig...",
-    "staysOff": "Hindi magagamit ang pagdikta hangga't hindi mo pinapayagan ang online na pagsasalin ng boses sa teksto.",
     "onlineTitle": "Pinoproseso online ang boses",
     "onlineMessage": "Hindi kayang isalin ng device na ito ang boses sa teksto nang walang internet. Ipinapadala ang iyong rekording sa {{provider}} para gawing teksto. Hindi iniimbak ng Kilo ang audio.",
     "allow": "Payagan",
@@ -3167,7 +3165,9 @@
       "sendInvite": "Ipadala ang imbitasyon",
       "title": "Mag-imbita ng miyembro",
       "alreadyInvited": "Imbitado na sila o miyembro na.",
-      "sendError": "Hindi naipadala ang imbitasyon."
+      "sendError": "Hindi naipadala ang imbitasyon.",
+      "pendingInvitation": "May nakabinbing imbitasyon na ang email na ito.",
+      "alreadyMember": "Miembro na ng organisasyong ito ang taong ito."
     },
     "invoices": {
       "downloadA11y": "I-download ang talaan ng singil {{number}}",
@@ -3237,7 +3237,12 @@
       "pendingInvitations": "Mga nakabinbing imbitasyon",
       "resendInvite": "Ipadala muli ang imbitasyon",
       "shareInviteLink": "Ibahagi ang link ng imbitasyon",
-      "resendInviteError": "Hindi naipadala muli ang imbitasyon."
+      "resendInviteError": "Hindi naipadala muli ang imbitasyon.",
+      "inviteNotResendable": "Hindi na maaaring ipadala muli ang imbitasyong ito.",
+      "ownerAuthority": "Ang may-ari lamang ng organisasyon ang maaaring mamahala ng mga may-ari.",
+      "ownRoleChange": "Hindi mo maaaring baguhin ang iyong sariling tungkulin.",
+      "inviteExpired": "Nag-expire na ang imbitasyong ito.",
+      "inviteAccepted": "Tinanggap na ang imbitasyong ito."
     },
     "usageStats": {
       "inputTokens": "Mga papasok na token",
@@ -3350,7 +3355,7 @@
     "activityKitDisabledBody": "Paganahin ang mga live na aktibidad sa mga setting para makita ang mga aktibong agent sa naka-lock na screen.",
     "openSession": "Buksan",
     "finished": "Natapos",
-    "followFailed": "Hindi maipakita ang ahenteng ito sa naka-lock na screen.",
+    "followFailed": "Hindi masubaybayan ang sesyon na ito.",
     "approveFailed": "Hindi maaprubahan. I-tap ang $t(common.approve) para subukang muli.",
     "checked": "Nakumpirma",
     "lastKnown": "Huling nalaman",
@@ -4067,8 +4072,8 @@
     "defaultModel": "Gamitin ang default na model ng Kilo",
     "duration": "Limitasyon sa oras (minuto)",
     "spendLimit": "Limitasyon sa gastos (USD)",
-    "safeguardHint": "Tiyak na limitasyon bawat buod, hindi pang-araw-araw na budget. Default: 10 minuto at $2. Ilalathala ang ulat pagkalipas ng hanggang limang minuto habang nagpapatuloy ang paggawa sa loob ng mga limitasyong ito.",
-    "invalidSafeguards": "Maglagay ng positibo at tiyak na limitasyon sa oras at gastos.",
+    "safeguardHint": "Mga limitasyong may hangganan bawat buod, hindi pang-araw-araw na budget. Default: 10 minuto at $2. Ilalathala ang ulat pagkalipas ng hanggang limang minuto habang nagpapatuloy ang paggawa sa loob ng mga limitasyong ito.",
+    "invalidSafeguards": "Maglagay ng mga positibong limitasyon sa oras at gastos na may hangganang halaga.",
     "estimate": "Tantiya {{estimate}} · maximum {{maximum}}",
     "estimateUnavailable": "Hindi available ang bayad na buod para sa mga setting na ito.",
     "estimatePricingUnavailable": "Walang available na presyo para sa modelong ito.",
@@ -4110,6 +4115,12 @@
     "estimatePermissionUnavailable": "Wala kang pahintulot na gamitin ang balanse ng kontekstong ito.",
     "createFailed": "Hindi magawa ang briefing na ito.",
     "reviewFailed": "Hindi masuri ang briefing na ito.",
-    "saved": "Na-save na ang mga setting ng briefing"
+    "saved": "Na-save na ang mga setting ng briefing",
+    "preparing": "Inihahanda ang iyong briefing…",
+    "preparationHint": "Maaari kang umalis at bumalik habang kinokolekta ang aktibidad. Hindi magsisimula ang gawain ng AI o ang pagsingil hangga’t hindi mo nasusuri at nakukumpirma ang tantiya.",
+    "resumeReview": "Ipagpatuloy ang pagsusuri",
+    "preparationFailed": "Hindi makolekta ang aktibidad para sa briefing na ito. Subukan muli.",
+    "preparationTimedOut": "Masyadong nagtagal ang pagkolekta ng aktibidad. Subukan muli.",
+    "preparationDrafts": "Mga briefing na hindi pa nakukumpirma"
   }
 }

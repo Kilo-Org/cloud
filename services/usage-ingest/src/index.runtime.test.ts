@@ -77,10 +77,19 @@ it.each([undefined, 'staging'])(
         );
       }
       // Runtime log capture and queue metrics observe the shipped handler without replacing it.
-      await vi.waitFor(() => expect(server.getLogs().length).toBeGreaterThanOrEqual(2), {
-        timeout: 10_000,
-      });
-      const receipts = server.getLogs().map(log => JSON.parse(log.message));
+      await vi.waitFor(
+        () =>
+          expect(
+            server.getLogs().filter(log => log.message.includes('usage_ingest_receipt')).length
+          ).toBeGreaterThanOrEqual(2),
+        {
+          timeout: 10_000,
+        }
+      );
+      const receipts = server
+        .getLogs()
+        .map(log => JSON.parse(log.message))
+        .filter(log => log.event === 'usage_ingest_receipt');
       expect([...new Set(receipts.map(receipt => receipt.usage_id))].sort()).toEqual(
         [usage.core.id, secondId].sort()
       );
@@ -115,7 +124,10 @@ it.each([undefined, 'staging'])(
         { timeout: 10_000 }
       );
       await setTimeout(500);
-      for (const receipt of server.getLogs().map(log => JSON.parse(log.message))) {
+      for (const receipt of server
+        .getLogs()
+        .map(log => JSON.parse(log.message))
+        .filter(log => log.event === 'usage_ingest_receipt')) {
         if (receipt.outcome === 'invalid') {
           expect(receipt).toEqual({
             level: 'info',

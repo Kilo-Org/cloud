@@ -1,11 +1,13 @@
 import { createStore } from 'jotai';
-import { assistantMsg, createEventHelpers, toolPart } from './__fixtures__/helpers';
+import { assistantMsg, createEventHelpers, textPart, toolPart } from './__fixtures__/helpers';
 import { createSessionManager } from './session-manager';
 import { createCloudAgentSession, REMOTE_SESSION_CREATION_NOT_SUPPORTED } from './session';
 import type { CloudAgentSession } from './session';
 import type { CloudAgentApi } from './transport';
 import type { KiloSessionId, SessionSnapshotPage, SessionSnapshotPageOutcome } from './types';
 import type { UserWebSystemEvent } from './user-web-connection';
+import { createMemoryStorage } from './storage/memory';
+import type { SessionStorage } from './storage/types';
 import { kiloId, cloudAgentId, makeSnapshot, stubTextPart, stubUserMessage } from './test-helpers';
 
 // WebSocket mock — needed because connect() → resolveSession → transport → WS
@@ -457,6 +459,7 @@ describe('session transport delegation (cloud agent)', () => {
 
     await connectSession(session);
     await session.send({
+      messageId: 'msg_123456789abc123456789AB001',
       payload: {
         type: 'prompt',
         prompt: 'hello',
@@ -468,6 +471,7 @@ describe('session transport delegation (cloud agent)', () => {
     expect(api.send).toHaveBeenCalledTimes(1);
     expect(api.send).toHaveBeenCalledWith({
       sessionId: cloudAgentSessionId,
+      messageId: 'msg_123456789abc123456789AB001',
       payload: { type: 'prompt', prompt: 'hello', mode: 'auto', model: 'test/model-1' },
     });
 
@@ -484,6 +488,7 @@ describe('session transport delegation (cloud agent)', () => {
 
     await connectSession(session);
     await session.send({
+      messageId: 'msg_123456789abc123456789AB002',
       payload: {
         type: 'prompt',
         prompt: 'hello',
@@ -495,6 +500,7 @@ describe('session transport delegation (cloud agent)', () => {
 
     expect(api.send).toHaveBeenCalledWith({
       sessionId: cloudAgentSessionId,
+      messageId: 'msg_123456789abc123456789AB002',
       payload: { type: 'prompt', prompt: 'hello', mode: 'auto', model: 'test/model-1' },
       attachments,
     });
@@ -1036,6 +1042,97 @@ describe('queued message cancellation replay', () => {
     expect(session.storage.getMessageIds()).not.toContain(messageId);
 
     session.destroy();
+  });
+});
+
+describe('tool part state handling', () => {
+  function deliver(streamEventType: string, data: unknown): void {
+    mockWs.onmessage?.({
+      data: JSON.stringify({
+        eventId: 0,
+        sessionId: cloudAgentSessionId,
+        streamEventType,
+        timestamp: '2026-09-02T00:00:00.000Z',
+        data,
+      }),
+    } as MessageEvent);
+  }
+
+  it('keeps the transcript readable when a tool part arrives with no state', async () => {
+    const session = createCloudAgentResolvedSession(createMockApi());
+    await connectSession(session);
+
+    deliver('kilocode', {
+      type: 'message.updated',
+      properties: { info: assistantMsg('msg-1', 'msg-0', kiloSessionId) },
+    });
+    const unreadable = {
+      id: 'part-tool',
+      sessionID: kiloSessionId,
+      messageID: 'msg-1',
+      type: 'tool',
+    };
+    expect(() =>
+      deliver('kilocode', {
+        type: 'message.part.updated',
+        properties: { part: unreadable },
+      })
+    ).not.toThrow();
+
+    deliver('kilocode', {
+      type: 'message.part.updated',
+      properties: { part: textPart('part-text', 'msg-1', 'still rendering', kiloSessionId) },
+    });
+
+    expect(session.storage.getParts('msg-1').map(part => part.id)).toEqual(['part-text']);
+    session.destroy();
+  });
+
+  it('keeps processing later events when one event throws', async () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const base = createMemoryStorage();
+      const storage: SessionStorage = {
+        ...base,
+        upsertPart(messageId, part, eventTime) {
+          if (part.id === 'part-boom') throw new Error('storage exploded');
+          base.upsertPart(messageId, part, eventTime);
+        },
+      };
+      const session = createCloudAgentSession({
+        kiloSessionId,
+        resolveSession: async () => ({
+          type: 'cloud-agent' as const,
+          kiloSessionId,
+          cloudAgentSessionId,
+        }),
+        transport: {
+          getTicket: () => 'ticket',
+          api: createMockApi(),
+          fetchSnapshot: () => Promise.resolve(makeSnapshot({ id: 'ses_transport-tests' })),
+        },
+        websocketBaseUrl: 'ws://localhost:9999',
+        storage,
+      });
+      await connectSession(session);
+
+      expect(() =>
+        deliver('kilocode', {
+          type: 'message.part.updated',
+          properties: { part: textPart('part-boom', 'msg-1', 'boom', kiloSessionId) },
+        })
+      ).not.toThrow();
+      deliver('kilocode', {
+        type: 'message.part.updated',
+        properties: { part: textPart('part-text', 'msg-1', 'still rendering', kiloSessionId) },
+      });
+
+      expect(session.storage.getParts('msg-1').map(part => part.id)).toEqual(['part-text']);
+      expect(errorSpy).toHaveBeenCalled();
+      session.destroy();
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 });
 

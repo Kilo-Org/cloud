@@ -1,5 +1,5 @@
 {
-  "id": "4dff162f-bda9-4d57-83ca-94c5a2cd3aa9",
+  "id": "f3abc364-273c-444a-824b-7db65a082252",
   "prevId": "2d61ccea-6389-4ab3-a6fd-492cc75f6550",
   "version": "7",
   "dialect": "postgresql",
@@ -6903,7 +6903,7 @@
         },
         "CHK_cloud_agent_webhook_triggers_cloud_agent_fields": {
           "name": "CHK_cloud_agent_webhook_triggers_cloud_agent_fields",
-          "value": "(\n        \"cloud_agent_webhook_triggers\".\"target_type\" != 'cloud_agent' OR\n        (\"cloud_agent_webhook_triggers\".\"github_repo\" IS NOT NULL AND \"cloud_agent_webhook_triggers\".\"profile_id\" IS NOT NULL)\n      )"
+          "value": "(\n        \"cloud_agent_webhook_triggers\".\"target_type\" != 'cloud_agent' OR\n        \"cloud_agent_webhook_triggers\".\"github_repo\" IS NOT NULL\n      )"
         },
         "CHK_cloud_agent_webhook_triggers_kiloclaw_fields": {
           "name": "CHK_cloud_agent_webhook_triggers_kiloclaw_fields",
@@ -10540,44 +10540,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "consumed_microdollars": {
-          "name": "consumed_microdollars",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "retired_microdollars": {
-          "name": "retired_microdollars",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "paid_credit_policy": {
-          "name": "paid_credit_policy",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "credit_source": {
-          "name": "credit_source",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "source_transaction_id": {
-          "name": "source_transaction_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "refund_principal_microdollars": {
-          "name": "refund_principal_microdollars",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
         "is_free": {
           "name": "is_free",
           "type": "boolean",
@@ -10765,21 +10727,6 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_credit_transactions_source_transaction_id": {
-          "name": "IDX_credit_transactions_source_transaction_id",
-          "columns": [
-            {
-              "expression": "source_transaction_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -21511,22 +21458,6 @@
           "method": "btree",
           "with": {}
         },
-        "IDX_kilocode_users_next_credit_expiration_at": {
-          "name": "IDX_kilocode_users_next_credit_expiration_at",
-          "columns": [
-            {
-              "expression": "next_credit_expiration_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"kilocode_users\".\"next_credit_expiration_at\" IS NOT NULL",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
         "IDX_kilocode_users_blocked_at": {
           "name": "IDX_kilocode_users_blocked_at",
           "columns": [
@@ -25295,22 +25226,6 @@
           ],
           "isUnique": false,
           "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "IDX_organizations_next_credit_expiration_at": {
-          "name": "IDX_organizations_next_credit_expiration_at",
-          "columns": [
-            {
-              "expression": "next_credit_expiration_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"organizations\".\"next_credit_expiration_at\" IS NOT NULL",
-          "concurrently": true,
           "method": "btree",
           "with": {}
         },

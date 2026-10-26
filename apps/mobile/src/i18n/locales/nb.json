@@ -53,6 +53,7 @@
     "connected": "Tilkoblet",
     "couldNotLoadModels": "Kunne ikke laste inn modellene.",
     "couldNotLoadRepositories": "Kunne ikke laste inn kodelagrene.",
+    "noRepositoriesFound": "Ingen kodelagre funnet",
     "critical": "Kritisk",
     "delete": "Slett",
     "deleted": "Slettet",
@@ -87,6 +88,7 @@
     "connect": "Koble til",
     "connectBitbucket": "Koble til Bitbucket",
     "connectGitlab": "Koble til GitLab",
+    "connectProvider": "Koble til en leverandør",
     "contentTruncated": "Innholdet er forkortet",
     "copyLink": "Kopier lenke",
     "couldNotLoadOrganizations": "Kunne ikke laste inn organisasjonene.",
@@ -145,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Endringer"
+    "changes": "Endringer",
+    "organizationTrialEnded": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. En organisasjonseier kan oppdatere faktureringen på kilo.ai og deretter prøve igjen."
   },
   "language": {
     "restarting": "Starter på nytt for å bruke språket",
@@ -1406,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "Du må kanskje gi tilgang til flere grupper eller prosjekter på GitLab.",
       "installGithubApp": "Installer GitHub-appen for kodelagre",
       "installGithubAppDescription": "Gi Kilos GitHub-app tilgang til kodelagrene du vil ha gjennomgått.",
-      "noRepositoriesFound": "Ingen kodelagre funnet",
       "repositoryAccess": "tilgang til kodelagre"
     },
     "style": {
@@ -1488,7 +1490,6 @@
       "invalidUrl": "Skriv inn en gyldig URL til en PR.",
       "couldNotCheckProviderStatus": "Kunne ikke sjekke leverandørstatusen.",
       "couldNotLoadProviders": "Kunne ikke laste inn de tilkoblede leverandørene dine. Prøv igjen.",
-      "connectProvider": "Koble til en leverandør",
       "connectProviderDescription": "Koble til GitHub for å starte en manuell gjennomgang av en PR.",
       "pullRequestUrl": "URL til PR",
       "instructions": "Instruksjoner (valgfritt)",
@@ -1616,8 +1617,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Ingen tilgjengelige filtre",
-      "noFiltersDescription": "Gå tilbake og åpne filtrene på nytt fra funnlisten.",
       "title": "Filtrer funn",
       "reset": "Tilbakestill",
       "severity": "Alvorlighetsgrad",
@@ -2171,8 +2170,8 @@
       "title": "Økt",
       "copyErrorDetails": "Kopier feildetaljer",
       "backToSessions": "Tilbake til økter",
-      "follow": "Følg på låseskjermen",
-      "unfollow": "Slutt å følge på låseskjermen",
+      "follow": "Følg økten",
+      "unfollow": "Slutt å følge økten",
       "couldNotLoad": "Kunne ikke laste inn økten.",
       "failedToLoadDetails": "Kunne ikke laste inn øktdetaljene.",
       "failedToStopExecution": "Kunne ikke stoppe kjøringen.",
@@ -2952,7 +2951,6 @@
   },
   "voiceInput": {
     "listening": "Lytter...",
-    "staysOff": "Diktering er deaktivert til du tillater at tale gjøres om til tekst på nettet.",
     "onlineTitle": "Tale behandles på nettet",
     "onlineMessage": "Denne enheten kan ikke gjøre tale om til tekst uten nettilkobling. Opptaket ditt sendes til {{provider}} for å gjøres om til tekst. Kilo lagrer ikke lyden.",
     "allow": "Tillat",
@@ -3167,7 +3165,9 @@
       "sendInvite": "Send invitasjon",
       "title": "Inviter medlem",
       "alreadyInvited": "Personen er allerede invitert eller allerede medlem.",
-      "sendError": "Kunne ikke sende invitasjonen."
+      "sendError": "Kunne ikke sende invitasjonen.",
+      "pendingInvitation": "Denne e-postadressen har allerede en ventende invitasjon.",
+      "alreadyMember": "Denne personen er allerede medlem av denne organisasjonen."
     },
     "invoices": {
       "downloadA11y": "Last ned faktura {{number}}",
@@ -3237,7 +3237,12 @@
       "pendingInvitations": "Ventende invitasjoner",
       "resendInvite": "Send invitasjon på nytt",
       "shareInviteLink": "Del invitasjonslenke",
-      "resendInviteError": "Kunne ikke sende invitasjonen på nytt."
+      "resendInviteError": "Kunne ikke sende invitasjonen på nytt.",
+      "inviteNotResendable": "Denne invitasjonen kan ikke lenger sendes på nytt.",
+      "ownerAuthority": "Bare en organisasjonseier kan administrere eiere.",
+      "ownRoleChange": "Du kan ikke endre din egen rolle.",
+      "inviteExpired": "Denne invitasjonen er utløpt.",
+      "inviteAccepted": "Denne invitasjonen er allerede akseptert."
     },
     "usageStats": {
       "inputTokens": "Inndatatokener",
@@ -3350,7 +3355,7 @@
     "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen.",
     "openSession": "Åpne",
     "finished": "Fullført",
-    "followFailed": "Kunne ikke vise denne agenten på låseskjermen.",
+    "followFailed": "Kunne ikke følge denne økten.",
     "approveFailed": "Kunne ikke godkjenne. Trykk på $t(common.approve) for å prøve igjen.",
     "checked": "Sjekket",
     "lastKnown": "Sist kjent",
@@ -4030,7 +4035,7 @@
     "emptyHint": "Kodeøktene dine i skyen og CLI vises her når en planlagt brief har aktivitet.",
     "loadError": "Kunne ikke laste briefer",
     "sessions": "Aktive i vinduet",
-    "pullRequests": "PRs åpnet",
+    "pullRequests": "PR-er åpnet",
     "blockers": "Nye hindringer",
     "spend": "Forbruk i vinduet",
     "view": "Les brief",
@@ -4063,7 +4068,7 @@
     "notificationsHint": "Ett generelt varsel per planlagt brief. Uavhengig av betalte AI-sammendrag.",
     "notificationPermission": "Slå på enhetsvarsler i $t(common.notifications) for å motta briefen.",
     "aiOptIn": "Betalte AI-sammendrag",
-    "aiHint": "Valgfritt, kun for denne konteksten. Utvalgte, sensurerte utdrag og strukturerte fakta sendes til modellen din på appens språk. Kostnader trekkes fra denne kontekstens saldo.",
+    "aiHint": "Valgfritt, kun for denne konteksten. Utvalgte, sladdede utdrag og strukturerte fakta sendes til modellen din på appens språk. Kostnader trekkes fra denne kontekstens saldo.",
     "defaultModel": "Bruk Kilos standardmodell",
     "duration": "Tidsgrense (minutter)",
     "spendLimit": "Forbruksgrense (USD)",
@@ -4110,6 +4115,12 @@
     "estimateBalanceUnavailable": "Ikke nok saldo for en betalt oppsummering.",
     "estimateModelNotAllowed": "Denne modellen er ikke tillatt her.",
     "estimateSpendLimitTooLow": "Øk forbruksgrensen for å tillate denne oppsummeringen.",
-    "saved": "Brief-innstillinger lagret"
+    "saved": "Brief-innstillinger lagret",
+    "preparing": "Forbereder briefen din…",
+    "preparationHint": "Du kan forlate siden og komme tilbake mens aktivitet samles inn. Ingen AI-behandling starter, og ingen kostnader påløper, før du har sett gjennom briefen og bekreftet estimatet.",
+    "resumeReview": "Fortsett gjennomgangen",
+    "preparationFailed": "Kunne ikke samle inn aktivitet for denne briefen. Prøv igjen.",
+    "preparationTimedOut": "Det tok for lang tid å samle inn aktivitet. Prøv igjen.",
+    "preparationDrafts": "Briefer som venter på bekreftelse"
   }
 }

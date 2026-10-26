@@ -328,3 +328,50 @@ describe('SessionItemSchema storage key identity', () => {
     ).toBe(false);
   });
 });
+
+describe('SessionItemSchema identity segments', () => {
+  it.each(['message', 'part', 'agent_notification'])(
+    'refuses a part whose message id equals the %s root',
+    reserved => {
+      expect(
+        SessionItemSchema.safeParse({
+          type: 'part',
+          data: { id: 'prt_child', messageID: reserved },
+        }).success
+      ).toBe(false);
+    }
+  );
+
+  it.each(['message', 'part', 'agent_notification'])(
+    'refuses a message whose id equals the %s root',
+    reserved => {
+      expect(SessionItemSchema.safeParse({ type: 'message', data: { id: reserved } }).success).toBe(
+        false
+      );
+    }
+  );
+
+  it('accepts ordinary message and part identities', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'message',
+        data: { id: 'msg_42', role: 'assistant' },
+      }).success
+    ).toBe(true);
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: 'prt_1', messageID: 'msg_42' },
+      }).success
+    ).toBe(true);
+  });
+
+  it('accepts a part id equal to an item-type root', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: 'message', messageID: 'msg_42' },
+      }).success
+    ).toBe(true);
+  });
+});

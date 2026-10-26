@@ -15,6 +15,7 @@ import {
 
 const DISPATCH_OWNER_LIMIT = 100;
 const DISPATCH_REMEDIATION_ATTEMPT_LIMIT = 100;
+const REMEDIATION_LAUNCH_RECLAIM_TIMEOUT_MS = 5 * 60 * 1000;
 const QUEUE_SEND_BATCH_LIMIT = 100;
 const DISPATCH_STAGE_SUCCEEDED_EVENT = 'security_auto_analysis.dispatcher_stage_succeeded';
 const DISPATCH_FAILED_EVENT = 'security_auto_analysis.dispatcher_failed';
@@ -147,7 +148,7 @@ export async function dispatchDueOwners(
     operation: () =>
       recoverStaleRemediationLaunchAttempts(db, {
         env,
-        claimedBefore: new Date(now - commandLifecycleConfig.acceptedCommandTimeoutMs),
+        claimedBefore: new Date(now - REMEDIATION_LAUNCH_RECLAIM_TIMEOUT_MS),
       }),
     successTags: result => ({
       requeued_stale_remediation_launch_count: result.requeuedCount,

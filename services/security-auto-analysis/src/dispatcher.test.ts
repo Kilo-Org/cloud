@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   deleteRetainedSecurityAgentCommands,
   reconcileStaleSecurityAgentCommands,
@@ -75,6 +75,40 @@ beforeEach(() => {
   vi.mocked(discoverQueuedRemediationAttempts).mockResolvedValue(['sensitive-attempt-id']);
   ownerQueueSend.mockResolvedValue(undefined);
   remediationQueueSend.mockResolvedValue(undefined);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe('dispatchDueOwners remediation launch recovery', () => {
+  it.each([undefined, '1000', '60000', '600000'])(
+    'keeps the five-minute reclaim window independent of command timeout %s',
+    async acceptedCommandTimeoutMs => {
+      vi.useFakeTimers();
+      const now = new Date('2026-10-26T22:00:00.000Z');
+      vi.setSystemTime(now);
+      const workerEnv = {
+        ...env(),
+        SECURITY_AGENT_COMMAND_ACCEPTED_TIMEOUT_MS: acceptedCommandTimeoutMs,
+      };
+
+      await dispatchDueOwners(workerEnv, 'dispatch-123');
+
+      expect(recoverStaleRemediationLaunchAttempts).toHaveBeenCalledWith(expect.anything(), {
+        env: workerEnv,
+        claimedBefore: new Date(now.getTime() - 5 * 60 * 1000),
+      });
+      expect(reconcileStaleSecurityAgentCommands).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          acceptedBefore: new Date(
+            now.getTime() - Number(acceptedCommandTimeoutMs ?? 5 * 60 * 1000)
+          ),
+        })
+      );
+    }
+  );
 });
 
 describe('dispatchDueOwners telemetry', () => {

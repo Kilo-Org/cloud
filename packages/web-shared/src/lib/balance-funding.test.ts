@@ -76,8 +76,16 @@ async function createExpiringPayer(organization: boolean) {
 describe('balance reads and usage funding', () => {
   test('viewing or refreshing a personal balance expires due principal without funding', async () => {
     const { user } = await createExpiringPayer(false);
-    expect(await getBalanceForUser(user)).toEqual({ balance: 0 });
-    expect(await getBalanceForUser(user, { forceRefresh: true })).toEqual({ balance: 0 });
+    expect(await getBalanceForUser(user)).toEqual({
+      balance: 0,
+      microdollars_used: 0,
+      total_microdollars_acquired: 0,
+    });
+    expect(await getBalanceForUser(user, { forceRefresh: true })).toEqual({
+      balance: 0,
+      microdollars_used: 0,
+      total_microdollars_acquired: 0,
+    });
     await finishDeferredWork();
     expect(maybePerformAutoTopUp).not.toHaveBeenCalled();
     expect(maybePerformOrganizationAutoTopUp).not.toHaveBeenCalled();
@@ -89,7 +97,11 @@ describe('balance reads and usage funding', () => {
       .update(kilocode_users)
       .set({ microdollars_used: 4_000_000 })
       .where(eq(kilocode_users.id, user.id));
-    expect(await getBalanceForUser(user)).toEqual({ balance: 0 });
+    expect(await getBalanceForUser(user)).toEqual({
+      balance: 0,
+      microdollars_used: 4_000_000,
+      total_microdollars_acquired: 4_000_000,
+    });
     await finishDeferredWork();
     expect(maybePerformAutoTopUp).not.toHaveBeenCalled();
   });

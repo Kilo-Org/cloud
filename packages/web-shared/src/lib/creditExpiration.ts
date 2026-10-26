@@ -1,4 +1,4 @@
-import type { CreditTransaction, User } from '@kilocode/db/schema';
+import type { CreditTransaction } from '@kilocode/db/schema';
 import { credit_transactions as creditTransactionsTable, organizations } from '@kilocode/db/schema';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { eq, and, gt, isNull, isNotNull, inArray, sql, type SQL } from 'drizzle-orm';
@@ -16,21 +16,25 @@ type DbOrTx = typeof db | DrizzleTransaction;
 export type CreditTransactionForBlocks = ExpiringTransaction &
   Pick<CreditTransaction, 'credit_category' | 'original_transaction_id' | 'created_at'>;
 
-export type UserForExpiration = EntityForExpiration;
-export type UserForLocalExpiration = Pick<
-  User,
-  | 'id'
-  | 'microdollars_used'
-  | 'next_credit_expiration_at'
-  | 'updated_at'
-  | 'total_microdollars_acquired'
->;
+export type CreditExpirationState = {
+  microdollars_used: number;
+  total_microdollars_acquired: number;
+  next_credit_expiration_at: string | null;
+};
 
 export async function fetchExpiringTransactions(userId: string, fromDb: DbOrTx = db) {
-  const expiredCredits = alias(creditTransactionsTable, 'expired_credits');
-
-  // Fetch ALL transactions with expiry dates (including future ones) for baseline adjustment
-  // Use LEFT JOIN to exclude transactions that have already been processed (have a credits_expired entry)
+  const closures = alias(creditTransactionsTable, 'closures');
+  // LIMIT keeps owner and category filters outside the unique-link lookup.
+  const expiredCredits = fromDb
+    .select({
+      original_transaction_id: closures.original_transaction_id,
+      kilo_user_id: closures.kilo_user_id,
+      credit_category: closures.credit_category,
+    })
+    .from(closures)
+    .where(eq(closures.original_transaction_id, creditTransactionsTable.id))
+    .limit(1)
+    .as('expired_credits');
   return await fromDb
     .select({
       id: creditTransactionsTable.id,
@@ -46,7 +50,7 @@ export async function fetchExpiringTransactions(userId: string, fromDb: DbOrTx =
       is_free: creditTransactionsTable.is_free,
     })
     .from(creditTransactionsTable)
-    .leftJoin(
+    .leftJoinLateral(
       expiredCredits,
       and(
         eq(expiredCredits.kilo_user_id, userId),
@@ -54,8 +58,7 @@ export async function fetchExpiringTransactions(userId: string, fromDb: DbOrTx =
           'credits_expired',
           'orb_credit_expired',
           'orb_credit_voided',
-        ]),
-        eq(expiredCredits.original_transaction_id, creditTransactionsTable.id)
+        ])
       )
     )
     .where(
@@ -63,59 +66,30 @@ export async function fetchExpiringTransactions(userId: string, fromDb: DbOrTx =
         eq(creditTransactionsTable.kilo_user_id, userId),
         gt(creditTransactionsTable.amount_microdollars, 0),
         isNotNull(creditTransactionsTable.expiry_date),
-        isNull(expiredCredits.id), // Not already processed
+        isNull(expiredCredits.original_transaction_id),
         isNull(creditTransactionsTable.organization_id)
       )
     );
 }
 
-type ExpirationBalanceState = Pick<
-  UserForLocalExpiration,
-  'total_microdollars_acquired' | 'microdollars_used' | 'next_credit_expiration_at'
->;
-
-function refreshedExpirationState(
-  snapshot: ExpirationBalanceState,
-  current: ExpirationBalanceState
-): ExpirationBalanceState | null {
-  const snapshotExpiry = snapshot.next_credit_expiration_at;
-  const currentExpiry = current.next_credit_expiration_at;
-  const sameExpiry =
-    snapshotExpiry === null || currentExpiry === null
-      ? snapshotExpiry === currentExpiry
-      : new Date(snapshotExpiry).getTime() === new Date(currentExpiry).getTime();
-  if (
-    sameExpiry &&
-    current.total_microdollars_acquired === snapshot.total_microdollars_acquired &&
-    current.microdollars_used === snapshot.microdollars_used
-  ) {
-    return null;
-  }
-  return {
-    total_microdollars_acquired: current.total_microdollars_acquired,
-    microdollars_used: current.microdollars_used,
-    next_credit_expiration_at: currentExpiry,
-  };
-}
-
-/**
- * Process local expirations for a migrated user (not in legacy Orb system).
- * Uses idempotency checks to prevent double-processing by excluding transactions
- * that already have a credits_expired entry.
- *
- * Returns null when the caller's snapshot is already current, otherwise the refreshed
- * balance fields and expiration pointer.
- */
 export async function processLocalExpirations(
-  user: UserForLocalExpiration,
-  now: Date
-): Promise<ExpirationBalanceState | null> {
-  return await db.transaction(async tx =>
-    refreshedExpirationState(
-      user,
-      await reconcileCreditExpirationsInTransaction({ type: 'user', id: user.id }, tx, now)
-    )
-  );
+  userId: string,
+  now: Date,
+  options: { force?: boolean } = {}
+): Promise<CreditExpirationState> {
+  return await db.transaction(async tx => {
+    const state = await reconcileCreditExpirationsInTransaction(
+      { type: 'user', id: userId },
+      tx,
+      now,
+      { onlyIfDue: !options.force }
+    );
+    return {
+      microdollars_used: state.microdollars_used,
+      total_microdollars_acquired: state.total_microdollars_acquired,
+      next_credit_expiration_at: state.next_credit_expiration_at,
+    };
+  });
 }
 
 /**
@@ -149,7 +123,17 @@ export async function fetchExpiringTransactionsForOrganization(
   organizationId: string,
   fromDb: DbOrTx = db
 ) {
-  const expiredCredits = alias(creditTransactionsTable, 'expired_credits');
+  const closures = alias(creditTransactionsTable, 'closures');
+  const expiredCredits = fromDb
+    .select({
+      original_transaction_id: closures.original_transaction_id,
+      organization_id: closures.organization_id,
+      credit_category: closures.credit_category,
+    })
+    .from(closures)
+    .where(eq(closures.original_transaction_id, creditTransactionsTable.id))
+    .limit(1)
+    .as('expired_credits');
 
   return await fromDb
     .select({
@@ -167,12 +151,11 @@ export async function fetchExpiringTransactionsForOrganization(
       kilo_user_id: creditTransactionsTable.kilo_user_id,
     })
     .from(creditTransactionsTable)
-    .leftJoin(
+    .leftJoinLateral(
       expiredCredits,
       and(
         eq(expiredCredits.organization_id, organizationId),
-        eq(expiredCredits.credit_category, 'credits_expired'),
-        eq(expiredCredits.original_transaction_id, creditTransactionsTable.id)
+        eq(expiredCredits.credit_category, 'credits_expired')
       )
     )
     .where(
@@ -180,7 +163,7 @@ export async function fetchExpiringTransactionsForOrganization(
         eq(creditTransactionsTable.organization_id, organizationId),
         isNotNull(creditTransactionsTable.expiry_date),
         gt(creditTransactionsTable.amount_microdollars, 0),
-        isNull(expiredCredits.id)
+        isNull(expiredCredits.original_transaction_id)
       )
     );
 }
@@ -439,13 +422,21 @@ export async function processOrganizationExpirationsBatch(
 }
 
 export async function processOrganizationExpirations(
-  org: OrganizationForExpiration,
-  now: Date
-): Promise<OrganizationExpirationState | null> {
-  return await db.transaction(async tx =>
-    refreshedExpirationState(
-      org,
-      await reconcileCreditExpirationsInTransaction({ type: 'organization', id: org.id }, tx, now)
-    )
-  );
+  organizationId: string,
+  now: Date,
+  options: { force?: boolean } = {}
+): Promise<CreditExpirationState> {
+  return await db.transaction(async tx => {
+    const state = await reconcileCreditExpirationsInTransaction(
+      { type: 'organization', id: organizationId },
+      tx,
+      now,
+      { onlyIfDue: !options.force }
+    );
+    return {
+      microdollars_used: state.microdollars_used,
+      total_microdollars_acquired: state.total_microdollars_acquired,
+      next_credit_expiration_at: state.next_credit_expiration_at,
+    };
+  });
 }

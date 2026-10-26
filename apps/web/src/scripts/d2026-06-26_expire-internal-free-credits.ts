@@ -250,20 +250,12 @@ async function processUser(
     })
     .where(inArray(credit_transactions.id, [...affectedIds]));
 
-  const expirationOutcome = await processLocalExpirations(
-    {
-      id: user.id,
-      microdollars_used: user.microdollars_used,
-      next_credit_expiration_at: user.next_credit_expiration_at,
-      updated_at: user.updated_at,
-      total_microdollars_acquired: user.total_microdollars_acquired,
-    },
-    new Date(expiryDateIso)
-  );
+  const expirationOutcome = await processLocalExpirations(user.id, new Date(expiryDateIso), {
+    force: true,
+  });
 
-  const acquiredAfter =
-    expirationOutcome?.total_microdollars_acquired ?? user.total_microdollars_acquired;
-  const realBalanceAfter = acquiredAfter - user.microdollars_used;
+  const acquiredAfter = expirationOutcome.total_microdollars_acquired;
+  const realBalanceAfter = acquiredAfter - expirationOutcome.microdollars_used;
 
   if (realBalanceAfter < 0) {
     const fix = -realBalanceAfter;
@@ -274,7 +266,7 @@ async function processUser(
         is_free: true,
         credit_category: 'accounting_adjustment',
         description: 'Correction to $0 after expiring internal free credits',
-        original_baseline_microdollars_used: user.microdollars_used,
+        original_baseline_microdollars_used: expirationOutcome.microdollars_used,
       });
       await tx
         .update(kilocode_users)

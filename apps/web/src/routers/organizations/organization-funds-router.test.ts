@@ -198,12 +198,12 @@ describe('organization funds router', () => {
       const reconcile = creditExpiration.processOrganizationExpirations;
       const interception = jest
         .spyOn(creditExpiration, 'processOrganizationExpirations')
-        .mockImplementationOnce(async (snapshot, now) => {
+        .mockImplementationOnce(async (organizationId, now) => {
           await db
             .update(organizations)
             .set({ microdollars_used: 800_000, microdollars_balance: 1_200_000 })
             .where(eq(organizations.id, childA.id));
-          return reconcile(snapshot, now);
+          return reconcile(organizationId, now);
         });
       try {
         const caller = await createCallerForUser(ownerUser.id);

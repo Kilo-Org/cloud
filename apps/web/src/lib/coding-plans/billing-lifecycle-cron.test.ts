@@ -432,7 +432,7 @@ describe('Coding Plan billing lifecycle cron', () => {
         .where(eq(kilocode_users.id, user.id))
         .returning();
 
-      if (readBalance) expect(await getBalanceForUser(payer)).toEqual({ balance: 0 });
+      if (readBalance) expect((await getBalanceForUser(payer)).balance).toBe(0);
       expect(maybePerformAutoTopUp).not.toHaveBeenCalled();
 
       await runCodingPlanBillingLifecycleCron(db);

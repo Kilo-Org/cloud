@@ -41,16 +41,11 @@ export async function GET(request: Request) {
     let batchesRun = 0;
     let hasMoreUsers = true;
     let hasMoreOrganizations = true;
-
     for (let batch = 0; batch < MAX_BATCHES_PER_RUN; batch++) {
       if (hasMoreUsers) {
         const users = await db
           .select({
             id: kilocode_users.id,
-            microdollars_used: kilocode_users.microdollars_used,
-            total_microdollars_acquired: kilocode_users.total_microdollars_acquired,
-            next_credit_expiration_at: kilocode_users.next_credit_expiration_at,
-            updated_at: kilocode_users.updated_at,
           })
           .from(kilocode_users)
           .where(lte(kilocode_users.next_credit_expiration_at, cutoffDate))
@@ -58,7 +53,7 @@ export async function GET(request: Request) {
           .limit(BATCH_SIZE + 1);
         for (const user of users.slice(0, BATCH_SIZE)) {
           try {
-            await processLocalExpirations(user, now);
+            await processLocalExpirations(user.id, now);
             usersProcessed++;
           } catch (error) {
             usersFailed++;
@@ -92,7 +87,7 @@ export async function GET(request: Request) {
             captureException(batchError, { tags: { source: 'expire_credits_cron' } });
             for (const owner of owners) {
               try {
-                await processOrganizationExpirations(owner, now);
+                await processOrganizationExpirations(owner.id, now);
                 organizationsProcessed++;
               } catch (error) {
                 organizationsFailed++;

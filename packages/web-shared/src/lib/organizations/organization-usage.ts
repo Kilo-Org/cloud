@@ -72,24 +72,26 @@ export async function getBalanceAndOrgSettings(
   funding?: 'usage'
 ): Promise<BalanceAndOrgSettings> {
   const balanceSpan = startInactiveSpan({ name: 'balance-check' });
-  const result = organizationId
-    ? await getBalanceForOrganizationUser(organizationId, user.id, { fromDb, funding })
-    : {
-        ...(await getBalanceForUser(user)),
-        balanceLimitedByUserAllowance: false,
-        payer: {
-          createdAt: user.created_at,
-          microdollarsUsed: user.microdollars_used,
-          totalMicrodollarsAcquired: user.total_microdollars_acquired,
-        },
-      };
-  if (!organizationId && funding === 'usage' && user.auto_top_up_enabled) {
-    after(() =>
-      maybePerformAutoTopUp({
-        ...user,
-        total_microdollars_acquired: result.balance * 1_000_000 + user.microdollars_used,
-      })
-    );
+  let result: BalanceAndOrgSettings;
+  if (organizationId) {
+    result = await getBalanceForOrganizationUser(organizationId, user.id, { fromDb, funding });
+  } else {
+    const { balance, microdollars_used, total_microdollars_acquired } =
+      await getBalanceForUser(user);
+    result = {
+      balance,
+      balanceLimitedByUserAllowance: false,
+      payer: {
+        createdAt: user.created_at,
+        microdollarsUsed: microdollars_used,
+        totalMicrodollarsAcquired: total_microdollars_acquired,
+      },
+    };
+    if (funding === 'usage' && user.auto_top_up_enabled) {
+      after(() =>
+        maybePerformAutoTopUp({ ...user, microdollars_used, total_microdollars_acquired })
+      );
+    }
   }
   balanceSpan.end();
   return result;
@@ -137,7 +139,6 @@ export async function getBalanceForOrganizationUser(
   const {
     microdollar_limit,
     microdollar_usage,
-    microdollars_used: initial_microdollars_used,
     settings,
     require_seats,
     plan,
@@ -146,8 +147,7 @@ export async function getBalanceForOrganizationUser(
     created_at,
   } = row;
 
-  let total_microdollars_acquired = row.total_microdollars_acquired;
-  let microdollars_used = initial_microdollars_used;
+  let { microdollars_used, total_microdollars_acquired } = row;
 
   // Lazy credit expiry check (mirrors user pattern in getBalanceForUser)
   const expireBefore = subHours(now, expiryJitterHours);
@@ -155,19 +155,9 @@ export async function getBalanceForOrganizationUser(
     next_credit_expiration_at && expireBefore >= new Date(next_credit_expiration_at);
 
   if (needsExpirationComputation) {
-    const expiryResult = await processOrganizationExpirations(
-      {
-        id: organizationId,
-        microdollars_used,
-        next_credit_expiration_at,
-        total_microdollars_acquired,
-      },
-      expireBefore
-    );
-    if (expiryResult) {
-      total_microdollars_acquired = expiryResult.total_microdollars_acquired;
-      microdollars_used = expiryResult.microdollars_used;
-    }
+    const expiryResult = await processOrganizationExpirations(organizationId, expireBefore);
+    microdollars_used = expiryResult.microdollars_used;
+    total_microdollars_acquired = expiryResult.total_microdollars_acquired;
   }
 
   if (

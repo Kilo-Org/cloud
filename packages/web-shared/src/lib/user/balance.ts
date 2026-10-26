@@ -4,7 +4,7 @@ import type { UserForBalance } from '@kilocode/web-shared/lib/user/balance-types
 import { accountBalanceMicrodollars } from '@kilocode/worker-utils/account-access';
 import { subHours } from 'date-fns';
 
-export type BalanceForUser = Awaited<ReturnType<typeof getBalanceForUser>>;
+export type BalanceForUser = { balance: number };
 export async function getBalanceForUser(
   user: UserForBalance,
   options: {
@@ -25,11 +25,15 @@ export async function getBalanceForUser(
 
   if (needsExpirationComputation) {
     const timer = createTimer();
-    const result = await processLocalExpirations(user, expireBefore);
+    const result = await processLocalExpirations(user.id, expireBefore, { force: forceRefresh });
     if (!quiet) timer.log(`processLocalExpirations for user ${user.id}`);
     user = { ...user, ...result };
   }
 
   const balance = accountBalanceMicrodollars(user) / 1_000_000;
-  return { balance };
+  return {
+    balance,
+    microdollars_used: user.microdollars_used,
+    total_microdollars_acquired: user.total_microdollars_acquired,
+  };
 }

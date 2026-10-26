@@ -69,6 +69,7 @@ function claimLotUsage(
     baselines.get(transaction.id) ?? transaction.expiration_baseline_microdollars_used ?? 0;
   const usageEnd = Math.min(baseline + lotExposure(transaction), microdollarsUsed);
   const consumed = Math.max(0, usageEnd - baseline);
+  if (consumed === 0) return 0;
   for (let laterIndex = index + 1; laterIndex < sorted.length; laterIndex++) {
     const later = sorted[laterIndex];
     const laterBaseline =
@@ -130,7 +131,8 @@ export type CreditExpirationOwnerState = OrganizationForExpiration;
 export async function reconcileCreditExpirationsInTransaction(
   owner: CreditOwner,
   tx: DrizzleTransaction,
-  now = new Date()
+  now = new Date(),
+  options?: { onlyIfDue?: boolean }
 ): Promise<CreditExpirationOwnerState> {
   const table = owner.type === 'user' ? kilocode_users : organizations;
   const [entity] = await tx
@@ -144,7 +146,23 @@ export async function reconcileCreditExpirationsInTransaction(
     .where(eq(table.id, owner.id))
     .for('no key update');
   if (!entity) throw new Error(`Credit owner not found: ${owner.type}:${owner.id}`);
-  const expiredCredits = alias(creditTransactionsTable, 'processed_expiration');
+  if (
+    options?.onlyIfDue &&
+    (entity.next_credit_expiration_at === null || new Date(entity.next_credit_expiration_at) > now)
+  ) {
+    return entity;
+  }
+  const closures = alias(creditTransactionsTable, 'processed_expiration');
+  // LIMIT preserves the global unique-link lookup before category matching.
+  const expiredCredits = tx
+    .select({
+      original_transaction_id: closures.original_transaction_id,
+      credit_category: closures.credit_category,
+    })
+    .from(closures)
+    .where(eq(closures.original_transaction_id, creditTransactionsTable.id))
+    .limit(1)
+    .as('expired_credits');
   const ownerCondition =
     owner.type === 'user'
       ? and(
@@ -168,23 +186,20 @@ export async function reconcileCreditExpirationsInTransaction(
         is_free: creditTransactionsTable.is_free,
       })
       .from(creditTransactionsTable)
-      .leftJoin(
+      .leftJoinLateral(
         expiredCredits,
-        and(
-          eq(expiredCredits.original_transaction_id, creditTransactionsTable.id),
-          inArray(expiredCredits.credit_category, [
-            'credits_expired',
-            'orb_credit_expired',
-            'orb_credit_voided',
-          ])
-        )
+        inArray(expiredCredits.credit_category, [
+          'credits_expired',
+          'orb_credit_expired',
+          'orb_credit_voided',
+        ])
       )
       .where(
         and(
           ownerCondition,
           gt(creditTransactionsTable.amount_microdollars, 0),
           expiryCondition,
-          isNull(expiredCredits.id)
+          isNull(expiredCredits.original_transaction_id)
         )
       );
   const expiringLots = await loadOpenLots(isNotNull(creditTransactionsTable.expiry_date));

@@ -74,7 +74,7 @@ describe('credit expiry cron', () => {
     expect(users.limit).toHaveBeenCalledWith(101);
     expect(orgs.limit).toHaveBeenCalledWith(101);
     expect(users.orderBy).toHaveBeenCalledWith(expect.anything(), expect.anything());
-    expect(processLocalExpirations).toHaveBeenCalledWith({ id: 'user' }, expect.any(Date));
+    expect(processLocalExpirations).toHaveBeenCalledWith('user', expect.any(Date));
     expect(processOrganizationExpirationsBatch).toHaveBeenCalledWith(
       [{ id: 'org' }],
       expect.any(Date)
@@ -153,8 +153,8 @@ describe('credit expiry cron', () => {
       hasMore: false,
     });
     expect(jest.mocked(processOrganizationExpirations).mock.calls.map(([org]) => org)).toEqual([
-      { id: 'failing-org' },
-      { id: 'org' },
+      'failing-org',
+      'org',
     ]);
     expect(captureException).toHaveBeenCalledWith(failure, {
       tags: { source: 'expire_credits_cron' },

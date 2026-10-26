@@ -291,6 +291,9 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
 
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
@@ -936,6 +939,10 @@ jobs:
       - name: Run cloud-agent-next unit tests
         if: matrix.part == 'unit'
         run: pnpm --filter cloud-agent-next test
+
+      - name: Build runtime artifacts for Worker integration tests
+        if: matrix.part == 'workers'
+        run: pnpm --filter cloud-agent-next build:wrapper
 
       - name: Run cloud-agent-next Workers tests
         if: matrix.part == 'workers'

@@ -2,8 +2,9 @@
  * Cloudflare Worker entry point for AI Attributions Tracking
  */
 
-import { Hono, type MiddlewareHandler } from 'hono';
+import { Hono, type Context, type MiddlewareHandler } from 'hono';
 import { useWorkersLogger } from 'workers-tagged-logger';
+import { readBoundedStream } from '@kilocode/worker-utils/bounded-stream-reader';
 import { AttributionTrackerDO, getAttributionTrackerDO } from './dos/AttributionTracker.do';
 import { logger } from './util/logger';
 import { resError, resSuccess } from '@kilocode/worker-utils';
@@ -14,6 +15,7 @@ import {
   AdminDeleteAttributionParams,
   AttributionsTrackRequestBody,
   AttributionEventResponse,
+  MAX_TRACK_BODY_BYTES,
 } from './schemas';
 
 export { AttributionTrackerDO };
@@ -64,15 +66,64 @@ app.post('/attributions/track', async c => {
   const user_id = c.get('user_id');
   const organization_id = c.get('organization_id');
 
+  // Apply the per-organization and the per-user limits before the body is read.
+  // Both counters are charged on every request, and each key keeps its own
+  // counter because a Rate Limit binding counts per key within a location.
+  const [organizationOutcome, userOutcome] = await Promise.all([
+    env.ATTRIBUTION_TRACK_ORG_RATE_LIMITER.limit({ key: organization_id }),
+    env.ATTRIBUTION_TRACK_USER_RATE_LIMITER.limit({ key: user_id }),
+  ]);
+  if (!organizationOutcome.success || !userOutcome.success) {
+    return c.json(resError('Too many attribution requests, slow down'), 429);
+  }
+
+  // Read the body with a bounded reader against the fixed byte budget.
+  let bodyText: string | undefined;
+  try {
+    const declaredLength = Number(c.req.header('Content-Length') ?? Number.NaN);
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_TRACK_BODY_BYTES) {
+      return c.json(resError('Request body too large'), 413);
+    }
+    if (c.req.raw.body !== null) {
+      const bounded = await readBoundedStream(
+        c.req.raw.body as ReadableStream<Uint8Array>,
+        MAX_TRACK_BODY_BYTES
+      );
+      if (!bounded.ok) {
+        return c.json(resError('Request body too large'), 413);
+      }
+      bodyText = new TextDecoder().decode(bounded.bytes);
+    }
+  } catch (error) {
+    // An upload that ends before completion surfaces here as a read error;
+    // return a plain 400 instead of surfacing an internal failure.
+    logger.warn('Attribution tracking request ended before completion', {
+      error: error instanceof Error ? error.message : String(error),
+      organization_id,
+    });
+    return c.json(resError('Invalid request payload'), 400);
+  }
+
   // Parse and validate request body
   let payload: AttributionsTrackRequestBody;
   try {
-    const body: unknown = await c.req.json();
+    const body: unknown = bodyText === undefined ? {} : JSON.parse(bodyText);
     payload = AttributionsTrackRequestBody.parse(body);
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     return c.json(resError('Invalid request payload:\n' + errMsg), 400);
   }
+
+  return trackAttribution(c, payload, user_id, organization_id);
+});
+
+async function trackAttribution(
+  c: Context<HonoContext>,
+  payload: AttributionsTrackRequestBody,
+  user_id: string,
+  organization_id: string
+) {
+  const env = c.env;
 
   // Get DurableObject stub
   const stub = getAttributionTrackerDO(env, {
@@ -101,7 +152,7 @@ app.post('/attributions/track', async c => {
     });
     return c.json(resError('Failed to track attribution'), 500);
   }
-});
+}
 
 // ============================================================================
 // Admin Routes (service-to-service communication)

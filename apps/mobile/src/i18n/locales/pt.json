@@ -1506,6 +1506,22 @@
       "loadingProposals": "A carregar propostas",
       "couldNotLoadProposals": "Não foi possível carregar as propostas.",
       "noProposals": "Sem propostas",
+      "proposalDetails": "Detalhes da proposta",
+      "proposalTitle": "Título da proposta",
+      "rationale": "Justificação",
+      "saveFirst": "Guarda as tuas alterações antes de abrir um pull request.",
+      "proposalSaved": "Proposta guardada",
+      "proposalDismissed": "Proposta rejeitada",
+      "dismissProposalTitle": "Rejeitar proposta?",
+      "dismissProposalMessage": "Esta proposta será removida da lista de propostas ativas e não poderá ser restaurada.",
+      "prOpened": "Pull request para o REVIEW.md aberto",
+      "alreadyPresent": "As orientações já constam do REVIEW.md",
+      "status": {
+        "edited": "Editada",
+        "opening_change_request": "A abrir PR",
+        "change_request_failed": "Falha ao abrir PR",
+        "superseded": "Já existe"
+      },
       "noProposalsDescription": "As propostas da memória de revisão aparecem aqui depois de o Kilo analisar as respostas dos responsáveis pelo projeto."
     },
     "manualReview": {
@@ -3776,6 +3792,7 @@
     "title": "Perfis",
     "entrySubtitle": "Reutilizar definições de ambiente entre sessões",
     "newProfile": "Novo perfil",
+    "openHint": "Abre o perfil",
     "emptyTitle": "Ainda não há perfis",
     "emptyDescription": "Crie um perfil para reutilizar variáveis de ambiente, comandos de configuração e competências entre sessões.",
     "loadFailed": "Não foi possível carregar perfis",
@@ -4014,11 +4031,13 @@
       "namePlaceholder": "Erros, ideias, versão…",
       "emoji": "Emoji",
       "mode": "Modo",
-      "defaultsHint": "As sessões iniciadas a partir desta lista usam estas predefinições."
+      "defaultsHint": "As sessões iniciadas a partir desta lista usam estas predefinições.",
+      "saveFailed": "Não foi possível guardar a lista. Verifica a tua ligação e tenta novamente."
     },
     "list": {
       "addPlaceholder": "Adiciona uma tarefa",
       "add": "Adicionar tarefa",
+      "addFailed": "Não foi possível adicionar a tarefa. Verifica a tua ligação e tenta novamente.",
       "empty": "Ainda sem tarefas",
       "setDefaults": "Definir repositório, modo e modelo",
       "completed_one": "Concluídas ({{count}})",
@@ -4057,7 +4076,9 @@
       "startNewSession": "Iniciar nova sessão",
       "startNewSessionHint": "Mantenha premido para iniciar uma nova sessão.",
       "linkSession": "Associar sessão",
-      "linkFailed": "Não foi possível associar a sessão à tarefa"
+      "linkFailed": "Não foi possível associar a sessão à tarefa",
+      "moveToAnotherTodo": "Mover para outra tarefa",
+      "startRefreshFailed": "A sessão iniciou, mas esta lista não foi atualizada."
     },
     "linkSession": {
       "title": "Associar a uma sessão",
@@ -4066,6 +4087,7 @@
     },
     "upNext": "A seguir",
     "sessionTodo": "Tarefa: {{title}}",
+    "openTodoHint": "Abre a tarefa.",
     "linkToTodo": "Associar a tarefa",
     "candidates": {
       "empty": "Sem tarefas em aberto"

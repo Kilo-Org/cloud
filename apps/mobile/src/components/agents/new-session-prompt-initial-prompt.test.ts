@@ -453,13 +453,12 @@ describe('NewSessionPrompt initialPrompt seed', () => {
   });
 
   it.each([
-    { isCreating: false, attachmentMax: 5, voiceAvailable: false, paperclipDisabled: false },
-    { isCreating: false, attachmentMax: 0, voiceAvailable: true, paperclipDisabled: true },
-    { isCreating: true, attachmentMax: 5, voiceAvailable: true, paperclipDisabled: true },
+    { isCreating: false, attachmentMax: 5, paperclipDisabled: false },
+    { isCreating: false, attachmentMax: 0, paperclipDisabled: true },
+    { isCreating: true, attachmentMax: 5, paperclipDisabled: true },
   ])('preserves control availability and disabled states for %j', async options => {
     const { NewSessionPrompt: renderPrompt } = await import('./new-session-prompt');
-    const { isCreating, attachmentMax, voiceAvailable, paperclipDisabled } = options;
-    voiceInputAvailable.current = voiceAvailable;
+    const { isCreating, attachmentMax, paperclipDisabled } = options;
     const element = renderPrompt({ ...defaultProps(), isCreating, attachmentMax });
 
     expect(
@@ -476,12 +475,13 @@ describe('NewSessionPrompt initialPrompt seed', () => {
       hitSlop: { top: 8.25, bottom: 8.25, left: 8.25, right: 8.25 },
     });
     expect(findElementByType(element, ComposerPasteButton)).toMatchObject({ disabled: isCreating });
-    expect(findElementByType(element, VoiceInputButton)).toEqual(
-      voiceAvailable ? expect.objectContaining({ disabled: isCreating, size: 'lg' }) : null
-    );
-    expect(findElementByType(element, VoiceInputStatus)).toEqual(
-      voiceAvailable ? { status: 'idle' } : null
-    );
+    // The microphone is part of the row whether or not the OS recognizer
+    // answers available; a tap says why it cannot start.
+    expect(findElementByType(element, VoiceInputButton)).toMatchObject({
+      disabled: isCreating,
+      size: 'lg',
+    });
+    expect(findElementByType(element, VoiceInputStatus)).toEqual({ status: 'idle' });
   });
 
   it('keeps the newline button between the voice status and voice button', async () => {

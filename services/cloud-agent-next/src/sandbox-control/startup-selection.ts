@@ -19,9 +19,8 @@ export function selectStartup(
   });
   if (!selected.success) throw new ProviderCreationError('invalid_configuration');
   const { mode, image } = selected.data;
-  // Downloaded startup is native-only. SDK and Vercel pins keep preinstalled startup.
-  if (mode === 'preinstalled' || provider !== 'cloudflare-containers')
-    return { mode: 'preinstalled', image };
+  // The retired SDK provider keeps its preinstalled launch contract.
+  if (mode === 'preinstalled' || provider === 'cloudflare') return { mode: 'preinstalled', image };
   if (!env.RUNTIME_RELEASE_DESCRIPTOR) throw new ProviderCreationError('invalid_configuration');
   return { mode, image, descriptor: env.RUNTIME_RELEASE_DESCRIPTOR };
 }

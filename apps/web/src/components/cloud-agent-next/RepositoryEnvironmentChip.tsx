@@ -85,6 +85,7 @@ export function RepositoryEnvironmentChip({
           repositoryLabel={repositoryLabel}
           environmentId={environment?.id ?? null}
           selectedProfileId={selectedProfileId}
+          canManage={canManage}
           onSaved={() => setDialogOpen(false)}
           onDeleted={() => setDialogOpen(false)}
         />

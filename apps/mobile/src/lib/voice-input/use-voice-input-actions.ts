@@ -21,6 +21,7 @@ import {
   voiceInputLanguageDisplayName,
 } from './voice-input-language';
 import {
+  classifyVoiceInputError,
   shouldAbortVoiceInput,
   type VoiceInputFeedback,
   type VoiceInputLifecycleInput,
@@ -34,6 +35,7 @@ import { isGatewayTranscriptionEnabled } from './gateway/gateway-transcription-p
 type VoiceInputControllerLike = {
   abort: (owner?: string) => Promise<boolean>;
   getSnapshot: () => VoiceInputControllerSnapshot;
+  refreshAvailability: () => void;
   start: (options: VoiceInputStartOptions) => Promise<boolean>;
   stop: (owner: string) => Promise<boolean>;
   subscribe: (listener: (snapshot: VoiceInputControllerSnapshot) => void) => () => void;
@@ -195,6 +197,13 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
     if (getDisabled()) {
       return;
     }
+    // The recognizer's availability is a live OS answer, not a constant: on iOS
+    // `SFSpeechRecognizer.isAvailable` goes false while the service is busy and
+    // on Android the platform answer goes false when no recognition service is
+    // bound. Every tap re-reads it, so a stale verdict taken when this surface
+    // was built can neither hide a working microphone nor send the user into the
+    // consent disclosure for a recognizer that cannot start.
+    controller.refreshAvailability();
     const owner = getOwner();
     const snapshot = controller.getSnapshot();
     const view = resolveOwnerVoiceInputView(snapshot, owner);
@@ -212,6 +221,14 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
     }
 
     if (view.isActive) {
+      return;
+    }
+
+    if (!view.available) {
+      // The microphone stays in place while the recognizer is unavailable, so
+      // the tap is the one place the reason can be given: say what is wrong
+      // instead of raising a consent question a start could not honour.
+      showFeedback(classifyVoiceInputError('service-not-allowed'));
       return;
     }
 

@@ -57,7 +57,7 @@ describe('processMessagesApiUsage', () => {
       cost_details: { upstream_inference_cost: 0.7 },
     };
 
-    const result = processMessagesApiUsage(usage, null, coreProps);
+    const result = processMessagesApiUsage(usage, null, coreProps, 'openrouter');
 
     expect(result.cost_mUsd).toBe(1000);
     expect(result.is_byok).toBe(false);
@@ -80,7 +80,7 @@ describe('processMessagesApiUsage', () => {
       cost_details: { upstream_inference_cost: 0.02 },
     };
 
-    const result = processMessagesApiUsage(usage, null, coreProps);
+    const result = processMessagesApiUsage(usage, null, coreProps, 'openrouter');
 
     expect(result.cost_mUsd).toBe(20000);
     expect(result.is_byok).toBe(true);
@@ -99,7 +99,7 @@ describe('processMessagesApiUsage', () => {
       gateway: { routing: { finalProvider: 'anthropic' }, cost: '0', marketCost: '0.000375' },
     };
 
-    const result = processMessagesApiUsage(usage, providerMetadata, coreProps);
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
 
     expect(result.cost_mUsd).toBe(375); // toMicrodollars(0.000375)
     expect(result.is_byok).toBeNull();
@@ -134,7 +134,7 @@ describe('processMessagesApiUsage', () => {
       },
     };
 
-    const result = processMessagesApiUsage(usage, providerMetadata, coreProps);
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
 
     expect(result.is_byok).toBe(true);
     expect(result.cost_mUsd).toBe(402);
@@ -165,7 +165,7 @@ describe('processMessagesApiUsage', () => {
       },
     };
 
-    const result = processMessagesApiUsage(usage, providerMetadata, coreProps);
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
 
     expect(result.is_byok).toBe(false);
   });
@@ -198,13 +198,13 @@ describe('processMessagesApiUsage', () => {
       },
     };
 
-    const result = processMessagesApiUsage(usage, providerMetadata, coreProps);
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
 
     expect(result.is_byok).toBe(false);
   });
 
   test('returns zero cost when no usage or metadata is provided', () => {
-    const result = processMessagesApiUsage(null, null, coreProps);
+    const result = processMessagesApiUsage(null, null, coreProps, 'openrouter');
 
     expect(result.cost_mUsd).toBe(0);
     expect(result.is_byok).toBeNull();
@@ -234,6 +234,53 @@ describe('parseMessagesMicrodollarUsageFromStream approval tests', () => {
 });
 
 describe('parseMessagesMicrodollarUsageFromStream', () => {
+  test.each([false, true])(
+    'retains Vercel start-frame cost and routing metadata with a final delta=%s',
+    async hasDelta => {
+      const events = [
+        {
+          type: 'message_start',
+          message: {
+            id: 'generation-id',
+            model: 'upstream-model',
+            usage: { input_tokens: 3, output_tokens: 1 },
+            provider_metadata: {
+              gateway: {
+                marketCost: '0.12',
+                routing: { canonicalSlug: 'resolved-model', finalProvider: 'anthropic' },
+              },
+            },
+          },
+        },
+        ...(hasDelta
+          ? [
+              {
+                type: 'message_delta',
+                usage: { output_tokens: 2 },
+                delta: { stop_reason: 'end_turn' },
+              },
+            ]
+          : []),
+      ];
+      const result = await parseMessagesMicrodollarUsageFromStream(
+        streamFromText(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')),
+        'fake-user-id',
+        undefined,
+        'vercel',
+        200,
+        false
+      );
+
+      expect(result).toMatchObject({
+        cost_mUsd: 120_000,
+        model: 'resolved-model',
+        inference_provider: 'anthropic',
+        inputTokens: 3,
+        outputTokens: hasDelta ? 2 : 1,
+      });
+    }
+  );
+
   test('records the successful Vercel routed model instead of the message start model', async () => {
     const stream = streamFromText(
       'event: message_start\n' +
@@ -474,7 +521,7 @@ describe('parseMessagesMicrodollarUsageFromString approval tests', () => {
   test(vercelMessagesJson, async () => {
     const inputFile = join(sampleDir, vercelMessagesJson);
     const jsonString = await readFile(inputFile, 'utf-8');
-    const result = parseMessagesMicrodollarUsageFromString(jsonString, 200);
+    const result = parseMessagesMicrodollarUsageFromString(jsonString, 200, 'openrouter');
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);

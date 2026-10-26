@@ -7,6 +7,7 @@ import {
   briefingReportMissing,
   briefingSyncDelayMs,
   canReadBriefingContext,
+  parseBriefingSafeguardInput,
   parseBriefingSafeguards,
   readableBriefingOrganizationIds,
   visibleHomeBriefing,
@@ -201,6 +202,79 @@ describe('parseBriefingSafeguards', () => {
     expect(parseBriefingSafeguards(5, Number.NaN)).toBeNull();
     expect(parseBriefingSafeguards(Number.POSITIVE_INFINITY, 2)).toBeNull();
     expect(parseBriefingSafeguards(5, Number.MAX_SAFE_INTEGER)).toBeNull();
+  });
+});
+
+describe('parseBriefingSafeguardInput', () => {
+  it('reads the decimal separator of the active language', () => {
+    expect(parseBriefingSafeguardInput('2,5', '2,5', 'de')).toEqual({
+      maxDurationSeconds: 150,
+      maxSpendMicrodollars: 2_500_000,
+    });
+    expect(parseBriefingSafeguardInput('10', '2.5', 'en')).toEqual({
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 2_500_000,
+    });
+  });
+
+  it('rejects text the fields cannot turn into a server-valid limit', () => {
+    expect(parseBriefingSafeguardInput('', '2,5', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('2,5', '', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('zwei', '2,5', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('2,5', '-1', 'de')).toBeNull();
+  });
+
+  it('refuses a separator the active language does not read as a decimal point', () => {
+    // Each case pairs the refused text with a valid value in the other field, so
+    // the grammar check is the only reason the result is null: without it the
+    // text would still turn into a server-valid limit.
+    expect(parseBriefingSafeguardInput('5', '2.5', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('0.5', '1', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('5', '2,5', 'en')).toBeNull();
+  });
+
+  it('refuses a group separator on the wrong side of the decimal separator', () => {
+    // Pasted from another convention: German grammar reads the comma as the
+    // decimal separator, so the trailing ".50" cannot be a group.
+    expect(parseBriefingSafeguardInput('10', '1,234.50', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('10', '1.234.5', 'de')).toBeNull();
+    expect(parseBriefingSafeguardInput('10', '1,23.50', 'en')).toBeNull();
+  });
+
+  it('accepts the language its own display writes', () => {
+    expect(parseBriefingSafeguardInput('10', '1234,5', 'de')).toEqual({
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 1_234_500_000,
+    });
+    expect(parseBriefingSafeguardInput('10', '1.234,5', 'de')).toEqual({
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 1_234_500_000,
+    });
+    expect(parseBriefingSafeguardInput('10', '1,234.5', 'en')).toEqual({
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 1_234_500_000,
+    });
+  });
+
+  it('follows the grouping and separator the active language formats', () => {
+    // Pairing groups of two then three is correct in these languages and wrong
+    // in English, where the same text must be refused.
+    expect(parseBriefingSafeguardInput('10', '1,23,456.7', 'hi')).toEqual({
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 123_456_700_000,
+    });
+    expect(parseBriefingSafeguardInput('10', '123,456.7', 'hi')).toBeNull();
+    // French formats a narrow no-break space; a typed plain space reads the same.
+    expect(parseBriefingSafeguardInput('10', '1 234,5', 'fr')).toEqual({
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 1_234_500_000,
+    });
+    // A fraction long enough to round the integer up must not invalidate the
+    // grouping the person typed.
+    expect(parseBriefingSafeguardInput('10', '9.999,9999', 'de')).toEqual({
+      maxDurationSeconds: 600,
+      maxSpendMicrodollars: 9_999_999_900,
+    });
   });
 });
 

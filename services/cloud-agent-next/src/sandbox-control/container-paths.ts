@@ -19,5 +19,13 @@ export const CONTROL_WRAPPER_PATH = runtimeInstallPath(
 );
 export const CONTROL_WRAPPER_LOG_PATH = '/tmp/kilocode-control-wrapper.log';
 
+/**
+ * The environment builder bundle. A builder container runs it as its main
+ * process (`RUNTIME_BUN_PATH` + this path), never through the session supervisor.
+ */
+export const ENVIRONMENT_BUILDER_PATH = runtimeInstallPath(
+  wrapperBundle('src/environment-builder/main.ts').installName
+);
+
 /** pgrep pattern matching the supervisor or its wrapper child. */
 export const CONTROL_PROCESS_MATCH = `${CONTROL_SUPERVISOR_PATH}|${CONTROL_WRAPPER_PATH}`;

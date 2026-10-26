@@ -1295,17 +1295,17 @@ remain decisive. No inspected validator enforces task-branch names or parses rec
 
 | Case | Current authority and transport |
 |---|---|
-| GitHub `kgh2` | HTTPS on `api.github.com`, `github.com`, `uploads.github.com`, and `npm.pkg.github.com`; default port only. No broker method, repository-path, or body restriction. |
-| GitHub operations | REST/PR, GraphQL, identity, upload/npm, Git read/write, LFS, archive requests, and runner operations pass destination validation. Redirects still need separate admission. |
+| GitHub `kgh3` | Task capability. HTTPS on `api.github.com` and `github.com`; default port only. A signed task grant (scope, repository, task ref) decides each request. Git reads, LFS downloads and archives of the task repository pass. Pushes pass only for the task ref. A fixed set of repository REST and GraphQL operations passes after body validation. Every other request is denied. |
+| GitHub operations | Task grants cover the task repository only. Uploads, npm, other repositories, and identity requests are denied. Redirects still need separate admission. |
 | GitHub credential selection | Native installation and selected-user sources retain their current identity pins and renewal checks. User-source failure never falls back to installation authority. Installation tokens select repository names but do not narrow App permissions, including organization-level permissions. Selected-user tokens have no broker-side cross-repository path fence. |
-| Legacy GitHub `kgh1` | Legacy unbound capabilities no longer redeem; the credential broker accepts only container-bound `kgh2` values. |
+| Legacy GitHub `kgh1` and `kgh2` | `kgh1` capabilities no longer redeem. Outbound GitHub requests redeem only container-bound `kgh3` task capabilities. A `kgh2` capability gets 403 until the worktree is renewed with a task grant. |
 | GitLab `kgl2` | Exact configured HTTPS origin and base path, including configured non-default ports. Project REST accepts the encoded project path; numeric selectors require the matching project-source capability. Matching REST subpaths have no method restriction. |
 | GitLab Git/LFS | Enumerated refs, upload/receive-pack, batch, locks, verify, and unlock paths. Modern validation does not constrain their methods or queries. Legacy unbound capabilities no longer redeem. |
 | Bitbucket `kbb1` | Exact Git/API origins and repository path boundaries. No method/body policy. Encoded slashes remain valid in query data, not paths. Credential-source and repository identity fences remain unchanged. |
 | Carriers | Canonical Basic uses `x-access-token`, `oauth2`, or `x-token-auth` for its provider. API `Bearer`/`token` supports existing casing and whitespace; GitLab permits only `Bearer` or `PRIVATE-TOKEN`. Matching duplicate GitLab carriers redeem once. |
 | Header replacement | Managed requests replace `Authorization` and use manual redirects. GitLab replaces both authorization surfaces. Mixed managed and caller-owned carriers fail closed before resolution or forwarding. |
 | Native adapters | SDK containment classes register `MANAGED_SCM_OUTBOUND_HANDLER` through the inherited setter. Other SDK classes keep HTTPS interception disabled. Native Containers passes trusted identity through unchanged props, after installing HTTPS `*` and all-HTTP interception before contained startup. |
-| Optional egress restriction | Native Containers checks its trusted allowlist before credential handling. Unrestricted native requests without managed carriers retain their original headers and redirect policy. Containment does not require restricted general egress. |
+| Optional egress restriction | Native Containers checks its trusted allowlist before credential handling. Unrestricted native requests without managed carriers retain their original headers and redirect policy, except to GitHub destinations: those allow only anonymous `GET` and `HEAD` reads, and any other request gets 401. Containment does not require restricted general egress. |
 | Retry and bounds | Only eligible GitHub upload-pack reads retry 429 responses: three retries, 30 seconds per scheduled wait, and 60 seconds of total scheduled waits. An excessive next wait returns the current response. POST replay includes exactly 1 MiB; over-cap or unavailable bodies forward once. This is not a total request deadline. Diagnostics read at most 2 KiB within 100 milliseconds. |
 
 **Intentionally denied**
@@ -1313,7 +1313,7 @@ remain decisive. No inspected validator enforces task-branch names or parses rec
 | Case | Existing decision |
 |---|---|
 | Managed credentials | Unsupported versions/carriers, wrong Basic usernames, malformed aliases, and conflicting managed carriers fail closed. Capability expiry, container binding, source replacement, and revocation remain with their current owners. |
-| GitHub destinations | Non-HTTPS URLs, URL credentials/fragments, non-default ports, raw IPs, and hosts outside the four-host set cannot redeem `kgh2`. Legacy `kgh1` values fail closed with `invalid_capability`. |
+| GitHub destinations | Non-HTTPS URLs, URL credentials/fragments, non-default ports, raw IPs, and hosts outside the four-host set cannot redeem `kgh3`. Legacy `kgh1` values fail closed with `invalid_capability`. |
 | GitLab | Identity, GraphQL, unrelated projects, origin/base-path escape, traversal, and non-enumerated web/Git paths cannot redeem managed credentials. |
 | Bitbucket | Other repositories, origin changes, traversal, and encoded path slashes cannot redeem managed credentials. |
 | Retry exclusions | Push/discovery for receive-pack, LFS, API requests, 403 responses, and responses without an observable reset never enter the GitHub retry loop. |

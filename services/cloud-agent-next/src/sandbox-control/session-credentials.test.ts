@@ -174,14 +174,30 @@ describe('prepared Vercel capability grants', () => {
           type: 'github',
           repo: 'acme/widgets',
         };
-        const issue = vi.fn<(...args: unknown[]) => Promise<Record<string, unknown>>>(async () => ({
-          success: true,
-          capability: 'kgh2.refreshed',
-          source: allowUserAuthorization ? 'user' : 'installation',
-          installationId: '123',
-          appType: 'standard',
-          gitAuthor: { name: 'Kilo', email: 'bot@example.com' },
-        }));
+        const taskRef = `refs/heads/session/${input.scopeId}`;
+        const issue = vi.fn<(...args: unknown[]) => Promise<Record<string, unknown>>>(
+          async params => ({
+            success: true,
+            capability: 'kgh3.refreshed',
+            taskGrant: {
+              revision: 1,
+              scopeId: input.scopeId,
+              taskRef,
+              repository: {
+                id:
+                  (params as { taskScope: { repositoryId?: number } }).taskScope.repositoryId ??
+                  101,
+                nodeId: 'R_fixture',
+                owner: 'acme',
+                name: 'widgets',
+              },
+            },
+            source: allowUserAuthorization ? 'user' : 'installation',
+            installationId: '123',
+            appType: 'standard',
+            gitAuthor: { name: 'Kilo', email: 'bot@example.com' },
+          })
+        );
         Object.assign(input.env, { GIT_TOKEN_SERVICE: { issueGitHubSessionCapability: issue } });
         const { grant } = await prepareCredentialGrant(input);
         expect(issue).toHaveBeenLastCalledWith({
@@ -190,6 +206,7 @@ describe('prepared Vercel capability grants', () => {
           githubRepo: 'acme/widgets',
           accessPurpose: 'workflow',
           allowUserAuthorization,
+          taskScope: { scopeId: input.scopeId, taskRef },
         });
         const resolved = await resolveSessionCredential({
           env: input.env,
@@ -200,9 +217,15 @@ describe('prepared Vercel capability grants', () => {
           outboundContainerId: 'allocation-binding',
           now: grant.scm!.capability!.expiresAt + 1,
         });
-        expect(resolved?.credential).toBe('kgh2.refreshed');
+        expect(resolved?.credential).toBe('kgh3.refreshed');
         expect(issue).toHaveBeenCalledTimes(2);
-        expect(issue.mock.calls[0]).toEqual(issue.mock.calls[1]);
+        // A renewal pins the repository that the first task grant named.
+        expect(issue.mock.calls[1]).toEqual([
+          {
+            ...(issue.mock.calls[0]?.[0] as object),
+            taskScope: { scopeId: input.scopeId, taskRef, repositoryId: 101 },
+          },
+        ]);
         expect(resolved?.grant.repository).toEqual(grant.repository);
         expect(resolved?.grant.scm?.alias).toBe(grant.scm?.alias);
         issue.mockResolvedValueOnce({ success: false, reason: 'user_authorization_denied' });

@@ -13,6 +13,7 @@ import type { CodingPlanId } from '@/lib/coding-plans/pricing';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { maybePerformAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
 import {
   byok_api_keys,
   coding_plan_key_inventory,
@@ -410,6 +411,47 @@ describe('Coding Plan billing lifecycle cron', () => {
     expect(subscription.payment_grace_expires_at).not.toBeNull();
     expect(maybePerformAutoTopUp).toHaveBeenCalledTimes(1);
   });
+
+  it.each([true, false])(
+    'reconciles expired principal and funds renewal once (balance read=%s)',
+    async readBalance => {
+      const { user, subscriptionId } = await createSubscription(COST_MICRODOLLARS * 2, true);
+      const expiry = new Date(Date.now() - 60_000).toISOString();
+      await db.insert(credit_transactions).values({
+        kilo_user_id: user.id,
+        amount_microdollars: COST_MICRODOLLARS,
+        is_free: false,
+        expiry_date: expiry,
+        expiration_baseline_microdollars_used: COST_MICRODOLLARS,
+        original_baseline_microdollars_used: COST_MICRODOLLARS,
+        description: 'Unused principal at renewal',
+      });
+      const [payer] = await db
+        .update(kilocode_users)
+        .set({ next_credit_expiration_at: expiry })
+        .where(eq(kilocode_users.id, user.id))
+        .returning();
+
+      if (readBalance) expect(await getBalanceForUser(payer)).toEqual({ balance: 0 });
+      expect(maybePerformAutoTopUp).not.toHaveBeenCalled();
+
+      await runCodingPlanBillingLifecycleCron(db);
+      await runCodingPlanBillingLifecycleCron(db);
+      const [subscription] = await db
+        .select()
+        .from(coding_plan_subscriptions)
+        .where(eq(coding_plan_subscriptions.id, subscriptionId));
+      expect(subscription.status).toBe('past_due');
+      expect(maybePerformAutoTopUp).toHaveBeenCalledTimes(1);
+      expect(maybePerformAutoTopUp).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: user.id,
+          total_microdollars_acquired: COST_MICRODOLLARS,
+          microdollars_used: COST_MICRODOLLARS,
+        })
+      );
+    }
+  );
 
   it('restores active status when credits arrive during grace', async () => {
     const { user, subscriptionId } = await createSubscription(COST_MICRODOLLARS, true);

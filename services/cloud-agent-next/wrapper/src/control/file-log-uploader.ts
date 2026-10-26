@@ -1,5 +1,4 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import {
   CONTROL_LOG_ARCHIVE_NAME,
@@ -12,6 +11,7 @@ import {
 } from '../../../src/shared/control-diagnostics.js';
 import { createTarStream, type TarArchiveEntry } from '../log-uploader.js';
 import { logToFile, withTimeoutAndAbort } from '../utils.js';
+import { defaultHomeRoots } from '../control-plane/workspace-home.js';
 
 export type ControlFileLogUploader = {
   start: (intervalMs?: number) => void;
@@ -24,7 +24,8 @@ type Options = {
   uploadUrl?: string;
   uploadGrant?: string;
   wrapperLogPath?: string;
-  homeRoot?: string;
+  /** Roots whose `<home>/.local/share/kilo/log` directories are archived. */
+  homeRoots?: readonly string[];
   fetch?: (url: string, init: RequestInit) => Promise<Response>;
   onDiagnostic?: ControlDiagnosticReporter;
   projector?: ControlDiagnosticProjector;
@@ -38,17 +39,27 @@ const UPLOAD_TIMEOUT_MS = 15_000;
 const FINAL_UPLOAD_TIMEOUT_MS = 5_000;
 const INTERVAL_MS = 30_000;
 
-export function defaultControlWorktreeHomeRoot(): string {
-  return path.join(os.tmpdir(), 'kilo-worktrees');
+/**
+ * The directory-keyed home root and the per-session root that allocations
+ * created before it still use. Both are read while such allocations exist.
+ */
+export function defaultControlHomeRoots(): string[] {
+  const roots = defaultHomeRoots();
+  return [roots.legacy, roots.directory];
 }
 
-export function listControlKiloLogDirs(homeRoot = defaultControlWorktreeHomeRoot()): string[] {
-  if (!existsSync(homeRoot)) return [];
+/** Kilo log directories under each home of each root; nothing else is collected. */
+export function listControlKiloLogDirs(
+  homeRoots: readonly string[] = defaultControlHomeRoots()
+): string[] {
   const dirs: string[] = [];
-  for (const entry of readdirSync(homeRoot, { withFileTypes: true })) {
-    if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
-    const logDir = path.join(homeRoot, entry.name, KILO_LOG_RELATIVE);
-    if (existsSync(logDir)) dirs.push(logDir);
+  for (const homeRoot of homeRoots) {
+    if (!existsSync(homeRoot)) continue;
+    for (const entry of readdirSync(homeRoot, { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
+      const logDir = path.join(homeRoot, entry.name, KILO_LOG_RELATIVE);
+      if (existsSync(logDir)) dirs.push(logDir);
+    }
   }
   return dirs;
 }
@@ -86,10 +97,14 @@ export function selectControlFileLogPaths(input: {
   return selected;
 }
 
+/**
+ * Archive entries named relative to the home root that contains each file. Home
+ * names are hashes, so two roots never produce the same relative name.
+ */
 function archiveEntries(
   files: string[],
   wrapperLogPath: string,
-  homeRoot: string
+  homeRoots: readonly string[]
 ): TarArchiveEntry[] {
   const entries: TarArchiveEntry[] = [];
   for (const filePath of files) {
@@ -97,9 +112,12 @@ function archiveEntries(
       entries.push({ directory: path.dirname(filePath), name: path.basename(filePath) });
       continue;
     }
-    const relative = path.relative(homeRoot, filePath);
-    if (relative.startsWith('..') || path.isAbsolute(relative)) continue;
-    entries.push({ directory: homeRoot, name: relative });
+    for (const homeRoot of homeRoots) {
+      const relative = path.relative(homeRoot, filePath);
+      if (relative.startsWith('..') || path.isAbsolute(relative)) continue;
+      entries.push({ directory: homeRoot, name: relative });
+      break;
+    }
   }
   return entries;
 }
@@ -140,7 +158,7 @@ export function createControlFileLogUploader(options: Options): ControlFileLogUp
   type Upload = { promise: Promise<void>; abort: AbortController };
   const upload = options.fetch ?? fetch;
   const wrapperLogPath = options.wrapperLogPath ?? DEFAULT_WRAPPER_LOG_PATH;
-  const homeRoot = options.homeRoot ?? defaultControlWorktreeHomeRoot();
+  const homeRoots = options.homeRoots ?? defaultControlHomeRoots();
   let intervalId: ReturnType<typeof setInterval> | undefined;
   let activeUpload: Upload | undefined;
   let queuedUpload: Upload | undefined;
@@ -209,10 +227,10 @@ export function createControlFileLogUploader(options: Options): ControlFileLogUp
             const files = [
               ...selectControlFileLogPaths({
                 wrapperLogPath,
-                kiloLogDirs: listControlKiloLogDirs(homeRoot),
+                kiloLogDirs: listControlKiloLogDirs(homeRoots),
               }),
             ];
-            const entries = archiveEntries(files, wrapperLogPath, homeRoot);
+            const entries = archiveEntries(files, wrapperLogPath, homeRoots);
             if (entries.length === 0) return;
             const body = await collectArchive(entries, CONTROL_LOG_MAX_ARCHIVE_BYTES);
             abort.signal.throwIfAborted();

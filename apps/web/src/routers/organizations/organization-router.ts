@@ -72,6 +72,7 @@ import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organizat
 import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import { organizationReviewAgentRouter } from '@/routers/organizations/organization-code-reviews-router';
 import { organizationCloudAgentNextRouter } from '@/routers/organizations/organization-cloud-agent-next-router';
+import { organizationVercelComputeRouter } from '@/routers/organizations/organization-vercel-compute-router';
 import { organizationSecurityAgentRouter } from '@/routers/organizations/organization-security-agent-router';
 import { organizationSecurityAuditLogRouter } from '@/routers/organizations/organization-security-audit-log-router';
 import { organizationAutoTopUpRouter } from '@/routers/organizations/organization-auto-top-up-router';
@@ -145,6 +146,7 @@ export const organizationsRouter = createTRPCRouter({
   modes: organizationModesRouter,
   reviewAgent: organizationReviewAgentRouter,
   cloudAgentNext: organizationCloudAgentNextRouter,
+  vercelCompute: organizationVercelComputeRouter,
   securityAgent: organizationSecurityAgentRouter,
   securityAuditLog: organizationSecurityAuditLogRouter,
   autoTopUp: organizationAutoTopUpRouter,

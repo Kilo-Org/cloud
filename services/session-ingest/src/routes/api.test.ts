@@ -35,6 +35,7 @@ vi.mock('../services/session-access', () => ({
 }));
 
 import { getWorkerDb } from '@kilocode/db/client';
+import { MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH } from '@kilocode/session-ingest-contracts';
 import { getSessionIngestDO } from '../dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { getUserConnectionDO } from '../dos/UserConnectionDO';
@@ -1511,6 +1512,22 @@ describe('api routes', () => {
     expect(await res.json()).toMatchObject({ success: false, error: 'Invalid paging input' });
   });
 
+  it('GET /session/:sessionId/messages returns 400 for an over-length before cursor', async () => {
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request(
+        `http://local/session/ses_12345678901234567890123456/messages?limit=50&before=${'A'.repeat(
+          MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH + 1
+        )}`,
+        { method: 'GET' }
+      ),
+      makeTestEnv()
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ success: false, error: 'Invalid before' });
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+  });
+
   it('GET /session/:sessionId/messages returns 404 when the user does not own the session', async () => {
     const { db, fns } = makeDbFakes();
     vi.mocked(getWorkerDb).mockReturnValue(db);
@@ -2096,7 +2113,8 @@ describe('api routes', () => {
     // The ingest seam (`SessionItemSchema` needs `id` + `messageID` on a part)
     // and the Durable Object's own part reader (`readPartIdentity`) both define
     // a persisted part's identity without `sessionID`
-    // (services/session-ingest/src/util/compaction.ts stores `messageID/id`). A
+    // (services/session-ingest/src/util/compaction.ts keys a part by its message
+    // id and part id). A
     // stored part that omits `sessionID` is therefore well-formed persisted
     // data; its body still fails this read contract's union (every variant
     // declares `sessionID`). It must be dropped and counted, not pushed back

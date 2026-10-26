@@ -1,3 +1,4 @@
+import { setupCommandsSchema } from './setup-script.js';
 import { z } from 'zod';
 
 export {
@@ -203,7 +204,7 @@ export const sessionAttachPayloadSchema = z
       .optional(),
     env: z.record(z.string().max(256), z.string().max(8192)).optional(),
     mcp: sessionAttachMcpServersSchema.optional(),
-    setupCommands: z.array(z.string().max(500)).max(20).optional(),
+    setupCommands: setupCommandsSchema.optional(),
     runtimeIsolation: z.enum(['per-session']).optional(),
     preparation: z
       .object({

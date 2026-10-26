@@ -21,7 +21,7 @@ const owner = { userId: 'oauth/user', orgId: 'org-id' };
 
 // Selection is enabled and Vercel is configured. Cloudflare containers are not
 // enrolled, and credential containment is on by default.
-const selectionEnv = {
+const selectionEnv = Object.assign({} as Env, {
   SANDBOX_SELECTION_IDS: 'org-id',
   VERCEL_TOKEN: 'test-token',
   VERCEL_TEAM_ID: 'team-id',
@@ -31,7 +31,7 @@ const selectionEnv = {
   VERCEL_SANDBOX_RUNTIME: 'node24',
   VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000',
   VERCEL_SANDBOX_EXTEND_DURATION_MS: '600000',
-} satisfies Partial<Env>;
+});
 const env = selectionEnv as Env;
 const enrolledEnv = { ...selectionEnv, CLOUDFLARE_CONTAINERS_ORG_IDS: 'org-id' } as Env;
 const withoutVercelEnv = { SANDBOX_SELECTION_IDS: 'org-id' } as Env;
@@ -42,6 +42,7 @@ function resolve(
     env?: Env;
     repositoryType?: 'github' | 'gitlab' | 'bitbucket';
     capability?: 'review' | 'remediation';
+    environmentAllocation?: string;
   } = {}
 ) {
   return resolveSavedSandboxAllocation({
@@ -50,6 +51,7 @@ function resolve(
     owner,
     repositoryType: args.repositoryType ?? 'github',
     ...(args.capability ? { capability: args.capability } : {}),
+    ...(args.environmentAllocation ? { environmentAllocation: args.environmentAllocation } : {}),
   });
 }
 
@@ -59,6 +61,27 @@ beforeEach(() => {
 });
 
 describe('resolveSavedSandboxAllocation', () => {
+  it('prefers the eligible environment allocation over the repository override', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      repositoryAllocation: 'cloudflare-single',
+      contextAllocation: 'cloudflare-single',
+    });
+
+    await expect(
+      resolve({ env: enrolledEnv, environmentAllocation: 'cloudflare-containers-standard-4' })
+    ).resolves.toBe('cloudflare-containers-standard-4');
+  });
+
+  it('falls back to the repository override when the environment allocation is unavailable', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      repositoryAllocation: 'cloudflare-single',
+    });
+
+    await expect(
+      resolve({ env: withoutVercelEnv, environmentAllocation: 'vercel-large' })
+    ).resolves.toBe('cloudflare-single');
+  });
+
   it('prefers the eligible repository override over the context default', async () => {
     getSandboxAllocationCandidatesMock.mockResolvedValue({
       repositoryAllocation: 'cloudflare-containers-standard-4',
@@ -94,7 +117,7 @@ describe('resolveSavedSandboxAllocation', () => {
       contextAllocation: 'vercel-small',
     });
 
-    await expect(resolve()).resolves.toBe('vercel-small');
+    await expect(resolve()).resolves.toBeUndefined();
   });
 
   it('skips a saved Vercel choice for a GitLab repository', async () => {
@@ -120,10 +143,12 @@ describe('resolveSavedSandboxAllocation', () => {
     }
   );
 
-  it('keeps a saved Vercel choice when nothing restricts it', async () => {
+  it('keeps a saved Vercel choice only for a BYOC-enrolled owner', async () => {
     getSandboxAllocationCandidatesMock.mockResolvedValue({ contextAllocation: 'vercel-small' });
 
-    await expect(resolve()).resolves.toBe('vercel-small');
+    await expect(resolve({ env: { ...env, BYOC_VERCEL_IDS: owner.orgId } as Env })).resolves.toBe(
+      'vercel-small'
+    );
   });
 
   it('returns nothing when no saved setting resolves', async () => {
@@ -186,6 +211,19 @@ describe('withSavedSandboxAllocation', () => {
     expect(first.savedSandboxAllocation).toBeNull();
     expect(second).toBe(first);
     expect(getSandboxAllocationCandidatesMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('applies the environment allocation that preflight carried', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      contextAllocation: 'cloudflare-single',
+    });
+
+    const resolved = await withSavedSandboxAllocation(
+      request({ environmentSandboxAllocation: 'cloudflare-containers-standard-4' }),
+      args
+    );
+
+    expect(requestedSandboxAllocation(resolved)).toBe('cloudflare-containers-standard-4');
   });
 
   it("keeps the client's choice and never reads settings", async () => {

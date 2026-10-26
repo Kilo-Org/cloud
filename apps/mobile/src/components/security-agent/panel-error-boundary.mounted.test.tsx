@@ -1,17 +1,15 @@
-// Panel render-crash containment: a completed analysis payload that is
-// missing a field the panel's render reads (sandboxAnalysis without
-// analysisAt) throws inside FindingAnalysisPanel — its isLoading/isError
-// guards never see it. PanelErrorBoundary must degrade that throw to the
-// local retryable error (header/tabs and the finding stay mounted in the
-// real screen; here the boundary + real panel pair is under test) instead
-// of letting it reach the app's root error boundary, which replaced the
-// whole app with the global error screen and dropped the finding.
+// Panel render-crash containment: a malformed payload can still throw in a
+// nested render path, so PanelErrorBoundary must degrade that throw to the
+// local retryable error rather than letting it reach the app's root boundary.
+// Missing `analysisAt` is a separate recoverable case: it renders the
+// not-recorded label instead of throwing.
 
 import { type ComponentProps } from 'react';
 import { PanelErrorBoundary } from './panel-error-boundary';
 import { FindingAnalysisPanel } from './finding-analysis-panel';
 import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { KvRow } from '@/components/ui/kv-row';
 import { act, TestRenderer } from '@/test/renderer';
 import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -90,13 +88,14 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
 type R = TestRenderer.ReactTestRenderer;
 
-// A payload whose shape the server never sends but a partial write can:
-// sandboxAnalysis with a real boolean isExploitable (so the panel enters the
-// terminal sandbox render branch) and `analysisAt` missing. The panel reads
-// it only inside that branch, so its loading/error guards pass and the render
-// itself throws (parseTimestamp(undefined) — verified against the real panel
-// before this fixture was written).
-function partialSandboxPayload(): Record<string, unknown> {
+function malformedSandboxPayload(): Record<string, unknown> {
+  return {
+    status: 'completed',
+    analysis: { sandboxAnalysis: { ...completeSandbox(), usageLocations: 5 } },
+  };
+}
+
+function missingAnalysisAtPayload(): Record<string, unknown> {
   const { analysisAt: _analysisAt, ...sandbox } = completeSandbox();
   return { status: 'completed', analysis: { sandboxAnalysis: sandbox } };
 }
@@ -110,6 +109,7 @@ function completeSandbox(): Record<string, unknown> {
     suggestedAction: 'open_pr',
     suggestedFix: 'fix it',
     analysisAt: '2026-06-17T11:44:59.000Z',
+    usageLocations: [],
   };
 }
 
@@ -170,8 +170,8 @@ describe('PanelErrorBoundary with the real analysis panel', () => {
     startAnalysis.mutate.mockClear();
   });
 
-  it('renders the local retryable error for a completed payload missing analysisAt', () => {
-    const tree = mountBoundary(analysisFixture(partialSandboxPayload()));
+  it('renders the local retryable error for a completed payload with invalid usageLocations', () => {
+    const tree = mountBoundary(analysisFixture(malformedSandboxPayload()));
 
     const error = tree.root.findByType(QueryError);
     expect(error.props.message).toBe('securityAgent.analysis.couldNotLoad');
@@ -179,9 +179,19 @@ describe('PanelErrorBoundary with the real analysis panel', () => {
     expect(tree.root.findAllByType(FindingAnalysisPanel)).toHaveLength(0);
     expect(tree.root.findAllByType(TabScreenScrollView)).toHaveLength(0);
   });
+  it('shows not-recorded when a completed payload has no analysisAt', () => {
+    const tree = mountBoundary(analysisFixture(missingAnalysisAtPayload()));
+    const analyzedRow = tree.root
+      .findAllByType(KvRow)
+      .find(row => row.props.label === 'securityAgent.analysis.analyzed');
+
+    expect(analyzedRow?.props.value).toBe('securityAgent.analysis.notRecorded');
+    expect(tree.root.findAllByType(FindingAnalysisPanel)).toHaveLength(1);
+    expect(events).toHaveLength(0);
+  });
 
   it('reports the panel crash through the telemetry sink with its component stack', () => {
-    mountBoundary(analysisFixture(partialSandboxPayload()));
+    mountBoundary(analysisFixture(malformedSandboxPayload()));
 
     expect(events).toHaveLength(1);
     const event = events[0];
@@ -215,7 +225,7 @@ describe('PanelErrorBoundary with the real analysis panel', () => {
     // refetch settles. While the stale crashing payload is still cached, the
     // fresh boundary instance would throw again and pin the fallback through
     // the refetch.
-    let query = analysisFixture(partialSandboxPayload());
+    let query = analysisFixture(malformedSandboxPayload());
     let refetchCount = 0;
     const onRetry = vi.fn<() => void>(() => {
       refetchCount += 1;
@@ -260,7 +270,7 @@ describe('PanelErrorBoundary with the real analysis panel', () => {
   });
 
   it('renders the Remediation tab copy through the fallbackMessage override', () => {
-    const tree = mountBoundary(analysisFixture(partialSandboxPayload()), {
+    const tree = mountBoundary(analysisFixture(malformedSandboxPayload()), {
       fallbackMessage: 'securityAgent.remediation.couldNotLoad',
     });
 

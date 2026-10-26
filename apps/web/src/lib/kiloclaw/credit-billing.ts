@@ -4,6 +4,7 @@ import { and, desc, eq, isNotNull, isNull, ne, sql } from 'drizzle-orm';
 import { addMonths, format } from 'date-fns';
 
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { reconcileCreditExpirationsInTransaction } from '@kilocode/db/credit-expiration';
 import {
   getKiloClawPlanCostMicrodollars,
   getKiloClawPricingCatalogEntry,
@@ -631,6 +632,7 @@ export async function applyStripeFundedKiloClawPeriod(
         skipPostTopUpFreeStuff: true,
         dbOrTx: tx,
         creditDescription: `KiloClaw ${plan} settlement`,
+        paidCredit: { source: 'settlement', purchasedAt: periodStart },
       }
     );
 
@@ -684,6 +686,8 @@ export async function applyStripeFundedKiloClawPeriod(
           kilo_user_id: userId,
           amount_microdollars: -amountMicrodollars,
           is_free: false,
+          paid_credit_policy: 'settlement',
+          credit_source: 'settlement',
           description: `KiloClaw ${plan} period deduction`,
           credit_category: deductionCategory,
           check_category_uniqueness: true,
@@ -711,6 +715,8 @@ export async function applyStripeFundedKiloClawPeriod(
           kilo_user_id: userId,
           amount_microdollars: -amountMicrodollars,
           is_free: false,
+          paid_credit_policy: 'settlement',
+          credit_source: 'settlement',
           description: `KiloClaw ${plan} period deduction`,
           credit_category: deductionCategory,
           check_category_uniqueness: true,
@@ -1472,7 +1478,12 @@ export async function enrollWithCredits(params: {
       effectiveThreshold !== null && projectedUsage >= effectiveThreshold
         ? await getKiloPassStateForUser(tx, userId, { forUpdate: true })
         : null;
-    const balance = user.total_microdollars_acquired - user.microdollars_used;
+    const creditState = await reconcileCreditExpirationsInTransaction(
+      { type: 'user', id: userId },
+      tx,
+      now
+    );
+    const balance = creditState.total_microdollars_acquired - creditState.microdollars_used;
     const { effectiveBalanceMicrodollars: effectiveBalance } =
       await getEffectiveCreditBalancePreview({
         userId,

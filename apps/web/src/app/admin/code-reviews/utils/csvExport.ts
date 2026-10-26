@@ -53,7 +53,6 @@ function escapeCsvValue(value: string | number | null | undefined): string {
     str = `'${str}`; // Prefix with single quote to treat as text
   }
 
-  // Standard CSV escaping
   if (str.includes(',') || str.includes('"') || /[\r\n]/.test(str)) {
     return `"${str.replace(/"/g, '""')}"`;
   }

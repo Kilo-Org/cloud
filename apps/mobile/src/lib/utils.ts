@@ -40,6 +40,9 @@ const RELATIVE_TIME_UNITS: readonly { unit: Intl.RelativeTimeFormatUnit; seconds
  * (conversation list, 2026-09-16). Callers that pass `nowMs` own the tick.
  */
 function timeAgo(date: Date, locale?: string, nowMs: number = Date.now()): string {
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
   const seconds = Math.floor((nowMs - date.getTime()) / 1000);
   const magnitude = Math.abs(seconds);
   if (magnitude < 60) {

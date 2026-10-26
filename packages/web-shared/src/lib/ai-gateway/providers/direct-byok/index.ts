@@ -147,10 +147,20 @@ export async function getDirectByokModelsForUser(userId: string) {
   return byokProviderIds.length === 0 ? [] : await getDirectByokModels(byokProviderIds);
 }
 
-export function createAiSdkProvider(directByokProvider: DirectByokProvider, apiKey: string) {
+/** An AI SDK provider for calling `modelId` with a stored credential, such as for key tests. */
+export async function createAiSdkProvider(
+  directByokProvider: DirectByokProvider,
+  credential: string,
+  modelId: string
+) {
+  const upstream = await directByokProvider.resolveUpstream({
+    credential,
+    model: { id: modelId },
+    stream: false,
+  });
   return createOpenAICompatible({
-    baseURL: directByokProvider.base_url,
-    apiKey,
+    baseURL: upstream.apiUrl,
+    apiKey: upstream.apiKey,
     name: 'openaiCompatible',
     headers:
       directByokProvider.id === 'opencode-go' ? { 'x-opencode-session': randomUUID() } : undefined,

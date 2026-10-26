@@ -50,25 +50,36 @@ export type DirectByokProvider = {
   id: DirectByokProviderMetaId;
   /** models.dev provider key; omitted for providers models.dev does not list. */
   models_dev_id?: string;
-  base_url: string;
-  base_url_overrides: ProviderApiUrlOverrides;
   models: () => Promise<ReadonlyArray<DirectByokModel>>;
-  supported_chat_apis: ReadonlyArray<GatewayChatApiKind>;
-  reasoning_details_transform: ProviderResponseTransforms | null;
   transformRequest(context: TransformRequestContext): void;
   /** Omitted when the general provider list already has a corresponding provider. */
   provider_listing?: DirectByokProviderListing;
   /**
-   * Builds the upstream from the stored credential, for providers whose URL or
-   * authentication depends on it, such as cloud regions or signed requests.
-   * Throws when the credential is unusable. When set, it replaces `base_url`,
-   * `base_url_overrides`, `supported_chat_apis` and `reasoning_details_transform`
-   * for requests.
+   * Builds the upstream for a request from the stored credential. Most providers
+   * use `apiKeyUpstream`; cloud providers can derive regions or signed requests.
    */
-  resolveUpstream?(input: DirectByokResolveUpstreamInput): Promise<DirectByokUpstream>;
+  resolveUpstream(input: DirectByokResolveUpstreamInput): Promise<DirectByokUpstream>;
   /** The chat API a model must be called with, for providers where it varies per model. */
   getModelChatApi?(model: DirectByokModel): GatewayChatApiKind;
 };
+
+/** The upstream of a provider that takes the stored credential as a bearer API key. */
+export function apiKeyUpstream(upstream: {
+  apiUrl: string;
+  apiUrlOverrides?: ProviderApiUrlOverrides;
+  supportedChatApis: ReadonlyArray<GatewayChatApiKind>;
+  responseTransforms: ProviderResponseTransforms | null;
+}): DirectByokProvider['resolveUpstream'] {
+  return async ({ credential }) => ({
+    apiUrl: upstream.apiUrl,
+    apiUrlOverrides: upstream.apiUrlOverrides ?? {},
+    disableUrlSuffix: false,
+    apiKey: credential,
+    apiKeyHeader: null,
+    supportedChatApis: upstream.supportedChatApis,
+    responseTransforms: upstream.responseTransforms,
+  });
+}
 
 export function faviconIcon(siteUrl: string): DirectByokProviderListing['icon'] {
   return {

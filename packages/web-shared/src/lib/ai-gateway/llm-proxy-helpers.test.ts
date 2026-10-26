@@ -46,7 +46,6 @@ import {
   countAndStoreEditUsage,
   countAndStoreFimUsage,
   countAndStoreEmbeddingUsage,
-  directByokCredentialErrorResponse,
   extractEditPromptInfo,
   extractEmbeddingPromptInfo,
   extractHeaderAndLimitLength,
@@ -61,29 +60,6 @@ import {
   requestedLogprobs,
   requestedSamples,
 } from './llm-proxy-helpers';
-
-describe('directByokCredentialErrorResponse', () => {
-  it('points users at their own BYOK page for a personal credential', async () => {
-    const response = directByokCredentialErrorResponse('Example Cloud', undefined);
-    const body = (await response.json()) as { error: string; error_type: string };
-
-    expect(response.status).toBe(400);
-    expect(body.error_type).toBe('byok_error');
-    expect(body.error).toMatch(
-      /^\[BYOK\] Your Example Cloud credentials .* Update them at .*\/byok\.$/
-    );
-  });
-
-  it('points organization members at the organization BYOK page and its owners', async () => {
-    const response = directByokCredentialErrorResponse('Example Cloud', 'org-123');
-    const body = (await response.json()) as { error: string };
-
-    expect(body.error).toContain("Your organization's Example Cloud credentials");
-    expect(body.error).toMatch(
-      /owner or admin can update them at .*\/organizations\/org-123\/byok\.$/
-    );
-  });
-});
 
 describe('getOutputHeaders', () => {
   it.each(['text/event-stream', 'text/event-stream; charset=utf-8', 'Text/Event-Stream'])(

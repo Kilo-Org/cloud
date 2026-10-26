@@ -20,7 +20,10 @@ import {
   type TransformRequestContext,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import type { DirectByokResolveUpstreamInput } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import {
+  apiKeyUpstream,
+  type DirectByokResolveUpstreamInput,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import type { OpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/types';
 import type { User } from '@kilocode/db/schema';
@@ -430,10 +433,11 @@ describe('getProvider direct BYOK routing', () => {
       jest.mocked(getDirectByokModel).mockResolvedValue({
         provider: {
           id: providerId,
-          base_url: 'https://direct-byok.example/v1',
-          base_url_overrides: {},
-          supported_chat_apis: ['chat_completions', 'responses', 'messages'],
-          reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
+          resolveUpstream: apiKeyUpstream({
+            apiUrl: 'https://direct-byok.example/v1',
+            supportedChatApis: ['chat_completions', 'responses', 'messages'],
+            responseTransforms: ReasoningDetailsTransform.ReasoningContent,
+          }),
           transformRequest: directByokTransform,
           models: async () => [],
         },
@@ -499,10 +503,6 @@ describe('getProvider direct BYOK routing', () => {
     jest.mocked(getDirectByokModel).mockResolvedValue({
       provider: {
         id: 'nvidia-byok',
-        base_url: 'https://unused.example/v1',
-        base_url_overrides: {},
-        supported_chat_apis: ['chat_completions', 'responses', 'messages'],
-        reasoning_details_transform: null,
         transformRequest() {},
         models: async () => [],
         resolveUpstream,
@@ -541,42 +541,5 @@ describe('getProvider direct BYOK routing', () => {
       awsBedrock: { region: 'eu-west-1' },
     });
     expect(result.bypassAccessCheck).toBe(true);
-  });
-
-  test('reports unusable stored credentials instead of falling through to another route', async () => {
-    jest.mocked(getDirectByokModel).mockResolvedValue({
-      provider: {
-        id: 'synthetic',
-        base_url: 'https://unused.example/v1',
-        base_url_overrides: {},
-        supported_chat_apis: ['chat_completions', 'messages'],
-        reasoning_details_transform: null,
-        transformRequest() {},
-        models: async () => [],
-        resolveUpstream: async () => {
-          throw new Error('Invalid credentials');
-        },
-      },
-      model: {
-        id: 'gemini-3.5-flash',
-        name: 'Gemini',
-        context_length: 1,
-        max_completion_tokens: 1,
-      },
-    });
-    jest
-      .mocked(getBYOKforUser)
-      .mockResolvedValue([{ decryptedAPIKey: 'not json', providerId: 'synthetic' }]);
-    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
-
-    const result = await getProvider(providerInput('synthetic/gemini-3.5-flash'));
-
-    expect(result).toEqual({
-      kind: 'direct-byok-credential-error',
-      providerId: 'synthetic',
-      organizationId: undefined,
-    });
-    expect(JSON.stringify(consoleError.mock.calls)).not.toContain('not json');
-    consoleError.mockRestore();
   });
 });

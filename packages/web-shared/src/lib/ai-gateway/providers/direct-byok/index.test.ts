@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { generateText } from 'ai';
 import { COMPATIBLE_USER_AGENT, type DirectByokModel, type DirectByokProvider } from './types';
+import type * as DirectByokTypes from './types';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   readDb: {},
@@ -30,8 +31,11 @@ jest.mock('./direct-byok-definitions', () => ({
   default: [
     {
       id: 'chutes-byok',
-      base_url: 'https://chutes.example.com/v1',
-      base_url_overrides: {},
+      resolveUpstream: jest.requireActual<typeof DirectByokTypes>('./types').apiKeyUpstream({
+        apiUrl: 'https://chutes.example.com/v1',
+        supportedChatApis: ['chat_completions'],
+        responseTransforms: 'reasoning-content',
+      }),
       models: jest.fn(async () => [
         {
           id: 'supported-model',
@@ -49,14 +53,15 @@ jest.mock('./direct-byok-definitions', () => ({
           max_completion_tokens: 1024,
         },
       ]),
-      supported_chat_apis: ['chat_completions'],
-      reasoning_details_transform: 'reasoning-content',
       transformRequest: jest.fn(),
     },
     {
       id: 'orcarouter',
-      base_url: 'https://orcarouter.example.com/v1',
-      base_url_overrides: {},
+      resolveUpstream: jest.requireActual<typeof DirectByokTypes>('./types').apiKeyUpstream({
+        apiUrl: 'https://orcarouter.example.com/v1',
+        supportedChatApis: ['chat_completions'],
+        responseTransforms: 'reasoning-content',
+      }),
       models: jest.fn(async () => [
         {
           id: 'other-model',
@@ -65,8 +70,6 @@ jest.mock('./direct-byok-definitions', () => ({
           max_completion_tokens: 1024,
         },
       ]),
-      supported_chat_apis: ['chat_completions'],
-      reasoning_details_transform: 'reasoning-content',
       transformRequest: jest.fn(),
     },
   ],
@@ -99,11 +102,11 @@ describe('createAiSdkProvider session headers', () => {
     const fetchMock = mockCompletions().mockResolvedValueOnce(
       new Response('Temporary failure', { status: 500 })
     );
-    const firstProbe = createAiSdkProvider(provider, 'test-key');
+    const firstProbe = await createAiSdkProvider(provider, 'test-key', 'test-model');
 
     await generateText({ model: firstProbe('test-model'), prompt: 'Say hi', maxRetries: 1 });
     await generateText({
-      model: createAiSdkProvider(provider, 'test-key')('test-model'),
+      model: (await createAiSdkProvider(provider, 'test-key', 'test-model'))('test-model'),
       prompt: 'Say hi',
       maxRetries: 0,
     });
@@ -127,7 +130,9 @@ describe('createAiSdkProvider session headers', () => {
     const fetchMock = mockCompletions();
 
     await generateText({
-      model: createAiSdkProvider(directByokProviders[0], 'test-key')('test-model'),
+      model: (await createAiSdkProvider(directByokProviders[0], 'test-key', 'test-model'))(
+        'test-model'
+      ),
       prompt: 'Say hi',
       maxRetries: 0,
     });

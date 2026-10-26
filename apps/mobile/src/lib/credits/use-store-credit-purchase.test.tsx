@@ -66,6 +66,7 @@ function createPurchase(overrides: Partial<Purchase> = {}): Purchase {
     purchaseToken: 'signed-jws',
     quantity: 1,
     store: 'apple',
+    storeId: 'apple',
     transactionDate: Date.now(),
     transactionId: 'tx-1',
     ...overrides,
@@ -217,6 +218,7 @@ describe('createStoreCreditPurchaseActions completion', () => {
   it('completes an Android purchase with productId and purchaseToken', async () => {
     const purchase = createPurchase({
       store: 'google',
+      storeId: 'play',
       productId: GOOGLE_PRODUCT_ID,
       purchaseToken: 'play-token',
     });
@@ -243,6 +245,7 @@ describe('createStoreCreditPurchaseActions completion', () => {
     // reach the backend, finish the transaction, announce, or report a failure.
     const pending = createPurchase({
       store: 'google',
+      storeId: 'play',
       productId: GOOGLE_PRODUCT_ID,
       purchaseToken: 'play-token',
       purchaseState: 'pending',
@@ -303,6 +306,7 @@ describe('createStoreCreditPurchaseActions completion', () => {
     // failure and never remembered.
     const purchase = createPurchase({
       store: 'google',
+      storeId: 'play',
       productId: GOOGLE_PRODUCT_ID,
       purchaseToken: 'play-token',
     });
@@ -737,7 +741,7 @@ describe('getStoreCreditPurchaseErrorMessageKey', () => {
     });
 
     await actions.handlePurchaseSuccess(
-      createPurchase({ store: 'google', productId: GOOGLE_PRODUCT_ID })
+      createPurchase({ store: 'google', storeId: 'play', productId: GOOGLE_PRODUCT_ID })
     );
 
     expect(showError).toHaveBeenCalledWith(CREDIT_PURCHASE_OWNED_BY_ANOTHER_ACCOUNT_PLAY_KEY);

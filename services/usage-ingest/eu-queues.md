@@ -1,6 +1,7 @@
 # Staging EU queues
 
-`wrangler.jsonc` declares the EU source/DLQ names and one consumer at cap200/batch1.
+`wrangler.jsonc` declares the EU source/DLQ names and one consumer at cap200/batch2
+with processing parallelism2 (at most 400 concurrent writer calls).
 The preparation step explicitly supplies `jurisdiction: "eu"` for both queues.
 
 Normal staging deployment has one preparation step before the existing relay and

@@ -33,7 +33,7 @@ Unrelated paths return 404; other methods on `/usage` return 405.
 | Production (top-level config) | `usage-ingest` | `usage-ingest-processing` | `usage-ingest-processing-dlq` |
 | Staging (`env.staging`) | `usage-ingest-staging` | `usage-ingest-processing-staging-eu` | `usage-ingest-processing-dlq-staging-eu` |
 
-Staging connects only this EU pair and one consumer capped at200, batch size1.
+Staging connects only this EU pair and one consumer capped at 200, batch size 2.
 The old global pair remains disconnected. See the [one-time EU setup](eu-queues.md).
 
 ## Processing mode
@@ -41,9 +41,15 @@ The old global pair remains disconnected. See the [one-time EU setup](eu-queues.
 Production commits `USAGE_INGEST_MODE=receipt`; staging commits `processing` with
 `https://staging-app.kilo.ai/api/internal/usage/record` as its Frankfurt writer URL.
 An absent mode also uses receipt behavior. Processing validates and writes events
-sequentially within each consumer invocation, preserving the supplied usage ID
-and validated fields. Concurrent invocations are capped by each environment's
-`max_concurrency` setting in the queue policy below.
+through a bounded number of slots per consumer invocation, preserving the supplied usage ID and validated fields.
+`USAGE_INGEST_PARALLELISM=2` opts into two concurrent writes; absent, `1`, or
+unrecognized values use one. Staging opts into two, production retains receipt
+mode. Every slot is awaited before the invocation returns or rejects. Each
+validated recorded/duplicate response ACKs only its own message; unavailable or
+invalid events retry individually. Unexpected processing exceptions retry that
+message, continue later messages, and reject only after all slots settle.
+Successful dispositions survive another message's failure. Receipt behavior is
+unchanged. Concurrent invocations are capped by each queue's `max_concurrency`.
 
 Processing uses `@kilocode/worker-utils/usage-writer-client` for the existing
 Frankfurt `/api/internal/usage/record` endpoint. Only a matching `recorded` or
@@ -88,6 +94,7 @@ settings, comparable aggregates and read-only database snapshots.
 
 | Processing configuration | Value |
 |---|---|
+| `USAGE_INGEST_PARALLELISM` | `2` for two processing slots; all other or absent values use one |
 | `USAGE_WRITER_URL` | Full Frankfurt writer URL ending in `/api/internal/usage/record` |
 | `USAGE_WRITER_SECRET` | Writer's existing `INTERNAL_API_SECRET`, sent as `x-internal-api-key` |
 | `USAGE_WRITER_PROTECTION_BYPASS` | Optional Vercel automation bypass secret |
@@ -175,16 +182,60 @@ reconcile against persisted usage rows when exact completeness matters.
 
 ## Queue policy
 
-Both environments use the following consumer settings:
+The current single staging source queue uses batch size 2 and at most two writer
+calls per invocation. Production retains its original receipt policy:
 
 | Consumer setting | Value | Purpose |
 |---|---|---|
-| `max_batch_size` | `1` | One message per invocation. |
+| `max_batch_size` | Production: `1`; staging: `2` | Maximum messages delivered per invocation. |
 | `max_batch_timeout` | `0` seconds | No intentional wait to fill a batch. |
-| `max_concurrency` | Production: `1`; staging: `200` | Cap active consumer invocations per source queue; staging uses a larger cap for load testing. |
+| `max_concurrency` | Production: `1`; staging: `200` | With parallelism 2, staging allows at most `200 × 2 = 400` concurrent writer calls. |
 | `max_retries` | `3` | Initial delivery plus up to three retries. |
 | `retry_delay` | `60` seconds | Space failed deliveries by one minute rather than retrying immediately. |
 | `dead_letter_queue` | Environment-specific name above | Retain exhausted failures separately from the source queue. |
+
+### Experiment control and verification
+
+Staging uses the single EU queue `usage-ingest-processing-staging-eu`
+and its EU DLQ `usage-ingest-processing-dlq-staging-eu`. It allows at most 400 concurrent writer calls with batch 2,
+parallelism 2 and invocation cap 200. Production remains receipt-only at cap 1.
+
+`USAGE_INGEST_PARALLELISM` is the simple serial/parallel experiment control:
+
+| Staging setting | Processing per invocation | Maximum writer calls at cap 200 |
+|---|---|---|
+| `2` (committed) | Up to two messages concurrently | `400` |
+| `1` (or absent/unrecognized) | One message at a time | `200` |
+
+Set the Worker variable to `1` in staging deployment configuration to compare
+serial processing. This **does not restore batch size 1**: each delivered batch
+can still contain two messages, now processed serially. Batch size and invocation
+cap are separate Wrangler deployment settings. Changes to either the Worker
+variable or the batch/cap configuration require a Worker redeploy to apply;
+this is not a live per-request switch. No additional experiment framework or
+request-controlled switch is introduced.
+
+With timeout zero, actual batches may still contain one message. Two-message
+parallel processing is a scheduling hypothesis; local tests do not establish
+batch fill or delivery-tail improvement. The 400-writer setting is a doubled
+upper bound versus the prior batch-1/cap-200 configuration, not a guarantee of
+throughput. Compare measured batch sizes, handler entry times, full writer-call
+duration, accounting age, backlog/retries/DLQ and writer/DB pressure before
+attributing any hosted latency effect.
+
+The first test sequence is diagnostics → EU → batching. Diagnostics and EU are
+already on main; staging-host middleware remains deferred. This refresh preserves
+the sole selected EU source/DLQ, its preparation and routing rollback behavior,
+both diagnostics and parallelism variables, and the relay. Keep one consumer at
+cap 200 / batch 2 / parallelism 2 (at most 400 writer calls); do not reconnect a
+legacy consumer or split the cap. The queue-budget and relay runtime tests pin
+the actual EU queue names and policy. Verify the refreshed source and those
+checks before merge. Historical four-PR compatibility results do not validate
+this first-test source, which keeps middleware unchanged.
+
+For a full configuration rollback, restore absent parallelism (or `1`), batch 1,
+timeout 0 and cap 200 for the same single queue. Preserve diagnostics, the current
+writer, relay, retry delay/budget and per-message dispositions.
 
 ## Deploy
 
@@ -266,8 +317,8 @@ in both environments.
 The existing `staging` configuration sends queued writes through a private
 service binding's **fetch** method to `usage-writer-relay-staging`. The relay's
 fetch handler forwards to the same staging Vercel writer with a placement hint
-of `aws:eu-central-1`. Production keeps direct writes. The writer, middleware,
-database and queue policy stay unchanged.
+of `aws:eu-central-1`. Production keeps direct writes. The writer, middleware and
+database stay unchanged.
 
 This is an outbound-request placement experiment. [Placement's shared limitations](https://developers.cloudflare.com/workers/configuration/placement/#review-limitations-1)
 apply to fetch handlers and do not pin the queue consumer. The hint selects a

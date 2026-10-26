@@ -26,7 +26,7 @@ it('keeps production direct and routes the single staging EU consumer through th
   expect(staging.queues.consumers).toMatchObject([
     {
       queue: 'usage-ingest-processing-staging-eu',
-      max_batch_size: 1,
+      max_batch_size: 2,
       max_batch_timeout: 0,
       max_retries: 3,
       retry_delay: 60,

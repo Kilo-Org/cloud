@@ -35,6 +35,7 @@
       "vars": {
         "USAGE_INGEST_MODE": "processing",
         "USAGE_INGEST_DIAGNOSTICS": "all",
+        "USAGE_INGEST_PARALLELISM": "2",
         "USAGE_WRITER_URL": "https://staging-app.kilo.ai/api/internal/usage/record",
       },
       "services": [{ "binding": "USAGE_WRITER_RELAY", "service": "usage-writer-relay-staging" }],
@@ -46,7 +47,7 @@
         "consumers": [
           {
             "queue": "usage-ingest-processing-staging-eu",
-            "max_batch_size": 1,
+            "max_batch_size": 2,
             "max_batch_timeout": 0,
             "max_retries": 3,
             "retry_delay": 60,

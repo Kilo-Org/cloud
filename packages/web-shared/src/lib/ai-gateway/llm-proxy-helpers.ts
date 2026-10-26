@@ -22,7 +22,6 @@ import type {
   GatewayRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
-import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { normalizeProjectId } from '@kilocode/web-shared/lib/normalizeProjectId';
 import { getXKiloCodeVersionNumber } from '@kilocode/web-shared/lib/userAgent';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
@@ -36,6 +35,7 @@ import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
   PromptInfo,
+  VercelProviderMetaData,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { detectContextOverflow } from '@kilocode/web-shared/lib/ai-gateway/context-overflow';
 import {
@@ -48,6 +48,8 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
   computeOpenRouterCostFields,
+  computeVercelCostMicrodollars,
+  extractVercelIsByok,
   providerReportsIsByok,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
@@ -1310,10 +1312,15 @@ export function countAndStoreEditUsage(
 // Embedding-Specific Code
 // ============================================================================
 
+// OpenRouter adds `cost`, `is_byok` and `cost_details` to the usage object.
+// Vercel AI Gateway reports only tokens there and puts the cost in
+// `providerMetadata.gateway`.
 type EmbeddingUsage = {
   prompt_tokens: number;
   total_tokens: number;
   cost?: number;
+  is_byok?: boolean | null;
+  cost_details?: { upstream_inference_cost: number };
 };
 
 // Upstream error bodies (`{ error: {...} }`) carry neither model nor usage.
@@ -1322,6 +1329,7 @@ type EmbeddingResponse = {
   object?: 'list';
   model?: string;
   usage?: EmbeddingUsage;
+  providerMetadata?: VercelProviderMetaData;
 };
 
 type TranscriptionUsage = {
@@ -1355,7 +1363,8 @@ function parseEmbeddingResponse(responseText: string, statusCode: number): Embed
 
 export function parseEmbeddingUsageFromResponse(
   responseText: string,
-  statusCode: number
+  statusCode: number,
+  provider: ProviderId
 ): MicrodollarUsageStats {
   const json = parseEmbeddingResponse(responseText, statusCode);
   const usage = json.usage;
@@ -1369,21 +1378,12 @@ export function parseEmbeddingUsageFromResponse(
     });
   }
 
-  // Upstream providers (OpenRouter, Vercel) include cost in USD → convert to microdollars.
-  const cost_mUsd = usage?.cost != null ? toMicrodollars(usage.cost) : 0;
-
-  return {
+  const base = {
     messageId: json.id ?? null,
     model: json.model ?? null,
     responseContent: '',
     hasError,
     inference_provider: null,
-    inputTokens: usage?.prompt_tokens ?? 0,
-    outputTokens: 0,
-    cacheHitTokens: 0,
-    cacheWriteTokens: 0,
-    cost_mUsd,
-    is_byok: null,
     upstream_id: null,
     finish_reason: null,
     latency: null,
@@ -1392,6 +1392,33 @@ export function parseEmbeddingUsageFromResponse(
     streamed: false,
     cancelled: false,
     status_code: statusCode,
+  };
+  // With BYOK, OpenRouter's `cost` is only its 5% fee; the shared OpenRouter
+  // cost logic bills `cost_details.upstream_inference_cost` instead.
+  const vercelGateway = json.providerMetadata?.gateway;
+  const cost =
+    usage?.cost != null || usage?.is_byok != null
+      ? computeOpenRouterCostFields(
+          usage,
+          base,
+          'embedding_usage_processing',
+          providerReportsIsByok(provider)
+        )
+      : vercelGateway
+        ? {
+            cost_mUsd: computeVercelCostMicrodollars(vercelGateway),
+            is_byok: extractVercelIsByok(vercelGateway),
+          }
+        : { cost_mUsd: 0, is_byok: null };
+
+  return {
+    ...base,
+    inputTokens: usage?.prompt_tokens ?? 0,
+    outputTokens: 0,
+    cacheHitTokens: 0,
+    cacheWriteTokens: 0,
+    cost_mUsd: cost.cost_mUsd,
+    is_byok: cost.is_byok,
   };
 }
 
@@ -1472,7 +1499,7 @@ export function countAndStoreEmbeddingUsage(
     ? Promise.resolve(null)
     : clonedResponse
         .text()
-        .then(text => parseEmbeddingUsageFromResponse(text, statusCode))
+        .then(text => parseEmbeddingUsageFromResponse(text, statusCode, usageContext.provider))
         .catch(() => null);
 
   after(

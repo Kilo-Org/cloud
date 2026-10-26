@@ -3884,6 +3884,7 @@
     "title": "Próifílí",
     "entrySubtitle": "Athúsáid socruithe timpeallachta ar fud na seisiún",
     "newProfile": "Próifíl nua",
+    "openHint": "Osclaíonn sé an phróifíl",
     "emptyTitle": "Níl próifílí ann fós",
     "emptyDescription": "Cruthaigh próifíl chun athróga timpeallachta, orduithe socraithe, agus scileanna a athúsáid thar seisiúin.",
     "loadFailed": "Níorbh fhéidir próifílí a lódáil",
@@ -4136,11 +4137,13 @@
       "namePlaceholder": "Fabhtanna, Smaointe, Eisiúintí…",
       "emoji": "Emoji",
       "mode": "Mód",
-      "defaultsHint": "Úsáideann seisiúin a thosaítear ón liosta seo na réamhshocruithe seo."
+      "defaultsHint": "Úsáideann seisiúin a thosaítear ón liosta seo na réamhshocruithe seo.",
+      "saveFailed": "Níorbh fhéidir an liosta a shábháil. Seiceáil do cheangal agus bain triail eile as."
     },
     "list": {
       "addPlaceholder": "Cuir tasc leis",
       "add": "Cuir leis",
+      "addFailed": "Níorbh fhéidir an tasc a chur leis. Seiceáil do cheangal agus bain triail eile as.",
       "empty": "Níl aon tasc ann fós",
       "setDefaults": "Socraigh stór, mód agus samhail",
       "completed_one": "Críochnaithe ({{count}})",
@@ -4183,7 +4186,8 @@
       "startNewSession": "Tosaigh seisiún nua",
       "startNewSessionHint": "Brúigh go fada chun seisiún nua a thosú.",
       "linkSession": "Nasc seisiún",
-      "linkFailed": "Níorbh fhéidir an seisiún a nascadh leis an tasc"
+      "linkFailed": "Níorbh fhéidir an seisiún a nascadh leis an tasc",
+      "startRefreshFailed": "Thosaigh an seisiún, ach níor nuashonraíodh an liosta seo."
     },
     "linkSession": {
       "title": "Nasc le seisiún",

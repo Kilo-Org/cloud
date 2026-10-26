@@ -652,6 +652,70 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       });
     });
 
+    test('maps a message reasoning string to reasoning_details', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        choices: [
+          {
+            index: 0,
+            message: { role: 'assistant', content: 'answer', reasoning: 'full thought' },
+            finish_reason: 'stop',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: ReasoningDetailsTransform.Reasoning,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message).toEqual({
+        role: 'assistant',
+        content: 'answer',
+        reasoning_details: [
+          { type: 'reasoning.text', text: 'full thought', index: 0, format: 'unknown' },
+        ],
+      });
+    });
+
+    test('leaves an OpenRouter reasoning string next to reasoning_details alone', async () => {
+      const upstream = jsonResponse({
+        model: 'upstream-model',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: 'answer',
+              reasoning: 'full thought',
+              reasoning_details: [{ type: 'reasoning.text', text: 'full thought', index: 0 }],
+            },
+            finish_reason: 'stop',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: ReasoningDetailsTransform.Reasoning,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message.reasoning).toBe('full thought');
+      expect(json.choices[0].message.reasoning_details).toEqual([
+        { type: 'reasoning.text', text: 'full thought', index: 0 },
+      ]);
+    });
+
     test('leaves reasoning_content alone when reasoning_details are already present', async () => {
       const upstream = jsonResponse({
         model: 'upstream-model',
@@ -1066,6 +1130,33 @@ describe('rewriteModelResponse_ChatCompletions', () => {
           { type: 'reasoning.text', text: 'thought', index: 0, format: 'unknown' },
         ],
       });
+      expect(chunk.choices[2].delta).toEqual({ content: 'answer' });
+    });
+
+    test('maps a delta reasoning string to reasoning_details', async () => {
+      const upstream = sseResponse(
+        'data: {"model":"upstream-model","choices":[{"index":0,"delta":{"reasoning":"first "}},{"index":0,"delta":{"reasoning_content":"untouched"}},{"index":0,"delta":{"content":"answer"}}]}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        removeCost: true,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: ReasoningDetailsTransform.Reasoning,
+      });
+      const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
+        choices: Array<{ delta: Record<string, unknown> }>;
+      }>;
+
+      expect(chunk.choices[0].delta).toEqual({
+        reasoning_details: [
+          { type: 'reasoning.text', text: 'first ', index: 0, format: 'unknown' },
+        ],
+      });
+      expect(chunk.choices[1].delta).toEqual({ reasoning_content: 'untouched' });
       expect(chunk.choices[2].delta).toEqual({ content: 'answer' });
     });
 

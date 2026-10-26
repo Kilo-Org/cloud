@@ -66,6 +66,55 @@ describe('readClientDimensions', () => {
       requestId: 'req-123',
     });
   });
+
+  test('records an unrecognized client or platform as other', () => {
+    expect(
+      readClientDimensions(
+        new Headers({
+          'x-kilo-client': 'mobile-handheld',
+          'x-kilo-app-platform': 'windows',
+        })
+      )
+    ).toEqual({
+      client: 'other',
+      platform: 'other',
+      version: null,
+      requestId: null,
+    });
+  });
+
+  test('treats an empty client or platform header as absent', () => {
+    expect(
+      readClientDimensions(new Headers({ 'x-kilo-client': '', 'x-kilo-app-platform': '' }))
+    ).toMatchObject({ client: null, platform: null });
+  });
+
+  test('drops a version that is malformed, empty or too long', () => {
+    for (const version of ['1.2.3-beta', 'not-a-version', '', '1'.repeat(33)]) {
+      expect(
+        readClientDimensions(new Headers({ ...MOBILE_HEADERS, 'x-kilo-app-version': version }))
+          .version
+      ).toBeNull();
+    }
+    expect(
+      readClientDimensions(new Headers({ ...MOBILE_HEADERS, 'x-kilo-app-version': '1.2.3' }))
+        .version
+    ).toBe('1.2.3');
+  });
+
+  test('drops a request id outside the allowed charset or length', () => {
+    for (const requestId of ['req 123', 'req/123', 'a'.repeat(65)]) {
+      expect(
+        readClientDimensions(new Headers({ ...MOBILE_HEADERS, 'x-kilo-request-id': requestId }))
+          .requestId
+      ).toBeNull();
+    }
+    expect(
+      readClientDimensions(
+        new Headers({ ...MOBILE_HEADERS, 'x-kilo-request-id': '2f1c0d3e-4a5b-6789:00.11_a' })
+      ).requestId
+    ).toBe('2f1c0d3e-4a5b-6789:00.11_a');
+  });
 });
 
 describe('isMobileDimensions', () => {
@@ -100,6 +149,13 @@ describe('shouldLogTiming', () => {
     expect(shouldLogTiming({ client: 'extension' })).toBe(true);
     random.mockReturnValue(0.5);
     expect(shouldLogTiming({ client: 'extension' })).toBe(false);
+  });
+
+  test('applies the base rate to an unrecognized client value', () => {
+    process.env.TRPC_TIMING_SAMPLE_RATE = '0';
+    expect(shouldLogTiming({ client: 'mobile2' })).toBe(false);
+    expect(shouldLogTiming({ client: 'MOBILE' })).toBe(false);
+    expect(shouldLogTiming({ client: 'other' })).toBe(false);
   });
 });
 
@@ -181,6 +237,30 @@ describe('withRestTiming', () => {
     });
     expect(line.durationMs).toEqual(expect.any(Number));
     expect(line).not.toHaveProperty('userId');
+  });
+
+  test('records an unrecognized client, platform and shape as other or null', async () => {
+    const handler = jest.fn(async () => new Response('ok', { status: 200 }));
+    const wrapped = withRestTiming('/api/openrouter/[...path]', handler);
+    const request = new Request('https://app.kilo.ai/api/openrouter/chat/completions', {
+      method: 'POST',
+      headers: {
+        'x-kilo-client': 'mobile-handheld',
+        'x-kilo-app-platform': 'executor',
+        'x-kilo-app-version': 'v1.2.3',
+        'x-kilo-request-id': 'r'.repeat(300),
+      },
+    });
+
+    await wrapped(request, undefined);
+
+    expect(logSpy).toHaveBeenCalledTimes(1);
+    expect(parseLines(logSpy)[0]).toMatchObject({
+      client: 'other',
+      platform: 'other',
+      version: null,
+      requestId: null,
+    });
   });
 
   test('logs and re-throws when the handler throws', async () => {
@@ -315,5 +395,18 @@ describe('withRestTiming sampling policy', () => {
       expect.objectContaining({ type: 'api_timing', client: 'extension' }),
       expect.objectContaining({ type: 'api_timing', client: null }),
     ]);
+  });
+
+  test('at rate 0, an unrecognized client value is not logged', async () => {
+    process.env.TRPC_TIMING_SAMPLE_RATE = '0';
+    const wrapped = withRestTiming(
+      '/api/gateway/[...path]',
+      jest.fn(async () => new Response('ok', { status: 200 }))
+    );
+
+    await wrapped(gatewayRequest({ 'x-kilo-client': 'mobile-app' }), undefined);
+    await wrapped(gatewayRequest({ 'x-kilo-client': 'MOBILE' }), undefined);
+
+    expect(logSpy).not.toHaveBeenCalled();
   });
 });

@@ -38,7 +38,6 @@
         "USAGE_INGEST_PARALLELISM": "2",
         "USAGE_WRITER_URL": "https://staging-app.kilo.ai/api/internal/usage/record",
       },
-      "services": [{ "binding": "USAGE_WRITER_RELAY", "service": "usage-writer-relay-staging" }],
       "queues": {
         "producers": [
           { "binding": "USAGE_INGEST_QUEUE", "queue": "usage-ingest-processing-staging-eu" },

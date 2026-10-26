@@ -3746,6 +3746,7 @@
     "title": "mombamomba",
     "entrySubtitle": "Ampiasao indray ny firafitry ny tontolo iainana mandritra ny fotoam-pivoriana",
     "newProfile": "Profil vaovao",
+    "openHint": "Manokatra ny mombamomba",
     "emptyTitle": "Tsy mbola misy mombamomba",
     "emptyDescription": "Mamorona mombamomba hampiasaina indray ny fari-piainan'ny tontolo iainana, baiko fanamboarana ary fahaiza-manao mandritra ny fotoam-pivoriana.",
     "loadFailed": "Tsy afaka mampiditra ny mombamomba",
@@ -3977,11 +3978,13 @@
       "namePlaceholder": "Olana, Hevitra, Fanontana…",
       "emoji": "Sary",
       "mode": "Fomba fiasa",
-      "defaultsHint": "Ny fotoam-piasana atomboka amin'ity lisitra ity dia mampiasa ireo safidy voafidy mialoha ireo."
+      "defaultsHint": "Ny fotoam-piasana atomboka amin'ity lisitra ity dia mampiasa ireo safidy voafidy mialoha ireo.",
+      "saveFailed": "Tsy azo notahirizina ny lisitra. Jereo ny fifandraisanao ary andramo indray."
     },
     "list": {
       "addPlaceholder": "Ampio asa hatao",
       "add": "Ampio",
+      "addFailed": "Tsy azo nampiana ny asa hatao. Jereo ny fifandraisanao ary andramo indray.",
       "empty": "Mbola tsy misy asa",
       "setDefaults": "Apetraho ny tahirin-kaody, ny fomba fiasa ary ny modely",
       "completed_one": "Vita ({{count}})",
@@ -4018,7 +4021,8 @@
       "startNewSession": "Manomboka sesiona vaovao",
       "startNewSessionHint": "Tsindrio ela hanombohana sesiona vaovao.",
       "linkSession": "Ampifandraiso fotoam-piasana",
-      "linkFailed": "Tsy afaka nampifandray ny fotoam-piasana tamin'ny asa"
+      "linkFailed": "Tsy afaka nampifandray ny fotoam-piasana tamin'ny asa",
+      "startRefreshFailed": "Natomboka ny fotoam-piasana, nefa tsy nohavaozina ity lisitra ity."
     },
     "linkSession": {
       "title": "Ampifandraiso fotoam-piasana",

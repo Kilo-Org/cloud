@@ -3838,6 +3838,7 @@
     "title": "Profile",
     "entrySubtitle": "Wykorzystuj ponownie ustawienia środowiska w różnych sesjach",
     "newProfile": "Nowy profil",
+    "openHint": "Otwiera profil",
     "emptyTitle": "Nie ma jeszcze profili",
     "emptyDescription": "Utwórz profil, aby ponownie używać zmiennych środowiskowych, poleceń konfiguracyjnych i umiejętności w różnych sesjach.",
     "loadFailed": "Nie udało się załadować profili",
@@ -4083,11 +4084,13 @@
       "namePlaceholder": "Błędy, Pomysły, Wydanie…",
       "emoji": "Emoji",
       "mode": "Tryb",
-      "defaultsHint": "Sesje rozpoczęte z tej listy używają tych ustawień domyślnych."
+      "defaultsHint": "Sesje rozpoczęte z tej listy używają tych ustawień domyślnych.",
+      "saveFailed": "Nie udało się zapisać listy. Sprawdź połączenie i spróbuj ponownie."
     },
     "list": {
       "addPlaceholder": "Dodaj zadanie",
       "add": "Dodaj zadanie",
+      "addFailed": "Nie udało się dodać zadania. Sprawdź połączenie i spróbuj ponownie.",
       "empty": "Brak zadań",
       "setDefaults": "Ustaw repozytorium, tryb i model",
       "completed_one": "Ukończone ({{count}})",
@@ -4128,7 +4131,8 @@
       "startNewSession": "Rozpocznij nową sesję",
       "startNewSessionHint": "Przytrzymaj, aby rozpocząć nową sesję.",
       "linkSession": "Powiąż sesję",
-      "linkFailed": "Nie udało się powiązać sesji z zadaniem"
+      "linkFailed": "Nie udało się powiązać sesji z zadaniem",
+      "startRefreshFailed": "Sesja została rozpoczęta, ale nie udało się zaktualizować tej listy."
     },
     "linkSession": {
       "title": "Powiąż sesję",

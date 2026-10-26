@@ -3746,6 +3746,7 @@
     "title": "Profil",
     "entrySubtitle": "Gunakan semula tetapan persekitaran merentas sesi",
     "newProfile": "Profil baharu",
+    "openHint": "Membuka profil",
     "emptyTitle": "Tiada profil lagi",
     "emptyDescription": "Buat profil untuk menggunakan semula pembolehubah persekitaran, arahan persediaan dan kemahiran merentas sesi.",
     "loadFailed": "Tidak dapat memuatkan profil",
@@ -3977,11 +3978,13 @@
       "namePlaceholder": "Pepijat, Idea, Keluaran…",
       "emoji": "Emoji",
       "mode": "Mod",
-      "defaultsHint": "Sesi yang dimulakan daripada senarai ini menggunakan tetapan lalai ini."
+      "defaultsHint": "Sesi yang dimulakan daripada senarai ini menggunakan tetapan lalai ini.",
+      "saveFailed": "Senarai tidak dapat disimpan. Semak sambungan anda dan cuba lagi."
     },
     "list": {
       "addPlaceholder": "Tambah tugasan baharu",
       "add": "Tambah tugasan",
+      "addFailed": "Tugasan tidak dapat ditambah. Semak sambungan anda dan cuba lagi.",
       "empty": "Belum ada tugasan",
       "setDefaults": "Tetapkan repositori, mod dan model",
       "completed_one": "Selesai ({{count}})",
@@ -4018,7 +4021,8 @@
       "startNewSession": "Mulakan sesi baharu",
       "startNewSessionHint": "Tekan lama untuk memulakan sesi baharu.",
       "linkSession": "Pautkan sesi",
-      "linkFailed": "Tidak dapat memautkan sesi pada tugasan"
+      "linkFailed": "Tidak dapat memautkan sesi pada tugasan",
+      "startRefreshFailed": "Sesi telah dimulakan, tetapi senarai ini tidak dikemas kini."
     },
     "linkSession": {
       "title": "Pautkan satu sesi",

@@ -35,7 +35,7 @@ import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-t
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import {
   hasBestEffortGuessDataCollectionRequirement,
-  isFreeModel,
+  isFreeModelExcludingCustomLlms,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   findCustomLlm,
@@ -599,8 +599,12 @@ export async function handleLlmProxyRequest(
 
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
   const customLlm = await findCustomLlm(effectiveModelIdLowerCased);
-  // Custom LLMs count as free; `getProvider` still refuses callers without access.
-  const isFreeRequestedModel = await isFreeModel(effectiveModelIdLowerCased);
+  const isPrivateCustomLlm = customLlm !== null && !isPublicCustomLlm(customLlm.definition);
+  // Anonymous callers cannot use private custom LLMs, so for them a private
+  // custom LLM id must behave exactly like an unknown id.
+  const isPubliclyFreeModel =
+    (customLlm !== null && !isPrivateCustomLlm) ||
+    isFreeModelExcludingCustomLlms(effectiveModelIdLowerCased);
 
   if (!ipAddress) {
     return NextResponse.json(
@@ -616,14 +620,14 @@ export async function handleLlmProxyRequest(
   // the report-only decide call and the usage event, which share this request.
   const clientIp = bareIpLiteral(ipAddress);
 
-  // Private custom LLMs are exempt, even when their id matches a free-model
-  // pattern; public ones are open to everyone, like any other free model.
-  const isPrivateCustomLlm = customLlm !== null && !isPublicCustomLlm(customLlm.definition);
-  if (isFreeRequestedModel && !isPrivateCustomLlm) {
+  if (isPubliclyFreeModel) {
     const rateLimitSubject = await resolveFreeModelRateLimitSubject(ipAddress, authPromise);
     if (rateLimitSubject instanceof NextResponse) return rateLimitSubject;
 
-    if (await isFreeModelRateLimited(request, rateLimitSubject)) {
+    // Private custom LLMs are exempt for signed-in callers, even when their id
+    // matches a free-model pattern.
+    const isExempt = isPrivateCustomLlm && rateLimitSubject.kind === 'account';
+    if (!isExempt && (await isFreeModelRateLimited(request, rateLimitSubject))) {
       console.warn(
         `Model rate limit exceeded, ${freeModelRateLimitKey(rateLimitSubject)}, model: ${effectiveModelIdLowerCased}, feature: ${feature ?? 'none'}`
       );
@@ -661,7 +665,7 @@ export async function handleLlmProxyRequest(
     }
 
     // No valid auth
-    if (!isFreeRequestedModel) {
+    if (!isPubliclyFreeModel) {
       return paidModelAuthRequiredResponse();
     }
 

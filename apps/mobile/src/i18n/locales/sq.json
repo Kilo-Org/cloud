@@ -3746,6 +3746,7 @@
     "title": "Profilet",
     "entrySubtitle": "Ripërdorni cilësimet e mjedisit nëpër sesione",
     "newProfile": "Profili i ri",
+    "openHint": "Hap profilin",
     "emptyTitle": "Nuk ka ende profile",
     "emptyDescription": "Krijo një profil për të ripërdorur variablat e mjedisit, komandat e konfigurimit dhe aftësitë nëpër sesione.",
     "loadFailed": "Profilet nuk mund të ngarkoheshin",
@@ -3977,11 +3978,13 @@
       "namePlaceholder": "Gabime, Ide, Publikime…",
       "emoji": "Emoji",
       "mode": "Mënyra",
-      "defaultsHint": "Seancat e nisura nga kjo listë përdorin këto parazgjedhje."
+      "defaultsHint": "Seancat e nisura nga kjo listë përdorin këto parazgjedhje.",
+      "saveFailed": "Nuk u ruajt lista. Kontrollo lidhjen dhe provo përsëri."
     },
     "list": {
       "addPlaceholder": "Shto një detyrë",
       "add": "Shto detyrë",
+      "addFailed": "Nuk u shtua detyra. Kontrollo lidhjen dhe provo përsëri.",
       "empty": "Ende pa detyra",
       "setDefaults": "Cakto depon, mënyrën dhe modelin",
       "completed_one": "Përfunduar ({{count}})",
@@ -4018,7 +4021,8 @@
       "startNewSession": "Nis sesion të ri",
       "startNewSessionHint": "Shtyp gjatë për të nisur një sesion të ri.",
       "linkSession": "Lidh seancën",
-      "linkFailed": "Seanca nuk u lidh me detyrën"
+      "linkFailed": "Seanca nuk u lidh me detyrën",
+      "startRefreshFailed": "Seanca nisi, por kjo listë nuk u përditësua."
     },
     "linkSession": {
       "title": "Lidh një seancë",

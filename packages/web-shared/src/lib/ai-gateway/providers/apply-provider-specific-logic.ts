@@ -45,6 +45,7 @@ import {
   addCacheBreakpoints,
   enableReasoningSummaries,
   fixResponsesRequest,
+  mapReasoningDetailsToReasoning,
   mapReasoningDetailsToReasoningContent,
   replaceReasoningObjectWithReasoningEffort,
   scrubOpenCodeSpecificProperties,
@@ -261,11 +262,11 @@ export function removeUnsupportedRequestServiceTier(
 }
 
 /**
- * Inverse of the reasoning-content response transform: folds
- * client-supplied `reasoning_details` back into the `reasoning_content` string
- * the upstream speaks, so reasoning survives the round trip. Reasoning-content
- * upstreams are OpenAI-compatible, so OpenRouter's `reasoning` object is also
- * replaced with `reasoning_effort`.
+ * Inverse of the reasoning-content and reasoning response transforms: folds
+ * client-supplied `reasoning_details` back into the `reasoning_content` or
+ * `reasoning` string the upstream speaks, so reasoning survives the round trip.
+ * These upstreams are OpenAI-compatible, so OpenRouter's `reasoning` object is
+ * also replaced with `reasoning_effort`.
  */
 export function applyReasoningDetailsTransform(
   provider: Provider,
@@ -282,6 +283,10 @@ export function applyReasoningDetailsTransform(
     case ReasoningDetailsTransform.ReasoningContent:
       replaceReasoningObjectWithReasoningEffort(requestToMutate);
       mapReasoningDetailsToReasoningContent(requestToMutate.body);
+      break;
+    case ReasoningDetailsTransform.Reasoning:
+      replaceReasoningObjectWithReasoningEffort(requestToMutate);
+      mapReasoningDetailsToReasoning(requestToMutate.body);
       break;
     case null:
       break;

@@ -63,6 +63,7 @@ exist as an org-scoped mirror under `organizations`, for example
 - `cloudAgentNext`
 - `cloudAgentNextFeedback`
 - `cloudAgentSettings`
+- `cloudEnvironments`
 - `codeIndexing`
 - `codeReviews`
 - `codingPlans`

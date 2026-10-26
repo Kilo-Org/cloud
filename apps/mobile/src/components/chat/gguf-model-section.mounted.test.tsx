@@ -46,6 +46,7 @@ const PAUSED: GgufDownload = {
   fileId: FILE_ID,
   name: 'Qwen2.5 0.5B Instruct',
   phase: 'paused',
+  pending: false,
   written: 250,
   total: 1_000,
 };
@@ -56,7 +57,7 @@ afterEach(() => {
   view = undefined;
 });
 
-type RenderedControl = { label: string | undefined; visible: string };
+type RenderedControl = { label: string | undefined; visible: string; disabled: boolean };
 
 /** Mount one row's controls and read every button's name and rendered text. */
 async function mountRow(
@@ -78,6 +79,7 @@ async function mountRow(
     .map(button => ({
       label: button.props.accessibilityLabel as string | undefined,
       visible: button.find(node => (node.type as string) === 'Text').props.children as string,
+      disabled: button.props.disabled === true,
     }));
 }
 
@@ -114,5 +116,15 @@ describe('the model row control names', () => {
 
     expect(controls[0]?.label).toBeUndefined();
     expect(controls[0]?.visible).not.toBe('');
+  });
+
+  it('spends the pause button while a pause is in flight and leaves Cancel live', async () => {
+    const controls = await mountRow({
+      models: [],
+      download: { ...PAUSED, pending: true },
+      failure: null,
+    });
+
+    expect(controls.map(control => control.disabled)).toEqual([true, false]);
   });
 });

@@ -99,6 +99,7 @@ describe('usage consumer mode', () => {
       {
         level: 'info',
         event: 'usage_ingest_processing',
+        queue: 'usage',
         outcome: 'recorded',
         queue_action: 'ack',
         usage_id: usage.core.id,
@@ -111,6 +112,7 @@ describe('usage consumer mode', () => {
       {
         level: 'info',
         event: 'usage_ingest_processing',
+        queue: 'usage',
         outcome: 'duplicate',
         queue_action: 'ack',
         usage_id: secondEvent.core.id,
@@ -220,6 +222,7 @@ describe('usage consumer mode', () => {
         {
           level: 'warn',
           event: 'usage_ingest_processing',
+          queue: 'usage',
           outcome: 'unavailable',
           reason: expect.any(String),
           queue_action: 'retry',
@@ -331,17 +334,17 @@ describe('usage consumer mode', () => {
     expect(processingLogs()[0].event_age_ms).toBe(0);
   });
 
-  it('preserves logging exceptions without settling failed or later messages', async () => {
+  it('does not let structured logging failures change successful dispositions', async () => {
     const { fetch, logs } = setup();
-    fetch.mockResolvedValue(acknowledgement());
+    fetch.mockImplementation(async () => acknowledgement());
     logs[1].mockImplementation(value => {
       if (String(value).startsWith('{')) throw new Error('synthetic logging failure');
     });
     const messages = [message(), message()];
-    await expect(worker.queue(batch(messages), env)).rejects.toThrow('synthetic logging failure');
-    expect(fetch).toHaveBeenCalledTimes(1);
+    await expect(worker.queue(batch(messages), env)).resolves.toBeUndefined();
+    expect(fetch).toHaveBeenCalledTimes(2);
     for (const msg of messages) {
-      expect(msg.ack).not.toHaveBeenCalled();
+      expect(msg.ack).toHaveBeenCalledExactlyOnceWith();
       expect(msg.retry).not.toHaveBeenCalled();
     }
   });

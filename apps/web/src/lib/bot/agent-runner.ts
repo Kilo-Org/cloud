@@ -1,6 +1,8 @@
 import { BOT_USER_AGENT, BOT_VERSION, MAX_ITERATIONS, SUMMARY_MODEL } from '@/lib/bot/constants';
+import { getGitHubRepositoryFullNameFromThread } from '@/lib/bot/github-thread';
 import { botPlatforms, type BotPlatform } from '@/lib/bot/platforms';
 import { composeBotSystemPrompt } from '@/lib/bot/prompt';
+import { getGitHubRepositoryReference } from '@/lib/bot/platforms/github';
 import { buildPrSignature } from '@/lib/bot/pr-signature';
 import {
   linkBotRequestToSession,
@@ -11,8 +13,10 @@ import { getNextBotCallbackStep, getRemainingBotIterations } from '@/lib/bot/ste
 import { resolveBotModelSlug } from '@/lib/bot/model';
 import spawnCloudAgentSession, {
   spawnCloudAgentInputSchema,
+  type SpawnCloudAgentInput,
 } from '@/lib/bot/tools/spawn-cloud-agent-session';
 import { buildSessionUrl } from '@/lib/cloud-agent-next/session-url';
+import { prepareCloudAgentWorkflowUser } from '@/lib/auth/cloud-agent-workflow-user';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
 import { ownerFromIntegration } from '@/lib/integrations/core/owner';
@@ -26,7 +30,11 @@ import {
   getGitLabRepositoryContext,
 } from '@/lib/slack-bot/gitlab-repository-context';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
-import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import {
+  generateApiToken,
+  generateCloudAgentWorkflowToken,
+  TOKEN_EXPIRY,
+} from '@kilocode/web-shared/lib/tokens';
 import { captureException } from '@sentry/nextjs';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { PlatformIntegration, User } from '@kilocode/db';
@@ -57,6 +65,11 @@ type RunBotAgentParams = {
   attachments?: CloudAgentAttachments;
   completedStepCount?: number;
   initialSteps?: BotRequestStep[];
+  /**
+   * GitHub login of the account that triggered this run. Absent for
+   * continuations that carry no verified account identity.
+   */
+  actorLogin?: string;
   onSessionReady?: (params: {
     kiloSessionId: string;
     cloudAgentSessionId: string;
@@ -88,18 +101,21 @@ async function buildSystemPrompt(
   botPlatform: BotPlatform,
   platformIntegration: PlatformIntegration,
   thread: Thread,
-  triggerMessage: BotAgentMessageLike
+  triggerMessage: BotAgentMessageLike,
+  githubRepo: string | null
 ) {
   const owner = ownerFromIntegration(platformIntegration);
 
   const [githubContext, gitlabContext, conversationContext] = await Promise.all([
-    getGitHubRepositoryContext(
-      owner,
-      thread.adapter.name === 'slack' && platformIntegration.platform === 'slack'
-        ? 'agent'
-        : 'workflow'
-    ),
-    getGitLabRepositoryContext(owner),
+    githubRepo
+      ? null
+      : getGitHubRepositoryContext(
+          owner,
+          thread.adapter.name === 'slack' && platformIntegration.platform === 'slack'
+            ? 'agent'
+            : 'workflow'
+        ),
+    githubRepo ? null : getGitLabRepositoryContext(owner),
     botPlatform.getConversationContext({ thread, triggerMessage, platformIntegration }),
   ]);
 
@@ -229,24 +245,44 @@ export async function runBotAgent(params: RunBotAgentParams): Promise<BotAgentCo
     };
   }
 
+  const githubRepo =
+    chatPlatform === 'github'
+      ? getGitHubRepositoryReference(params.thread, params.rawMessage).fullName
+      : null;
+  if (chatPlatform === 'github' && !githubRepo) {
+    return {
+      finalText:
+        'Could not resolve the GitHub repository for this thread. No Cloud Agent session was started.',
+      startedCloudAgentSession: false,
+      collectedSteps,
+      responseTimeMs: Date.now() - startedAt,
+    };
+  }
+
   const agent = new ToolLoopAgent({
     model: provider.chatModel(modelSlug),
     instructions: await buildSystemPrompt(
       botPlatform,
       params.platformIntegration,
       params.thread,
-      params.message
+      params.message,
+      githubRepo
     ),
     stopWhen: isStepCount(remainingIterations),
     tools: {
       spawnCloudAgentSession: tool({
-        description: `Spawn a Cloud Agent session to perform coding tasks on a GitHub repository or GitLab project. The agent can make code changes, fix bugs, implement features, review/analyze code, run tests, or open PRs/MRs. Do NOT use it for questions you can answer directly.
+        description: `Spawn a Cloud Agent session to perform coding tasks on ${githubRepo ? `this thread's GitHub repository (${githubRepo})` : 'a GitHub repository or GitLab project'}. The agent can make code changes, fix bugs, implement features, review/analyze code, run tests, or open PRs/MRs. Do NOT use it for questions you can answer directly.
 
 If the user attached images or files (PDF, Markdown, text, CSV) to their message, those attachments are automatically forwarded to the Cloud Agent session — you do not need to describe or re-upload them. Reference them in the prompt if relevant (e.g. "implement the design shown in the attached screenshot" or "use the requirements in the attached document").
 
 This tool returns an acknowledgement immediately. The final Cloud Agent result will be posted later in the same thread after the async session completes.`,
-        inputSchema: spawnCloudAgentInputSchema,
+        inputSchema: githubRepo
+          ? spawnCloudAgentInputSchema.omit({ githubRepo: true, gitlabProject: true })
+          : spawnCloudAgentInputSchema,
         execute: async args => {
+          const spawnArgs: SpawnCloudAgentInput = githubRepo
+            ? { githubRepo, prompt: args.prompt, mode: args.mode }
+            : args;
           let resolvedCloudAgentSessionId: string | undefined;
           let resolvedKiloSessionId: string | undefined;
 
@@ -257,23 +293,37 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
             completedStepsInCurrentRun: collectedSteps.length,
           });
 
+          const cloudAgentToken = generateCloudAgentWorkflowToken(
+            await prepareCloudAgentWorkflowUser(params.user),
+            {
+              organizationId: owner.type === 'org' ? owner.id : undefined,
+              tokenSource: 'kilo-bot',
+              createdOnPlatform: chatPlatform,
+              expiresIn: TOKEN_EXPIRY.oneHour,
+            }
+          );
+
           const result = await spawnCloudAgentSession(
-            args,
+            spawnArgs,
             modelSlug,
             params.platformIntegration,
-            authToken,
+            cloudAgentToken,
             params.botRequestId,
             ({ kiloSessionId, cloudAgentSessionId }) => {
               startedCloudAgentSession = true;
               resolvedCloudAgentSessionId = cloudAgentSessionId;
               resolvedKiloSessionId = kiloSessionId;
-              params.onSessionReady?.({ kiloSessionId, cloudAgentSessionId, prompt: args.prompt });
+              params.onSessionReady?.({
+                kiloSessionId,
+                cloudAgentSessionId,
+                prompt: spawnArgs.prompt,
+              });
               const sessionUrl = buildSessionUrl(kiloSessionId, owner);
               void postSessionLinkEphemeral({
                 thread: params.thread,
                 message: params.message,
                 sessionUrl,
-                prompt: args.prompt,
+                prompt: spawnArgs.prompt,
                 provider,
                 modelSlug,
               });
@@ -283,6 +333,8 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
               chatPlatform,
               currentStep,
               attachments: params.attachments,
+              actorLogin: params.actorLogin,
+              threadRepository: getGitHubRepositoryFullNameFromThread(params.thread.id),
             }
           );
 
@@ -296,9 +348,9 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
               spawnGroupId,
               cloudAgentSessionId: resolvedCloudAgentSessionId,
               kiloSessionId: resolvedKiloSessionId,
-              mode: args.mode,
-              githubRepo: args.githubRepo,
-              gitlabProject: args.gitlabProject,
+              mode: spawnArgs.mode,
+              githubRepo: spawnArgs.githubRepo,
+              gitlabProject: spawnArgs.gitlabProject,
               callbackStep: currentStep,
             });
           }

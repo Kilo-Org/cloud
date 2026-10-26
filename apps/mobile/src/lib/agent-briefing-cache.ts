@@ -39,6 +39,39 @@ function pruneBriefingQuery(
       client.removeQueries({ queryKey: key, exact: true });
       return true;
     }
+  } else if (procedure === 'oneOffPreparation') {
+    const data = client.getQueryData<BriefingOutputs['oneOffPreparation']>(key);
+    if (data && !canReadBriefingContext(data.draft.context.organizationId, true, organizationIds)) {
+      client.removeQueries({ queryKey: key, exact: true });
+      return true;
+    }
+  } else if (procedure === 'oneOffDrafts') {
+    const data = client.getQueryData<
+      BriefingOutputs['oneOffDrafts'] | InfiniteData<BriefingOutputs['oneOffDrafts']>
+    >(key);
+    if (!data) {
+      return false;
+    }
+    const filterPage = (page: BriefingOutputs['oneOffDrafts']) => {
+      const drafts = page.drafts.filter(draft =>
+        canReadBriefingContext(draft.context.organizationId, true, organizationIds)
+      );
+      return drafts.length === page.drafts.length ? page : { ...page, drafts };
+    };
+    if ('pages' in data) {
+      const pages = data.pages.map(filterPage);
+      if (pages.every((page, index) => page === data.pages[index])) {
+        return false;
+      }
+      client.setQueryData(key, { ...data, pages });
+    } else {
+      const next = filterPage(data);
+      if (next === data) {
+        return false;
+      }
+      client.setQueryData(key, next);
+    }
+    return true;
   } else if (procedure === 'list') {
     const data = client.getQueryData<
       BriefingOutputs['list'] | InfiniteData<BriefingOutputs['list']>

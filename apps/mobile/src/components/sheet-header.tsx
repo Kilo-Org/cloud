@@ -167,7 +167,7 @@ export function SheetHeader({
       onLayout={remeasureWindowTop}
     >
       <View style={safeAreaStyle}>
-        <View className="min-h-11 flex-row items-center gap-x-3">
+        <View className="min-h-[48px] flex-row items-center gap-x-3">
           {onShare !== undefined ? (
             <Pressable
               onPress={onShare}
@@ -176,7 +176,7 @@ export function SheetHeader({
               accessibilityRole="button"
               accessibilityLabel={t('common.share', { title })}
               accessibilityState={{ disabled: sharing || disabled, busy: sharing }}
-              className="min-h-11 min-w-11 shrink-0 items-center justify-center px-2 py-2 active:opacity-70 disabled:opacity-50"
+              className="min-h-[48px] min-w-[48px] shrink-0 items-center justify-center px-2 py-2 active:opacity-70 disabled:opacity-50"
             >
               <Share size={20} color={colors.foreground} />
             </Pressable>
@@ -188,7 +188,7 @@ export function SheetHeader({
               hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel={resolvedCancelLabel}
-              className="min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 disabled:opacity-50"
+              className="min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 disabled:opacity-50"
             >
               <Text
                 className="text-center text-base font-medium text-foreground"
@@ -220,7 +220,7 @@ export function SheetHeader({
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={resolvedDoneLabel}
-            className="ms-auto min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 disabled:opacity-50 will-change-pressable"
+            className="ms-auto min-h-[48px] min-w-[48px] shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 disabled:opacity-50 will-change-pressable"
           >
             <Text
               className="text-center text-base font-medium text-foreground"

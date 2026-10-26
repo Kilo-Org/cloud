@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { AGENT_SESSION_NAV_GUARD_MS } from '@/components/agents/agent-session-nav-guard';
 import { type TodoList } from '@/lib/todos/todo-types';
 import { act, TestRenderer } from '@/test/renderer';
 
@@ -14,11 +15,14 @@ const state = vi.hoisted(() => ({
   navigate: vi.fn(),
   push: vi.fn(),
   toastError: vi.fn(),
+  focusEffects: [] as (() => void)[],
 }));
 
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: state.push }),
-  useFocusEffect: () => undefined,
+  useFocusEffect: (effect: () => void) => {
+    state.focusEffects.push(effect);
+  },
 }));
 vi.mock('sonner-native', () => ({ toast: { error: state.toastError } }));
 vi.mock('expo-haptics', () => ({
@@ -66,6 +70,7 @@ beforeEach(async () => {
   const environment = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
   environment.IS_REACT_ACT_ENVIRONMENT = true;
   await i18n.changeLanguage('en');
+  state.focusEffects = [];
   state.startAgent.mockReset();
   state.link.mockReset();
   state.invalidate.mockReset();
@@ -83,6 +88,7 @@ afterEach(() => {
   renderer?.unmount();
   renderer = undefined;
   holder.current = null;
+  vi.restoreAllMocks();
 });
 
 async function start(startList: typeof list = list) {
@@ -158,5 +164,44 @@ describe('useStartTodo start now', () => {
 
     expect(state.startAgent).not.toHaveBeenCalled();
     expect(state.push).toHaveBeenCalledTimes(1);
+  });
+  it('opens review once on rapid presses and again after the guard window', () => {
+    const now = Date.now();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    act(() => {
+      mounted().review(todo, list);
+      mounted().review(todo, list);
+    });
+
+    expect(state.push).toHaveBeenCalledTimes(1);
+    expect(state.push.mock.calls[0]?.[0]).toContain('/(app)/agent-chat/new?organizationId=');
+
+    nowSpy.mockReturnValue(now + AGENT_SESSION_NAV_GUARD_MS);
+    act(() => {
+      mounted().review(todo, list);
+    });
+
+    expect(state.push).toHaveBeenCalledTimes(2);
+  });
+
+  it('opens review again when its screen regains focus', () => {
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(Date.now());
+
+    act(() => {
+      mounted().review(todo, list);
+      mounted().review(todo, list);
+    });
+    expect(state.push).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      for (const effect of state.focusEffects) {
+        effect();
+      }
+      mounted().review(todo, list);
+    });
+
+    expect(state.push).toHaveBeenCalledTimes(2);
+    nowSpy.mockRestore();
   });
 });

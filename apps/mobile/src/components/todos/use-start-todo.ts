@@ -1,11 +1,12 @@
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { toast } from 'sonner-native';
 
 import { appendNewSessionPrefill } from '@/components/agents/new-session-prefill';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
+import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
 import { i18n } from '@/i18n';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { startAgent } from '@/lib/app-actions/start-agent';
@@ -48,10 +49,10 @@ function todoNewSessionHref(todo: StartableTodo, list: StartDefaults): Href {
  * list's repository, so without one `startNow` falls back to the review.
  */
 export function useStartTodo(): StartTodoControls {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const navigateToSession = useAgentSessionNavigator();
+  const { openNewSessionHref } = useNewSessionNavigator();
   const [startingTodoId, setStartingTodoId] = useState<string | null>(null);
   // A to-do already starting ignores a second press. Held in a ref because the
   // state that drives the spinner lands after this tick.
@@ -59,9 +60,9 @@ export function useStartTodo(): StartTodoControls {
 
   const review = useCallback(
     (todo: StartableTodo, list: StartDefaults) => {
-      router.push(todoNewSessionHref(todo, list));
+      openNewSessionHref(todoNewSessionHref(todo, list));
     },
-    [router]
+    [openNewSessionHref]
   );
 
   const startNow = useCallback(

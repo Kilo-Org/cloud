@@ -309,6 +309,18 @@ original campaign for reconciliation, and review a future campaign containing on
 provider-confirmed `not_sent` recipients. Explicitly exclude sent and unknown targets; copying
 the entire original cohort into a new directory would notify successful recipients again.
 
+### Cutover verification
+
+- Verify a mode-only owner and an owner with a converted pool.
+- Save each platform mode, restart the worker, and read the saved mode again.
+- Clear the organization override and verify personal-mode inheritance.
+- Clear the personal mode and verify the default.
+- Verify Efficient selects from the platform table despite a retained legacy pool.
+- Edit a non-default custom-router member without changing the default member.
+- Reload the settings page and verify the custom pool, mode, and benchmark difficulty.
+- During tooling retirement, reuse the persisted namespace and verify these settings again.
+- Confirm the retired conversion endpoint returns not found while mode reads and writes remain available.
+
 ## Invariants
 
 1. The benchmark worker is the only writer of measurements and tables (ADR 0002 invariant 1).

@@ -19,10 +19,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { AnimatedDollars } from './AnimatedDollars';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
-import { formatDollars, formatIsoDateTime_IsoOrderNoSeconds } from '@/lib/utils';
+import { formatDollars } from '@/lib/utils';
 import CreditPurchaseOptions from '@/components/payment/CreditPurchaseOptions';
 import { PiggyBank, Bell, Clock } from 'lucide-react';
 import { useExpiringCredits } from './useExpiringCredits';
+import { OrganizationCreditPurchaseHistory } from './OrganizationCreditPurchaseHistory';
+import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 
 type Props = {
   organizationId: string;
@@ -138,12 +140,18 @@ export function OrganizationPaymentDetails({ organizationId, role, isAutoTopUpEn
                   <Clock className="h-4 w-4 shrink-0 text-amber-500" />
                   <span className="text-sm">
                     {formatDollars(fromMicrodollars(group.balance_mUsd))} in credits expiring at{' '}
-                    {formatIsoDateTime_IsoOrderNoSeconds(group.expiry_date)}
+                    {new Date(group.expiry_date).toLocaleString('en-US', {
+                      timeZone: 'UTC',
+                      timeZoneName: 'short',
+                    })}
                   </span>
                 </div>
               ))}
             </CardContent>
           </Card>
+        )}
+        {(canManageOrganizationBilling(role) || isKiloAdmin) && (
+          <OrganizationCreditPurchaseHistory organizationId={organizationId} />
         )}
 
         <Tabs value={timePeriod} onValueChange={value => setTimePeriod(value as TimePeriod)}>

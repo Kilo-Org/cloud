@@ -227,7 +227,6 @@
     "hideBalance": "Ascunde soldul",
     "showBalance": "Afișează soldul",
     "balanceHidden": "Sold ascuns",
-    "bonusCreditsExpiring": "Creditele în valoare de {{amount}} expiră la {{date}}.",
     "signOutTitle": "Te deconectezi?",
     "signOutMessage": "Va trebui să te autentifici din nou pentru a accesa spațiul tău de lucru.",
     "deleteAccountTitle": "Ștergi contul?",
@@ -1506,6 +1505,22 @@
       "loadingProposals": "Se încarcă propunerile",
       "couldNotLoadProposals": "Nu s-au putut încărca propunerile.",
       "noProposals": "Nicio propunere",
+      "proposalDetails": "Detaliile propunerii",
+      "proposalTitle": "Titlul propunerii",
+      "rationale": "Justificare",
+      "saveFirst": "Salvează modificările înainte de a deschide un pull request.",
+      "proposalSaved": "Propunere salvată",
+      "proposalDismissed": "Propunere respinsă",
+      "dismissProposalTitle": "Respingeți propunerea?",
+      "dismissProposalMessage": "Această propunere va fi eliminată din lista de propuneri active și nu va mai putea fi recuperată.",
+      "prOpened": "Pull request pentru REVIEW.md deschis",
+      "alreadyPresent": "Instrucțiunile există deja în REVIEW.md",
+      "status": {
+        "edited": "Editată",
+        "opening_change_request": "Se deschide PR-ul",
+        "change_request_failed": "Deschiderea PR-ului a eșuat",
+        "superseded": "Există deja"
+      },
       "noProposalsDescription": "Propunerile memoriei de revizuire apar aici după ce Kilo analizează răspunsurile responsabililor de proiect."
     },
     "manualReview": {
@@ -3187,7 +3202,7 @@
     "creditActivity": {
       "emptyDescription": "Achizițiile, consumul și ajustările de credite ale acestei organizații vor apărea aici pe măsură ce au loc.",
       "emptyTitle": "Nicio operațiune cu credite",
-      "expires": "Expiră la {{date}}",
+      "expiresUtc": "Expiră la {{date}} (UTC)",
       "title": "Istoricul creditelor",
       "transactionFallback": "Tranzacție cu credite",
       "category": {
@@ -3776,6 +3791,7 @@
     "title": "Profiluri",
     "entrySubtitle": "Reutilizați setările de mediu între sesiuni",
     "newProfile": "Profil nou",
+    "openHint": "Deschide profilul",
     "emptyTitle": "Niciun profil încă",
     "emptyDescription": "Creați un profil pentru a reutiliza variabilele de mediu, comenzile de configurare și abilitățile în sesiuni.",
     "loadFailed": "Profilurile nu au putut fi încărcate",
@@ -3972,6 +3988,10 @@
   "credits": {
     "title": "Cumpără credite",
     "description": "Creditele sunt o achiziție unică adăugată la soldul tău Kilo pentru rularea sesiunilor de codare AI în Kilo App. Magazinul îți debitează contul, iar creditele sunt adăugate după ce magazinul confirmă plata.",
+    "nextExpiry": "Creditele în valoare de {{amount}} expiră la {{date}} (UTC). Creditele cu cea mai apropiată dată de expirare sunt folosite primele.",
+    "appStoreExpiry": "Creditele cumpărate prin App Store nu expiră.",
+    "playOneYearExpiry": "Aceste credite expiră la un an calendaristic după achiziție.",
+    "playNonexpiring": "Aceste credite nu expiră.",
     "packLabel": "Adaugă {{amount}} în credite",
     "priceUnavailable": "Preț indisponibil",
     "purchased": "Creditele au fost adăugate la soldul tău.",
@@ -4014,11 +4034,13 @@
       "namePlaceholder": "Erori, Idei, Lansare…",
       "emoji": "Emoji",
       "mode": "Mod",
-      "defaultsHint": "Sesiunile pornite din această listă folosesc aceste valori implicite."
+      "defaultsHint": "Sesiunile pornite din această listă folosesc aceste valori implicite.",
+      "saveFailed": "Nu s-a putut salva lista. Verifică conexiunea și încearcă din nou."
     },
     "list": {
       "addPlaceholder": "Sarcină nouă",
       "add": "Adaugă sarcină",
+      "addFailed": "Nu s-a putut adăuga sarcina. Verifică conexiunea și încearcă din nou.",
       "empty": "Încă nu există sarcini",
       "setDefaults": "Setează depozitul, modul și modelul",
       "completed_one": "Finalizat ({{count}})",
@@ -4057,7 +4079,9 @@
       "startNewSession": "Începe o sesiune nouă",
       "startNewSessionHint": "Ține apăsat pentru a începe o sesiune nouă.",
       "linkSession": "Asociază sesiunea",
-      "linkFailed": "Nu s-a putut asocia sesiunea cu sarcina"
+      "linkFailed": "Nu s-a putut asocia sesiunea cu sarcina",
+      "moveToAnotherTodo": "Mută la o altă sarcină",
+      "startRefreshFailed": "Sesiunea a pornit, dar această listă nu s-a actualizat."
     },
     "linkSession": {
       "title": "Asociază o sesiune",
@@ -4066,6 +4090,7 @@
     },
     "upNext": "Urmează",
     "sessionTodo": "Sarcină: {{title}}",
+    "openTodoHint": "Deschide sarcina.",
     "linkToTodo": "Asociază cu sarcina",
     "candidates": {
       "empty": "Nicio sarcină deschisă"

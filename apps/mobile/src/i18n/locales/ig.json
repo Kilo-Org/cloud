@@ -227,7 +227,6 @@
     "hideBalance": "Zoo ego fọdụrụ",
     "showBalance": "Gosi ego fọdụrụ",
     "balanceHidden": "Ezoro ego fọdụrụ",
-    "bonusCreditsExpiring": "Ego ojiji {{amount}} ga-agwụ na {{date}}.",
     "signOutTitle": "Pụọ?",
     "signOutMessage": "Ị ga-abanyerịrị ọzọ iji nweta ebe ọrụ gị.",
     "deleteAccountTitle": "Hichapụ akaụntụ?",
@@ -1484,6 +1483,22 @@
       "loadingProposals": "Na-ebudata aro",
       "couldNotLoadProposals": "Enweghị ike ibudata aro.",
       "noProposals": "Enweghị aro",
+      "proposalDetails": "Nkọwa aro",
+      "proposalTitle": "Aha aro",
+      "rationale": "Ihe kpatara ya",
+      "saveFirst": "Chekwaa mgbanwe gị tupu imepe pull request.",
+      "proposalSaved": "Echekwara aro",
+      "proposalDismissed": "Ewepụla aro",
+      "dismissProposalTitle": "Wepụ aro a?",
+      "dismissProposalMessage": "A ga-ewepụ aro a na ndepụta na-arụ ọrụ, a gaghịkwa enwe ike iweghachi ya.",
+      "prOpened": "Emeghela pull request maka REVIEW.md",
+      "alreadyPresent": "Nduzi adịlarị na REVIEW.md",
+      "status": {
+        "edited": "Edezigharịrị",
+        "opening_change_request": "Na-emepe PR",
+        "change_request_failed": "Imepe PR akụrụ afọ n'ala",
+        "superseded": "Ọ dịlarị"
+      },
       "noProposalsDescription": "Aro ebe nchekwa nyocha ga-apụta ebe a mgbe Kilo nyochachara nzaghachi ndị na-elekọta."
     },
     "manualReview": {
@@ -3143,7 +3158,7 @@
     "creditActivity": {
       "emptyDescription": "Ịzụta ego ojiji, iji ya eme ihe, na mgbanwe e mere na ya maka ụlọ ọrụ a ga-apụta ebe a.",
       "emptyTitle": "Enweghị ihe mere na ego ojiji",
-      "expires": "Oge ya ga-agwụ na {{date}}",
+      "expiresUtc": "Oge ya ga-agwụ na {{date}} (UTC)",
       "title": "Ndekọ ego ojiji",
       "transactionFallback": "Azụmahịa ego ojiji",
       "category": {
@@ -3730,6 +3745,7 @@
     "title": "Profaịlụ",
     "entrySubtitle": "Jigharịa ntọala gburugburu ebe niile n'ofe oge",
     "newProfile": "Profaịlụ ọhụrụ",
+    "openHint": "Na-emepe profaịlụ ahụ",
     "emptyTitle": "Enweghị profaịlụ",
     "emptyDescription": "Mepụta profaịlụ iji megharịa mgbanwe gburugburu ebe obibi, iwu ntọlite na nka n'ofe oge.",
     "loadFailed": "Enweghị ike ibunye profaịlụ",
@@ -3921,6 +3937,10 @@
   "credits": {
     "title": "Zụta ego ojiji",
     "description": "Ego ojiji bụ azụmahịa otu oge nke a na-agbakwunye na nguzozi Kilo gị maka ịgba nnọkọ ịde koodu AI na Kilo App. Ụlọ ahịa na-akwụ ụgwọ na akaụntụ gị, a na-agbakwunye ego ojiji mgbe ụlọ ahịa kwadoro ịkwụ ụgwọ ahụ.",
+    "nextExpiry": "Ego ojiji ruru {{amount}} ga-agwụ na {{date}} (UTC). A na-ebu ụzọ jiri ego ojiji nke ga-akacha agwụ ngwa ngwa.",
+    "appStoreExpiry": "Ego ojiji e ji App Store zụta anaghị agwụ.",
+    "playOneYearExpiry": "Ego ojiji ndị a ga-agwụ otu afọ kalenda mgbe ịzụrụ ha.",
+    "playNonexpiring": "Ego ojiji ndị a anaghị agwụ.",
     "packLabel": "Tinye ego ojiji ruru {{amount}}",
     "priceUnavailable": "Ọnụ ahịa adịghị",
     "purchased": "E tinyela ego ojiji na nguzozi gị.",
@@ -3961,11 +3981,13 @@
       "namePlaceholder": "Nsogbu, Echiche, Mwepụta…",
       "emoji": "Akara ngosi",
       "mode": "Ụdị ọrụ",
-      "defaultsHint": "Nnọkọ ndị a na-amalite site na ndepụta a na-eji ihe ndabara ndị a."
+      "defaultsHint": "Nnọkọ ndị a na-amalite site na ndepụta a na-eji ihe ndabara ndị a.",
+      "saveFailed": "Enweghị ike ịchekwa ndepụta ahụ. Lelee njikọ gị wee nwalee ọzọ."
     },
     "list": {
       "addPlaceholder": "Tinye ọrụ",
       "add": "Tinye",
+      "addFailed": "Enweghị ike itinye ọrụ ahụ. Lelee njikọ gị wee nwalee ọzọ.",
       "empty": "Enweghị ọrụ ọ bụla",
       "setDefaults": "Tinye ebe nchekwa koodu, ụdị ọrụ na ihe nlereanya",
       "completed_one": "Emechara ({{count}})",
@@ -4002,7 +4024,9 @@
       "startNewSession": "Malite nzukọ ọhụrụ",
       "startNewSessionHint": "Pịa ogologo oge iji malite nzukọ ọhụrụ.",
       "linkSession": "Jikọọ nnọkọ",
-      "linkFailed": "Enweghị ike ijikọ nnọkọ ahụ na ọrụ ahụ"
+      "linkFailed": "Enweghị ike ijikọ nnọkọ ahụ na ọrụ ahụ",
+      "moveToAnotherTodo": "Bugharịa gaa na ọrụ ọzọ",
+      "startRefreshFailed": "Nnọkọ ahụ amaliteela, mana ndepụta a emelighị ya."
     },
     "linkSession": {
       "title": "Jikọọ nnọkọ",
@@ -4011,6 +4035,7 @@
     },
     "upNext": "Na-esote",
     "sessionTodo": "Ọrụ: {{title}}",
+    "openTodoHint": "Na-emepe ọrụ.",
     "linkToTodo": "Jikọọ na ọrụ",
     "candidates": {
       "empty": "Enweghị ọrụ mepere emepe"

@@ -227,7 +227,6 @@
     "hideBalance": "Skrýt zůstatek",
     "showBalance": "Zobrazit zůstatek",
     "balanceHidden": "Zůstatek je skrytý",
-    "bonusCreditsExpiring": "Platnost kreditů v hodnotě {{amount}} vyprší {{date}}.",
     "signOutTitle": "Odhlásit se?",
     "signOutMessage": "Pro přístup do pracovního prostoru se budeš muset znovu přihlásit.",
     "deleteAccountTitle": "Smazat účet?",
@@ -1528,6 +1527,22 @@
       "loadingProposals": "Načítání návrhů",
       "couldNotLoadProposals": "Návrhy se nepodařilo načíst.",
       "noProposals": "Žádné návrhy",
+      "proposalDetails": "Podrobnosti návrhu",
+      "proposalTitle": "Název návrhu",
+      "rationale": "Odůvodnění",
+      "saveFirst": "Před otevřením pull requestu uložte změny.",
+      "proposalSaved": "Návrh uložen",
+      "proposalDismissed": "Návrh zamítnut",
+      "dismissProposalTitle": "Zamítnout návrh?",
+      "dismissProposalMessage": "Tento návrh bude odstraněn ze seznamu aktivních návrhů a nebude možné ho obnovit.",
+      "prOpened": "Pull request pro REVIEW.md otevřen",
+      "alreadyPresent": "Pokyny již existují v souboru REVIEW.md",
+      "status": {
+        "edited": "Upraveno",
+        "opening_change_request": "Otevírání PR",
+        "change_request_failed": "PR selhal",
+        "superseded": "Již existuje"
+      },
       "noProposalsDescription": "Návrhy z paměti kontrol se zde zobrazí, jakmile Kilo analyzuje odpovědi správců."
     },
     "manualReview": {
@@ -3231,7 +3246,7 @@
     "creditActivity": {
       "emptyDescription": "Zde se budou průběžně zobrazovat nákupy, čerpání a úpravy kreditů této organizace.",
       "emptyTitle": "Žádné pohyby kreditů",
-      "expires": "Platnost do {{date}}",
+      "expiresUtc": "Platnost do {{date}} (UTC)",
       "title": "Pohyby kreditů",
       "transactionFallback": "Transakce s kredity",
       "category": {
@@ -3822,6 +3837,7 @@
     "title": "Profily",
     "entrySubtitle": "Znovu použijte nastavení prostředí napříč relacemi",
     "newProfile": "Nový profil",
+    "openHint": "Otevře profil",
     "emptyTitle": "Zatím žádné profily",
     "emptyDescription": "Vytvořte profil pro opětovné použití proměnných prostředí, instalačních příkazů a dovedností napříč relacemi.",
     "loadFailed": "Profily se nepodařilo načíst",
@@ -4023,6 +4039,10 @@
   "credits": {
     "title": "Koupit kredity",
     "description": "Kredity jsou jednorázový nákup přidaný do vašeho zůstatku Kilo pro spouštění AI programovacích relací v aplikaci Kilo. Obchod vám strhne platbu z účtu a kredity se přidají po potvrzení platby obchodem.",
+    "nextExpiry": "Platnost kreditů v hodnotě {{amount}} vyprší {{date}} (UTC). Nejdříve se čerpají kredity s nejbližším datem vypršení.",
+    "appStoreExpiry": "Kredity zakoupené přes App Store nevyprší.",
+    "playOneYearExpiry": "Platnost těchto kreditů vyprší jeden kalendářní rok po nákupu.",
+    "playNonexpiring": "Platnost těchto kreditů nevyprší.",
     "packLabel": "Přidat {{amount}} v kreditech",
     "priceUnavailable": "Cena není k dispozici",
     "purchased": "Kredity byly přidány do vašeho zůstatku.",
@@ -4067,11 +4087,13 @@
       "namePlaceholder": "Chyby, Nápady, Vydání…",
       "emoji": "Emoji",
       "mode": "Režim",
-      "defaultsHint": "Relace spuštěné z tohoto seznamu použijí tato výchozí nastavení."
+      "defaultsHint": "Relace spuštěné z tohoto seznamu použijí tato výchozí nastavení.",
+      "saveFailed": "Seznam se nepodařilo uložit. Zkontrolujte připojení a zkuste to znovu."
     },
     "list": {
       "addPlaceholder": "Přidat úkol",
       "add": "Přidat",
+      "addFailed": "Úkol se nepodařilo přidat. Zkontrolujte připojení a zkuste to znovu.",
       "empty": "Zatím žádné úkoly",
       "setDefaults": "Nastavit repozitář, režim a model",
       "completed_one": "Dokončeno ({{count}})",
@@ -4112,7 +4134,9 @@
       "startNewSession": "Zahájit novou relaci",
       "startNewSessionHint": "Dlouhým stisknutím zahájíš novou relaci.",
       "linkSession": "Připojit relaci",
-      "linkFailed": "Relaci se nepodařilo připojit k úkolu"
+      "linkFailed": "Relaci se nepodařilo připojit k úkolu",
+      "moveToAnotherTodo": "Přesunout do jiného úkolu",
+      "startRefreshFailed": "Relace byla spuštěna, ale tento seznam se neaktualizoval."
     },
     "linkSession": {
       "title": "Připojení relace",
@@ -4121,6 +4145,7 @@
     },
     "upNext": "Následuje",
     "sessionTodo": "Úkol: {{title}}",
+    "openTodoHint": "Otevře úkol.",
     "linkToTodo": "Připojit k úkolu",
     "candidates": {
       "empty": "Žádné otevřené úkoly"

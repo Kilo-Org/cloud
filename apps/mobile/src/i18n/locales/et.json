@@ -227,7 +227,6 @@
     "hideBalance": "Peida saldo",
     "showBalance": "Näita saldot",
     "balanceHidden": "Saldo on peidetud",
-    "bonusCreditsExpiring": "Krediit summas {{amount}} aegub {{date}}.",
     "signOutTitle": "Kas logida välja?",
     "signOutMessage": "Tööruumi kasutamiseks pead uuesti sisse logima.",
     "deleteAccountTitle": "Kas kustutada konto?",
@@ -1484,6 +1483,22 @@
       "loadingProposals": "Ettepanekute laadimine",
       "couldNotLoadProposals": "Ettepanekuid ei õnnestunud laadida.",
       "noProposals": "Ettepanekuid pole",
+      "proposalDetails": "Ettepaneku üksikasjad",
+      "proposalTitle": "Ettepaneku pealkiri",
+      "rationale": "Põhjendus",
+      "saveFirst": "Salvesta muudatused enne tõmbetaotluse avamist.",
+      "proposalSaved": "Ettepanek salvestatud",
+      "proposalDismissed": "Ettepanek tagasi lükatud",
+      "dismissProposalTitle": "Kas lükata ettepanek tagasi?",
+      "dismissProposalMessage": "See ettepanek eemaldatakse aktiivsete ettepanekute loendist ja seda ei saa taastada.",
+      "prOpened": "Faili REVIEW.md tõmbetaotlus avatud",
+      "alreadyPresent": "Juhised on failis REVIEW.md juba olemas",
+      "status": {
+        "edited": "Muudetud",
+        "opening_change_request": "PR-i avamine",
+        "change_request_failed": "PR ebaõnnestus",
+        "superseded": "Juba olemas"
+      },
       "noProposalsDescription": "Ülevaatuste mälu ettepanekud ilmuvad siia pärast seda, kui Kilo on hooldajate vastuseid analüüsinud."
     },
     "manualReview": {
@@ -3143,7 +3158,7 @@
     "creditActivity": {
       "emptyDescription": "Siin kuvatakse selle organisatsiooni ostud, krediidikasutus ja krediidi korrigeerimised kohe, kui need toimuvad.",
       "emptyTitle": "Krediiditehinguid pole",
-      "expires": "Aegub {{date}}",
+      "expiresUtc": "Aegub {{date}} (UTC)",
       "title": "Krediiditehingud",
       "transactionFallback": "Krediiditehing",
       "category": {
@@ -3730,6 +3745,7 @@
     "title": "Profiilid",
     "entrySubtitle": "Keskkonnaseadete taaskasutamine seansside jooksul",
     "newProfile": "Uus profiil",
+    "openHint": "Avab profiili",
     "emptyTitle": "Profiilid veel puuduvad",
     "emptyDescription": "Looge profiil keskkonnamuutujate, häälestuskäskude ja oskuste taaskasutamiseks seansside jooksul.",
     "loadFailed": "Profiilide laadimine nurjus",
@@ -3921,6 +3937,10 @@
   "credits": {
     "title": "Osta krediiti",
     "description": "Krediit on ühekordne ost, mis lisatakse sinu Kilo saldole AI kodeerimisseansside käitamiseks Kilo Appis. Pood võtab tasu sinu kontolt ja krediit lisatakse pärast seda, kui pood makse kinnitab.",
+    "nextExpiry": "Krediit summas {{amount}} aegub {{date}} (UTC). Esmalt kasutatakse kõige varem aeguvaid krediite.",
+    "appStoreExpiry": "App Store'i kaudu ostetud krediidid ei aegu.",
+    "playOneYearExpiry": "Need krediidid aeguvad üks kalendriaasta pärast ostu.",
+    "playNonexpiring": "Need krediidid ei aegu.",
     "packLabel": "Lisa {{amount}} krediiti",
     "priceUnavailable": "Hind pole saadaval",
     "purchased": "Krediit on sinu saldole lisatud.",
@@ -3961,11 +3981,13 @@
       "namePlaceholder": "Vead, Ideed, Väljalase…",
       "emoji": "Emotikon",
       "mode": "Režiim",
-      "defaultsHint": "Sellest loendist alustatud seansid kasutavad neid vaikeseadeid."
+      "defaultsHint": "Sellest loendist alustatud seansid kasutavad neid vaikeseadeid.",
+      "saveFailed": "Loendi salvestamine ei õnnestunud. Kontrolli oma ühendust ja proovi uuesti."
     },
     "list": {
       "addPlaceholder": "Uus ülesanne",
       "add": "Lisa ülesanne",
+      "addFailed": "Ülesande lisamine ei õnnestunud. Kontrolli oma ühendust ja proovi uuesti.",
       "empty": "Ülesandeid veel pole",
       "setDefaults": "Määra hoidla, režiim ja mudel",
       "completed_one": "Lõpetatud ({{count}})",
@@ -4002,7 +4024,9 @@
       "startNewSession": "Alusta uut seanssi",
       "startNewSessionHint": "Uue seansi alustamiseks vajuta pikalt.",
       "linkSession": "Seo seanss",
-      "linkFailed": "Seanssi ei õnnestunud ülesandega siduda"
+      "linkFailed": "Seanssi ei õnnestunud ülesandega siduda",
+      "moveToAnotherTodo": "Teisalda teise ülesandesse",
+      "startRefreshFailed": "Seanss algas, kuid seda loendit ei värskendatud."
     },
     "linkSession": {
       "title": "Seansside linkimine",
@@ -4011,6 +4035,7 @@
     },
     "upNext": "Järgmisena",
     "sessionTodo": "Ülesanne: {{title}}",
+    "openTodoHint": "Avab ülesande.",
     "linkToTodo": "Lingi ülesandega",
     "candidates": {
       "empty": "Avatud ülesandeid pole"

@@ -87,13 +87,27 @@ Consumer `usage_ingest_processing` events additionally expose:
 
 - `writer_duration_ms`: the HTTP writer attempt, including response validation;
   omitted when the writer is skipped.
-- `queue_wait_ms`: age of the platform queue message at the start of handling that
-  message, before its writer attempt, including backlog and redelivery delay.
-  Both environments use `max_batch_size: 1`; waiting behind earlier messages in
-  the same batch would apply only if batching were enabled.
+- `queue_wait_ms`: age of the platform queue message at the start of processing
+  that individual message, before its writer attempt. It includes time before
+  invocation and any wait for a processing slot within the delivered batch,
+  including backlog and redelivery delay; it is not a pure queue-delivery metric.
+  Staging uses batch size 2 and parallelism 2, allowing two messages to start
+  concurrently. `USAGE_INGEST_PARALLELISM=1` keeps batch size 2 but processes it
+  serially, so the second message's value includes waiting for the first message
+  to settle. Production keeps batch size 1 and receipt mode by default; receipt
+  logs are not processing/persistence completions.
 - `event_age_ms`: creation through consumer outcome logging, including writer wait.
 - `delivery_attempts`, categorical `reason`, and `queue_action`: diagnose retries;
   `retry` does not confirm DLQ storage.
+
+Record the deployed batch size, processing parallelism, invocation cap and mode
+with each run. Staging cap 200 with parallelism 2 allows at most 400 concurrent
+writer calls; parallelism 1 allows at most 200 and does not restore a batch-1
+baseline. Changing these Worker variables/config settings requires redeployment.
+Timeout 0 does not guarantee two-message batches. With main's diagnostics enabled
+(`USAGE_INGEST_DIAGNOSTICS=all` in staging), the shared handler-entry timestamp
+measures invocation entry, while `queue_wait_ms` still measures age at each
+message's own processing start; keep those boundaries separate.
 
 Use the queue's backlog and DLQ monitoring to observe growth, exhaustion and drain
 time. A quiet database alongside an increasing backlog is not equivalent throughput.

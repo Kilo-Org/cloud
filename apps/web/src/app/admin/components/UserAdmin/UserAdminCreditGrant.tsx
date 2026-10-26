@@ -38,7 +38,6 @@ export function UserAdminCreditGrant({
   const queryClient = useQueryClient();
   const { canManageCredits } = useAdminCreditManagementPermission();
 
-  // Credit form state
   const [selectedCredit, setSelectedCredit] = useState<string>('custom');
   const [showSelfServe, setShowSelfServe] = useState(false);
   const [includeNonSupport, setIncludeNonSupport] = useState(false);
@@ -47,8 +46,8 @@ export function UserAdminCreditGrant({
   const [expirationDate, setExpirationDate] = useState<string>('');
   const [expiryHours, setExpiryHours] = useState<string>('');
   const [neverExpire, setNeverExpire] = useState(false);
+  const [creditKind, setCreditKind] = useState<'paid' | 'promotional'>('promotional');
 
-  // API state
   const [isGrantingCredit, setIsGrantingCredit] = useState(false);
   const [creditMessage, setCreditMessage] = useState<CreditMessage | null>(null);
 
@@ -57,16 +56,13 @@ export function UserAdminCreditGrant({
   );
   const expectNegative = selectedCreditCategory?.expect_negative_amount ?? false;
 
-  // Check if expiration is provided (either via date, hours, or category default)
   const hasExpirationFromCategory =
     selectedCreditCategory?.expiry_hours != null ||
     selectedCreditCategory?.credit_expiry_date != null;
   const hasExpirationFromForm = expirationDate.trim() !== '' || Number(expiryHours) > 0;
   const hasExpiration = hasExpirationFromCategory || hasExpirationFromForm || neverExpire;
 
-  // Form validation - credit category required; description required for negative amount categories
-  // For non-negative amounts, expiration is required unless "Never expire" is checked
-  const isExpirationValid = expectNegative || hasExpiration;
+  const isExpirationValid = expectNegative || creditKind === 'paid' || hasExpiration;
   const isFormValid =
     selectedCredit && (!expectNegative || customDescription.trim().length > 0) && isExpirationValid;
 
@@ -100,8 +96,10 @@ export function UserAdminCreditGrant({
         amount_usd: customAmount ? parseFloat(customAmount) : undefined,
         description: customDescription.trim() || undefined,
         credit_category: selectedCredit,
-        credit_expiry_date: expirationDate,
-        expiry_hours: expiryHours ? parseFloat(expiryHours) : undefined,
+        creditKind: expectNegative ? 'promotional' : creditKind,
+        credit_expiry_date: creditKind === 'promotional' ? expirationDate : undefined,
+        expiry_hours:
+          creditKind === 'promotional' && expiryHours ? parseFloat(expiryHours) : undefined,
       };
 
       const response = await fetch('/admin/api/users/add-credit', {
@@ -115,7 +113,7 @@ export function UserAdminCreditGrant({
       if (response.ok) {
         setCreditMessage({
           type: 'success',
-          text: `Successfully added credit transaction to ${google_user_email}${expirationDate ? ` (expires ${expirationDate})` : ''}`,
+          text: `Successfully added credit transaction to ${google_user_email}${creditKind === 'promotional' && expirationDate ? ` (expires ${expirationDate})` : ''}`,
         });
         setSelectedCredit('');
         setCustomAmount('');
@@ -123,6 +121,7 @@ export function UserAdminCreditGrant({
         setExpirationDate('');
         setExpiryHours('');
         setNeverExpire(false);
+        setCreditKind('promotional');
         await queryClient.invalidateQueries({ queryKey: ['admin-user-credit-transactions', id] });
       } else {
         setCreditMessage({
@@ -218,6 +217,30 @@ export function UserAdminCreditGrant({
             </div>
           )}
         </div>
+        {!expectNegative && (
+          <div className="space-y-2">
+            <Label htmlFor="user-credit-kind">Credit classification</Label>
+            <Select
+              value={creditKind}
+              onValueChange={value => {
+                if (value === 'paid' || value === 'promotional') setCreditKind(value);
+              }}
+              disabled={!canManageCredits}
+            >
+              <SelectTrigger id="user-credit-kind">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="promotional">Promotional / bonus credits</SelectItem>
+                <SelectItem value="paid">Paid credits (payment received)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-muted-foreground text-xs">
+              Use paid credits only for a verified payment. Paid-credit expiration is determined by
+              the purchase policy, not promotional expiration overrides.
+            </p>
+          </div>
+        )}
 
         <div className="grid [grid-template-columns:repeat(auto-fit,minmax(150px,1fr))] gap-4">
           <div>
@@ -239,7 +262,7 @@ export function UserAdminCreditGrant({
               disabled={!canManageCredits || !selectedCredit}
             />
           </div>
-          {!expectNegative && (
+          {!expectNegative && creditKind === 'promotional' && (
             <>
               <div>
                 <Label className="text-sm font-medium" htmlFor="expiry-hours">

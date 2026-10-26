@@ -227,7 +227,6 @@
     "hideBalance": "Ocultar saldo",
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
-    "bonusCreditsExpiring": "Os créditos no valor de {{amount}} expiram em {{date}}.",
     "signOutTitle": "Terminar sessão?",
     "signOutMessage": "Terás de iniciar sessão novamente para aceder ao teu espaço de trabalho.",
     "deleteAccountTitle": "Eliminar conta?",
@@ -1506,6 +1505,22 @@
       "loadingProposals": "A carregar propostas",
       "couldNotLoadProposals": "Não foi possível carregar as propostas.",
       "noProposals": "Sem propostas",
+      "proposalDetails": "Detalhes da proposta",
+      "proposalTitle": "Título da proposta",
+      "rationale": "Justificação",
+      "saveFirst": "Guarda as tuas alterações antes de abrir um pull request.",
+      "proposalSaved": "Proposta guardada",
+      "proposalDismissed": "Proposta rejeitada",
+      "dismissProposalTitle": "Rejeitar proposta?",
+      "dismissProposalMessage": "Esta proposta será removida da lista de propostas ativas e não poderá ser restaurada.",
+      "prOpened": "Pull request para o REVIEW.md aberto",
+      "alreadyPresent": "As orientações já constam do REVIEW.md",
+      "status": {
+        "edited": "Editada",
+        "opening_change_request": "A abrir PR",
+        "change_request_failed": "Falha ao abrir PR",
+        "superseded": "Já existe"
+      },
       "noProposalsDescription": "As propostas da memória de revisão aparecem aqui depois de o Kilo analisar as respostas dos responsáveis pelo projeto."
     },
     "manualReview": {
@@ -3187,7 +3202,7 @@
     "creditActivity": {
       "emptyDescription": "As compras, a utilização e os ajustes de créditos desta organização aparecem aqui à medida que ocorrem.",
       "emptyTitle": "Sem movimentos de créditos",
-      "expires": "Expira em {{date}}",
+      "expiresUtc": "Expira em {{date}} (UTC)",
       "title": "Movimentos de créditos",
       "transactionFallback": "Transação de créditos",
       "category": {
@@ -3776,6 +3791,7 @@
     "title": "Perfis",
     "entrySubtitle": "Reutilizar definições de ambiente entre sessões",
     "newProfile": "Novo perfil",
+    "openHint": "Abre o perfil",
     "emptyTitle": "Ainda não há perfis",
     "emptyDescription": "Crie um perfil para reutilizar variáveis de ambiente, comandos de configuração e competências entre sessões.",
     "loadFailed": "Não foi possível carregar perfis",
@@ -3972,6 +3988,10 @@
   "credits": {
     "title": "Comprar créditos",
     "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de programação com IA na aplicação Kilo. A loja cobra na sua conta e os créditos são adicionados depois de a loja confirmar o pagamento.",
+    "nextExpiry": "Os créditos no valor de {{amount}} expiram em {{date}} (UTC). Os créditos com a data de expiração mais próxima são utilizados primeiro.",
+    "appStoreExpiry": "Os créditos comprados através da App Store não expiram.",
+    "playOneYearExpiry": "Estes créditos expiram um ano civil após a compra.",
+    "playNonexpiring": "Estes créditos não expiram.",
     "packLabel": "Adicionar {{amount}} em créditos",
     "priceUnavailable": "Preço indisponível",
     "purchased": "Créditos adicionados ao seu saldo.",
@@ -4014,11 +4034,13 @@
       "namePlaceholder": "Erros, ideias, versão…",
       "emoji": "Emoji",
       "mode": "Modo",
-      "defaultsHint": "As sessões iniciadas a partir desta lista usam estas predefinições."
+      "defaultsHint": "As sessões iniciadas a partir desta lista usam estas predefinições.",
+      "saveFailed": "Não foi possível guardar a lista. Verifica a tua ligação e tenta novamente."
     },
     "list": {
       "addPlaceholder": "Adiciona uma tarefa",
       "add": "Adicionar tarefa",
+      "addFailed": "Não foi possível adicionar a tarefa. Verifica a tua ligação e tenta novamente.",
       "empty": "Ainda sem tarefas",
       "setDefaults": "Definir repositório, modo e modelo",
       "completed_one": "Concluídas ({{count}})",
@@ -4057,7 +4079,9 @@
       "startNewSession": "Iniciar nova sessão",
       "startNewSessionHint": "Mantenha premido para iniciar uma nova sessão.",
       "linkSession": "Associar sessão",
-      "linkFailed": "Não foi possível associar a sessão à tarefa"
+      "linkFailed": "Não foi possível associar a sessão à tarefa",
+      "moveToAnotherTodo": "Mover para outra tarefa",
+      "startRefreshFailed": "A sessão iniciou, mas esta lista não foi atualizada."
     },
     "linkSession": {
       "title": "Associar a uma sessão",
@@ -4066,6 +4090,7 @@
     },
     "upNext": "A seguir",
     "sessionTodo": "Tarefa: {{title}}",
+    "openTodoHint": "Abre a tarefa.",
     "linkToTodo": "Associar a tarefa",
     "candidates": {
       "empty": "Sem tarefas em aberto"

@@ -3,26 +3,33 @@ import { createTestHarness, unstable_readConfig } from 'wrangler';
 import { expect, it, vi } from 'vitest';
 import { usage } from './usage.test-fixture';
 
-it('keeps production direct and routes the existing staging consumer through the private relay', () => {
+it('keeps production and the single staging EU consumer direct, with the private relay available', () => {
   const config = new URL('../wrangler.jsonc', import.meta.url).pathname;
   const production = unstable_readConfig({ config });
   const staging = unstable_readConfig({ config, env: 'staging' });
   expect(production.services).toEqual([]);
   expect(production.vars.USAGE_INGEST_DIAGNOSTICS).toBeUndefined();
   expect(staging.vars.USAGE_INGEST_DIAGNOSTICS).toBe('all');
-  expect(staging.services).toMatchObject([
-    { binding: 'USAGE_WRITER_RELAY', service: 'usage-writer-relay-staging' },
+  expect(production.queues.producers).toEqual([
+    { binding: 'USAGE_INGEST_QUEUE', queue: 'usage-ingest-processing' },
+    { binding: 'USAGE_INGEST_DLQ', queue: 'usage-ingest-processing-dlq' },
   ]);
+  expect(staging.queues.producers).toEqual([
+    { binding: 'USAGE_INGEST_QUEUE', queue: 'usage-ingest-processing-staging-eu' },
+    { binding: 'USAGE_INGEST_DLQ', queue: 'usage-ingest-processing-dlq-staging-eu' },
+  ]);
+  expect(staging.services).toEqual([]);
   expect(staging.name).toBe('usage-ingest-staging');
+  expect(staging.queues.consumers).toHaveLength(1);
   expect(staging.queues.consumers).toMatchObject([
     {
-      queue: 'usage-ingest-processing-staging',
-      max_batch_size: 1,
+      queue: 'usage-ingest-processing-staging-eu',
+      max_batch_size: 2,
       max_batch_timeout: 0,
       max_retries: 3,
       retry_delay: 60,
       max_concurrency: 200,
-      dead_letter_queue: 'usage-ingest-processing-dlq-staging',
+      dead_letter_queue: 'usage-ingest-processing-dlq-staging-eu',
     },
   ]);
   const relay = unstable_readConfig({
@@ -36,7 +43,7 @@ it('keeps production direct and routes the existing staging consumer through the
   expect(relay.vars.USAGE_INGEST_DIAGNOSTICS).toBe('all');
 });
 
-it('runs the real queue -> service-binding fetch -> relay -> HTTP writer path', async () => {
+it('runs the optional queue -> service-binding fetch -> relay -> HTTP writer path', async () => {
   const calls: { path: string | undefined; body: unknown; headers: Record<string, unknown> }[] = [];
   const release = Promise.withResolvers<void>();
   const writer = createServer(async (request, response) => {
@@ -73,6 +80,8 @@ it('runs the real queue -> service-binding fetch -> relay -> HTTP writer path', 
         {
           configPath: new URL('../wrangler.jsonc', import.meta.url),
           env: 'staging',
+          // Restore the optional binding only in this rollback-path fixture.
+          bindingOverrides: { USAGE_WRITER_RELAY: 'usage-writer-relay-staging' },
           vars: {
             // Direct egress here cannot reach the loopback writer. Only the relay
             // knows that target, proving this test traverses the service binding.
@@ -113,7 +122,7 @@ it('runs the real queue -> service-binding fetch -> relay -> HTTP writer path', 
     expect(entries).toHaveLength(1);
     expect(entries[0]).toMatchObject({
       usage_id: usage.core.id,
-      queue: 'usage-ingest-processing-staging',
+      queue: 'usage-ingest-processing-staging-eu',
       handler_entry_at_ms: expect.any(Number),
       message_timestamp_ms: expect.any(Number),
       event_created_at_ms: Date.parse(usage.core.created_at),
@@ -176,7 +185,8 @@ it('runs the real queue -> service-binding fetch -> relay -> HTTP writer path', 
       });
       expect(log.forward_duration_ms).toBeGreaterThanOrEqual(0);
     }
-    for (const log of processingLogs()) expect(log.queue).toBe('usage-ingest-processing-staging');
+    for (const log of processingLogs())
+      expect(log.queue).toBe('usage-ingest-processing-staging-eu');
     const logs = JSON.stringify(harness.getLogs());
     for (const value of [
       'synthetic-publisher',

@@ -1,5 +1,4 @@
 import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
-import type { Images } from '@kilocode/app-shared/images-schema';
 import {
   errorShapeSchema,
   parseCustomerBillingFailure,
@@ -605,7 +604,6 @@ type SessionManager = {
   send(input: {
     payload: SessionManagerSendPayload;
     attachments?: CloudAgentAttachments;
-    images?: Images;
     /**
      * Ready file parts to forward to a remote CLI session. Distinct from the
      * cloud-only `attachments` field: cloud sessions use `attachments`, remote
@@ -3201,7 +3199,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   async function send(input: {
     payload: SessionManagerSendPayload;
     attachments?: CloudAgentAttachments;
-    images?: Images;
     attachmentParts?: RemoteAttachmentPart[];
     onOptimisticSend?: () => void;
   }): Promise<boolean> {
@@ -3342,7 +3339,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         payload: transportPayload,
         messageId,
         ...(input.attachments ? { attachments: input.attachments } : {}),
-        images: input.images,
         ...(sessionType === 'remote' && remoteModelOverride ? { remoteModelOverride } : {}),
         ...(input.attachmentParts && input.attachmentParts.length > 0
           ? { attachmentParts: input.attachmentParts }

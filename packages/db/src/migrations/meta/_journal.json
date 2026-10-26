@@ -2115,6 +2115,27 @@
       "when": 1792876471766,
       "tag": "0301_contributor_credit_window",
       "breakpoints": true
+    },
+    {
+      "idx": 302,
+      "version": "7",
+      "when": 1792878599267,
+      "tag": "0302_loud_victor_mancha",
+      "breakpoints": true
+    },
+    {
+      "idx": 303,
+      "version": "7",
+      "when": 1793016204545,
+      "tag": "0303_rainy_wildside",
+      "breakpoints": true
+    },
+    {
+      "idx": 304,
+      "version": "7",
+      "when": 1793024513267,
+      "tag": "0304_fine_moonstone",
+      "breakpoints": true
     }
   ]
 }

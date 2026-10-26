@@ -227,7 +227,6 @@
     "hideBalance": "Ukryj saldo",
     "showBalance": "Pokaż saldo",
     "balanceHidden": "Saldo ukryte",
-    "bonusCreditsExpiring": "Środki w kwocie {{amount}} stracą ważność {{date}}.",
     "signOutTitle": "Wylogować się?",
     "signOutMessage": "Aby wrócić do swojego obszaru roboczego, musisz zalogować się ponownie.",
     "deleteAccountTitle": "Usunąć konto?",
@@ -1020,6 +1019,22 @@
       "loading": "Ładowanie pamięci przeglądów",
       "loadingProposals": "Ładowanie propozycji",
       "noProposals": "Brak propozycji",
+      "proposalDetails": "Szczegóły propozycji",
+      "proposalTitle": "Tytuł propozycji",
+      "rationale": "Uzasadnienie",
+      "saveFirst": "Zapisz zmiany przed otwarciem pull requesta.",
+      "proposalSaved": "Propozycja zapisana",
+      "proposalDismissed": "Propozycja odrzucona",
+      "dismissProposalTitle": "Odrzucić propozycję?",
+      "dismissProposalMessage": "Ta propozycja zostanie usunięta z listy aktywnych propozycji i nie będzie można jej przywrócić.",
+      "prOpened": "Otwarto pull request do pliku REVIEW.md",
+      "alreadyPresent": "Wytyczne są już w pliku REVIEW.md",
+      "status": {
+        "edited": "Edytowana",
+        "opening_change_request": "Otwieranie PR",
+        "change_request_failed": "Nie udało się otworzyć PR",
+        "superseded": "Już istnieje"
+      },
       "noProposalsDescription": "Propozycje z pamięci przeglądów pojawią się tutaj, gdy Kilo przeanalizuje odpowiedzi opiekunów repozytorium.",
       "off": "Pamięć przeglądów jest wyłączona.",
       "on": "Pamięć przeglądów jest włączona.",
@@ -3223,7 +3238,7 @@
     "creditActivity": {
       "emptyDescription": "Tutaj na bieżąco pojawiają się doładowania, zużycie środków i korekty salda tej organizacji.",
       "emptyTitle": "Brak operacji na saldzie",
-      "expires": "Wygasa {{date}}",
+      "expiresUtc": "Wygasa {{date}} (UTC)",
       "title": "Historia salda",
       "transactionFallback": "Operacja na saldzie",
       "category": {
@@ -3822,6 +3837,7 @@
     "title": "Profile",
     "entrySubtitle": "Wykorzystuj ponownie ustawienia środowiska w różnych sesjach",
     "newProfile": "Nowy profil",
+    "openHint": "Otwiera profil",
     "emptyTitle": "Nie ma jeszcze profili",
     "emptyDescription": "Utwórz profil, aby ponownie używać zmiennych środowiskowych, poleceń konfiguracyjnych i umiejętności w różnych sesjach.",
     "loadFailed": "Nie udało się załadować profili",
@@ -4023,6 +4039,10 @@
   "credits": {
     "title": "Kup kredyty",
     "description": "Kredyty to jednorazowy zakup dodawany do Twojego salda Kilo na potrzeby sesji kodowania AI w aplikacji Kilo. Sklep obciąża Twoje konto, a kredyty są dodawane po potwierdzeniu płatności przez sklep.",
+    "nextExpiry": "Kredyty w kwocie {{amount}} stracą ważność {{date}} (UTC). Najpierw wykorzystywane są kredyty z najwcześniejszym terminem ważności.",
+    "appStoreExpiry": "Kredyty kupione przez App Store nie tracą ważności.",
+    "playOneYearExpiry": "Te kredyty tracą ważność rok kalendarzowy po zakupie.",
+    "playNonexpiring": "Te kredyty nie tracą ważności.",
     "packLabel": "Dodaj {{amount}} w kredytach",
     "priceUnavailable": "Cena niedostępna",
     "purchased": "Kredyty zostały dodane do Twojego salda.",
@@ -4067,11 +4087,13 @@
       "namePlaceholder": "Błędy, Pomysły, Wydanie…",
       "emoji": "Emoji",
       "mode": "Tryb",
-      "defaultsHint": "Sesje rozpoczęte z tej listy używają tych ustawień domyślnych."
+      "defaultsHint": "Sesje rozpoczęte z tej listy używają tych ustawień domyślnych.",
+      "saveFailed": "Nie udało się zapisać listy. Sprawdź połączenie i spróbuj ponownie."
     },
     "list": {
       "addPlaceholder": "Dodaj zadanie",
       "add": "Dodaj zadanie",
+      "addFailed": "Nie udało się dodać zadania. Sprawdź połączenie i spróbuj ponownie.",
       "empty": "Brak zadań",
       "setDefaults": "Ustaw repozytorium, tryb i model",
       "completed_one": "Ukończone ({{count}})",
@@ -4112,7 +4134,9 @@
       "startNewSession": "Rozpocznij nową sesję",
       "startNewSessionHint": "Przytrzymaj, aby rozpocząć nową sesję.",
       "linkSession": "Powiąż sesję",
-      "linkFailed": "Nie udało się powiązać sesji z zadaniem"
+      "linkFailed": "Nie udało się powiązać sesji z zadaniem",
+      "moveToAnotherTodo": "Przenieś do innego zadania",
+      "startRefreshFailed": "Sesja została rozpoczęta, ale nie udało się zaktualizować tej listy."
     },
     "linkSession": {
       "title": "Powiąż sesję",
@@ -4121,6 +4145,7 @@
     },
     "upNext": "Następne",
     "sessionTodo": "Zadanie: {{title}}",
+    "openTodoHint": "Otwiera zadanie.",
     "linkToTodo": "Powiąż z zadaniem",
     "candidates": {
       "empty": "Brak otwartych zadań"

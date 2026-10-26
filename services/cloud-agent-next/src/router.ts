@@ -22,6 +22,13 @@ import {
   getHostedWorkspace,
   listHostedWorkspaces,
 } from './router/handlers/hosted-workspace-list.js';
+import {
+  buildEnvironment,
+  cancelEnvironmentBuild,
+  getEnvironmentBuildLogs,
+  getEnvironmentBuildStatus,
+  notifyEnvironmentDeleted,
+} from './router/handlers/environment-build.js';
 
 export const appRouter = router({
   deleteWorktree,
@@ -30,6 +37,11 @@ export const appRouter = router({
   listHostedSessions,
   listHostedWorkspaces,
   getHostedWorkspace,
+  buildEnvironment,
+  getEnvironmentBuildStatus,
+  getEnvironmentBuildLogs,
+  cancelEnvironmentBuild,
+  notifyEnvironmentDeleted,
   ...createSessionManagementHandlers(),
   ...createSessionPrepareHandlers(),
   ...createSessionExecutionV2Handlers(),

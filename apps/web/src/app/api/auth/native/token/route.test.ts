@@ -83,6 +83,7 @@ import {
   createDeviceSession,
   issueSessionCredentials,
   createDeviceSessionWithAttestedKey,
+  revokeDeviceSession,
 } from '@/lib/auth/device-sessions';
 import { captureMessage } from '@sentry/nextjs';
 
@@ -106,6 +107,7 @@ const mockPersistAttestedKey = jest.mocked(persistAttestedKey);
 const mockCreateDeviceSession = jest.mocked(createDeviceSession);
 const mockIssueSessionCredentials = jest.mocked(issueSessionCredentials);
 const mockCreateDeviceSessionWithAttestedKey = jest.mocked(createDeviceSessionWithAttestedKey);
+const mockRevokeDeviceSession = jest.mocked(revokeDeviceSession);
 const mockCaptureMessage = jest.mocked(captureMessage);
 
 const fakeUser = { id: 'user-1', api_token_pepper: 'pepper' } as User;
@@ -137,6 +139,7 @@ describe('POST /api/auth/native/token', () => {
       isNew: false,
     } as never);
     mockGenerateApiToken.mockReturnValue('minted-jwt');
+    mockCreateDeviceSession.mockResolvedValue('session-1');
     mockCheckDomainSignInEligibility.mockResolvedValue({ ok: true, existingUser: false });
     mockFindUserById.mockResolvedValue(undefined);
     mockFindUserByNormalizedEmail.mockResolvedValue(undefined);
@@ -160,6 +163,7 @@ describe('POST /api/auth/native/token', () => {
     mockCommitSignInCode.mockResolvedValue(true);
     mockReleaseSignInCode.mockResolvedValue(undefined);
     mockConsumeSignInCode.mockResolvedValue(true);
+    mockRevokeDeviceSession.mockResolvedValue(undefined);
   });
 
   describe('apple', () => {
@@ -198,7 +202,13 @@ describe('POST /api/auth/native/token', () => {
         true,
         expect.any(Function)
       );
-      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser);
+      expect(mockCreateDeviceSession).toHaveBeenCalledWith({
+        userId: fakeUser.id,
+        userAgent: undefined,
+      });
+      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser, {
+        deviceSessionId: 'session-1',
+      });
     });
 
     it('falls back to the email prefix as the name when fullName is not provided', async () => {
@@ -827,6 +837,34 @@ describe('POST /api/auth/native/token', () => {
       expect(mockReleaseSignInCode).toHaveBeenCalledTimes(1);
     });
 
+    it('uses the same email sign-in after a subsequent attempt', async () => {
+      mockCreateDeviceSession
+        .mockRejectedValueOnce(new Error('temporary'))
+        .mockResolvedValueOnce('session-retry');
+
+      const email = 'session-retry@example.com';
+      const code = '246810';
+
+      await expect(POST(createRequest({ provider: 'email', email, code }))).rejects.toThrow(
+        'temporary'
+      );
+
+      // Retry the same sign-in after session-bound credential preparation.
+      expect(mockCommitSignInCode).not.toHaveBeenCalled();
+      expect(mockConsumeSignInCode).not.toHaveBeenCalled();
+      expect(mockReleaseSignInCode).toHaveBeenCalledWith(email, code, undefined);
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+
+      const retry = await POST(createRequest({ provider: 'email', email, code }));
+
+      expect(retry.status).toBe(200);
+      expect(await retry.json()).toEqual({ token: 'minted-jwt', created: false });
+      expect(mockCommitSignInCode).toHaveBeenCalledWith(email, code, undefined);
+      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser, {
+        deviceSessionId: 'session-retry',
+      });
+    });
+
     it('releases the reservation on an unexpected error', async () => {
       mockCreateOrUpdateUser.mockRejectedValue(new Error('DB crash'));
 
@@ -862,10 +900,26 @@ describe('POST /api/auth/native/token', () => {
 
       expect(response.status).toBe(401);
       expect(await response.json()).toEqual({ error: 'INVALID_CODE' });
-      // No credentials must be issued when consumeSignInCode fails.
       expect(mockGenerateApiToken).not.toHaveBeenCalled();
-      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
       expect(mockReleaseSignInCode).not.toHaveBeenCalled();
+      // The prepared session is not left usable for a request that delivers nothing.
+      expect(mockRevokeDeviceSession).toHaveBeenCalledWith('session-1', 'sign_in_not_completed');
+    });
+
+    it('revokes the prepared session when the code confirmation throws', async () => {
+      mockCommitSignInCode.mockRejectedValue(new Error('commit failed'));
+
+      const email = 'commit-failed@example.com';
+      const code = '135790';
+
+      await expect(POST(createRequest({ provider: 'email', email, code }))).rejects.toThrow(
+        'commit failed'
+      );
+
+      expect(mockReleaseSignInCode).toHaveBeenCalledWith(email, code, undefined);
+      expect(mockRevokeDeviceSession).toHaveBeenCalledWith('session-1', 'sign_in_not_completed');
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
     });
 
     it('reservation-lapse full-flow produces one account and one device session', async () => {
@@ -1561,8 +1615,13 @@ describe('POST /api/auth/native/token', () => {
 
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({ token: 'minted-jwt', created: false });
-      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser);
-      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockCreateDeviceSession).toHaveBeenCalledWith({
+        userId: fakeUser.id,
+        userAgent: undefined,
+      });
+      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser, {
+        deviceSessionId: 'session-1',
+      });
       expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_token_legacy_long_lived_count: 1');
     });
@@ -1583,7 +1642,13 @@ describe('POST /api/auth/native/token', () => {
 
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({ token: 'minted-jwt', created: false });
-      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockCreateDeviceSession).toHaveBeenCalledWith({
+        userId: fakeUser.id,
+        userAgent: undefined,
+      });
+      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser, {
+        deviceSessionId: 'session-1',
+      });
       expect(mockCaptureMessage).toHaveBeenCalledWith('native_token_legacy_long_lived_count: 1');
     });
   });
@@ -1812,8 +1877,13 @@ describe('POST /api/auth/native/token', () => {
 
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({ token: 'minted-jwt', created: false });
-      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser);
-      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockCreateDeviceSession).toHaveBeenCalledWith({
+        userId: fakeUser.id,
+        userAgent: undefined,
+      });
+      expect(mockGenerateApiToken).toHaveBeenCalledWith(fakeUser, {
+        deviceSessionId: 'device-session-1',
+      });
       expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
     });
 

@@ -227,7 +227,6 @@
     "hideBalance": "Ocultar saldo",
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
-    "bonusCreditsExpiring": "Tienes {{amount}} en créditos que caducan el {{date}}.",
     "signOutTitle": "¿Cerrar sesión?",
     "signOutMessage": "Tendrás que iniciar sesión de nuevo para acceder a tu espacio de trabajo.",
     "deleteAccountTitle": "¿Eliminar cuenta?",
@@ -1017,6 +1016,22 @@
       "loading": "Cargando la memoria de revisión",
       "loadingProposals": "Cargando propuestas",
       "noProposals": "Sin propuestas",
+      "proposalDetails": "Detalles de la propuesta",
+      "proposalTitle": "Título de la propuesta",
+      "rationale": "Justificación",
+      "saveFirst": "Guarda tus cambios antes de abrir una pull request.",
+      "proposalSaved": "Propuesta guardada",
+      "proposalDismissed": "Propuesta descartada",
+      "dismissProposalTitle": "¿Descartar la propuesta?",
+      "dismissProposalMessage": "Esta propuesta se eliminará de la lista de propuestas activas y no se podrá restaurar.",
+      "prOpened": "Pull request de REVIEW.md abierta",
+      "alreadyPresent": "Las directrices ya están en REVIEW.md",
+      "status": {
+        "edited": "Editada",
+        "opening_change_request": "Abriendo PR",
+        "change_request_failed": "PR fallida",
+        "superseded": "Ya existe"
+      },
       "noProposalsDescription": "Las propuestas de la memoria de revisión aparecen aquí después de que Kilo analice las respuestas de los responsables del mantenimiento.",
       "off": "La memoria de revisión está desactivada.",
       "on": "La memoria de revisión está activada.",
@@ -3179,7 +3194,7 @@
     "creditActivity": {
       "emptyDescription": "Aquí aparecerán las compras, el consumo y los ajustes de créditos de esta organización a medida que se registren.",
       "emptyTitle": "Sin movimientos de créditos",
-      "expires": "Caduca el {{date}}",
+      "expiresUtc": "Caduca el {{date}} (UTC)",
       "title": "Movimientos de créditos",
       "transactionFallback": "Transacción de créditos",
       "category": {
@@ -3776,6 +3791,7 @@
     "title": "Perfiles",
     "entrySubtitle": "Reutilizar la configuración del entorno en todas las sesiones",
     "newProfile": "Nuevo perfil",
+    "openHint": "Abre el perfil",
     "emptyTitle": "Aún no hay perfiles",
     "emptyDescription": "Cree un perfil para reutilizar variables de entorno, comandos de configuración y habilidades en todas las sesiones.",
     "loadFailed": "No se pudieron cargar perfiles",
@@ -3972,6 +3988,10 @@
   "credits": {
     "title": "Comprar créditos",
     "description": "Los créditos son una compra única que se añade a tu saldo de Kilo para ejecutar sesiones de codificación con IA en Kilo App. La tienda cobra en tu cuenta y los créditos se añaden cuando la tienda confirma el pago.",
+    "nextExpiry": "{{amount}} en créditos caducan el {{date}} (UTC). Los créditos con la caducidad más próxima se usan primero.",
+    "appStoreExpiry": "Los créditos comprados a través de la App Store no caducan.",
+    "playOneYearExpiry": "Estos créditos caducan un año natural después de la compra.",
+    "playNonexpiring": "Estos créditos no caducan.",
     "packLabel": "Añadir {{amount}} en créditos",
     "priceUnavailable": "Precio no disponible",
     "purchased": "Se han añadido créditos a tu saldo.",
@@ -4014,11 +4034,13 @@
       "namePlaceholder": "Errores, Ideas, Versión…",
       "emoji": "Emoji",
       "mode": "Modo",
-      "defaultsHint": "Las sesiones iniciadas desde esta lista usan estos valores predeterminados."
+      "defaultsHint": "Las sesiones iniciadas desde esta lista usan estos valores predeterminados.",
+      "saveFailed": "No se pudo guardar la lista. Comprueba tu conexión e inténtalo de nuevo."
     },
     "list": {
       "addPlaceholder": "Añadir una tarea",
       "add": "Añadir tarea",
+      "addFailed": "No se pudo añadir la tarea. Comprueba tu conexión e inténtalo de nuevo.",
       "empty": "Aún no hay tareas",
       "setDefaults": "Definir repositorio, modo y modelo",
       "completed_one": "Completadas ({{count}})",
@@ -4057,7 +4079,9 @@
       "startNewSession": "Iniciar nueva sesión",
       "startNewSessionHint": "Mantén pulsado para iniciar una nueva sesión.",
       "linkSession": "Vincular sesión",
-      "linkFailed": "No se pudo vincular la sesión a la tarea"
+      "linkFailed": "No se pudo vincular la sesión a la tarea",
+      "moveToAnotherTodo": "Mover a otra tarea",
+      "startRefreshFailed": "La sesión se inició, pero esta lista no se actualizó."
     },
     "linkSession": {
       "title": "Vincular una sesión",
@@ -4066,6 +4090,7 @@
     },
     "upNext": "A continuación",
     "sessionTodo": "Tarea: {{title}}",
+    "openTodoHint": "Abre la tarea.",
     "linkToTodo": "Vincular a una tarea",
     "candidates": {
       "empty": "No hay tareas abiertas"

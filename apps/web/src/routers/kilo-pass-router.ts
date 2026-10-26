@@ -1,4 +1,6 @@
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
+import type { PaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy';
 import { captureException } from '@sentry/nextjs';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -140,6 +142,7 @@ const KiloPassCreditHistoryEntrySchema = z.object({
   id: z.string(),
   date: z.string(),
   amountUsd: z.number(),
+  expiryDate: z.string().nullable(),
   kind: z.enum([
     KiloPassIssuanceItemKind.Base,
     KiloPassIssuanceItemKind.Bonus,
@@ -284,6 +287,7 @@ type KiloPassCreditHistoryRow = {
   amountUsd: number;
   createdAt: string;
   description: string | null;
+  expiryDate: string | null;
 };
 
 type StripeManagedKiloPassSubscription = KiloPassSubscriptionState & {
@@ -637,6 +641,7 @@ async function getKiloPassIssuanceCreditHistoryRows(
       amountUsd: kilo_pass_issuance_items.amount_usd,
       createdAt: credit_transactions.created_at,
       description: credit_transactions.description,
+      expiryDate: credit_transactions.expiry_date,
     })
     .from(kilo_pass_issuance_items)
     .innerJoin(
@@ -668,6 +673,7 @@ async function getStoreUpgradeCreditHistoryRows(params: {
         amountMicrodollars: credit_transactions.amount_microdollars,
         createdAt: credit_transactions.created_at,
         description: credit_transactions.description,
+        expiryDate: credit_transactions.expiry_date,
       })
       .from(credit_transactions)
       .innerJoin(
@@ -704,6 +710,7 @@ async function getStoreUpgradeCreditHistoryRows(params: {
         amountMicrodollars: credit_transactions.amount_microdollars,
         createdAt: credit_transactions.created_at,
         description: credit_transactions.description,
+        expiryDate: credit_transactions.expiry_date,
       })
       .from(credit_transactions)
       .innerJoin(
@@ -730,6 +737,7 @@ async function getStoreUpgradeCreditHistoryRows(params: {
     amountUsd: roundToCents(fromMicrodollars(row.amountMicrodollars)),
     createdAt: row.createdAt,
     description: row.description,
+    expiryDate: row.expiryDate,
   }));
 }
 
@@ -1252,7 +1260,9 @@ export async function createPersonalKiloPassCheckoutSession(params: {
   affiliateTrackingId: string;
   priceId: string;
   deps?: PersonalKiloPassCheckoutDependencies;
+  paidCreditTerms?: PaidCreditTerms;
 }): Promise<CheckoutSessionLike & { amountCents: number }> {
+  const paidCreditTerms = params.paidCreditTerms ?? getPaidCreditTerms('pass', params.deps?.now);
   const deps = {
     ...createDefaultPersonalKiloPassCheckoutDependencies(),
     ...params.deps,
@@ -1278,6 +1288,7 @@ export async function createPersonalKiloPassCheckoutSession(params: {
     tier: params.tier,
     cadence: params.cadence,
     affiliateTrackingId: params.affiliateTrackingId,
+    paid_credit_policy: paidCreditTerms,
   };
   const sessionMetadata = mergeServiceFeeCommercialMetadata(
     productMetadata,
@@ -1290,6 +1301,14 @@ export async function createPersonalKiloPassCheckoutSession(params: {
     prepared,
     buildSessionParams: feeLine => ({
       mode: 'subscription',
+      ...(paidCreditTerms === 'one_year' && {
+        custom_text: {
+          submit: {
+            message:
+              'Each monthly base-credit allotment expires one year after issuance. Bonus-credit deadlines are unchanged.',
+          },
+        },
+      }),
       customer: params.stripeCustomerId,
       allow_promotion_codes: true,
       billing_address_collection: 'required',
@@ -2757,6 +2776,7 @@ export const kiloPassRouter = createTRPCRouter({
         amountUsd: row.amountUsd,
         kind: row.kind,
         description: row.description ?? `${row.kind} credits`,
+        expiryDate: row.expiryDate,
       }));
 
       return {
@@ -2789,12 +2809,14 @@ export const kiloPassRouter = createTRPCRouter({
 
       const priceId = getStripePriceIdForKiloPass({ tier, cadence });
       const attribution = await getAffiliateAttribution(ctx.user.id, 'impact');
+      const paidCreditTerms = getPaidCreditTerms('pass');
       const sessionMetadata = {
         type: 'kilo-pass',
         kiloUserId: ctx.user.id,
         tier,
         cadence,
         affiliateTrackingId: attribution?.tracking_id ?? '',
+        paid_credit_policy: paidCreditTerms,
       };
 
       await assertChargeAllowed({
@@ -2816,6 +2838,7 @@ export const kiloPassRouter = createTRPCRouter({
             cadence,
             affiliateTrackingId: attribution?.tracking_id ?? '',
             priceId,
+            paidCreditTerms,
           }),
         // Enqueue inside the checkout transaction for the charged session, created or reused. The
         // stable id derived from the session id makes a retry or reuse idempotent.

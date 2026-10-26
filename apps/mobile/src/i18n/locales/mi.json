@@ -227,7 +227,6 @@
     "hideBalance": "Hunaia te toenga",
     "showBalance": "Whakaaturia te toenga",
     "balanceHidden": "Kua huna te toenga",
-    "bonusCreditsExpiring": "Ka mōnehu ā te {{date}} ngā moni {{amount}}.",
     "signOutTitle": "Takiputa?",
     "signOutMessage": "Me takiuru anō koe kia uru ki tō wāhi mahi.",
     "deleteAccountTitle": "Mukua te pūkete?",
@@ -1484,6 +1483,22 @@
       "loadingProposals": "Kei te uta i ngā tono",
       "couldNotLoadProposals": "Kāore i taea te uta i ngā tono.",
       "noProposals": "Kāore he tono",
+      "proposalDetails": "Ngā taipitopito o te tono",
+      "proposalTitle": "Te taitara o te tono",
+      "rationale": "Te take",
+      "saveFirst": "Tiakina ō whakatikatika i mua i te whakatuwhera i tētahi PR.",
+      "proposalSaved": "Kua tiakina te tono",
+      "proposalDismissed": "Kua whakakorea te tono",
+      "dismissProposalTitle": "Whakakorea te tono?",
+      "dismissProposalMessage": "Ka tangohia tēnei tono i te rārangi hohe, ā, kāore e taea te whakahoki mai.",
+      "prOpened": "Kua whakatuwheratia te PR mō REVIEW.md",
+      "alreadyPresent": "Kei roto kē ngā aratohu i REVIEW.md",
+      "status": {
+        "edited": "Kua whakatikaina",
+        "opening_change_request": "Kei te whakatuwhera PR",
+        "change_request_failed": "Kāore i taea te whakatuwhera i te PR",
+        "superseded": "Kei roto kē"
+      },
       "noProposalsDescription": "Ka puta ngā tono mahara arotake ki konei i muri i te tātari a Kilo i ngā whakautu a ngā kaitiaki."
     },
     "manualReview": {
@@ -3143,7 +3158,7 @@
     "creditActivity": {
       "emptyDescription": "Ka puta ki konei ngā hokonga, te whakamahinga me ngā whakatikatika moni tōmua o tēnei rōpū i te wā e mahia ana.",
       "emptyTitle": "Kāore he tauwhitinga moni tōmua",
-      "expires": "Ka mōnehu ā te {{date}}",
+      "expiresUtc": "Ka mōnehu ā te {{date}} (UTC)",
       "title": "Ngā tauwhitinga moni tōmua",
       "transactionFallback": "Tauwhitinga moni tōmua",
       "category": {
@@ -3730,6 +3745,7 @@
     "title": "Kōtaha",
     "entrySubtitle": "Whakamahia ano nga tautuhinga taiao puta noa i nga waahi",
     "newProfile": "Kōtaha hou",
+    "openHint": "Ka whakatuwhera i te kōtaha",
     "emptyTitle": "Karekau he pūkete",
     "emptyDescription": "Waihangatia he kōtaha hei whakamahi ano i nga taurangi taiao, nga whakahau tatūnga, me nga pukenga puta noa i nga waahi.",
     "loadFailed": "Kāore i taea te uta kōtaha",
@@ -3921,6 +3937,10 @@
   "credits": {
     "title": "Hoko whiwhinga",
     "description": "He hokonga kotahi ngā whiwhinga ka tāpirihia ki tō toenga Kilo hei whakahaere i ngā wātū whakawaehere AI i te Taupānga Kilo. Ka utu te toa i tō pūkete, ā, ka tāpirihia ngā whiwhinga i muri i te whakamanatanga a te toa i te utu.",
+    "nextExpiry": "Ka mōnehu ā te {{date}} (UTC) ngā whiwhinga {{amount}}. Ka whakamahia tuatahitia ngā whiwhinga ka mōnehu tuatahi.",
+    "appStoreExpiry": "Kāore e mōnehu ngā whiwhinga i hokona mā te App Store.",
+    "playOneYearExpiry": "Ka mōnehu ēnei whiwhinga kotahi tau maramataka i muri i te hokonga.",
+    "playNonexpiring": "Kāore e mōnehu ēnei whiwhinga.",
     "packLabel": "Tāpirihia {{amount}} whiwhinga",
     "priceUnavailable": "Kāore te utu e wātea",
     "purchased": "Kua tāpirihia ngā whiwhinga ki tō toenga.",
@@ -3961,11 +3981,13 @@
       "namePlaceholder": "Hē, Whakaaro, Whakaputanga…",
       "emoji": "Emoji",
       "mode": "Aratau",
-      "defaultsHint": "Ka whakamahi ngā wātū ka tīmata mai i tēnei rārangi i ēnei taunoa."
+      "defaultsHint": "Ka whakamahi ngā wātū ka tīmata mai i tēnei rārangi i ēnei taunoa.",
+      "saveFailed": "Kāore i taea te tiaki i te rārangi. Tirohia tō hononga, ka ngana anō."
     },
     "list": {
       "addPlaceholder": "Tāpiri mahi",
       "add": "Tāpiri",
+      "addFailed": "Kāore i taea te tāpiri i te mahi. Tirohia tō hononga, ka ngana anō.",
       "empty": "Kāore anō he mahi",
       "setDefaults": "Tautuhia te pūranga waehere, te aratau me te tauira",
       "completed_one": "Kua oti ({{count}})",
@@ -4002,7 +4024,9 @@
       "startNewSession": "Tīmata wātū hou",
       "startNewSessionHint": "Pēhia kia roa kia tīmata ai i tētahi wātū hou.",
       "linkSession": "Hono wātū",
-      "linkFailed": "Kāore i taea te hono te wātū ki te mahi"
+      "linkFailed": "Kāore i taea te hono te wātū ki te mahi",
+      "moveToAnotherTodo": "Neke ki tētahi mahi",
+      "startRefreshFailed": "Kua tīmata te wātū, engari kāore i whakahōutia tēnei rārangi."
     },
     "linkSession": {
       "title": "Hono i tētahi wātū",
@@ -4011,6 +4035,7 @@
     },
     "upNext": "E whai ake nei",
     "sessionTodo": "Mahi: {{title}}",
+    "openTodoHint": "Ka whakatuwhera i te mahi.",
     "linkToTodo": "Hono ki te mahi",
     "candidates": {
       "empty": "Kāore he mahi tuwhera"

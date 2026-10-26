@@ -53,6 +53,7 @@
     "connected": "Verbunden",
     "couldNotLoadModels": "Die Modelle konnten nicht geladen werden.",
     "couldNotLoadRepositories": "Die Code-Repositories konnten nicht geladen werden.",
+    "noRepositoriesFound": "Keine Repositories gefunden",
     "critical": "Kritisch",
     "delete": "Löschen",
     "deleted": "Gelöscht",
@@ -87,6 +88,7 @@
     "connect": "Verbinden",
     "connectBitbucket": "Bitbucket verbinden",
     "connectGitlab": "GitLab verbinden",
+    "connectProvider": "Anbieter verbinden",
     "contentTruncated": "Inhalt gekürzt",
     "copyLink": "Link kopieren",
     "couldNotLoadOrganizations": "Die Organisationen konnten nicht geladen werden.",
@@ -145,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Änderungen"
+    "changes": "Änderungen",
+    "organizationTrialEnded": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Ein Inhaber der Organisation kann die Abrechnung unter kilo.ai aktualisieren und es dann erneut versuchen."
   },
   "language": {
     "restarting": "Neustart zum Übernehmen der Sprache",
@@ -269,7 +272,6 @@
     "voiceInput": "Spracheingabe",
     "autoExpandThinking": "Denkprozess automatisch aufklappen",
     "autoExpandThinkingSubtitle": "Den Denkprozess des Agenten nach Abschluss aufgeklappt anzeigen.",
-    "autoExpandThinkingInactiveSubtitle": "Keine Auswirkung, solange Denkdetails ausgeblendet sind.",
     "hideThinking": "Denkdetails ausblenden",
     "hideThinkingSubtitle": "Den Denkprozess des Agenten nicht auf der Sitzungsseite anzeigen.",
     "keepScreenOn": "Bildschirm in der Sitzungsansicht eingeschaltet lassen",
@@ -294,7 +296,8 @@
     "condenseToolCallsSubtitle": "Aufeinanderfolgende Tool-Aufrufe in einer Zeile zusammenfassen, die sich öffnen lässt.",
     "toolSummaryTranslation": "Werkzeugzusammenfassungen übersetzen",
     "toolSummaryTranslationSubtitle": "Sende jede Werkzeugzusammenfassung an ein Modell, um sie in deine App-Sprache zu übersetzen. Wenn die Übersetzung fehlschlägt, wird das Original angezeigt.",
-    "toolSummaryTranslationModelUnavailableNotice": "Dieses Modell wird nicht mehr angeboten. Tippe auf $t(common.model), um ein anderes zu wählen."
+    "toolSummaryTranslationModelUnavailableNotice": "Dieses Modell wird nicht mehr angeboten. Tippe auf $t(common.model), um ein anderes zu wählen.",
+    "autoExpandThinkingInactiveSubtitle": "Keine Auswirkung, solange Denkdetails ausgeblendet sind."
   },
   "notifications": {
     "liveActivities": "Live-Aktivitäten",
@@ -883,7 +886,6 @@
       "gitlabNoRepositoriesDescription": "Du musst möglicherweise Zugriff auf weitere Gruppen oder Projekte in GitLab gewähren.",
       "installGithubApp": "GitHub-App auf Repositories installieren",
       "installGithubAppDescription": "Gewähre der Kilo-GitHub-App Zugriff auf die Repositories, die du prüfen lassen möchtest.",
-      "noRepositoriesFound": "Keine Repositories gefunden",
       "repositoryAccess": "repository-Zugriff"
     },
     "style": {
@@ -907,7 +909,6 @@
     "followReviewMd": "REVIEW.md befolgen",
     "followReviewMdSubtitle": "Anweisungen aus der REVIEW.md-Datei des jeweiligen Repositorys beachten",
     "manualReview": {
-      "connectProvider": "Anbieter verbinden",
       "connectProviderDescription": "Verbinde GitHub, um ein manuelles Review eines Pull-Requests zu starten.",
       "couldNotCheckProviderStatus": "Der Anbieterstatus konnte nicht geprüft werden.",
       "couldNotLoadProviders": "Deine verbundenen Anbieter konnten nicht geladen werden. Bitte versuche es erneut.",
@@ -916,6 +917,8 @@
       "invalidUrl": "Gib eine gültige Pull-Request-URL ein.",
       "pullRequestUrl": "Pull-Request-URL",
       "start": "Review starten",
+      "starting": "Review wird gestartet …",
+      "title": "Manuelles Review",
       "startNotFound": "Der {{requestNoun}} konnte nicht von {{provider}} gelesen werden. Überprüfe die URL und ob das Repository zugänglich ist.",
       "startRateLimited": "{{provider}} begrenzt aktuell die Anfragen. Versuche es in ein paar Minuten erneut.",
       "startNotAllowed": "Du hast keinen Zugriff, um ein Review für diesen {{requestNoun}} zu starten. Überprüfe deine Berechtigungen und den Plan deiner Organisation.",
@@ -923,9 +926,7 @@
       "startAlreadyRunning": "Für diesen {{requestNoun}} läuft bereits ein Review.",
       "startRejected": "Dieser {{requestNoun}} kann nicht überprüft werden. Stelle sicher, dass er offen und kein Entwurf ist und dass die URL korrekt ist.",
       "startProviderUnavailable": "{{provider}} konnte nicht erreicht werden, um diesen {{requestNoun}} zu lesen. Versuche es erneut.",
-      "startFailed": "Das Review konnte nicht gestartet werden. Prüfe deine Verbindung und versuche es erneut.",
-      "starting": "Review wird gestartet …",
-      "title": "Manuelles Review"
+      "startFailed": "Das Review konnte nicht gestartet werden. Prüfe deine Verbindung und versuche es erneut."
     },
     "notConnectedReadOnly": "{{platform}} ist nicht verbunden. Nur Organisationsinhaber und Admins können die Verbindung herstellen.",
     "gitlab": {
@@ -963,12 +964,6 @@
       "findingsUnavailable": "Die Ergebnisse sind nicht verfügbar, weil dieses Review fehlgeschlagen ist.",
       "serviceUnavailable": "Der Code-Review-Dienst konnte nicht erreicht werden. Führe das Review erneut aus, wenn der Dienst verfügbar ist.",
       "reviewFailed": "Das Review ist fehlgeschlagen. Bitte versuche es erneut.",
-      "cancelReasonSuperseded": "Es wurde ein neuerer Commit gepusht, daher wurde dieses Review ersetzt.",
-      "cancelReasonIntegrationDisconnected": "{{platform}} ist nicht verbunden, daher wurde dieses Review abgebrochen. Stelle die Verbindung wieder her und führe das Review erneut aus.",
-      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer wurde für Bitbucket deaktiviert, daher wurde dieses Review abgebrochen. Aktiviere es wieder und führe das Review erneut aus.",
-      "cancelReasonBitbucketPullRequestChanged": "Der Bitbucket-Pull-Request wurde geändert, daher wurde dieses Review ersetzt.",
-      "cancelReasonCancelled": "Dieses Review wurde abgebrochen.",
-      "cancelReasonInterrupted": "Dieses Review wurde unterbrochen.",
       "retryMessage": "Das Code-Review wird erneut ausgeführt.",
       "retryReview": "Review erneut ausführen",
       "retryNeedsSettings": "Der Code-Prüfer ist ausgeschaltet oder seine Einstellungen erfordern Aufmerksamkeit. Korrigiere die Einstellungen und führe dieses Review dann erneut aus.",
@@ -976,6 +971,8 @@
       "retryTitle": "Review erneut ausführen?",
       "showMore": "Mehr anzeigen",
       "started": "Gestartet",
+      "reviewEnded": "Beendet",
+      "severityNitpick": "Kleinigkeit",
       "threshold": "Schwellenwert",
       "title": "Prüfung",
       "tokens": "Text-Tokens",
@@ -994,7 +991,13 @@
       "sessionError": "In der Sitzung ist ein Fehler aufgetreten: {{error}}.",
       "statusWithValue": "Zustand: {{status}}",
       "toolName": "Werkzeug: {{name}}",
-      "toolNameError": "Beim Werkzeug {{name}} ist ein Fehler aufgetreten."
+      "toolNameError": "Beim Werkzeug {{name}} ist ein Fehler aufgetreten.",
+      "cancelReasonSuperseded": "Es wurde ein neuerer Commit gepusht, daher wurde dieses Review ersetzt.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} ist nicht verbunden, daher wurde dieses Review abgebrochen. Stelle die Verbindung wieder her und führe das Review erneut aus.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer wurde für Bitbucket deaktiviert, daher wurde dieses Review abgebrochen. Aktiviere es wieder und führe das Review erneut aus.",
+      "cancelReasonBitbucketPullRequestChanged": "Der Bitbucket-Pull-Request wurde geändert, daher wurde dieses Review ersetzt.",
+      "cancelReasonCancelled": "Dieses Review wurde abgebrochen.",
+      "cancelReasonInterrupted": "Dieses Review wurde unterbrochen."
     },
     "reviewList": {
       "configureProvider": "Anbieter konfigurieren",
@@ -1011,6 +1014,22 @@
       "loading": "Gespeicherte Prüfhinweise werden geladen",
       "loadingProposals": "Vorschläge werden geladen",
       "noProposals": "Keine Vorschläge",
+      "proposalDetails": "Vorschlagsdetails",
+      "proposalTitle": "Vorschlagstitel",
+      "rationale": "Begründung",
+      "saveFirst": "Speichere deine Änderungen, bevor du einen Pull Request öffnest.",
+      "proposalSaved": "Vorschlag gespeichert",
+      "proposalDismissed": "Vorschlag verworfen",
+      "dismissProposalTitle": "Vorschlag verwerfen?",
+      "dismissProposalMessage": "Dieser Vorschlag wird aus der Liste der aktiven Vorschläge entfernt und kann nicht wiederhergestellt werden.",
+      "prOpened": "Pull Request für REVIEW.md geöffnet",
+      "alreadyPresent": "Die Richtlinien sind bereits in REVIEW.md vorhanden",
+      "status": {
+        "edited": "Bearbeitet",
+        "opening_change_request": "PR wird geöffnet",
+        "change_request_failed": "PR fehlgeschlagen",
+        "superseded": "Bereits vorhanden"
+      },
       "noProposalsDescription": "Hier erscheinen Vorschläge zu den gespeicherten Prüfhinweisen, sobald Kilo die Antworten der Projektverantwortlichen analysiert hat.",
       "off": "Gespeicherte Prüfhinweise sind deaktiviert.",
       "on": "Gespeicherte Prüfhinweise sind aktiviert.",
@@ -1091,8 +1110,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Keine Filter verfügbar",
-      "noFiltersDescription": "Geh zurück und öffne die Filter erneut über die Befundliste.",
       "title": "Befunde filtern",
       "fixed": "Behoben",
       "outcome": "Ergebnis",
@@ -1158,12 +1175,18 @@
       "actorSystem": "Kilo-System",
       "couldNotLoad": "Der Auditbericht konnte nicht geladen werden.",
       "events": "Ereignisse",
+      "eventConfidence": "Konfidenz: {{confidence}}",
+      "eventReason": "Grund: {{reason}}",
+      "eventsCount_one": "{{displayCount}} Ereignis",
+      "eventsCount_other": "{{displayCount}} Ereignisse",
       "generated": "Der Bericht wurde am {{generatedAt}} erstellt.",
       "noActivity": "Keine Aktivitäten erfasst",
       "noActivityDescription": "Kilo hat vom {{start}} bis zum {{end}} keine Aktivitäten zu Sicherheitsbefunden erfasst, die in den Bericht aufgenommen werden können.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "Die Berichtsanfrage wurde nicht abgeschlossen. Versuche es erneut.",
       "repositoryNotRecorded": "Repository nicht erfasst",
+      "reasonUnknown": "Unbekannter Grund",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Zusammenfassung des Berichts",
       "title": "Auditbericht",
       "unavailable": "Auditbericht nicht verfügbar",
@@ -1274,7 +1297,7 @@
       "deadlinePassed": "Frist abgelaufen",
       "deadlinePassedDetail": "{{critical}} kritisch, {{high}} hoch",
       "dueThisWeek": "Diese Woche fällig",
-      "dueThisWeekDetail": "{{exploitable}} nachweislich ausnutzbar",
+      "dueThisWeekDetail": "{{exploitable}} davon nachweislich ausnutzbar",
       "noDeadline": "Keine Frist",
       "reviewSlaAssignment": "SLA-Zuweisung prüfen",
       "allOpenFindingsTracked": "Alle offenen Befunde erfasst"
@@ -1405,6 +1428,7 @@
       "reauthorizeButton": "GitHub-App erneut autorisieren",
       "reauthorizeDescription": "Security Agent benötigt die Berechtigung, Dependabot-Warnungen zu lesen. Autorisiere die GitHub-App erneut, um diese Berechtigung zu gewähren.",
       "reauthorizeTitle": "Zusätzliche Berechtigungen erforderlich",
+      "retryFailed": "Security Agent konnte immer noch nicht geladen werden. Prüfe deine Verbindung und versuche es erneut.",
       "setupFailed": "Die GitHub-Einrichtung konnte nicht gestartet werden. Bitte versuche es erneut."
     },
     "settingsOverview": {
@@ -1610,8 +1634,8 @@
       "dollar_other": "Dollar",
       "costSpoken": "kostet {{cost}}",
       "costSpokenWithTime": "kostet {{cost}}, {{time}}",
-      "spokenJoiner": ",",
-      "pullRequest": "pull-Request {{number}}"
+      "pullRequest": "pull-Request {{number}}",
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenMessage": "Die Einrichtung der GitHub-App konnte nicht gestartet werden. Bitte versuche es erneut.",
@@ -1639,8 +1663,8 @@
       "title": "Sitzung",
       "copyErrorDetails": "Fehlerdetails kopieren",
       "backToSessions": "Zurück zu den Sitzungen",
-      "follow": "Auf dem Sperrbildschirm verfolgen",
-      "unfollow": "Nicht mehr auf dem Sperrbildschirm verfolgen",
+      "follow": "Sitzung verfolgen",
+      "unfollow": "Sitzung nicht mehr verfolgen",
       "couldNotLoad": "Die Sitzung konnte nicht geladen werden.",
       "failedToLoadDetails": "Die Sitzungsdetails konnten nicht geladen werden.",
       "failedToStopExecution": "Die Ausführung konnte nicht gestoppt werden.",
@@ -2041,7 +2065,10 @@
       "allowOnceAccessibility": "Einmal erlauben",
       "alwaysAllow": "Immer erlauben",
       "alwaysAllowAccessibility": "Immer erlauben",
-      "retrying": "Erneuter Versuch…"
+      "retrying": "Erneuter Versuch…",
+      "retryDeny": "Erneut verweigern",
+      "retryAllowOnce": "Erneut einmal erlauben",
+      "retryAlwaysAllow": "Erneut immer erlauben"
     },
     "questionCard": {
       "title": "Der Agent braucht deine Antwort",
@@ -2420,7 +2447,6 @@
     "allow": "Erlauben",
     "onlineMessage": "Dieses Gerät kann Sprache nicht offline in Text umwandeln. Deine Aufnahme wird zur Umwandlung in Text an {{provider}} gesendet. Kilo speichert die Audiodaten nicht.",
     "onlineTitle": "Sprachaufnahmen werden online verarbeitet",
-    "staysOff": "Die Spracheingabe bleibt deaktiviert, bis du die Online-Transkription erlaubst.",
     "start": "Spracheingabe starten",
     "stop": "Spracheingabe beenden",
     "restricted": "Die Spracheingabe ist auf diesem Gerät eingeschränkt.",
@@ -3109,22 +3135,16 @@
     "boundary": {
       "backToProfile": "Zurück zum Profil",
       "loadErrorMessage": "Prüfe deine Verbindung und versuche es erneut.",
-
       "chooseAccount": "Konto auswählen",
       "loadErrorTitle": "Deine Organisationen konnten nicht geladen werden.",
       "membershipLostNotice": "Du hast keinen Zugriff mehr auf diese Organisation. Gewechselt zu {{target}}.",
       "noOrganization": "Keine Organisation",
-
       "noOrganizationDescription": "Dieses Konto gehört keiner Organisation an. Erstelle eine Organisation oder tritt einer auf der Website bei, um Organisationsfunktionen wie Mitgliedseinladungen und Warnungen bei niedrigem Guthaben zu nutzen.",
-
       "openWebOrganizations": "Organisationen auf der Website öffnen",
-
       "organizationUnavailable": "Die Organisation ist nicht verfügbar.",
       "selectDescriptionWithOrganizations": "Du gehörst einer oder mehreren Organisationen an. Wähle das Konto aus, das dieser Bildschirm verwenden soll.",
-
       "selectOrganization": "Organisation auswählen",
       "unavailableDescription": "Diese Organisation ist nicht mehr verfügbar. Wähle in deinem Profil eine andere Organisation aus, um fortzufahren.",
-
       "unavailableSessionsDescription": "Diese Organisation ist nicht mehr verfügbar. Deren Sitzungen können nicht geladen werden.",
       "accessDeniedDescription": "Du hast keinen Zugriff auf diese Organisation."
     },
@@ -3154,14 +3174,16 @@
       "renameTitle": "Organisation umbenennen"
     },
     "inviteMember": {
-      "alreadyInvited": "Diese Person ist bereits eingeladen oder bereits Mitglied.",
       "emailError": "Gib eine gültige E-Mail-Adresse ein.",
       "emailPlaceholder": "name@firma.de",
       "permissionDenied": "Du hast keine Berechtigung, Mitglieder einzuladen.",
       "roleMember": "Die Rolle ist „Mitglied“.",
-      "sendError": "Die Einladung konnte nicht gesendet werden.",
       "sendInvite": "Einladung senden",
-      "title": "Mitglied einladen"
+      "title": "Mitglied einladen",
+      "alreadyInvited": "Diese Person ist bereits eingeladen oder bereits Mitglied.",
+      "sendError": "Die Einladung konnte nicht gesendet werden.",
+      "pendingInvitation": "Für diese E-Mail-Adresse liegt bereits eine ausstehende Einladung vor.",
+      "alreadyMember": "Diese Person ist bereits Mitglied dieser Organisation."
     },
     "invoices": {
       "downloadA11y": "Rechnung {{number}} herunterladen",
@@ -3230,8 +3252,13 @@
       "inviteCreated": "Einladung erstellt",
       "pendingInvitations": "Ausstehende Einladungen",
       "resendInvite": "Einladung erneut senden",
+      "shareInviteLink": "Einladungslink teilen",
       "resendInviteError": "Die Einladung konnte nicht erneut gesendet werden.",
-      "shareInviteLink": "Einladungslink teilen"
+      "inviteNotResendable": "Diese Einladung kann nicht mehr erneut gesendet werden.",
+      "ownerAuthority": "Nur ein Organisationsinhaber kann Inhaber verwalten.",
+      "ownRoleChange": "Sie können Ihre eigene Rolle nicht ändern.",
+      "inviteExpired": "Diese Einladung ist abgelaufen.",
+      "inviteAccepted": "Diese Einladung wurde bereits angenommen."
     },
     "usageStats": {
       "inputTokens": "Eingabe-Tokens",
@@ -3345,7 +3372,7 @@
     "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen.",
     "openSession": "Öffnen",
     "finished": "Abgeschlossen",
-    "followFailed": "Dieser Agent konnte nicht auf dem Sperrbildschirm angezeigt werden.",
+    "followFailed": "Diese Sitzung konnte nicht verfolgt werden.",
     "approveFailed": "Genehmigen fehlgeschlagen. Tippe auf $t(common.approve), um es erneut zu versuchen.",
     "checked": "Geprüft",
     "lastKnown": "Zuletzt bekannt",
@@ -3377,11 +3404,11 @@
   },
   "transcriptionModel": {
     "title": "Transkriptionsmodell",
-    "choose": "Modell wählen",
     "noneChosen": "Keines ausgewählt",
     "emptyTitle": "Keine Transkriptionsmodelle",
     "emptyDescription": "Kilo Gateway bietet derzeit keine Transkriptionsmodelle.",
-    "loadFailed": "Die Transkriptionsmodelle konnten nicht geladen werden."
+    "loadFailed": "Die Transkriptionsmodelle konnten nicht geladen werden.",
+    "choose": "Modell wählen"
   },
   "voiceLanguage": {
     "title": "Sprache der Spracheingabe",
@@ -3403,7 +3430,6 @@
   },
   "modelChat": {
     "offlineFailure": "Dieses Modell benötigt eine Internetverbindung. Stelle eine Verbindung her und versuche es erneut, oder wechsle zu einem Modell auf diesem Gerät.",
-    "creditsRequired": "Nicht genug Guthaben, um diese Nachricht zu senden. Lade Guthaben auf und versuche es erneut.",
     "empty": {
       "title": "Chat starten",
       "description": "Sende eine Nachricht, um mit einem Modell zu sprechen."
@@ -3597,6 +3623,7 @@
       "fromHuggingFace": "Von Hugging Face",
       "loading": "Modelle werden geladen",
       "noResults": "Keine Modelle gefunden",
+      "noResultsForQuery": "Keine Modelle für \"{{query}}\" gefunden",
       "noFits": "Keine Modelle passen auf dieses Gerät",
       "noFitsDescription": "Größere Modelle findest du im Tab „$t(common.all)“.",
       "fit": {
@@ -3671,13 +3698,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "Dieses Modell unterstützt Denkaufwand"
-    }
+    },
+    "creditsRequired": "Nicht genug Guthaben, um diese Nachricht zu senden. Lade Guthaben auf und versuche es erneut."
   },
   "settingsTools": {
     "confirmTitle": "Diese Änderung bestätigen?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "dein zuletzt verwendetes Repository",
+      "confirmMessage": "Repository: {{repository}}. Prompt: {{prompt}}",
+      "confirmTitle": "Diesen Agent starten?",
       "promptRequired": "Agent starten benötigt einen Prompt. Füge einen Prompt hinzu und führe die Aktion erneut aus.",
       "repositoryRequired": "Agent starten benötigt ein Repository. Öffne Kilo, wähle eines und führe die Aktion erneut aus.",
       "repositoryUnknown": "Kilo erkennt {{repository}} nicht als GitHub- oder GitLab-Repository. Wähle ein anderes Repository in Kilo.",
@@ -3706,10 +3737,10 @@
     "noSpend": "Noch keine Ausgaben erfasst",
     "spend24h": "Ausgaben der letzten 24 Stunden",
     "multiplierError": "Gib einen Multiplikator von 1 oder mehr ein",
-    "multiplierMaxError": "Gib einen Multiplikator von {{max}} oder weniger ein",
-    "thresholdMaxError": "Gib einen Betrag von {{max}} oder weniger ein.",
     "permissionDenied": "Du hast keine Berechtigung, Ausgaben-Warnungen zu verwalten.",
-    "pushOffByCategory": "In Benachrichtigungen aus"
+    "pushOffByCategory": "In Benachrichtigungen aus",
+    "multiplierMaxError": "Gib einen Multiplikator von {{max}} oder weniger ein",
+    "thresholdMaxError": "Gib einen Betrag von {{max}} oder weniger ein."
   },
   "profiles": {
     "title": "Profile",
@@ -3768,7 +3799,6 @@
     },
     "variablesEmpty": "Noch keine Variablen",
     "variablesSaveFailed": "Variable konnte nicht gespeichert werden",
-    "variablesDeleteFailed": "Die Variable konnte nicht gelöscht werden",
     "commandsTitle": "Setup-Befehle",
     "addCommand": "Befehl hinzufügen",
     "commandLabel": "Befehl",
@@ -3779,7 +3809,6 @@
     "moveDown": "Nach unten verschieben",
     "moveCommandUp": "Befehl {{position}} nach oben verschieben",
     "moveCommandDown": "Befehl {{position}} nach unten verschieben",
-    "deleteCommand": "Befehl {{position}} löschen",
     "skillsTitle": "Fähigkeiten",
     "addSkill": "Fertigkeit hinzufügen",
     "skillNameLabel": "Fähigkeitsname",
@@ -3901,7 +3930,9 @@
       "pinFailed": "Repo konnte nicht angeheftet werden",
       "unboundToast": "Repo ungebunden",
       "unbindFailed": "Repo konnte nicht entbunden werden"
-    }
+    },
+    "variablesDeleteFailed": "Die Variable konnte nicht gelöscht werden",
+    "deleteCommand": "Befehl {{position}} löschen"
   },
   "credits": {
     "title": "Guthaben kaufen",
@@ -3937,7 +3968,8 @@
       "archive": "Archivieren",
       "unarchive": "Wiederherstellen",
       "deleteTitle": "{{name}} löschen?",
-      "deleteMessage": "Die zugehörigen Aufgaben werden ebenfalls gelöscht. Die Sitzungen bleiben erhalten."
+      "deleteMessage": "Die zugehörigen Aufgaben werden ebenfalls gelöscht. Die Sitzungen bleiben erhalten.",
+      "createFailed": "Liste konnte nicht erstellt werden."
     },
     "listSettings": {
       "title": "Listeneinstellungen",
@@ -4008,25 +4040,24 @@
     }
   },
   "agentBriefing": {
-    "title": "Morgenbriefing",
+    "title": "Agenten-Briefing",
     "atLeast": "≥{{value}}",
     "coverageHint": "Einige frühere Aktivitäten fehlen möglicherweise. ≥ bedeutet mindestens so viel; unbekannt ist nicht null.",
     "available": "Verfügbare Briefings",
     "history": "Briefing-Verlauf",
-    "historyHint": "Berichte werden 30 Tage lang aufbewahrt, auch ausgeblendete.",
+    "historyHint": "Briefings werden 30 Tage lang aufbewahrt, auch ausgeblendete.",
     "settings": "Briefing-Einstellungen",
-    "saved": "Briefing-Einstellungen gespeichert",
-    "empty": "Keine nächtliche Aktivität",
-    "emptyHint": "Deine Cloud- und CLI-Coding-Sitzungen erscheinen hier nach einer aktiven Nacht.",
+    "empty": "Keine Aktivität in diesem Briefing-Zeitraum.",
+    "emptyHint": "Deine Cloud- und CLI-Coding-Sitzungen erscheinen hier, wenn ein geplantes Briefing Aktivität hat.",
     "loadError": "Briefings konnten nicht geladen werden",
-    "sessions": "Nachts aktiv",
-    "pullRequests": "Geöffnete PRs",
+    "sessions": "Im Zeitraum aktiv",
+    "pullRequests": "Im Zeitraum eröffnete PRs",
     "blockers": "Neue Blocker",
-    "spend": "Nächtliche Kosten",
+    "spend": "Kosten im Zeitraum",
     "view": "Briefing lesen",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Briefing verwerfen",
+    "dismiss": "Briefing ausblenden",
     "offline": "Offline · gespeichertes Briefing",
     "cached": "Gespeicherter Bericht · Aktualisierung nicht verfügbar",
     "revised": "Überarbeitet · {{revision}}",
@@ -4044,13 +4075,13 @@
     "sources": "Nachweise und Artefakte",
     "timezone": "Briefing-Zeitzone",
     "deviceTimezone": "Gerätezeitzone verwenden",
-    "timezoneHint": "IANA-Zeitzone, z. B. Europe/Berlin. Zeitplanänderungen gelten für künftige Nächte.",
-    "nightStart": "Nacht beginnt",
-    "morningStart": "Nacht endet / Morgen beginnt",
-    "morningEnd": "Morgen endet",
-    "timeHint": "Die Startseiten-Karte zeigt nach Ende des Morgens wieder den Live-Status, auch offline.",
-    "invalidSchedule": "Wähle eine gültige Zeitzone sowie nicht überlappende, nicht leere Nacht- und Morgenzeiträume.",
-    "notificationsHint": "Eine allgemeine Benachrichtigung pro Morgen, sobald dein erster Bericht bereit ist. Unabhängig von kostenpflichtigen AI-Zusammenfassungen.",
+    "timezoneHint": "IANA-Zeitzone, z. B. Europe/Berlin. Zeitplanänderungen gelten für künftige Briefings.",
+    "nightStart": "Briefing-Zeitraum beginnt",
+    "morningStart": "Briefing bereit um",
+    "morningEnd": "Briefing verfügbar bis",
+    "timeHint": "Die Startseiten-Karte zeigt nach Ende des Briefing-Zeitraums wieder den Live-Status, auch offline.",
+    "invalidSchedule": "Wähle eine gültige Zeitzone und einen nicht leeren Briefing-Zeitraum.",
+    "notificationsHint": "Eine allgemeine Benachrichtigung pro geplantem Briefing. Unabhängig von kostenpflichtigen AI-Zusammenfassungen.",
     "notificationPermission": "Aktiviere Gerätebenachrichtigungen unter $t(common.notifications), um dein Briefing zu erhalten.",
     "aiOptIn": "Kostenpflichtige AI-Zusammenfassungen",
     "aiHint": "Optional, nur für diesen Kontext. Ausgewählte, geschwärzte Auszüge und strukturierte Fakten werden in deiner App-Sprache an dein Modell gesendet. Kosten werden vom Guthaben dieses Kontexts abgebucht.",
@@ -4072,7 +4103,7 @@
     "contextSettings": "AI-Einstellungen · {{context}}",
     "allContexts": "Persönliche und Organisations-Briefings bleiben getrennt.",
     "create": "Briefing erstellen",
-    "oneOff": "Einmalig",
+    "oneOff": "Auf Anfrage",
     "createdAt": "Erstellt {{time}}",
     "chooseContext": "Einen Kontext auswählen",
     "period": "Briefing-Zeitraum",
@@ -4087,16 +4118,25 @@
     "invalidPeriod": "Wähle einen Beginn vor dem Ende.",
     "futurePeriod": "Der Zeitraum darf nicht in der Zukunft enden.",
     "periodTooLong": "Wähle einen Zeitraum von höchstens 31 Tagen.",
-    "invalidLocalTime": "Diese Ortszeit existiert in der Briefing-Zeitzone nicht. Wähle eine andere Uhrzeit.",
-    "reviewBriefing": "Briefing prüfen",
-    "reviewAgain": "Neue Prüfung vorbereiten",
+    "invalidLocalTime": "Diese Ortszeit existiert in der Zeitzone des Briefings nicht. Wähle eine andere Uhrzeit.",
+    "reviewBriefing": "Briefing-Vorschau vorbereiten",
+    "reviewAgain": "Neue Vorschau vorbereiten",
     "payer": "Wird {{context}} berechnet",
     "emptyPeriod": "Keine Aktivität in diesem Zeitraum gefunden. Keine AI-Zusammenfassung und keine Kosten.",
     "emptyHistory": "Keine gespeicherten Briefings",
     "historicalStateHint": "Der Sitzungsstatus entspricht dem Stand am Ende des ausgewählten Zeitraums, nicht dem aktuellen Live-Status.",
-    "oneOffHint": "Die AI erhält ausgewählte, um sensible Angaben bereinigte Belege in deiner App-Sprache. Dieser einmalige Bericht ändert weder deinen morgendlichen Zeitplan noch deine AI-Einstellungen.",
-    "createOffline": "Gehe online, um ein Briefing zu prüfen oder zu erstellen. Kostenpflichtige Anfragen werden offline niemals zur späteren Ausführung vorgemerkt.",
+    "oneOffHint": "Die AI erhält ausgewählte, um sensible Angaben bereinigte Belege in deiner App-Sprache. Dieses Briefing auf Anfrage ändert weder dein geplantes Briefing noch deine AI-Einstellungen.",
+    "createOffline": "Gehe online, um eine Briefing-Vorschau vorzubereiten oder ein Briefing zu erstellen. Kostenpflichtige Anfragen werden offline niemals zur späteren Ausführung vorgemerkt.",
     "estimateInputTooLarge": "Dieser Zeitraum enthält zu viele Belege für das ausgewählte Modell.",
-    "estimatePermissionUnavailable": "Du hast keine Berechtigung, das Guthaben dieses Kontexts zu nutzen."
+    "estimatePermissionUnavailable": "Du hast keine Berechtigung, das Guthaben dieses Kontexts zu nutzen.",
+    "createFailed": "Dieses Briefing konnte nicht erstellt werden.",
+    "reviewFailed": "Die Vorschau für dieses Briefing konnte nicht vorbereitet werden.",
+    "saved": "Briefing-Einstellungen gespeichert",
+    "preparing": "Dein Briefing wird vorbereitet…",
+    "preparationHint": "Du kannst diese Ansicht verlassen und zurückkehren, während die Aktivitäten gesammelt werden. Die AI-Verarbeitung beginnt erst und Kosten fallen erst an, wenn du die Vorschau geprüft und die Kostenschätzung bestätigt hast.",
+    "resumeReview": "Vorschau fortsetzen",
+    "preparationFailed": "Die Aktivitäten für dieses Briefing konnten nicht gesammelt werden. Versuche es erneut.",
+    "preparationTimedOut": "Das Sammeln der Aktivitäten hat zu lange gedauert. Versuche es erneut.",
+    "preparationDrafts": "Noch nicht bestätigte Briefings"
   }
 }

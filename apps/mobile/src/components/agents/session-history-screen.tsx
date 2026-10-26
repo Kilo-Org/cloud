@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, View } from 'react-native';
+import { AppState, Keyboard, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useTranslation } from 'react-i18next';
-import { useFocusEffect, useNavigation } from 'expo-router';
+import { type Href, useFocusEffect, useNavigation, useRouter } from 'expo-router';
 
 import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
+import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import { AgentSessionListContent } from '@/components/agents/session-list-content';
 import { SessionListHeaderActions } from '@/components/agents/session-list-header-actions';
 import { selectSessionListIsLoading } from '@/components/agents/session-list-loading';
@@ -13,6 +14,7 @@ import { SessionListSearchHeader } from '@/components/agents/session-list-search
 import { useAgentSessionListData } from '@/components/agents/use-agent-session-list-data';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { useSessionSearchInput } from '@/components/agents/use-session-search-input';
+import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
 import { shouldLoadMoreSessions } from '@/lib/agent-session-pages';
 import { usePersistedAgentSessionFilters } from '@/lib/hooks/use-persisted-agent-session-filters';
@@ -22,10 +24,6 @@ import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { SESSION_SEARCH_DRAFT_KEY } from '@/lib/persist/drafts';
 import { useOrganization } from '@/lib/organization-context';
 
-const noopCreateSession = () => {
-  // History owns no creation flow: the empty-state CTA is intentionally inert.
-};
-
 /**
  * Pushed sibling of the live Agents tab. Owns the stored session history with
  * search, filters, sort, and pagination, but never renders the live tray, the
@@ -34,6 +32,7 @@ const noopCreateSession = () => {
 export function SessionHistoryScreen() {
   const { t } = useTranslation();
   const navigation = useNavigation();
+  const router = useRouter();
 
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
   const {
@@ -81,7 +80,7 @@ export function SessionHistoryScreen() {
     storedIsPending,
     storedFetchedSinceMount,
     paging,
-    handleRetry,
+    handleRetry: retryHistory,
     handleRefetch,
     isSearching,
     search,
@@ -95,6 +94,20 @@ export function SessionHistoryScreen() {
     ready,
     searchQuery,
   });
+
+  const [isRetrying, setIsRetrying] = useState(false);
+  const handleRetry = useCallback(() => {
+    setIsRetrying(true);
+    void (async () => {
+      try {
+        await retryHistory();
+      } catch {
+        setIsRetrying(false);
+        return;
+      }
+      setIsRetrying(false);
+    })();
+  }, [retryHistory]);
 
   const showSearchBusy = selectShowSearchBusy({
     awaitingCommit,
@@ -141,6 +154,13 @@ export function SessionHistoryScreen() {
   }, [navigation, refetchOutsidePull]);
 
   const navigateToSession = useAgentSessionNavigator();
+
+  // The empty history's next step is a real session, in the current
+  // organization: the same destination the Agents tab's "New session" action
+  // opens, so history never dead-ends at a message.
+  const handleCreateSession = useCallback(() => {
+    router.push(getNewAgentSessionPath(organizationId) as Href);
+  }, [router, organizationId]);
 
   const handleEndReached = useCallback(() => {
     if (shouldLoadMoreSessions(paging)) {
@@ -203,8 +223,9 @@ export function SessionHistoryScreen() {
       hasActiveQuery={hasActiveQuery}
       isSearching={isSearching}
       searchQuery={searchQuery}
+      isRetrying={isRetrying}
       onClearQuery={handleClearQuery}
-      onCreateSession={noopCreateSession}
+      onCreateSession={handleCreateSession}
     />
   );
 
@@ -218,13 +239,23 @@ export function SessionHistoryScreen() {
           <SessionListHeaderActions
             activeFilterCount={activeFilterCount}
             showNewSession={false}
-            onNewSession={noopCreateSession}
+            onNewSession={handleCreateSession}
             onOpenFilters={() => {
+              // The search field sits above this button; without the dismissal
+              // the keyboard stays up and covers the sheet’s Apply row.
+              Keyboard.dismiss();
               setShowFilterModal(true);
             }}
           />
         }
       />
+      {/* The stored list is scoped to the selected account, so the scope is
+          named above it (and above the search field it filters) instead of
+          only in an empty-state sentence. `ContextControl` is the same
+          switchable control the Agents tab and Home carry. */}
+      <View className="px-4">
+        <ContextControl />
+      </View>
       {showSearchHeader ? (
         <SessionListSearchHeader
           inputRef={searchInputRef}

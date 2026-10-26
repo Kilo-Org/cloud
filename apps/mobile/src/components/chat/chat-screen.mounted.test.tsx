@@ -345,6 +345,24 @@ function metricOf(tree: ReactTestRenderer): Metric {
   return metric;
 }
 
+describe('the chat header', () => {
+  it('spaces its three controls so they never sit flush', async () => {
+    state.status = 'idle';
+    const tree = await mount();
+    const header = tree.root.find(node => (node.type as string) === 'ScreenHeader');
+    const cluster = header.props.headerRight as ReactElement<{
+      className: string;
+      children: readonly ReactElement[];
+    }>;
+    // Three controls share this row: the context pill, the backend button and
+    // the tools button. Without a gap they touch, which reads as one broken
+    // control rather than three. Every other multi-control header cluster in
+    // the app carries the same spacing.
+    expect(cluster.props.className).toContain('gap-2');
+    expect(cluster.props.children).toHaveLength(3);
+  });
+});
+
 function details(tree: ReactTestRenderer) {
   return tree.root.find(node => (node.type as string) === 'ChatDetailsSheet').props as {
     readonly visible: boolean;
@@ -601,6 +619,22 @@ describe('a retained chat failure', () => {
       onPress();
     });
     expect(state.retry).toHaveBeenCalledOnce();
+  });
+
+  it('offers no retry for a chat this place cannot open', async () => {
+    /* Entering it again settles the same state, so the row says what is true
+       without offering a button that cannot change it. */
+    state.status = 'idle';
+    state.failureKey = 'queryError.notFoundDescription';
+
+    const tree = await mount();
+
+    const status = tree.root.find(node => (node.type as string) === 'AccessibleStatus');
+    expect(status.props.message).toBe('This item may have been removed or is no longer available.');
+    const retryLabels = tree.root.findAll(
+      node => (node.type as string) === 'Text' && node.props.children === i18n.t('common.retry')
+    );
+    expect(retryLabels).toHaveLength(0);
   });
 
   it('says the balance blocked the send and opens where the credit is bought', async () => {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,6 +22,16 @@ import {
 } from '@/components/ui/table';
 import { InlineDeleteConfirmation } from '@/components/ui/inline-delete-confirmation';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   useCustomLlms,
   useCopyCustomLlm,
   useUpsertCustomLlm,
@@ -36,16 +46,83 @@ import type { CustomLlmCredentials, CustomLlmDefinition } from '@kilocode/db/sch
 import { deepStrict } from '@/lib/zod/deep-strict';
 import { formatZodError } from '@/lib/zod/format-zod-error';
 import { toast } from 'sonner';
-import { Copy as CopyIcon, Plus, Pencil } from 'lucide-react';
-import Editor from '@monaco-editor/react';
+import { ChevronRight, Copy as CopyIcon, Globe, Lock, Plus, Pencil } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import Editor, { type EditorProps } from '@monaco-editor/react';
 
 const StrictCustomLlmDefinitionSchema = deepStrict(CustomLlmDefinitionSchema);
 const StrictCustomLlmCredentialsSchema = deepStrict(CustomLlmCredentialsSchema);
+
+const JSON_EDITOR_OPTIONS = {
+  minimap: { enabled: false },
+  fontSize: 13,
+  lineNumbers: 'on',
+  scrollBeyondLastLine: false,
+  scrollbar: { alwaysConsumeMouseWheel: false },
+  automaticLayout: true,
+  tabSize: 2,
+  formatOnPaste: true,
+} satisfies EditorProps['options'];
+
+const CREDENTIAL_FORMATS: { title: string; description: ReactNode; example: string }[] = [
+  {
+    title: 'API key',
+    description: (
+      <>
+        Use <code className="text-foreground">&quot;type&quot;: &quot;x-api-key&quot;</code> instead
+        when the provider expects an <code className="text-foreground">x-api-key</code> header.
+      </>
+    ),
+    example: `{
+  "type": "api_key",
+  "api_key": "YOUR_API_KEY"
+}`,
+  },
+  {
+    title: 'Secure proxy',
+    description: (
+      <>
+        Set the definition&apos;s <code className="text-foreground">base_url</code> to the
+        proxy&apos;s <code className="text-foreground">/api/proxy</code> URL.
+      </>
+    ),
+    example: `{
+  "type": "secure_proxy",
+  "proxy_secret": "KILO_AI_GATEWAY_SECURE_PROXY_SECRET value",
+  "config": {
+    "url": "https://upstream.example.com/v1",
+    "extra_headers": { "Authorization": "Bearer YOUR_API_KEY" }
+  }
+}`,
+  },
+  {
+    title: 'Amazon Bedrock IAM access keys',
+    description: (
+      <>
+        Set the definition&apos;s <code className="text-foreground">base_url</code> to a Bedrock
+        endpoint such as{' '}
+        <code className="text-foreground break-all">
+          https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1
+        </code>
+        . Requests are signed with AWS SigV4. Bedrock API keys use{' '}
+        <code className="text-foreground">api_key</code> on OpenAI-compatible routes and{' '}
+        <code className="text-foreground">x-api-key</code> on Anthropic Messages routes.
+      </>
+    ),
+    example: `{
+  "type": "aws_bedrock",
+  "region": "us-east-1",
+  "access_key_id": "AKIA...",
+  "secret_access_key": "YOUR_SECRET_ACCESS_KEY"
+}`,
+  },
+];
 
 type EditorState = {
   open: boolean;
   mode: 'create' | 'edit';
   publicId: string;
+  wasPublic: boolean;
   credentialsJson: string;
   definitionJson: string;
   validationError: string | null;
@@ -53,6 +130,7 @@ type EditorState = {
 
 type CopyState = {
   sourcePublicId: string;
+  sourceIsPublic: boolean;
   publicId: string;
   displayName: string;
   internalId: string;
@@ -77,10 +155,27 @@ const INITIAL_CREDENTIALS: CustomLlmCredentials = {
   api_key: '',
 };
 
+type UpsertInput = {
+  public_id: string;
+  definition: CustomLlmDefinition;
+  credentials: CustomLlmCredentials | undefined;
+};
+
+type CopyInput = {
+  source_public_id: string;
+  public_id: string;
+  display_name: string;
+  internal_id: string | undefined;
+};
+
+/** A save that makes a custom LLM public, which needs confirmation. */
+type PendingChange = { kind: 'upsert'; input: UpsertInput } | { kind: 'copy'; input: CopyInput };
+
 const initialEditorState: EditorState = {
   open: false,
   mode: 'create',
   publicId: '',
+  wasPublic: false,
   credentialsJson: JSON.stringify(INITIAL_CREDENTIALS, null, 2),
   definitionJson: JSON.stringify(INITIAL_DEFINITION, null, 2),
   validationError: null,
@@ -93,12 +188,14 @@ export function CustomLlmsContent() {
   const deleteMutation = useDeleteCustomLlm();
   const [editor, setEditor] = useState<EditorState>(initialEditorState);
   const [copy, setCopy] = useState<CopyState | null>(null);
+  const [pendingChange, setPendingChange] = useState<PendingChange | null>(null);
 
   const openCreate = useCallback(() => {
     setEditor({
       open: true,
       mode: 'create',
       publicId: '',
+      wasPublic: false,
       credentialsJson: JSON.stringify(INITIAL_CREDENTIALS, null, 2),
       definitionJson: JSON.stringify(INITIAL_DEFINITION, null, 2),
       validationError: null,
@@ -110,6 +207,7 @@ export function CustomLlmsContent() {
       open: true,
       mode: 'edit',
       publicId,
+      wasPublic: definition.public !== undefined,
       credentialsJson: '',
       definitionJson: JSON.stringify(definition, null, 2),
       validationError: null,
@@ -120,22 +218,53 @@ export function CustomLlmsContent() {
     setEditor(initialEditorState);
   }, []);
 
-  const openCopy = useCallback(
-    (sourcePublicId: string, sourceDisplayName: string, sourceInternalId: string | undefined) => {
-      setCopy({
-        sourcePublicId,
-        publicId: sourcePublicId,
-        displayName: sourceDisplayName,
-        internalId: sourceInternalId ?? '',
-        validationError: null,
-      });
-    },
-    []
-  );
+  const openCopy = useCallback((sourcePublicId: string, source: CustomLlmDefinition) => {
+    setCopy({
+      sourcePublicId,
+      sourceIsPublic: source.public !== undefined,
+      publicId: sourcePublicId,
+      displayName: source.display_name,
+      internalId: source.internal_id ?? '',
+      validationError: null,
+    });
+  }, []);
 
   const closeCopy = useCallback(() => {
     setCopy(null);
   }, []);
+
+  const submitCopy = useCallback(
+    async (input: CopyInput) => {
+      try {
+        await copyMutation.mutateAsync(input);
+        toast.success('Custom LLM copied');
+        closeCopy();
+      } catch (error) {
+        setCopy(prev =>
+          prev
+            ? {
+                ...prev,
+                validationError: { field: null, message: formatZodError(error) },
+              }
+            : prev
+        );
+      }
+    },
+    [copyMutation, closeCopy]
+  );
+
+  const submitUpsert = useCallback(
+    async (input: UpsertInput) => {
+      try {
+        await upsertMutation.mutateAsync(input);
+        toast.success(editor.mode === 'create' ? 'Custom LLM created' : 'Custom LLM updated');
+        closeEditor();
+      } catch (error) {
+        toast.error(formatZodError(error));
+      }
+    },
+    [editor.mode, upsertMutation, closeEditor]
+  );
 
   const handleCopy = useCallback(async () => {
     if (!copy) return;
@@ -181,26 +310,18 @@ export function CustomLlmsContent() {
       return;
     }
 
-    try {
-      await copyMutation.mutateAsync({
-        source_public_id: copy.sourcePublicId,
-        public_id: publicId,
-        display_name: displayName,
-        internal_id: internalId || undefined,
-      });
-      toast.success('Custom LLM copied');
-      closeCopy();
-    } catch (error) {
-      setCopy(prev =>
-        prev
-          ? {
-              ...prev,
-              validationError: { field: null, message: formatZodError(error) },
-            }
-          : prev
-      );
+    const input: CopyInput = {
+      source_public_id: copy.sourcePublicId,
+      public_id: publicId,
+      display_name: displayName,
+      internal_id: internalId || undefined,
+    };
+    if (copy.sourceIsPublic) {
+      setPendingChange({ kind: 'copy', input });
+      return;
     }
-  }, [copy, copyMutation, closeCopy]);
+    await submitCopy(input);
+  }, [copy, submitCopy]);
 
   const handleSave = useCallback(async () => {
     const trimmedPublicId = editor.publicId.trim();
@@ -248,7 +369,11 @@ export function CustomLlmsContent() {
       return;
     }
 
-    const defResult = StrictCustomLlmDefinitionSchema.safeParse(parsedDefinition);
+    // The strict copy rejects unknown keys but drops cross-field rules, so check both.
+    const strictDefResult = StrictCustomLlmDefinitionSchema.safeParse(parsedDefinition);
+    const defResult = strictDefResult.success
+      ? CustomLlmDefinitionSchema.safeParse(parsedDefinition)
+      : strictDefResult;
     if (!defResult.success) {
       setEditor(prev => ({ ...prev, validationError: formatZodError(defResult.error) }));
       return;
@@ -262,18 +387,24 @@ export function CustomLlmsContent() {
       return;
     }
 
-    try {
-      await upsertMutation.mutateAsync({
-        public_id: trimmedPublicId,
-        definition: defResult.data,
-        credentials: parsedCredentials,
-      });
-      toast.success(editor.mode === 'create' ? 'Custom LLM created' : 'Custom LLM updated');
-      closeEditor();
-    } catch (error) {
-      toast.error(formatZodError(error));
+    const input: UpsertInput = {
+      public_id: trimmedPublicId,
+      definition: defResult.data,
+      credentials: parsedCredentials,
+    };
+    if (input.definition.public !== undefined && !editor.wasPublic) {
+      setPendingChange({ kind: 'upsert', input });
+      return;
     }
-  }, [editor, upsertMutation, closeEditor]);
+    await submitUpsert(input);
+  }, [editor, submitUpsert]);
+
+  const confirmPendingChange = useCallback(async () => {
+    const change = pendingChange;
+    setPendingChange(null);
+    if (change?.kind === 'upsert') await submitUpsert(change.input);
+    if (change?.kind === 'copy') await submitCopy(change.input);
+  }, [pendingChange, submitUpsert, submitCopy]);
 
   const handleDelete = useCallback(
     async (publicId: string) => {
@@ -312,6 +443,7 @@ export function CustomLlmsContent() {
             <TableRow>
               <TableHead>Public ID</TableHead>
               <TableHead>Display Name</TableHead>
+              <TableHead>Access</TableHead>
               <TableHead>Internal ID</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -319,7 +451,7 @@ export function CustomLlmsContent() {
           <TableBody>
             {data?.items.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="text-muted-foreground text-center">
+                <TableCell colSpan={5} className="text-muted-foreground text-center">
                   No custom LLMs defined yet.
                 </TableCell>
               </TableRow>
@@ -328,6 +460,19 @@ export function CustomLlmsContent() {
               <TableRow key={item.public_id}>
                 <TableCell className="font-mono text-sm">{item.public_id}</TableCell>
                 <TableCell>{item.definition.display_name}</TableCell>
+                <TableCell>
+                  {item.definition.public ? (
+                    <Badge variant="new">
+                      <Globe />
+                      Public
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary">
+                      <Lock />
+                      Private
+                    </Badge>
+                  )}
+                </TableCell>
                 <TableCell className="font-mono text-sm">
                   {item.definition.internal_id ?? 'Not set'}
                 </TableCell>
@@ -345,13 +490,7 @@ export function CustomLlmsContent() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() =>
-                        openCopy(
-                          item.public_id,
-                          item.definition.display_name,
-                          item.definition.internal_id
-                        )
-                      }
+                      onClick={() => openCopy(item.public_id, item.definition)}
                       aria-label={`Copy ${item.public_id}`}
                       title="Copy custom LLM"
                     >
@@ -375,14 +514,14 @@ export function CustomLlmsContent() {
           if (!open) closeEditor();
         }}
       >
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-3xl grid-rows-[auto_minmax(0,1fr)_auto]">
           <DialogHeader>
             <DialogTitle>
               {editor.mode === 'create' ? 'Add Custom LLM' : `Edit: ${editor.publicId}`}
             </DialogTitle>
           </DialogHeader>
 
-          <div className="flex flex-col gap-4">
+          <div className="-mx-6 flex min-h-0 flex-col gap-4 overflow-y-auto px-6">
             <div>
               <Label htmlFor="public-id">Public ID</Label>
               <Input
@@ -423,69 +562,29 @@ export function CustomLlmsContent() {
                     }))
                   }
                   theme="vs-dark"
-                  options={{
-                    minimap: { enabled: false },
-                    fontSize: 13,
-                    lineNumbers: 'on',
-                    scrollBeyondLastLine: false,
-                    automaticLayout: true,
-                    tabSize: 2,
-                    formatOnPaste: true,
-                  }}
+                  options={{ ...JSON_EDITOR_OPTIONS, ariaLabel: 'Custom LLM credentials JSON' }}
                 />
               </div>
-              {!editor.credentialsJson.trim() && (
-                <div className="bg-muted text-muted-foreground mt-2 rounded-md p-3 text-xs">
-                  <p>Add an API key using one of these credential formats:</p>
-                  <pre className="text-foreground mt-2 overflow-x-auto font-mono whitespace-pre-wrap">
-                    {`{
-  "type": "api_key",
-  "api_key": "YOUR_API_KEY"
-}`}
-                  </pre>
-                  <p className="mt-2">
-                    Use{' '}
-                    <code className="text-foreground">&quot;type&quot;: &quot;x-api-key&quot;</code>{' '}
-                    instead when the provider expects an{' '}
-                    <code className="text-foreground">x-api-key</code> header.
-                  </p>
-                  <p className="mt-2">
-                    To route through the secure proxy, set the definition&apos;s{' '}
-                    <code className="text-foreground">base_url</code> to the proxy&apos;s{' '}
-                    <code className="text-foreground">/api/proxy</code> URL and use:
-                  </p>
-                  <pre className="text-foreground mt-2 overflow-x-auto font-mono whitespace-pre-wrap">
-                    {`{
-  "type": "secure_proxy",
-  "proxy_secret": "KILO_AI_GATEWAY_SECURE_PROXY_SECRET value",
-  "config": {
-    "url": "https://upstream.example.com/v1",
-    "extra_headers": { "Authorization": "Bearer YOUR_API_KEY" }
-  }
-}`}
-                  </pre>
-                  <p className="mt-2">
-                    For Amazon Bedrock with IAM access keys, set the definition&apos;s{' '}
-                    <code className="text-foreground">base_url</code> to a Bedrock endpoint such as{' '}
-                    <code className="text-foreground">
-                      https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1
-                    </code>{' '}
-                    and use the following. Requests are signed with AWS SigV4. Bedrock API keys use{' '}
-                    <code className="text-foreground">&quot;type&quot;: &quot;api_key&quot;</code>{' '}
-                    on OpenAI-compatible routes and{' '}
-                    <code className="text-foreground">&quot;type&quot;: &quot;x-api-key&quot;</code>{' '}
-                    on Anthropic Messages routes.
-                  </p>
-                  <pre className="text-foreground mt-2 overflow-x-auto font-mono whitespace-pre-wrap">
-                    {`{
-  "type": "aws_bedrock",
-  "region": "us-east-1",
-  "access_key_id": "AKIA...",
-  "secret_access_key": "YOUR_SECRET_ACCESS_KEY"
-}`}
-                  </pre>
+              <details className="group mt-2 text-xs">
+                <summary className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 flex w-fit cursor-pointer list-none items-center gap-1 rounded-sm select-none focus-visible:ring-[3px] focus-visible:outline-none [&::-webkit-details-marker]:hidden">
+                  <ChevronRight
+                    className="size-3.5 transition-transform group-open:rotate-90"
+                    aria-hidden="true"
+                  />
+                  Credential formats
+                </summary>
+                <div className="bg-muted text-muted-foreground mt-2 flex flex-col gap-3 rounded-md p-3">
+                  {CREDENTIAL_FORMATS.map(format => (
+                    <section key={format.title} className="flex flex-col gap-1">
+                      <h3 className="text-foreground font-medium">{format.title}</h3>
+                      <p>{format.description}</p>
+                      <pre className="text-foreground overflow-x-auto font-mono">
+                        {format.example}
+                      </pre>
+                    </section>
+                  ))}
                 </div>
-              )}
+              </details>
             </div>
 
             <div>
@@ -503,16 +602,7 @@ export function CustomLlmsContent() {
                     }))
                   }
                   theme="vs-dark"
-                  options={{
-                    minimap: { enabled: false },
-                    fontSize: 13,
-                    lineNumbers: 'on',
-                    scrollBeyondLastLine: false,
-                    automaticLayout: true,
-                    tabSize: 2,
-                    formatOnPaste: true,
-                    ariaLabel: 'Custom LLM definition JSON',
-                  }}
+                  options={{ ...JSON_EDITOR_OPTIONS, ariaLabel: 'Custom LLM definition JSON' }}
                 />
               </div>
               <p className="text-muted-foreground mt-1 text-xs">
@@ -527,6 +617,19 @@ export function CustomLlmsContent() {
                 must not start with <code>kilo/</code>, <code>kilo-auto/</code>,{' '}
                 <code>kilocode/</code>, or a direct BYOK provider prefix, and must not be an
                 OpenRouter or Kilo-exclusive model.
+              </p>
+              <p className="text-muted-foreground mt-1 text-xs">
+                Custom LLMs are always free for users. To make the model available to every user,
+                replace <code>organization_ids</code> and <code>group_ids</code> with{' '}
+                <code>
+                  &quot;public&quot;: {'{'} &quot;inference_providers&quot;: [&quot;acme&quot;],
+                  &quot;description&quot;: &quot;…&quot; {'}'}
+                </code>
+                . Organization provider allow lists apply to these providers. Unknown providers
+                appear in the provider list after the next provider sync. Without{' '}
+                <code>public</code>, <code>organization_ids</code>, or <code>group_ids</code>, the
+                model is stored but nobody can use it. Saved changes reach every server within a
+                minute.
               </p>
             </div>
 
@@ -547,6 +650,36 @@ export function CustomLlmsContent() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={pendingChange !== null}
+        onOpenChange={open => {
+          if (!open) setPendingChange(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Make this custom LLM public?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="flex flex-col gap-2">
+                <p>
+                  Every Kilo user, including signed-out users, will be able to use{' '}
+                  <code className="font-mono">{pendingChange?.input.public_id}</code> for free. Kilo
+                  pays for all usage.
+                </p>
+                <p>
+                  Test this definition with a local web app before saving it. A broken definition
+                  fails requests for everyone who can use it.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmPendingChange}>Make public</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog
         open={copy !== null}

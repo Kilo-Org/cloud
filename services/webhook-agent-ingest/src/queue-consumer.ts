@@ -299,7 +299,7 @@ async function processWebhookMessage(
       ),
       withDORetry(
         () => stub,
-        doStub => doStub.getConfig(),
+        async (doStub): Promise<TriggerConfig | null> => await doStub.getConfig(),
         'getConfig'
       ),
     ]);
@@ -368,11 +368,11 @@ async function processWebhookMessage(
       githubRepo: triggerGithubRepo,
       profileId: triggerProfileId,
     } = triggerConfig;
-    if (!triggerMode || !triggerModel || !triggerGithubRepo || !triggerProfileId) {
+    if (!triggerMode || !triggerModel || !triggerGithubRepo) {
       await failRequest(
         stub,
         webhook.requestId,
-        'Cloud Agent trigger missing required fields (mode, model, githubRepo, or profileId)'
+        'Cloud Agent trigger missing required fields (mode, model, githubRepo)'
       );
       message.ack();
       return;
@@ -420,18 +420,7 @@ async function processWebhookMessage(
       };
 
       // Profile resolution (repo binding + default + explicit override) happens
-      // inside cloud-agent-next. A trigger must still have a profile assigned;
-      // cloud-agent-next returns 404 if the id is stale/revoked and we let that
-      // flow through the existing non-5xx failure path below.
-      if (!triggerProfileId) {
-        logger.error('No Agent Env Profile found.', {
-          triggerId: triggerConfig.triggerId,
-          requestId: webhook.requestId,
-        });
-        await failRequest(stub, webhook.requestId, 'No Agent Env Profile found.');
-        message.ack();
-        return;
-      }
+      // inside cloud-agent-next. Omit the explicit override to use those defaults.
 
       const prepareSessionBody: {
         prompt: string;
@@ -442,7 +431,7 @@ async function processWebhookMessage(
         githubRepo: string;
         kilocodeOrganizationId?: string;
         callbackTarget: { url: string; headers: Record<string, string> };
-        profileId: string;
+        profileId?: string;
         autoCommit?: boolean;
         condenseOnComplete?: boolean;
         createdOnPlatform: string;
@@ -452,7 +441,7 @@ async function processWebhookMessage(
         model: triggerModel,
         githubRepo: triggerGithubRepo,
         callbackTarget,
-        profileId: triggerProfileId,
+        ...(triggerProfileId ? { profileId: triggerProfileId } : {}),
         createdOnPlatform: request.method === 'SCHEDULED' ? 'scheduled' : 'webhook',
       };
 

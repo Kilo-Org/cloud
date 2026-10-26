@@ -1,4 +1,6 @@
-import { type PrRef, setMergePartialSuccess } from './merge-result-banner-store';
+import { type ProviderPrTriple } from '@/lib/pr-review/provider-pr-ref';
+
+import { setMergePartialSuccess } from './merge-result-banner-store';
 import { gateMergeResult, type MergePullRequestResult } from './merge-result-gate';
 
 type MergeSuccessEffects = {
@@ -18,7 +20,7 @@ type MergeSuccessEffects = {
  */
 export function applyMergeSuccessEffects(
   result: MergePullRequestResult,
-  ref: PrRef
+  ref: ProviderPrTriple
 ): MergeSuccessEffects {
   const gate = gateMergeResult(result);
   if (gate.kind === 'incomplete') {

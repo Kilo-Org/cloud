@@ -1,7 +1,10 @@
 import 'server-only';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
+import {
+  ORGANIZATION_BILLING_ROLES,
+  ORGANIZATION_MANAGE_ROLES,
+} from '@kilocode/app-shared/organizations';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   handleStatefulPlatformOAuthConnect,
@@ -49,6 +52,7 @@ const statefulOAuthConnectRouteConfigEntries = [
       source: 'slack_oauth',
       loadBuildOAuthUrl: async () =>
         (await import('@/lib/integrations/slack-service')).getSlackOAuthUrl,
+      organizationRoles: ORGANIZATION_MANAGE_ROLES,
     },
   ],
 ] as const satisfies readonly (readonly [StandardOAuthPlatform, StatefulOAuthConnectRouteConfig])[];

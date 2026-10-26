@@ -14,6 +14,7 @@ import { LanguagePickerSheet } from '@/components/language-picker-sheet';
 const reloadAppAsync = vi.hoisted(() => vi.fn());
 const setLanguagePreferenceAsync = vi.hoisted(() => vi.fn());
 const writeLanguageReturnTarget = vi.hoisted(() => vi.fn());
+const writeDirectionAttemptAsync = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 const renameAndroidNotificationChannels = vi.hoisted(() => vi.fn());
 const registerNeedsInputCategories = vi.hoisted(() => vi.fn());
 const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
@@ -22,17 +23,7 @@ const i18nManager = vi.hoisted(() => ({
   isRTL: false,
   forceRTL: vi.fn(),
 }));
-const navigation = vi.hoisted(() => ({ dispatch: vi.fn() }));
-// react-navigation re-registers the guard on every render, and Continue relies
-// on the skip flag arming the registration that is live *before* the state
-// update lands, so the mock keeps each registration instead of dropping it.
-const guardRegistrations = vi.hoisted(
-  () =>
-    [] as {
-      prevented: boolean;
-      callback: (event: { data: { action: string } }) => void;
-    }[]
-);
+const prevention = vi.hoisted(() => ({ enabled: false, disable: vi.fn() }));
 // FlashList renders through a callback, so a host-string mock would drop every
 // row. This mock calls the render props so the row assertions still see rows.
 const flashListMock = vi.hoisted(
@@ -84,7 +75,10 @@ vi.mock('react-native', async () => {
 vi.mock('expo-router', async () => {
   const { useEffect } = await import('react');
   return {
-    useNavigation: () => navigation,
+    usePreventRemove: (enabled: boolean) => {
+      prevention.enabled = enabled;
+      return prevention.disable;
+    },
     // Run the focus effect once on mount, like react-navigation's first focus.
     useFocusEffect: (effect: () => void) => {
       // eslint-disable-next-line react-hooks/exhaustive-deps -- run the focus effect once on mount, like react-navigation's first focus
@@ -97,15 +91,7 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('expo', () => ({ reloadAppAsync }));
-vi.mock('@/lib/navigation/prevent-remove', () => ({
-  usePreventRemove: (
-    prevented: boolean,
-    // eslint-disable-next-line promise/prefer-await-to-callbacks -- the mock must capture the guard callback so a test can fire the navigation it holds
-    callback: (event: { data: { action: string } }) => void
-  ) => {
-    guardRegistrations.push({ prevented, callback });
-  },
-}));
+
 vi.mock('@/i18n/apply-language', async importOriginal => {
   const actual = await importOriginal<typeof ApplyLanguageModule>();
   return {
@@ -115,6 +101,9 @@ vi.mock('@/i18n/apply-language', async importOriginal => {
     applyLanguagePreference: vi.fn(actual.applyLanguagePreference),
   };
 });
+// The apply path records the direction relaunch; the record itself is covered
+// by the apply-language suite, and its real store pulls in the native keychain.
+vi.mock('@/i18n/direction-attempt', () => ({ writeDirectionAttemptAsync }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/picker-sheet', () => ({
   PickerSheet: (props: { headerContent?: ReactNode; children?: ReactNode }) =>
@@ -224,15 +213,17 @@ describe('LanguagePickerSheet apply', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     clearSearch.mockReset();
+    prevention.enabled = false;
+    prevention.disable.mockReset();
     setLanguagePreferenceAsync.mockReset();
     setLanguagePreferenceAsync.mockResolvedValue(true);
     reloadAppAsync.mockReset();
+    writeDirectionAttemptAsync.mockReset();
+    writeDirectionAttemptAsync.mockResolvedValue(true);
     writeLanguageReturnTarget.mockReset();
     renameAndroidNotificationChannels.mockReset();
     registerNeedsInputCategories.mockReset();
     insets.bottom = 0;
-    guardRegistrations.length = 0;
-    navigation.dispatch.mockReset();
     i18nManager.isRTL = false;
     i18nManager.forceRTL.mockReset();
     vi.mocked(applyLanguagePreference).mockClear();
@@ -291,6 +282,42 @@ describe('LanguagePickerSheet apply', () => {
     renderer.unmount();
   });
 
+  it('marks the tapped row selected and applies that language on Done', async () => {
+    const onClose = vi.fn<() => void>();
+    const renderer = await mountSheet(onClose);
+    expect(findChoiceRow(renderer.root, 'Español').props.selected).toBe(false);
+
+    act(() => {
+      (findChoiceRow(renderer.root, 'Español').props.onPress as () => void)();
+    });
+
+    // FlashList's memoized cells only repaint when `data` or `extraData`
+    // changes identity, so the selection has to travel through `extraData`.
+    // Without it the tap leaves `selected` unreadable and the picker inert.
+    expect(renderer.root.findByType(flashListMock).props.extraData).toEqual({
+      selected: 'es',
+      disabled: false,
+    });
+    expect(findChoiceRow(renderer.root, 'Español').props.selected).toBe(true);
+    expect(findChoiceRow(renderer.root, 'Français').props.selected).toBe(false);
+
+    const sheet = findByType(renderer.root, 'PickerSheet')[0];
+    if (!sheet) {
+      throw new Error('PickerSheet not found');
+    }
+    await act(async () => {
+      (sheet.props.onDone as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('es', 'en');
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
   it('clears the live search field on focus instead of remounting the input', async () => {
     const renderer = await mountSheet(vi.fn<() => void>());
     const input = findByType(renderer.root, 'TextInput')[0];
@@ -327,6 +354,8 @@ describe('LanguagePickerSheet apply', () => {
     // default; the apply must re-register them in the new language.
     expect(registerNeedsInputCategories).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
+    expect(prevention.enabled).toBe(false);
+    expect(prevention.disable).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
   });
@@ -432,6 +461,8 @@ describe('LanguagePickerSheet apply', () => {
     expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('ar');
     expect(reloadAppAsync).toHaveBeenCalledTimes(1);
     expect(onClose).not.toHaveBeenCalled();
+    expect(prevention.enabled).toBe(true);
+    expect(prevention.disable).not.toHaveBeenCalled();
 
     const failedSheet = findByType(renderer.root, 'PickerSheet')[0];
     if (!failedSheet) {
@@ -445,6 +476,47 @@ describe('LanguagePickerSheet apply', () => {
       await Promise.resolve();
     });
     expect(reloadAppAsync).toHaveBeenCalledTimes(2);
+    expect(prevention.enabled).toBe(true);
+
+    renderer.unmount();
+  });
+
+  it('shows Could not restart without reloading when the relaunch cannot be recorded', async () => {
+    writeDirectionAttemptAsync.mockResolvedValue(false);
+    const onClose = vi.fn<() => void>();
+    const renderer = await applySelection(onClose, 'العربية');
+
+    expect(writeDirectionAttemptAsync).toHaveBeenCalledWith('ar');
+    // Without the record a relaunch that did not take the direction would
+    // repeat on every launch, so the sheet refuses it and offers Retry.
+    expect(reloadAppAsync).not.toHaveBeenCalled();
+    expect(i18nManager.forceRTL).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+
+    const failedSheet = findByType(renderer.root, 'PickerSheet')[0];
+    if (!failedSheet) {
+      throw new Error('PickerSheet not found');
+    }
+    expect(failedSheet.props.title).toBe('Could not restart');
+    expect(failedSheet.props.doneLabel).toBe('Retry');
+
+    // Retry has to resume the step that failed: this outcome never forced the
+    // direction, so reloading alone would relaunch into the previous one with
+    // still no record. The apply path runs again, retries the record write and
+    // only then relaunches.
+    writeDirectionAttemptAsync.mockResolvedValue(true);
+    await act(async () => {
+      (failedSheet.props.onDone as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(writeDirectionAttemptAsync).toHaveBeenCalledTimes(2);
+    expect(i18nManager.forceRTL).toHaveBeenCalledWith(true);
+    expect(reloadAppAsync).toHaveBeenCalledTimes(1);
+    // The retry re-runs the same apply path, so the idempotent preference write
+    // runs again before the relaunch.
+    expect(setLanguagePreferenceAsync).toHaveBeenLastCalledWith('ar');
 
     renderer.unmount();
   });
@@ -461,10 +533,9 @@ describe('LanguagePickerSheet apply', () => {
     expect(failedSheet.props.cancelLabel).toBe('Continue');
     expect(failedSheet.props.onCancel).toEqual(expect.any(Function));
     expect(failedSheet.props.doneLabel).toBe('Retry');
-    const armed = guardRegistrations.findLast(registration => registration.prevented);
-    if (!armed) {
-      throw new Error('the failed state did not hold the navigation guard');
-    }
+    // The failed state holds the guard while Retry is on screen.
+    expect(prevention.enabled).toBe(true);
+    expect(prevention.disable).not.toHaveBeenCalled();
 
     act(() => {
       (failedSheet.props.onCancel as () => void)();
@@ -477,17 +548,10 @@ describe('LanguagePickerSheet apply', () => {
     expect(reloadAppAsync).toHaveBeenCalledTimes(1);
     expect(findByType(renderer.root, 'PickerSheet')[0]?.props.doneLabel).toBe('Done');
 
-    // The guard the failed state held is still registered when the close runs,
-    // so the skip Continue armed releases exactly this one navigation.
-    act(() => {
-      armed.callback({ data: { action: 'BACK' } });
-    });
-    expect(navigation.dispatch).toHaveBeenCalledTimes(1);
-    expect(navigation.dispatch).toHaveBeenCalledWith('BACK');
-    act(() => {
-      armed.callback({ data: { action: 'BACK' } });
-    });
-    expect(navigation.dispatch).toHaveBeenCalledTimes(1);
+    // Closing releases the guard the failed state held, so the sheet's own
+    // close is the one navigation it lets through.
+    expect(prevention.disable).toHaveBeenCalledTimes(1);
+    expect(prevention.enabled).toBe(false);
 
     renderer.unmount();
   });

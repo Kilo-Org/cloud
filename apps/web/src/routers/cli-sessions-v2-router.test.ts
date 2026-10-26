@@ -12,6 +12,7 @@ import {
 import { eq, and, inArray } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
 import type { KiloSdkStoredMessage } from '@kilocode/session-ingest-contracts';
+import { MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH } from '@kilocode/session-ingest-contracts';
 import * as githubAdapter from '@/lib/integrations/platforms/github/adapter';
 import { TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
@@ -1158,6 +1159,19 @@ describe('cli-sessions-v2-router', () => {
           session_id: sessionId,
           limit: 10,
           cursor: 'not-a-real-cursor',
+        })
+      ).rejects.toThrow();
+      expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
+    });
+
+    it('rejects an over-length continuation cursor before calling the client', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+
+      await expect(
+        caller.cliSessionsV2.getSessionMessagesPage({
+          session_id: sessionId,
+          limit: 10,
+          cursor: 'A'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH + 1),
         })
       ).rejects.toThrow();
       expect(fetchSessionMessagesPage).not.toHaveBeenCalled();
@@ -3857,6 +3871,39 @@ describe('cli-sessions-v2-router', () => {
       expect(result.results.find(session => session.session_id === sharedId)).not.toHaveProperty(
         'public_id'
       );
+    });
+  });
+
+  describe('share size result', () => {
+    const sessionId = 'ses_share_oversized_info_0001';
+
+    beforeEach(async () => {
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: regularUser.id,
+        title: 'Large session',
+      });
+    });
+
+    afterEach(async () => {
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, sessionId));
+    });
+
+    it('returns PAYLOAD_TOO_LARGE with the size message from an HTTP 413', async () => {
+      const fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ success: false, error: 'share_snapshot_too_large' }), {
+          status: 413,
+        })
+      );
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(caller.cliSessionsV2.share({ session_id: sessionId })).rejects.toMatchObject({
+          code: 'PAYLOAD_TOO_LARGE',
+          message: 'Session details are too large to share. Existing links are unchanged.',
+        });
+      } finally {
+        fetchSpy.mockRestore();
+      }
     });
   });
 

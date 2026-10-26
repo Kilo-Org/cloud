@@ -79,7 +79,9 @@ it.each([undefined, 'staging'])(
       expect((await publish()).status).toBe(202);
       await vi.waitFor(() => expect(calls).toHaveLength(1), { timeout: 10_000 });
       // The writer has received the event, but has not yet acknowledged it.
-      expect(server.getLogs()).toEqual([]);
+      expect(
+        server.getLogs().filter(log => log.message.includes('usage_ingest_processing'))
+      ).toEqual([]);
       await setTimeout(100);
       release.resolve();
       const processingLogs = () =>

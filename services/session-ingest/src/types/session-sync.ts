@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { fitsKiloSdkMessagesCursorId, messageIdSchema } from '@kilocode/session-ingest-contracts';
 
 // Session ingest payload.
 // Intentionally minimal validation: enforce only identity fields needed for compaction.
@@ -7,6 +8,35 @@ const storageKeySegmentSchema = z
   .min(1)
   .refine(segment => !segment.includes('/') && !segment.includes('\u0000'), {
     message: 'storage key segments must not contain / or U+0000',
+  });
+
+/**
+ * Item-type roots that start an item id (`message/<id>`, `part/<messageId>/<id>`,
+ * `agent_notification/<id>`). An identity segment equal to one of these roots is refused.
+ */
+const RESERVED_IDENTITY_SEGMENTS: Record<string, true> = {
+  message: true,
+  part: true,
+  agent_notification: true,
+};
+
+function isNotReservedIdentitySegment(segment: string): boolean {
+  return !Object.hasOwn(RESERVED_IDENTITY_SEGMENTS, segment);
+}
+
+const identitySegmentSchema = storageKeySegmentSchema.refine(isNotReservedIdentitySegment, {
+  message: 'storage key segments must not repeat an item-type root',
+});
+
+// Message ids are re-emitted as history cursors and already have to satisfy
+// the message id format when history is read, so ingest applies the whole
+// cursor id contract rather than keeping its own.
+const messageStorageKeySegmentSchema = messageIdSchema
+  .refine(fitsKiloSdkMessagesCursorId, {
+    message: 'message ids must fit the message cursor id byte limit',
+  })
+  .refine(isNotReservedIdentitySegment, {
+    message: 'storage key segments must not repeat an item-type root',
   });
 
 export const SessionItemSchema = z.discriminatedUnion('type', [
@@ -26,14 +56,14 @@ export const SessionItemSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('message'),
     data: z.looseObject({
-      id: storageKeySegmentSchema,
+      id: messageStorageKeySegmentSchema,
     }),
   }),
   z.object({
     type: z.literal('part'),
     data: z.looseObject({
       id: storageKeySegmentSchema,
-      messageID: storageKeySegmentSchema,
+      messageID: identitySegmentSchema,
     }),
   }),
   z.object({

@@ -47,6 +47,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'lib/chat/backend-url.ts': 'hostname comparison',
   'lib/chat/gguf-catalog.ts': 'file-extension comparison',
   'lib/chat/hf-catalog.ts': 'SPDX id lookup key',
+  'lib/chat/hf-quant-size.ts': 'quantization-family normalization for a size table',
   'lib/auth/use-native-auth.ts': 'email normalization',
   'lib/telemetry/install-error-reporting.ts': 'hostname comparison',
   'lib/pr-review/diff/highlight.ts': 'file-extension normalization',
@@ -78,7 +79,6 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'components/profiles/profile-agents-model.ts': 'agent-slug comparison',
   'components/profiles/kilo-command-form-sheet.tsx': 'slash-command name normalization',
   'components/profiles/repo-bindings-model.ts': 'repository full-name search and comparison',
-  'components/todos/todo-link-session-sheet.tsx': 'repository full-name comparison',
   'app/(app)/kiloclaw/[instance-id]/settings/model-list.tsx': 'model search folding',
 };
 

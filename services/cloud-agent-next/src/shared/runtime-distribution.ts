@@ -1,6 +1,6 @@
 export const RUNTIME_DISTRIBUTION = {
   nodeMajor: '24',
-  bun: '1.3.14',
+  bun: '1.4.4',
   pnpm: '12.14.0',
   glab: '1.124.0',
   gh: '2.102.0',
@@ -38,7 +38,20 @@ export const WRAPPER_BUNDLES: readonly WrapperBundle[] = [
     installName: 'kilocode-control-plane-wrapper.js',
     executable: false,
   },
+  {
+    entry: 'src/environment-builder/main.ts',
+    distName: 'environment-builder.js',
+    installName: 'kilocode-environment-builder.js',
+    executable: false,
+  },
 ];
+
+/**
+ * The Bun binary that runs a bundle as a container's main process. It is an
+ * absolute path so the main-process identity check can match `/proc/1/cmdline`
+ * exactly; both images install Bun there.
+ */
+export const RUNTIME_BUN_PATH = '/usr/local/bin/bun';
 
 export const CONTROL_PLANE_SUPERVISOR = {
   wrapperPath: 'control-plane-supervisor.sh',

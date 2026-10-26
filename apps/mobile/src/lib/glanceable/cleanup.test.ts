@@ -228,7 +228,7 @@ describe('cleanup', () => {
       status: 'happy',
       running: 2,
       needsInput: 1,
-      needsApproval: 0,
+      needsApproval: 1,
       idle: 1,
       scheduled: 0,
       needsInputSince: '2026-08-26T23:00:00.000Z',
@@ -257,6 +257,7 @@ describe('cleanup', () => {
           status: 'expired',
           running: 0,
           needsInput: 0,
+          needsApproval: 0,
           idle: 0,
           needsInputSince: null,
         });

@@ -1,3 +1,4 @@
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { type LucideIcon } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { IconTile } from '@/components/ui/icon-tile';
@@ -64,6 +65,15 @@ type ConfigureRowProps = {
   hue?: RowHue;
   onPress?: () => void;
   disabled?: boolean;
+  /**
+   * Full accessible name of the pressable row. Set it when the row's state or
+   * its action is not readable from the text a reader can already hear:
+   * `accessibilityHint` cannot carry that on Android, where React Native maps
+   * it to the node's tooltip and never to its content description, so the name
+   * is the only place TalkBack reads. Omit it and the name stays the row's
+   * visible text.
+   */
+  accessibilityLabel?: string;
   trailing?: ReactNode;
   /** Suppress bottom divider on the last row of a group. */
   last?: boolean;
@@ -80,12 +90,14 @@ export function ConfigureRow({
   hue,
   onPress,
   disabled,
+  accessibilityLabel,
   trailing,
   last,
   className,
 }: Readonly<ConfigureRowProps>) {
   const colors = useThemeColors();
-  const { fontScale, width } = useWindowDimensions();
+  const { width } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
   // A narrow window squeezes the flexible text block between the fixed icon
   // tile and the chevron exactly as a large font scale does, until a whole word
   // no longer fits and Android breaks it mid-word ("Gene ral", 160 dp, e1,
@@ -159,6 +171,7 @@ export function ConfigureRow({
         onPress={onPress}
         disabled={disabled}
         accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
         accessibilityState={{ disabled: Boolean(disabled) }}
         className={cn(!disabled && 'active:opacity-70')}
       >

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the picker's five presentations (expired, loading, error, zero instances, list) share one sheet chrome and one refetch, and the error and zero-instance actions both carry the shared state-action floor */
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -14,14 +15,15 @@ import { radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { instancePickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 import {
-  dedupeInstanceLabels,
-  type LabeledInstance,
+  type InstancePickerListItem,
+  instancePickerListItems,
   resolveInstancePickerViewState,
 } from '@/lib/instance-picker-rows';
 import { useTRPC } from '@/lib/trpc';
@@ -38,10 +40,6 @@ const INSTANCE_GROUP_LABEL_KEYS = {
 // (never `className`), and the list carries the sheet background itself because
 // no wrapping View may sit between the formSheet header and the list.
 const listStyle = { flex: 1 } satisfies ViewStyle;
-
-type PickerListItem =
-  | { key: string; type: 'header'; kind: InstancePickerInstance['kind'] }
-  | { key: string; type: 'instance'; instance: LabeledInstance };
 
 export default function InstancePickerScreen() {
   const router = useRouter();
@@ -99,10 +97,9 @@ export default function InstancePickerScreen() {
       // actually describes, so refetch explicitly here too.
       void refetchInstances();
 
-      return () => {
-        instancePickerSlot.clear(UNFENCED_ROUTE_KEY);
-        bridgeRef.current = undefined;
-      };
+      // The bridge outlives a blur: `useRouteRegistry` clears this route's
+      // slots when the route unmounts, so a return to a sheet that is still on
+      // screen shows its options again instead of the "options expired" shell.
       // eslint-disable-next-line react-hooks/exhaustive-deps -- refetchInstances is a stable react-query function identity; including it would re-run this effect on every render because react-query does not memoize it across renders.
     }, [])
   );
@@ -112,20 +109,10 @@ export default function InstancePickerScreen() {
     [instancesData]
   );
 
-  const listItems = useMemo<PickerListItem[]>(() => {
-    const labeled = dedupeInstanceLabels(instances, i18n.language);
-    const items: PickerListItem[] = [];
-    for (const kind of ['remote', 'cli'] as const) {
-      const group = labeled.filter(instance => instance.kind === kind);
-      if (group.length > 0) {
-        items.push({ key: `header:${kind}`, type: 'header', kind });
-        for (const instance of group) {
-          items.push({ key: instance.connectionId, type: 'instance', instance });
-        }
-      }
-    }
-    return items;
-  }, [instances, i18n.language]);
+  const listItems = useMemo(
+    () => instancePickerListItems(instances, i18n.language),
+    [instances, i18n.language]
+  );
 
   const viewState = resolveInstancePickerViewState({
     isLoading: isLoadingInstances,
@@ -161,7 +148,7 @@ export default function InstancePickerScreen() {
   // renders (a poll tick, the bridge refresh); FlashList's memoized cell
   // compares `renderItem` by identity before re-rendering a mounted row.
   const renderItem = useCallback(
-    ({ item: row }: ListRenderItemInfo<PickerListItem>) => {
+    ({ item: row }: ListRenderItemInfo<InstancePickerListItem>) => {
       if (row.type === 'header') {
         return (
           <Text
@@ -272,6 +259,7 @@ export default function InstancePickerScreen() {
           description={t('organization.boundary.loadErrorMessage')}
           action={
             <Button
+              className={STATE_ACTION_CLASS}
               variant="outline"
               onPress={() => {
                 void refetchInstances();
@@ -301,7 +289,8 @@ export default function InstancePickerScreen() {
       {/* The list must stay a direct child of the sheet header for native
           formSheet sizing, so the radiogroup role and the visible "Run on"
           group name live on the FlashList container instead of a wrapper. */}
-      <FlashList<PickerListItem>
+      <FlashList<InstancePickerListItem>
+        nestedScrollEnabled
         style={[listStyle, { backgroundColor: colors.background }]}
         accessibilityRole="radiogroup"
         accessibilityLabel={t('agentChat.instancePicker.runOn')}
@@ -343,6 +332,7 @@ export default function InstancePickerScreen() {
               )}
               action={
                 <Button
+                  className={STATE_ACTION_CLASS}
                   variant="outline"
                   onPress={() => {
                     void refetchInstances();

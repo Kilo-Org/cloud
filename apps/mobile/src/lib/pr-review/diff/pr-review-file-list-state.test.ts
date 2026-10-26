@@ -7,9 +7,7 @@ import { buildPrReviewFileListQueryOptions } from './pr-review-file-list-state';
 // tRPC client (via `@/lib/trpc`), which the node vitest pipeline cannot
 // transform. The options builder itself is pure, so only the module-load chain
 // needs these mocks; no hook is mounted.
-vi.mock('react-native', () => ({
-  InteractionManager: { runAfterInteractions: vi.fn() },
-}));
+vi.mock('@/lib/query/schedule-cache-maintenance', () => ({ scheduleCacheMaintenance: vi.fn() }));
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: vi.fn(),

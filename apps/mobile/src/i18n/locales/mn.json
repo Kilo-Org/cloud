@@ -1484,6 +1484,22 @@
       "loadingProposals": "Саналуудыг ачаалж байна",
       "couldNotLoadProposals": "Саналуудыг ачаалж чадсангүй.",
       "noProposals": "Санал байхгүй",
+      "proposalDetails": "Саналын дэлгэрэнгүй",
+      "proposalTitle": "Саналын гарчиг",
+      "rationale": "Үндэслэл",
+      "saveFirst": "Pull request нээхээсээ өмнө өөрчлөлтөө хадгална уу.",
+      "proposalSaved": "Саналыг хадгаллаа",
+      "proposalDismissed": "Саналыг хэрэгсэхгүй болголоо",
+      "dismissProposalTitle": "Саналыг хэрэгсэхгүй болгох уу?",
+      "dismissProposalMessage": "Энэ санал идэвхтэй жагсаалтаас хасагдах бөгөөд сэргээх боломжгүй болно.",
+      "prOpened": "REVIEW.md файлын pull request нээгдлээ",
+      "alreadyPresent": "Заавар REVIEW.md файлд аль хэдийн байна",
+      "status": {
+        "edited": "Засварласан",
+        "opening_change_request": "PR нээж байна",
+        "change_request_failed": "PR амжилтгүй болсон",
+        "superseded": "Аль хэдийн байна"
+      },
       "noProposalsDescription": "Kilo төслийн хариуцагчдын хариултыг шинжилсний дараа шалгалтын санах ойн саналууд энд харагдана."
     },
     "manualReview": {

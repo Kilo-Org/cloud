@@ -750,7 +750,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
       usage: { prompt_tokens: 100, total_tokens: 100, cost: 0.00005 },
     });
 
-    const result = parseEmbeddingUsageFromResponse(response, 200);
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
 
     expect(result.cost_mUsd).toBe(50);
   });
@@ -760,7 +760,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
       usage: { prompt_tokens: 1000, total_tokens: 1000 },
     });
 
-    const result = parseEmbeddingUsageFromResponse(response, 200);
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
 
     expect(result.cost_mUsd).toBe(0);
   });
@@ -768,7 +768,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
   it('should extract id as messageId', () => {
     const response = makeResponse({ id: 'embd-abc' });
 
-    const result = parseEmbeddingUsageFromResponse(response, 200);
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
 
     expect(result.messageId).toBe('embd-abc');
   });
@@ -778,7 +778,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
     const parsed = JSON.parse(response);
     delete parsed.id;
 
-    const result = parseEmbeddingUsageFromResponse(JSON.stringify(parsed), 200);
+    const result = parseEmbeddingUsageFromResponse(JSON.stringify(parsed), 200, 'openrouter');
 
     expect(result.messageId).toBeNull();
   });
@@ -786,7 +786,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
   it('should set hasError to true when model is empty', () => {
     const response = makeResponse({ model: '' });
 
-    const result = parseEmbeddingUsageFromResponse(response, 200);
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
 
     expect(result.hasError).toBe(true);
   });
@@ -794,7 +794,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
   it('should set hasError to false when model is present', () => {
     const response = makeResponse({ model: 'text-embedding-3-small' });
 
-    const result = parseEmbeddingUsageFromResponse(response, 200);
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
 
     expect(result.hasError).toBe(false);
   });
@@ -802,7 +802,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
   it('should always set outputTokens to 0 and streamed/cancelled to false', () => {
     const response = makeResponse();
 
-    const result = parseEmbeddingUsageFromResponse(response, 200);
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
 
     expect(result.outputTokens).toBe(0);
     expect(result.streamed).toBe(false);
@@ -814,9 +814,59 @@ describe('parseEmbeddingUsageFromResponse', () => {
       usage: { prompt_tokens: 42, total_tokens: 42 },
     });
 
-    const result = parseEmbeddingUsageFromResponse(response, 200);
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
 
     expect(result.inputTokens).toBe(42);
+  });
+});
+
+describe('parseEmbeddingUsageFromResponse upstream cost shapes', () => {
+  it('bills the upstream inference cost of a BYOK-served OpenRouter embedding', () => {
+    const response = JSON.stringify({
+      id: 'gen-emb-123',
+      object: 'list',
+      model: 'codestral-embed-2505',
+      usage: {
+        prompt_tokens: 3000,
+        total_tokens: 3000,
+        cost: 0.0000225,
+        is_byok: true,
+        cost_details: { upstream_inference_cost: 0.00045 },
+      },
+      provider: 'Mistral',
+    });
+
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
+
+    expect(result.cost_mUsd).toBe(450);
+    expect(result.is_byok).toBe(true);
+  });
+
+  it('reads Vercel AI Gateway cost and credential type from providerMetadata', () => {
+    const response = JSON.stringify({
+      object: 'list',
+      model: 'mistral/codestral-embed',
+      usage: { prompt_tokens: 3000, total_tokens: 3000 },
+      providerMetadata: {
+        gateway: {
+          routing: {
+            modelAttempts: [
+              {
+                success: true,
+                providerAttempts: [{ provider: 'mistral', credentialType: 'byok', success: true }],
+              },
+            ],
+          },
+          cost: '0',
+          marketCost: '0.00045',
+        },
+      },
+    });
+
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'vercel');
+
+    expect(result.cost_mUsd).toBe(450);
+    expect(result.is_byok).toBe(true);
   });
 });
 
@@ -843,7 +893,8 @@ describe('parseTranscriptionUsageFromResponse', () => {
       makeResponse(),
       200,
       'openai/gpt-4o-mini-transcribe',
-      'openrouter'
+      'openrouter',
+      null
     );
 
     expect(result.cost_mUsd).toBe(20);
@@ -866,7 +917,8 @@ describe('parseTranscriptionUsageFromResponse', () => {
       }),
       200,
       'openai/gpt-4o-mini-transcribe',
-      'openrouter'
+      'openrouter',
+      null
     );
 
     expect(result.cost_mUsd).toBe(40);
@@ -878,7 +930,8 @@ describe('parseTranscriptionUsageFromResponse', () => {
       makeResponse(),
       200,
       'openai/gpt-4o-mini-transcribe',
-      'openrouter'
+      'openrouter',
+      null
     );
 
     expect(result.generation_time).toBe(2.5);
@@ -892,7 +945,8 @@ describe('parseTranscriptionUsageFromResponse', () => {
       JSON.stringify(parsed),
       200,
       'openai/whisper-1',
-      'openrouter'
+      'openrouter',
+      null
     );
 
     expect(result.model).toBe('openai/whisper-1');
@@ -906,10 +960,53 @@ describe('parseTranscriptionUsageFromResponse', () => {
       JSON.stringify(parsed),
       200,
       'openai/gpt-4o-mini-transcribe',
-      'openrouter'
+      'openrouter',
+      null
     );
 
     expect(result.hasError).toBe(true);
+  });
+
+  describe('OpenRouter response without BYOK status', () => {
+    // Shape OpenRouter returns for a BYOK-served whisper-1 transcription: `cost`
+    // is only the 5% BYOK fee, and neither is_byok nor cost_details is present.
+    const openRouterWhisperResponse = JSON.stringify({
+      text: 'This is a short transcription test.',
+      usage: { seconds: 2, cost: 0.00001 },
+    });
+
+    beforeEach(() => {
+      jest.mocked(captureMessage).mockClear();
+    });
+
+    it('uses the x-generation-id header so the generation lookup can resolve the cost', () => {
+      const result = parseTranscriptionUsageFromResponse(
+        openRouterWhisperResponse,
+        200,
+        'openai/whisper-1',
+        'openrouter',
+        'gen-stt-123'
+      );
+
+      expect(result.messageId).toBe('gen-stt-123');
+      expect(captureMessage).not.toHaveBeenCalled();
+    });
+
+    it('reports the unresolvable cost when there is no generation id', () => {
+      const result = parseTranscriptionUsageFromResponse(
+        openRouterWhisperResponse,
+        200,
+        'openai/whisper-1',
+        'openrouter',
+        null
+      );
+
+      expect(result.messageId).toBeNull();
+      expect(captureMessage).toHaveBeenCalledWith(
+        "SUSPICIOUS: openrouters cost accounting doesn't make sense",
+        expect.anything()
+      );
+    });
   });
 });
 

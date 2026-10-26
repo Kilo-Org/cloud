@@ -144,6 +144,11 @@ export async function rewriteModelResponse_ChatCompletions({
             json.choices = [];
           }
 
+          // Vertex managed models attach metadata-only usage to intermediate chunks.
+          if (json.usage && typeof json.usage.prompt_tokens !== 'number') {
+            delete json.usage;
+          }
+
           if (json.usage) {
             rewriteUsage(json.usage, removeCost);
           }

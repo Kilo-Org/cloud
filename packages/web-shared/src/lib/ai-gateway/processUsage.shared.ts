@@ -93,7 +93,9 @@ export function computeOpenRouterCostFields(
   if (
     (requireIsByok && is_byok == null && (openrouterCost_USD || upstream_inference_cost_USD)) || // unknown byok status but known non-zero costs? We're borked!
     // A BYOK charge is 0 while the fee is waived, and at least the fee otherwise.
-    (is_byok && openrouterCost_USD > 0 && (fee_USD - openrouterCost_USD) * 1_000_000 > 1.1)
+    (is_byok && openrouterCost_USD > 0 && (fee_USD - openrouterCost_USD) * 1_000_000 > 1.1) ||
+    // Without the upstream cost, a BYOK request bills no inference at all.
+    (is_byok && openrouterCost_USD > 0 && usage.cost_details?.upstream_inference_cost == null)
   ) {
     const { responseContent: _ignore, ...corePropsCopy } = coreProps;
     captureMessage("SUSPICIOUS: openrouters cost accounting doesn't make sense", {

@@ -256,6 +256,21 @@ describe('processOpenRouterUsage', () => {
       expect.anything()
     );
   });
+
+  test.each(['openrouter', 'vercel'] as const)(
+    'reports %s BYOK usage without an upstream cost as suspicious',
+    provider => {
+      const usage = { ...tokenUsage, is_byok: true, cost: 0.001 };
+
+      const result = processOpenRouterUsage(usage, coreProps, provider);
+
+      expect(result.cost_mUsd).toBe(1000);
+      expect(captureMessage).toHaveBeenCalledWith(
+        "SUSPICIOUS: openrouters cost accounting doesn't make sense",
+        expect.anything()
+      );
+    }
+  );
 });
 
 describe('authoritative usage transaction configuration', () => {

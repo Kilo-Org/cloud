@@ -11,6 +11,7 @@ jest.mock('@/lib/gastown/feature-flags', () => ({ isGastownEnabled: async () => 
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { device_sessions } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
+import { invalidateDeviceSession } from '@kilocode/web-shared/lib/auth/device-session-cache';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { generateApiToken, validateAuthorizationHeader } from '@kilocode/web-shared/lib/tokens';
 import { POST as mintGastownToken } from '@/app/api/gastown/token/route';
@@ -60,6 +61,8 @@ describe.each([
       .update(device_sessions)
       .set({ revoked_at: new Date().toISOString() })
       .where(eq(device_sessions.id, session.id));
+    // Revocation from this instance drops its cached answer immediately.
+    invalidateDeviceSession(session.id);
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${body.token}` }));
     const retry = await mintToken();
     expect(retry.status).toBe(401);

@@ -3746,6 +3746,7 @@
     "title": "Profilak",
     "entrySubtitle": "Berrerabili ingurunearen ezarpenak saio guztietan",
     "newProfile": "Profil berria",
+    "openHint": "Profila irekitzen du",
     "emptyTitle": "Oraindik ez dago profilik",
     "emptyDescription": "Sortu profil bat ingurune-aldagaiak, konfigurazio komandoak eta trebetasunak saioetan berrerabiltzeko.",
     "loadFailed": "Ezin izan dira kargatu profilak",

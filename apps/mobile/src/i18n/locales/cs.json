@@ -3838,6 +3838,7 @@
     "title": "Profily",
     "entrySubtitle": "Znovu použijte nastavení prostředí napříč relacemi",
     "newProfile": "Nový profil",
+    "openHint": "Otevře profil",
     "emptyTitle": "Zatím žádné profily",
     "emptyDescription": "Vytvořte profil pro opětovné použití proměnných prostředí, instalačních příkazů a dovedností napříč relacemi.",
     "loadFailed": "Profily se nepodařilo načíst",

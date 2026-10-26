@@ -3746,6 +3746,7 @@
     "title": "Hồ sơ",
     "entrySubtitle": "Sử dụng lại cài đặt môi trường qua các phiên",
     "newProfile": "Hồ sơ mới",
+    "openHint": "Mở hồ sơ",
     "emptyTitle": "Chưa có hồ sơ nào",
     "emptyDescription": "Tạo hồ sơ để sử dụng lại các biến môi trường, lệnh thiết lập và kỹ năng trong các phiên.",
     "loadFailed": "Không thể tải hồ sơ",

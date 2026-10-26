@@ -3792,6 +3792,7 @@
     "title": "Perfils",
     "entrySubtitle": "Reutilitza la configuració de l'entorn entre sessions",
     "newProfile": "Nou perfil",
+    "openHint": "Obre el perfil",
     "emptyTitle": "Encara no hi ha perfils",
     "emptyDescription": "Creeu un perfil per reutilitzar variables d'entorn, ordres de configuració i habilitats entre sessions.",
     "loadFailed": "No s'han pogut carregar els perfils",

@@ -3746,6 +3746,7 @@
     "title": "Profiller",
     "entrySubtitle": "Oturumlar arasında ortam ayarlarını yeniden kullanma",
     "newProfile": "Yeni profil",
+    "openHint": "Profili açar",
     "emptyTitle": "Henüz profil yok",
     "emptyDescription": "Oturumlar arasında ortam değişkenlerini, kurulum komutlarını ve becerileri yeniden kullanmak için bir profil oluşturun.",
     "loadFailed": "Profiller yüklenemedi",

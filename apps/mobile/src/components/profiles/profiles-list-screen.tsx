@@ -178,24 +178,31 @@ export function ProfilesListScreen({
               ) : null}
               {section.profiles.map((profile, index) => {
                 const subtitle = formatProfileCountItems(t, profileCountItems(profile)).join(' · ');
+                const isDefault = isEffectiveDefault(profile, effectiveDefaultId);
+                // The star is a visual mark inside the pressable row, so the
+                // row's own name has to carry the state it announces. TalkBack
+                // never reads `accessibilityHint` (React Native maps it to the
+                // node's tooltip), so the action belongs in the name as well.
+                const accessibilityLabel = [
+                  profile.name,
+                  subtitle,
+                  isDefault ? t('profiles.defaultSectionTitle') : '',
+                  t('profiles.openHint'),
+                ]
+                  .filter(part => part.length > 0)
+                  .join(', ');
                 return (
                   <ConfigureRow
                     key={profile.id}
                     icon={ownerIcon(profile)}
                     title={profile.name}
                     subtitle={subtitle || undefined}
+                    accessibilityLabel={accessibilityLabel}
                     className="rounded-lg bg-secondary px-3"
                     last={index === section.profiles.length - 1}
                     trailing={
-                      isEffectiveDefault(profile, effectiveDefaultId) ? (
-                        // The row already announces the profile name; the
-                        // star adds only the state it marks.
-                        <Star
-                          size={16}
-                          color={colors.primary}
-                          fill={colors.primary}
-                          accessibilityLabel={t('profiles.defaultSectionTitle')}
-                        />
+                      isDefault ? (
+                        <Star size={16} color={colors.primary} fill={colors.primary} />
                       ) : undefined
                     }
                     onPress={() => {

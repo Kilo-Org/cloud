@@ -3746,6 +3746,7 @@
     "title": "Profielen",
     "entrySubtitle": "Hergebruik omgevingsinstellingen tussen sessies",
     "newProfile": "Nieuw profiel",
+    "openHint": "Opent het profiel",
     "emptyTitle": "Nog geen profielen",
     "emptyDescription": "Maak een profiel aan om omgevingsvariabelen, installatieopdrachten en vaardigheden tijdens sessies opnieuw te gebruiken.",
     "loadFailed": "Kan profielen niet laden",

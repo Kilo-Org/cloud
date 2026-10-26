@@ -3930,6 +3930,7 @@
     "title": "Proffiliau",
     "entrySubtitle": "Ailddefnyddio gosodiadau amgylchedd ar draws sesiynau",
     "newProfile": "Proffil newydd",
+    "openHint": "Yn agor y proffil",
     "emptyTitle": "Dim proffiliau eto",
     "emptyDescription": "Creu proffil i ailddefnyddio newidynnau amgylchedd, gorchmynion gosod, a sgiliau ar draws sesiynau.",
     "loadFailed": "Methu llwytho proffiliau",

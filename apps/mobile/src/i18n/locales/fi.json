@@ -3746,6 +3746,7 @@
     "title": "Profiilit",
     "entrySubtitle": "Käytä ympäristöasetuksia uudelleen istuntojen aikana",
     "newProfile": "Uusi profiili",
+    "openHint": "Avaa profiilin",
     "emptyTitle": "Ei vielä profiileja",
     "emptyDescription": "Luo profiili käyttääksesi uudelleen ympäristömuuttujia, asetuskomentoja ja taitoja istuntojen aikana.",
     "loadFailed": "Profiilien lataaminen epäonnistui",

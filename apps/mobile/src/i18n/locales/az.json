@@ -3746,6 +3746,7 @@
     "title": "Profillər",
     "entrySubtitle": "Seanslar arasında mühit parametrlərini təkrar istifadə edin",
     "newProfile": "Yeni profil",
+    "openHint": "Profili açır",
     "emptyTitle": "Hələ profil yoxdur",
     "emptyDescription": "Mühit dəyişənlərindən, quraşdırma əmrlərindən və sessiyalar arasında bacarıqlardan təkrar istifadə etmək üçün profil yaradın.",
     "loadFailed": "Profilləri yükləmək mümkün olmadı",

@@ -3746,6 +3746,7 @@
     "title": "Profile",
     "entrySubtitle": "Umgebungseinstellungen sitzungsübergreifend wiederverwenden",
     "newProfile": "Neues Profil",
+    "openHint": "Öffnet das Profil",
     "emptyTitle": "Noch keine Profile",
     "emptyDescription": "Erstelle ein Profil, um Umgebungsvariablen, Setup-Befehle und Fähigkeiten sitzungsübergreifend wiederzuverwenden.",
     "loadFailed": "Profile konnten nicht geladen werden",

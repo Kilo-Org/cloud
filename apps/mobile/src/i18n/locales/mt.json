@@ -3884,6 +3884,7 @@
     "title": "Profili",
     "entrySubtitle": "Uża mill-ġdid is-settings tal-ambjent matul is-sessjonijiet",
     "newProfile": "Profil ġdid",
+    "openHint": "Jiftaħ il-profil",
     "emptyTitle": "Għadu l-ebda profil",
     "emptyDescription": "Oħloq profil biex tuża mill-ġdid il-varjabbli ambjentali, il-kmandi tas-setup, u l-ħiliet matul is-sessjonijiet.",
     "loadFailed": "Ma setgħetx tagħbija profili",

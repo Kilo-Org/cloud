@@ -3792,6 +3792,7 @@
     "title": "Perfiles",
     "entrySubtitle": "Reutilizar la configuración del entorno en todas las sesiones",
     "newProfile": "Nuevo perfil",
+    "openHint": "Abre el perfil",
     "emptyTitle": "Aún no hay perfiles",
     "emptyDescription": "Cree un perfil para reutilizar variables de entorno, comandos de configuración y habilidades en todas las sesiones.",
     "loadFailed": "No se pudieron cargar perfiles",

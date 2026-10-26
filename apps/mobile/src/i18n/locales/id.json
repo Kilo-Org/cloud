@@ -3746,6 +3746,7 @@
     "title": "Profil",
     "entrySubtitle": "Gunakan kembali pengaturan lingkungan di seluruh sesi",
     "newProfile": "Profil baru",
+    "openHint": "Membuka profil",
     "emptyTitle": "Belum ada profil",
     "emptyDescription": "Buat profil untuk menggunakan kembali variabel lingkungan, perintah pengaturan, dan keterampilan di seluruh sesi.",
     "loadFailed": "Tidak dapat memuat profil",

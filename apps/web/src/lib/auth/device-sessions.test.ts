@@ -22,6 +22,10 @@ import {
 import { KeyCollisionError } from './native-admission';
 import type { User } from '@kilocode/db/schema';
 import {
+  isDeviceSessionActive,
+  resetDeviceSessionCacheForTest,
+} from '@kilocode/web-shared/lib/auth/device-session-cache';
+import {
   isEmailBlacklistedByDomainAsync,
   isBlockedTLD,
 } from '@kilocode/web-shared/lib/user/server';
@@ -94,11 +98,31 @@ describe('device-sessions', () => {
       expect(row!.revoked_at).toBeNull();
     });
 
-    test('signs out the least recently active app session beyond the cap', async () => {
+    test('retires the least recently active app session and clears its cached state', async () => {
       const sessionIds: string[] = [];
-      for (let index = 0; index <= MAX_LIVE_APP_SESSIONS; index += 1) {
+      for (let index = 0; index < MAX_LIVE_APP_SESSIONS; index += 1) {
         sessionIds.push(await createDeviceSession({ userId: testUserId }));
       }
+
+      const oldestSessionId = sessionIds[0];
+      const loadSessionActive = jest.fn(async () => {
+        const [row] = await db
+          .select({ revoked_at: device_sessions.revoked_at })
+          .from(device_sessions)
+          .where(eq(device_sessions.id, oldestSessionId));
+        return row !== undefined && row.revoked_at === null;
+      });
+      resetDeviceSessionCacheForTest();
+      expect(await isDeviceSessionActive(oldestSessionId, testUserId, loadSessionActive)).toBe(
+        true
+      );
+
+      sessionIds.push(await createDeviceSession({ userId: testUserId }));
+
+      expect(await isDeviceSessionActive(oldestSessionId, testUserId, loadSessionActive)).toBe(
+        false
+      );
+      expect(loadSessionActive).toHaveBeenCalledTimes(2);
 
       const rows = await db
         .select({
@@ -112,8 +136,7 @@ describe('device-sessions', () => {
       const live = rows.filter(row => row.revoked_at === null);
       expect(live).toHaveLength(MAX_LIVE_APP_SESSIONS);
 
-      // The oldest insert is the one the cap retired.
-      const oldest = rows.find(row => row.id === sessionIds[0]);
+      const oldest = rows.find(row => row.id === oldestSessionId);
       expect(oldest?.revoked_reason).toBe('session_limit');
       expect(oldest?.revoked_at).not.toBeNull();
       expect(live.map(row => row.id)).toContain(sessionIds[sessionIds.length - 1]);
@@ -934,6 +957,42 @@ describe('device-sessions', () => {
       );
       expect(result.expiresIn).toBe(3600);
       expect(result.token.length).toBeGreaterThan(0);
+    });
+
+    test('refreshes local session state after an attested sign-in', async () => {
+      const sessionIds: string[] = [];
+      for (let index = 0; index < MAX_LIVE_APP_SESSIONS; index += 1) {
+        sessionIds.push(await createDeviceSession({ userId: testUserId }));
+      }
+
+      const oldestSessionId = sessionIds[0];
+      const loadSessionActive = jest.fn(async () => {
+        const [row] = await db
+          .select({ revoked_at: device_sessions.revoked_at })
+          .from(device_sessions)
+          .where(eq(device_sessions.id, oldestSessionId));
+        return row !== undefined && row.revoked_at === null;
+      });
+      resetDeviceSessionCacheForTest();
+      expect(await isDeviceSessionActive(oldestSessionId, testUserId, loadSessionActive)).toBe(
+        true
+      );
+
+      await createDeviceSessionWithAttestedKey({
+        userId: testUserId,
+        user: fakeUser,
+        verification: {
+          ok: true,
+          platform: 'ios',
+          keyId: `ios-cap-key-${Date.now()}`,
+          publicKey: 'c3BraS1wdWJsaWMta2V5',
+        },
+      });
+
+      expect(await isDeviceSessionActive(oldestSessionId, testUserId, loadSessionActive)).toBe(
+        false
+      );
+      expect(loadSessionActive).toHaveBeenCalledTimes(2);
     });
 
     test('refuses a key already bound to another account and leaves no session', async () => {

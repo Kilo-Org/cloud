@@ -115,7 +115,7 @@ export const MAX_LIVE_APP_SESSIONS = 20;
 async function enforceLiveAppSessionLimit(
   executor: typeof db | DrizzleTransaction,
   userId: string
-): Promise<void> {
+): Promise<string[]> {
   const stale = await executor
     .select({ id: device_sessions.id })
     .from(device_sessions)
@@ -130,18 +130,16 @@ async function enforceLiveAppSessionLimit(
     .offset(MAX_LIVE_APP_SESSIONS);
 
   if (stale.length === 0) {
-    return;
+    return [];
   }
 
+  const staleSessionIds = stale.map(session => session.id);
   await executor
     .update(device_sessions)
     .set({ revoked_at: new Date().toISOString(), revoked_reason: 'session_limit' })
-    .where(
-      inArray(
-        device_sessions.id,
-        stale.map(session => session.id)
-      )
-    );
+    .where(inArray(device_sessions.id, staleSessionIds));
+
+  return staleSessionIds;
 }
 
 /**
@@ -153,7 +151,7 @@ export async function createDeviceSession(params: {
   userAgent?: string;
   deviceAuthRequestId?: string;
 }): Promise<string> {
-  return await db.transaction(async tx => {
+  const { sessionId, evictedSessionIds } = await db.transaction(async tx => {
     const [session] = await tx
       .insert(device_sessions)
       .values({
@@ -169,12 +167,19 @@ export async function createDeviceSession(params: {
 
     // A device-auth session is minted by the CLI flow, so it neither counts
     // toward the app-session cap nor evicts one.
-    if (params.deviceAuthRequestId === undefined) {
-      await enforceLiveAppSessionLimit(tx, params.userId);
-    }
+    const evictedSessionIds =
+      params.deviceAuthRequestId === undefined
+        ? await enforceLiveAppSessionLimit(tx, params.userId)
+        : [];
 
-    return session.id;
+    return { sessionId: session.id, evictedSessionIds };
   });
+
+  for (const evictedSessionId of evictedSessionIds) {
+    invalidateDeviceSession(evictedSessionId);
+  }
+
+  return sessionId;
 }
 
 /**
@@ -485,7 +490,7 @@ export async function createDeviceSessionWithAttestedKey(params: {
   user: User;
   verification: VerifyAdmissionOk;
 }): Promise<{ token: string; refreshToken: string; expiresIn: number; sessionId: string }> {
-  return await db.transaction(async tx => {
+  const { credentials, evictedSessionIds } = await db.transaction(async tx => {
     await persistAttestedKey(params.userId, params.verification, tx);
 
     const [session] = await tx
@@ -500,7 +505,7 @@ export async function createDeviceSessionWithAttestedKey(params: {
       throw new Error('Failed to create device session');
     }
 
-    await enforceLiveAppSessionLimit(tx, params.userId);
+    const evictedSessionIds = await enforceLiveAppSessionLimit(tx, params.userId);
 
     const accessToken = generateApiToken(
       params.user,
@@ -519,12 +524,21 @@ export async function createDeviceSessionWithAttestedKey(params: {
     });
 
     return {
-      token: accessToken,
-      refreshToken,
-      expiresIn: TOKEN_EXPIRY.oneHour,
-      sessionId: session.id,
+      credentials: {
+        token: accessToken,
+        refreshToken,
+        expiresIn: TOKEN_EXPIRY.oneHour,
+        sessionId: session.id,
+      },
+      evictedSessionIds,
     };
   });
+
+  for (const evictedSessionId of evictedSessionIds) {
+    invalidateDeviceSession(evictedSessionId);
+  }
+
+  return credentials;
 }
 
 /**

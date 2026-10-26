@@ -22,6 +22,9 @@ import {
 } from '@kilocode/db/operation-ledger';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { reconcileCreditExpirationsInTransaction } from '@kilocode/db/credit-expiration';
+import { recordRefundDebtRepayment } from '@kilocode/db/credit-refund-repayments';
+import { refundCreditTransaction } from '@kilocode/web-shared/lib/creditAdjustments';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { getMonthlyPriceUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus';
 import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
@@ -206,8 +209,24 @@ async function insertCreditTransactionAdjustment(
     creditCategory: string;
     originalBaselineMicrodollarsUsed: number;
     isFree?: boolean;
+    sourceTransactionId?: string;
   }
 ): Promise<{ wasInserted: boolean; creditTransactionId: string | null }> {
+  if (params.amountMicrodollars < 0) {
+    if (!params.sourceTransactionId) throw new Error('Upgrade clawback requires its source credit');
+    const refund = await refundCreditTransaction(tx, {
+      owner: { type: 'user', id: params.kiloUserId },
+      sourceTransactionId: params.sourceTransactionId,
+      amountMicrodollars: -params.amountMicrodollars,
+      creditCategory: params.creditCategory,
+      description: params.description,
+    });
+    return { wasInserted: refund.wasInserted, creditTransactionId: refund.creditTransactionId };
+  }
+  const owner = await reconcileCreditExpirationsInTransaction(
+    { type: 'user', id: params.kiloUserId },
+    tx
+  );
   const creditTransactionId = crypto.randomUUID();
   const insertResult = await tx
     .insert(credit_transactions)
@@ -220,6 +239,10 @@ async function insertCreditTransactionAdjustment(
       credit_category: params.creditCategory,
       check_category_uniqueness: true,
       original_baseline_microdollars_used: params.originalBaselineMicrodollarsUsed,
+      ...(!params.isFree && {
+        paid_credit_policy: 'apple_exempt',
+        credit_source: 'apple',
+      }),
     })
     .onConflictDoNothing();
 
@@ -235,6 +258,15 @@ async function insertCreditTransactionAdjustment(
       )
       .limit(1);
     return { wasInserted: false, creditTransactionId: existingRows[0]?.id ?? null };
+  }
+  if (params.amountMicrodollars > 0) {
+    await recordRefundDebtRepayment(tx, {
+      owner: { type: 'user', id: params.kiloUserId },
+      transactionId: creditTransactionId,
+      priorAcquired: owner.total_microdollars_acquired,
+      priorUsed: owner.microdollars_used,
+      amountMicrodollars: params.amountMicrodollars,
+    });
   }
 
   await tx
@@ -346,6 +378,7 @@ async function resetIssuanceItemsForStoreUpgrade(
       itemId: kilo_pass_issuance_items.id,
       kind: kilo_pass_issuance_items.kind,
       amountMicrodollars: credit_transactions.amount_microdollars,
+      sourceTransactionId: credit_transactions.id,
     })
     .from(kilo_pass_issuance_items)
     .innerJoin(
@@ -375,6 +408,7 @@ async function resetIssuanceItemsForStoreUpgrade(
       creditCategory: `kilo-pass-upgrade-bonus-reversal:${params.purchase.paymentProvider}:${params.purchase.providerTransactionId}:${item.kind}:${item.itemId}`,
       originalBaselineMicrodollarsUsed: params.originalBaselineMicrodollarsUsed,
       isFree: true,
+      sourceTransactionId: item.sourceTransactionId,
     });
     if (reversal.creditTransactionId) {
       reversedBonusCreditTransactionIds.push(reversal.creditTransactionId);
@@ -457,12 +491,20 @@ async function applyStoreUpgradeCreditAdjustments(
   });
 
   if (refundMicrodollars > 0) {
+    const baseItem = await tx.query.kilo_pass_issuance_items.findFirst({
+      where: and(
+        eq(kilo_pass_issuance_items.kilo_pass_issuance_id, params.issuanceId),
+        eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Base)
+      ),
+      columns: { credit_transaction_id: true },
+    });
     const refundResult = await insertCreditTransactionAdjustment(tx, {
       kiloUserId: params.user.id,
       amountMicrodollars: -refundMicrodollars,
       description: `Kilo Pass upgrade refund clawback (${params.oldTier})`,
       creditCategory: `kilo-pass-upgrade-refund:${params.purchase.paymentProvider}:${params.purchase.providerTransactionId}`,
       originalBaselineMicrodollarsUsed: freshUser.microdollarsUsed,
+      sourceTransactionId: baseItem?.credit_transaction_id,
     });
     await appendKiloPassAuditLog(tx, {
       action: KiloPassAuditLogAction.BaseCreditsIssued,
@@ -984,6 +1026,15 @@ export async function completeStoreKiloPassPurchase(params: {
           amountUsd: baseAmountUsd,
           providerPaymentId: getProviderPaymentId(purchase),
           description: `Kilo Pass base credits (${purchase.tier}, ${purchase.cadence})`,
+          paidCredit: {
+            source:
+              purchase.paymentProvider === KiloPassPaymentProvider.AppStore
+                ? 'apple'
+                : 'google_play',
+            purchasedAt: purchase.purchasedAtIso,
+            issuedAt: purchase.purchasedAtIso,
+            terms: 'legacy',
+          },
         });
 
     if (isAppStoreSamePeriodUpgrade && previousStorePurchase?.expires_at) {

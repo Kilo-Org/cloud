@@ -38,6 +38,7 @@ import { sentryRootSpan } from '../getRootSpan';
 import {
   mutateOrganizationUsage,
   scheduleOrganizationLowBalanceAlert,
+  scheduleOrganizationUsageAutoTopUp,
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import type { OrganizationUsageMutationResult } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
@@ -98,6 +99,8 @@ import {
 import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
 import { enqueueDailyUsageRollupRepair } from './usage-daily-rollup-repairs';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
+import { maybePerformAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
+import type { UserForBalance } from '@kilocode/web-shared/lib/user/balance-types';
 import {
   normalizeJa4,
   reportUsageEvent,
@@ -579,6 +582,7 @@ type UsageStatementExecutor = Pick<DrizzleTransaction, 'execute'>;
 type UsageStatementResult = UsageRecordInsertResult & {
   kiloPassThreshold: number | null;
   organizationUsage?: OrganizationUsageMutationResult;
+  autoTopUpUser?: UserForBalance | null;
 };
 
 type UsageTransactionResult = {
@@ -693,6 +697,23 @@ function organizationUsageMutationTask(
   };
 }
 
+function scheduleUsageAutoTopUp(usage: MicrodollarUsage, result: UsageStatementResult): void {
+  if (usage.cost <= 0) return;
+  try {
+    if (result.organizationUsage) {
+      scheduleOrganizationUsageAutoTopUp(result.organizationUsage);
+    } else if (result.autoTopUpUser) {
+      const user = result.autoTopUpUser;
+      after(() => maybePerformAutoTopUp(user));
+    }
+  } catch {
+    console.warn('usage auto-top-up unavailable', {
+      usageId: usage.id,
+      reason: 'registration_failed',
+    });
+  }
+}
+
 async function runPostCommitUsageWork(
   usage: MicrodollarUsage,
   result: UsageStatementResult,
@@ -715,6 +736,7 @@ async function runPostCommitUsageWork(
     });
   }
   await runBestEffortPostCommitTasks(tasks);
+  scheduleUsageAutoTopUp(usage, result);
 }
 
 function scheduleKiloPassBonusIfNeeded(
@@ -888,6 +910,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
     usage_created_at: string;
     new_microdollars_used: string | null;
     kilo_pass_threshold: string | null;
+    auto_top_up_user: UserForBalance | null;
   }>(sql`
           WITH microdollar_usage_ins AS (
             INSERT INTO microdollar_usage (
@@ -1018,13 +1041,22 @@ async function insertUsageAndMetadataWithBalanceUpdate(
             WHERE id = ${coreUsageFields.kilo_user_id}
               AND ${coreUsageFields.organization_id}::uuid IS NULL
               AND ${coreUsageFields.cost} > 0
-            RETURNING microdollars_used AS new_microdollars_used, kilo_pass_threshold
+            RETURNING microdollars_used AS new_microdollars_used, kilo_pass_threshold,
+              CASE WHEN auto_top_up_enabled THEN jsonb_build_object(
+                'id', id,
+                'total_microdollars_acquired', total_microdollars_acquired,
+                'microdollars_used', microdollars_used,
+                'next_credit_expiration_at', next_credit_expiration_at,
+                'updated_at', updated_at,
+                'auto_top_up_enabled', auto_top_up_enabled
+              ) END AS auto_top_up_user
           )
           SELECT
             microdollar_usage_ins.id AS usage_id,
             microdollar_usage_ins.created_at AS usage_created_at,
             balance_update.new_microdollars_used,
-            balance_update.kilo_pass_threshold
+            balance_update.kilo_pass_threshold,
+            balance_update.auto_top_up_user
           FROM microdollar_usage_ins
           LEFT JOIN balance_update ON true
         `);
@@ -1059,6 +1091,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
     createdAt: inserted.usage_created_at,
     newMicrodollarsUsed,
     kiloPassThreshold,
+    autoTopUpUser: inserted.auto_top_up_user,
   };
 }
 

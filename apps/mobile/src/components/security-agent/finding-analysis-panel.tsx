@@ -105,6 +105,11 @@ export function FindingAnalysisPanel({
   );
   const triage = analysis.analysis?.triage;
   const sandbox = analysis.analysis?.sandboxAnalysis;
+  const analyzedAt = sandbox ? parseTimestamp(sandbox.analysisAt) : null;
+  const analyzedLabel =
+    analyzedAt === null || Number.isNaN(analyzedAt.getTime())
+      ? t('securityAgent.analysis.notRecorded')
+      : timeAgo(analyzedAt);
   const presentationTitle = getSecurityAnalysisDetailTitle(analysisState);
   const presentationDescription = getSecurityAnalysisDetailDescription(analysisState, {
     analysisError: analysis.error,
@@ -279,7 +284,7 @@ export function FindingAnalysisPanel({
             />
             <KvRow
               label={t('securityAgent.analysis.analyzed')}
-              value={timeAgo(parseTimestamp(sandbox.analysisAt))}
+              value={analyzedLabel}
               last
               selectable
             />

@@ -3745,6 +3745,7 @@
     "title": "Mga profile",
     "entrySubtitle": "Muling gamitin ang mga setting ng kapaligiran sa mga session",
     "newProfile": "Bagong profile",
+    "openHint": "Binubuksan ang profile",
     "emptyTitle": "Wala pang mga profile",
     "emptyDescription": "Gumawa ng profile para magamit muli ang mga variable ng kapaligiran, mga command sa pag-setup, at mga kasanayan sa mga session.",
     "loadFailed": "Hindi ma-load ang mga profile",

@@ -3745,6 +3745,7 @@
     "title": "配置文件",
     "entrySubtitle": "跨会话重用环境设置",
     "newProfile": "新建配置文件",
+    "openHint": "打开配置文件",
     "emptyTitle": "还没有配置文件",
     "emptyDescription": "创建配置文件以跨会话重复使用环境变量、设置命令和技能。",
     "loadFailed": "无法加载配置文件",

@@ -1086,9 +1086,9 @@ describe('prepareSession endpoint', () => {
     );
   });
 
-  it('auto-initiates through grouped creation with canonicalized legacy initial attachments', async () => {
+  it('auto-initiates through grouped creation with canonical initial attachments', async () => {
     const initialMessageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
-    const images = {
+    const attachments = {
       path: '123e4567-e89b-12d3-a456-426614174000',
       files: ['123e4567-e89b-12d3-a456-426614174001.png'],
     };
@@ -1103,7 +1103,7 @@ describe('prepareSession endpoint', () => {
 
     await caller.prepareSession({
       prompt: 'Inspect the screenshot',
-      images,
+      attachments,
       initialMessageId,
       mode: 'code',
       model: 'claude-3',
@@ -1118,7 +1118,7 @@ describe('prepareSession endpoint', () => {
             turn: expect.objectContaining({
               type: 'prompt',
               prompt: 'Inspect the screenshot',
-              attachments: images,
+              attachments,
             }),
             id: initialMessageId,
           }),

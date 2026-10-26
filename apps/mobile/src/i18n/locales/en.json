@@ -3692,7 +3692,7 @@
       "loadingModel": "Loading model details",
       "couldNotLoadModel": "Couldn't load this model",
       "noFiles": "No files this app can run",
-      "noFilesDescription": "This app runs models that are one GGUF file.",
+      "noFilesDescription": "This app runs models that are one complete GGUF file, and this repository offers none.",
       "tooLargeTitle": "This model may not run",
       "tooLargeMessage": "{{name}} likely needs more memory than this device has. The app can close while the model answers. Download it anyway?",
       "downloadAnyway": "Download anyway"
@@ -3845,6 +3845,7 @@
     "title": "Profiles",
     "entrySubtitle": "Reuse environment settings across sessions",
     "newProfile": "New profile",
+    "openHint": "Opens the profile",
     "emptyTitle": "No profiles yet",
     "emptyDescription": "Create a profile to reuse environment variables, setup commands, and skills across sessions.",
     "loadFailed": "Couldn't load profiles",

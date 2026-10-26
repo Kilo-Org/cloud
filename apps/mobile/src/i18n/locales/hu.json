@@ -3745,6 +3745,7 @@
     "title": "Profilok",
     "entrySubtitle": "Használja újra a környezeti beállításokat a munkamenetek között",
     "newProfile": "Új profil",
+    "openHint": "Megnyitja a profilt",
     "emptyTitle": "Még nincsenek profilok",
     "emptyDescription": "Hozzon létre egy profilt a környezeti változók, a beállítási parancsok és a készségek munkamenetek közötti újrafelhasználásához.",
     "loadFailed": "Nem sikerült betölteni a profilokat",

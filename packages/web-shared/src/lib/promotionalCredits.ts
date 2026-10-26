@@ -60,6 +60,11 @@ type GrantCreditResult = CustomResult<
  */
 export const GRANT_MSG_ALREADY_APPLIED = 'has already been applied';
 export const GRANT_MSG_CAP_REACHED = 'reached its redemption limit';
+/**
+ * User-facing text returned when a grant fails unexpectedly.
+ */
+export const GRANT_MSG_UNEXPECTED_FAILURE =
+  'The promotional credit could not be applied. Please try again later.';
 
 async function getTotalRedemptions(dbOrTx: DbOrTx, promoCreditCategory: string): Promise<number> {
   const result = await dbOrTx
@@ -195,8 +200,13 @@ export async function grantCreditForCategoryConfig(
   } catch (error: unknown) {
     captureException(error, {
       tags: { source: 'promotional_credits_grant' },
+      extra: {
+        credit_category: promotion.credit_category,
+        kilo_user_id: user.id,
+        organization_id: entity.organization?.id ?? null,
+      },
     });
-    return { success: false, message: 'Failed to apply promotional credit' };
+    return { success: false, message: GRANT_MSG_UNEXPECTED_FAILURE };
   }
 }
 

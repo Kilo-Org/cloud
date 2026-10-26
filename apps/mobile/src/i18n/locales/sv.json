@@ -3745,6 +3745,7 @@
     "title": "Profiler",
     "entrySubtitle": "Återanvänd miljöinställningar över sessioner",
     "newProfile": "Ny profil",
+    "openHint": "Öppnar profilen",
     "emptyTitle": "Inga profiler än",
     "emptyDescription": "Skapa en profil för att återanvända miljövariabler, installationskommandon och färdigheter över sessioner.",
     "loadFailed": "Det gick inte att läsa in profiler",

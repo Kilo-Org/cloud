@@ -3745,6 +3745,7 @@
     "title": "Profile-yada",
     "entrySubtitle": "Dib u isticmaal jaangooyooyinka deegaanka ee fadhiyada oo dhan",
     "newProfile": "profile cusub",
+    "openHint": "Wuxuu furayaa profile-ka",
     "emptyTitle": "Weli profiles ma jiraan",
     "emptyDescription": "Abuur profile si dib loogu isticmaalo doorsoomayaasha deegaanka, amarrada dejinta, iyo xirfadaha kalfadhiyada oo dhan.",
     "loadFailed": "Waa la rari waayay muuqaallada",

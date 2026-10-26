@@ -3745,6 +3745,7 @@
     "title": "Profiler",
     "entrySubtitle": "Gjenbruk miljøinnstillinger på tvers av økter",
     "newProfile": "Ny profil",
+    "openHint": "Åpner profilen",
     "emptyTitle": "Ingen profiler ennå",
     "emptyDescription": "Opprett en profil for å gjenbruke miljøvariabler, oppsettkommandoer og ferdigheter på tvers av økter.",
     "loadFailed": "Kunne ikke laste inn profiler",

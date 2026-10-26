@@ -1518,7 +1518,6 @@ export function ChatComposer({
               sendDisabledReason={sendDisabledReason}
               textInputStyle={textInputStyle}
               voiceDisabled={control.voiceDisabled}
-              voiceInputAvailable={voiceInput.available}
               voiceInputStatus={voiceInput.status}
             />
           </View>

@@ -495,6 +495,21 @@ describe('adminCustomLlmRouter', () => {
       ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: expect.stringContaining(message) });
     });
 
+    it('rejects a free model id', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: 'stealth/custom-alpha',
+          definition: validDefinition,
+          credentials,
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('free model id'),
+      });
+    });
+
     it('rejects a Kilo-exclusive model id', async () => {
       const exclusiveModelId = kiloExclusiveModels.find(
         model => !model.public_id.includes(':')

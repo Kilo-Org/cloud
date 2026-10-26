@@ -3837,6 +3837,7 @@
     "title": "Profile",
     "entrySubtitle": "Wykorzystuj ponownie ustawienia środowiska w różnych sesjach",
     "newProfile": "Nowy profil",
+    "openHint": "Otwiera profil",
     "emptyTitle": "Nie ma jeszcze profili",
     "emptyDescription": "Utwórz profil, aby ponownie używać zmiennych środowiskowych, poleceń konfiguracyjnych i umiejętności w różnych sesjach.",
     "loadFailed": "Nie udało się załadować profili",

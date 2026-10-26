@@ -3745,6 +3745,7 @@
     "title": "Profilet",
     "entrySubtitle": "Ripërdorni cilësimet e mjedisit nëpër sesione",
     "newProfile": "Profili i ri",
+    "openHint": "Hap profilin",
     "emptyTitle": "Nuk ka ende profile",
     "emptyDescription": "Krijo një profil për të ripërdorur variablat e mjedisit, komandat e konfigurimit dhe aftësitë nëpër sesione.",
     "loadFailed": "Profilet nuk mund të ngarkoheshin",

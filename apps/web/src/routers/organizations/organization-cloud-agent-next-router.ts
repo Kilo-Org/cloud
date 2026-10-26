@@ -70,13 +70,9 @@ import {
   baseCreatePreviewNextSchema,
   baseCreatePreviewNextOutputSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
-  cloudAgentGetImageUploadUrlSchema,
   cloudAgentReleasePendingUploadsSchema,
 } from '../cloud-agent-next-schemas';
-import {
-  generateCloudAgentAttachmentUploadUrl,
-  generateImageUploadUrl,
-} from '@/lib/r2/cloud-agent-attachments';
+import { generateCloudAgentAttachmentUploadUrl } from '@/lib/r2/cloud-agent-attachments';
 import {
   linkAttachmentsForDispatch,
   releasePendingUploads,
@@ -195,10 +191,6 @@ const InterruptSessionInput = baseInterruptSessionNextSchema.extend({
 });
 
 const CancelQueuedMessageInput = baseCancelQueuedMessageNextSchema.extend({
-  organizationId: z.uuid(),
-});
-
-const ImageUploadUrlInput = cloudAgentGetImageUploadUrlSchema.extend({
   organizationId: z.uuid(),
 });
 
@@ -343,7 +335,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         publicRepoUrl,
         organizationId,
         attachments,
-        images,
         ...restInput
       } = input;
 
@@ -403,14 +394,13 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         // New-session flows call prepareSession without a follow-up
         // sendMessage, so the attachment rows must be linked before prepare
         // can accept the session; otherwise the reaper deletes new-session
-        // objects. Only ATTACHMENT rows are admitted (images are never
-        // admitted; only generateCloudAgentAttachmentUploadUrl admits).
+        // objects.
         await linkAttachmentsForDispatch(ctx.user.id, attachments);
 
         return await client.prepareSession({
           ...restInput,
           ...gitParams,
-          attachments: attachments ?? images,
+          attachments,
           createdOnPlatform: 'cloud-agent-web',
           githubAccessPurpose: 'agent',
           kilocodeOrganizationId: organizationId,
@@ -529,9 +519,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         // Link the attachment rows before the worker can accept the turn: the
         // link is what keeps their objects out of the abandoned-upload reaper,
         // and once the worker has answered there is no ledger work left that
-        // could report an accepted send as failed. Only ATTACHMENT rows are
-        // admitted (images are never admitted; only
-        // generateCloudAgentAttachmentUploadUrl admits).
+        // could report an accepted send as failed.
         linkedObjectKeys = await linkAttachmentsForDispatch(ctx.user.id, attachments);
       } catch (error) {
         rethrowCloudAgentError(error);
@@ -543,7 +531,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           payload: input.payload,
           autoCommit: input.autoCommit,
           messageId: input.messageId,
-          attachments: attachments ?? input.images,
+          attachments,
         });
       } catch (error) {
         // A send can fail after the worker accepted the turn, so only the rows
@@ -764,21 +752,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       } catch (error) {
         rethrowAsTerminalError(error);
       }
-    }),
-
-  /**
-   * Generate a presigned URL for uploading an image attachment.
-   */
-  getImageUploadUrl: organizationMemberMutationProcedure
-    .input(ImageUploadUrlInput)
-    .mutation(async ({ ctx, input }) => {
-      return generateImageUploadUrl({
-        userId: ctx.user.id,
-        messageUuid: input.messageUuid,
-        imageId: input.imageId,
-        contentType: input.contentType,
-        contentLength: input.contentLength,
-      });
     }),
 
   /**

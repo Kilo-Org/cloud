@@ -69,6 +69,7 @@ describe('grantCreditForCategory', () => {
   });
 
   it('returns a fixed message when the grant throws', async () => {
+    const user = await insertTestUser();
     const thrown = new Error('sensitive-internal-detail');
     jest.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(() => {
       throw thrown;
@@ -89,7 +90,7 @@ describe('grantCreditForCategory', () => {
         await import('@kilocode/web-shared/lib/promotionalCredits');
 
       const result = await isolatedGrant(
-        { organization: null, user: mockUser },
+        { organization: null, user },
         { credit_category: 'unexpected-failure', counts_as_selfservice: false },
         config
       );
@@ -103,7 +104,7 @@ describe('grantCreditForCategory', () => {
       tags: { source: 'promotional_credits_grant' },
       extra: {
         credit_category: 'unexpected-failure',
-        kilo_user_id: mockUser.id,
+        kilo_user_id: user.id,
         organization_id: null,
       },
     });

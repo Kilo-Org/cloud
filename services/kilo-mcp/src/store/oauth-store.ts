@@ -93,11 +93,18 @@ export type PendingAuthorization = {
   /** The parsed library authorization request, stored as JSON. */
   authRequest: AuthRequest;
   deviceAuthCode: string;
+  userCode: string | null;
   status: PendingAuthorizationStatus;
   kiloUserId: string | null;
   organizationId: string | null;
   /** Kilo API token from the approved pairing; never log it. */
   kiloToken: string | null;
+  /**
+   * The flow-cookie token the browser that started the authorization must
+   * present; handlers compare it before serving status or the picker. Empty
+   * (pre-column rows) matches nothing, so such records fail closed.
+   */
+  flowToken: string;
   createdAt: string;
   expiresAt: string;
 };
@@ -106,6 +113,9 @@ export type NewPendingAuthorization = {
   id: string;
   authRequest: AuthRequest;
   deviceAuthCode: string;
+  userCode: string;
+  /** The flow-cookie token bound to the starting browser. */
+  flowToken: string;
   createdAt: string;
   /** ISO timestamp; the record is only actionable until then. */
   expiresAt: string;
@@ -167,10 +177,12 @@ function rowToPendingAuthorization(
     id: row.id,
     authRequest: JSON.parse(row.auth_request) as AuthRequest,
     deviceAuthCode: row.device_auth_code,
+    userCode: row.user_code,
     status: row.status,
     kiloUserId: row.kilo_user_id,
     organizationId: row.organization_id,
     kiloToken: row.kilo_token,
+    flowToken: row.flow_token,
     createdAt: row.created_at,
     expiresAt: row.expires_at,
   };
@@ -224,7 +236,9 @@ export class KiloMcpOAuthStore
         id: input.id,
         auth_request: JSON.stringify(input.authRequest),
         device_auth_code: input.deviceAuthCode,
+        user_code: input.userCode,
         status: 'pending',
+        flow_token: input.flowToken,
         created_at: input.createdAt,
         expires_at: input.expiresAt,
       })

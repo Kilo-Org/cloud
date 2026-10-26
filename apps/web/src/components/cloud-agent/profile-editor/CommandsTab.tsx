@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { Plus, Loader2, Trash2, Terminal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { EnvironmentSnapshotNotice } from '@/components/cloud-agent-next/EnvironmentSnapshotNotice';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type {
@@ -18,9 +19,16 @@ type CommandsTabProps = {
   mutations:
     | ReturnType<typeof useProfileMutations>
     | ReturnType<typeof useCombinedProfileMutations>;
+  readOnly?: boolean;
 };
 
-export function CommandsTab({ profileId, organizationId, commands, mutations }: CommandsTabProps) {
+export function CommandsTab({
+  profileId,
+  organizationId,
+  commands,
+  mutations,
+  readOnly = false,
+}: CommandsTabProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [newCommand, setNewCommand] = useState('');
   const [saving, setSaving] = useState(false);
@@ -67,6 +75,7 @@ export function CommandsTab({ profileId, organizationId, commands, mutations }: 
         <Terminal className="text-muted-foreground h-3.5 w-3.5" />
         <span className="text-xs font-medium">Setup Commands</span>
       </div>
+      <EnvironmentSnapshotNotice />
 
       {commands.map((cmd, i) => (
         <div
@@ -77,15 +86,17 @@ export function CommandsTab({ profileId, organizationId, commands, mutations }: 
           <code className="bg-muted flex-1 truncate rounded px-2 py-0.5 font-mono text-xs">
             {cmd.command}
           </code>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-destructive hover:text-destructive h-7 w-7 shrink-0"
-            onClick={() => handleDelete(i)}
-            disabled={saving}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {!readOnly && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-destructive hover:text-destructive h-7 w-7 shrink-0"
+              onClick={() => handleDelete(i)}
+              disabled={saving}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       ))}
 
@@ -120,14 +131,16 @@ export function CommandsTab({ profileId, organizationId, commands, mutations }: 
           </div>
         </div>
       ) : (
-        <Button
-          variant="outline"
-          className="h-11 w-full border-dashed"
-          onClick={() => setIsAdding(true)}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add Command
-        </Button>
+        !readOnly && (
+          <Button
+            variant="outline"
+            className="h-11 w-full border-dashed"
+            onClick={() => setIsAdding(true)}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Command
+          </Button>
+        )
       )}
 
       {commands.length === 0 && !isAdding && (

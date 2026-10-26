@@ -59,8 +59,10 @@ export function BriefingSummary({ report }: { readonly report: BriefingReport })
   const onSuccess = () => {
     void client.invalidateQueries({ queryKey: trpc.agentBriefing.pathKey() });
   };
-  const onError = (error: { message: string }) => {
-    toast.error(error.message);
+  // The server writes its failure sentence in English; the toast says what
+  // happened in the reader's language and the detail stays in the log.
+  const onError = () => {
+    toast.error(t('common.somethingWentWrong'));
   };
   const generate = useMutation(
     trpc.agentBriefing.generateSummary.mutationOptions({
@@ -140,7 +142,7 @@ export function BriefingSummary({ report }: { readonly report: BriefingReport })
         </Text>
       ) : null}
       {report.summary.text ? (
-        <Text className="text-sm leading-6" selectable>
+        <Text className="text-sm leading-[1.5rem]" selectable>
           {report.summary.text}
         </Text>
       ) : null}

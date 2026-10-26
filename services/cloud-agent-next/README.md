@@ -62,6 +62,18 @@ By default, the script looks for kilo-cli at `$HOME/projects/kilo-cli`. Override
 - GitHub CLI (`gh`) and GitLab CLI (`glab`)
 - Wrapper bundle built inside the container
 
+Both sandbox Dockerfiles configure the [Git stable PPA](https://launchpad.net/~git-core/+archive/ubuntu/ppa) directly.
+APT verifies the repository with its signing key in a dedicated `signed-by` keyring.
+This retains current Git packages without calling the Launchpad API through `add-apt-repository`.
+
+### Managed GitLab requests
+
+Managed GitLab sessions support project REST operations and Git smart-HTTP/LFS
+endpoints for their configured repository. REST project selectors use the full
+project path; project credentials also support their recorded numeric project ID.
+The configured instance base path and outbound container binding remain part of
+request authorization.
+
 ## API Documentation
 
 ### Overview
@@ -785,6 +797,10 @@ pnpm --filter cloud-agent-next test:all
 ```
 
 **When to use:** Testing Durable Object behavior, queue consumers, WebSocket handling, SQLite storage, alarms, and any functionality that depends on the Cloudflare Workers runtime. Integration tests use utilities like `runInDurableObject`, `createMessageBatch`, and `getQueueResult` from `cloudflare:test`.
+
+Terminal lifecycle fixtures use `installFakeRuntimeProxyPeer` for credential
+issuance while retaining real Session DO notifications. A fake wrapper answers
+`session.prepare` with `session.ready` before terminal operations begin.
 
 #### Other Quality Checks
 

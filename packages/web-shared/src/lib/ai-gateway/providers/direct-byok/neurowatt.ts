@@ -1,16 +1,19 @@
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import {
+  apiKeyUpstream,
   faviconIcon,
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
 export default {
   id: 'neuralwatt',
-  base_url: 'https://api.neuralwatt.com/v1',
-  base_url_overrides: {},
-  supported_chat_apis: ['chat_completions'],
-  reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
+  models_dev_id: 'neuralwatt',
+  resolveUpstream: apiKeyUpstream({
+    apiUrl: 'https://api.neuralwatt.com/v1',
+    supportedChatApis: ['chat_completions'],
+    responseTransforms: ReasoningDetailsTransform.ReasoningContent,
+  }),
   transformRequest() {},
   models: cachedEnhancedDirectByokModelList({
     providerId: 'neuralwatt',

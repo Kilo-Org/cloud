@@ -64,16 +64,20 @@ function Probe() {
 }
 
 /**
- * The clearance `useTabBarBottomPadding` reserves under a tab-bar context:
- * `true`/`false` are the tabs layout's label decisions, `null` is the root
- * stack (no bar), `undefined` is a screen rendered under neither layout.
+ * The clearance `useTabBarBottomPadding` reserves under a tab-bar context: a
+ * boolean is the tabs layout's label decision, `null` is the root stack (no
+ * bar), `undefined` is a screen rendered under neither layout.
  */
 async function clearanceFor(showLabel: boolean | null | undefined): Promise<number> {
   const probe = createElement(Probe);
   const ui =
     showLabel === undefined
       ? probe
-      : createElement(TabBarLabelContext, { value: showLabel }, probe);
+      : createElement(
+          TabBarLabelContext,
+          { value: showLabel === null ? null : { showLabel, labelLines: 1 } },
+          probe
+        );
   const mounted = await renderWithProviders(ui);
   try {
     return mounted.renderer.root.findByType('Probe').props.padding as number;
@@ -131,7 +135,11 @@ describe('tab screen bottom clearance', () => {
 
   it('keeps the label-inclusive height when the layout keeps the labels', async () => {
     await expect(clearanceFor(true)).resolves.toBe(
-      getTabBarOverlayHeight(layout.bottom, 'android', layout.fontScale) + TAB_SCREEN_BOTTOM_GAP
+      getTabBarOverlayHeight({
+        bottomInset: layout.bottom,
+        platform: 'android',
+        fontScale: layout.fontScale,
+      }) + TAB_SCREEN_BOTTOM_GAP
     );
   });
 
@@ -145,7 +153,11 @@ describe('tab screen bottom clearance', () => {
   it('keeps the font-scale rule for a screen rendered under neither layout', async () => {
     layout.fontScale = 1.5;
     await expect(clearanceFor(undefined)).resolves.toBe(
-      getTabBarOverlayHeight(layout.bottom, 'android', layout.fontScale) + TAB_SCREEN_BOTTOM_GAP
+      getTabBarOverlayHeight({
+        bottomInset: layout.bottom,
+        platform: 'android',
+        fontScale: layout.fontScale,
+      }) + TAB_SCREEN_BOTTOM_GAP
     );
   });
 });
@@ -162,7 +174,7 @@ describe('TabScreenScrollView', () => {
     const { renderer, unmount } = await renderWithProviders(
       createElement(
         TabBarLabelContext,
-        { value: true },
+        { value: { showLabel: true, labelLines: 1 } },
         createElement(TabScreenScrollView, null, createElement('Content'))
       )
     );

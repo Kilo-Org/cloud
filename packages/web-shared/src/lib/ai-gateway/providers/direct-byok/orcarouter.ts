@@ -1,16 +1,19 @@
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import {
+  apiKeyUpstream,
   faviconIcon,
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
 export default {
   id: 'orcarouter',
-  base_url: 'https://api.orcarouter.ai/v1',
-  base_url_overrides: {},
-  supported_chat_apis: ['chat_completions', 'messages', 'responses'],
-  reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
+  models_dev_id: 'orcarouter',
+  resolveUpstream: apiKeyUpstream({
+    apiUrl: 'https://api.orcarouter.ai/v1',
+    supportedChatApis: ['chat_completions', 'messages', 'responses'],
+    responseTransforms: ReasoningDetailsTransform.ReasoningContent,
+  }),
   transformRequest() {},
   models: cachedEnhancedDirectByokModelList({
     providerId: 'orcarouter',

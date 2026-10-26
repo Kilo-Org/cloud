@@ -1,5 +1,5 @@
 import { Stack } from 'expo-router';
-import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
+import { appScreenLayout } from '@/components/app-screen-layout';
 import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 
@@ -139,7 +139,7 @@ export default function AppLayout() {
               whose layout publishes its own decision for every tab screen. */}
           <TabBarLabelContext value={null}>
             <Stack
-              screenLayout={appUnlockScreenLayout}
+              screenLayout={appScreenLayout}
               screenOptions={{
                 contentStyle: { backgroundColor: colors.background },
                 headerShown: false,
@@ -148,6 +148,17 @@ export default function AppLayout() {
               }}
             >
               <Stack.Screen name="(tabs)" />
+              <Stack.Screen
+                name="model-catalog/[owner]/[repo]"
+                options={{
+                  // Back from a model detail belongs to the catalog list, and
+                  // the screen's own rule names it (`lib/chat/model-catalog-back`).
+                  // A native swipe pop bypasses that rule and reveals whatever
+                  // route sits beneath a detail opened without the list, so the
+                  // header control is this screen's only Back affordance.
+                  gestureEnabled: false,
+                }}
+              />
               <Stack.Screen name="pr-review/index" options={{ headerShown: false }} />
               <Stack.Screen
                 name="pr-review/[owner]/[repo]/[number]"

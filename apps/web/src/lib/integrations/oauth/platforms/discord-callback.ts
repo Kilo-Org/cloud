@@ -3,8 +3,9 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { captureException, captureMessage } from '@sentry/nextjs';
+import { getCallbackReportParams } from '@/lib/integrations/oauth/callback-params';
 import { exchangeDiscordCode, upsertDiscordInstallation } from '@/lib/integrations/discord-service';
-import { isLegacyProviderOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
+import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
@@ -62,7 +63,7 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
       captureMessage('Discord callback missing code', {
         level: 'warning',
         tags: { endpoint: 'discord/callback', source: 'discord_oauth' },
-        extra: { state, allParams: Object.fromEntries(searchParams.entries()) },
+        extra: { state, allParams: getCallbackReportParams(searchParams) },
       });
 
       return NextResponse.redirect(
@@ -79,7 +80,7 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
       captureMessage('Discord callback invalid or tampered state signature', {
         level: 'warning',
         tags: { endpoint: 'discord/callback', source: 'discord_oauth' },
-        extra: { code: '***', state, allParams: Object.fromEntries(searchParams.entries()) },
+        extra: { code: '***', state, allParams: getCallbackReportParams(searchParams) },
       });
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
@@ -116,7 +117,7 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
       }
     }
 
-    if (verified.purpose !== 'provider_install' && !isLegacyProviderOAuthState(verified)) {
+    if (verified.provider !== PLATFORM.DISCORD || verified.purpose !== 'provider_install') {
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
 

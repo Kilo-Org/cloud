@@ -23,7 +23,6 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toNonNullish } from '@/lib/utils';
 
-// Table column definition structure
 type TableColumn<T> = {
   key: keyof T;
   title: string;
@@ -32,21 +31,9 @@ type TableColumn<T> = {
 };
 
 const getAbuseTooltipContent = (_item: UsageForTableDisplay) => {
-  // try {
-  //   const result = classifyRecord(item);
-  //   const activeChecks = Object.entries(result.checks)
-  //     .filter(([_, value]) => value)
-  //     .map(([key, _]) => key.replace(/_/g, ' '));
-
-  //   if (activeChecks.length === 0) return 'No abuse indicators detected';
-
-  //   return `Flagged as abuse because:\n${activeChecks.map(check => `• ${check}`).join('\n')}`;
-  // } catch (_error) {
   return 'Unable to determine abuse reasons';
-  // }
 };
 
-// Create column definitions for MicrodollarUsage
 const createMicrodollarUsageColumns = (): TableColumn<UsageForTableDisplay>[] => [
   {
     key: 'created_at',
@@ -378,9 +365,6 @@ export function UserAdminHeuristicAbuse({ id }: Pick<UserDetailProps, 'id'>) {
   };
 
   const getAbuseStatusColor = (_o: UsageForTableDisplay) => {
-    // const result = isLikelyAbuse(o);
-    // if (result === true) return '';
-    // if (result === false) return 'text-gray-300';
     return '';
   };
 
@@ -390,10 +374,8 @@ export function UserAdminHeuristicAbuse({ id }: Pick<UserDetailProps, 'id'>) {
     );
   };
 
-  // Get visible columns
   const visibleColumns = columns.filter(col => col.visible);
 
-  // Toggle all columns
   const toggleAllColumns = (visible: boolean) => {
     setColumns(prevColumns => prevColumns.map(col => ({ ...col, visible })));
   };

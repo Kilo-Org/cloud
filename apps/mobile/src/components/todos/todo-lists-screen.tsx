@@ -46,7 +46,7 @@ function ListRowsSkeleton() {
  * The Agents tab's To-dos view: the context's lists, drag to reorder, swipe
  * to archive or delete, with the archived ones collapsed at the bottom.
  */
-export function TodoListsScreen({ segmentControl }: Readonly<{ segmentControl: ReactNode }>) {
+export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }>) {
   const { t } = useTranslation();
   const router = useRouter();
   const colors = useThemeColors();
@@ -220,7 +220,7 @@ export function TodoListsScreen({ segmentControl }: Readonly<{ segmentControl: R
           ) : undefined
         }
       />
-      {segmentControl}
+      {tabHeader}
       <TabScreenScrollView>{body}</TabScreenScrollView>
       {dialog}
     </View>

@@ -1,6 +1,7 @@
 import type { DirectByokProviderMetaId } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import type {
   GatewayChatApiKind,
+  Provider,
   ProviderApiUrlOverrides,
   ProviderResponseTransforms,
   TransformRequestContext,
@@ -25,17 +26,58 @@ export type DirectByokProviderListing = {
   icon: NonNullable<OpenRouterProvider['icon']>;
 };
 
+/** Upstream routing and authentication derived from a stored credential. */
+export type DirectByokUpstream = Pick<
+  Provider,
+  | 'apiUrl'
+  | 'apiUrlOverrides'
+  | 'disableUrlSuffix'
+  | 'apiKey'
+  | 'apiKeyHeader'
+  | 'awsBedrock'
+  | 'supportedChatApis'
+  | 'responseTransforms'
+>;
+
+export type DirectByokResolveUpstreamInput = {
+  /** The decrypted credential stored for the provider. */
+  credential: string;
+  model: Pick<DirectByokModel, 'id'>;
+  stream: boolean;
+};
+
 export type DirectByokProvider = {
   id: DirectByokProviderMetaId;
-  base_url: string;
-  base_url_overrides: ProviderApiUrlOverrides;
+  /** models.dev provider key; omitted for providers models.dev does not list. */
+  models_dev_id?: string;
   models: () => Promise<ReadonlyArray<DirectByokModel>>;
-  supported_chat_apis: ReadonlyArray<GatewayChatApiKind>;
-  reasoning_details_transform: ProviderResponseTransforms | null;
   transformRequest(context: TransformRequestContext): void;
   /** Omitted when the general provider list already has a corresponding provider. */
   provider_listing?: DirectByokProviderListing;
+  /**
+   * Builds the upstream for a request from the stored credential. Most providers
+   * use `apiKeyUpstream`; cloud providers can derive regions or signed requests.
+   */
+  resolveUpstream(input: DirectByokResolveUpstreamInput): Promise<DirectByokUpstream>;
 };
+
+/** The upstream of a provider that takes the stored credential as a bearer API key. */
+export function apiKeyUpstream(upstream: {
+  apiUrl: string;
+  apiUrlOverrides?: ProviderApiUrlOverrides;
+  supportedChatApis: ReadonlyArray<GatewayChatApiKind>;
+  responseTransforms: ProviderResponseTransforms | null;
+}): DirectByokProvider['resolveUpstream'] {
+  return async ({ credential }) => ({
+    apiUrl: upstream.apiUrl,
+    apiUrlOverrides: upstream.apiUrlOverrides ?? {},
+    disableUrlSuffix: false,
+    apiKey: credential,
+    apiKeyHeader: null,
+    supportedChatApis: upstream.supportedChatApis,
+    responseTransforms: upstream.responseTransforms,
+  });
+}
 
 export function faviconIcon(siteUrl: string): DirectByokProviderListing['icon'] {
   return {

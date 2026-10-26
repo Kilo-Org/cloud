@@ -68,6 +68,22 @@ with checked state on Android. `ChoiceRow` and `radioItemA11y` use this mapping.
 Verify both the native role and state transitions in device accessibility trees;
 a rendered checkmark alone does not verify accessibility.
 
+## Review memory proposals
+
+Code Reviewer review-memory rows show the proposal status and open full proposal
+details. Personal owners and organization owners, admins, and billing managers can
+edit or dismiss open, edited, and failed proposals, or open a REVIEW.md pull request.
+Save edits before opening the pull request. Other members can inspect the same
+details without mutation controls.
+Dismissal asks for confirmation before removing a proposal from the active list.
+
+For local device verification, run
+`pnpm dev:seed app:mobile-review-memory kilo-<name>-<timestamp>@example.com`.
+The fixture requires a localhost database and `SKIP_STRIPE_API=true`, returns mobile
+deep links, and creates no provider integration. It covers editable, opened, failed,
+and member-only proposals; successful provider pull-request creation requires a
+separate integration fixture.
+
 ## PR merge sheet
 
 The merge sheet composes the form and provider-specific bodies. `usePrMergeDraft`
@@ -213,7 +229,7 @@ suite changes.
 The suite needs no backend or signed-in account and includes flowcharts and
 data-image diagrams.
 
-## Briefing localization
+## Agent brief localization
 
 Scheduled report dates use the app language and preserve the report's calendar
 day across device timezones. Period windows retain the report's own timezone.
@@ -222,10 +238,28 @@ and locale separators. Positive amounts below half a cent display as less than
 one cent; partial-coverage lower bounds retain the separate at-least marker.
 The summary prompt requests the same precision, separators, and sub-cent rule.
 
-## One-off agent briefings
+A brief is a saved retrospective activity report. Its preview precedes confirmation.
+Its AI summary is an optional section, not the complete report.
 
-- Open **Briefings → Create briefing** and select Personal or one organization.
+- Use a consistent artifact noun in each locale's title, history, settings, actions, progress messages, and unconfirmed drafts.
+- Keep natural inflections and established loanwords. Do not force identical substrings.
+- Keep the preview and AI summary distinct from the saved report.
+- Treat a window as a time period. Treat an agent as software, not a human representative.
+- Describe redaction as concealment of sensitive information, not editing or censorship.
+- Preserve separate balances, per-context opt-in, explicit paid consent, and offline restrictions.
+- After finding a meaning error, check that concept across every supported locale.
+
+Catalog checks verify structure, not translation meaning. Verify corrected copy on its native screen.
+
+## On-demand agent briefs
+
+- Open **Agent brief → Create brief** and select Personal or one organization.
 - Select a preset or a custom period of up to 31 days, then review the exact range and timezone.
+- Review starts persisted background activity collection.
+- Leave and return through **Unconfirmed briefs** to continue the same review, including after an app restart.
+- The creation form stays usable while activity collection continues in the background.
+- **Prepare a new review** returns to the creation form to choose a new context or period.
+- Collection has a two-minute deadline. Failed or interrupted collection becomes a visible terminal failure; retrying is explicit and keeps the original request and evidence cutoff.
 - Review coverage, the payer, the model, and the cost limit before creating a paid summary.
 - Incomplete history remains available with a coverage warning. Missing data does not mean zero activity.
 - Empty periods produce a saved report without an AI request or charge.
@@ -237,7 +271,11 @@ The summary prompt requests the same precision, separators, and sub-cent rule.
 - Paid retries require another cost review. Offline paid requests do not enter a background queue.
 - The Kilo Model Context Protocol (MCP) catalog excludes paid briefing confirmation.
 
-Deploy the database migration before the backend that uses the new report metadata.
+Background preparation uses existing report metadata and needs no additional database migration.
+Deploy the background preparation API before releasing the mobile client that uses it.
+The existing synchronous `prepareOneOff` API remains supported for released clients;
+new clients use `startOneOffPreparation`, `oneOffPreparation`, and paginated `oneOffDrafts`.
+Only `createOneOff` publishes a reviewed draft or authorizes its paid summary.
 
 ## Quick Chat backends
 
@@ -324,6 +362,21 @@ Storage is checked before download and again when the server supplies a length.
 Credit packs retain their native App Store and Google Play purchase flow.
 They require a development or production build with in-app purchases enabled;
 Expo Go is not supported.
+
+The app uses `expo-iap` v6 through a single `CreditNativeIapOwner`. Purchase
+completion comes from its `onPurchaseSuccess` callback, not the resolved value of
+`requestPurchase`. The backend verifies and grants the credits before the app calls
+`finishTransaction` with `isConsumable: true`. A failed store finish leaves the
+transaction available for a later recovery pass.
+
+Recovery reads unfinished StoreKit transactions with `getPendingTransactionsIOS`
+and Play purchases with `getAvailablePurchases`; these are not interchangeable
+for consumable credit packs.
+
+The Expo plugin disables Horizon and Fire OS through `modules.horizon` and
+`modules.amazon.fireOS`. The Amazon peer packages are optional for Apple/Play
+builds. Rebuild the native development client after changing `expo-iap`; a Metro
+reload alone does not update its native billing implementation.
 
 Kilo Pass has no native purchase, restore, or store-management flow in the app.
 The Profile card and `/kilo-pass` route render the backend

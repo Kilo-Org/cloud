@@ -1150,6 +1150,7 @@ function buildSessionRegistrationCommand(
     },
     repository: input.repository,
     profile: input.profile?.resolved,
+    ...(input.environment ? { environment: input.environment } : {}),
     finalization: input.finalization,
     callback: input.options?.callbackTarget ? { target: input.options.callbackTarget } : undefined,
     workspace: {

@@ -1,5 +1,5 @@
 {
-  "id": "633d51ac-6b6c-48c9-8eef-a10ed7bfe332",
+  "id": "3ef93f9d-c2d8-4ef7-87ce-4876b6dba5de",
   "prevId": "ff5b8190-a865-47ea-9c73-8120c8d9963a",
   "version": "7",
   "dialect": "postgresql",
@@ -5756,6 +5756,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'{}'"
+        },
+        "configuration_revision": {
+          "name": "configuration_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
         },
         "sandbox_allocation": {
           "name": "sandbox_allocation",
@@ -22096,13 +22103,6 @@
         },
         "attempts": {
           "name": "attempts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "legacy_attempts": {
-          "name": "legacy_attempts",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,

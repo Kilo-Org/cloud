@@ -3745,6 +3745,7 @@
     "title": "Profiele",
     "entrySubtitle": "Hergebruik omgewingsinstellings oor sessies heen",
     "newProfile": "Nuwe profiel",
+    "openHint": "Maak die profiel oop",
     "emptyTitle": "Nog geen profiele nie",
     "emptyDescription": "Skep 'n profiel om omgewingsveranderlikes, opstelopdragte en vaardighede oor sessies te hergebruik.",
     "loadFailed": "Kon nie profiele laai nie",

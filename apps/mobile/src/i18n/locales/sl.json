@@ -3837,6 +3837,7 @@
     "title": "Profili",
     "entrySubtitle": "Ponovno uporabite nastavitve okolja med sejami",
     "newProfile": "Nov profil",
+    "openHint": "Odpre profil",
     "emptyTitle": "Še ni profilov",
     "emptyDescription": "Ustvarite profil za ponovno uporabo spremenljivk okolja, nastavitvenih ukazov in veščin med sejami.",
     "loadFailed": "Profilov ni bilo mogoče naložiti",

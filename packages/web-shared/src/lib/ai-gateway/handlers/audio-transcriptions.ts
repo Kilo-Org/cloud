@@ -183,11 +183,6 @@ export async function handleAudioTranscriptionsRequest(
     parsedRequest.kind === 'json' ? parsedRequest.body.model.trim() : parsedRequest.model;
   const requestedModelLowerCased = requestedModel.toLowerCase();
 
-  // Custom LLMs are served only through chat routes; never forward their ids elsewhere.
-  if (await isCustomLlm(requestedModelLowerCased)) {
-    return modelDoesNotExistResponse();
-  }
-
   const ipAddress = rawClientIp(request);
   if (!ipAddress) {
     return NextResponse.json(
@@ -227,6 +222,12 @@ export async function handleAudioTranscriptionsRequest(
       },
       { status: 401 }
     );
+  }
+
+  // Custom LLMs are served only through chat routes; never forward their ids
+  // elsewhere. Checked after auth so anonymous callers cannot probe for them.
+  if (await isCustomLlm(requestedModelLowerCased)) {
+    return modelDoesNotExistResponse();
   }
 
   const user = maybeUser;

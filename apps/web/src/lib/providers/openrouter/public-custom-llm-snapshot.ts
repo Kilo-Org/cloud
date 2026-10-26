@@ -12,16 +12,19 @@ export type SnapshotExtraModel = {
 };
 
 /**
- * Lists each public custom LLM under every inference provider it declares.
- * Public custom LLMs are free, so like free Kilo-exclusive models they are
- * assumed to train on and retain prompts.
+ * Lists each available public custom LLM under every inference provider it
+ * declares. Public custom LLMs are free, so like free Kilo-exclusive models they
+ * are assumed to train on and retain prompts.
  */
 export function buildPublicCustomLlmSnapshotModels(
   customLlms: readonly CustomLlm[],
+  unavailableModelIds: ReadonlySet<string>,
   updatedAt: string
 ): SnapshotExtraModel[] {
   return customLlms.flatMap(({ public_id, definition }) => {
-    if (!isPublicCustomLlm(definition)) return [];
+    if (!isPublicCustomLlm(definition) || unavailableModelIds.has(public_id.toLowerCase())) {
+      return [];
+    }
     const model: OpenRouterModel = {
       slug: normalizeModelId(public_id),
       name: definition.display_name,

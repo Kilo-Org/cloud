@@ -3791,6 +3791,7 @@
     "title": "Profili",
     "entrySubtitle": "Riutilizza le impostazioni dell'ambiente tra le sessioni",
     "newProfile": "Nuovo profilo",
+    "openHint": "Apre il profilo",
     "emptyTitle": "Nessun profilo ancora",
     "emptyDescription": "Crea un profilo per riutilizzare variabili di ambiente, comandi di configurazione e competenze tra le sessioni.",
     "loadFailed": "Impossibile caricare i profili",

@@ -3745,6 +3745,7 @@
     "title": "Profillar",
     "entrySubtitle": "Seanslar davomida muhit sozlamalaridan qayta foydalaning",
     "newProfile": "Yangi profil",
+    "openHint": "Profilni ochadi",
     "emptyTitle": "Hozircha profil yo'q",
     "emptyDescription": "Seanslar davomida muhit o'zgaruvchilari, sozlash buyruqlari va ko'nikmalarni qayta ishlatish uchun profil yarating.",
     "loadFailed": "Profillarni yuklab bo‘lmadi",

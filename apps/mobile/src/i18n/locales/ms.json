@@ -3745,6 +3745,7 @@
     "title": "Profil",
     "entrySubtitle": "Gunakan semula tetapan persekitaran merentas sesi",
     "newProfile": "Profil baharu",
+    "openHint": "Membuka profil",
     "emptyTitle": "Tiada profil lagi",
     "emptyDescription": "Buat profil untuk menggunakan semula pembolehubah persekitaran, arahan persediaan dan kemahiran merentas sesi.",
     "loadFailed": "Tidak dapat memuatkan profil",

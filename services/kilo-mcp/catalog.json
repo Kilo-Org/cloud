@@ -4850,7 +4850,8 @@
         },
         "cursor": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 140
         }
       },
       "required": [
@@ -5707,56 +5708,6 @@
       "extension"
     ],
     "searchBlob": "cloudAgentNext.getAttachmentUploadUrl Get a presigned URL to upload a file attachment for a cloud agent message. cloudagentnext getattachmentuploadurl messageuuid attachmentid contenttype contentlength extension messageUuid attachmentId contentType contentLength extension"
-  },
-  "cloudAgentNext.getImageUploadUrl": {
-    "path": "cloudAgentNext.getImageUploadUrl",
-    "kind": "mutation",
-    "summary": "Get a presigned URL to upload an image for a cloud agent message.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "messageUuid": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "imageId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "contentType": {
-          "type": "string",
-          "enum": [
-            "image/png",
-            "image/jpeg",
-            "image/webp",
-            "image/gif"
-          ]
-        },
-        "contentLength": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "maximum": 5242880
-        }
-      },
-      "required": [
-        "messageUuid",
-        "imageId",
-        "contentType",
-        "contentLength"
-      ]
-    },
-    "tags": [
-      "cloudagentnext",
-      "getimageuploadurl",
-      "messageuuid",
-      "imageid",
-      "contenttype",
-      "contentlength"
-    ],
-    "searchBlob": "cloudAgentNext.getImageUploadUrl Get a presigned URL to upload an image for a cloud agent message. cloudagentnext getimageuploadurl messageuuid imageid contenttype contentlength messageUuid imageId contentType contentLength"
   },
   "cloudAgentNext.getMessageResult": {
     "path": "cloudAgentNext.getMessageResult",
@@ -6828,29 +6779,6 @@
                 "files"
               ]
             },
-            "images": {
-              "type": "object",
-              "properties": {
-                "path": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                },
-                "files": {
-                  "minItems": 1,
-                  "maxItems": 5,
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|webp|gif)$"
-                  }
-                }
-              },
-              "required": [
-                "path",
-                "files"
-              ]
-            },
             "devcontainer": {
               "type": "boolean"
             }
@@ -7484,29 +7412,6 @@
                 "files"
               ]
             },
-            "images": {
-              "type": "object",
-              "properties": {
-                "path": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                },
-                "files": {
-                  "minItems": 1,
-                  "maxItems": 5,
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|webp|gif)$"
-                  }
-                }
-              },
-              "required": [
-                "path",
-                "files"
-              ]
-            },
             "devcontainer": {
               "type": "boolean"
             }
@@ -7790,29 +7695,6 @@
             "path",
             "files"
           ]
-        },
-        "images": {
-          "type": "object",
-          "properties": {
-            "path": {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            },
-            "files": {
-              "minItems": 1,
-              "maxItems": 5,
-              "type": "array",
-              "items": {
-                "type": "string",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|webp|gif)$"
-              }
-            }
-          },
-          "required": [
-            "path",
-            "files"
-          ]
         }
       },
       "required": [
@@ -7829,10 +7711,9 @@
       "expectedworktreeid",
       "autocommit",
       "messageid",
-      "attachments",
-      "images"
+      "attachments"
     ],
-    "searchBlob": "cloudAgentNext.sendMessage Send a follow-up prompt, command, or attachment to an existing cloud agent session. cloudagentnext sendmessage cloudagentsessionid payload expectedworktreeid autocommit messageid attachments images cloudAgentSessionId payload expectedWorktreeId autoCommit messageId attachments images"
+    "searchBlob": "cloudAgentNext.sendMessage Send a follow-up prompt, command, or attachment to an existing cloud agent session. cloudagentnext sendmessage cloudagentsessionid payload expectedworktreeid autocommit messageid attachments cloudAgentSessionId payload expectedWorktreeId autoCommit messageId attachments"
   },
   "cloudAgentNextFeedback.create": {
     "path": "cloudAgentNextFeedback.create",
@@ -16613,64 +16494,6 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.getAttachmentUploadUrl Get a presigned URL to upload a file attachment for a cloud agent message. Use to attach a file. organizations cloudagentnext getattachmentuploadurl organizationid messageuuid attachmentid contenttype contentlength extension organizationId messageUuid attachmentId contentType contentLength extension"
   },
-  "organizations.cloudAgentNext.getImageUploadUrl": {
-    "path": "organizations.cloudAgentNext.getImageUploadUrl",
-    "kind": "mutation",
-    "summary": "Get a presigned URL to upload an image for a cloud agent message. Use to attach an image.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "messageUuid": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "imageId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "contentType": {
-          "type": "string",
-          "enum": [
-            "image/png",
-            "image/jpeg",
-            "image/webp",
-            "image/gif"
-          ]
-        },
-        "contentLength": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "maximum": 5242880
-        }
-      },
-      "required": [
-        "organizationId",
-        "messageUuid",
-        "imageId",
-        "contentType",
-        "contentLength"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "cloudagentnext",
-      "getimageuploadurl",
-      "organizationid",
-      "messageuuid",
-      "imageid",
-      "contenttype",
-      "contentlength"
-    ],
-    "searchBlob": "organizations.cloudAgentNext.getImageUploadUrl Get a presigned URL to upload an image for a cloud agent message. Use to attach an image. organizations cloudagentnext getimageuploadurl organizationid messageuuid imageid contenttype contentlength organizationId messageUuid imageId contentType contentLength"
-  },
   "organizations.cloudAgentNext.getMessageResult": {
     "path": "organizations.cloudAgentNext.getMessageResult",
     "kind": "query",
@@ -17932,29 +17755,6 @@
                     "files"
                   ]
                 },
-                "images": {
-                  "type": "object",
-                  "properties": {
-                    "path": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                    },
-                    "files": {
-                      "minItems": 1,
-                      "maxItems": 5,
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|webp|gif)$"
-                      }
-                    }
-                  },
-                  "required": [
-                    "path",
-                    "files"
-                  ]
-                },
                 "devcontainer": {
                   "type": "boolean"
                 }
@@ -18594,29 +18394,6 @@
                     "files"
                   ]
                 },
-                "images": {
-                  "type": "object",
-                  "properties": {
-                    "path": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                    },
-                    "files": {
-                      "minItems": 1,
-                      "maxItems": 5,
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|webp|gif)$"
-                      }
-                    }
-                  },
-                  "required": [
-                    "path",
-                    "files"
-                  ]
-                },
                 "devcontainer": {
                   "type": "boolean"
                 }
@@ -18967,29 +18744,6 @@
             "path",
             "files"
           ]
-        },
-        "images": {
-          "type": "object",
-          "properties": {
-            "path": {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            },
-            "files": {
-              "minItems": 1,
-              "maxItems": 5,
-              "type": "array",
-              "items": {
-                "type": "string",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|webp|gif)$"
-              }
-            }
-          },
-          "required": [
-            "path",
-            "files"
-          ]
         }
       },
       "required": [
@@ -19009,10 +18763,9 @@
       "expectedworktreeid",
       "autocommit",
       "messageid",
-      "attachments",
-      "images"
+      "attachments"
     ],
-    "searchBlob": "organizations.cloudAgentNext.sendMessage Send a prompt or command to a running cloud agent session. Use to continue the conversation with the agent. organizations cloudagentnext sendmessage organizationid cloudagentsessionid payload expectedworktreeid autocommit messageid attachments images organizationId cloudAgentSessionId payload expectedWorktreeId autoCommit messageId attachments images"
+    "searchBlob": "organizations.cloudAgentNext.sendMessage Send a prompt or command to a running cloud agent session. Use to continue the conversation with the agent. organizations cloudagentnext sendmessage organizationid cloudagentsessionid payload expectedworktreeid autocommit messageid attachments organizationId cloudAgentSessionId payload expectedWorktreeId autoCommit messageId attachments"
   },
   "organizations.create": {
     "path": "organizations.create",

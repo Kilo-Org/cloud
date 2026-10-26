@@ -15,6 +15,7 @@ import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { DirectUserByokInferenceProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 
 const publicIdSchema = z.string().trim().min(1, 'public_id is required');
 
@@ -41,6 +42,11 @@ async function assertPublicIdIsClaimable(publicId: string) {
   }
   if (isKiloExclusiveModel(modelId)) {
     badRequest(`public_id "${modelId}" is a Kilo-exclusive model`);
+  }
+  // Anonymous callers may request free model ids, so a private custom LLM with
+  // one would answer them differently from an unknown id.
+  if (isFreeModelExcludingCustomLlms(modelId)) {
+    badRequest(`public_id "${modelId}" matches a built-in free model id`);
   }
   if (Object.hasOwn(await getOpenRouterModelsMetadataFromDatabase(), modelId)) {
     badRequest(`public_id "${modelId}" already exists in the OpenRouter model list`);

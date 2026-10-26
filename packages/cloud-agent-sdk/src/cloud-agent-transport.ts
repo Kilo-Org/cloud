@@ -494,7 +494,6 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
             payload: normalizeCloudAgentPayload(input.payload),
             messageId,
             ...(input.attachments ? { attachments: input.attachments } : {}),
-            ...(input.images ? { images: input.images } : {}),
           })
         );
       },

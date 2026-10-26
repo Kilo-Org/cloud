@@ -3745,6 +3745,7 @@
     "title": "設定檔",
     "entrySubtitle": "跨會話重複使用環境設置",
     "newProfile": "新增設定檔",
+    "openHint": "開啟設定檔",
     "emptyTitle": "還沒有設定檔",
     "emptyDescription": "建立設定檔以跨會話重複使用環境變數、設定命令和技能。",
     "loadFailed": "無法載入設定檔",

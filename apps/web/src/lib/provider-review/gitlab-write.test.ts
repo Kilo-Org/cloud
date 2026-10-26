@@ -34,6 +34,7 @@ jest.mock('@/lib/integrations/gitlab-service', () => ({
 }));
 
 jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
+  ...jest.requireActual('@/lib/integrations/platforms/gitlab/adapter'),
   createMRNote: (...args: unknown[]) => mockCreateMRNote(...args),
   fetchGitLabMergeRequest: (params: unknown) => mockFetchGitLabMergeRequest(params),
   fetchGitLabUser: jest.fn(),
@@ -562,6 +563,65 @@ describe('resolveThread / unresolveThread', () => {
       ],
     };
   }
+
+  it.each([
+    { resolved: true, desired: true, replayed: true },
+    { resolved: false, desired: true, replayed: false },
+    { resolved: undefined, desired: true, replayed: false },
+    { resolved: true, desired: false, replayed: false },
+    { resolved: false, desired: false, replayed: true },
+    { resolved: undefined, desired: false, replayed: true },
+  ])(
+    'uses the first resolvable note ($resolved) for desired state $desired',
+    async ({ resolved, desired, replayed }) => {
+      const discussion = discussionFixture(false);
+      const note = discussion.notes[0];
+      fetchMock
+        .mockResolvedValueOnce(
+          jsonResponse({
+            ...discussion,
+            notes: [
+              { ...note, id: 10, resolvable: false, resolved: !resolved },
+              { ...note, resolved },
+              { ...note, id: 12, resolved: !resolved },
+            ],
+          })
+        )
+        .mockResolvedValueOnce(jsonResponse(discussionFixture(desired)));
+
+      const mutate = desired ? resolveThread : unresolveThread;
+      const result = await mutate({ ...TARGET, discussionId: 'disc-1' });
+
+      expect(result).toEqual({ done: true, replayed });
+      expect(fetchMock).toHaveBeenCalledTimes(replayed ? 1 : 2);
+      if (!replayed) {
+        expect(lastRequest().init.method).toBe('PUT');
+        expect(lastRequest().url.searchParams.get('resolved')).toBe(String(desired));
+      }
+    }
+  );
+
+  it.each([
+    { name: 'empty notes', flags: [] },
+    {
+      name: 'non-resolvable notes with a resolved flag',
+      flags: [{ resolvable: false, resolved: true }],
+    },
+  ])('rejects $name without a write', async ({ flags }) => {
+    const discussion = discussionFixture(false);
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        ...discussion,
+        notes: flags.map(flag => ({ ...discussion.notes[0], ...flag })),
+      })
+    );
+
+    await expect(resolveThread({ ...TARGET, discussionId: 'disc-1' })).rejects.toMatchObject({
+      kind: 'bad_request',
+      retryable: false,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 
   it('PUTs the discussion resolved flag', async () => {
     fetchMock

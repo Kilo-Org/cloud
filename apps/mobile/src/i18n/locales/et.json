@@ -3745,6 +3745,7 @@
     "title": "Profiilid",
     "entrySubtitle": "Keskkonnaseadete taaskasutamine seansside jooksul",
     "newProfile": "Uus profiil",
+    "openHint": "Avab profiili",
     "emptyTitle": "Profiilid veel puuduvad",
     "emptyDescription": "Looge profiil keskkonnamuutujate, häälestuskäskude ja oskuste taaskasutamiseks seansside jooksul.",
     "loadFailed": "Profiilide laadimine nurjus",

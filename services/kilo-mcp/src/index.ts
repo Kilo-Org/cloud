@@ -42,6 +42,7 @@ import {
 import {
   DEFAULT_SEARCH_LIMIT,
   MAX_SEARCH_LIMIT,
+  MAX_SEARCH_QUERY_LENGTH,
   noSemanticCandidates,
   searchCatalogDetailed,
 } from './search';
@@ -54,6 +55,7 @@ import {
   type GrantProps,
   type OtpSubmitOutcome,
   type ProtectedRequestsApi,
+  type SearchAllowance,
   type SearchResult,
   type SemanticCandidates,
 } from './types';
@@ -147,6 +149,7 @@ const TOOLS = [
       properties: {
         query: {
           type: 'string',
+          maxLength: MAX_SEARCH_QUERY_LENGTH,
           description: 'What you want to do, in the words an agent would type.',
         },
         limit: {
@@ -269,6 +272,12 @@ type McpHandlerDeps = {
   /** Vectorize kNN hook; token-only search when omitted. */
   semanticCandidates?: SemanticCandidates;
   /**
+   * Per-account search allowance (the Workers rate-limit binding). Omitted only
+   * by a caller that builds the handler directly (tests), which leaves the
+   * semantic stage ungated.
+   */
+  searchAllowance?: SearchAllowance;
+  /**
    * PostHog emitter for this request (s2). Omitted in tests that do not care
    * about analytics; the handler then uses a no-op emitter so behaviour is
    * unchanged. The emitter is best-effort and can never throw.
@@ -370,23 +379,6 @@ function cappedSearchResults(results: SearchResult[]): { text: string; truncated
   return { text: JSON.stringify({ results: [], truncated: true }), truncated: true };
 }
 
-/**
- * The longest piece of a caller's search query echoed back in the empty-results
- * payload. `searchArgsSchema` gives `query` no length bound, so echoing it
- * verbatim could push the payload past `MAX_RESULT_BYTES`, and the generic cap
- * would cut the structured payload mid-token and leave unparseable JSON. A
- * bounded echo keeps the recovery payload valid JSON and inside the cap.
- */
-const MAX_ECHOED_QUERY_CHARACTERS = 200;
-
-/** Trim a query and bound its length on code-point boundaries for the echo. */
-function boundedQueryEcho(query: string): string {
-  const trimmed = query.trim();
-  const codePoints = [...trimmed];
-  if (codePoints.length <= MAX_ECHOED_QUERY_CHARACTERS) return trimmed;
-  return `${codePoints.slice(0, MAX_ECHOED_QUERY_CHARACTERS).join('')}…`;
-}
-
 /** JSON object guard used only to recover the JSON-RPC `id` from a malformed envelope. */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -443,6 +435,38 @@ function lockedRefusal(retryAfterSeconds: number): JsonRpcFailure {
   );
 }
 
+/**
+ * Whether one search request may run the semantic stage, which embeds the query
+ * with Workers AI and queries Vectorize on every call. The request spends one
+ * unit of its account's allowance first; when the allowance is spent, the search
+ * answers from the bundled catalog and runs no Workers AI or Vectorize call. A
+ * failing allowance binding is treated the same way, so search keeps answering
+ * during a platform incident. The key is the grant's Kilo user, never a
+ * caller-supplied value, and no identity is logged.
+ */
+async function semanticStageAllowed(
+  allowance: SearchAllowance | undefined,
+  kiloUserId: string
+): Promise<boolean> {
+  if (!allowance) return true;
+  try {
+    const { success } = await allowance.limit({ key: kiloUserId });
+    if (!success) {
+      console.warn(
+        '[kilo-mcp] search allowance spent for this account; answering without semantic search'
+      );
+    }
+    return success;
+  } catch (error) {
+    console.warn(
+      `[kilo-mcp] search allowance check failed; answering without semantic search: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return false;
+  }
+}
+
 async function runTool(
   name: string,
   args: Record<string, unknown>,
@@ -466,13 +490,18 @@ async function runTool(
       );
     }
     const { query, limit } = parsed.data;
+    // One unit of this account's search allowance covers the semantic stage of
+    // this request; the answer below is built from the catalog either way.
+    const semanticCandidates = (await semanticStageAllowed(deps.searchAllowance, auth.kiloUserId))
+      ? (deps.semanticCandidates ?? noSemanticCandidates)
+      : noSemanticCandidates;
     // One pass yields the rows and whether the guarded gate withheld a match, so
     // the empty-state answer below needs no second search: an opted-in grant
     // withholds nothing, and a query with no match anywhere reports `false`.
     const { results, hiddenGuardedMatches } = await searchCatalogDetailed(query, {
       catalog: deps.catalog,
       limit,
-      semanticCandidates: deps.semanticCandidates ?? noSemanticCandidates,
+      semanticCandidates,
       // Fail-closed: only a grant that ticked the admin opt-in sees admin or
       // debug rows.
       includeGuarded: auth.adminEnabled === true,
@@ -498,9 +527,10 @@ async function runTool(
       // the single search pass above, so no second embedding or vector lookup
       // runs while the user is already waiting on an empty answer. Only an admin
       // is told the endpoints exist — a non-admin gets no admin/debug trace.
-      // The echoed query is bounded before serialization — never passed to the
-      // byte cap, which would cut the structured payload into invalid JSON.
-      const message = `No endpoints matched "${boundedQueryEcho(query)}". Refine your query: use fewer or different keywords, or describe the task in plain language.${
+      // `searchArgsSchema` bounds the query length, so echoing it here cannot
+      // push the structured payload into the byte cap, which would cut it into
+      // invalid JSON.
+      const message = `No endpoints matched "${query.trim()}". Refine your query: use fewer or different keywords, or describe the task in plain language.${
         hiddenGuardedMatches && auth.adminEligible === true
           ? ' Some endpoints matching this query are admin or debug endpoints and are hidden for this connection. If you are a Kilo admin, reconnect the Kilo MCP server and tick "Enable admin and debug actions" at sign-in to allow them; admin and debug calls then need a code from your authenticator app.'
           : ''
@@ -943,6 +973,10 @@ export const apiHandler = {
       catalog,
       webBaseUrl: env.WEB_BASE_URL,
       semanticCandidates: createSemanticCandidates(env),
+      // The per-account allowance for the paid semantic stage. Resolved only
+      // when the binding is present so a handler built without one (tests)
+      // still serves search.
+      ...(env.SEARCH_RATE_LIMITER ? { searchAllowance: env.SEARCH_RATE_LIMITER } : {}),
       analytics,
       ...(protectedRequests ? { protectedRequests } : {}),
     });

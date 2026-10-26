@@ -3745,6 +3745,7 @@
     "title": "Snið",
     "entrySubtitle": "Endurnotaðu umhverfisstillingar yfir lotur",
     "newProfile": "Nýtt snið",
+    "openHint": "Opnar sniðið",
     "emptyTitle": "Engir prófílar ennþá",
     "emptyDescription": "Búðu til prófíl til að endurnýta umhverfisbreytur, uppsetningarskipanir og færni yfir lotur.",
     "loadFailed": "Ekki tókst að hlaða prófílum",

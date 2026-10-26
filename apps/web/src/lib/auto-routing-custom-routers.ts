@@ -493,7 +493,7 @@ async function admitPlatformBenchmarks(params: {
   return plan;
 }
 
-async function lockOwner(tx: DrizzleTransaction, owner: CustomRouterOwner): Promise<void> {
+export async function lockOwner(tx: DrizzleTransaction, owner: CustomRouterOwner): Promise<void> {
   const key = `auto-routing-custom-routers:${owner.type}:${owner.id}`;
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${key}, 0))`);
 }

@@ -666,7 +666,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
       const result = await rewriteModelResponse_ChatCompletions({
         response: upstream,
-        removeCost: true,
+        usageContext: freeUsageContext,
         capture: null,
         vercelRequestId: null,
         reasoningEffort: null,
@@ -702,7 +702,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
       const result = await rewriteModelResponse_ChatCompletions({
         response: upstream,
-        removeCost: true,
+        usageContext: freeUsageContext,
         capture: null,
         vercelRequestId: null,
         reasoningEffort: null,
@@ -1141,7 +1141,7 @@ describe('rewriteModelResponse_ChatCompletions', () => {
 
       const result = await rewriteModelResponse_ChatCompletions({
         response: upstream,
-        removeCost: true,
+        usageContext: freeUsageContext,
         capture: null,
         vercelRequestId: null,
         reasoningEffort: null,

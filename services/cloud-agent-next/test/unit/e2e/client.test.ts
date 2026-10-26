@@ -432,7 +432,7 @@ describe('startSession allocation selection', () => {
     await startSession({ ...config, sandboxAllocation: 'vercel-small' }, { prompt: 'echo:hi' });
 
     expect(bodyOf(fetchMock).runtime).toEqual({
-      sandboxAllocation: { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'small' },
+      sandboxAllocation: { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'small' },
     });
   });
 
@@ -456,7 +456,7 @@ describe('startSession allocation selection', () => {
     );
 
     expect(bodyOf(fetchMock).sandboxAllocation).toEqual({
-      provider: { id: 'vercel', account: 'kilo' },
+      provider: { id: 'vercel', account: 'byoc' },
       instanceType: 'small',
     });
   });

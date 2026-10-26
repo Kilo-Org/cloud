@@ -153,17 +153,20 @@ test('the gate job exposes the promote outputs the workflow reads', () => {
 
 // One native build takes longer than the gap between two pushes of the same
 // native inputs, so the gate's artifact lookup cannot see the build in
-// flight. The job-level slot plus the re-check is what stops the duplicate.
-// The slot is keyed on the event as well: a push build must not be the pending
-// job that a later pull_request job cancels, or main keeps no durable artifact.
-test('each heavy job is serialized on its nativeHash and re-checks its artifact', () => {
+// flight. The job-level slot plus the re-check is what stops a duplicate.
+// A pull_request run owns its slot per ref: one slot per nativeHash made
+// sibling pull requests cancel each other's pending build, because GitHub keeps
+// a single pending job per group. A push build keeps the nativeHash slot,
+// keyed on the event as well, so it is never the pending job that a later
+// pull_request job cancels and main keeps its durable artifact.
+test('each heavy job takes its own pull_request slot, the nativeHash slot elsewhere, and re-checks its artifact', () => {
   const workflow = readWorkflow();
   for (const platform of ['ios', 'android'] as const) {
     const job = workflow.jobs[platform];
     assert.deepEqual(job.concurrency, {
       group:
         `\${{ github.workflow }}-\${{ github.event_name }}-${platform}` +
-        `-\${{ needs.gate.outputs.${platform}_hash }}`,
+        `-\${{ github.event_name == 'pull_request' && github.ref || needs.gate.outputs.${platform}_hash }}`,
       'cancel-in-progress': false,
     });
     const published = step(job, 'published');

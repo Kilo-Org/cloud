@@ -61,20 +61,16 @@ export function NewSessionPromptControls({
             attachment list still allows a text paste. */}
         <ComposerPasteButton onPress={pasteClipboard} disabled={control.draftMutationLocked} />
       </View>
-      {voiceInput.available ? (
-        <View className="h-9 flex-1 items-center justify-center overflow-hidden px-2">
-          <VoiceInputStatus status={voiceInput.status} />
-        </View>
-      ) : null}
+      <View className="h-9 flex-1 items-center justify-center overflow-hidden px-2">
+        <VoiceInputStatus status={voiceInput.status} />
+      </View>
       {children}
-      {voiceInput.available ? (
-        <VoiceInputButton
-          disabled={control.voiceDisabled}
-          size="lg"
-          status={voiceInput.status}
-          onPress={handleVoiceToggle}
-        />
-      ) : null}
+      <VoiceInputButton
+        disabled={control.voiceDisabled}
+        size="lg"
+        status={voiceInput.status}
+        onPress={handleVoiceToggle}
+      />
     </View>
   );
 }

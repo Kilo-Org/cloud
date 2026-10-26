@@ -36,6 +36,7 @@ import {
   organization_groups,
   organization_group_memberships,
   organization_group_policy_settings,
+  byoc_connections,
   organization_user_limits,
   organization_user_usage,
   organization_invitations,
@@ -991,6 +992,8 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - organization_membership_removals (tombstones deleted; removed_by anonymized)
  * - organization_invitations (sent by user + addressed to user's email)
  * - organization_user_limits/usage
+ * - personal byoc_connections rows (organization-owned
+ *   credentials are retained)
  * - organization_audit_logs (actor PII nulled)
  * - kiloclaw_admin_audit_logs (actor PII nulled, target_user_id anonymized)
  * - admin_action_audit_logs (actor PII nulled, user target_id anonymized)
@@ -1300,6 +1303,8 @@ export async function anonymizeCloudUserData(
 
   // User-owned resources (these would have been CASCADE-deleted if we
   // deleted the user row, but since we keep it, we delete them explicitly)
+
+  await tx.delete(byoc_connections).where(eq(byoc_connections.user_id, userId));
 
   // cloud_agent_webhook_triggers has RESTRICT FK on agent_environment_profiles,
   // so delete triggers before profiles

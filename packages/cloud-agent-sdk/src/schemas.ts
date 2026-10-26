@@ -376,6 +376,12 @@ export const REMOTE_COMMAND_MAX_STRING_LENGTH = 2_000;
 export const REMOTE_COMMAND_MAX_HINTS = 32;
 export const REMOTE_COMMAND_CATALOG_MAX_SERIALIZED_BYTES = 512 * 1024;
 
+export const PREPARATION_MAX_MESSAGE_LENGTH = 16_384;
+export const PREPARATION_MAX_DETAIL_LENGTH = 16_384;
+export const PREPARATION_MAX_SETUP_LOG_ENTRIES = 100;
+export const PREPARATION_MAX_ATTEMPTS = 10;
+export const PREPARATION_MAX_STEPS = 100;
+
 /** Most message IDs a `session.queue.changed` snapshot may carry. */
 export const SESSION_QUEUE_MAX_IDS = 1_000;
 /** Most questions a `question.asked` event may carry. */
@@ -964,7 +970,7 @@ const preparationStepSchema = z.object({
   parentStepId: z.string().optional(),
   completedAt: z.number().optional(),
   revision: z.number(),
-  latestDetail: z.string().optional(),
+  latestDetail: z.string().max(PREPARATION_MAX_DETAIL_LENGTH).optional(),
   safeError: z.string().optional(),
   command: z.string().optional(),
   commandIndex: z.number().optional(),
@@ -987,7 +993,7 @@ const preparationAttemptSchema = z.object({
 export const preparingDataSchema = z
   .object({
     step: z.string(),
-    message: z.string(),
+    message: z.string().max(PREPARATION_MAX_MESSAGE_LENGTH),
     branch: z.string().optional(),
     version: z.literal(2).optional(),
     attemptId: z.string().optional(),
@@ -1015,7 +1021,7 @@ export const preparingDataSchema = z
     command: z.string().optional(),
     commandIndex: z.number().optional(),
     commandCount: z.number().optional(),
-    detail: z.string().optional(),
+    detail: z.string().max(PREPARATION_MAX_DETAIL_LENGTH).optional(),
     output: z.string().max(PREPARATION_OUTPUT_MAX_LENGTH).optional(),
     safeError: z.string().optional(),
     exitCode: z.number().optional(),

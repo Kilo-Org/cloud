@@ -116,7 +116,6 @@ export function SessionTraceViewer() {
 
   const resolveQuery = useAdminResolveCloudAgentSession(pendingAgentId, canViewSessions);
 
-  // When the agent ID resolves, transition to the CLI session ID
   useEffect(() => {
     if (resolveQuery.data?.session_id && pendingAgentId) {
       const resolved = resolveQuery.data.session_id;
@@ -127,7 +126,6 @@ export function SessionTraceViewer() {
     }
   }, [resolveQuery.data, pendingAgentId, router]);
 
-  // Initialize from URL parameter on mount
   useEffect(() => {
     if (!sessionIdFromUrl) return;
     if (isCloudAgentSessionId(sessionIdFromUrl)) {

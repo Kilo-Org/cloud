@@ -18,6 +18,7 @@ import {
   BITBUCKET_PR_REVIEW_CAPABILITIES,
 } from '@/lib/provider-review/bitbucket-write';
 import { GITLAB_MR_REVIEW_CAPABILITIES } from '@/lib/provider-review/gitlab-write';
+import { createSignedToken } from '@/lib/signed-token';
 import { providerLedgerResourceKey, providerReviewRouter } from './provider-review-router';
 
 const ORG_ID = '2b1d4c8e-9f3a-4e5d-8c7b-6a5948372615';
@@ -75,7 +76,6 @@ jest.mock('@/lib/provider-review/gitlab-read', () => ({
   listChecks: (...a: unknown[]) => gitlabRead.listChecks(...a),
   listInbox: (...a: unknown[]) => gitlabRead.listInbox(...a),
   getMergeState: (...a: unknown[]) => gitlabRead.getMergeState(...a),
-  requestGitLabJson: jest.fn(),
 }));
 
 const bitbucketRead = {
@@ -277,6 +277,33 @@ describe('providerReviewRouter inputs', () => {
       undefined
     );
   });
+  it('round-trips a maximum-size signed inbox cursor through the router', async () => {
+    const base = {
+      kind: 'bitbucket-inbox-cursor',
+      identity: 'bitbucket-inbox:acme',
+      ceiling: '2026-09-02T00:00:00.000000+00:00',
+      served: [],
+      pages: [],
+    };
+    let cursor = createSignedToken({ ...base, padding: '' });
+    for (let length = 0; length < 2048; length += 1) {
+      const candidate = createSignedToken({ ...base, padding: 'x'.repeat(length) });
+      if (candidate.length > 2048) break;
+      cursor = candidate;
+    }
+    expect(cursor.length).toBeLessThanOrEqual(2048);
+    bitbucketRead.listInbox.mockResolvedValueOnce({ items: [], nextCursor: cursor });
+    await caller.listInbox({ platform: 'bitbucket', organizationId: ORG_ID });
+    bitbucketRead.listInbox.mockResolvedValueOnce({ items: [], nextCursor: null });
+
+    await caller.listInbox({ platform: 'bitbucket', organizationId: ORG_ID, cursor });
+    expect(cursor.length).toBeGreaterThan(2000);
+
+    expect(bitbucketRead.listInbox).toHaveBeenLastCalledWith(
+      { type: 'organization', organizationId: ORG_ID, userId: USER_ID },
+      cursor
+    );
+  });
 });
 
 // ----- identity is server-derived ----------------------------------------------
@@ -428,6 +455,30 @@ describe('providerReviewRouter inbox connection failures', () => {
 });
 
 // ----- the shared operation ledger ------------------------------------------------
+
+describe('providerReviewRouter file line reads', () => {
+  const fileLines = { ref: 'abc123', path: 'src/app.ts', startLine: 1, endLine: 5 };
+
+  it('surfaces an oversized file as PAYLOAD_TOO_LARGE on the GitLab arm', async () => {
+    gitlabRead.getFileLines.mockRejectedValueOnce(
+      new GitLabReviewError('too_large', 'The file exceeds the review read limit.')
+    );
+
+    await expect(caller.getFileLines({ ...gitlabBase, ...fileLines })).rejects.toMatchObject({
+      code: 'PAYLOAD_TOO_LARGE',
+    });
+  });
+
+  it('surfaces an oversized file as PAYLOAD_TOO_LARGE on the Bitbucket arm', async () => {
+    bitbucketRead.getFileLines.mockRejectedValueOnce(
+      new BitbucketReviewError('too_large', 'The file exceeds the review read limit.')
+    );
+
+    await expect(caller.getFileLines({ ...bitbucketBase, ...fileLines })).rejects.toMatchObject({
+      code: 'PAYLOAD_TOO_LARGE',
+    });
+  });
+});
 
 describe('providerReviewRouter ledger', () => {
   it('admits provider writes into the shared pr domain with a provider-tagged resource key', async () => {

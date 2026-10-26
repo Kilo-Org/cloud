@@ -32,14 +32,16 @@ export const CONTROL_PLANE_GIT_PLATFORMS = ['github', 'gitlab', 'bitbucket'] as 
 export type ControlPlaneGitPlatform = (typeof CONTROL_PLANE_GIT_PLATFORMS)[number];
 
 /**
- * Route preparation steps. `sandbox_create`, `sandbox_start` and
- * `snapshot_fallback` come from the Sandbox DO's allocation (provider create,
- * then waiting for the wrapper's `hello`, and starting from the image when a
- * repository snapshot start failed); the rest come from the wrapper's
- * `session.progress`.
+ * Route preparation steps. `sandbox_create`, `environment_snapshot`,
+ * `sandbox_start` and `snapshot_fallback` come from the Sandbox DO's allocation
+ * (provider create, the environment snapshot decision, then waiting for the
+ * wrapper's `hello`, and starting from the image when a snapshot start failed);
+ * the rest come from the wrapper's `session.progress`. `snapshot` is only sent
+ * by wrappers that still capture.
  */
 export const CONTROL_PLANE_PREPARATION_STEPS = [
   'sandbox_create',
+  'environment_snapshot',
   'sandbox_start',
   'snapshot_fallback',
   'clone',
@@ -124,6 +126,11 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'prompt_failed',
   'sandbox_stopped',
   'execution_limit',
+  'byoc_credential_missing',
+  'byoc_vercel_not_ready',
+  'byoc_vercel_forbidden',
+  'byoc_vercel_capacity',
+  'byoc_vercel_snapshot_missing',
 ] as const;
 export type ControlPlaneFailureReason = (typeof CONTROL_PLANE_FAILURE_REASON_VALUES)[number];
 

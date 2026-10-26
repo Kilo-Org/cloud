@@ -23,6 +23,13 @@ vi.mock('@/lib/chat/gguf-models', () => ({
   useGgufModels: () => ({}),
 }));
 vi.mock('./gguf-model-section', () => ({ GgufDownloadControls: 'GgufDownloadControls' }));
+// The screen binds both Back exits to the catalog rule, which reads
+// `expo-router`; that pipeline is not what this suite covers, so the rule is
+// stubbed here and exercised by `lib/chat/model-catalog-back.mounted.test.tsx`.
+vi.mock('@/lib/chat/model-catalog-back', () => ({
+  useModelCatalogBack: () => () => undefined,
+  useModelCatalogHardwareBack: () => undefined,
+}));
 // The real component renders the header and the summary through FlashList's
 // header slot, so a host-string stub would drop the only content under test.
 vi.mock('@shopify/flash-list', async () => {

@@ -10,3 +10,15 @@ export function toEnvironmentCommands(script: string): string[] {
   const trimmed = script.trim();
   return trimmed ? [trimmed] : [];
 }
+
+/** Builds use saved configuration. Keep the editor baseline stable during status polling. */
+export function hasEnvironmentFormChanges(
+  saved: { script: string; variablesText: string; sandboxAllocation: string | null },
+  draft: { script: string; variablesText: string; sandboxAllocation: string | null }
+): boolean {
+  return (
+    saved.script !== draft.script ||
+    saved.variablesText !== draft.variablesText ||
+    saved.sandboxAllocation !== draft.sandboxAllocation
+  );
+}

@@ -23,6 +23,7 @@ import {
   pickerModelPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { applyCustomPricingToPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
 import {
@@ -227,9 +228,10 @@ async function briefingPriceRates(
   model: string
 ): Promise<TextPricingRates & { reasoning: boolean }> {
   const extra = pickerExtraModel(model);
-  const [endpointsMetadata, preferredProviderOrderConfig] = await Promise.all([
+  const [endpointsMetadata, preferredProviderOrderConfig, customPricingConfig] = await Promise.all([
     getOpenRouterModelsMetadataFromDatabase().catch((): StoredModelMap => ({})),
     getPreferredProviderOrderConfig(),
+    getCustomPricingConfig(),
   ]);
   const unavailable = await getUnavailableModelIds();
   const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
@@ -257,6 +259,7 @@ async function briefingPriceRates(
     rates = [entry, ...(targetExtra ? [targetExtra] : target ? [target] : [])].map(item =>
       textPricingRates(
         applyCustomPricingToPricing(
+          customPricingConfig,
           item.id,
           item === extra || item === targetExtra
             ? item.pricing

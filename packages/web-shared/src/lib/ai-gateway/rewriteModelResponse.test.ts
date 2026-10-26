@@ -25,6 +25,7 @@ import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake
 import { eq } from 'drizzle-orm';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import type { RewriteResponseParams } from './rewriteModelResponse.shared';
+import { CUSTOM_PRICING_FALLBACK_CONFIG } from './custom-pricing.constants';
 
 jest.mock('@kilocode/web-shared/lib/r2/create-client', () =>
   jest
@@ -56,6 +57,7 @@ const freeUsageContext = {
   provider: 'openrouter',
   is_free: true,
   user_byok: false,
+  custom_pricing_config: CUSTOM_PRICING_FALLBACK_CONFIG,
   api_kind: 'chat_completions',
 } satisfies RewriteResponseParams['usageContext'];
 
@@ -2103,6 +2105,7 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
               provider,
               is_free: isFree,
               user_byok: userByok,
+              custom_pricing_config: CUSTOM_PRICING_FALLBACK_CONFIG,
               api_kind: shape.kind,
             },
             usage,
@@ -2131,6 +2134,7 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
           provider: 'openai-chatgpt',
           is_free: false,
           user_byok: false,
+          custom_pricing_config: CUSTOM_PRICING_FALLBACK_CONFIG,
           api_kind: shape.kind,
         },
         {
@@ -2160,6 +2164,7 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
             provider: 'vercel',
             is_free: false,
             user_byok: false,
+            custom_pricing_config: CUSTOM_PRICING_FALLBACK_CONFIG,
             api_kind: shape.kind,
           },
           {
@@ -2195,6 +2200,7 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
             provider: 'vercel',
             is_free: false,
             user_byok: userByok,
+            custom_pricing_config: CUSTOM_PRICING_FALLBACK_CONFIG,
             api_kind: shape.kind,
           },
           {
@@ -2264,6 +2270,7 @@ test.each(['openrouter', 'vercel'] as const)(
         provider,
         is_free: false,
         user_byok: false,
+        custom_pricing_config: CUSTOM_PRICING_FALLBACK_CONFIG,
         api_kind: 'messages',
       },
       capture: null,
@@ -2303,6 +2310,7 @@ test.each(['provider_metadata', 'providerMetadata'])(
         provider: 'vercel',
         is_free: false,
         user_byok: false,
+        custom_pricing_config: CUSTOM_PRICING_FALLBACK_CONFIG,
         api_kind: 'messages',
       },
       capture: null,
@@ -2377,6 +2385,7 @@ describe.each(usageShapes.filter(shape => shape.kind !== 'chat_completions'))(
             provider: 'vercel',
             is_free: false,
             user_byok: false,
+            custom_pricing_config: CUSTOM_PRICING_FALLBACK_CONFIG,
             api_kind: shape.kind,
           },
           capture: null,

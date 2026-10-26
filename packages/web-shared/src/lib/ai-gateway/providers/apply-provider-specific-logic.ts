@@ -54,7 +54,9 @@ import {
 import { isQwenExplicitCacheModel } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
 import { ReasoningFormat } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/format';
 import { ReasoningDetailType } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
+import type { CustomPricing } from '@kilocode/db/schema-types';
 import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
@@ -243,9 +245,9 @@ function serviceTierForLog(serviceTier: unknown) {
 export function removeUnsupportedRequestServiceTier(
   requestedModel: string,
   requestToMutate: GatewayRequest,
-  kiloExclusiveModel: KiloExclusiveModel | null
+  kiloExclusiveModel: KiloExclusiveModel | null,
+  customPricing: CustomPricing | undefined
 ) {
-  const customPricing = getCustomPricing(requestedModel);
   const reason =
     customPricing && !customPricing.fallbackOnly
       ? 'non-fallback custom pricing'
@@ -356,7 +358,12 @@ export async function applyProviderSpecificLogic(
   enableReasoningSummaries(requestToMutate);
 
   const kiloExclusiveModel = findKiloExclusiveModel(requestedModel);
-  removeUnsupportedRequestServiceTier(requestedModel, requestToMutate, kiloExclusiveModel);
+  removeUnsupportedRequestServiceTier(
+    requestedModel,
+    requestToMutate,
+    kiloExclusiveModel,
+    getCustomPricing(await getCustomPricingConfig(), requestedModel)
+  );
   if (kiloExclusiveModel) {
     applyKiloExclusiveModelSettings(requestToMutate, kiloExclusiveModel);
   }

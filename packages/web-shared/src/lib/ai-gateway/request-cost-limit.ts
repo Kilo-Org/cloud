@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { StoredModelSchema, type StoredModel } from '@kilocode/db';
-import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
+import type { CustomPricingConfig, PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   getRawOpenRouterModels,
@@ -13,6 +13,7 @@ import {
   formatPricePerToken,
   getCustomPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   getModelDisplayPricing,
@@ -79,18 +80,20 @@ function pickerRequestPrice(
   models: Record<string, StoredModel>,
   catalog: OpenRouterModel[],
   preferredProviderOrderConfig: PreferredProviderOrderConfig,
+  customPricingConfig: CustomPricingConfig,
   inputTokenCeiling: number
 ): TextPricingRates {
   const extra = pickerExtraModel(modelId);
   const model = extra ?? catalog.find(entry => entry.id === modelId);
   if (!model) throw new Error('Model pricing is unavailable');
   const pickerPricing = applyCustomPricingToPricing(
+    customPricingConfig,
     model.id,
     extra ? model.pricing : pickerModelPricing(model, models, preferredProviderOrderConfig)
   );
   let rates = textPricingRates(pickerPricing);
   const exclusivePricing = findKiloExclusiveModel(modelId)?.pricing;
-  const customPricing = getCustomPricing(modelId);
+  const customPricing = getCustomPricing(customPricingConfig, modelId);
   const exclusiveTier = exclusivePricing
     ? tierAtInputLength(exclusivePricing.tiers, inputTokenCeiling)
     : undefined;
@@ -304,11 +307,13 @@ export async function enforceRequestCostLimit(
   const parsed = boundedRequestSchema.safeParse(body);
   if (!parsed.success) return refused(boundedRefusal(parsed.error));
   try {
-    const [models, rawCatalog, preferredProviderOrderConfig] = await Promise.all([
-      getOpenRouterModelsMetadataFromDatabase(),
-      getRawOpenRouterModels(),
-      getPreferredProviderOrderConfig(),
-    ]);
+    const [models, rawCatalog, preferredProviderOrderConfig, customPricingConfig] =
+      await Promise.all([
+        getOpenRouterModelsMetadataFromDatabase(),
+        getRawOpenRouterModels(),
+        getPreferredProviderOrderConfig(),
+        getCustomPricingConfig(),
+      ]);
     const requestedMetadata = StoredModelSchema.safeParse(models[model]);
     const aliasTarget =
       model.startsWith('~') && requestedMetadata.success
@@ -340,6 +345,7 @@ export async function enforceRequestCostLimit(
       models,
       rawCatalog.data,
       preferredProviderOrderConfig,
+      customPricingConfig,
       inputTokenCeiling
     );
     const targetPrice = aliasTarget
@@ -348,6 +354,7 @@ export async function enforceRequestCostLimit(
           models,
           rawCatalog.data,
           preferredProviderOrderConfig,
+          customPricingConfig,
           inputTokenCeiling
         )
       : undefined;
@@ -418,7 +425,10 @@ function worstRates(rates: readonly (TextPricingRates | null)[]): TextPricingRat
  * whichever route serves the request at whichever price it is quoted. `null` when the catalog
  * cannot price every one of them.
  */
-function storedModelWorstRates(metadata: StoredModel): TextPricingRates | null {
+function storedModelWorstRates(
+  metadata: StoredModel,
+  customPricingConfig: CustomPricingConfig
+): TextPricingRates | null {
   const routes = worstRates(
     metadata.endpoints.flatMap(endpoint => [
       pricedRates(endpoint.pricing),
@@ -427,7 +437,7 @@ function storedModelWorstRates(metadata: StoredModel): TextPricingRates | null {
   );
   const tiers = worstRates(
     [
-      ...(getCustomPricing(metadata.id)?.pricing ?? []),
+      ...(getCustomPricing(customPricingConfig, metadata.id)?.pricing ?? []),
       ...(findKiloExclusiveModel(metadata.id)?.pricing?.tiers ?? []),
     ].map(tier => pricedRates(tierPricing(tier)))
   );
@@ -448,9 +458,10 @@ export const SYSTEM_ONE_MAX_OUTPUT_TOKENS = 16_384;
  */
 export function systemOneRequestCostBound(
   metadata: StoredModel,
-  request: { state: unknown; questions: Record<string, unknown> }
+  request: { state: unknown; questions: Record<string, unknown> },
+  customPricingConfig: CustomPricingConfig
 ): number | null {
-  const price = storedModelWorstRates(metadata);
+  const price = storedModelWorstRates(metadata, customPricingConfig);
   if (!price) return null;
   const questionBytes = Buffer.byteLength(JSON.stringify(request.questions) ?? '', 'utf8');
   const inputTokenCeiling =

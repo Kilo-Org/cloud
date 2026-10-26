@@ -2584,6 +2584,70 @@ export const PreferredProviderOrderConfigSchema = z.object({
 
 export type PreferredProviderOrderConfig = z.infer<typeof PreferredProviderOrderConfigSchema>;
 
+export const CUSTOM_PRICING_MAX_MODELS = 500;
+
+const PricePerMillionSchema = z.number().finite().nonnegative();
+
+const CustomPricingTierSchema = z.object({
+  start_context_length: z.number().int().nonnegative(),
+  pricing: z.object({
+    prompt_per_million: PricePerMillionSchema,
+    completion_per_million: PricePerMillionSchema,
+    input_cache_read_per_million: PricePerMillionSchema.nullable(),
+    input_cache_write_per_million: PricePerMillionSchema.nullable(),
+  }),
+});
+
+export const CustomPricingSchema = z.object({
+  model: GatewayModelIdSchema,
+  pricing: z.tuple([CustomPricingTierSchema], CustomPricingTierSchema).superRefine((tiers, ctx) => {
+    if (tiers[0].start_context_length !== 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'The first pricing tier must start at context length 0',
+        path: [0, 'start_context_length'],
+      });
+    }
+    for (let index = 1; index < tiers.length; index++) {
+      if (tiers[index].start_context_length <= tiers[index - 1].start_context_length) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Pricing tiers must be ordered by ascending start context length',
+          path: [index, 'start_context_length'],
+        });
+      }
+    }
+  }),
+  /** Human-readable discount shown in the model name; never used in calculations. */
+  discountPercentage: z.number().gt(0).lte(100).optional(),
+  /** Only use this pricing when the upstream response does not report a market cost. */
+  fallbackOnly: z.boolean().optional(),
+});
+
+export type CustomPricing = z.infer<typeof CustomPricingSchema>;
+
+/** Stored as an array because jsonb does not keep object key order. */
+export const CustomPricingConfigSchema = z.object({
+  models: z
+    .array(CustomPricingSchema)
+    .max(CUSTOM_PRICING_MAX_MODELS)
+    .superRefine((models, ctx) => {
+      const seen = new Set<string>();
+      for (const [index, { model }] of models.entries()) {
+        if (seen.has(model)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `Duplicate model "${model}"`,
+            path: [index, 'model'],
+          });
+        }
+        seen.add(model);
+      }
+    }),
+});
+
+export type CustomPricingConfig = z.infer<typeof CustomPricingConfigSchema>;
+
 // --- StoredModel ---
 
 export const ModelSchema = z.object({

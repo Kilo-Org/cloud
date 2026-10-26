@@ -1,15 +1,17 @@
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import {
+  apiKeyUpstream,
   faviconIcon,
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 
 export default {
   id: 'martian',
-  base_url: 'https://api.withmartian.com/v1',
-  base_url_overrides: {},
-  supported_chat_apis: ['chat_completions', 'messages', 'responses'],
-  reasoning_details_transform: null,
+  resolveUpstream: apiKeyUpstream({
+    apiUrl: 'https://api.withmartian.com/v1',
+    supportedChatApis: ['chat_completions', 'messages', 'responses'],
+    responseTransforms: null,
+  }),
   transformRequest() {},
   models: cachedEnhancedDirectByokModelList({
     providerId: 'martian',

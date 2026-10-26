@@ -26,7 +26,12 @@ import {
   type EnvironmentResponse,
 } from '@/hooks/useCloudAgentEnvironments';
 import { useEnvironmentProfiles } from '@/hooks/useEnvironmentProfiles';
-import { toEnvironmentCommands, toEnvironmentScript } from './environment-form';
+import {
+  hasEnvironmentFormChanges,
+  toEnvironmentCommands,
+  toEnvironmentScript,
+} from './environment-form';
+import { EnvironmentBuildPanel } from './EnvironmentBuildPanel';
 import {
   buildEnvironmentVariableChanges,
   formatEnvironmentVariables,
@@ -45,6 +50,7 @@ type EnvironmentDialogProps = {
   repositoryLabel?: string;
   environmentId: string | null;
   selectedProfileId?: string | null;
+  canManage: boolean;
   onSaved: (environmentId: string) => void;
   onDeleted: () => void;
 };
@@ -98,6 +104,7 @@ function EnvironmentForm({
   repository,
   repositoryLabel,
   selectedProfileId,
+  canManage,
   existing,
   onSaved,
   onDeleted,
@@ -113,9 +120,10 @@ function EnvironmentForm({
   const name =
     existing?.name ??
     splitRepositoryName(fullName).name.slice(0, ENVIRONMENT_LIMITS.MAX_NAME_LENGTH);
-  const [sandboxAllocation, setSandboxAllocation] = useState(() =>
+  const [initialSandboxAllocation] = useState(() =>
     toSelectableAllocation(existing?.sandboxAllocation ?? null)
   );
+  const [sandboxAllocation, setSandboxAllocation] = useState(initialSandboxAllocation);
   const sandboxRepository = existing
     ? { platform: existing.platform, fullName }
     : repository
@@ -135,8 +143,17 @@ function EnvironmentForm({
     plainVars: existing?.plainVars ?? [],
     secretKeys: existing?.secretKeys ?? [],
   }));
-  const [variablesText, setVariablesText] = useState(() =>
+  const [initialVariablesText] = useState(() =>
     formatEnvironmentVariables(savedVariables.plainVars, savedVariables.secretKeys)
+  );
+  const [variablesText, setVariablesText] = useState(initialVariablesText);
+  const hasUnsavedChanges = hasEnvironmentFormChanges(
+    {
+      script: initialScript,
+      variablesText: initialVariablesText,
+      sandboxAllocation: initialSandboxAllocation,
+    },
+    { script, variablesText, sandboxAllocation }
   );
   const [error, setError] = useState<string | null>(null);
   let variables: ReturnType<typeof buildEnvironmentVariableChanges> | undefined;
@@ -279,9 +296,6 @@ function EnvironmentForm({
                   onClick={() => changePage('variables')}
                 />
               </div>
-              <p className="text-muted-foreground text-xs">
-                Applies automatically to new sessions in this repository.
-              </p>
             </>
           )}
           {page === 'scripts' && <EnvironmentScriptsEditor script={script} onChange={setScript} />}
@@ -294,6 +308,17 @@ function EnvironmentForm({
             />
           )}
         </fieldset>
+        {page === 'overview' &&
+          (existing ? (
+            <EnvironmentBuildPanel
+              organizationId={organizationId}
+              environmentId={existing.id}
+              canManage={canManage}
+              hasUnsavedChanges={hasUnsavedChanges || isSaving || deleteEnvironment.isPending}
+            />
+          ) : (
+            <p className="text-muted-foreground text-xs">Save to enable snapshot builds.</p>
+          ))}
         {profileQuery.isError ? (
           <p role="alert" className="text-destructive text-xs">
             Could not check profile settings.{' '}

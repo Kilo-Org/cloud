@@ -8,27 +8,18 @@ const workspaceStampSchema = z
   .object({
     allocationId: z.string().min(1),
     commit: z.string(),
-    /** Epoch ms of the capture this workspace descends from (or would be captured at). */
-    capturedAt: z.number().int().nonnegative(),
-    /** Refreshes since the last clone: 0 for a clone, one more per refresh of an adopted snapshot. */
-    generation: z.number().int().nonnegative(),
+    // Lineage written by wrappers that captured session snapshots. Read only so
+    // a stamp in an older snapshot still classifies; never written again.
+    capturedAt: z.number().int().nonnegative().optional(),
+    generation: z.number().int().nonnegative().optional(),
   })
   .strict();
 
-/** An adopted snapshot older than this is captured again, from the adopted workspace. */
-export const SNAPSHOT_REFRESH_AFTER_MS = 4 * 24 * 60 * 60 * 1000;
 /**
- * Refreshes allowed on top of a clone. Each capture stacks on the last, so deleted
- * files and untracked leftovers accumulate; once the cap is reached and the
- * snapshot is due again, it is rebuilt from a fresh clone instead.
- */
-export const SNAPSHOT_MAX_GENERATION = 4;
-
-/**
- * Written once a workspace is fully prepared: which allocation prepared it, at
- * which commit, and when and how many refreshes ago it was cloned and captured. A
- * stamp from another allocation means the files came from a repository snapshot,
- * so they are adopted (reconciled) before use.
+ * Written once a workspace is fully prepared: which allocation prepared it and at
+ * which commit. A stamp from another allocation means the files came from an
+ * environment snapshot (the builder stamps with its own allocation), so they are
+ * adopted (reconciled) before use.
  */
 export type WorkspaceStamp = z.infer<typeof workspaceStampSchema>;
 
@@ -88,48 +79,4 @@ export function classifyWorkspace(input: {
   if (stamp.allocationId === allocationId) return 'same';
   // A stamp beside a directory that has no repository has nothing to adopt.
   return hasGit ? 'foreign' : 'empty';
-}
-
-/** What an adopted snapshot of this age and generation needs, if anything. */
-export type SnapshotAction =
-  /** Not due yet: adopt it as it is. */
-  | 'keep'
-  /** Due: adopt it, then capture the adopted workspace as the next generation. */
-  | 'refresh'
-  /** Due at the generation cap: discard it, clone fresh and capture as generation 0. */
-  | 'rebuild';
-
-export function snapshotAction(previous: WorkspaceStamp, now: number): SnapshotAction {
-  if (now - previous.capturedAt < SNAPSHOT_REFRESH_AFTER_MS) return 'keep';
-  return previous.generation < SNAPSHOT_MAX_GENERATION ? 'refresh' : 'rebuild';
-}
-
-export type StampPlan = {
-  lineage: Pick<WorkspaceStamp, 'capturedAt' | 'generation'>;
-  /** Whether this preparation should save the workspace as a repository snapshot. */
-  capture: boolean;
-};
-
-/**
- * What a prepared workspace carries into its stamp and whether it is captured.
- * A fresh clone is captured as generation 0. An adopted snapshot is captured again
- * only when it is due for a refresh, and otherwise keeps its capture time and
- * generation, so its age keeps counting from the snapshot taken.
- */
-export function planStamp(input: {
-  cloning: boolean;
-  adopted: boolean;
-  previous: WorkspaceStamp | null;
-  now: number;
-}): StampPlan {
-  const { cloning, adopted, previous, now } = input;
-  if (adopted && previous !== null) {
-    return snapshotAction(previous, now) === 'refresh'
-      ? { lineage: { capturedAt: now, generation: previous.generation + 1 }, capture: true }
-      : {
-          lineage: { capturedAt: previous.capturedAt, generation: previous.generation },
-          capture: false,
-        };
-  }
-  return { lineage: { capturedAt: now, generation: 0 }, capture: cloning };
 }

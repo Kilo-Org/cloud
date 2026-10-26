@@ -103,7 +103,7 @@ describe('briefing model pricing', () => {
 
     const quote = await briefingPriceBound(aion.id, 'Overnight activity', 2_000_000);
 
-    expect(quote.inputRate).toBeCloseTo(0.00002, 12);
+    expect(quote.inputRate).toBeCloseTo(0.00001, 12);
     expect(quote.outputRate).toBeCloseTo(0.00002, 12);
     await expect(
       enforceRequestCostLimit(

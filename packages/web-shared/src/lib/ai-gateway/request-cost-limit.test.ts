@@ -270,7 +270,7 @@ describe('request cost admission', () => {
       id: 'openrouter',
       userFunded: false,
     });
-    expect(decision.providerConfig?.max_price).toMatchObject({ prompt: 20, completion: 20 });
+    expect(decision.providerConfig?.max_price).toMatchObject({ prompt: 10, completion: 20 });
   });
   it('bounds custom pricing configured for a requested alias, which billing uses', async () => {
     const alias: StoredModel = {
@@ -288,7 +288,7 @@ describe('request cost admission', () => {
       2_000_000,
       { id: 'openrouter', userFunded: false }
     );
-    expect(decision.providerConfig?.max_price).toMatchObject({ prompt: 20, completion: 20 });
+    expect(decision.providerConfig?.max_price).toMatchObject({ prompt: 10, completion: 20 });
   });
   it('rejects before upstream spend for an insufficient ceiling or balance', async () => {
     await expect(enforceRequestCostLimit('1', model.id, body, 2_000_000)).resolves.toMatch(

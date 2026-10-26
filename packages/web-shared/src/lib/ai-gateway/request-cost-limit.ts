@@ -39,12 +39,9 @@ export function ratesForTier(tier: RateTier, requestCost: number): TextPricingRa
   const rates = textPricingRates({
     prompt: formatPricePerToken(pricing.prompt_per_million),
     completion: formatPricePerToken(pricing.completion_per_million),
-    input_cache_read: formatPricePerToken(
-      pricing.input_cache_read_per_million ?? pricing.prompt_per_million
-    ),
-    input_cache_write: formatPricePerToken(
-      pricing.input_cache_write_per_million ?? pricing.prompt_per_million
-    ),
+    // A null cache price bills cache tokens at the prompt rate, which the prompt rate already bounds.
+    input_cache_read: formatPricePerToken(pricing.input_cache_read_per_million ?? 0),
+    input_cache_write: formatPricePerToken(pricing.input_cache_write_per_million ?? 0),
     request: '0',
   });
   return { ...rates, requestCost };

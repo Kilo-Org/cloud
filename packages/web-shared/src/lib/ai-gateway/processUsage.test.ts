@@ -1512,7 +1512,7 @@ describe('logMicrodollarUsage', () => {
 
       expect(fetchGeneration).toHaveBeenCalledWith('gen-stt-123', expect.anything());
       expect(captureMessage).toHaveBeenCalledWith(
-        "SUSPICIOUS: openrouters cost accounting doesn't make sense",
+        'SUSPICIOUS: OpenRouter generation lookup failed, so a cost without BYOK status may be only the BYOK fee',
         expect.objectContaining({ tags: { source: 'generation_lookup_fallback' } })
       );
     });

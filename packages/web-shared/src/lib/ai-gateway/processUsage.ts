@@ -1464,20 +1464,22 @@ export async function processTokenData(
     usageStats.is_byok == null &&
     usageStats.cost_mUsd > 0
   ) {
-    // The response did not say whether the request was BYOK-served (OpenRouter
-    // transcriptions never do), and the generation lookup that would have said so
-    // failed. With BYOK, the cost kept here is only OpenRouter's 5% fee.
-    captureMessage("SUSPICIOUS: openrouters cost accounting doesn't make sense", {
-      level: 'error',
-      tags: { source: 'generation_lookup_fallback' },
-      extra: {
-        messageId: usageStats.messageId,
-        model: usageStats.model,
-        requested_model: usageContext.requested_model,
-        api_kind: usageContext.api_kind,
-        cost_mUsd: usageStats.cost_mUsd,
-      },
-    });
+    // OpenRouter transcriptions never report is_byok, so only the generation
+    // lookup can say whether their cost is the full cost or the BYOK fee.
+    captureMessage(
+      'SUSPICIOUS: OpenRouter generation lookup failed, so a cost without BYOK status may be only the BYOK fee',
+      {
+        level: 'error',
+        tags: { source: 'generation_lookup_fallback' },
+        extra: {
+          messageId: usageStats.messageId,
+          model: usageStats.model,
+          requested_model: usageContext.requested_model,
+          api_kind: usageContext.api_kind,
+          cost_mUsd: usageStats.cost_mUsd,
+        },
+      }
+    );
   }
 
   if (

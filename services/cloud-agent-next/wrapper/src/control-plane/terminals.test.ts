@@ -134,6 +134,51 @@ function attachedTerminals(client: WrapperKiloClient) {
 }
 
 describe('control-plane terminal adapter (B10)', () => {
+  it('acknowledges a repeated close after the first request finishes and still checks session ownership', async () => {
+    const client = fakeClient(serverUrl);
+    const deletion = Promise.withResolvers<boolean>();
+    let deletions = 0;
+    client.deletePty = async () => {
+      deletions++;
+      return deletion.promise;
+    };
+    const terminals = attachedTerminals(client);
+    try {
+      await terminals.handle({
+        type: 'terminal.create',
+        requestId: 'create_before_retry',
+        session,
+        payload: { operationId: crypto.randomUUID() },
+      });
+      const close = (identity = session) =>
+        terminals.handle({
+          type: 'terminal.close',
+          requestId: crypto.randomUUID(),
+          session: identity,
+          payload: { ptyId },
+        });
+      const forged = { ...session, kiloSessionId: 'another_session' };
+      expect(await close(forged)).toMatchObject({ ok: false, error: { code: 'unauthorized' } });
+      const other = {
+        sessionId: 'workspace_other',
+        kiloSessionId: 'kilo_other',
+        directory: '/workspace/other',
+      };
+      terminals.rememberAttachedSession(other, other.sessionId);
+      expect(await close(other)).toMatchObject({ ok: false, error: { code: 'unauthorized' } });
+      expect(deletions).toBe(0);
+
+      const pending = close();
+      deletion.resolve(true);
+      expect(await pending).toMatchObject({ ok: true, result: { success: true } });
+      expect(await close()).toMatchObject({ ok: true, result: { success: true } });
+      expect(deletions).toBe(1);
+      expect(await close(forged)).toMatchObject({ ok: false, error: { code: 'unauthorized' } });
+    } finally {
+      terminals.shutdown();
+    }
+  });
+
   it('rolls back the global root when attachment reads a restarting runtime client', () => {
     const runtime = fakeRuntime(fakeClient(serverUrl));
     Object.defineProperty(runtime, 'client', {

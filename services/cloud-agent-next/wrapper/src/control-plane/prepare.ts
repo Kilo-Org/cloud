@@ -1,4 +1,5 @@
 import { runSetupScript } from '../setup-script.js';
+import { rememberLogSecrets } from '../log-redaction.js';
 import { materializeRuntimeProfile, withRuntimeProfileEnvironment } from './runtime-profile.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -976,6 +977,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         ),
         spec
       );
+      rememberLogSecrets(
+        { ...builtEnv, ...(credentials?.git?.token ? { GIT_TOKEN: credentials.git.token } : {}) },
+        spec.secretEnvKeys ?? []
+      );
       const redact = createSecretRedactor(
         inheritedEnv,
         [
@@ -1170,6 +1175,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         { ...route.spec, cloudAgentMcp: route.cloudAgentMcp }
       ),
       route.spec
+    );
+    rememberLogSecrets(
+      { ...nextEnv, GIT_TOKEN: credentials.git?.token },
+      route.spec.secretEnvKeys ?? []
     );
     route.env = nextEnv;
     await deps.runtimes.installCredentials(route.key, nextEnv, route.cloudAgentMcp);

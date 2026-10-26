@@ -28,6 +28,9 @@ import type {
   ControlPlaneTerminalInput,
 } from '../../shared/control-plane-protocol.js';
 import { isTerminalSessionPlatform } from '../../terminal/access.js';
+import { createTerminalAuthorization } from '../../terminal/authorization.js';
+import { createTerminalRevocations } from '../../terminal/revocations.js';
+import { logger } from '../../logger.js';
 
 const TERMINAL_PREFIX = 'control_terminal:';
 const TERMINAL_OPERATION_PREFIX = 'control_terminal_operation:';
@@ -82,6 +85,8 @@ export type ControlPlaneTerminalsDeps = {
   isRouteReady: () => boolean;
   /** Passive sandbox snapshot used to distinguish an asleep sandbox from a starting one. */
   getSandboxStatus: () => Promise<SandboxStatusSnapshot>;
+  checkAccess: (metadata: SessionMetadata) => Promise<'allowed' | 'denied' | 'unavailable'>;
+  scheduleAuthorization: () => Promise<void>;
   /** Forwards one terminal request to the Sandbox DO (spec §10). */
   request: (
     sandboxId: string,
@@ -128,6 +133,31 @@ function sameTerminalIdentity(left: SandboxTerminalRecord, right: SandboxTermina
  * `terminal-bridge.ts`; records are keyed by the V2 `wrapperId` (spec §6).
  */
 export function createControlPlaneTerminals(deps: ControlPlaneTerminalsDeps) {
+  const revocations = createTerminalRevocations({
+    storage: deps.state.storage,
+    getWrapperId: deps.getWrapperId,
+    closeTerminal: async target => {
+      const response = await deps.request(target.sandboxId, {
+        operation: 'close',
+        session: target.session,
+        payload: { ptyId: target.ptyId },
+      });
+      const result = response.ok && sessionTerminalCloseResultSchema.safeParse(response.result);
+      return Boolean(result && result.success && result.data.success);
+    },
+    reportUnconfirmed: ptyId => {
+      logger
+        .withFields({ sessionId: deps.sessionId, ptyId })
+        .warn('Terminal revocation cleanup is unconfirmed');
+    },
+  });
+  const authorization = createTerminalAuthorization({
+    storage: deps.state.storage,
+    getMetadata: deps.getMetadata,
+    checkAccess: deps.checkAccess,
+    revokeTerminals,
+    schedule: deps.scheduleAuthorization,
+  });
   const inFlightCreations = new Map<
     string,
     { fingerprint: string; promise: Promise<TerminalCreateResult> }
@@ -198,6 +228,10 @@ export function createControlPlaneTerminals(deps: ControlPlaneTerminalsDeps) {
     if (!deps.isRouteReady()) {
       return (await isSandboxSleeping()) ? sleeping() : unavailable();
     }
+    if (!(await authorization.ensure())) return denied('session access is unavailable');
+    await revocations.drain();
+    if (await revocations.hasUnconfirmed())
+      return denied('terminal cleanup is unconfirmed; stop this worktree and try again');
     const wrapperId = await deps.getWrapperId();
     if (wrapperId === undefined) {
       return (await isSandboxSleeping()) ? sleeping() : unavailable();
@@ -356,6 +390,7 @@ export function createControlPlaneTerminals(deps: ControlPlaneTerminalsDeps) {
     context: ReadyTerminalContext,
     payload: { operationId: string; cols?: number; rows?: number }
   ): Promise<OperationResult<{ pty: z.infer<typeof sessionTerminalCreateResultSchema>['pty'] }>> {
+    const revision = authorization.revision();
     let response: ControlPlaneControlResult;
     try {
       response = await deps.request(context.sandboxId, {
@@ -386,6 +421,11 @@ export function createControlPlaneTerminals(deps: ControlPlaneTerminalsDeps) {
       await closeWrapperTerminal(context, pty.id);
       return unavailable();
     }
+    if (revision !== authorization.revision() || !(await authorization.ensure())) {
+      await revocations.enqueue(makeRecord(context, pty.id));
+      await revocations.drain();
+      return denied('session access was revoked');
+    }
     const record = makeRecord(context, pty.id);
     const existing = await readRecord(pty.id);
     if (existing && !sameTerminalIdentity(existing, record)) {
@@ -401,6 +441,12 @@ export function createControlPlaneTerminals(deps: ControlPlaneTerminalsDeps) {
     };
     await deps.state.storage.put(`${TERMINAL_PREFIX}${pty.id}`, record);
     await deps.state.storage.put(`${TERMINAL_OPERATION_PREFIX}${payload.operationId}`, completion);
+    if (revision !== authorization.revision()) {
+      await revocations.enqueue(record);
+      await markEnded(record);
+      await revocations.drain();
+      return denied('session access was revoked');
+    }
     return { success: true, data: result.data };
   }
 
@@ -541,8 +587,55 @@ export function createControlPlaneTerminals(deps: ControlPlaneTerminalsDeps) {
     // Terminal input must not renew sandbox activity (spec §6).
     reportActivity: async () => undefined,
     markEnded,
+    authorize: authorization.ensure,
     resolveDirectory: () => deps.getDirectory(),
   });
+
+  async function revokeTerminals(): Promise<void> {
+    bridge.closeAll(1008, 'Terminal access revoked');
+    const rows = await deps.state.storage.list<unknown>({ prefix: TERMINAL_PREFIX });
+    for (const raw of rows.values()) {
+      const parsed = terminalRecordSchema.safeParse(raw);
+      if (!parsed.success || parsed.data.state !== 'running') continue;
+      const record = parsed.data;
+      await revocations.enqueue(record);
+      await markEnded(record);
+    }
+    await revocations.drain();
+  }
+
+  async function nextAuthorizationCheckAt(): Promise<number | null> {
+    const candidates: number[] = [];
+    const retry = await revocations.nextAttemptAt();
+    if (retry !== null) candidates.push(retry);
+    const rows = await deps.state.storage.list<unknown>({ prefix: TERMINAL_PREFIX });
+    for (const raw of rows.values()) {
+      const record = terminalRecordSchema.safeParse(raw);
+      if (record.success && record.data.state === 'running') {
+        const check = await authorization.nextCheckAt();
+        // Terminals created before this lease existed must also acquire it.
+        candidates.push(check ?? Date.now());
+        break;
+      }
+    }
+    return candidates.length ? Math.min(...candidates) : null;
+  }
+
+  async function maintainAuthorization(): Promise<void> {
+    await revocations.drain();
+    if ((await authorization.nextCheckAt()) === null) {
+      const rows = await deps.state.storage.list<unknown>({ prefix: TERMINAL_PREFIX });
+      if (
+        [...rows.values()].some(raw => {
+          const record = terminalRecordSchema.safeParse(raw);
+          return record.success && record.data.state === 'running';
+        })
+      )
+        await authorization.ensure();
+      return;
+    }
+    await authorization.maintain();
+  }
 
   return {
     create,
@@ -551,6 +644,9 @@ export function createControlPlaneTerminals(deps: ControlPlaneTerminalsDeps) {
     requestConnect,
     getTerminal,
     markEnded,
+    revoke: authorization.revoke,
+    maintainAuthorization,
+    nextAuthorizationCheckAt,
     handleBrowserUpgrade: bridge.handleBrowserUpgrade,
     handleWrapperUpgrade: bridge.handleWrapperUpgrade,
     handleMessage: bridge.handleMessage,

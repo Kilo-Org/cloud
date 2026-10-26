@@ -1,4 +1,5 @@
 import { environmentReferenceSchema } from '../environment-build/reference.js';
+import { githubTaskGrantSchema } from '@kilocode/worker-utils/github-task-grant';
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import {
@@ -149,6 +150,7 @@ const MetadataRepositorySchema = z.preprocess(
           githubIntegrationId: z.string().uuid().optional(),
           githubAccessPurpose: z.enum(['workflow', 'agent']).optional(),
           githubInstallationId: z.string().optional(),
+          githubTaskGrant: githubTaskGrantSchema.optional(),
           githubAppType: z.enum(['standard', 'lite']).optional(),
           pullRequestNumber: z.number().int().positive().optional(),
           ...RepositoryCommonSchema,

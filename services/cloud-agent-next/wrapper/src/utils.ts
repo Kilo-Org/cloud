@@ -1,3 +1,4 @@
+import { redactLogText } from './log-redaction.js';
 import { spawn, type ChildProcess, type SpawnOptions } from 'child_process';
 import { appendFileSync } from 'fs';
 import { setTimeout as delay } from 'node:timers/promises';
@@ -458,7 +459,7 @@ export async function hasGitUpstream(
 export function logToFile(message: string): void {
   const logPath = process.env.WRAPPER_LOG_PATH || '/tmp/kilocode-wrapper.log';
   try {
-    appendFileSync(logPath, `${new Date().toISOString()} ${message}\n`);
+    appendFileSync(logPath, `${new Date().toISOString()} ${redactLogText(message)}\n`);
   } catch {
     // Ignore logging failures to avoid breaking the wrapper
   }

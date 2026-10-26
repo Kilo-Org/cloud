@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'bun:test';
-import { createOutputRedactor, createSecretRedactor, redactSecrets } from './redact-output';
+import {
+  collectSecretValues,
+  createOutputRedactor,
+  createSecretRedactor,
+  redactSecrets,
+} from './redact-output';
 
 describe('redactSecrets', () => {
   it('redacts bearer tokens in Authorization headers', () => {
@@ -100,6 +105,15 @@ describe('redactSecrets', () => {
 });
 
 describe('known setup secret redaction', () => {
+  it('extracts configuration credentials while retaining malformed and explicitly named secrets', () => {
+    const malformed = '{unparsed configuration secret';
+    const config = JSON.stringify({ apiKey: 'configuration-token', model: 'public-model' });
+    expect(collectSecretValues({ KILO_CONFIG_CONTENT: config })).toEqual(['configuration-token']);
+    expect(collectSecretValues({ KILO_AUTH_CONTENT: malformed })).toEqual([malformed]);
+    expect(collectSecretValues({ PROFILE_VALUE: config }, [], ['PROFILE_VALUE'])).toEqual([config]);
+    expect(createSecretRedactor({ KILO_CONFIG_CONTENT: config })(config)).toBe('[REDACTED]');
+  });
+
   const environment = {
     KILO_AUTH_CONTENT: JSON.stringify({
       kilo: {
@@ -153,6 +167,17 @@ describe('known setup secret redaction', () => {
     expect(result).toContain('[REDACTED]');
     expect(result).toContain('installed packages');
     expect(result).toContain('development');
+  });
+
+  it('redacts malformed Unicode secrets without failing redactor construction', () => {
+    const secret = 'synthetic-malformed-\ud800-secret';
+    const redact = createSecretRedactor({ API_TOKEN: secret });
+    expect(redact(secret)).toBe('[REDACTED]');
+    expect(redact(JSON.stringify(secret))).not.toContain('synthetic-malformed');
+    const nested = createSecretRedactor({
+      KILO_CONFIG_CONTENT: JSON.stringify({ apiKey: secret }),
+    });
+    expect(nested(secret)).toBe('[REDACTED]');
   });
 
   it('retains secrets from wrapper, attachment, and rebuilt worktree configurations', () => {

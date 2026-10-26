@@ -10,7 +10,7 @@ import {
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { createHmac } from 'node:crypto';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const serviceMocks = vi.hoisted(() => ({
   findManagedInstallationForRepo: vi.fn(),
@@ -66,6 +66,8 @@ function createService(): GitTokenRPCEntrypoint {
   return new GitTokenRPCEntrypoint(
     {} as ExecutionContext,
     {
+      GITHUB_APP_CLIENT_ID: 'synthetic-client',
+      GITHUB_APP_CLIENT_SECRET: 'synthetic-secret',
       GITHUB_APP_SLUG: 'kiloconnect',
       GITHUB_APP_BOT_USER_ID: '240665456',
     } as CloudflareEnv
@@ -73,7 +75,27 @@ function createService(): GitTokenRPCEntrypoint {
 }
 
 describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
+  afterEach(() => vi.unstubAllGlobals());
   beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string) => {
+        const path = new URL(input).pathname;
+        if (path === '/repos/acme/repo')
+          return Response.json({
+            id: 101,
+            node_id: 'R_repo',
+            name: 'repo',
+            owner: { login: 'acme' },
+          });
+        if (path.endsWith('/token/scoped'))
+          return Response.json({
+            token: 'scoped-user-token',
+            installation: { repository_selection: 'selected' },
+          });
+        throw new Error('Unexpected synthetic request');
+      })
+    );
     vi.clearAllMocks();
     serviceMocks.findManagedInstallationForRepo.mockResolvedValue({
       success: true,
@@ -135,7 +157,7 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
     expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
     expect(result).toMatchObject({
       success: true,
-      githubToken: 'user-token',
+      githubToken: 'scoped-user-token',
       source: 'user',
       gitAuthor: { name: 'octocat', email: '1+octocat@users.noreply.github.com' },
       commitCoAuthor: {
@@ -143,6 +165,36 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
         email: '240665456+kiloconnect[bot]@users.noreply.github.com',
       },
     });
+  });
+
+  it('narrows a connected identity before returning a native credential', async () => {
+    const result = await createService().getCloudAgentAuthForRepo({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      allowUserAuthorization: true,
+    });
+    expect(result).toMatchObject({ success: true, githubToken: 'scoped-user-token' });
+    expect(JSON.stringify(result)).not.toContain('"user-token"');
+    const calls = vi.mocked(fetch).mock.calls;
+    const body = calls.at(-1)?.[1]?.body;
+    if (typeof body !== 'string') throw new Error('Expected a JSON credential scope');
+    expect(JSON.parse(body)).toEqual({
+      access_token: 'user-token',
+      target: 'acme',
+      repository_ids: [101],
+    });
+  });
+
+  it('does not return the connected identity or use a bot fallback when narrowing fails', async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 403 }));
+    await expect(
+      createService().getCloudAgentAuthForRepo({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        allowUserAuthorization: true,
+      })
+    ).resolves.toEqual({ success: false, reason: 'user_authorization_unavailable' });
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
   });
 
   it('repairs stale login metadata before resolving fenced Cloud Agent auth', async () => {
@@ -181,7 +233,7 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
     await expect(createService().getCloudAgentAuthForRepo(params)).resolves.toMatchObject({
       success: true,
       source: 'user',
-      githubToken: 'user-token',
+      githubToken: 'scoped-user-token',
     });
     expect(serviceMocks.findManagedInstallationForRepo).toHaveBeenCalledTimes(2);
     expect(serviceMocks.findRefreshCandidates).toHaveBeenCalledWith(params, 'managed');
@@ -191,25 +243,77 @@ describe('GitTokenRPCEntrypoint.getCloudAgentAuthForRepo', () => {
     );
   });
 
-  it.each(['credential_unreadable', 'credential_configuration_error'] as const)(
-    'uses installation identity when selection reports %s',
+  it.each([
+    'no_user_authorization',
+    'revoked',
+    'refresh_failed',
+    'insufficient_user_access',
+    'credential_unreadable',
+    'credential_configuration_error',
+  ] as const)(
+    'uses repository-scoped bot auth for initial selection when personal auth reports %s',
     async reason => {
       serviceMocks.selectUserAuthorization.mockResolvedValueOnce({ selected: false, reason });
-
       const result = await createService().getCloudAgentAuthForRepo({
         githubRepo: 'acme/repo',
         userId: 'user_1',
         allowUserAuthorization: true,
       });
-
       expect(result).toMatchObject({
         success: true,
-        githubToken: 'installation-token',
         source: 'installation',
+        githubToken: 'installation-token',
         fallbackReason: reason,
       });
+      expect(serviceMocks.getTokenForRepo).toHaveBeenCalledWith('123', 'repo', 'standard');
+      expect(fetch).not.toHaveBeenCalled();
     }
   );
+
+  it('uses the lite bot without requiring personal authorization', async () => {
+    serviceMocks.findManagedInstallationForRepo.mockResolvedValueOnce({
+      success: true,
+      installationId: '123',
+      accountLogin: 'acme',
+      githubAppType: 'lite',
+      repoName: 'repo',
+    });
+    await expect(
+      createService().getCloudAgentAuthForRepo({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        allowUserAuthorization: true,
+      })
+    ).resolves.toMatchObject({
+      success: true,
+      source: 'installation',
+      fallbackReason: 'lite_installation',
+    });
+    expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+  });
+
+  it('keeps using authorized bot access when installation permissions do not support personal authorization', async () => {
+    serviceMocks.findManagedInstallationForRepo.mockResolvedValueOnce({
+      success: true,
+      installationId: '123',
+      accountLogin: 'acme',
+      githubAppType: 'standard',
+      repoName: 'repo',
+      permissions: { contents: 'read', pull_requests: 'read' },
+    });
+    await expect(
+      createService().getCloudAgentAuthForRepo({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        allowUserAuthorization: true,
+      })
+    ).resolves.toMatchObject({
+      success: true,
+      source: 'installation',
+      fallbackReason: 'insufficient_user_access',
+    });
+    expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+  });
 });
 
 describe('fetch disconnect endpoint', () => {

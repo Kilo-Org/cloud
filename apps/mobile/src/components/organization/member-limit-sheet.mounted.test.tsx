@@ -37,9 +37,10 @@ const query = vi.hoisted(() => ({
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: vi.fn() }),
-  useFocusEffect: (effect: () => void): void => {
-    effect();
-  },
+  // None of these surfaces needs a focus effect to run, and the invite sheet
+  // resets its form on every focus after mount, so running one per render
+  // would loop.
+  useFocusEffect: () => undefined,
 }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('react-native', () => ({
@@ -97,7 +98,7 @@ const mutations = vi.hoisted(() => {
   return {
     updateMember,
     current: {
-      invite: { isPending: false, isError: false, mutate: vi.fn() },
+      invite: { isPending: false, isError: false, mutate: vi.fn(), reset: vi.fn() },
       updateMember,
     },
   };

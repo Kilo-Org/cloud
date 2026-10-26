@@ -5,6 +5,7 @@ import { i18n } from '@/i18n';
 import { formatSpokenCost } from './session-row-accessibility-label';
 import {
   composeStoredSessionSpokenMeta,
+  composeStoredSessionVisibleMeta,
   formatSessionTotalCost,
   selectSessionCostInputs,
 } from './session-list-helpers';
@@ -201,6 +202,13 @@ describe('selectSessionCostInputs', () => {
  * spoken formatter (`formatSpokenCost` → "12 cents").
  */
 describe('composeStoredSessionSpokenMeta (spoken wiring)', () => {
+  it('keeps cost-only metadata free of dangling timestamp separators', () => {
+    expect(composeStoredSessionVisibleMeta('$0.12', '')).toBe('$0.12');
+    expect(composeStoredSessionSpokenMeta('12 cents', '')).toBe('cost 12 cents');
+    expect(composeStoredSessionVisibleMeta(null, '')).toBe('');
+    expect(composeStoredSessionSpokenMeta(null, '')).toBe('');
+  });
+
   it('localizes stored session cost metadata in Hindi', async () => {
     const previousLanguage = i18n.language;
     try {

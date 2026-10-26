@@ -136,6 +136,32 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     }
   });
 
+  it('answers anonymous callers the same for a custom LLM as for an unknown id', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: new Response('unauthorized', { status: 401 }),
+      organizationId: undefined,
+    } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
+    await insertCustomLlmForTest('acme/transcribe-custom-model');
+    try {
+      const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+      const [customResponse, unknownResponse] = await Promise.all(
+        ['acme/transcribe-custom-model', 'acme/transcribe-unknown-model'].map(model =>
+          handleAudioTranscriptionsRequest(
+            makeRequest({ model, input_audio: { data: 'UklGRiQA', format: 'wav' } }) as never
+          )
+        )
+      );
+
+      expect(customResponse.status).toBe(401);
+      expect(unknownResponse.status).toBe(401);
+      expect(await customResponse.json()).toEqual(await unknownResponse.json());
+      expect(mockedFetch).not.toHaveBeenCalled();
+    } finally {
+      await deleteCustomLlmForTest('acme/transcribe-custom-model');
+    }
+  });
+
   it('proxies transcription requests to OpenRouter', async () => {
     setUserAuth();
     mockedFetch.mockResolvedValue(

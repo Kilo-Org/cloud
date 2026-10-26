@@ -22,7 +22,6 @@ import type {
   GatewayRequest,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
-import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { normalizeProjectId } from '@kilocode/web-shared/lib/normalizeProjectId';
 import { getXKiloCodeVersionNumber } from '@kilocode/web-shared/lib/userAgent';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
@@ -36,6 +35,7 @@ import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
   PromptInfo,
+  VercelProviderMetaData,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { detectContextOverflow } from '@kilocode/web-shared/lib/ai-gateway/context-overflow';
 import {
@@ -48,6 +48,9 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
   computeOpenRouterCostFields,
+  computeVercelCostMicrodollars,
+  extractVercelIsByok,
+  providerReportsIsByok,
   readResponseText,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
@@ -233,19 +236,42 @@ export function checkExclusiveModelProviderAllowed(
   model: string,
   provider: OpenRouterProviderConfig | undefined
 ) {
-  if (!provider) return null;
   const exclusiveModel = findKiloExclusiveModel(model);
   if (!exclusiveModel) return null;
   const inferenceProviders = exclusiveModel.inference_providers;
   if (inferenceProviders.length === 0) return null;
-  if (
-    inferenceProviders.some(
-      inferenceProvider =>
-        (!provider.only || provider.only.includes(inferenceProvider)) &&
-        (!provider.ignore || !provider.ignore.includes(inferenceProvider))
+  return checkInferenceProvidersAllowed(inferenceProviders, provider);
+}
+
+/**
+ * Rejects a request whose provider config excludes every provider that can
+ * serve the model. Used for models routed to a fixed set of providers.
+ */
+export function checkInferenceProvidersAllowed(
+  inferenceProviders: readonly string[],
+  provider: OpenRouterProviderConfig | undefined
+) {
+  return allowedInferenceProviders(inferenceProviders, provider).length > 0
+    ? null
+    : inferenceProvidersNotAllowedResponse(inferenceProviders);
+}
+
+/** The inference providers that every given provider config's only/ignore lists allow. */
+export function allowedInferenceProviders(
+  inferenceProviders: readonly string[],
+  ...providerConfigs: ReadonlyArray<OpenRouterProviderConfig | undefined>
+): string[] {
+  return inferenceProviders.filter(inferenceProvider =>
+    providerConfigs.every(
+      provider =>
+        !provider ||
+        ((!provider.only || provider.only.includes(inferenceProvider)) &&
+          (!provider.ignore || !provider.ignore.includes(inferenceProvider)))
     )
-  )
-    return null;
+  );
+}
+
+export function inferenceProvidersNotAllowedResponse(inferenceProviders: readonly string[]) {
   const error = `No eligible provider can serve the selected model. Please enable provider: ${inferenceProviders.join(', ')}`;
   return NextResponse.json(
     {
@@ -1310,17 +1336,24 @@ export function countAndStoreEditUsage(
 // Embedding-Specific Code
 // ============================================================================
 
+// OpenRouter adds `cost`, `is_byok` and `cost_details` to the usage object.
+// Vercel AI Gateway reports only tokens there and puts the cost in
+// `providerMetadata.gateway`.
 type EmbeddingUsage = {
   prompt_tokens: number;
   total_tokens: number;
   cost?: number;
+  is_byok?: boolean | null;
+  cost_details?: { upstream_inference_cost: number };
 };
 
+// Upstream error bodies (`{ error: {...} }`) carry neither model nor usage.
 type EmbeddingResponse = {
   id?: string;
-  object: 'list';
-  model: string;
-  usage: EmbeddingUsage;
+  object?: 'list';
+  model?: string;
+  usage?: EmbeddingUsage;
+  providerMetadata?: VercelProviderMetaData;
 };
 
 type TranscriptionUsage = {
@@ -1339,27 +1372,41 @@ type TranscriptionResponse = {
   usage?: TranscriptionUsage;
 };
 
+// An upstream error can arrive without a JSON body, such as an empty 429 or an
+// HTML error page from an edge proxy. It still carries no usage, so treat it like
+// a JSON error body. A successful response that is not JSON stays a parse failure.
+function parseEmbeddingResponse(responseText: string, statusCode: number): EmbeddingResponse {
+  try {
+    return JSON.parse(responseText) as EmbeddingResponse;
+  } catch (error) {
+    if (statusCode >= 400) return {};
+    throw error;
+  }
+}
+
 export function parseEmbeddingUsageFromResponse(
   responseText: string,
-  statusCode: number
+  statusCode: number,
+  provider: ProviderId
 ): MicrodollarUsageStats {
-  const json = JSON.parse(responseText) as EmbeddingResponse;
+  const json = parseEmbeddingResponse(responseText, statusCode);
+  const usage = json.usage;
+  const hasError = !json.model || statusCode >= 400;
 
-  // Upstream providers (OpenRouter, Vercel) include cost in USD → convert to microdollars.
-  const cost_mUsd = json.usage.cost != null ? toMicrodollars(json.usage.cost) : 0;
+  if (!usage && !hasError) {
+    captureMessage('SUSPICIOUS: No embedding usage information', {
+      level: 'error',
+      tags: { source: 'embedding_usage_processing' },
+      extra: { model: json.model, statusCode },
+    });
+  }
 
-  return {
+  const base = {
     messageId: json.id ?? null,
-    model: json.model,
+    model: json.model ?? null,
     responseContent: '',
-    hasError: !json.model || statusCode >= 400,
+    hasError,
     inference_provider: null,
-    inputTokens: json.usage.prompt_tokens,
-    outputTokens: 0,
-    cacheHitTokens: 0,
-    cacheWriteTokens: 0,
-    cost_mUsd,
-    is_byok: null,
     upstream_id: null,
     finish_reason: null,
     latency: null,
@@ -1369,16 +1416,53 @@ export function parseEmbeddingUsageFromResponse(
     cancelled: false,
     status_code: statusCode,
   };
+  // With BYOK, OpenRouter's `cost` is only its 5% fee; the shared OpenRouter
+  // cost logic bills `cost_details.upstream_inference_cost` instead.
+  const vercelGateway = json.providerMetadata?.gateway;
+  const cost =
+    usage?.cost != null || usage?.is_byok != null
+      ? computeOpenRouterCostFields(
+          usage,
+          base,
+          'embedding_usage_processing',
+          providerReportsIsByok(provider)
+        )
+      : vercelGateway
+        ? {
+            cost_mUsd: computeVercelCostMicrodollars(vercelGateway),
+            is_byok: extractVercelIsByok(vercelGateway),
+          }
+        : { cost_mUsd: 0, is_byok: null };
+
+  return {
+    ...base,
+    inputTokens: usage?.prompt_tokens ?? 0,
+    outputTokens: 0,
+    cacheHitTokens: 0,
+    cacheWriteTokens: 0,
+    cost_mUsd: cost.cost_mUsd,
+    is_byok: cost.is_byok,
+  };
 }
 
+/**
+ * OpenRouter transcriptions report only `usage.cost`, without `is_byok` or
+ * `cost_details`, so a BYOK-served transcription reports just the 5% BYOK fee.
+ * The generation id from the `x-generation-id` response header lets
+ * `processTokenData` look up the generation, which reports `is_byok` and the
+ * upstream inference cost.
+ */
 export function parseTranscriptionUsageFromResponse(
   responseText: string,
   statusCode: number,
-  requestedModel: string
+  requestedModel: string,
+  provider: ProviderId,
+  generationId: string | null
 ): MicrodollarUsageStats {
   const json = JSON.parse(responseText) as TranscriptionResponse;
+  const messageId = json.id ?? generationId;
   const base = {
-    messageId: json.id ?? null,
+    messageId,
     model: json.model ?? requestedModel,
     responseContent: json.text ?? '',
     hasError: statusCode >= 400 || typeof json.text !== 'string',
@@ -1395,7 +1479,8 @@ export function parseTranscriptionUsageFromResponse(
   const cost = computeOpenRouterCostFields(
     json.usage ?? {},
     base,
-    'transcription_usage_processing'
+    'transcription_usage_processing',
+    messageId === null && providerReportsIsByok(provider)
   );
 
   return {
@@ -1437,7 +1522,7 @@ export function countAndStoreEmbeddingUsage(
     ? Promise.resolve(null)
     : clonedResponse
         .text()
-        .then(text => parseEmbeddingUsageFromResponse(text, statusCode))
+        .then(text => parseEmbeddingUsageFromResponse(text, statusCode, usageContext.provider))
         .catch(() => null);
 
   after(
@@ -1476,7 +1561,13 @@ export function countAndStoreTranscriptionUsage(
     ? Promise.resolve(null)
     : readResponseText(clonedResponse.body, usageContext.requestStartedAt)
         .then(({ text, timing }) => ({
-          ...parseTranscriptionUsageFromResponse(text, statusCode, usageContext.requested_model),
+          ...parseTranscriptionUsageFromResponse(
+            text,
+            statusCode,
+            usageContext.requested_model,
+            usageContext.provider,
+            clonedResponse.headers.get('x-generation-id')
+          ),
           ...timing,
         }))
         .catch(() => null);

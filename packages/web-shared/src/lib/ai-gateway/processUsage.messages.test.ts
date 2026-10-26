@@ -57,7 +57,7 @@ describe('processMessagesApiUsage', () => {
       cost_details: { upstream_inference_cost: 0.7 },
     };
 
-    const result = processMessagesApiUsage(usage, null, coreProps);
+    const result = processMessagesApiUsage(usage, null, coreProps, 'openrouter');
 
     expect(result.cost_mUsd).toBe(1000);
     expect(result.is_byok).toBe(false);
@@ -80,7 +80,7 @@ describe('processMessagesApiUsage', () => {
       cost_details: { upstream_inference_cost: 0.02 },
     };
 
-    const result = processMessagesApiUsage(usage, null, coreProps);
+    const result = processMessagesApiUsage(usage, null, coreProps, 'openrouter');
 
     expect(result.cost_mUsd).toBe(20000);
     expect(result.is_byok).toBe(true);
@@ -99,7 +99,7 @@ describe('processMessagesApiUsage', () => {
       gateway: { routing: { finalProvider: 'anthropic' }, cost: '0', marketCost: '0.000375' },
     };
 
-    const result = processMessagesApiUsage(usage, providerMetadata, coreProps);
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
 
     expect(result.cost_mUsd).toBe(375); // toMicrodollars(0.000375)
     expect(result.is_byok).toBeNull();
@@ -134,7 +134,7 @@ describe('processMessagesApiUsage', () => {
       },
     };
 
-    const result = processMessagesApiUsage(usage, providerMetadata, coreProps);
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
 
     expect(result.is_byok).toBe(true);
     expect(result.cost_mUsd).toBe(402);
@@ -165,7 +165,7 @@ describe('processMessagesApiUsage', () => {
       },
     };
 
-    const result = processMessagesApiUsage(usage, providerMetadata, coreProps);
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
 
     expect(result.is_byok).toBe(false);
   });
@@ -198,13 +198,13 @@ describe('processMessagesApiUsage', () => {
       },
     };
 
-    const result = processMessagesApiUsage(usage, providerMetadata, coreProps);
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
 
     expect(result.is_byok).toBe(false);
   });
 
   test('returns zero cost when no usage or metadata is provided', () => {
-    const result = processMessagesApiUsage(null, null, coreProps);
+    const result = processMessagesApiUsage(null, null, coreProps, 'openrouter');
 
     expect(result.cost_mUsd).toBe(0);
     expect(result.is_byok).toBeNull();
@@ -443,7 +443,7 @@ describe('parseMessagesMicrodollarUsageFromString approval tests', () => {
   test(vercelMessagesJson, async () => {
     const inputFile = join(sampleDir, vercelMessagesJson);
     const jsonString = await readFile(inputFile, 'utf-8');
-    const result = parseMessagesMicrodollarUsageFromString(jsonString, 200);
+    const result = parseMessagesMicrodollarUsageFromString(jsonString, 200, 'openrouter');
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);

@@ -1484,6 +1484,22 @@
       "loadingProposals": "Laai voorstelle",
       "couldNotLoadProposals": "Die voorstelle kon nie gelaai word nie.",
       "noProposals": "Geen voorstelle",
+      "proposalDetails": "Voorstelbesonderhede",
+      "proposalTitle": "Voorsteltitel",
+      "rationale": "Motivering",
+      "saveFirst": "Stoor jou wysigings voordat jy 'n pull request oopmaak.",
+      "proposalSaved": "Voorstel gestoor",
+      "proposalDismissed": "Voorstel verwerp",
+      "dismissProposalTitle": "Voorstel verwerp?",
+      "dismissProposalMessage": "Hierdie voorstel sal uit die aktiewe lys verwyder word en kan nie herstel word nie.",
+      "prOpened": "Pull request vir REVIEW.md oopgemaak",
+      "alreadyPresent": "Riglyne is reeds in REVIEW.md",
+      "status": {
+        "edited": "Gewysig",
+        "opening_change_request": "Maak PR oop",
+        "change_request_failed": "PR het misluk",
+        "superseded": "Reeds teenwoordig"
+      },
       "noProposalsDescription": "Voorstelle uit die hersieningsgeheue verskyn hier nadat Kilo instandhouers se antwoorde ontleed het."
     },
     "manualReview": {
@@ -3730,6 +3746,7 @@
     "title": "Profiele",
     "entrySubtitle": "Hergebruik omgewingsinstellings oor sessies heen",
     "newProfile": "Nuwe profiel",
+    "openHint": "Maak die profiel oop",
     "emptyTitle": "Nog geen profiele nie",
     "emptyDescription": "Skep 'n profiel om omgewingsveranderlikes, opstelopdragte en vaardighede oor sessies te hergebruik.",
     "loadFailed": "Kon nie profiele laai nie",
@@ -3961,11 +3978,13 @@
       "namePlaceholder": "Foute, Idees, Vrystelling…",
       "emoji": "Emoji",
       "mode": "Modus",
-      "defaultsHint": "Sessies wat uit hierdie lys begin word, gebruik hierdie verstekwaardes."
+      "defaultsHint": "Sessies wat uit hierdie lys begin word, gebruik hierdie verstekwaardes.",
+      "saveFailed": "Kon die lys nie stoor nie. Kontroleer jou verbinding en probeer weer."
     },
     "list": {
       "addPlaceholder": "Voeg 'n taak by",
       "add": "Voeg taak by",
+      "addFailed": "Kon die taak nie byvoeg nie. Kontroleer jou verbinding en probeer weer.",
       "empty": "Nog geen take nie",
       "setDefaults": "Stel bewaarplek, modus en model",
       "completed_one": "Voltooi ({{count}})",
@@ -4002,7 +4021,9 @@
       "startNewSession": "Begin nuwe sessie",
       "startNewSessionHint": "Druk lank om 'n nuwe sessie te begin.",
       "linkSession": "Koppel sessie",
-      "linkFailed": "Kon nie die sessie aan die taak koppel nie"
+      "linkFailed": "Kon nie die sessie aan die taak koppel nie",
+      "moveToAnotherTodo": "Skuif na 'n ander taak",
+      "startRefreshFailed": "Die sessie het begin, maar hierdie lys is nie opgedateer nie."
     },
     "linkSession": {
       "title": "Koppel 'n sessie",
@@ -4011,6 +4032,7 @@
     },
     "upNext": "Volgende",
     "sessionTodo": "Taak: {{title}}",
+    "openTodoHint": "Maak die taak oop.",
     "linkToTodo": "Koppel aan taak",
     "candidates": {
       "empty": "Geen oop take nie"

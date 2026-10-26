@@ -90,6 +90,7 @@ import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gat
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import {
   computeOpenRouterCostFields,
+  providerReportsIsByok,
   drainSseStream,
   extractVercelIsByok,
   extractVercelUpstreamId,
@@ -1103,7 +1104,11 @@ export function countAndStoreUsage(
             requestStartedAt
           )
         : parseResponseText(clonedReponse.body, content =>
-            parseResponsesMicrodollarUsageFromString(content, clonedReponse.status)
+            parseResponsesMicrodollarUsageFromString(
+              content,
+              clonedReponse.status,
+              usageContext.provider
+            )
           );
     }
     if (usageContext.api_kind === 'chat_completions') {
@@ -1118,7 +1123,12 @@ export function countAndStoreUsage(
             requestStartedAt
           )
         : parseResponseText(clonedReponse.body, content =>
-            parseMicrodollarUsageFromString(content, usageContext.kiloUserId, clonedReponse.status)
+            parseMicrodollarUsageFromString(
+              content,
+              usageContext.kiloUserId,
+              clonedReponse.status,
+              usageContext.provider
+            )
           );
     }
     if (usageContext.api_kind === 'messages') {
@@ -1133,7 +1143,11 @@ export function countAndStoreUsage(
             requestStartedAt
           )
         : parseResponseText(clonedReponse.body, content =>
-            parseMessagesMicrodollarUsageFromString(content, clonedReponse.status)
+            parseMessagesMicrodollarUsageFromString(
+              content,
+              clonedReponse.status,
+              usageContext.provider
+            )
           );
     }
   }
@@ -1144,13 +1158,15 @@ export function countAndStoreUsage(
 export function processOpenRouterUsage(
   usage: OpenRouterUsage | null | undefined,
   coreProps: NotYetCostedUsageStats,
+  provider: ProviderId,
   vercelProviderMetadata?: VercelProviderMetaData | null
 ): JustTheCostsUsageStats {
   // usage may be null when there's no response (e.g. error), so default to empty object
   const { cost_mUsd, is_byok } = computeOpenRouterCostFields(
     usage ?? {},
     coreProps,
-    'sse_processing'
+    'sse_processing',
+    providerReportsIsByok(provider)
   );
 
   return {
@@ -1292,7 +1308,7 @@ export async function parseMicrodollarUsageFromStream(
     status_code: effectiveStatusCode,
   };
 
-  const costs = processOpenRouterUsage(usage, coreProps, vercelProviderMetadata);
+  const costs = processOpenRouterUsage(usage, coreProps, provider, vercelProviderMetadata);
 
   return { ...coreProps, ...costs };
 }
@@ -1300,7 +1316,8 @@ export async function parseMicrodollarUsageFromStream(
 export function parseMicrodollarUsageFromString(
   fullResponse: string,
   kiloUserId: string,
-  statusCode: number
+  statusCode: number,
+  provider: ProviderId
 ): MicrodollarUsageStats {
   const responseJson = JSON.parse(fullResponse) as
     | (OpenAI.Chat.Completions.ChatCompletion &
@@ -1308,7 +1325,11 @@ export function parseMicrodollarUsageFromString(
         MaybeHasVercelProviderMetaData)
     | null;
 
-  if (responseJson?.usage?.is_byok == null && responseJson?.usage?.cost) {
+  if (
+    providerReportsIsByok(provider) &&
+    responseJson?.usage?.is_byok == null &&
+    responseJson?.usage?.cost
+  ) {
     captureException(new Error('SUSPICIOUS: is_byok is null'), {
       tags: { source: 'string_processing' },
       extra: { responseJson },
@@ -1335,7 +1356,12 @@ export function parseMicrodollarUsageFromString(
     status_code: statusCode,
   };
 
-  const costs = processOpenRouterUsage(responseJson?.usage, coreProps, vercelProviderMetadata);
+  const costs = processOpenRouterUsage(
+    responseJson?.usage,
+    coreProps,
+    provider,
+    vercelProviderMetadata
+  );
 
   return { ...coreProps, ...costs };
 }
@@ -1437,6 +1463,28 @@ export async function processTokenData(
       );
     }
     usageStats = genStats;
+  } else if (
+    generationProvider === OPENROUTER &&
+    usageStats.messageId &&
+    usageStats.is_byok == null &&
+    usageStats.cost_mUsd > 0
+  ) {
+    // OpenRouter transcriptions never report is_byok, so only the generation
+    // lookup can say whether their cost is the full cost or the BYOK fee.
+    captureMessage(
+      'SUSPICIOUS: OpenRouter generation lookup failed, so a cost without BYOK status may be only the BYOK fee',
+      {
+        level: 'error',
+        tags: { source: 'generation_lookup_fallback' },
+        extra: {
+          messageId: usageStats.messageId,
+          model: usageStats.model,
+          requested_model: usageContext.requested_model,
+          api_kind: usageContext.api_kind,
+          cost_mUsd: usageStats.cost_mUsd,
+        },
+      }
+    );
   }
 
   if (

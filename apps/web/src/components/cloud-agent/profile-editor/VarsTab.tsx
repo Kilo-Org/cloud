@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 import { Plus, Loader2, Eye, EyeOff, Lock, Trash2, Key } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { EnvironmentSnapshotNotice } from '@/components/cloud-agent-next/EnvironmentSnapshotNotice';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { InlineDeleteConfirmation } from '@/components/ui/inline-delete-confirmation';
@@ -187,6 +188,7 @@ export function VarsTab({
         <Key className="text-muted-foreground h-3.5 w-3.5" />
         <span className="text-xs font-medium">Environment Variables</span>
       </div>
+      <EnvironmentSnapshotNotice />
 
       {vars.map(varItem => (
         <div

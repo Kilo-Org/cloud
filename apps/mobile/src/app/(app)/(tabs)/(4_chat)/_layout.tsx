@@ -25,6 +25,9 @@ export default function ChatLayout() {
         <Stack
           screenLayout={appSceneLayout}
           screenOptions={{ headerShown: false }}
+          // A push or a pop moves a screen that is still the touch target until
+          // the transition ends, so that is where the input window can close for
+          // a same-tab press.
           screenListeners={{ transitionEnd: settleTabSwitchInput }}
         />
       </TabStackErrorBoundary>

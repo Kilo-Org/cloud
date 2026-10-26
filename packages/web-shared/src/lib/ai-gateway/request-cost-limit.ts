@@ -34,7 +34,7 @@ type RateTier = {
   };
 };
 
-function ratesForTier(tier: RateTier, requestCost: number): TextPricingRates {
+export function ratesForTier(tier: RateTier, requestCost: number): TextPricingRates {
   const { pricing } = tier;
   const rates = textPricingRates({
     prompt: formatPricePerToken(pricing.prompt_per_million),

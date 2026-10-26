@@ -8,6 +8,7 @@ import { getRawOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/prov
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
 import { enforceRequestCostLimit } from '@kilocode/web-shared/lib/ai-gateway/request-cost-limit';
+import { getConfiguredCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/configured-custom-pricing';
 import { briefingPriceBound, briefingPrompt } from './summary';
 import type { BriefingReportRow } from './store';
 
@@ -23,6 +24,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config', () => ({
   getPreferredProviderOrderConfig: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/configured-custom-pricing', () => ({
+  getConfiguredCustomPricing: jest.fn(),
 }));
 
 function catalogModel(id: string, pricing: OpenRouterModel['pricing']): OpenRouterModel {
@@ -48,6 +52,7 @@ describe('briefing model pricing', () => {
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
     jest.mocked(getUnavailableModelIds).mockResolvedValue(new Set<string>());
     jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue({ rules: [] });
+    jest.mocked(getConfiguredCustomPricing).mockResolvedValue({});
     jest
       .mocked(getRawOpenRouterModels)
       .mockResolvedValue({ data: [aion] } satisfies OpenRouterModelsResponse);
@@ -76,6 +81,43 @@ describe('briefing model pricing', () => {
     await expect(briefingPriceBound(aion.id, 'Overnight activity', 1)).rejects.toThrow(
       'spend_limit_too_low'
     );
+  });
+
+  it('quotes configured fallback-only pricing above the list price, as billing may charge it', async () => {
+    jest.mocked(getConfiguredCustomPricing).mockResolvedValue({
+      [aion.id]: {
+        pricing: [
+          {
+            start_context_length: 0,
+            pricing: {
+              prompt_per_million: 10,
+              completion_per_million: 20,
+              input_cache_read_per_million: null,
+              input_cache_write_per_million: null,
+            },
+          },
+        ],
+        fallbackOnly: true,
+      },
+    });
+
+    const quote = await briefingPriceBound(aion.id, 'Overnight activity', 2_000_000);
+
+    expect(quote.inputRate).toBeCloseTo(0.00002, 12);
+    expect(quote.outputRate).toBeCloseTo(0.00002, 12);
+    await expect(
+      enforceRequestCostLimit(
+        String(quote.upperBound),
+        aion.id,
+        {
+          messages: [{ role: 'user', content: 'Overnight activity' }],
+          max_tokens: quote.maxTokens,
+          stream: false,
+        },
+        2_000_000,
+        { id: 'openrouter', userFunded: false }
+      )
+    ).resolves.toMatchObject({ refusal: null });
   });
 
   it('quotes the configured preferred route rather than the first endpoint or catalog price', async () => {

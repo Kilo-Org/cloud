@@ -26,7 +26,9 @@ import { applyCustomPricingToPricing } from '@kilocode/web-shared/lib/ai-gateway
 import { getConfiguredCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/configured-custom-pricing';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
+import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import {
+  ratesForTier,
   textPricingRates,
   type TextPricingRates,
 } from '@kilocode/web-shared/lib/ai-gateway/request-cost-limit';
@@ -251,8 +253,8 @@ async function briefingPriceRates(model: string): Promise<TextPricingRates> {
   if (aliasTarget && !targetExtra && !target) throw new Error('model_pricing_unavailable');
   let rates: TextPricingRates[];
   try {
-    rates = [entry, ...(targetExtra ? [targetExtra] : target ? [target] : [])].map(item =>
-      textPricingRates(
+    rates = [entry, ...(targetExtra ? [targetExtra] : target ? [target] : [])].flatMap(item => {
+      const listRates = textPricingRates(
         applyCustomPricingToPricing(
           item.id,
           item === extra || item === targetExtra
@@ -260,8 +262,16 @@ async function briefingPriceRates(model: string): Promise<TextPricingRates> {
             : pickerModelPricing(item, endpointsMetadata, preferredProviderOrderConfig),
           configuredCustomPricing
         )
-      )
-    );
+      );
+      // Billing still charges fallback-only pricing when the upstream reports no cost.
+      const customPricing = getCustomPricing(item.id, configuredCustomPricing);
+      return customPricing?.fallbackOnly
+        ? [
+            listRates,
+            ...customPricing.pricing.map(tier => ratesForTier(tier, listRates.requestCost)),
+          ]
+        : [listRates];
+    });
   } catch {
     throw new Error('invalid_model_pricing');
   }

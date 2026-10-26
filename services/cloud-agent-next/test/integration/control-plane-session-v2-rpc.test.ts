@@ -36,7 +36,7 @@ const sandboxes = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace 
 const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDBOX_SESSION;
 
 const USER_ID = 'user_123';
-const ORG_ID = 'org_123';
+const ORG_ID = '11111111-1111-4111-8111-111111111111';
 let sequence = 0;
 
 function b64url(value: string): string {
@@ -498,7 +498,11 @@ describe('SandboxSessionV2 worker RPC surface', () => {
         },
       }),
       message: promptPayload(firstMessageId),
-      sandboxSelection: { provider: 'vercel', allocationName: 'alloc_test' },
+      sandboxSelection: {
+        provider: 'vercel',
+        allocationName: 'alloc_test',
+        byoc: { organizationId: ORG_ID, credentialId: '22222222-2222-4222-8222-222222222222' },
+      },
     });
 
     // M2: legacy admission ack shape.
@@ -528,10 +532,12 @@ describe('SandboxSessionV2 worker RPC surface', () => {
       messages: [{ messageId: firstMessageId, state: 'queued' }],
     });
 
-    // H1: the non-default provider/allocation reached the sandbox pin.
+    // Vercel pins each physical allocation under its own immutable name.
+    const allocation = await sandboxStub.getAllocationState();
+    expect(allocation.allocationId).toEqual(expect.any(String));
     await expect(sandboxStub.getProviderRuntime()).resolves.toEqual({
       provider: 'vercel',
-      allocationName: 'alloc_test',
+      allocationName: `sbx-${allocation.allocationId?.replaceAll('-', '')}`,
     });
     expect(provider.createCalls).toBe(1);
 
@@ -726,7 +732,10 @@ describe('SandboxSessionV2 worker RPC surface', () => {
       sessionStub.createSessionWithInitialAdmission({
         metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
         message: promptPayload(messageId()),
-        sandboxSelection: { provider: 'vercel' },
+        sandboxSelection: {
+          provider: 'vercel',
+          byoc: { organizationId: ORG_ID, credentialId: '22222222-2222-4222-8222-222222222222' },
+        },
       })
     ).resolves.toEqual({
       success: false,

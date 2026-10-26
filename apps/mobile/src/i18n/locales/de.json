@@ -1014,6 +1014,22 @@
       "loading": "Gespeicherte Prüfhinweise werden geladen",
       "loadingProposals": "Vorschläge werden geladen",
       "noProposals": "Keine Vorschläge",
+      "proposalDetails": "Vorschlagsdetails",
+      "proposalTitle": "Vorschlagstitel",
+      "rationale": "Begründung",
+      "saveFirst": "Speichere deine Änderungen, bevor du einen Pull Request öffnest.",
+      "proposalSaved": "Vorschlag gespeichert",
+      "proposalDismissed": "Vorschlag verworfen",
+      "dismissProposalTitle": "Vorschlag verwerfen?",
+      "dismissProposalMessage": "Dieser Vorschlag wird aus der Liste der aktiven Vorschläge entfernt und kann nicht wiederhergestellt werden.",
+      "prOpened": "Pull Request für REVIEW.md geöffnet",
+      "alreadyPresent": "Die Richtlinien sind bereits in REVIEW.md vorhanden",
+      "status": {
+        "edited": "Bearbeitet",
+        "opening_change_request": "PR wird geöffnet",
+        "change_request_failed": "PR fehlgeschlagen",
+        "superseded": "Bereits vorhanden"
+      },
       "noProposalsDescription": "Hier erscheinen Vorschläge zu den gespeicherten Prüfhinweisen, sobald Kilo die Antworten der Projektverantwortlichen analysiert hat.",
       "off": "Gespeicherte Prüfhinweise sind deaktiviert.",
       "on": "Gespeicherte Prüfhinweise sind aktiviert.",
@@ -3730,6 +3746,7 @@
     "title": "Profile",
     "entrySubtitle": "Umgebungseinstellungen sitzungsübergreifend wiederverwenden",
     "newProfile": "Neues Profil",
+    "openHint": "Öffnet das Profil",
     "emptyTitle": "Noch keine Profile",
     "emptyDescription": "Erstelle ein Profil, um Umgebungsvariablen, Setup-Befehle und Fähigkeiten sitzungsübergreifend wiederzuverwenden.",
     "loadFailed": "Profile konnten nicht geladen werden",
@@ -3961,11 +3978,13 @@
       "namePlaceholder": "Bugs, Ideen, Release…",
       "emoji": "Emoji",
       "mode": "Modus",
-      "defaultsHint": "Sitzungen, die aus dieser Liste gestartet werden, verwenden diese Standardwerte."
+      "defaultsHint": "Sitzungen, die aus dieser Liste gestartet werden, verwenden diese Standardwerte.",
+      "saveFailed": "Liste konnte nicht gespeichert werden. Prüfe deine Verbindung und versuche es erneut."
     },
     "list": {
       "addPlaceholder": "Aufgabe hinzufügen",
       "add": "Aufgabe hinzufügen",
+      "addFailed": "Aufgabe konnte nicht hinzugefügt werden. Prüfe deine Verbindung und versuche es erneut.",
       "empty": "Noch keine Aufgaben",
       "setDefaults": "Repository, Modus und Modell festlegen",
       "completed_one": "Abgeschlossen ({{count}})",
@@ -4002,7 +4021,9 @@
       "startNewSession": "Neue Sitzung starten",
       "startNewSessionHint": "Lange drücken, um eine neue Sitzung zu starten.",
       "linkSession": "Sitzung verknüpfen",
-      "linkFailed": "Die Sitzung konnte nicht mit der Aufgabe verknüpft werden."
+      "linkFailed": "Die Sitzung konnte nicht mit der Aufgabe verknüpft werden.",
+      "moveToAnotherTodo": "Zu anderer Aufgabe verschieben",
+      "startRefreshFailed": "Die Sitzung wurde gestartet, aber diese Liste wurde nicht aktualisiert."
     },
     "linkSession": {
       "title": "Eine Sitzung verknüpfen",
@@ -4011,6 +4032,7 @@
     },
     "upNext": "Als Nächstes",
     "sessionTodo": "Aufgabe: {{title}}",
+    "openTodoHint": "Öffnet die Aufgabe.",
     "linkToTodo": "Mit Aufgabe verknüpfen",
     "candidates": {
       "empty": "Keine offenen Aufgaben"

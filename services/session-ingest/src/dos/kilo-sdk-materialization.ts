@@ -4,7 +4,8 @@ import { z } from 'zod';
 
 import {
   decodeKiloSdkMessagesCursor,
-  encodeKiloSdkMessagesCursor,
+  fitsKiloSdkMessagesCursorId,
+  tryEncodeKiloSdkMessagesCursor,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
   MAX_SESSION_DIFF_READ_BYTES,
   messageIdSchema,
@@ -319,7 +320,7 @@ function finishBoundedKiloSdkMessageInfoEnumeration(
   }
   return {
     pageNewestFirst,
-    nextCursor: encodeKiloSdkMessagesCursor(oldestReturnedMessage.identity),
+    nextCursor: tryEncodeKiloSdkMessagesCursor(oldestReturnedMessage.identity),
     omittedItemCount,
   };
 }
@@ -400,7 +401,15 @@ async function enumerateBoundedKiloSdkMessageInfos(
           if (!identity || identity.id !== storageIdentity.messageId) {
             return { kind: 'invalid_data' };
           }
-          pageNewestFirst.push({ info: outcome.value, identity });
+          if (!fitsKiloSdkMessagesCursorId(identity.id)) {
+            const omittedRows = countOmittedKiloSdkMessageRows(db, row.item_id);
+            if (omittedRows.kind === 'invalid_data') {
+              return omittedRows;
+            }
+            omittedItemCount += omittedRows.count;
+          } else {
+            pageNewestFirst.push({ info: outcome.value, identity });
+          }
         }
       }
       lastConsumedMessageStorageIdentity = storageIdentity;

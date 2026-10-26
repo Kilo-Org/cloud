@@ -440,7 +440,7 @@ export const byokRouter = createTRPCRouter({
         };
       }
 
-      function setup() {
+      async function setup() {
         const provider = UserByokProviderIdSchema.parse(decryptedKey.providerId);
         const model = UserByokTestModels[provider];
 
@@ -448,7 +448,9 @@ export const byokRouter = createTRPCRouter({
         if (directByokProvider) {
           return {
             finalProvider: provider,
-            model: createAiSdkProvider(directByokProvider, decryptedKey.decryptedAPIKey)(model),
+            model: (
+              await createAiSdkProvider(directByokProvider, decryptedKey.decryptedAPIKey, model)
+            )(model),
           };
         }
 
@@ -468,7 +470,7 @@ export const byokRouter = createTRPCRouter({
       }
 
       try {
-        const { finalProvider, model, providerOptions } = setup();
+        const { finalProvider, model, providerOptions } = await setup();
         const output = await generateText({
           model,
           prompt: 'Say hi',

@@ -17,16 +17,11 @@ export const CLOUD_AGENT_IMAGE_MIME_TO_EXTENSION: Record<CloudAgentImageAllowedT
   'image/gif': 'gif',
 };
 
-export const CLOUD_AGENT_IMAGE_MAX_COUNT = 5;
 export const CLOUD_AGENT_IMAGE_MAX_ORIGINAL_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
-export const CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
 export const CLOUD_AGENT_IMAGE_MAX_DIMENSION_PX = 1536;
 
-export const CLOUD_AGENT_IMAGE_PRESIGNED_URL_EXPIRY_SECONDS = 900; // 15 min
-
 /**
- * File upload constraints for Cloud Agent prompts. Kept separate from the
- * image-only contract used by older Cloud Agent upload flows.
+ * File upload constraints for Cloud Agent prompts.
  */
 export const CLOUD_AGENT_ATTACHMENT_ALLOWED_TYPES = [
   ...CLOUD_AGENT_IMAGE_ALLOWED_TYPES,

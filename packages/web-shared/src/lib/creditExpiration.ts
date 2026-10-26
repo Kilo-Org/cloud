@@ -227,7 +227,6 @@ async function fetchOpenCreditLotsForOrganizations(
     .leftJoin(
       expiredCredits,
       and(
-        eq(expiredCredits.organization_id, creditTransactionsTable.organization_id),
         inArray(expiredCredits.credit_category, [
           'credits_expired',
           'orb_credit_expired',

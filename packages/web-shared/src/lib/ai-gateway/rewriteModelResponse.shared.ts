@@ -327,8 +327,13 @@ export function rewriteUsage(
   applyUsagePricing(costs, context);
   usage.cost = costs.cost_mUsd / 1_000_000;
   usage.is_byok = context.user_byok || context.provider === 'openai-chatgpt';
-  if (!usage.cost_details && gateway && (gateway.marketCost != null || gateway.cost != null)) {
+  if (
+    usage.cost_details?.upstream_inference_cost == null &&
+    gateway &&
+    (gateway.marketCost != null || gateway.cost != null)
+  ) {
     usage.cost_details = {
+      ...usage.cost_details,
       upstream_inference_cost: computeVercelCostMicrodollars(gateway) / 1_000_000,
     };
   }

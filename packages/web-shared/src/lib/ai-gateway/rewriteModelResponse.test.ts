@@ -1774,6 +1774,46 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
     );
 
     test.each([
+      { inferenceCost: null, userByok: false },
+      { inferenceCost: undefined, userByok: false },
+      { inferenceCost: null, userByok: true },
+      { inferenceCost: undefined, userByok: true },
+    ])(
+      'backfills Vercel inference cost $inferenceCost for user BYOK=$userByok',
+      async ({ inferenceCost, userByok }) => {
+        const { payload } = await rewriteUsageFixture(
+          shape,
+          stream,
+          {
+            requested_model: 'openai/gpt-5',
+            provider: 'vercel',
+            is_free: false,
+            user_byok: userByok,
+            api_kind: shape.kind,
+          },
+          {
+            ...shape.tokens,
+            cost_details: {
+              upstream_inference_cost: inferenceCost,
+              upstream_inference_prompt_cost: 0.2,
+            },
+            ...(shape.kind === 'chat_completions' ? { cost: 1.2, is_byok: false } : {}),
+          },
+          { provider_metadata: { gateway: { marketCost: '1.2' } } }
+        );
+
+        expect(payload.usage).toMatchObject({
+          cost: userByok ? 0 : 1.2,
+          is_byok: userByok,
+          cost_details: {
+            upstream_inference_cost: 1.2,
+            upstream_inference_prompt_cost: 0.2,
+          },
+        });
+      }
+    );
+
+    test.each([
       ['requested/alias', 'requested/alias'],
       ['~auto', 'upstream-model'],
       ['openrouter/auto', 'upstream-model'],
@@ -1831,6 +1871,50 @@ test.each(['openrouter', 'vercel'] as const)(
 
     expect(start.message.usage).toEqual({ ...startUsage, cost: 0.544167, is_byok: false });
     expect(delta.usage).toEqual({ ...deltaUsage, cost: 2.419167, is_byok: false });
+  }
+);
+
+test.each(['provider_metadata', 'providerMetadata'])(
+  'retains Messages start-frame %s for final usage',
+  async metadataKey => {
+    const events = [
+      {
+        type: 'message_start',
+        message: {
+          id: 'message-start-metadata',
+          model: 'upstream-model',
+          usage: { input_tokens: 3, output_tokens: 0 },
+          [metadataKey]: { gateway: { marketCost: '0.12' } },
+        },
+      },
+      { type: 'message_delta', usage: { output_tokens: 2 }, delta: {} },
+      { type: 'message_stop' },
+    ];
+    const result = await rewriteModelResponse_Messages({
+      response: sseResponse(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')),
+      usageContext: {
+        requested_model: 'requested-model',
+        provider: 'vercel',
+        is_free: false,
+        user_byok: false,
+        api_kind: 'messages',
+      },
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+    const objects = dataObjects(await readOutputStream(result)) as {
+      usage?: Record<string, unknown>;
+    }[];
+
+    expect(objects[1].usage).toEqual({
+      output_tokens: 2,
+      cost: 0.12,
+      is_byok: false,
+      cost_details: { upstream_inference_cost: 0.12 },
+    });
+    expect(JSON.stringify(objects)).not.toContain(`"${metadataKey}"`);
+    expect(JSON.stringify(objects)).not.toContain('upstream-model');
   }
 );
 

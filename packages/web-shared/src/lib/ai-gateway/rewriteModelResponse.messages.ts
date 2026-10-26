@@ -124,6 +124,8 @@ export async function rewriteModelResponse_Messages({
 
           if (json.type === 'message_start') {
             const e = json as MessagesApiMessageStart;
+            providerMetadata =
+              e.message.provider_metadata ?? e.message.providerMetadata ?? providerMetadata;
             if (generationId === undefined && e.message.id) {
               generationId = e.message.id;
               logExceptInTest('[rewriteModelResponse] received generation ID', {
@@ -133,11 +135,7 @@ export async function rewriteModelResponse_Messages({
             }
             if (e.message.usage) {
               startUsage = { ...e.message.usage };
-              rewriteUsage(
-                e.message.usage,
-                usageContext,
-                e.message.provider_metadata ?? e.message.providerMetadata
-              );
+              rewriteUsage(e.message.usage, usageContext, providerMetadata);
             }
             rewriteResponseMetadata(e.message, usageContext);
           }

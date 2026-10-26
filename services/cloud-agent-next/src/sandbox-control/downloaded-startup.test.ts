@@ -61,14 +61,25 @@ describe('startup selection and preflight', () => {
   ] as const)('rejects unsupported configuration before provider work: %s', (env, provider) => {
     expect(() => selectStartup(env, provider)).toThrow('configuration');
   });
-  it('keeps preinstalled startup for SDK and Vercel pins on a downloaded target', () => {
-    for (const provider of ['cloudflare', 'vercel'] as const)
+  it('keeps preinstalled startup for SDK pins on a downloaded target', () => {
+    for (const provider of ['cloudflare'] as const)
       expect(
         selectStartup(
           { RUNTIME_STARTUP_MODE: 'downloaded', RUNTIME_RELEASE_DESCRIPTOR: text },
           provider
         ).mode
       ).toBe('preinstalled');
+  });
+  it('selects downloaded startup for Vercel and requires its release descriptor', () => {
+    expect(
+      selectStartup(
+        { RUNTIME_STARTUP_MODE: 'downloaded', RUNTIME_RELEASE_DESCRIPTOR: text },
+        'vercel'
+      )
+    ).toMatchObject({ mode: 'downloaded', descriptor: text });
+    expect(() => selectStartup({ RUNTIME_STARTUP_MODE: 'downloaded' }, 'vercel')).toThrow(
+      'configuration'
+    );
   });
   it('keeps image and mode independent and isolates downloaded snapshot keys', () => {
     for (const image of ['all-in-one', 'runtime-free'])
@@ -118,30 +129,44 @@ describe('startup selection and preflight', () => {
       })
     ).rejects.toMatchObject({ permanentReason: 'invalid_configuration' });
   });
-  it('renders bounded commands using the Worker host and the latest first-connect deadline', async () => {
-    const deadlineAt = Date.now() + 420123;
-    const command = await downloadedStartup({
-      env: {
-        WORKER_URL: 'https://worker.test',
-        NEXTAUTH_SECRET: secret,
-        RUNTIME_RELEASE_BUCKET: {
-          async head() {
-            return { size: 1 };
-          },
-        } as unknown as R2Bucket,
-      },
-      descriptor: text,
-      sandboxId: 'sbx_test',
-      allocationId: crypto.randomUUID(),
-      deadlineAt,
-    });
-    expect(command.argv[0]).toBe('/bin/sh');
-    expect(command.argv.every(arg => new TextEncoder().encode(arg).byteLength < 128 * 1024)).toBe(
-      true
-    );
-    // Do not include command or token values in assertion output.
-    expect(command.argv.some(arg => arg.includes('https://worker.test'))).toBe(true);
-  });
+  it.each([undefined, 'environment-builder'] as const)(
+    'renders bounded %s commands using the Worker host',
+    async mainProcess => {
+      const deadlineAt = Date.now() + 420123;
+      const command = await downloadedStartup({
+        env: {
+          WORKER_URL: 'https://worker.test',
+          NEXTAUTH_SECRET: secret,
+          RUNTIME_RELEASE_BUCKET: {
+            async head() {
+              return { size: 1 };
+            },
+          } as unknown as R2Bucket,
+        },
+        descriptor: text,
+        sandboxId: 'sbx_test',
+        allocationId: crypto.randomUUID(),
+        deadlineAt,
+        mainProcess,
+      });
+      expect(
+        command.argv.some(arg =>
+          arg.includes(
+            mainProcess === 'environment-builder'
+              ? 'kilocode-environment-builder.js'
+              : 'kilocode-control-plane-supervisor.sh'
+          )
+        )
+      ).toBe(true);
+      expect(command.argv[0]).toBe('/bin/sh');
+      expect(command.user).toBe('root');
+      expect(command.argv.every(arg => new TextEncoder().encode(arg).byteLength < 128 * 1024)).toBe(
+        true
+      );
+      // Do not include command or token values in assertion output.
+      expect(command.argv.some(arg => arg.includes('https://worker.test'))).toBe(true);
+    }
+  );
   it('rejects an escaped bootstrap argument above the Linux limit even when the descriptor fits', async () => {
     const large = structuredClone(descriptor);
     const control = large.artifacts.find(artifact => artifact.role === 'control')!;

@@ -4,11 +4,23 @@
  *
  * Processes ServiceEvents from the normalizer and provides a reactive snapshot
  * of the current service state via subscribe().
+ *
+ * Preparation diagnostics use the PREPARATION_MAX_* history budgets in schemas.ts:
+ * setup messages follow arrival order, attempts follow startedAt, and steps follow
+ * causal start order. Each list retains its newest entries. Output tails use the
+ * UTF-8 byte budget in limits.ts.
  */
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import type { ServiceEvent } from './normalizer';
 import { PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
-import { knownSessionStatus, sessionCommitDataSchema, type KnownSessionStatus } from './schemas';
+import {
+  PREPARATION_MAX_ATTEMPTS,
+  PREPARATION_MAX_SETUP_LOG_ENTRIES,
+  PREPARATION_MAX_STEPS,
+  knownSessionStatus,
+  sessionCommitDataSchema,
+  type KnownSessionStatus,
+} from './schemas';
 import type {
   SessionInfo,
   SessionActivity,
@@ -489,7 +501,7 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
     } else {
       cloudStatus = { type: 'preparing', step: event.step, message: event.message };
       if (event.step === 'setup_commands' && event.message) {
-        setupLog = [...setupLog, event.message];
+        setupLog = [...setupLog.slice(-(PREPARATION_MAX_SETUP_LOG_ENTRIES - 1)), event.message];
       }
     }
     notify();
@@ -559,11 +571,10 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
           ? settleRunningSteps(handedOff.steps, 'completed')
           : (existing?.steps ?? []),
       };
-      preparationAttempts = [
-        ...preparationAttempts.filter(item => item.id !== attempt.id),
-        attempt,
-      ].sort((a, b) => a.startedAt - b.startedAt);
-      return attempt;
+      preparationAttempts = [...preparationAttempts.filter(item => item.id !== attempt.id), attempt]
+        .sort((a, b) => a.startedAt - b.startedAt)
+        .slice(-PREPARATION_MAX_ATTEMPTS);
+      return preparationAttempts.includes(attempt) ? attempt : null;
     }
     if (event.action === 'attempt_snapshot' && event.attempt) {
       if (existing && existing.revision > event.attempt.revision) return null;
@@ -578,11 +589,10 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
         revision: snapshot.revision,
         steps: existing?.steps ?? [],
       };
-      preparationAttempts = [
-        ...preparationAttempts.filter(item => item.id !== attempt.id),
-        attempt,
-      ].sort((a, b) => a.startedAt - b.startedAt);
-      return attempt;
+      preparationAttempts = [...preparationAttempts.filter(item => item.id !== attempt.id), attempt]
+        .sort((a, b) => a.startedAt - b.startedAt)
+        .slice(-PREPARATION_MAX_ATTEMPTS);
+      return preparationAttempts.includes(attempt) ? attempt : null;
     }
     if (!existing) return null;
     if (event.action === 'attempt_completed' || event.action === 'attempt_failed') {
@@ -665,15 +675,17 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
     const attempt: PreparationAttempt = {
       ...existing,
       revision: Math.max(existing.revision, step.revision),
-      steps: [...existing.steps.filter(item => item.id !== step.id), step].sort(
-        (a, b) =>
-          Number(a.startedRevision !== undefined) - Number(b.startedRevision !== undefined) ||
-          (a.startedRevision !== undefined && b.startedRevision !== undefined
-            ? a.startedRevision - b.startedRevision
-            : 0) ||
-          a.startedAt - b.startedAt ||
-          a.id.localeCompare(b.id)
-      ),
+      steps: [...existing.steps.filter(item => item.id !== step.id), step]
+        .sort(
+          (a, b) =>
+            Number(a.startedRevision !== undefined) - Number(b.startedRevision !== undefined) ||
+            (a.startedRevision !== undefined && b.startedRevision !== undefined
+              ? a.startedRevision - b.startedRevision
+              : 0) ||
+            a.startedAt - b.startedAt ||
+            a.id.localeCompare(b.id)
+        )
+        .slice(-PREPARATION_MAX_STEPS),
     };
     preparationAttempts = preparationAttempts.map(item =>
       item.id === existing.id ? attempt : item

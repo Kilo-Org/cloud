@@ -6,8 +6,13 @@ import type { TransformRequestContext } from '../types';
 import { getAiSdkProvider } from '../model-settings';
 import openCodeGo from './opencode-go';
 
-test('allows the Responses API for OpenCode Go', () => {
-  expect(openCodeGo.supported_chat_apis).toContain('responses');
+test('allows the Responses API for OpenCode Go', async () => {
+  const upstream = await openCodeGo.resolveUpstream({
+    credential: 'test-api-key',
+    model: { id: 'qwen3.7-plus' },
+    stream: false,
+  });
+  expect(upstream.supportedChatApis).toContain('responses');
 });
 
 describe('OpenCode Go session headers', () => {
@@ -23,12 +28,12 @@ describe('OpenCode Go session headers', () => {
     return {
       provider: {
         id: 'direct-byok',
-        apiUrl: openCodeGo.base_url,
+        apiUrl: 'https://opencode.ai/zen/go/v1',
         apiUrlOverrides: {},
         disableUrlSuffix: false,
         apiKey: 'test-api-key',
         apiKeyHeader: null,
-        supportedChatApis: openCodeGo.supported_chat_apis,
+        supportedChatApis: ['chat_completions', 'messages', 'responses'],
         responseTransforms: null,
         async transformRequest() {},
       },

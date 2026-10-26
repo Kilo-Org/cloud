@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Boxes, FolderCog, Lock, SlidersHorizontal } from 'lucide-react';
+import { Boxes, Cpu, FolderCog, Lock, SlidersHorizontal } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,12 +19,13 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { DefaultSandboxSection } from './DefaultSandboxSection';
 import { EnvironmentsSection } from './EnvironmentsSection';
 import { RepositoryOverridesSection } from './RepositoryOverridesSection';
+import { VercelComputeSettings } from './VercelComputeSettings';
 
 type CloudAgentSettingsDialogProps = {
   organizationId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initialSection?: 'general' | 'profiles' | 'environments';
+  initialSection?: 'general' | 'profiles' | 'environments' | 'compute';
   onProfileSelect?: (profileId: string) => void;
   openToNewProfile?: boolean;
   initialSelectedProfileId?: string | null;
@@ -69,6 +70,8 @@ function CloudAgentSettings({
   const settingsQuery = useCloudAgentSettings({ organizationId });
   const settings = settingsQuery.data;
   const canManage = organizationId ? (settings?.canManage ?? false) : true;
+  const activeSection =
+    section === 'compute' && settings && !settings.canManage ? 'general' : section;
 
   return (
     <>
@@ -77,7 +80,7 @@ function CloudAgentSettings({
           <DialogTitle>Cloud Agent settings</DialogTitle>
           <Badge variant="secondary">{organizationId ? 'Organization' : 'Personal'}</Badge>
         </div>
-        {section !== 'profiles' && settings && !settings.canManage ? (
+        {settings && !settings.canManage ? (
           <DialogDescription className="mt-1 flex items-center gap-1.5">
             <Lock className="size-3.5 shrink-0" aria-hidden />
             View only. Organization owners and admins can change these settings.
@@ -90,11 +93,15 @@ function CloudAgentSettings({
       </DialogHeader>
 
       <Tabs
-        value={section}
+        value={activeSection}
         onValueChange={value => {
-          if (value === 'general' || value === 'profiles' || value === 'environments') {
+          if (
+            value === 'general' ||
+            value === 'profiles' ||
+            value === 'environments' ||
+            (value === 'compute' && settings?.canManage)
+          )
             setSection(value);
-          }
         }}
         orientation={isMobile ? 'horizontal' : 'vertical'}
         className="flex min-h-0 flex-1 flex-col md:flex-row"
@@ -124,6 +131,15 @@ function CloudAgentSettings({
             <FolderCog className="size-4 shrink-0" aria-hidden />
             Profiles
           </TabsTrigger>
+          {settings?.canManage && (
+            <TabsTrigger
+              value="compute"
+              className="gap-2 pointer-coarse:min-h-11 md:w-full md:justify-start"
+            >
+              <Cpu className="size-4" aria-hidden />
+              Compute
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent
@@ -163,6 +179,18 @@ function CloudAgentSettings({
             openToNewProfile={openToNewProfile}
             initialSelectedProfileId={initialSelectedProfileId}
           />
+        </TabsContent>
+        <TabsContent
+          value="compute"
+          className="mt-0 min-h-0 min-w-0 flex-1 overflow-y-auto px-6 py-5"
+        >
+          {settings?.canManage ? (
+            <VercelComputeSettings organizationId={organizationId} />
+          ) : settingsQuery.isError ? (
+            <LoadError onRetry={() => void settingsQuery.refetch()} />
+          ) : (
+            <LoadingSkeleton />
+          )}
         </TabsContent>
       </Tabs>
     </>

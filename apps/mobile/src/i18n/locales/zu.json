@@ -1484,6 +1484,22 @@
       "loadingProposals": "Kulayishwa iziphakamiso",
       "couldNotLoadProposals": "Asikwazanga ukulayisha iziphakamiso.",
       "noProposals": "Azikho iziphakamiso",
+      "proposalDetails": "Imininingwane yesiphakamiso",
+      "proposalTitle": "Isihloko sesiphakamiso",
+      "rationale": "Isizathu",
+      "saveFirst": "Londoloza izinguquko zakho ngaphambi kokuvula i-PR.",
+      "proposalSaved": "Isiphakamiso silondoloziwe",
+      "proposalDismissed": "Isiphakamiso sichithiwe",
+      "dismissProposalTitle": "Chitha isiphakamiso?",
+      "dismissProposalMessage": "Lesi siphakamiso sizosuswa ohlwini olusebenzayo futhi ngeke sikwazi ukubuyiselwa.",
+      "prOpened": "I-PR ye-REVIEW.md ivuliwe",
+      "alreadyPresent": "Imihlahlandlela isivele ikhona ku-REVIEW.md",
+      "status": {
+        "edited": "Kuhlelwe",
+        "opening_change_request": "Kuvulwa i-PR",
+        "change_request_failed": "I-PR yehlulekile",
+        "superseded": "Isivele ikhona"
+      },
       "noProposalsDescription": "Iziphakamiso zenkumbulo yokuhlola zivela lapha ngemva kokuba i-Kilo ihlaziye izimpendulo zabagcini bekhodi."
     },
     "manualReview": {
@@ -3730,6 +3746,7 @@
     "title": "Amaphrofayili",
     "entrySubtitle": "Sebenzisa kabusha izilungiselelo zendawo kuzo zonke izikhathi",
     "newProfile": "Iphrofayela entsha",
+    "openHint": "Ivula iphrofayela",
     "emptyTitle": "Awekho amaphrofayela okwamanje",
     "emptyDescription": "Dala iphrofayela ukuze usebenzise kabusha okuguquguqukayo kwendawo, imiyalo yokusetha, namakhono kuzo zonke izikhathi.",
     "loadFailed": "Ayikwazanga ukulayisha amaphrofayela",
@@ -3961,11 +3978,13 @@
       "namePlaceholder": "Amaphutha, Imibono, Ukukhishwa…",
       "emoji": "Emoji",
       "mode": "Imodi",
-      "defaultsHint": "Amaseshini aqalwa kulolu hlu asebenzisa lezi zilungiselelo ezizenzakalelayo."
+      "defaultsHint": "Amaseshini aqalwa kulolu hlu asebenzisa lezi zilungiselelo ezizenzakalelayo.",
+      "saveFailed": "Ayikwazanga ukulondoloza uhlu. Hlola uxhumano lwakho bese uzama futhi."
     },
     "list": {
       "addPlaceholder": "Engeza umsebenzi",
       "add": "Engeza umsebenzi",
+      "addFailed": "Awukwazanga ukungeza umsebenzi. Hlola uxhumano lwakho bese uzama futhi.",
       "empty": "Ayikho imisebenzi okwamanje",
       "setDefaults": "Setha inqolobane yekhodi, imodi nemodeli",
       "completed_one": "Kuqediwe ({{count}})",
@@ -4002,7 +4021,9 @@
       "startNewSession": "Qala iseshini entsha",
       "startNewSessionHint": "Cindezela isikhathi eside ukuqala iseshini entsha.",
       "linkSession": "Xhumanisa iseshini",
-      "linkFailed": "Ayikwazanga ukuxhumanisa iseshini nomsebenzi"
+      "linkFailed": "Ayikwazanga ukuxhumanisa iseshini nomsebenzi",
+      "moveToAnotherTodo": "Hambisa kwelinye umsebenzi",
+      "startRefreshFailed": "Iseshini siqalile, kodwa lolu hlu aluvuselelwa."
     },
     "linkSession": {
       "title": "Ukuxhumanisa iseshini",
@@ -4011,6 +4032,7 @@
     },
     "upNext": "Okulandelayo",
     "sessionTodo": "Umsebenzi: {{title}}",
+    "openTodoHint": "Ivula umsebenzi.",
     "linkToTodo": "Xhumanisa nomsebenzi",
     "candidates": {
       "empty": "Ayikho imisebenzi evuliwe"

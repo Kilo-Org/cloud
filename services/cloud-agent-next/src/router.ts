@@ -18,12 +18,24 @@ import { createSessionWorktreeChangesHandlers } from './router/handlers/session-
 import { getSandboxSelectionOptions } from './router/handlers/sandbox-selection.js';
 import { getPreviewOptions } from './router/handlers/preview-options.js';
 import { listHostedSessions } from './router/handlers/hosted-session-list.js';
+import {
+  buildEnvironment,
+  cancelEnvironmentBuild,
+  getEnvironmentBuildLogs,
+  getEnvironmentBuildStatus,
+  notifyEnvironmentDeleted,
+} from './router/handlers/environment-build.js';
 
 export const appRouter = router({
   deleteWorktree,
   getSandboxSelectionOptions,
   getPreviewOptions,
   listHostedSessions,
+  buildEnvironment,
+  getEnvironmentBuildStatus,
+  getEnvironmentBuildLogs,
+  cancelEnvironmentBuild,
+  notifyEnvironmentDeleted,
   ...createSessionManagementHandlers(),
   ...createSessionPrepareHandlers(),
   ...createSessionExecutionV2Handlers(),

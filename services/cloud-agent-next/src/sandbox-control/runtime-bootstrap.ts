@@ -332,6 +332,7 @@ export function renderRuntimeBootstrap(input: {
   allocationId: string;
   grant: string;
   deadlineAt: number;
+  mainProcess?: 'environment-builder';
 }): ProviderStartupCommand {
   const descriptor = parseRuntimeRelease(input.descriptor);
   serializeRuntimeRelease(descriptor);
@@ -351,6 +352,14 @@ export function renderRuntimeBootstrap(input: {
   )
     throw new Error('Invalid runtime startup URLs');
   if (!Number.isSafeInteger(input.deadlineAt)) throw new Error('Invalid runtime deadline');
+  const mainPath =
+    input.mainProcess === 'environment-builder'
+      ? runtimeInstallPath('kilocode-environment-builder.js')
+      : runtimeInstallPath(CONTROL_PLANE_SUPERVISOR.installName);
+  const mainArgv =
+    input.mainProcess === 'environment-builder'
+      ? `/usr/local/bin/bun ${shellQuote(mainPath)}`
+      : `/bin/sh ${shellQuote(mainPath)}`;
   const config = JSON.stringify({
     ...input,
     descriptor,
@@ -398,10 +407,10 @@ export function renderRuntimeBootstrap(input: {
     `/usr/bin/flock -n -E ${STARTUP_FAILURES.install_interrupted.exitCode} 9`,
     `cli_path=$(${installNode} install)`,
     'unset bootstrap_config',
-    `if [ ! -f ${shellQuote(runtimeInstallPath(CONTROL_PLANE_SUPERVISOR.installName))} ]; then exit ${STARTUP_FAILURES.supervisor_missing.exitCode}; fi`,
+    `if [ ! -f ${shellQuote(mainPath)} ]; then exit ${STARTUP_FAILURES.supervisor_missing.exitCode}; fi`,
     `${node} ${shellQuote(PROBE)} "$cli_path" ${shellQuote(descriptor.cliVersion)} ${shellQuote(String(input.deadlineAt))}`,
     'trap - 0',
-    `exec ${environment} KILO_RUNTIME_CLI_PATH="$cli_path" /bin/sh ${shellQuote(runtimeInstallPath(CONTROL_PLANE_SUPERVISOR.installName))}`,
+    `exec ${environment} KILO_RUNTIME_CLI_PATH="$cli_path" ${mainArgv}`,
   ].join('\n');
   return { argv: ['/bin/sh', '-c', script] };
 }

@@ -64,7 +64,6 @@ import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/provider
 import { rewriteModelResponse } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
-import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { getEffectiveModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
@@ -74,6 +73,11 @@ import {
   releaseDecideLease,
   type DecideResponse,
 } from '@kilocode/web-shared/lib/bouncer/client';
+import {
+  findCustomLlm,
+  isCustomLlm,
+  type CustomLlm,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { after, NextRequest, NextResponse } from 'next/server';
 import { handleLlmProxyRequest } from './llm-proxy';
 
@@ -108,6 +112,10 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   readDb: {},
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
+  ...(jest.requireActual(
+    '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog'
+  ) as Record<string, unknown>),
+  findCustomLlm: jest.fn(async () => null),
   isCustomLlm: jest.fn(async () => false),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => ({
@@ -250,6 +258,11 @@ const mockedIsCustomLlm = jest.mocked(isCustomLlm);
 const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
 const mockedDecide = jest.mocked(decide);
 const mockedIsNonTrialEnterpriseOrganization = jest.mocked(isNonTrialEnterpriseOrganization);
+const mockedFindCustomLlm = jest.mocked(findCustomLlm);
+function mockCustomLlm(customLlm: CustomLlm) {
+  mockedFindCustomLlm.mockResolvedValue(customLlm);
+  jest.mocked(isCustomLlm).mockResolvedValue(true);
+}
 
 const provider = {
   id: 'openrouter',
@@ -1500,10 +1513,27 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
   });
 
+  function rateLimitTestCustomLlm(publicId: string, isPublic: boolean): CustomLlm {
+    return {
+      public_id: publicId,
+      encrypted_api_key: null,
+      definition: {
+        display_name: 'Custom model',
+        context_length: 1000,
+        max_completion_tokens: 100,
+        base_url: 'https://upstream.example.com/v1',
+        ...(isPublic
+          ? { public: { inference_providers: ['acme'], description: 'Public model' } }
+          : { organization_ids: [] }),
+      },
+    };
+  }
+
   it.each(['kilo-internal/custom-model', 'acme/custom-model:free'])(
-    'does not apply free-model rate limiting to the custom LLM %s',
+    'does not apply free-model rate limiting to the private custom LLM %s',
     async customModelId => {
       mockedIsCustomLlm.mockImplementation(async modelId => modelId === customModelId);
+      mockedFindCustomLlm.mockResolvedValue(rateLimitTestCustomLlm(customModelId, false));
       mockedIsFreeModelRateLimited.mockResolvedValue(true);
 
       try {
@@ -1515,9 +1545,47 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
         expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
       } finally {
         mockedIsCustomLlm.mockImplementation(async () => false);
+        mockedFindCustomLlm.mockResolvedValue(null);
       }
     }
   );
+
+  it('applies free-model rate limiting to a public custom LLM', async () => {
+    mockedIsCustomLlm.mockResolvedValue(true);
+    mockedFindCustomLlm.mockResolvedValue(rateLimitTestCustomLlm('acme/public-model', true));
+    mockedIsFreeModelRateLimited.mockResolvedValue(true);
+
+    try {
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(
+        makeRequest(makeBody('acme/public-model')) as never
+      );
+
+      expect(response.status).toBe(429);
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    } finally {
+      mockedIsCustomLlm.mockResolvedValue(false);
+      mockedFindCustomLlm.mockResolvedValue(null);
+    }
+  });
+
+  it('rate-limits anonymous callers of a private custom LLM with a free model id', async () => {
+    setAnonymousAuth();
+    mockedFindCustomLlm.mockResolvedValue(rateLimitTestCustomLlm('stealth/private-alpha', false));
+    mockedIsFreeModelRateLimited.mockResolvedValue(true);
+
+    try {
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(
+        makeRequest(makeBody('stealth/private-alpha')) as never
+      );
+
+      expect(response.status).toBe(429);
+      expect(mockedGetProvider).not.toHaveBeenCalled();
+    } finally {
+      mockedFindCustomLlm.mockResolvedValue(null);
+    }
+  });
 
   it('returns the reconnect error instead of serving another billing path when the ChatGPT connection is dead', async () => {
     mockedGetProvider.mockResolvedValue({
@@ -2897,6 +2965,247 @@ describe('custom routers and signed auto decisions', () => {
 
       expect(response.status).toBe(503);
       expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe('custom LLM requests', () => {
+  const customProvider = { ...provider, id: 'custom' } satisfies Provider;
+
+  function customLlm(publicId: string, isPublic: boolean): CustomLlm {
+    return {
+      public_id: publicId,
+      encrypted_api_key: null,
+      definition: {
+        display_name: 'Custom model',
+        context_length: 1000,
+        max_completion_tokens: 100,
+        base_url: 'https://upstream.example.com/v1',
+        ...(isPublic
+          ? { public: { inference_providers: ['acme'], description: 'Public model' } }
+          : { organization_ids: [] }),
+      },
+    };
+  }
+
+  function setAnonymousAuth() {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: new Response('unauthorized', { status: 401 }),
+      organizationId: undefined,
+    } as AuthResult);
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setUserAuth();
+    mockedFindCustomLlm.mockResolvedValue(null);
+    jest.mocked(isCustomLlm).mockResolvedValue(false);
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider: customProvider,
+      userByok: null,
+      isFree: true,
+      bypassAccessCheck: false,
+    });
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'success',
+      response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'custom', choices: [] }),
+    });
+  });
+
+  it('serves a public custom LLM to an anonymous caller', async () => {
+    setAnonymousAuth();
+    mockCustomLlm(customLlm('acme/public-model', true));
+
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('acme/public-model')) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedGetProvider).toHaveBeenCalledWith(
+      expect.objectContaining({ user: expect.objectContaining({ isAnonymous: true }) })
+    );
+  });
+
+  it('serves a public custom LLM to a user without balance', async () => {
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 0,
+      settings: undefined,
+      plan: undefined,
+    });
+    mockCustomLlm(customLlm('acme/public-model', true));
+
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('acme/public-model')) as never
+    );
+
+    expect(response.status).toBe(200);
+  });
+
+  it('answers an anonymous caller of a private custom LLM like one of an unknown id', async () => {
+    setAnonymousAuth();
+    mockCustomLlm(customLlm('acme/private-model', false));
+
+    const privateResponse = await handleLlmProxyRequest(
+      makeRequest(makeBody('acme/private-model')) as never
+    );
+    mockedFindCustomLlm.mockResolvedValue(null);
+    const unknownResponse = await handleLlmProxyRequest(
+      makeRequest(makeBody('acme/unknown-model')) as never
+    );
+
+    expect(privateResponse.status).toBe(401);
+    expect(await privateResponse.json()).toEqual(await unknownResponse.json());
+    expect(mockedGetProvider).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('returns model not found instead of falling back when the caller is not eligible', async () => {
+    mockCustomLlm(customLlm('acme/private-model', false));
+    mockedGetProvider.mockResolvedValue({ kind: 'custom-llm-unavailable' });
+
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('acme/private-model')) as never
+    );
+
+    expect(response.status).toBe(404);
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects a public custom LLM when the request excludes its inference providers', async () => {
+    mockCustomLlm(customLlm('acme/public-model', true));
+
+    const response = await handleLlmProxyRequest(
+      makeRequest({ ...makeBody('acme/public-model'), provider: { only: ['openai'] } }) as never
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ error_type: 'provider_not_allowed' });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects a public custom LLM when organization policy allows none of its providers', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-123', google_user_email: 'test@example.com', microdollars_used: 0 } as User,
+      authFailedResponse: null,
+      organizationId: 'org-123',
+    });
+    mockedGetEffectiveModelDecision.mockResolvedValueOnce({
+      allowed: false,
+      denialSource: 'organization_provider',
+    });
+    mockCustomLlm(customLlm('acme/public-model', true));
+
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('acme/public-model')) as never
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ error_type: 'model_not_allowed' });
+    expect(mockedGetEffectiveModelDecision).toHaveBeenCalledWith(
+      expect.anything(),
+      'acme/public-model'
+    );
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  function setOrganizationAuth() {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-123', google_user_email: 'test@example.com', microdollars_used: 0 } as User,
+      authFailedResponse: null,
+      organizationId: 'org-123',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: { data_collection: 'allow' },
+      plan: 'enterprise',
+    });
+  }
+
+  it('checks organization policy against the trimmed model id', async () => {
+    setOrganizationAuth();
+    mockedGetEffectiveModelDecision.mockResolvedValueOnce({
+      allowed: false,
+      denialSource: 'organization_model',
+    });
+    mockCustomLlm(customLlm('acme/public-model', true));
+
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('  acme/public-model  ')) as never
+    );
+
+    expect(response.status).toBe(404);
+    expect(mockedGetEffectiveModelDecision).toHaveBeenCalledWith(
+      expect.anything(),
+      'acme/public-model'
+    );
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('keeps the request provider exclusions when organization policy replaces the provider config', async () => {
+    setOrganizationAuth();
+    mockedGetEffectiveModelDecision.mockResolvedValueOnce({
+      allowed: true,
+      eligibleProviderRoutes: new Set(['acme']),
+    });
+    mockCustomLlm(customLlm('acme/public-model', true));
+
+    const response = await handleLlmProxyRequest(
+      makeRequest({ ...makeBody('acme/public-model'), provider: { ignore: ['acme'] } }) as never
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ error_type: 'provider_not_allowed' });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  function multiProviderCustomLlm(): CustomLlm {
+    return {
+      public_id: 'acme/public-model',
+      encrypted_api_key: null,
+      definition: {
+        display_name: 'Custom model',
+        context_length: 1000,
+        max_completion_tokens: 100,
+        base_url: 'https://upstream.example.com/v1',
+        public: { inference_providers: ['acme', 'other'], description: 'Public model' },
+      },
+    };
+  }
+
+  it('rejects a request when the caller and organization allow disjoint providers', async () => {
+    setOrganizationAuth();
+    mockedGetEffectiveModelDecision.mockResolvedValueOnce({
+      allowed: true,
+      eligibleProviderRoutes: new Set(['other']),
+    });
+    mockCustomLlm(multiProviderCustomLlm());
+
+    const response = await handleLlmProxyRequest(
+      makeRequest({ ...makeBody('acme/public-model'), provider: { only: ['acme'] } }) as never
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({ error_type: 'provider_not_allowed' });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('forwards only the providers that the caller and organization both allow', async () => {
+    setOrganizationAuth();
+    mockedGetEffectiveModelDecision.mockResolvedValueOnce({
+      allowed: true,
+      eligibleProviderRoutes: new Set(['acme', 'other']),
+    });
+    mockCustomLlm(multiProviderCustomLlm());
+
+    const response = await handleLlmProxyRequest(
+      makeRequest({ ...makeBody('acme/public-model'), provider: { ignore: ['other'] } }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toMatchObject({
+      only: ['acme'],
     });
   });
 });

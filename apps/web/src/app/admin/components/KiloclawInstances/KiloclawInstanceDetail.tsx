@@ -589,7 +589,6 @@ function VolumeReassociationCard({
   const isStopped = currentStatus === 'stopped';
   const isInProgress = phase !== 'idle' && phase !== 'done' && phase !== 'error';
 
-  // Poll parent status during active phases
   const polling = phase === 'stopping' || phase === 'starting' || phase === 'waiting';
   useQuery({
     queryKey: ['volume-reassociate-poll', userId, instanceId, polling],
@@ -604,7 +603,6 @@ function VolumeReassociationCard({
     refetchInterval: polling ? 3000 : false,
   });
 
-  // Advance phase based on machine status changes
   if (phase === 'waiting' && currentStatus === 'running') {
     setPhase('done');
     void refetchCandidates();
@@ -630,7 +628,6 @@ function VolumeReassociationCard({
     setErrorMessage(null);
 
     try {
-      // Step 1: Stop if not already stopped
       if (!isStopped) {
         setPhase('stopping');
         await machineStop({ userId, instanceId });
@@ -638,15 +635,12 @@ function VolumeReassociationCard({
         await new Promise(resolve => setTimeout(resolve, 5000));
       }
 
-      // Step 2: Reassociate
       setPhase('reassociating');
       await reassociate({ userId, instanceId, newVolumeId: selectedVolumeId, reason });
 
-      // Step 3: Start
       setPhase('starting');
       await machineStart({ userId, instanceId });
 
-      // Step 4: Wait for running
       setPhase('waiting');
       setSelectedVolumeId('');
       setReason('');
@@ -1882,7 +1876,6 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
   const isResizingMachine =
     resizePhase !== 'idle' && resizePhase !== 'done' && resizePhase !== 'error';
 
-  // Poll status during resize phases
   const resizePolling =
     resizePhase === 'stopping' ||
     resizePhase === 'starting' ||
@@ -1898,7 +1891,6 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
     refetchInterval: resizePolling ? 3000 : false,
   });
 
-  // Advance resize phase when machine reaches running
   const currentStatus = data?.workerStatus?.status;
   useEffect(() => {
     if (resizePhase === 'waiting' && currentStatus === 'running') {
@@ -1953,7 +1945,6 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
         await new Promise(resolve => setTimeout(resolve, 5000));
       }
 
-      // Step 2: Update DO state
       setResizePhase('resizing');
       await resizeMachineMutation({
         userId,
@@ -1961,11 +1952,9 @@ export function KiloclawInstanceDetail({ instanceId }: { instanceId: string }) {
         instanceType: selectedInstanceType,
       });
 
-      // Step 3: Start with new size
       setResizePhase('starting');
       await machineStart({ userId, instanceId });
 
-      // Step 4: Wait for running
       setResizePhase('waiting');
     } catch (err) {
       setResizePhase('error');

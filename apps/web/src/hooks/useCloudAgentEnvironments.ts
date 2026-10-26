@@ -1,6 +1,7 @@
 /** React Query hooks for managing cloud agent repository environments. */
 'use client';
 
+import { useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   EnvironmentResponse,
@@ -116,6 +117,10 @@ export function useCloudAgentEnvironmentMutations() {
     await queryClient.invalidateQueries({ queryKey: trpc.cloudEnvironments.list.queryKey() });
     await queryClient.invalidateQueries({ queryKey: trpc.cloudEnvironments.listAll.queryKey() });
     await queryClient.invalidateQueries({ queryKey: trpc.cloudEnvironments.get.queryKey() });
+    // A saved change bumps the configuration revision the build detail shows.
+    await queryClient.invalidateQueries({
+      queryKey: trpc.cloudEnvironments.buildStatus.queryKey(),
+    });
   };
 
   const createEnvironment = useMutation(
@@ -129,4 +134,88 @@ export function useCloudAgentEnvironmentMutations() {
   );
 
   return { createEnvironment, updateEnvironment, deleteEnvironment };
+}
+
+const BUILD_POLL_MS = 3_000;
+
+/**
+ * Snapshot build status for one environment. It polls only while `poll` is set
+ * (the detail is open) and a build is active, so an idle environment costs no
+ * requests.
+ */
+export function useEnvironmentBuildStatus(
+  environmentId: string | null,
+  options: UseEnvironmentOptions & { poll?: boolean } = {}
+) {
+  const { organizationId, enabled = true, poll = false } = options;
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.cloudEnvironments.buildStatus.queryOptions(
+      { organizationId, environmentId: environmentId ?? '' },
+      {
+        enabled: enabled && !!environmentId,
+        staleTime: 10_000,
+        refetchInterval: query => (poll && query.state.data?.activeBuild ? BUILD_POLL_MS : false),
+      }
+    )
+  );
+}
+
+/** The latest retained build output, refreshed while the build is running. */
+export function useEnvironmentBuildLogs(
+  environmentId: string | null,
+  buildId: string | null,
+  options: UseEnvironmentOptions & { live?: boolean } = {}
+) {
+  const { organizationId, enabled = true, live = false } = options;
+  const trpc = useTRPC();
+  return useQuery(
+    trpc.cloudEnvironments.buildLogs.queryOptions(
+      { organizationId, environmentId: environmentId ?? '', buildId: buildId ?? '' },
+      {
+        enabled: enabled && !!environmentId && !!buildId,
+        refetchInterval: live ? BUILD_POLL_MS : false,
+      }
+    )
+  );
+}
+
+/**
+ * Build/Refresh and Cancel. A Build request keeps its request id until the
+ * server answers, so a retry after a lost response cannot start a second build.
+ */
+export function useEnvironmentBuildMutations() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  // Survives re-renders: a retried Build after a lost response reuses its id.
+  const pendingRequestIds = useRef(new Map<string, string>()).current;
+
+  const invalidate = async () => {
+    await queryClient.invalidateQueries({
+      queryKey: trpc.cloudEnvironments.buildStatus.queryKey(),
+    });
+    await queryClient.invalidateQueries({ queryKey: trpc.cloudEnvironments.buildLogs.queryKey() });
+  };
+
+  const buildMutation = useMutation(
+    trpc.cloudEnvironments.build.mutationOptions({ onSettled: invalidate })
+  );
+  const cancelBuild = useMutation(
+    trpc.cloudEnvironments.cancelBuild.mutationOptions({ onSettled: invalidate })
+  );
+
+  const requestBuild = async (input: {
+    organizationId?: string;
+    environmentId: string;
+    expectedRevision: number;
+  }) => {
+    const key = `${input.environmentId}:${input.expectedRevision}`;
+    const requestId = pendingRequestIds.get(key) ?? crypto.randomUUID();
+    pendingRequestIds.set(key, requestId);
+    const result = await buildMutation.mutateAsync({ ...input, requestId });
+    pendingRequestIds.delete(key);
+    return result;
+  };
+
+  return { requestBuild, isRequesting: buildMutation.isPending, cancelBuild };
 }

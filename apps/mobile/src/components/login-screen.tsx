@@ -25,7 +25,6 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
-  clearLoginDrafts,
   clearPersistedLoginDrafts,
   persistLoginDrafts,
   restoreLoginDrafts,
@@ -82,13 +81,11 @@ export function LoginScreen() {
 
   // Every provider's completed sign-in — device code, email code, Apple,
   // Google, passkey — publishes its token through the auth context, so this
-  // one watch covers them all: the module drafts are dropped (a later
-  // sign-out must not re-persist the previous account's address) and the
-  // unmount persistence stays off, or the next login mount would pre-fill
-  // the previous account's address.
+  // one watch covers them all: `signIn` drops the module drafts, and this
+  // flag keeps the unmount persistence off, or the next login mount would
+  // pre-fill the previous account's address.
   useEffect(() => {
     if (publishedToken !== undefined) {
-      clearLoginDrafts();
       signedInRef.current = true;
     }
   }, [publishedToken]);

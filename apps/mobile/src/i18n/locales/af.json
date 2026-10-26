@@ -4025,6 +4025,7 @@
       "startNewSessionHint": "Druk lank om 'n nuwe sessie te begin.",
       "linkSession": "Koppel sessie",
       "linkFailed": "Kon nie die sessie aan die taak koppel nie",
+      "moveToAnotherTodo": "Skuif na 'n ander taak",
       "startRefreshFailed": "Die sessie het begin, maar hierdie lys is nie opgedateer nie."
     },
     "linkSession": {
@@ -4034,6 +4035,7 @@
     },
     "upNext": "Volgende",
     "sessionTodo": "Taak: {{title}}",
+    "openTodoHint": "Maak die taak oop.",
     "linkToTodo": "Koppel aan taak",
     "candidates": {
       "empty": "Geen oop take nie"

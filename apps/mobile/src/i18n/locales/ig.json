@@ -4025,6 +4025,7 @@
       "startNewSessionHint": "Pịa ogologo oge iji malite nzukọ ọhụrụ.",
       "linkSession": "Jikọọ nnọkọ",
       "linkFailed": "Enweghị ike ijikọ nnọkọ ahụ na ọrụ ahụ",
+      "moveToAnotherTodo": "Bugharịa gaa na ọrụ ọzọ",
       "startRefreshFailed": "Nnọkọ ahụ amaliteela, mana ndepụta a emelighị ya."
     },
     "linkSession": {
@@ -4034,6 +4035,7 @@
     },
     "upNext": "Na-esote",
     "sessionTodo": "Ọrụ: {{title}}",
+    "openTodoHint": "Na-emepe ọrụ.",
     "linkToTodo": "Jikọọ na ọrụ",
     "candidates": {
       "empty": "Enweghị ọrụ mepere emepe"

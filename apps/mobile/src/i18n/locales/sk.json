@@ -4135,6 +4135,7 @@
       "startNewSessionHint": "Dlhým stlačením začnete novú reláciu.",
       "linkSession": "Prepojiť reláciu",
       "linkFailed": "Reláciu sa nepodarilo prepojiť s úlohou",
+      "moveToAnotherTodo": "Presunúť do inej úlohy",
       "startRefreshFailed": "Relácia sa spustila, ale tento zoznam sa neaktualizoval."
     },
     "linkSession": {
@@ -4144,6 +4145,7 @@
     },
     "upNext": "Ďalej",
     "sessionTodo": "Úloha: {{title}}",
+    "openTodoHint": "Otvorí úlohu.",
     "linkToTodo": "Prepojiť s úlohou",
     "candidates": {
       "empty": "Žiadne otvorené úlohy"

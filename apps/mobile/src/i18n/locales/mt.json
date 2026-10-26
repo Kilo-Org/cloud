@@ -4190,6 +4190,7 @@
       "startNewSessionHint": "Agħfas fit-tul biex tibda sessjoni ġdida.",
       "linkSession": "Qabbad sessjoni",
       "linkFailed": "Ma setgħetx tiġi marbuta s-sessjoni mal-kompitu",
+      "moveToAnotherTodo": "Mexxi għal kompitu ieħor",
       "startRefreshFailed": "Is-sessjoni bdiet, imma din il-lista ma ġietx aġġornata."
     },
     "linkSession": {
@@ -4199,6 +4200,7 @@
     },
     "upNext": "Li jmiss",
     "sessionTodo": "Kompitu: {{title}}",
+    "openTodoHint": "Jiftaħ il-kompitu.",
     "linkToTodo": "Qabbad mal-kompitu",
     "candidates": {
       "empty": "L-ebda kompitu miftuħ"

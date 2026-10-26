@@ -4080,6 +4080,7 @@
       "startNewSessionHint": "Dugo pritisni da započneš novu sesiju.",
       "linkSession": "Poveži sesiju",
       "linkFailed": "Povezivanje sesije sa zadatkom nije uspjelo",
+      "moveToAnotherTodo": "Premjesti na drugi zadatak",
       "startRefreshFailed": "Sesija je pokrenuta, ali se ova lista nije ažurirala."
     },
     "linkSession": {
@@ -4089,6 +4090,7 @@
     },
     "upNext": "Sljedeće na redu",
     "sessionTodo": "Zadatak: {{title}}",
+    "openTodoHint": "Otvara zadatak.",
     "linkToTodo": "Poveži sa zadatkom",
     "candidates": {
       "empty": "Nema otvorenih zadataka"

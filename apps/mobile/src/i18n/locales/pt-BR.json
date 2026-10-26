@@ -4080,6 +4080,7 @@
       "startNewSessionHint": "Toque e segure para iniciar uma nova sessão.",
       "linkSession": "Vincular sessão",
       "linkFailed": "Não foi possível vincular a sessão à tarefa",
+      "moveToAnotherTodo": "Mover para outra tarefa",
       "startRefreshFailed": "A sessão foi iniciada, mas esta lista não foi atualizada."
     },
     "linkSession": {
@@ -4089,6 +4090,7 @@
     },
     "upNext": "A seguir",
     "sessionTodo": "Tarefa: {{title}}",
+    "openTodoHint": "Abre a tarefa.",
     "linkToTodo": "Vincular a uma tarefa",
     "candidates": {
       "empty": "Não há tarefas abertas"

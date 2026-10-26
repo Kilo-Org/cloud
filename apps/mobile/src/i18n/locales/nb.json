@@ -4025,6 +4025,7 @@
       "startNewSessionHint": "Langtrykk for å starte en ny økt.",
       "linkSession": "Koble til økt",
       "linkFailed": "Kunne ikke koble økten til gjøremålet.",
+      "moveToAnotherTodo": "Flytt til et annet gjøremål",
       "startRefreshFailed": "Økten startet, men listen ble ikke oppdatert."
     },
     "linkSession": {
@@ -4034,6 +4035,7 @@
     },
     "upNext": "Neste",
     "sessionTodo": "Gjøremål: {{title}}",
+    "openTodoHint": "Åpner gjøremålet.",
     "linkToTodo": "Koble til gjøremål",
     "candidates": {
       "empty": "Ingen åpne gjøremål"

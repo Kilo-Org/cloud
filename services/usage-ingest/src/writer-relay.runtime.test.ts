@@ -3,7 +3,7 @@ import { createTestHarness, unstable_readConfig } from 'wrangler';
 import { expect, it, vi } from 'vitest';
 import { usage } from './usage.test-fixture';
 
-it('keeps production direct and routes the single staging EU consumer through the private relay', () => {
+it('keeps production and the single staging EU consumer direct, with the private relay available', () => {
   const config = new URL('../wrangler.jsonc', import.meta.url).pathname;
   const production = unstable_readConfig({ config });
   const staging = unstable_readConfig({ config, env: 'staging' });
@@ -18,9 +18,7 @@ it('keeps production direct and routes the single staging EU consumer through th
     { binding: 'USAGE_INGEST_QUEUE', queue: 'usage-ingest-processing-staging-eu' },
     { binding: 'USAGE_INGEST_DLQ', queue: 'usage-ingest-processing-dlq-staging-eu' },
   ]);
-  expect(staging.services).toMatchObject([
-    { binding: 'USAGE_WRITER_RELAY', service: 'usage-writer-relay-staging' },
-  ]);
+  expect(staging.services).toEqual([]);
   expect(staging.name).toBe('usage-ingest-staging');
   expect(staging.queues.consumers).toHaveLength(1);
   expect(staging.queues.consumers).toMatchObject([
@@ -45,7 +43,7 @@ it('keeps production direct and routes the single staging EU consumer through th
   expect(relay.vars.USAGE_INGEST_DIAGNOSTICS).toBe('all');
 });
 
-it('runs the real queue -> service-binding fetch -> relay -> HTTP writer path', async () => {
+it('runs the optional queue -> service-binding fetch -> relay -> HTTP writer path', async () => {
   const calls: { path: string | undefined; body: unknown; headers: Record<string, unknown> }[] = [];
   const release = Promise.withResolvers<void>();
   const writer = createServer(async (request, response) => {
@@ -82,6 +80,8 @@ it('runs the real queue -> service-binding fetch -> relay -> HTTP writer path', 
         {
           configPath: new URL('../wrangler.jsonc', import.meta.url),
           env: 'staging',
+          // Restore the optional binding only in this rollback-path fixture.
+          bindingOverrides: { USAGE_WRITER_RELAY: 'usage-writer-relay-staging' },
           vars: {
             // Direct egress here cannot reach the loopback writer. Only the relay
             // knows that target, proving this test traverses the service binding.

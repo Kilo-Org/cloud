@@ -4025,6 +4025,7 @@
       "startNewSessionHint": "Bonyeza kwa muda mrefu kuanza kikao kipya.",
       "linkSession": "Unganisha kikao",
       "linkFailed": "Imeshindikana kuunganisha kikao na kazi",
+      "moveToAnotherTodo": "Hamisha kwenye kazi nyingine",
       "startRefreshFailed": "Kikao kilianza, lakini orodha hii haikusasishwa."
     },
     "linkSession": {
@@ -4034,6 +4035,7 @@
     },
     "upNext": "Kinachofuata",
     "sessionTodo": "Kazi: {{title}}",
+    "openTodoHint": "Hufungua kazi.",
     "linkToTodo": "Unganisha na kazi",
     "candidates": {
       "empty": "Hakuna kazi zilizo wazi"

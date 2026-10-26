@@ -4025,6 +4025,7 @@
       "startNewSessionHint": "አዲስ ክፍለ-ጊዜ ለመጀመር ረዘም ብለህ ተጫን።",
       "linkSession": "ክፍለ ጊዜ አገናኝ",
       "linkFailed": "ክፍለ ጊዜውን ከተግባሩ ጋር ማገናኘት አልተቻለም",
+      "moveToAnotherTodo": "ወደ ሌላ ተግባር ይለውጡ",
       "startRefreshFailed": "ክፍለ ጊዜው ተጀምሯል፣ ነገር ግን ይህ ዝርዝር አልተዘምነም።"
     },
     "linkSession": {
@@ -4034,6 +4035,7 @@
     },
     "upNext": "ቀጣይ",
     "sessionTodo": "ተግባር፦ {{title}}",
+    "openTodoHint": "ተግባሩን ይከፍታል።",
     "linkToTodo": "ከተግባር ጋር አገናኝ",
     "candidates": {
       "empty": "ክፍት ተግባሮች የሉም"

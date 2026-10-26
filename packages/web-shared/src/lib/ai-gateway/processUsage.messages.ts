@@ -207,6 +207,12 @@ export async function parseMessagesMicrodollarUsageFromStream(
         if (openRouterProvider) {
           inference_provider = openRouterProvider;
         }
+        const meta = (json.message as MaybeHasVercelProviderMetadata).provider_metadata;
+        if (meta) {
+          providerMetadata = meta;
+          model = getVercelResolvedModel(meta) ?? model;
+          inference_provider = meta.gateway?.routing?.finalProvider ?? inference_provider;
+        }
       }
 
       if (

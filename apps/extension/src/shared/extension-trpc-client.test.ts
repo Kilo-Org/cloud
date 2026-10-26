@@ -10,14 +10,17 @@ const FAKE_BASE_URL = 'https://api.example.com';
 const FAKE_SESSION_ID = 'test-session-id';
 const PROMPT_PAYLOAD = {
   cloudAgentSessionId: FAKE_SESSION_ID,
+  messageId: 'msg_123456789abc123456789ABCDE',
   payload: { mode: 'plan' as const, model: 'test-model', prompt: 'hello', type: 'prompt' as const },
 };
 const PROMPT_FIRST = {
   cloudAgentSessionId: FAKE_SESSION_ID,
+  messageId: 'msg_123456789abc123456789ABC01',
   payload: { mode: 'plan' as const, model: 'test-model', prompt: 'first', type: 'prompt' as const },
 };
 const PROMPT_SECOND = {
   cloudAgentSessionId: FAKE_SESSION_ID,
+  messageId: 'msg_123456789abc123456789ABC02',
   payload: {
     mode: 'plan' as const,
     model: 'test-model',

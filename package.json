@@ -7,7 +7,7 @@
   },
   "scripts": {
     "prepare": "bash scripts/prepare.sh",
-    "preinstall": "npx only-allow pnpm",
+    "preinstall": "node scripts/check-pnpm.mjs",
     "typecheck": "scripts/typecheck-all.sh",
     "build": "pnpm --filter web build",
     "test": "pnpm --filter web test && pnpm run test:scripts",

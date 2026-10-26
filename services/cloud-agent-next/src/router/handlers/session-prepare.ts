@@ -106,12 +106,12 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
             id: input.initialMessageId,
             command: input.initialPayload.command,
             arguments: input.initialPayload.arguments,
-            attachments: input.attachments ?? input.images,
+            attachments: input.attachments,
           }
         : {
             type: 'prompt',
             prompt: input.prompt,
-            attachments: input.attachments ?? input.images,
+            attachments: input.attachments,
             id: input.initialMessageId,
           };
 

@@ -14,6 +14,7 @@ import {
 } from '@/lib/hooks/use-agent-sessions';
 import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
 import type * as PlatformFilterModule from './platform-filter-modal';
+import { AGENT_SESSION_NAV_GUARD_MS } from './agent-session-nav-guard';
 import { SessionHistoryScreen } from './session-history-screen';
 
 type MockStoredSession = Pick<StoredSession, 'session_id' | 'organization_id'> &
@@ -527,6 +528,51 @@ describe('SessionHistoryScreen', () => {
       (content.props.onCreateSession as () => void)();
     });
     expect(routerPush).toHaveBeenCalledWith('/(app)/agent-chat/new?organizationId=org-drain');
+  });
+  it('drops the second press while history opens a session', async () => {
+    Object.assign(listState.organization, { organizationId: 'org-drain', isLoaded: true });
+    const now = Date.now();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
+    const renderer = await renderScreen();
+    const onCreateSession = findNodeByType(renderer, 'AgentSessionListContent').props
+      .onCreateSession as () => void;
+
+    act(() => {
+      onCreateSession();
+      onCreateSession();
+    });
+
+    expect(routerPush).toHaveBeenCalledExactlyOnceWith(
+      '/(app)/agent-chat/new?organizationId=org-drain'
+    );
+
+    nowSpy.mockReturnValue(now + AGENT_SESSION_NAV_GUARD_MS);
+    act(() => {
+      onCreateSession();
+    });
+
+    expect(routerPush).toHaveBeenCalledTimes(2);
+  });
+  it('opens a new session after history regains focus', async () => {
+    Object.assign(listState.organization, { organizationId: 'org-drain', isLoaded: true });
+    const now = Date.now();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
+    const renderer = await renderScreen();
+    const onCreateSession = findNodeByType(renderer, 'AgentSessionListContent').props
+      .onCreateSession as () => void;
+
+    act(() => {
+      onCreateSession();
+    });
+    expect(routerPush).toHaveBeenCalledTimes(1);
+
+    nowSpy.mockReturnValue(now + 50);
+    act(() => {
+      fireFocus();
+      onCreateSession();
+    });
+
+    expect(routerPush).toHaveBeenCalledTimes(2);
   });
 
   it('keeps saved repository and platform selections after a successful history retry', async () => {

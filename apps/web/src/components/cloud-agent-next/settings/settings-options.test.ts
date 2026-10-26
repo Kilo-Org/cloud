@@ -1,6 +1,6 @@
 import { describe, test, expect } from '@jest/globals';
 import {
-  getKiloSandboxAllocation,
+  getSandboxAllocation,
   getSandboxAllocationRequest,
   type SandboxSelectionCapabilities,
 } from '@kilocode/worker-utils/sandbox-allocation';
@@ -44,7 +44,7 @@ describe('settings-options', () => {
   test('names a provider-chosen default without a capacity', () => {
     expect(
       describeDefaultSandbox({
-        provider: { id: 'vercel', account: 'kilo' },
+        provider: { id: 'vercel', account: 'byoc' },
         instanceType: 'default',
       })
     ).toEqual({ summary: 'Vercel · Provider default', full: 'Vercel · Provider default' });
@@ -168,6 +168,6 @@ describe('settings-options', () => {
 
   test('the chosen key round-trips through the capability option', () => {
     const option = capabilities().options[0];
-    expect(getKiloSandboxAllocation(option.allocation)).toBe('cloudflare-single');
+    expect(getSandboxAllocation(option.allocation)).toBe('cloudflare-single');
   });
 });

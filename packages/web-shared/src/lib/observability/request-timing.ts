@@ -4,6 +4,12 @@
  * Pure module: no `server-only`, no database. The tRPC timing middleware and
  * the REST route wrapper both build their structured log line here, so the two
  * surfaces carry the same client dimensions and join on `requestId`.
+ *
+ * Each dimension comes from a request header, so `readClientDimensions` bounds
+ * and validates every one of them before it reaches the log line: a known value
+ * passes, an unrecognized non-empty value is recorded as `'other'`, and a
+ * version or request id outside the accepted shape is left out. The sample
+ * rate is deployment configuration.
  */
 
 /** Same shape the min-version helper reads (`lib/trpc/min-version.ts`). */
@@ -18,13 +24,42 @@ export type ClientDimensions = {
 
 const DEFAULT_SAMPLE_RATE = 0.01;
 
+/**
+ * Client and platform values the first-party apps send. A non-empty value
+ * outside the list is recorded as `'other'`.
+ */
+const KNOWN_CLIENTS = ['mobile', 'web', 'extension'] as const;
+const KNOWN_PLATFORMS = ['ios', 'android'] as const;
+const OTHER = 'other';
+
+/** Same pattern the min-version helper enforces (`lib/trpc/min-version.ts`). */
+const VERSION_PATTERN = /^\d+(\.\d+)*$/;
+const VERSION_MAX_LENGTH = 32;
+
+/** Accepted request-id shape: 1-64 characters from a bounded character set. */
+const REQUEST_ID_PATTERN = /^[A-Za-z0-9._:-]{1,64}$/;
+
+/** An absent or empty header is `null`; a known value passes; anything else is `'other'`. */
+function readAllowlisted(
+  raw: string | null | undefined,
+  allowlist: readonly string[]
+): string | null {
+  if (raw === null || raw === undefined || raw === '') return null;
+  return allowlist.includes(raw) ? raw : OTHER;
+}
+
 /** Header names the app already sends on every request. */
 export function readClientDimensions(headersList?: TimingHeaders | null): ClientDimensions {
+  const version = headersList?.get('x-kilo-app-version') ?? null;
+  const requestId = headersList?.get('x-kilo-request-id') ?? null;
   return {
-    client: headersList?.get('x-kilo-client') ?? null,
-    platform: headersList?.get('x-kilo-app-platform') ?? null,
-    version: headersList?.get('x-kilo-app-version') ?? null,
-    requestId: headersList?.get('x-kilo-request-id') ?? null,
+    client: readAllowlisted(headersList?.get('x-kilo-client'), KNOWN_CLIENTS),
+    platform: readAllowlisted(headersList?.get('x-kilo-app-platform'), KNOWN_PLATFORMS),
+    version:
+      version !== null && version.length <= VERSION_MAX_LENGTH && VERSION_PATTERN.test(version)
+        ? version
+        : null,
+    requestId: requestId !== null && REQUEST_ID_PATTERN.test(requestId) ? requestId : null,
   };
 }
 

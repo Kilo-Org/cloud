@@ -13,6 +13,7 @@
   // src/lib/notification-history-prune.ts.
   "triggers": { "crons": ["41 3 * * *"] },
   "vars": {
+    "INTERNAL_SESSION_AUTH_LEGACY_ENABLED": "true",
     "WORKER_ENV": "production",
     "KILO_WEB_API_BASE_URL": "https://app.kilo.ai",
     // APNs auth for Live Activity push. The topic is the iOS bundle id; the
@@ -96,6 +97,11 @@
       "binding": "INTERNAL_API_SECRET",
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
       "secret_name": "INTERNAL_API_SECRET_PROD",
+    },
+    {
+      "binding": "GLANCEABLE_SNAPSHOT_SIGNING_SECRET",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "GLANCEABLE_SNAPSHOT_SIGNING_SECRET_PROD",
     },
   ],
 

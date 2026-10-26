@@ -1,7 +1,12 @@
 import { timingSafeEqual } from '@kilocode/encryption';
 import { Hono } from 'hono';
 import { createMiddleware } from 'hono/factory';
-import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
+import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
+import { verifySessionAccessInvalidationCredential } from '@kilocode/worker-utils/session-access-invalidation-credential';
+import {
+  isLegacyInternalSessionAuthEnabled,
+  type InternalSessionAuthMethod,
+} from '@kilocode/worker-utils/internal-session-auth';
 import type { Env } from './env';
 import { z } from 'zod';
 
@@ -11,14 +16,32 @@ import { cloudAgentSessionScopeApi } from './routes/cloud-agent-session-scope';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { getUserConnectionDO } from './dos/UserConnectionDO';
-import { getSessionExport } from './services/session-export';
 import { resolveSessionShareToken } from './services/session-share-token';
 import { withDORetry } from '@kilocode/worker-utils';
+
+const NO_STORE = { 'cache-control': 'no-store' } as const;
 
 const invalidateSessionAccessSchema = z.object({
   kiloUserId: z.string().min(1),
   organizationId: z.uuid(),
 });
+
+function logInvalidationAudit(
+  outcome: 'ok' | 'unauthorized' | 'forbidden' | 'invalid_request' | 'unavailable' | 'failed',
+  status: number,
+  startedAt: number,
+  authMethod: InternalSessionAuthMethod
+): void {
+  console.log(
+    JSON.stringify({
+      type: 'session_access_invalidation',
+      outcome,
+      status,
+      durationMs: Date.now() - startedAt,
+      authMethod,
+    })
+  );
+}
 
 async function hasValidInternalSecret(c: {
   req: { header(name: string): string | undefined };
@@ -124,33 +147,97 @@ app.get('/session/:shareToken/metadata', async c => {
   );
 });
 
-app.post('/internal/session-access/invalidate', requireValidInternalSecret, async c => {
-  const parsed = invalidateSessionAccessSchema.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) {
-    return c.json({ success: false, error: 'Invalid request', issues: parsed.error.issues }, 400);
+app.post('/internal/session-access/invalidate', async c => {
+  const startedAt = Date.now();
+  const authMethod = c.req.raw.headers.has('authorization') ? 'bearer' : 'legacy';
+  let bearerAuthority: { userId: string; organizationId: string | undefined } | undefined;
+  if (authMethod === 'bearer') {
+    const token = extractBearerToken(c.req.header('Authorization'));
+    if (!token) {
+      logInvalidationAudit('unauthorized', 401, startedAt, authMethod);
+      return c.json({ success: false, error: 'Unauthorized' }, 401, NO_STORE);
+    }
+    let expectedSecret: string;
+    try {
+      const secret = await c.env.SESSION_INGEST_INVALIDATION_SIGNING_SECRET_PROD.get();
+      if (!secret) {
+        logInvalidationAudit('unavailable', 503, startedAt, authMethod);
+        return c.json({ success: false, error: 'Service temporarily unavailable' }, 503, NO_STORE);
+      }
+      expectedSecret = secret;
+    } catch (error) {
+      console.error('Auth infrastructure failure', {
+        operation: 'session-access-invalidation-secret-get',
+        errorClass: error instanceof Error ? error.name : typeof error,
+      });
+      logInvalidationAudit('unavailable', 503, startedAt, authMethod);
+      return c.json({ success: false, error: 'Service temporarily unavailable' }, 503, NO_STORE);
+    }
+
+    const credential = await verifySessionAccessInvalidationCredential({
+      token,
+      secret: expectedSecret,
+    });
+    if (!credential.ok) {
+      logInvalidationAudit('unauthorized', 401, startedAt, authMethod);
+      return c.json({ success: false, error: 'Unauthorized' }, 401, NO_STORE);
+    }
+    bearerAuthority = credential;
+  } else {
+    if (
+      !isLegacyInternalSessionAuthEnabled(c.env.INTERNAL_SESSION_AUTH_LEGACY_ENABLED) ||
+      !c.req.header('X-Internal-Secret')
+    ) {
+      logInvalidationAudit('unauthorized', 401, startedAt, authMethod);
+      return c.json({ success: false, error: 'Unauthorized' }, 401, NO_STORE);
+    }
+    try {
+      if (!(await hasValidInternalSecret(c))) {
+        logInvalidationAudit('unauthorized', 401, startedAt, authMethod);
+        return c.json({ success: false, error: 'Unauthorized' }, 401, NO_STORE);
+      }
+    } catch (error) {
+      console.error('Auth infrastructure failure', {
+        operation: 'session-access-legacy-secret-get',
+        errorClass: error instanceof Error ? error.name : typeof error,
+      });
+      logInvalidationAudit('unavailable', 503, startedAt, authMethod);
+      return c.json({ success: false, error: 'Service temporarily unavailable' }, 503, NO_STORE);
+    }
   }
 
-  await withDORetry(
-    () => getSessionAccessCacheDO(c.env, { kiloUserId: parsed.data.kiloUserId }),
-    sessionCache => sessionCache.invalidateOrganization(parsed.data.organizationId),
-    'SessionAccessCacheDO.invalidateOrganization'
-  );
+  const parsed = invalidateSessionAccessSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) {
+    logInvalidationAudit('invalid_request', 400, startedAt, authMethod);
+    return c.json(
+      { success: false, error: 'Invalid request', issues: parsed.error.issues },
+      400,
+      NO_STORE
+    );
+  }
 
-  await getUserConnectionDO(c.env, { kiloUserId: parsed.data.kiloUserId }).closeViewerSockets();
+  if (
+    bearerAuthority &&
+    (bearerAuthority.userId !== parsed.data.kiloUserId ||
+      bearerAuthority.organizationId !== parsed.data.organizationId)
+  ) {
+    logInvalidationAudit('forbidden', 403, startedAt, authMethod);
+    return c.json({ success: false, error: 'Forbidden' }, 403, NO_STORE);
+  }
 
-  return c.body(null, 204);
-});
+  try {
+    await withDORetry(
+      () => getSessionAccessCacheDO(c.env, { kiloUserId: parsed.data.kiloUserId }),
+      sessionCache => sessionCache.invalidateOrganization(parsed.data.organizationId),
+      'SessionAccessCacheDO.invalidateOrganization'
+    );
 
-// Internal route for service-binding HTTP fetch (secret-protected)
-app.get('/internal/session/:sessionId/export', requireValidInternalSecret, async c => {
-  const kiloUserId = c.req.header('X-Kilo-User-Id');
-  if (!kiloUserId) return c.json({ success: false, error: 'Missing X-Kilo-User-Id' }, 400);
+    await getUserConnectionDO(c.env, { kiloUserId: parsed.data.kiloUserId }).closeViewerSockets();
+  } catch (error) {
+    logInvalidationAudit('failed', 500, startedAt, authMethod);
+    throw error;
+  }
 
-  const parsed = sessionIdSchema.safeParse(c.req.param('sessionId'));
-  if (!parsed.success) return c.json({ success: false, error: 'Invalid sessionId' }, 400);
-
-  const result = await getSessionExport(c.env, parsed.data, kiloUserId);
-  if (result.status !== 'ok') return c.json({ success: false, error: 'Session not found' }, 404);
-
-  return c.body(result.stream, 200, { 'content-type': 'application/json; charset=utf-8' });
+  logInvalidationAudit('ok', 204, startedAt, authMethod);
+  return c.body(null, 204, NO_STORE);
 });

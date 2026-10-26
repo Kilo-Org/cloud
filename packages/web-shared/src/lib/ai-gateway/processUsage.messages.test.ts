@@ -234,6 +234,53 @@ describe('parseMessagesMicrodollarUsageFromStream approval tests', () => {
 });
 
 describe('parseMessagesMicrodollarUsageFromStream', () => {
+  test.each([false, true])(
+    'retains Vercel start-frame cost and routing metadata with a final delta=%s',
+    async hasDelta => {
+      const events = [
+        {
+          type: 'message_start',
+          message: {
+            id: 'generation-id',
+            model: 'upstream-model',
+            usage: { input_tokens: 3, output_tokens: 1 },
+            provider_metadata: {
+              gateway: {
+                marketCost: '0.12',
+                routing: { canonicalSlug: 'resolved-model', finalProvider: 'anthropic' },
+              },
+            },
+          },
+        },
+        ...(hasDelta
+          ? [
+              {
+                type: 'message_delta',
+                usage: { output_tokens: 2 },
+                delta: { stop_reason: 'end_turn' },
+              },
+            ]
+          : []),
+      ];
+      const result = await parseMessagesMicrodollarUsageFromStream(
+        streamFromText(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')),
+        'fake-user-id',
+        undefined,
+        'vercel',
+        200,
+        false
+      );
+
+      expect(result).toMatchObject({
+        cost_mUsd: 120_000,
+        model: 'resolved-model',
+        inference_provider: 'anthropic',
+        inputTokens: 3,
+        outputTokens: hasDelta ? 2 : 1,
+      });
+    }
+  );
+
   test('records the successful Vercel routed model instead of the message start model', async () => {
     const stream = streamFromText(
       'event: message_start\n' +

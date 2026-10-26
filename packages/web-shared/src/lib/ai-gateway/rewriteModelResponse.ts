@@ -1,6 +1,4 @@
 import { api_request_log, type User } from '@kilocode/db/schema';
-import { isKiloExclusiveFreeModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { detectToolCallArgumentErrors } from '@kilocode/web-shared/lib/ai-gateway/api-request-log-errors';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { getReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
@@ -14,7 +12,10 @@ import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { sanitizeJsonbValue } from '@kilocode/web-shared/lib/sanitize-jsonb';
 import { uploadApiRequestLogBlobs } from '@kilocode/web-shared/lib/r2/api-request-log';
 import { after, type NextResponse } from 'next/server';
-import type { RequestLogCapture } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse.shared';
+import type {
+  RequestLogCapture,
+  ResponseUsageContext,
+} from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse.shared';
 import { rewriteModelResponse_ChatCompletions } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse.chatCompletions';
 import { rewriteModelResponse_Messages } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse.messages';
 import { rewriteModelResponse_Responses } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse.responses';
@@ -39,6 +40,8 @@ export type RewriteModelResponseParams = {
   model: string;
   providerId: ProviderId;
   kind: GatewayRequest['kind'];
+  isFree: boolean;
+  userByok: boolean;
   logging: RequestLoggingParams;
   responseTransforms: ProviderResponseTransforms | null;
 };
@@ -196,17 +199,19 @@ export async function rewriteModelResponse({
   model,
   providerId,
   kind,
+  isFree,
+  userByok,
   logging,
   responseTransforms,
 }: RewriteModelResponseParams): Promise<NextResponse> {
   const capture = await createRequestLogCapture(response, model, providerId, logging);
-  const customPricing = getCustomPricing(model);
-  // Custom LLMs are always free, so an upstream-reported cost must not reach the user.
-  const requiresCostRemoval =
-    providerId === 'custom' ||
-    ((providerId === 'openrouter' || providerId === 'vercel') &&
-      (isKiloExclusiveFreeModel(model) ||
-        (customPricing !== undefined && !customPricing.fallbackOnly)));
+  const usageContext: ResponseUsageContext = {
+    requested_model: model,
+    provider: providerId,
+    api_kind: kind,
+    is_free: isFree,
+    user_byok: userByok,
+  };
 
   console.debug('[rewriteModelResponse] rewriting response for %s', model);
   const { vercel_request_id: vercelRequestId } = logging;
@@ -214,7 +219,7 @@ export async function rewriteModelResponse({
   if (kind === 'chat_completions') {
     return rewriteModelResponse_ChatCompletions({
       response,
-      removeCost: requiresCostRemoval,
+      usageContext,
       capture,
       reasoningEffort,
       vercelRequestId,
@@ -224,7 +229,7 @@ export async function rewriteModelResponse({
   if (kind === 'responses') {
     return rewriteModelResponse_Responses({
       response,
-      removeCost: requiresCostRemoval,
+      usageContext,
       capture,
       reasoningEffort,
       vercelRequestId,
@@ -233,7 +238,7 @@ export async function rewriteModelResponse({
   if (kind === 'messages') {
     return rewriteModelResponse_Messages({
       response,
-      removeCost: requiresCostRemoval,
+      usageContext,
       capture,
       reasoningEffort,
       vercelRequestId,

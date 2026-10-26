@@ -2,6 +2,10 @@ import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import 'server-only'; // This file imports the database and can therefore only be used on the server side.
 import Stripe from 'stripe';
 import { client } from '@kilocode/web-shared/lib/stripe-client';
+import {
+  getStripeChargeInvoice,
+  getStripeInvoiceChargeId,
+} from '@kilocode/web-shared/lib/stripe-invoice-payments';
 import { captureException } from '@sentry/nextjs';
 import { db, auto_deleted_at } from '@kilocode/web-shared/lib/drizzle';
 import type { User, PaymentMethod, Organization } from '@kilocode/db/schema';
@@ -176,12 +180,11 @@ function getAffiliateDisputeSaleKind(invoice: Stripe.Invoice): AffiliateDisputeS
 
 async function getAffiliateDisputeChargeContext(
   chargeId: string,
-  preFetchedCharge?: Stripe.Charge & { invoice?: string | Stripe.Invoice | null }
+  preFetchedCharge?: Stripe.Charge
 ): Promise<AffiliateDisputeChargeContext | null> {
-  const charge: Stripe.Charge & { invoice?: string | Stripe.Invoice | null } =
-    preFetchedCharge ?? (await client.charges.retrieve(chargeId, { expand: ['invoice'] }));
-  const invoice = charge.invoice;
-  if (!invoice || typeof invoice === 'string') {
+  const charge = preFetchedCharge ?? (await client.charges.retrieve(chargeId));
+  const invoice = await getStripeChargeInvoice(client, charge);
+  if (!invoice) {
     return null;
   }
 
@@ -199,16 +202,10 @@ async function getAffiliateDisputeChargeContext(
 
 async function suspendOrganizationKiloPassForAdverseCharge(
   chargeId: string,
-  preFetchedCharge?: Stripe.Charge & { invoice?: string | Stripe.Invoice | null }
+  preFetchedCharge?: Stripe.Charge
 ) {
-  const charge: Stripe.Charge & { invoice?: string | Stripe.Invoice | null } = preFetchedCharge
-    ? preFetchedCharge
-    : await client.charges.retrieve(chargeId, { expand: ['invoice'] });
-  const invoiceReference = charge.invoice;
-  const invoice =
-    typeof invoiceReference === 'string'
-      ? await client.invoices.retrieve(invoiceReference)
-      : invoiceReference;
+  const charge = preFetchedCharge ?? (await client.charges.retrieve(chargeId));
+  const invoice = await getStripeChargeInvoice(client, charge);
   if (invoice && invoiceLooksLikeOrganizationKiloPass(invoice)) {
     await handleOrganizationKiloPassPaymentAdverseForInvoice(invoice);
   }
@@ -1253,24 +1250,17 @@ async function handlePaymentMethodEvent(
     | Stripe.PaymentMethodUpdatedEvent
 ) {
   const paymentMethod = event.data.object;
-  const user = await findUserByStripeCustomer(paymentMethod.customer);
-  if (process.env.NODE_ENV !== 'test') console.log(event.type, user?.id, paymentMethod);
-
-  if (!user) return;
-
   if (event.type === 'payment_method.detached') {
-    // Soft delete using Drizzle - set deleted_at timestamp
     await db
       .update(payment_methods)
       .set({ ...auto_deleted_at })
-      .where(
-        and(eq(payment_methods.stripe_id, paymentMethod.id), eq(payment_methods.user_id, user.id))
-      );
-  } else if (event.type === 'payment_method.attached') {
-    await ensurePaymentMethodStored(user.id, paymentMethod);
-  } else {
-    await ensurePaymentMethodStored(user.id, paymentMethod);
+      .where(eq(payment_methods.stripe_id, paymentMethod.id));
+    return;
   }
+
+  const user = await findUserByStripeCustomer(paymentMethod.customer);
+  if (!user) return;
+  await ensurePaymentMethodStored(user.id, paymentMethod);
 }
 
 type AutoTopUpOwner = { type: 'user'; id: string } | { type: 'organization'; id: string };
@@ -1324,7 +1314,7 @@ async function syncStripeDisputeCaseFromWebhook(params: {
 
   let disputeCharge: DisputeChargeWithInvoice;
   try {
-    disputeCharge = await client.charges.retrieve(chargeId, { expand: ['invoice'] });
+    disputeCharge = await client.charges.retrieve(chargeId);
   } catch (error) {
     await observeStripeDisputeCreated({
       eventId: params.eventId,
@@ -1358,9 +1348,8 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
       // One payment is reported once: a charge tied to an invoice is reported by the
       // `invoice.paid` case below, and a standalone charge (the top-up and auto-top-up setup
       // charges this handler credits) is reported here.
-      const chargeInvoiceId =
-        'invoice' in charge && typeof charge.invoice === 'string' ? charge.invoice : null;
-      if (!chargeInvoiceId) {
+      const chargeInvoice = await getStripeChargeInvoice(client, charge);
+      if (!chargeInvoice) {
         await reportWebhookCreditEvent(
           {
             kiloUserId: paymentIntent.metadata.kiloUserId,
@@ -1437,8 +1426,7 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         invoice.metadata?.type === 'auto-topup' || invoice.metadata?.type === 'org-auto-topup';
       if (invoice.amount_paid > 0 && (isSubscriptionInvoice || isAutoTopUpInvoice)) {
         const subscriptionMetadata = invoice.parent?.subscription_details?.metadata;
-        const invoiceChargeId =
-          'charge' in invoice && typeof invoice.charge === 'string' ? invoice.charge : null;
+        const invoiceChargeId = await getStripeInvoiceChargeId(client, invoice);
         await reportWebhookCreditEvent(
           {
             kiloUserId: invoice.metadata?.kiloUserId ?? subscriptionMetadata?.kiloUserId,
@@ -1484,9 +1472,10 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
       const isOrgAutoTopup = invoice.metadata?.type === 'org-auto-topup';
 
       if (isUserAutoTopup || isOrgAutoTopup) {
-        const chargeId =
-          'charge' in invoice && typeof invoice.charge === 'string' ? invoice.charge : null;
-        if (!chargeId) break;
+        const chargeId = await getStripeInvoiceChargeId(client, invoice);
+        if (!chargeId) {
+          throw new Error(`Paid auto-top-up invoice ${invoice.id} has no settled charge`);
+        }
 
         const config: StripeConfig = { type: 'stripe', stripe_payment_id: chargeId };
 
@@ -1740,9 +1729,10 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         break;
       }
 
+      const invoice = await getStripeChargeInvoice(client, charge);
       await observeServiceFeeChargeRefunded({
         store: createServiceFeeStores().assessments,
-        charge,
+        charge: { ...charge, invoice: invoice?.id ?? null },
         stripe: client,
       });
       await suspendOrganizationKiloPassForAdverseCharge(charge.id);

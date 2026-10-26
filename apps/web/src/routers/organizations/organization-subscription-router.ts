@@ -602,19 +602,30 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
           from_subscription: subscription.id,
         });
       } catch (error) {
-        // Concurrent requests may both pass the existing-schedule check above
-        // but only one can create a schedule. Catch the Stripe rejection for the
-        // second and return a clean client error instead of a 500.
         if (
           error instanceof Error &&
           'type' in error &&
-          (error as { code?: string }).code === 'resource_already_exists'
+          error.type === 'StripeInvalidRequestError'
         ) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message:
-              'A billing cycle change is already scheduled. Cancel the existing change before scheduling a new one.',
-          });
+          const current = await retrieveSubscription(subscription.id).catch(() => null);
+          const attached =
+            typeof current?.schedule === 'string'
+              ? await client.subscriptionSchedules.retrieve(current.schedule).catch(() => null)
+              : current?.schedule;
+          const attachedSubscriptionId =
+            typeof attached?.subscription === 'string'
+              ? attached.subscription
+              : attached?.subscription?.id;
+          if (
+            attachedSubscriptionId === subscription.id &&
+            (attached?.status === 'active' || attached?.status === 'not_started')
+          ) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message:
+                'A billing cycle change is already scheduled. Cancel the existing change before scheduling a new one.',
+            });
+          }
         }
         throw error;
       }

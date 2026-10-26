@@ -2608,14 +2608,16 @@ export const CustomPricingSchema = z.object({
         path: [0, 'start_context_length'],
       });
     }
-    for (let index = 1; index < tiers.length; index++) {
-      if (tiers[index].start_context_length <= tiers[index - 1].start_context_length) {
+    let previousStart = tiers[0].start_context_length;
+    for (const [index, { start_context_length }] of tiers.entries()) {
+      if (index > 0 && start_context_length <= previousStart) {
         ctx.addIssue({
           code: 'custom',
           message: 'Pricing tiers must be ordered by ascending start context length',
           path: [index, 'start_context_length'],
         });
       }
+      previousStart = start_context_length;
     }
   }),
   /** Human-readable discount shown in the model name; never used in calculations. */

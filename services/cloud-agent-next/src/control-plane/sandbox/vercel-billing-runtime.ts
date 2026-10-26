@@ -13,6 +13,10 @@ import {
   assertSandboxBillingAllocation,
   vercelBillingIdentity,
 } from '../../container-usage-context.js';
+import {
+  containerCapacityEnforced,
+  getContainerCapacityFailureReason,
+} from '../../container-concurrency.js';
 import { MeteredBillingLifecycle, type BillingIdentity } from '../../metered-billing-lifecycle.js';
 import type { BillingScheduleTable } from '../../sandbox-control/billing-schedule.js';
 import {
@@ -27,6 +31,13 @@ import type { ProviderAdapter } from '../../sandbox-control/provider.js';
 import type { AgentSandboxProvider, Env } from '../../types.js';
 import type { AllocationEvent, AllocationState, SandboxTimers } from './allocation.js';
 import type { StoredProviderPin } from './sandbox-do.js';
+
+export type VercelCreateAdmission =
+  | 'admitted'
+  | 'blocked'
+  | 'limit_reached'
+  | 'unavailable'
+  | 'retry';
 
 export const VERCEL_BILLING_FORCE_STOP_CALLBACK = 'billingForceStop';
 export const VERCEL_BILLING_DELIVERY_RETRY_MS = 5_000;
@@ -80,9 +91,7 @@ export type VercelBillingRuntimeDeps = {
 
 export type VercelBillingRuntime = {
   ensureRuntime: () => Promise<VercelBillingRuntimeState | undefined>;
-  admitCreate: (
-    pin: StoredProviderPin
-  ) => Promise<'admitted' | 'blocked' | 'unavailable' | 'retry'>;
+  admitCreate: (pin: StoredProviderPin) => Promise<VercelCreateAdmission>;
   recordLifetime: (evidence: VercelBillingLifetimeEvidence) => Promise<void>;
   settleStoppedCreatedRef: (ref: string, confirmed: boolean) => Promise<void>;
   afterTransition: (event: AllocationEvent) => Promise<void>;
@@ -161,6 +170,7 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
     const lifecycle = new MeteredBillingLifecycle({
       storage: deps.storage,
       usageClient,
+      enforceContainerCapacity: containerCapacityEnforced(deps.env()),
       schedule,
       deleteSchedules,
       getState,
@@ -233,9 +243,7 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
     await active.billing.prepareSettlement({ generation });
   }
 
-  async function admitCreate(
-    pin: StoredProviderPin
-  ): Promise<'admitted' | 'blocked' | 'unavailable' | 'retry'> {
+  async function admitCreate(pin: StoredProviderPin): Promise<VercelCreateAdmission> {
     const existing = await getBillingContext(deps.storage);
     if (existing !== undefined) {
       await deps.schedule.ensure(
@@ -274,6 +282,9 @@ export function createVercelBillingRuntime(deps: VercelBillingRuntimeDeps): Verc
       await clearBillingContext(deps.storage);
       await deleteVercelBillingBinding(deps.storage, outcome.generation);
       await deps.schedule.remove(VERCEL_BILLING_SETTLEMENT_CALLBACK, outcome.generation);
+      if (getContainerCapacityFailureReason(outcome.error) === 'container_limit_reached') {
+        return 'limit_reached';
+      }
       return outcome.error instanceof ContainerUsageAdmissionError &&
         outcome.error.code === 'insufficient_credits'
         ? 'blocked'

@@ -45,10 +45,8 @@ import type {
   StopResult,
 } from '../../src/sandbox-control/provider.js';
 import { ProviderCreationError } from '../../src/sandbox-control/provider.js';
-import {
-  ContainerCapacityUnavailableError,
-  ContainerConcurrencyLimitError,
-} from '../../src/container-concurrency.js';
+import { ContainerCapacityUnavailableError } from '../../src/container-concurrency.js';
+import { containerLimitError } from '../../src/container-limit-test-helpers.js';
 import { VERCEL_BILLING_SETTLEMENT_CALLBACK } from '../../src/sandbox-control/vercel-billing.js';
 import { encodeVercelProviderRef } from '../../src/sandbox-control/vercel-provider.js';
 import { encodeCloudflareProviderRef } from '../../src/sandbox-control/cloudflare-provider.js';
@@ -650,48 +648,57 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     );
   });
 
-  it.each(['cloudflare', 'cloudflare-containers', 'vercel'] as const)(
-    'does not call the %s provider when database admission is unavailable',
-    async providerKind => {
-      const sandboxId = `ses-${'b'.repeat(48)}`;
-      const sessionId = 'workspace_11111111-1111-4111-8111-111111111111';
-      const stub = sandboxNamespace.getByName(sandboxId);
-      await runInDurableObject(stub, instance => {
-        Object.assign(instance, {
-          env: {
-            ...instance.env,
-            CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED: 'false',
-            HYPERDRIVE: undefined,
+  it('does not call the Vercel provider when the meter rejects the container limit', async () => {
+    const sandboxId = `ses-${'b'.repeat(48)}`;
+    const sessionId = 'workspace_11111111-1111-4111-8111-111111111111';
+    const starts: Array<{ enforceCapacity?: true }> = [];
+    const meter: ContainerUsageRpcMethods = {
+      async recordStart(input) {
+        starts.push(input);
+        return {
+          success: false,
+          error: {
+            code: 'container_limit_reached',
+            message: containerLimitError('user', 3).message,
           },
-        });
-      });
-      const provider = createFakeProvider();
-      await startAllocation(provider, {
+        };
+      },
+      async recordHeartbeat() {
+        throw new Error('A rejected start must not heartbeat');
+      },
+      async recordStop() {
+        throw new Error('A rejected start must not stop');
+      },
+    };
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider, {
+      sandboxId,
+      provider: 'vercel',
+      configuration: VERCEL_SMALL_CONFIGURATION,
+      preparingRoute: sessionId,
+      billing: {
         sandboxId,
-        provider: providerKind,
-        preparingRoute: sessionId,
-        billing: {
-          sandboxId,
-          subject: { type: 'user', id: 'owner-1' },
-          actor: { type: 'user', id: 'owner-1' },
-          sessionId,
-          metadata: { origin: 'cloud-agent' },
-        },
-      });
-      await waitFor(async () =>
-        expect((await stub.status({ sessionId })).view).toMatchObject({
-          state: 'failed',
-          reason: 'billing_unavailable',
-        })
-      );
-      expect((await readState(stub)).kind).not.toBe('creating');
-      expect(provider.createCalls).toBe(0);
-      expect(provider.launchEnvs).toHaveLength(0);
-    }
-  );
+        subject: { type: 'user', id: 'owner-1' },
+        actor: { type: 'user', id: 'owner-1' },
+        sessionId,
+        metadata: { origin: 'cloud-agent' },
+      },
+      meter,
+    });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId })).view).toMatchObject({
+        state: 'failed',
+        reason: 'container_limit_reached',
+      })
+    );
+    expect((await readState(stub)).kind).not.toBe('creating');
+    expect(starts).toEqual([expect.objectContaining({ enforceCapacity: true })]);
+    expect(provider.createCalls).toBe(0);
+    expect(provider.launchEnvs).toHaveLength(0);
+  });
 
   it.each([
-    [new ContainerConcurrencyLimitError('personal', 20), 'container_limit_reached'],
+    [containerLimitError(), 'container_limit_reached'],
     [new ContainerCapacityUnavailableError(), 'billing_unavailable'],
   ] as const)(
     'fails capacity denial from the sandbox start without retrying creation: %s',

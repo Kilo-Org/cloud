@@ -27,6 +27,8 @@ describe('getBalanceForUser (migrated users)', () => {
     const result = await getBalanceForUser(user);
     expect(result).toEqual({
       balance: expectedBalance,
+      microdollars_used,
+      total_microdollars_acquired,
     });
   });
 
@@ -41,7 +43,11 @@ describe('getBalanceForUser (migrated users)', () => {
     });
 
     const result = await getBalanceForUser(user);
-    expect(result).toEqual({ balance: userBalance });
+    expect(result).toEqual({
+      balance: userBalance,
+      microdollars_used,
+      total_microdollars_acquired,
+    });
   });
 
   test('should calculate balance locally even with stale cache', async () => {
@@ -57,6 +63,8 @@ describe('getBalanceForUser (migrated users)', () => {
     const result = await getBalanceForUser(user);
     expect(result).toEqual({
       balance: expectedBalance,
+      microdollars_used,
+      total_microdollars_acquired,
     });
   });
 });

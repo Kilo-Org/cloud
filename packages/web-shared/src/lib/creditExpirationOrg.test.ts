@@ -179,15 +179,7 @@ describe('processOrganizationExpirations', () => {
       description: 'Expiring credits',
     });
 
-    const result = await processOrganizationExpirations(
-      {
-        id: orgId,
-        microdollars_used: 3_000_000,
-        next_credit_expiration_at: '2024-01-10T00:00:00Z',
-        total_microdollars_acquired: 10_000_000,
-      },
-      new Date('2024-01-15T00:00:00Z')
-    );
+    const result = await processOrganizationExpirations(orgId, new Date('2024-01-15T00:00:00Z'));
 
     expect(result).not.toBeNull();
     // total_acquired should decrease by the expired amount (10M - 3M used = 7M expired)
@@ -213,7 +205,7 @@ describe('processOrganizationExpirations', () => {
     expect(updatedOrg!.next_credit_expiration_at).toBeNull();
   });
 
-  it('applies the expiration only while the persisted usage matches the snapshot', async () => {
+  it('expires against current persisted usage rather than a prior caller snapshot', async () => {
     const txnId = randomUUID();
     await db.insert(creditTransactionsTable).values({
       id: txnId,
@@ -233,45 +225,13 @@ describe('processOrganizationExpirations', () => {
       .where(eq(organizations.id, orgId));
 
     const now = new Date('2024-01-15T00:00:00Z');
-    const staleResult = await processOrganizationExpirations(
-      {
-        id: orgId,
-        microdollars_used: 3_000_000,
-        next_credit_expiration_at: '2024-01-10T00:00:00Z',
-        total_microdollars_acquired: 10_000_000,
-      },
-      now
-    );
+    const result = await processOrganizationExpirations(orgId, now);
 
-    expect(staleResult).toBeNull();
-
-    const expirationTxns = await db
-      .select()
-      .from(creditTransactionsTable)
-      .where(eq(creditTransactionsTable.credit_category, 'credits_expired'));
-    expect(expirationTxns).toHaveLength(0);
-
-    const unchangedOrg = await db.query.organizations.findFirst({
-      where: eq(organizations.id, orgId),
+    expect(result).toEqual({
+      microdollars_used: 8_000_000,
+      total_microdollars_acquired: 8_000_000,
+      next_credit_expiration_at: null,
     });
-    expect(unchangedOrg!.total_microdollars_acquired).toBe(10_000_000);
-    expect(unchangedOrg!.microdollars_balance).toBe(2_000_000);
-    expect(new Date(unchangedOrg!.next_credit_expiration_at!).getTime()).toBe(
-      new Date('2024-01-10T00:00:00Z').getTime()
-    );
-
-    // The next read sees the new usage and expires only the unconsumed 2M.
-    const result = await processOrganizationExpirations(
-      {
-        id: orgId,
-        microdollars_used: unchangedOrg!.microdollars_used,
-        next_credit_expiration_at: unchangedOrg!.next_credit_expiration_at,
-        total_microdollars_acquired: unchangedOrg!.total_microdollars_acquired,
-      },
-      now
-    );
-
-    expect(result).toEqual({ total_microdollars_acquired: 8_000_000 });
 
     const committed = await db
       .select()
@@ -279,6 +239,7 @@ describe('processOrganizationExpirations', () => {
       .where(eq(creditTransactionsTable.credit_category, 'credits_expired'));
     expect(committed).toHaveLength(1);
     expect(committed[0].amount_microdollars).toBe(-2_000_000);
+    expect(committed[0].original_baseline_microdollars_used).toBe(8_000_000);
     expect(committed[0].organization_id).toBe(orgId);
 
     const updatedOrg = await db.query.organizations.findFirst({
@@ -313,15 +274,7 @@ describe('processOrganizationExpirations', () => {
       },
     ]);
 
-    await processOrganizationExpirations(
-      {
-        id: orgId,
-        microdollars_used: 3_000_000,
-        next_credit_expiration_at: '2024-01-10T00:00:00Z',
-        total_microdollars_acquired: 10_000_000,
-      },
-      new Date('2024-01-15T00:00:00Z')
-    );
+    await processOrganizationExpirations(orgId, new Date('2024-01-15T00:00:00Z'));
 
     const updatedOrg = await db.query.organizations.findFirst({
       where: eq(organizations.id, orgId),
@@ -331,7 +284,7 @@ describe('processOrganizationExpirations', () => {
     );
   });
 
-  it('returns null when no expirations are due', async () => {
+  it('returns current state and corrects a stale hint when no expirations are due', async () => {
     await db.insert(creditTransactionsTable).values({
       kilo_user_id: ownerId,
       organization_id: orgId,
@@ -343,17 +296,13 @@ describe('processOrganizationExpirations', () => {
       description: 'Future expiry',
     });
 
-    const result = await processOrganizationExpirations(
-      {
-        id: orgId,
-        microdollars_used: 3_000_000,
-        next_credit_expiration_at: '2024-03-01T00:00:00Z',
-        total_microdollars_acquired: 10_000_000,
-      },
-      new Date('2024-01-15T00:00:00Z')
-    );
+    const result = await processOrganizationExpirations(orgId, new Date('2024-01-15T00:00:00Z'));
 
-    expect(result).toBeNull();
+    expect(result.microdollars_used).toBe(3_000_000);
+    expect(result.total_microdollars_acquired).toBe(10_000_000);
+    expect(new Date(result.next_credit_expiration_at!).toISOString()).toBe(
+      '2024-03-01T00:00:00.000Z'
+    );
   });
 
   it('is idempotent — calling twice does not duplicate', async () => {
@@ -368,31 +317,13 @@ describe('processOrganizationExpirations', () => {
       description: 'Expiring credits',
     });
 
-    const orgInput = {
-      id: orgId,
-      microdollars_used: 3_000_000,
-      next_credit_expiration_at: '2024-01-10T00:00:00Z' as string | null,
-      total_microdollars_acquired: 10_000_000,
-    };
     const now = new Date('2024-01-15T00:00:00Z');
 
-    const result1 = await processOrganizationExpirations(orgInput, now);
+    const result1 = await processOrganizationExpirations(orgId, now);
     expect(result1).not.toBeNull();
 
-    // Re-fetch org for second call
-    const updatedOrg = await db.query.organizations.findFirst({
-      where: eq(organizations.id, orgId),
-    });
-    const result2 = await processOrganizationExpirations(
-      {
-        id: orgId,
-        microdollars_used: updatedOrg!.microdollars_used,
-        next_credit_expiration_at: updatedOrg!.next_credit_expiration_at,
-        total_microdollars_acquired: updatedOrg!.total_microdollars_acquired,
-      },
-      now
-    );
-    expect(result2).toBeNull();
+    const result2 = await processOrganizationExpirations(orgId, now);
+    expect(result2).toEqual(result1);
 
     const expirations = await db
       .select()
@@ -401,7 +332,7 @@ describe('processOrganizationExpirations', () => {
     expect(expirations).toHaveLength(1);
   });
 
-  it('handles concurrent execution — one succeeds, other returns null', async () => {
+  it('returns the same committed state to concurrent callers without duplicate expirations', async () => {
     await db.insert(creditTransactionsTable).values({
       kilo_user_id: ownerId,
       organization_id: orgId,
@@ -413,23 +344,19 @@ describe('processOrganizationExpirations', () => {
       description: 'Expiring credits',
     });
 
-    const orgInput = {
-      id: orgId,
-      microdollars_used: 3_000_000,
-      next_credit_expiration_at: '2024-01-10T00:00:00Z',
-      total_microdollars_acquired: 10_000_000,
-    };
     const now = new Date('2024-01-15T00:00:00Z');
 
     const [r1, r2] = await Promise.all([
-      processOrganizationExpirations(orgInput, now),
-      processOrganizationExpirations(orgInput, now),
+      processOrganizationExpirations(orgId, now),
+      processOrganizationExpirations(orgId, now),
     ]);
 
-    const successes = [r1, r2].filter(r => r !== null);
-    const nulls = [r1, r2].filter(r => r === null);
-    expect(successes).toHaveLength(1);
-    expect(nulls).toHaveLength(1);
+    expect(r1).toEqual(r2);
+    expect(r1).toEqual({
+      microdollars_used: 3_000_000,
+      total_microdollars_acquired: 3_000_000,
+      next_credit_expiration_at: null,
+    });
 
     const expirations = await db
       .select()
@@ -456,15 +383,7 @@ describe('processOrganizationExpirations', () => {
       .set({ microdollars_used: 7_000_000, microdollars_balance: 3_000_000 })
       .where(eq(organizations.id, orgId));
 
-    const result = await processOrganizationExpirations(
-      {
-        id: orgId,
-        microdollars_used: 7_000_000,
-        next_credit_expiration_at: '2024-01-10T00:00:00Z',
-        total_microdollars_acquired: 10_000_000,
-      },
-      new Date('2024-01-15T00:00:00Z')
-    );
+    const result = await processOrganizationExpirations(orgId, new Date('2024-01-15T00:00:00Z'));
 
     expect(result).not.toBeNull();
     expect(result!.total_microdollars_acquired).toBe(10_000_000 - 3_000_000);
@@ -495,15 +414,7 @@ describe('processOrganizationExpirations', () => {
       .set({ microdollars_used: 8_000_000, microdollars_balance: 2_000_000 })
       .where(eq(organizations.id, orgId));
 
-    const result = await processOrganizationExpirations(
-      {
-        id: orgId,
-        microdollars_used: 8_000_000,
-        next_credit_expiration_at: '2024-01-10T00:00:00Z',
-        total_microdollars_acquired: 10_000_000,
-      },
-      new Date('2024-01-15T00:00:00Z')
-    );
+    const result = await processOrganizationExpirations(orgId, new Date('2024-01-15T00:00:00Z'));
 
     expect(result).not.toBeNull();
     // total_acquired unchanged since expiration amount is 0

@@ -68,18 +68,8 @@ async function getOrganizationWithExpiryProcessed(organizationId: string) {
     organization.next_credit_expiration_at &&
     new Date() >= new Date(organization.next_credit_expiration_at)
   ) {
-    const expiryResult = await processOrganizationExpirations(
-      {
-        id: organizationId,
-        microdollars_used: organization.microdollars_used,
-        next_credit_expiration_at: organization.next_credit_expiration_at,
-        total_microdollars_acquired: organization.total_microdollars_acquired,
-      },
-      new Date()
-    );
-    if (expiryResult) {
-      organization = (await getOrganizationById(organizationId)) ?? organization;
-    }
+    const expiryResult = await processOrganizationExpirations(organizationId, new Date());
+    organization = { ...organization, ...expiryResult };
   }
   return organization;
 }
@@ -115,25 +105,16 @@ export const organizationFundsRouter = createTRPCRouter({
       const now = new Date();
       const children: { id: string; name: string; balanceMicrodollars: number }[] = [];
       for (const child of childRows) {
-        let totalAcquired = child.total_microdollars_acquired;
+        let currentChild = child;
         if (child.next_credit_expiration_at && now >= new Date(child.next_credit_expiration_at)) {
-          const expiryResult = await processOrganizationExpirations(
-            {
-              id: child.id,
-              microdollars_used: child.microdollars_used,
-              next_credit_expiration_at: child.next_credit_expiration_at,
-              total_microdollars_acquired: child.total_microdollars_acquired,
-            },
-            now
-          );
-          if (expiryResult) {
-            totalAcquired = expiryResult.total_microdollars_acquired;
-          }
+          const expiryResult = await processOrganizationExpirations(child.id, now);
+          currentChild = { ...child, ...expiryResult };
         }
         children.push({
           id: child.id,
           name: child.name,
-          balanceMicrodollars: totalAcquired - child.microdollars_used,
+          balanceMicrodollars:
+            currentChild.total_microdollars_acquired - currentChild.microdollars_used,
         });
       }
 

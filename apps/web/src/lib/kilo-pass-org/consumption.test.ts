@@ -515,19 +515,7 @@ describe('organization Pass consumption', () => {
     if (!expiringBonus) throw new Error('unlocked bonus credit was not created');
     expect(new Date(expiringBonus.expiry_date!).toISOString()).toBe('2027-08-01T00:00:00.000Z');
     expect(expiringBonus.expiration_baseline_microdollars_used).toBe(19_000_000);
-    const [org] = await db
-      .select()
-      .from(organizations)
-      .where(eq(organizations.id, organization.id));
-    await processOrganizationExpirations(
-      {
-        id: organization.id,
-        microdollars_used: org.microdollars_used,
-        next_credit_expiration_at: org.next_credit_expiration_at,
-        total_microdollars_acquired: org.total_microdollars_acquired,
-      },
-      new Date('2027-08-02T00:00:00.000Z')
-    );
+    await processOrganizationExpirations(organization.id, new Date('2027-08-02T00:00:00.000Z'));
     const expirations = await db
       .select()
       .from(credit_transactions)

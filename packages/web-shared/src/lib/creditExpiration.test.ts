@@ -506,7 +506,7 @@ describe('processLocalExpirations', () => {
     });
 
     const now = new Date('2024-01-15');
-    const result = await processLocalExpirations(user, now);
+    const result = await processLocalExpirations(user.id, now);
 
     expect(result).not.toBeNull();
 
@@ -521,7 +521,7 @@ describe('processLocalExpirations', () => {
     expect(expirationTxns[0].original_transaction_id).toBe(initialId);
   });
 
-  it('applies the expiration only while the persisted usage matches the snapshot', async () => {
+  it('expires against current persisted usage rather than a prior caller snapshot', async () => {
     const user = await insertMigratedTestUser({
       microdollars_used: 500,
       total_microdollars_acquired: 1000,
@@ -546,31 +546,13 @@ describe('processLocalExpirations', () => {
       .where(eq(kilocode_users.id, user.id));
 
     const now = new Date('2024-01-15');
-    const staleResult = await processLocalExpirations(user, now);
+    const result = await processLocalExpirations(user.id, now);
 
-    expect(staleResult).toBeNull();
-
-    const expirationTxns = await db
-      .select()
-      .from(creditTransactionsTable)
-      .where(eq(creditTransactionsTable.credit_category, 'credits_expired'));
-    expect(expirationTxns).toHaveLength(0);
-
-    const unchangedUser = await db.query.kilocode_users.findFirst({
-      where: eq(kilocode_users.id, user.id),
+    expect(result).toEqual({
+      microdollars_used: 900,
+      total_microdollars_acquired: 900,
+      next_credit_expiration_at: null,
     });
-    expect(unchangedUser!.total_microdollars_acquired).toBe(1000);
-    expect(new Date(unchangedUser!.next_credit_expiration_at!).getTime()).toBe(
-      new Date('2024-01-10T00:00:00Z').getTime()
-    );
-
-    // The next read sees the new usage and expires only the unconsumed 100.
-    const freshUser = await db.query.kilocode_users.findFirst({
-      where: eq(kilocode_users.id, user.id),
-    });
-    const result = await processLocalExpirations(freshUser!, now);
-
-    expect(result).toEqual({ total_microdollars_acquired: 900 });
 
     const committed = await db
       .select()
@@ -578,6 +560,7 @@ describe('processLocalExpirations', () => {
       .where(eq(creditTransactionsTable.credit_category, 'credits_expired'));
     expect(committed).toHaveLength(1);
     expect(committed[0].amount_microdollars).toBe(-100);
+    expect(committed[0].original_baseline_microdollars_used).toBe(900);
 
     const updatedUser = await db.query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
@@ -605,21 +588,9 @@ describe('processLocalExpirations', () => {
 
     const now = new Date('2024-01-15');
 
-    // First call
-    await processLocalExpirations(user, now);
-
-    // Get updated next_credit_expiration_at
-    const updatedUser = await db.query.kilocode_users.findFirst({
-      where: eq(kilocode_users.id, user.id),
-      columns: { next_credit_expiration_at: true },
-    });
-
-    // Second call with updated user
-    const userForSecondCall = {
-      ...user,
-      next_credit_expiration_at: updatedUser?.next_credit_expiration_at ?? null,
-    };
-    await processLocalExpirations(userForSecondCall, now);
+    const first = await processLocalExpirations(user.id, now);
+    const second = await processLocalExpirations(user.id, now);
+    expect(second).toEqual(first);
 
     // Should still only have one expiration transaction
     const expirationTxns = await db
@@ -630,7 +601,7 @@ describe('processLocalExpirations', () => {
     expect(expirationTxns).toHaveLength(1);
   });
 
-  it('returns null when no expirations to process', async () => {
+  it('returns current state when no expirations are due', async () => {
     const user = await insertMigratedTestUser({
       microdollars_used: 0,
       next_credit_expiration_at: '2024-02-01T00:00:00Z', // Future date
@@ -647,12 +618,16 @@ describe('processLocalExpirations', () => {
     });
 
     const now = new Date('2024-01-15');
-    const result = await processLocalExpirations(user, now);
+    const result = await processLocalExpirations(user.id, now);
 
-    expect(result).toBeNull();
+    expect(result).toEqual({
+      microdollars_used: user.microdollars_used,
+      total_microdollars_acquired: user.total_microdollars_acquired,
+      next_credit_expiration_at: user.next_credit_expiration_at,
+    });
   });
 
-  it('handles concurrent execution - one succeeds, other returns null', async () => {
+  it('returns the same committed state to concurrent callers without duplicate expirations', async () => {
     const user = await insertMigratedTestUser({
       microdollars_used: 0,
       next_credit_expiration_at: '2024-01-10T00:00:00Z',
@@ -672,17 +647,16 @@ describe('processLocalExpirations', () => {
 
     // Launch two concurrent processes
     const [result1, result2] = await Promise.all([
-      processLocalExpirations(user, now),
-      processLocalExpirations(user, now),
+      processLocalExpirations(user.id, now),
+      processLocalExpirations(user.id, now),
     ]);
 
-    // Exactly one should succeed, one should return null (optimistic lock failed)
-    const results = [result1, result2];
-    const successes = results.filter(r => r !== null);
-    const nulls = results.filter(r => r === null);
-
-    expect(successes).toHaveLength(1);
-    expect(nulls).toHaveLength(1);
+    expect(result1).toEqual(result2);
+    expect(result1).toEqual({
+      microdollars_used: 0,
+      total_microdollars_acquired: user.total_microdollars_acquired - 1000,
+      next_credit_expiration_at: null,
+    });
 
     // Verify: Only ONE expiration transaction created (no duplicates)
     const expirations = await db
@@ -836,7 +810,7 @@ describe('processLocalExpirations', () => {
     });
     const jan15 = new Date('2024-01-15T00:00:00Z');
 
-    await processLocalExpirations(userAtJan15!, jan15);
+    await processLocalExpirations(userAtJan15!.id, jan15);
 
     // Verify: A expired, B's expiration_baseline shifted but original_baseline unchanged
     const txnsAfterFirstExpiry = await db
@@ -877,7 +851,7 @@ describe('processLocalExpirations', () => {
       new Date('2024-01-20T00:00:00Z').getTime()
     );
     const jan25 = new Date('2024-01-25T00:00:00Z');
-    await processLocalExpirations(userAtJan25!, jan25);
+    await processLocalExpirations(userAtJan25!.id, jan25);
 
     // Final verification
     const finalTxns = await db
@@ -928,7 +902,7 @@ describe('processLocalExpirations', () => {
     });
 
     const now = new Date('2024-01-15');
-    const result = await processLocalExpirations(user, now);
+    const result = await processLocalExpirations(user.id, now);
 
     expect(result).not.toBeNull();
 

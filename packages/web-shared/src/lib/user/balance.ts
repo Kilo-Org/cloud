@@ -6,7 +6,7 @@ import type { UserForBalance } from '@kilocode/web-shared/lib/user/balance-types
 import { subHours } from 'date-fns';
 import { accountBalanceMicrodollars } from '@kilocode/worker-utils/account-access';
 
-export type BalanceForUser = Awaited<ReturnType<typeof getBalanceForUser>>;
+export type BalanceForUser = { balance: number };
 export async function getBalanceForUser(
   user: UserForBalance,
   options: {
@@ -24,9 +24,6 @@ export async function getBalanceForUser(
     now = new Date(),
     expiryJitterHours = Math.random(),
   } = options;
-  // If we DO unfortunately coincidentally check a user in multiple threads,
-  // reduce chance of optimistic concurrency issues by giving users a random
-  // extra 0 - 1 extra  hours before expiration:
   const expireBefore = subHours(now, expiryJitterHours);
 
   const needsExpirationComputation =
@@ -34,14 +31,17 @@ export async function getBalanceForUser(
     (user.next_credit_expiration_at && expireBefore >= new Date(user.next_credit_expiration_at));
 
   if (needsExpirationComputation) {
-    // Process local expirations for migrated users (also updates cache timestamp)
     const timer = createTimer();
-    const result = await processLocalExpirations(user, expireBefore);
+    const result = await processLocalExpirations(user.id, expireBefore, { force: forceRefresh });
     if (!quiet) timer.log(`processLocalExpirations for user ${user.id}`);
     user = { ...user, ...result };
   }
 
   after(() => maybePerformAutoTopUp(user));
   const balance = accountBalanceMicrodollars(user) / 1_000_000;
-  return { balance };
+  return {
+    balance,
+    microdollars_used: user.microdollars_used,
+    total_microdollars_acquired: user.total_microdollars_acquired,
+  };
 }

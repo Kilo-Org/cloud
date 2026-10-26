@@ -66,17 +66,22 @@ export async function getBalanceAndOrgSettings(
   fromDb: typeof db = db
 ): Promise<BalanceAndOrgSettings> {
   const balanceSpan = startInactiveSpan({ name: 'balance-check' });
-  const result = organizationId
-    ? await getBalanceForOrganizationUser(organizationId, user.id, { fromDb })
-    : {
-        ...(await getBalanceForUser(user)),
-        balanceLimitedByUserAllowance: false,
-        payer: {
-          createdAt: user.created_at,
-          microdollarsUsed: user.microdollars_used,
-          totalMicrodollarsAcquired: user.total_microdollars_acquired,
-        },
-      };
+  let result: BalanceAndOrgSettings;
+  if (organizationId) {
+    result = await getBalanceForOrganizationUser(organizationId, user.id, { fromDb });
+  } else {
+    const { balance, microdollars_used, total_microdollars_acquired } =
+      await getBalanceForUser(user);
+    result = {
+      balance,
+      balanceLimitedByUserAllowance: false,
+      payer: {
+        createdAt: user.created_at,
+        microdollarsUsed: microdollars_used,
+        totalMicrodollarsAcquired: total_microdollars_acquired,
+      },
+    };
+  }
   balanceSpan.end();
   return result;
 }
@@ -121,7 +126,6 @@ export async function getBalanceForOrganizationUser(
   const {
     microdollar_limit,
     microdollar_usage,
-    microdollars_used,
     settings,
     require_seats,
     plan,
@@ -130,7 +134,7 @@ export async function getBalanceForOrganizationUser(
     created_at,
   } = row;
 
-  let total_microdollars_acquired = row.total_microdollars_acquired;
+  let { microdollars_used, total_microdollars_acquired } = row;
 
   // Lazy credit expiry check (mirrors user pattern in getBalanceForUser)
   const expireBefore = subHours(now, expiryJitterHours);
@@ -138,18 +142,9 @@ export async function getBalanceForOrganizationUser(
     next_credit_expiration_at && expireBefore >= new Date(next_credit_expiration_at);
 
   if (needsExpirationComputation) {
-    const expiryResult = await processOrganizationExpirations(
-      {
-        id: organizationId,
-        microdollars_used,
-        next_credit_expiration_at,
-        total_microdollars_acquired,
-      },
-      expireBefore
-    );
-    if (expiryResult) {
-      total_microdollars_acquired = expiryResult.total_microdollars_acquired;
-    }
+    const expiryResult = await processOrganizationExpirations(organizationId, expireBefore);
+    microdollars_used = expiryResult.microdollars_used;
+    total_microdollars_acquired = expiryResult.total_microdollars_acquired;
   }
 
   // Trigger org auto-top-up after expiration check so it receives post-expiry values
@@ -175,6 +170,7 @@ export async function getBalanceForOrganizationUser(
   const { balanceMicrodollars, limitedByUserAllowance } = organizationMemberBalance({
     ...row,
     total_microdollars_acquired,
+    microdollars_used,
   });
 
   const endTime = performance.now();

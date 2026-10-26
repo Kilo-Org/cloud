@@ -784,16 +784,8 @@ export const organizationAdminRouter = createTRPCRouter({
         organization.next_credit_expiration_at &&
         new Date() >= new Date(organization.next_credit_expiration_at)
       ) {
-        await processOrganizationExpirations(
-          {
-            id: organizationId,
-            microdollars_used: organization.microdollars_used,
-            next_credit_expiration_at: organization.next_credit_expiration_at,
-            total_microdollars_acquired: organization.total_microdollars_acquired,
-          },
-          new Date()
-        );
-        organization = (await getOrganizationById(organizationId)) ?? organization;
+        const expiryResult = await processOrganizationExpirations(organizationId, new Date());
+        organization = { ...organization, ...expiryResult };
       }
 
       const next_credit_expiration_at = organization.next_credit_expiration_at

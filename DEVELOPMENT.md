@@ -245,6 +245,27 @@ pnpm test
 This runs the web, web environment, and local development-tool tests. They
 should pass against the local PostgreSQL database.
 
+### Credit expiration checks
+
+Single-account expiration locks the primary account before reading its credit transactions.
+It returns current usage, acquired credits, and the next expiration.
+Balance callers use these fields together.
+Forced checks pass `{ force: true }`, including checks with no expiration hint.
+
+Use synthetic accounts and a local PostgreSQL database for expiration checks.
+
+```bash
+pnpm test:db
+pnpm --filter web exec env NODE_ENV=test jest --runInBand \
+  ../../packages/web-shared/src/lib/creditExpiration.test.ts \
+  ../../packages/web-shared/src/lib/creditExpirationOrg.test.ts \
+  ../../packages/web-shared/src/lib/creditExpiration.concurrent.test.ts \
+  ../../packages/web-shared/src/lib/organizations/organization-usage.test.ts \
+  src/tests/profile-balance.test.ts \
+  src/routers/organizations/organization-router.test.ts
+```
+
+
 ## Common Development Commands
 
 | Command | Description |

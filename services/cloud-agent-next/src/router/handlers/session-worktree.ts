@@ -429,7 +429,7 @@ function buildRegistrationInput(
 
   return {
     metadata,
-    sandboxSelection: buildControlPlaneSandboxSelection(metadata, ctx.env, workspace.sandboxId),
+    sandboxSelection: buildControlPlaneSandboxSelection(metadata, workspace.sandboxId),
     ...(runtimeAuthorization ? { runtimeAuthorizationSeal: runtimeAuthorization.seal } : {}),
   };
 }

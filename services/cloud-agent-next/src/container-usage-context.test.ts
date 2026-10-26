@@ -2,11 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import type { VercelSandboxResources } from '@kilocode/worker-utils/sandbox-allocation';
 import type { SandboxId, SandboxInstance } from './types.js';
 import type { SessionMetadata } from './persistence/session-metadata.js';
+import { ContainerConcurrencyLimitError } from './container-concurrency.js';
 import {
   assertSandboxBillingAllocation,
   billingCapacityForSandboxClass,
   buildSandboxBillingInput,
-  configureSandboxBillingInput,
+  ensureSandboxBillingAdmissionInput,
   parseSandboxBillingInput,
   CONTAINERS_BILLING_CAPACITIES,
   containersBillingIdentity,
@@ -434,7 +435,7 @@ describe('container usage context', () => {
       expect(input.sessionId).toBe(sessionScoped ? 'workspace_placed' : undefined);
       expect(() => assertSandboxBillingAllocation(className, input)).not.toThrow();
       // The kind survives the strict envelope without reaching the usage context.
-      expect(parseSandboxBillingInput(input)).toEqual({ ...input, enforcementRequested: false });
+      expect(parseSandboxBillingInput(input)).toEqual(input);
     }
   );
 
@@ -567,29 +568,45 @@ describe('container usage context', () => {
     ).toThrow('SandboxSmall billing received an incompatible sandbox ID');
   });
 
-  it('skips shadow configuration when a sandbox does not expose the metering RPC', async () => {
-    await expect(
-      configureSandboxBillingInput({} as SandboxInstance, {
-        sandboxId: 'ses-abcdef',
-        subject: { type: 'user', id: 'user_1' },
-        actor: { type: 'user', id: 'user_1' },
-        sessionId: 'agent_1',
-        metadata: { origin: 'cloud-agent' },
-      })
-    ).resolves.toBeUndefined();
+  const admissionInput = {
+    sandboxId: 'ses-abcdef',
+    subject: { type: 'user', id: 'user_1' },
+    actor: { type: 'user', id: 'user_1' },
+    sessionId: 'agent_1',
+    metadata: { origin: 'cloud-agent' },
+  } as const;
+
+  it('accepts and drops the enforcement flag stored by earlier Workers', () => {
+    expect(parseSandboxBillingInput({ ...admissionInput, enforcementRequested: true })).toEqual(
+      admissionInput
+    );
   });
 
-  it('propagates attribution configuration failures before sandbox startup', async () => {
-    const configureBilling = vi.fn().mockRejectedValue(new Error('meter unavailable'));
+  it('fails admission closed when a sandbox does not expose the admission RPC', async () => {
     await expect(
-      configureSandboxBillingInput({ configureBilling } as unknown as SandboxInstance, {
-        sandboxId: 'ses-abcdef',
-        subject: { type: 'user', id: 'user_1' },
-        actor: { type: 'user', id: 'user_1' },
-        sessionId: 'agent_1',
-        metadata: { origin: 'cloud-agent' },
-      })
-    ).rejects.toThrow('meter unavailable');
-    expect(configureBilling).toHaveBeenCalledOnce();
+      ensureSandboxBillingAdmissionInput(() => ({}) as SandboxInstance, admissionInput)
+    ).resolves.toMatchObject({ success: false, code: 'meter_unavailable' });
+  });
+
+  it('fails admission closed when the admission RPC throws', async () => {
+    const ensureBillingAdmission = vi.fn().mockRejectedValue(new Error('meter unavailable'));
+    await expect(
+      ensureSandboxBillingAdmissionInput(
+        () => ({ ensureBillingAdmission }) as unknown as SandboxInstance,
+        admissionInput
+      )
+    ).resolves.toMatchObject({ success: false, code: 'meter_unavailable' });
+    expect(ensureBillingAdmission).toHaveBeenCalledOnce();
+  });
+
+  it('rethrows a capacity failure from the admission RPC', async () => {
+    const failure = new ContainerConcurrencyLimitError('personal', 20);
+    const ensureBillingAdmission = vi.fn().mockRejectedValue(failure);
+    await expect(
+      ensureSandboxBillingAdmissionInput(
+        () => ({ ensureBillingAdmission }) as unknown as SandboxInstance,
+        admissionInput
+      )
+    ).rejects.toBe(failure);
   });
 });

@@ -66,6 +66,11 @@ import {
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { FakeSessionPeer, createRuntimeProxyMintingPeer } from './helpers/fake-session-peer.js';
+import {
+  installAckingUsageMeter,
+  VERCEL_SMALL_CONFIGURATION,
+  vercelBilling,
+} from './helpers/fake-vercel-billing.js';
 import { waitFor } from './wait-for.js';
 import { SandboxStatusSnapshotSchema } from '../../src/shared/sandbox-status.js';
 
@@ -1940,14 +1945,14 @@ describe('SandboxControlV2 allocation lifecycle', () => {
       actor: { type: 'user' as const, id: 'owner-1' },
       sessionId: 'workspace_11111111-1111-4111-8111-111111111111',
       metadata: { origin: 'cloud-agent' },
-      enforcementRequested: true,
     };
     const dueAtMs = Date.now() + MINUTE;
     await runInDurableObject(stub, instance => instance.getAllocationState());
     await runInDurableObject(stub, async (_instance, state) => {
       await state.storage.delete('control_plane_generation');
       await state.storage.put('provider_kind', 'vercel');
-      await state.storage.put('billing_input', billing);
+      // Stored before the rollout flag was removed.
+      await state.storage.put('billing_input', { ...billing, enforcementRequested: true });
       await state.storage.put(VERCEL_BILLING_SCHEDULE_KEY, {
         [VERCEL_BILLING_SETTLEMENT_CALLBACK]: {
           dueAtMs,
@@ -1966,7 +1971,9 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     expect(retained.schedule?.[VERCEL_BILLING_SETTLEMENT_CALLBACK]?.dueAtMs).toBe(dueAtMs);
     expect(retained.acknowledgement).toBe('generation-1');
     expect(await readAlarm(stub)).toBe(dueAtMs);
-    expect(JSON.parse((await readProviderPin(stub)) ?? '{}').billing).toMatchObject(billing);
+    const pinnedBilling = JSON.parse((await readProviderPin(stub)) ?? '{}').billing;
+    expect(pinnedBilling).toMatchObject(billing);
+    expect(pinnedBilling).not.toHaveProperty('enforcementRequested');
   });
 
   it('keeps a legacy sandbox recoverable when its optional billing input is malformed', async () => {
@@ -2033,7 +2040,6 @@ describe('SandboxControlV2 allocation lifecycle', () => {
           actor: { type: 'user', id: 'owner-1' },
           sessionId: 'workspace_11111111-1111-4111-8111-111111111111',
           metadata: { origin: 'cloud-agent' },
-          enforcementRequested: true,
         },
         meter,
         ...(result === 'insufficient'
@@ -2183,7 +2189,6 @@ describe('SandboxControlV2 allocation lifecycle', () => {
         actor: { type: 'user', id: 'owner-1' },
         sessionId,
         metadata: { origin: 'cloud-agent' },
-        enforcementRequested: true,
       },
       meter,
       preparingRoute: sessionId,
@@ -2269,7 +2274,6 @@ describe('SandboxControlV2 allocation lifecycle', () => {
           actor: { type: 'user', id: 'owner-1' },
           sessionId: 'workspace_11111111-1111-4111-8111-111111111111',
           metadata: { origin: 'cloud-agent' },
-          enforcementRequested: true,
         },
         meter,
       });
@@ -2373,9 +2377,9 @@ describe('SandboxControlV2 allocation lifecycle', () => {
   );
 
   it('reads current stored grants after eviction and adapter construction, excluding expired grants', async () => {
-    // The DO id must be a valid sandbox id (legacy-shared `__` shape); the
-    // allocation name is what the real Vercel REST client validates.
-    const sandboxId = 'sbx__chunk3_grant_reader';
+    // Vercel billing admits only an isolated sandbox id; the allocation name is
+    // what the real Vercel REST client validates.
+    const sandboxId = `ses-${'f'.repeat(47)}1`;
     const allocationName = 'ses-chunk3-grant-reader';
     const stub = sandboxNamespace.getByName(sandboxId);
     const now = Date.now();
@@ -2419,12 +2423,18 @@ describe('SandboxControlV2 allocation lifecycle', () => {
       vi.stubGlobal('fetch', fetchStub);
     });
 
+    const billing = vercelBilling({
+      sandboxId,
+      sessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+      userId: 'owner-1',
+    });
     // With no owner, admission is unavailable: this persists the Vercel pin
     // without a provider create.
     await stub.ensureAllocation({
       provider: 'vercel',
-      configuration: { provider: 'vercel' },
+      configuration: VERCEL_SMALL_CONFIGURATION,
       allocationName,
+      billing,
     });
     await waitFor(async () => expect((await stub.getAllocationState()).kind).toBe('stopped'));
     expect(captured).toHaveLength(0);
@@ -2447,6 +2457,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
           createProviderAdapter(pin: StoredProviderPin): ProviderAdapter;
         }
       ).createProviderAdapter.bind(instance);
+      installAckingUsageMeter(instance);
       Object.assign(instance, {
         createProviderAdapter(pin: StoredProviderPin) {
           expect(listScopeGrants(db)).toEqual(expect.arrayContaining([active, expired]));
@@ -2467,8 +2478,9 @@ describe('SandboxControlV2 allocation lifecycle', () => {
 
     await stub.ensureAllocation({
       provider: 'vercel',
-      configuration: { provider: 'vercel' },
+      configuration: VERCEL_SMALL_CONFIGURATION,
       allocationName,
+      billing,
     });
     await waitFor(() => expect(captured.length).toBeGreaterThan(0));
 
@@ -2508,7 +2520,6 @@ describe('SandboxControlV2 allocation lifecycle', () => {
         actor: { type: 'user', id: 'owner-1' },
         sessionId: 'workspace_11111111-1111-4111-8111-111111111111',
         metadata: { origin: 'cloud-agent' },
-        enforcementRequested: true,
       },
       meter,
     });
@@ -2581,7 +2592,6 @@ describe('SandboxControlV2 allocation lifecycle', () => {
           actor: { type: 'user', id: 'owner-1' },
           sessionId: 'workspace_11111111-1111-4111-8111-111111111111',
           metadata: { origin: 'cloud-agent' },
-          enforcementRequested: true,
         },
         meter,
         preparingRoute: 'workspace_admission_error',
@@ -2659,7 +2669,6 @@ describe('SandboxControlV2 allocation lifecycle', () => {
           actor: { type: 'user', id: 'owner-1' },
           sessionId: 'workspace_11111111-1111-4111-8111-111111111111',
           metadata: { origin: 'cloud-agent' },
-          enforcementRequested: true,
         },
         meter,
       });
@@ -2749,7 +2758,6 @@ describe('SandboxControlV2 allocation lifecycle', () => {
           actor: { type: 'user', id: 'owner-1' },
           sessionId: 'workspace_11111111-1111-4111-8111-111111111111',
           metadata: { origin: 'cloud-agent' },
-          enforcementRequested: true,
         },
         meter,
         preparingRoute: 'workspace_retry_launch',
@@ -2838,7 +2846,6 @@ describe('SandboxControlV2 allocation lifecycle', () => {
         actor: { type: 'user', id: 'owner-1' },
         sessionId: 'workspace_11111111-1111-4111-8111-111111111111',
         metadata: { origin: 'cloud-agent' },
-        enforcementRequested: true,
       },
       meter,
       preparingRoute: 'workspace_pending_cleanup',
@@ -2904,11 +2911,14 @@ describe('SandboxControlV2 allocation lifecycle', () => {
   }, 20_000);
 
   it.each(['valid', 'wrong-owner', 'invalid-size'] as const)(
-    'handles a shadow admission exception with %s billing identity',
+    'fails the route closed when Vercel admission throws with %s billing identity',
     async identity => {
       const sandboxId = `ses-${(identity === 'valid' ? 'b' : identity === 'wrong-owner' ? 'c' : 'd').repeat(47)}e`;
+      let starts = 0;
+      let stops = 0;
       const meter: ContainerUsageRpcMethods = {
         async recordStart() {
+          starts++;
           return { success: true, ack: { intervalId: 'interval-1', durable: 'pg', dedup: false } };
         },
         async recordHeartbeat() {
@@ -2920,6 +2930,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
           };
         },
         async recordStop() {
+          stops++;
           return { intervalId: 'interval-1', durable: 'pg', dedup: false };
         },
       };
@@ -2937,30 +2948,29 @@ describe('SandboxControlV2 allocation lifecycle', () => {
           actor: { type: 'user', id: 'owner-1' },
           sessionId: 'workspace_11111111-1111-4111-8111-111111111111',
           metadata: { origin: 'cloud-agent' },
-          enforcementRequested: false,
         },
         meter,
-        preparingRoute: 'workspace_shadow_exception',
+        preparingRoute: 'workspace_admission_exception',
         admissionError: 'throw-after-open',
       });
-      if (identity === 'valid') {
-        await waitFor(() => expect(provider.createCalls).toBe(1));
-        const context = await runInDurableObject(stub, (_instance, state) =>
-          getBillingContext(state.storage)
-        );
-        expect(context?.subject.id).toBe('owner-1');
-      } else {
-        await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
-        expect(provider.createCalls).toBe(0);
-        const route = await runInDurableObject(stub, async (_instance, state) => {
-          const db = drizzle(state.storage, { logger: false });
-          return db
-            .select()
-            .from(routesTable)
-            .where(eq(routesTable.session_id, 'workspace_shadow_exception'));
-        });
-        expect(route[0]).toMatchObject({ state: 'failed', reason: 'billing_unavailable' });
-      }
+      const startedAt = Date.now();
+      await waitFor(async () => expect((await readState(stub)).kind).toBe('stopped'));
+      expect(Date.now() - startedAt).toBeLessThan(2_000);
+      expect(provider.createCalls).toBe(0);
+      const route = await runInDurableObject(stub, async (_instance, state) => {
+        const db = drizzle(state.storage, { logger: false });
+        return db
+          .select()
+          .from(routesTable)
+          .where(eq(routesTable.session_id, 'workspace_admission_exception'));
+      });
+      expect(route[0]).toMatchObject({ state: 'failed', reason: 'billing_unavailable' });
+      // An interval opened before the exception is closed, not left open at the meter.
+      await waitFor(() => expect(stops).toBe(starts));
+      expect(starts).toBe(identity === 'valid' ? 1 : 0);
+      expect(
+        await runInDurableObject(stub, (_instance, state) => getBillingContext(state.storage))
+      ).toBeUndefined();
     }
   );
 });

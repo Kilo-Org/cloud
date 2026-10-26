@@ -114,10 +114,10 @@ describe('resolveSavedSandboxAllocation', () => {
   it('skips a saved containers size that the picker does not offer', async () => {
     getSandboxAllocationCandidatesMock.mockResolvedValue({
       repositoryAllocation: 'cloudflare-containers-standard-4',
-      contextAllocation: 'vercel-small',
+      contextAllocation: 'cloudflare-shared',
     });
 
-    await expect(resolve()).resolves.toBe('vercel-small');
+    await expect(resolve()).resolves.toBe('cloudflare-shared');
   });
 
   it('skips a saved Vercel choice for a GitLab repository', async () => {
@@ -143,10 +143,10 @@ describe('resolveSavedSandboxAllocation', () => {
     }
   );
 
-  it('keeps a saved Vercel choice when nothing restricts it', async () => {
+  it('skips a saved Vercel choice because Vercel does not support enforced billing', async () => {
     getSandboxAllocationCandidatesMock.mockResolvedValue({ contextAllocation: 'vercel-small' });
 
-    await expect(resolve()).resolves.toBe('vercel-small');
+    await expect(resolve()).resolves.toBeUndefined();
   });
 
   it('returns nothing when no saved setting resolves', async () => {

@@ -20,7 +20,6 @@ import {
   isCloudflareContainersEnrolled,
   type CloudflareContainersEnrollmentEnv,
 } from './agent-sandbox/cloudflare-containers/cloudflare-containers-runtime-config.js';
-import { isCloudAgentContainerBillingEnabled } from './container-billing-rollout.js';
 import { providerSupportsEnforcedBilling } from './sandbox-provider-eligibility.js';
 
 export const MANAGED_SCM_OUTBOUND_HANDLER = 'managedScm';
@@ -235,13 +234,7 @@ export type SandboxSelectionEnv = {
 } & VercelSandboxEnrollmentEnv &
   VercelSandboxRuntimeConfigEnv &
   CloudflareContainersEnrollmentEnv &
-  Pick<
-    Env,
-    | 'CLOUD_AGENT_CONTAINER_BILLING_ENABLED'
-    | 'CLOUD_AGENT_CONTAINER_BILLING_USER_IDS'
-    | 'CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS'
-    | 'CREDENTIAL_CONTAINMENT_ENABLED'
-  >;
+  Pick<Env, 'CREDENTIAL_CONTAINMENT_ENABLED'>;
 
 type SelectSandboxForNewSessionInput = {
   env: SandboxSelectionEnv;
@@ -287,12 +280,7 @@ export function selectDefaultSandboxProvider(input: {
   userId: string;
   isolated: boolean;
 }): AgentSandboxProvider {
-  const enforced = isCloudAgentContainerBillingEnabled(input.env, {
-    userId: input.userId,
-    ...(input.orgId !== undefined ? { orgId: input.orgId } : {}),
-  });
-  const eligible = (provider: AgentSandboxProvider): boolean =>
-    !enforced || providerSupportsEnforcedBilling(provider);
+  const eligible = providerSupportsEnforcedBilling;
 
   const enrollment = parseVercelSandboxEnrollment(input.env);
   const runtimeConfig = parseVercelSandboxRuntimeConfig(input.env);

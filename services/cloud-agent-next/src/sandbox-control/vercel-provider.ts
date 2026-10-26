@@ -175,7 +175,7 @@ export function createVercelProviderAdapter(deps: {
     _ref,
     billing
   ) => {
-    if (billing?.enforcementRequested) {
+    if (billing) {
       throw new AgentSandboxUnavailableError(
         'Container billing admission is unavailable for Vercel sandbox sessions',
         'billing_blocked'

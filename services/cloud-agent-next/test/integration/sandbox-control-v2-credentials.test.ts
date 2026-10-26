@@ -48,9 +48,15 @@ import {
 } from './helpers/fake-credentials.js';
 import { createRuntimeProxyMintingPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
+import {
+  installVercelBilling,
+  VERCEL_SMALL_CONFIGURATION,
+  vercelBilling,
+} from './helpers/fake-vercel-billing.js';
 import { waitFor } from './wait-for.js';
 
-const SANDBOX_ID = 'sbx__control_v2_credentials';
+// Vercel billing admits only an isolated sandbox, so the fixture uses an isolated ID.
+const SANDBOX_ID = `ses-${'c'.repeat(48)}`;
 const SESSION = 'workspace_11111111-1111-1111-1111-111111111111';
 const SESSION_NEXT = 'workspace_22222222-2222-2222-2222-222222222222';
 const OUTBOUND_CONTAINER_ID = fakeOutboundContainerId(SANDBOX_ID);
@@ -371,10 +377,18 @@ async function setupVercel(
     KILO_OPENROUTER_BASE: VERCEL_TARGET,
     KILO_SESSION_INGEST_URL: VERCEL_TARGET,
   });
-  await runInDurableObject(stub, async instance => {
+  await runInDurableObject(stub, async (instance, state) => {
+    await installVercelBilling(instance, state, 'user_123');
     await instance.ensureAllocation({
       provider: 'vercel',
+      configuration: VERCEL_SMALL_CONFIGURATION,
       allocationName: SANDBOX_ID,
+      billing: vercelBilling({
+        sandboxId: SANDBOX_ID,
+        sessionId: SESSION,
+        userId: 'user_123',
+        orgId: 'org_123',
+      }),
       containment: WORKTREE_CREDENTIAL_CONTAINMENT,
     });
   });
@@ -2256,7 +2270,7 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
     // The selected containment namespace is missing, not redirected to a
     // stand-in that throws. The original idFromName call still raises.
     await installGrantBroker(stub, broker.service, env => {
-      delete env.SandboxContainment;
+      delete env.SandboxSmallContainment;
     });
 
     const capture = captureRouteFailed();

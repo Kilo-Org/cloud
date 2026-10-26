@@ -180,10 +180,6 @@ export class MeteredBillingLifecycle {
       const block = await this.getBillingBlock();
       let active = await getBillingContext(this.host.storage);
 
-      if (!block && !parsed.enforcementRequested) {
-        return { success: true };
-      }
-
       // An unmeasured context is admitted only when its start is already acknowledged and it
       // carries no stop waiting for delivery. A pending stop must fall through to the
       // stop-delivery path instead of being skipped.

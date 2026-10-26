@@ -139,6 +139,7 @@ export type PreparingStep =
   | 'workspace_restore'
   | 'workspace_backup'
   | 'sandbox_provision'
+  | 'environment_snapshot'
   | 'sandbox_boot'
   | 'snapshot_fallback'
   | 'kilo_server'

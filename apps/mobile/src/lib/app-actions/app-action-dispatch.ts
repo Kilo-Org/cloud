@@ -15,13 +15,14 @@ import {
   parseAppActionPayload,
 } from './app-action-contract';
 import { setPendingAppAction } from './pending-app-action';
+import { preflightStartAgent } from './start-agent-preflight';
 
 /** The `StartAgent` request without its discriminant: what `start-agent.ts` takes. */
 type StartAgentInput = Omit<Extract<AppActionRequest, { action: 'StartAgent' }>, 'action'>;
 
 /**
- * The headless create, the native bridge, and Sentry — loaded on demand rather
- * than imported.
+ * The headless create, the native bridge, Sentry, and the confirmation surface
+ * — loaded on demand rather than imported.
  *
  * `index.js` registers this dispatcher at boot, before any screen mounts, and
  * the tabs layout imports it on every launch. A static import would evaluate
@@ -31,10 +32,19 @@ type StartAgentInput = Omit<Extract<AppActionRequest, { action: 'StartAgent' }>,
  * mount without one failing.
  */
 export type AppActionDispatcherDeps = {
+  /**
+   * Asks the person to confirm an externally requested `StartAgent`.
+   * Resolves true only on the explicit continue answer.
+   */
+  confirmStart: (input: StartAgentInput) => Promise<boolean>;
   startAgent: (input: StartAgentInput) => Promise<AppActionResult>;
 };
 
 const defaultDeps: AppActionDispatcherDeps = {
+  confirmStart: async input => {
+    const { confirmAppActionStart } = await import('./confirm-app-action-start');
+    return confirmAppActionStart(input);
+  },
   startAgent: async input => {
     const { startAgent } = await import('./start-agent');
     return startAgent(input);
@@ -101,6 +111,10 @@ export async function dispatchAppActionRequest(
   deps: AppActionDispatcherDeps = defaultDeps
 ): Promise<AppActionResult> {
   if (request.action === 'StartAgent') {
+    const preflight = preflightStartAgent(request);
+    if (!preflight.ok) {
+      return preflight.result;
+    }
     const result = await runStartAgent(request, deps);
     if (result.ok && result.sessionId !== undefined) {
       // The move the in-app create makes through `replaceWithAgentSession`
@@ -148,6 +162,22 @@ async function runStartAgent(
     ...(request.repository === undefined ? {} : { repository: request.repository }),
     ...(request.sessionId === undefined ? {} : { sessionId: request.sessionId }),
   };
+  let confirmed = false;
+  try {
+    confirmed = await deps.confirmStart(input);
+  } catch (error) {
+    await captureAppActionError(error, 'confirm_start_agent');
+    return {
+      ok: false,
+      action: 'StartAgent',
+      retryable: true,
+      code: 'start-failed',
+      message: i18n.t('agentChat.session.serviceUnavailable'),
+    };
+  }
+  if (!confirmed) {
+    return startCancelledResult();
+  }
   try {
     return await deps.startAgent(input);
   } catch (error) {
@@ -160,6 +190,20 @@ async function runStartAgent(
       message: i18n.t('agentChat.session.serviceUnavailable'),
     };
   }
+}
+
+/**
+ * The result a cancelled confirmation reports: the distinct non-retryable
+ * `start-cancelled` code, and a message no consumer shows as an error.
+ */
+function startCancelledResult(): AppActionResult {
+  return {
+    ok: false,
+    action: 'StartAgent',
+    retryable: false,
+    code: 'start-cancelled',
+    message: i18n.t('common.cancelled'),
+  };
 }
 
 /**

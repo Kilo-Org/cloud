@@ -1,4 +1,5 @@
-import { test, describe, expect } from '@jest/globals';
+import { test, describe, expect, afterEach } from '@jest/globals';
+import { captureException } from '@sentry/nextjs';
 import {
   parseMessagesMicrodollarUsageFromStream,
   parseMessagesMicrodollarUsageFromString,
@@ -9,6 +10,11 @@ import { join } from 'node:path';
 import { createReadStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
+
+jest.mock('@sentry/nextjs', () => ({
+  ...jest.requireActual<object>('@sentry/nextjs'),
+  captureException: jest.fn(),
+}));
 
 const sampleDir = join(process.cwd(), 'src/tests/sample');
 
@@ -51,7 +57,7 @@ describe('processMessagesApiUsage', () => {
       cost_details: { upstream_inference_cost: 0.7 },
     };
 
-    const result = processMessagesApiUsage(usage, null, coreProps);
+    const result = processMessagesApiUsage(usage, null, coreProps, 'openrouter');
 
     expect(result.cost_mUsd).toBe(1000);
     expect(result.is_byok).toBe(false);
@@ -74,7 +80,7 @@ describe('processMessagesApiUsage', () => {
       cost_details: { upstream_inference_cost: 0.02 },
     };
 
-    const result = processMessagesApiUsage(usage, null, coreProps);
+    const result = processMessagesApiUsage(usage, null, coreProps, 'openrouter');
 
     expect(result.cost_mUsd).toBe(20000);
     expect(result.is_byok).toBe(true);
@@ -93,7 +99,7 @@ describe('processMessagesApiUsage', () => {
       gateway: { routing: { finalProvider: 'anthropic' }, cost: '0', marketCost: '0.000375' },
     };
 
-    const result = processMessagesApiUsage(usage, providerMetadata, coreProps);
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
 
     expect(result.cost_mUsd).toBe(375); // toMicrodollars(0.000375)
     expect(result.is_byok).toBeNull();
@@ -128,7 +134,7 @@ describe('processMessagesApiUsage', () => {
       },
     };
 
-    const result = processMessagesApiUsage(usage, providerMetadata, coreProps);
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
 
     expect(result.is_byok).toBe(true);
     expect(result.cost_mUsd).toBe(402);
@@ -159,7 +165,7 @@ describe('processMessagesApiUsage', () => {
       },
     };
 
-    const result = processMessagesApiUsage(usage, providerMetadata, coreProps);
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
 
     expect(result.is_byok).toBe(false);
   });
@@ -192,13 +198,13 @@ describe('processMessagesApiUsage', () => {
       },
     };
 
-    const result = processMessagesApiUsage(usage, providerMetadata, coreProps);
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
 
     expect(result.is_byok).toBe(false);
   });
 
   test('returns zero cost when no usage or metadata is provided', () => {
-    const result = processMessagesApiUsage(null, null, coreProps);
+    const result = processMessagesApiUsage(null, null, coreProps, 'openrouter');
 
     expect(result.cost_mUsd).toBe(0);
     expect(result.is_byok).toBeNull();
@@ -218,7 +224,8 @@ describe('parseMessagesMicrodollarUsageFromStream approval tests', () => {
       'fake-user-id',
       undefined,
       'vercel',
-      200
+      200,
+      false
     );
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
@@ -242,7 +249,8 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
       'fake-user-id',
       undefined,
       'vercel',
-      200
+      200,
+      false
     );
 
     expect(result.model).toBe('anthropic/claude-opus-4.8');
@@ -263,7 +271,8 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
       'fake-user-id',
       undefined,
       'vercel',
-      200
+      200,
+      false
     );
 
     expect(result.generation_time).toBe(39303);
@@ -280,7 +289,8 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
       'fake-user-id',
       undefined,
       'vercel',
-      200
+      200,
+      false
     );
 
     expect(result.generation_time).toBeNull();
@@ -301,7 +311,8 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
       'fake-user-id',
       undefined,
       'martian',
-      200
+      200,
+      false
     );
 
     expect(result).toMatchObject({
@@ -325,7 +336,8 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
       'fake-user-id',
       undefined,
       'martian',
-      200
+      200,
+      false
     );
 
     expect(result).toMatchObject({
@@ -349,7 +361,8 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
       'fake-user-id',
       undefined,
       'martian',
-      200
+      200,
+      false
     );
 
     expect(result).toMatchObject({ inputTokens: 25, outputTokens: 724 });
@@ -366,7 +379,8 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
       'fake-user-id',
       undefined,
       'openrouter',
-      200
+      200,
+      false
     );
 
     expect(result.hasError).toBe(true);
@@ -385,11 +399,73 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
       'fake-user-id',
       undefined,
       'openrouter',
-      200
+      200,
+      false
     );
 
     expect(result.hasError).toBe(true);
     expect(result.finish_reason).toBe('error');
+  });
+
+  describe('upstream error reporting', () => {
+    afterEach(() => {
+      jest.mocked(captureException).mockClear();
+      jest.restoreAllMocks();
+    });
+
+    const parseError = (error: object, usesUserCredentials: boolean) =>
+      parseMessagesMicrodollarUsageFromStream(
+        streamFromText(`event: error\ndata: ${JSON.stringify({ type: 'error', error })}\n\n`),
+        'fake-user-id',
+        undefined,
+        'openrouter',
+        200,
+        usesUserCredentials
+      );
+
+    test('logs transient stream errors without reporting to Sentry', async () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      await parseError(
+        {
+          type: 'api_error',
+          error_type: 'provider_unavailable',
+          message: 'JSON error injected into SSE stream',
+        },
+        false
+      );
+
+      expect(captureException).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        'Messages API stream error: JSON error injected into SSE stream',
+        expect.objectContaining({
+          source: 'messages_sse_processing',
+          error_type: 'provider_unavailable',
+          provider: 'openrouter',
+        })
+      );
+    });
+
+    test('reports authentication errors on Kilo credentials to Sentry', async () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      await parseError({ type: 'authentication_error', message: 'invalid x-api-key' }, false);
+
+      expect(warn).not.toHaveBeenCalled();
+      expect(captureException).toHaveBeenCalledWith(
+        new Error('Messages API stream error: invalid x-api-key'),
+        expect.objectContaining({ tags: { source: 'messages_sse_processing' } })
+      );
+    });
+
+    test('only logs authentication errors on user credentials', async () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      await parseError({ type: 'authentication_error', message: 'invalid x-api-key' }, true);
+
+      expect(captureException).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
   });
 });
 
@@ -398,7 +474,7 @@ describe('parseMessagesMicrodollarUsageFromString approval tests', () => {
   test(vercelMessagesJson, async () => {
     const inputFile = join(sampleDir, vercelMessagesJson);
     const jsonString = await readFile(inputFile, 'utf-8');
-    const result = parseMessagesMicrodollarUsageFromString(jsonString, 200);
+    const result = parseMessagesMicrodollarUsageFromString(jsonString, 200, 'openrouter');
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);

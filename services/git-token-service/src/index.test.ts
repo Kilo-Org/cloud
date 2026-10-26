@@ -2705,36 +2705,33 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
       'GET',
       'https://gitlab.com/api/v4/projects/42/merge_requests/42/changes',
       { 'PRIVATE-TOKEN': 'project-access-token' },
+      null,
     ],
-    ['POST', 'https://gitlab.com/api/graphql', { 'PRIVATE-TOKEN': 'project-access-token' }],
     [
-      'DELETE',
-      'https://gitlab.com/api/v4/projects/99/merge_requests/7',
+      'GET',
+      'https://gitlab.com/api/v4/projects/acme%2Fwidgets/approval_rules',
       { 'PRIVATE-TOKEN': 'project-access-token' },
+      null,
     ],
     [
       'GET',
       'https://gitlab.com/acme/widgets.git/info/refs?service=git-upload-pack',
       { authorization: `Basic ${Buffer.from('oauth2:project-access-token').toString('base64')}` },
+      null,
     ],
+    ['POST', 'https://gitlab.com/api/graphql', null, 'invalid_upstream_request'],
+    ['GET', 'https://gitlab.com/api/v4/projects', null, 'invalid_upstream_request'],
+    ['GET', 'https://gitlab.com/api/v4/projects/acme%2Fother/issues', null, 'repository_mismatch'],
+    ['GET', 'https://gitlab.com/api/v4/projects/99/issues', null, 'repository_mismatch'],
     [
       'GET',
       'https://gitlab.com/other/project.git/info/refs?service=git-upload-pack',
-      { authorization: `Basic ${Buffer.from('oauth2:project-access-token').toString('base64')}` },
-    ],
-    [
-      'GET',
-      'https://gitlab.com/api/project.git/info/refs?service=git-upload-pack',
-      { authorization: `Basic ${Buffer.from('oauth2:project-access-token').toString('base64')}` },
-    ],
-    [
-      'POST',
-      'https://gitlab.com/api/v4/project.git/info/lfs/locks/123/unlock',
-      { authorization: `Basic ${Buffer.from('oauth2:project-access-token').toString('base64')}` },
+      null,
+      'repository_mismatch',
     ],
   ] as const)(
-    'redeems an unrestricted bound project-source capability server-side for %s %s',
-    async (requestMethod, requestUrl, headers) => {
+    'applies project credential request policy for %s %s',
+    async (requestMethod, requestUrl, headers, reason) => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ id: 42 })));
       const projectIntegration = {
         success: true as const,
@@ -2763,6 +2760,8 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
       });
       if (!issued.success) throw new Error('Expected successful issuance');
       serviceMocks.getGitLabToken.mockClear();
+      serviceMocks.findGitLabIntegration.mockClear();
+      serviceMocks.resolveGitLabCredential.mockClear();
 
       await expect(
         service.redeemGitLabSessionCapability({
@@ -2771,7 +2770,11 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
           requestMethod,
           requestUrl,
         })
-      ).resolves.toEqual({ success: true, headers });
+      ).resolves.toEqual(reason ? { success: false, reason } : { success: true, headers });
+      if (reason) {
+        expect(serviceMocks.findGitLabIntegration).not.toHaveBeenCalled();
+        expect(serviceMocks.resolveGitLabCredential).not.toHaveBeenCalled();
+      }
       expect(serviceMocks.getGitLabToken).not.toHaveBeenCalled();
     }
   );
@@ -2885,18 +2888,6 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
       'GET',
       'https://gitlab.example.com:8443/gitlab/api/v4/projects/acme%2Fplatform%2Fwidgets/merge_requests/42/changes',
       { authorization: 'Bearer refreshed-self-managed-token' },
-    ],
-    [
-      'POST',
-      'https://gitlab.example.com:8443/gitlab/api/graphql',
-      { authorization: 'Bearer refreshed-self-managed-token' },
-    ],
-    [
-      'GET',
-      'https://gitlab.example.com:8443/gitlab/other/project.git/info/refs?service=git-upload-pack',
-      {
-        authorization: `Basic ${Buffer.from('oauth2:refreshed-self-managed-token').toString('base64')}`,
-      },
     ],
   ] as const)(
     'issues and redeems a nested self-managed GitLab capability for %s %s',
@@ -3093,6 +3084,18 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
       'https://gitlab.com/api/v4/projects/acme%2Fwidgets/merge_requests/42/discussions',
       'Bearer',
     ],
+    ['GET', 'https://gitlab.com/api/v4/projects/acme%2Fwidgets', 'Bearer'],
+    [
+      'GET',
+      'https://gitlab.com/api/v4/projects/acme%2Fwidgets/merge_requests/42/versions',
+      'Bearer',
+    ],
+    [
+      'GET',
+      'https://gitlab.com/api/v4/projects/acme%2Fwidgets/merge_requests/42/approval_state',
+      'Bearer',
+    ],
+    ['DELETE', 'https://gitlab.com/api/v4/projects/acme%2Fwidgets/issues/1', 'Bearer'],
   ] as const)('redeems allowed GitLab request %s %s', async (requestMethod, requestUrl, scheme) => {
     const service = createService();
     const issued = await service.issueGitLabSessionCapability({
@@ -3127,12 +3130,19 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
   });
 
   it.each([
-    ['GET', 'https://gitlab.com/api/v4/projects?membership=true'],
-    ['POST', 'https://gitlab.com/api/graphql'],
-    ['DELETE', 'https://gitlab.com/api/v4/projects/acme%2Fother/issues/1'],
+    ['GET', 'https://gitlab.com/api/v4/projects?membership=true', 'invalid_upstream_request'],
+    ['POST', 'https://gitlab.com/api/graphql', 'invalid_upstream_request'],
+    ['DELETE', 'https://gitlab.com/api/v4/projects/acme%2Fother/issues/1', 'repository_mismatch'],
+    ['GET', 'https://gitlab.com/api/v4/projects/42/merge_requests/7', 'repository_mismatch'],
+    [
+      'GET',
+      'https://gitlab.com/other/project.git/info/refs?service=git-upload-pack',
+      'repository_mismatch',
+    ],
+    ['GET', 'https://gitlab.com/acme/widgets', 'invalid_upstream_request'],
   ] as const)(
-    'redeems an unrestricted bound GitLab integration capability for API request %s %s',
-    async (requestMethod, requestUrl) => {
+    'applies integration request policy for %s %s',
+    async (requestMethod, requestUrl, reason) => {
       const service = createService();
       const issued = await service.issueGitLabSessionCapability({
         gitUrl: 'https://gitlab.com/acme/widgets.git',
@@ -3141,11 +3151,8 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
       });
       if (!issued.success) throw new Error('Expected successful issuance');
       serviceMocks.findGitLabIntegration.mockClear();
-      serviceMocks.getGitLabToken.mockResolvedValueOnce({
-        success: true,
-        token: 'refreshed-gitlab-token',
-        instanceUrl: 'https://gitlab.com',
-      });
+      serviceMocks.resolveGitLabCredential.mockClear();
+      serviceMocks.getGitLabToken.mockClear();
 
       await expect(
         service.redeemGitLabSessionCapability({
@@ -3154,11 +3161,10 @@ describe('GitTokenRPCEntrypoint GitLab session capability RPCs', () => {
           requestMethod,
           requestUrl,
         })
-      ).resolves.toEqual({
-        success: true,
-        headers: { authorization: 'Bearer refreshed-gitlab-token' },
-      });
-      expect(serviceMocks.findGitLabIntegration).toHaveBeenCalledOnce();
+      ).resolves.toEqual({ success: false, reason });
+      expect(serviceMocks.findGitLabIntegration).not.toHaveBeenCalled();
+      expect(serviceMocks.resolveGitLabCredential).not.toHaveBeenCalled();
+      expect(serviceMocks.getGitLabToken).not.toHaveBeenCalled();
     }
   );
 

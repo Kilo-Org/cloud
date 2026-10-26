@@ -45,7 +45,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 
 import { useRootNavigationReady } from '@/lib/navigation-ready';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { I18nManager, View, type ViewInstance } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
@@ -58,7 +58,7 @@ import { StateSurface } from '@/components/centered-state-surface';
 import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
 import { RuntimeErrorScreen } from '@/components/runtime-error-screen';
 import { splashContentScale } from '@/components/splash-reveal';
-import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
+import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { MotionProvider } from '@/lib/a11y/motion';
 import { useAuth } from '@/lib/auth/auth-context';
 import { resolveBootstrapDecision, shouldShowBootstrapLoading } from '@/lib/bootstrap-decision';
@@ -68,7 +68,7 @@ import { subscribeToConsentChanges } from '@/lib/consent';
 import { shouldStartAnalytics } from '@/lib/analytics-consent';
 import { isPostHogReady, subscribeToPostHogReady } from '@/lib/analytics/posthog';
 import { drainStartupTimings } from '@/lib/startup-drain';
-import { markStartup, markStartupComplete } from '@/lib/startup-timing';
+import { isStartupComplete, markStartup, markStartupComplete } from '@/lib/startup-timing';
 import { prefetchCurrentUser } from '@/lib/startup-prefetch';
 import { useAnalyticsConsentGate } from '@/lib/hooks/use-analytics-consent-gate';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
@@ -87,7 +87,16 @@ import {
   useThemePreference,
 } from '@/lib/hooks/use-theme-preference';
 import { i18n } from '@/i18n';
-import { syncRtl } from '@/i18n/rtl';
+import {
+  clearDirectionAttemptAsync,
+  readDirectionAttemptAsync,
+  writeDirectionAttemptAsync,
+} from '@/i18n/direction-attempt';
+import { isRtlLanguage, syncRtl } from '@/i18n/rtl';
+import {
+  retryLanguageStartupDirectionAsync,
+  runLanguageStartupDirectionAsync,
+} from '@/i18n/startup-direction-run';
 import { type LanguageReturnTarget, readLanguageReturnTarget } from '@/i18n/return-target';
 import {
   getResolvedLanguage,
@@ -130,6 +139,7 @@ import {
   consumeLastRouteForRepair,
   getLastRouteHydrationVersion,
   isLastRouteHydrated,
+  prepareLastRouteRepair,
   subscribeLastRoute,
 } from '@/lib/last-route';
 import { shouldRepairRestoredRoute } from '@/lib/last-route-repair';
@@ -283,9 +293,8 @@ function RootLayoutNav({
   const [optionalConsent, setOptionalConsentState] = useState(false);
   const [consentCheckError, setConsentCheckError] = useState<unknown>(null);
   const [consentCheckRetryKey, setConsentCheckRetryKey] = useState(0);
-  // Flipped by every splash-hide site below, so the app_startup drain can
-  // depend on "startup finished" as an ordinary dependency.
-  const [startupFinished, setStartupFinished] = useState(false);
+  // A recreated activity has no splash once this runtime completed startup.
+  const [startupFinished, setStartupFinished] = useState(isStartupComplete);
   // Reactive snapshot so the drain effect re-triggers when the PostHog
   // client becomes ready after async init.
   const postHogReady = useSyncExternalStore(subscribeToPostHogReady, isPostHogReady);
@@ -451,19 +460,28 @@ function RootLayoutNav({
 
     const prepareLanguage = async () => {
       const resolved = getResolvedLanguage();
-      let reloadFailed = false;
-      if (syncRtl(resolved)) {
-        try {
-          await reloadAppAsync();
-          // The native reload tears down this JS context; nothing below runs.
-          return;
-        } catch {
-          // Reload failed: keep going so the language still loads, then show
-          // the Retry/Continue screen instead of first-painting in the wrong
-          // direction.
-          reloadFailed = true;
+      const direction = await runLanguageStartupDirectionAsync(
+        {
+          language: resolved,
+          isRtl: I18nManager.isRTL,
+          shouldBeRtl: isRtlLanguage(resolved),
+        },
+        {
+          syncRtl,
+          readAttempt: readDirectionAttemptAsync,
+          writeAttempt: writeDirectionAttemptAsync,
+          clearAttempt: clearDirectionAttemptAsync,
+          reload: reloadAppAsync,
         }
+      );
+      if (direction === 'reloaded') {
+        // The native reload tears down this JS context; nothing below runs.
+        return;
       }
+      // A direction that could not be applied still loads the language, then
+      // shows the Retry/Continue screen instead of first-painting in the wrong
+      // direction.
+      const reloadFailed = direction === 'retry';
       // Reopen the screen the user was on before an RTL reload. Read once,
       // after the reload path, so the helper's one-shot delete is the only read.
       // On a failed reload the key stays in SecureStore, so Retry's successful
@@ -1119,11 +1137,11 @@ function RootLayoutNav({
   // Hidden root-route entry contract (D17): while `hidden`, the wrapper leaves
   // both accessibility trees. On the hidden → visible transition,
   // `announceForA11y` is the deterministic entry context for screen-reader
-  // users, and the wrapper focus is best-effort (`moveA11yFocus` returns false
-  // when the platform declines — no retry), deferred to the next frame so the
-  // revealed tree is measurable. Per-screen heading/first-control focus is
-  // owned by the screens themselves; the gate cannot know the active screen's
-  // heading.
+  // users, and the wrapper focus is best-effort (`requestA11yFocus` returns false
+  // only when the wrapper has no node yet or the native call throws — no retry),
+  // deferred to the next frame so the revealed tree is measurable. Per-screen
+  // heading/first-control focus is owned by the screens themselves; the gate
+  // cannot know the active screen's heading.
   //
   // The transition is skipped while a bootstrap error is shown: the wrapper
   // is unmounted then (the error screen replaces it), so "Content ready"
@@ -1131,7 +1149,7 @@ function RootLayoutNav({
   // cleanup cancels the pending frame, which React runs before any later
   // render's frame can fire, so an interrupted reveal never focuses a stale
   // wrapper.
-  const wrapperRef = useRef<View>(null);
+  const wrapperRef = useRef<ViewInstance>(null);
   const wasHiddenRef = useRef(wrapperObscured);
   useEffect(() => {
     const wasHidden = wasHiddenRef.current;
@@ -1141,7 +1159,7 @@ function RootLayoutNav({
     }
     announceForA11y(i18n.t('bootstrap.contentReady'));
     const frame = requestAnimationFrame(() => {
-      moveA11yFocus(wrapperRef);
+      requestA11yFocus(wrapperRef);
     });
     return () => {
       cancelAnimationFrame(frame);
@@ -1221,13 +1239,14 @@ function RootLayoutNav({
     return (
       <LanguageReloadErrorScreen
         onRetry={() => {
-          void (async () => {
-            try {
-              await reloadAppAsync();
-            } catch {
-              // Reload failed: the screen stays so the user can retry or continue.
-            }
-          })();
+          // A retry is the user asking for another attempt, not the automatic
+          // relaunch the record guards against. The runner drops the record
+          // first; a reload failure leaves this screen up so the user can retry
+          // or continue.
+          void retryLanguageStartupDirectionAsync({
+            clearAttempt: clearDirectionAttemptAsync,
+            reload: reloadAppAsync,
+          });
         }}
         onContinue={() => {
           setLanguageReloadFailed(false);
@@ -1385,7 +1404,14 @@ function RootLayout() {
 }
 
 function RootErrorBoundary({ retry }: ErrorBoundaryProps) {
-  return <RuntimeErrorScreen onRetry={() => void retry()} />;
+  return (
+    <RuntimeErrorScreen
+      onRetry={() => {
+        prepareLastRouteRepair();
+        void retry();
+      }}
+    />
+  );
 }
 
 export const ErrorBoundary = Sentry.wrapExpoRouterErrorBoundary(RootErrorBoundary);

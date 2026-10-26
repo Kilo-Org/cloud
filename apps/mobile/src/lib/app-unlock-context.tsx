@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { AppState, type AppStateStatus } from 'react-native';
+import { AppState } from 'react-native';
 import { z } from 'zod';
 
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
@@ -279,7 +279,7 @@ export function AppUnlockProvider({
 
   useEffect(() => {
     mounted.current = true;
-    const onChange = (next: AppStateStatus) => {
+    const onChange = (next: typeof AppState.currentState) => {
       appState.current = next;
       if (next === 'background' && !background.current) {
         intervalGeneration.current += 1;

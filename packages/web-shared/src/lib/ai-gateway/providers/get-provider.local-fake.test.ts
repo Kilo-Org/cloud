@@ -20,6 +20,10 @@ import {
   type TransformRequestContext,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  apiKeyUpstream,
+  type DirectByokResolveUpstreamInput,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import type { OpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/types';
 import type { User } from '@kilocode/db/schema';
@@ -242,6 +246,18 @@ describe('getProvider exclusive model routing', () => {
       expect(result.kind === 'provider' && result.provider).toBe(VERCEL_AI_GATEWAY);
     }
   );
+
+  test('keeps a spend-bounded request on the provider that can enforce its ceiling', async () => {
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
+
+    const result = await getProvider({
+      ...providerInput('openai/gpt-5-nano'),
+      boundedSpending: true,
+    });
+
+    expect(result.kind === 'provider' && result.provider).toBe(OPENROUTER);
+    expect(shouldRouteToVercel).not.toHaveBeenCalled();
+  });
 });
 
 describe('getProvider ChatGPT connection routing order', () => {
@@ -429,10 +445,11 @@ describe('getProvider direct BYOK routing', () => {
       jest.mocked(getDirectByokModel).mockResolvedValue({
         provider: {
           id: providerId,
-          base_url: 'https://direct-byok.example/v1',
-          base_url_overrides: {},
-          supported_chat_apis: ['chat_completions', 'responses', 'messages'],
-          reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
+          resolveUpstream: apiKeyUpstream({
+            apiUrl: 'https://direct-byok.example/v1',
+            supportedChatApis: ['chat_completions', 'responses', 'messages'],
+            responseTransforms: ReasoningDetailsTransform.ReasoningContent,
+          }),
           transformRequest: directByokTransform,
           models: async () => [],
         },
@@ -478,4 +495,62 @@ describe('getProvider direct BYOK routing', () => {
       expect(request.body.model).toBe('upstream-model');
     }
   );
+
+  test('uses the upstream a provider resolves from the stored credential', async () => {
+    const resolveUpstream = jest.fn(async (_input: DirectByokResolveUpstreamInput) => ({
+      apiUrl: 'https://bedrock-runtime.eu-west-1.amazonaws.com/openai/v1',
+      apiUrlOverrides: {},
+      disableUrlSuffix: false,
+      apiKey: '',
+      apiKeyHeader: null,
+      supportedChatApis: ['chat_completions'] as const,
+      responseTransforms: null,
+      awsBedrock: {
+        type: 'aws_bedrock' as const,
+        region: 'eu-west-1',
+        access_key_id: 'AKIDEXAMPLE',
+        secret_access_key: 'secret',
+      },
+    }));
+    jest.mocked(getDirectByokModel).mockResolvedValue({
+      provider: {
+        id: 'nvidia-byok',
+        transformRequest() {},
+        models: async () => [],
+        resolveUpstream,
+      },
+      model: {
+        id: 'zai.glm-5',
+        name: 'GLM-5',
+        context_length: 1000,
+        max_completion_tokens: 1000,
+      },
+    });
+    jest
+      .mocked(getBYOKforUser)
+      .mockResolvedValue([
+        { decryptedAPIKey: '{"stored":"credential"}', providerId: 'nvidia-byok' },
+      ]);
+
+    const input = providerInput('nvidia-byok/zai.glm-5');
+    const result = await getProvider({
+      ...input,
+      request: { kind: 'chat_completions', body: { ...input.request.body, stream: true } },
+    });
+    if (result.kind !== 'provider') throw new Error('expected provider result');
+
+    expect(resolveUpstream).toHaveBeenCalledWith({
+      credential: '{"stored":"credential"}',
+      model: expect.objectContaining({ id: 'zai.glm-5' }),
+      stream: true,
+    });
+    expect(result.provider).toMatchObject({
+      id: 'direct-byok',
+      apiUrl: 'https://bedrock-runtime.eu-west-1.amazonaws.com/openai/v1',
+      apiKey: '',
+      supportedChatApis: ['chat_completions'],
+      awsBedrock: { region: 'eu-west-1' },
+    });
+    expect(result.bypassAccessCheck).toBe(true);
+  });
 });

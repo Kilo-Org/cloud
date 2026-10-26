@@ -1,3 +1,4 @@
+import { setupCommandsSchema } from '@kilocode/cloud-agent-profile/setup-script';
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
@@ -19,9 +20,6 @@ import {
   CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES,
   CLOUD_AGENT_ATTACHMENT_RELAXED_CONTENT_TYPE_REGEX,
   CLOUD_AGENT_ATTACHMENT_RELAXED_FILENAME_REGEX,
-  CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
-  CLOUD_AGENT_IMAGE_MAX_COUNT,
-  CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
 } from '@/lib/cloud-agent/constants';
 import {
   PREVIEW_PORT_MAX,
@@ -44,26 +42,6 @@ export type {
  *
  * Uses V2 WebSocket-based API only.
  */
-
-const cloudAgentImageFilenameSchema = z
-  .string()
-  .regex(
-    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.(?:png|jpg|webp|gif)$/
-  );
-
-export const cloudAgentImagesSchema = z
-  .object({
-    path: z.uuid(),
-    files: z.array(cloudAgentImageFilenameSchema).min(1).max(CLOUD_AGENT_IMAGE_MAX_COUNT),
-  })
-  .optional();
-
-export const cloudAgentGetImageUploadUrlSchema = z.object({
-  messageUuid: z.uuid(),
-  imageId: z.uuid(),
-  contentType: z.enum(CLOUD_AGENT_IMAGE_ALLOWED_TYPES),
-  contentLength: z.number().int().positive().max(CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES),
-});
 
 const DENIED_EXTENSION_SET = new Set<string>(CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS);
 
@@ -176,17 +154,6 @@ export const cloudAgentGetAttachmentDownloadUrlSchema = z.object({
 });
 
 /**
- * Send-time finalization input for the pending-upload ledger. The object keys
- * are full R2 keys produced by the upload presign; the server scopes the link
- * to the caller's own rows, so the array needs no per-key structure beyond a
- * length cap that reuses the landed attachment-count constant.
- */
-export const cloudAgentLinkPendingUploadsSchema = z.object({
-  messageUuid: z.uuid(),
-  objectKeys: z.array(z.string().min(1).max(1024)).min(1).max(CLOUD_AGENT_ATTACHMENT_MAX_COUNT),
-});
-
-/**
  * Release-time input for the pending-upload ledger. A removed composer file
  * releases its admitted row so it stops consuming the per-message quota. The
  * keys are full R2 keys scoped to the caller; only 'pending' rows are released,
@@ -195,10 +162,6 @@ export const cloudAgentLinkPendingUploadsSchema = z.object({
 export const cloudAgentReleasePendingUploadsSchema = z.object({
   objectKeys: z.array(z.string().min(1).max(1024)).min(1).max(CLOUD_AGENT_ATTACHMENT_MAX_COUNT),
 });
-
-function hasOnlyOneAttachmentField(data: { images?: unknown; attachments?: unknown }): boolean {
-  return data.images === undefined || data.attachments === undefined;
-}
 
 /**
  * Agent mode enum - all supported modes.
@@ -348,11 +311,14 @@ export const agentModeSendMessageSchema = z
  * Discriminated execution payload for follow-up messages and prepared-session
  * initialization. Mirrors the worker's SendMessageV2Payload schema; both
  * variants ride the same execution pipeline on the cloud-agent-next side.
+ * Free-text fields are bounded by `CLOUD_AGENT_PROMPT_MAX_LENGTH` so both
+ * entry paths enforce one limit: `arguments` expands into the prompt through
+ * `$1`/`$ARGUMENTS`, and `command` stays a bare catalog name.
  */
 export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('prompt'),
-    prompt: z.string().min(1),
+    prompt: z.string().min(1).max(CLOUD_AGENT_PROMPT_MAX_LENGTH),
     mode: agentModeSendMessageSchema,
     model: z.string().min(1),
     variant: z
@@ -364,14 +330,15 @@ export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('command'),
     command: z.string().min(1),
-    arguments: z.string().default(''),
+    arguments: z.string().max(CLOUD_AGENT_PROMPT_MAX_LENGTH).default(''),
   }),
 ]);
 
 /**
  * Send-only execution payload for follow-up messages. Mirrors
  * `sendMessageNextPayloadSchema` but allows an empty prompt, because a
- * follow-up send may carry attachments or images with no text. Used only by
+ * follow-up send may carry attachments with no text; that is the
+ * only difference, since both paths keep the shared length cap. Used only by
  * `baseSendMessageNextSchema.payload`; prepare `initialPayload` keeps the
  * `.min(1)` prompt via `sendMessageNextPayloadSchema`.
  */
@@ -445,14 +412,13 @@ const PrepareSessionSharedFields = {
 
   // Optional configuration
   envVars: z.record(z.string().max(256), z.string().max(256)).optional(),
-  setupCommands: z.array(z.string().max(500)).max(20).optional(),
+  setupCommands: setupCommandsSchema.optional(),
   mcpServers: z.record(z.string(), mcpServerConfigNextSchema).optional(),
   runtimeSkills: z.array(runtimeSkillInputSchema).max(50).optional(),
   runtimeAgents: z.array(runtimeAgentInputSchema).max(20).optional(),
   upstreamBranch: z.string().optional(),
   autoCommit: z.boolean().optional(),
   attachments: cloudAgentAttachmentsSchema.optional(),
-  images: cloudAgentImagesSchema,
   devcontainer: z
     .boolean()
     .refine(value => !value, { message: 'Devcontainer support has been retired' })
@@ -460,7 +426,7 @@ const PrepareSessionSharedFields = {
 };
 
 const PrepareSessionNonCloneVariant = z.object({
-  prompt: z.string().min(1).max(100_000),
+  prompt: z.string().min(1).max(CLOUD_AGENT_PROMPT_MAX_LENGTH),
   initialMessageId: messageIdNextSchema.optional(),
   initialPayload: sendMessageNextPayloadSchema.optional(),
   autoInitiate: z.boolean().optional(),
@@ -509,10 +475,6 @@ export const basePrepareSessionNextSchema = z
   .refine(data => data.githubIntegrationId === undefined || data.githubRepo !== undefined, {
     message: 'GitHub integration requires a GitHub repository',
     path: ['githubIntegrationId'],
-  })
-  .refine(hasOnlyOneAttachmentField, {
-    message: 'Must not provide both attachments and images',
-    path: ['attachments'],
   });
 
 export const personalPrepareSessionNextSchema = basePrepareSessionNextSchema
@@ -589,9 +551,14 @@ export const baseSendMessageNextSchema = z
     payload: sendMessageNextSendPayloadSchema,
     expectedWorktreeId: cloudAgentWorktreeIdSchema.optional(),
     autoCommit: z.boolean().optional(),
-    messageId: messageIdNextSchema.nullish(),
+    /**
+     * Durable user-message identity. The control plane replays a repeated id
+     * instead of admitting a second turn, so a client retry after a failed
+     * response must carry the id of the turn it is retrying; the server cannot
+     * invent one on the client's behalf.
+     */
+    messageId: messageIdNextSchema,
     attachments: cloudAgentAttachmentsSchema.optional(),
-    images: cloudAgentImagesSchema,
   })
   .refine(
     data =>
@@ -599,17 +566,11 @@ export const baseSendMessageNextSchema = z
       controlPlaneSessionIdNextSchema.safeParse(data.cloudAgentSessionId).success,
     { message: 'Worktree review requires a control-plane session', path: ['cloudAgentSessionId'] }
   )
-  .refine(hasOnlyOneAttachmentField, {
-    message: 'Must not provide both attachments and images',
-    path: ['attachments'],
-  })
   .refine(
     data => {
       if (data.payload.type === 'command') return true;
       if (data.payload.prompt.trim().length > 0) return true;
-      const hasFiles =
-        (data.attachments?.files.length ?? 0) > 0 || (data.images?.files.length ?? 0) > 0;
-      return hasFiles;
+      return (data.attachments?.files.length ?? 0) > 0;
     },
     {
       message: 'Prompt is required',

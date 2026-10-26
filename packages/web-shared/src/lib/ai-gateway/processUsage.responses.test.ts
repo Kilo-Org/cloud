@@ -119,7 +119,7 @@ describe('processResponsesApiUsage', () => {
       cost_details: { upstream_inference_cost: 0.7 },
     };
 
-    const result = processResponsesApiUsage(usage, null, coreProps);
+    const result = processResponsesApiUsage(usage, null, coreProps, 'openrouter');
 
     expect(result.cost_mUsd).toBe(1000);
     expect(result.is_byok).toBe(false);
@@ -141,7 +141,7 @@ describe('processResponsesApiUsage', () => {
       cost_details: { upstream_inference_cost: 0.02 },
     };
 
-    const result = processResponsesApiUsage(usage, null, coreProps);
+    const result = processResponsesApiUsage(usage, null, coreProps, 'openrouter');
 
     expect(result.cost_mUsd).toBe(20000);
     expect(result.is_byok).toBe(true);
@@ -159,7 +159,7 @@ describe('processResponsesApiUsage', () => {
       gateway: { routing: { finalProvider: 'openai' }, cost: '0', marketCost: '0.0962825' },
     };
 
-    const result = processResponsesApiUsage(usage, providerMetadata, coreProps);
+    const result = processResponsesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
 
     expect(result.cost_mUsd).toBe(96283); // toMicrodollars(0.0962825)
     expect(result.is_byok).toBeNull();
@@ -170,7 +170,7 @@ describe('processResponsesApiUsage', () => {
   });
 
   test('returns zero cost when no usage or metadata is provided', () => {
-    const result = processResponsesApiUsage(null, null, coreProps);
+    const result = processResponsesApiUsage(null, null, coreProps, 'openrouter');
 
     expect(result.cost_mUsd).toBe(0);
     expect(result.is_byok).toBeNull();
@@ -202,7 +202,7 @@ describe('processResponsesApiUsage', () => {
       },
     };
 
-    const result = processResponsesApiUsage(usage, providerMetadata, coreProps);
+    const result = processResponsesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
 
     expect(result.is_byok).toBe(true);
     expect(result.cost_mUsd).toBe(100);
@@ -220,7 +220,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'fake-user-id',
       undefined,
       'openrouter',
-      200
+      200,
+      false
     );
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
@@ -237,7 +238,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'fake-user-id',
       undefined,
       'vercel',
-      200
+      200,
+      false
     );
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
@@ -269,7 +271,8 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       'fake-user-id',
       undefined,
       'openrouter',
-      200
+      200,
+      false
     );
 
     expect(result.responseContent).toBe('Hello world');
@@ -282,7 +285,7 @@ describe('parseMicrodollarUsageFromString approval tests', () => {
   test(openrouterResponsesJson, async () => {
     const inputFile = join(sampleDir, openrouterResponsesJson);
     const jsonString = await readFile(inputFile, 'utf-8');
-    const result = parseResponsesMicrodollarUsageFromString(jsonString, 200);
+    const result = parseResponsesMicrodollarUsageFromString(jsonString, 200, 'openrouter');
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);
@@ -292,7 +295,7 @@ describe('parseMicrodollarUsageFromString approval tests', () => {
   test(vercelResponsesJson, async () => {
     const inputFile = join(sampleDir, vercelResponsesJson);
     const jsonString = await readFile(inputFile, 'utf-8');
-    const result = parseResponsesMicrodollarUsageFromString(jsonString, 200);
+    const result = parseResponsesMicrodollarUsageFromString(jsonString, 200, 'openrouter');
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);

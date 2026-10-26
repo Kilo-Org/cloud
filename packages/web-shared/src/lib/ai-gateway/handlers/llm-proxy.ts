@@ -6,6 +6,10 @@ import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { extractPromptInfo } from '@kilocode/web-shared/lib/ai-gateway/extractPromptInfo';
 import { determineFallbackFeature } from '@kilocode/web-shared/lib/ai-gateway/determineFallbackFeature';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
+import {
+  BRIEFING_SETTLEMENT_HEADER,
+  recordBriefingUsage,
+} from '@kilocode/web-shared/lib/agent-briefing-usage';
 import type {
   OpenRouterChatCompletionRequest,
   GatewayResponsesRequest,
@@ -31,9 +35,12 @@ import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-t
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import {
   hasBestEffortGuessDataCollectionRequirement,
-  isFreeModel,
+  isFreeModelExcludingCustomLlms,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
-import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import {
+  findCustomLlm,
+  isPublicCustomLlm,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   accountForMicrodollarUsage,
   captureProxyError,
@@ -64,6 +71,8 @@ import {
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
   checkExclusiveModelProviderAllowed,
+  allowedInferenceProviders,
+  inferenceProvidersNotAllowedResponse,
   modelDoesNotExistOnOpenRouterResponse,
   chatGptReconnectResponse,
   lastUserPromptText,
@@ -136,7 +145,7 @@ import {
   hasMiddleOutTransform,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { redactProviderHints } from '@kilocode/auto-routing-contracts';
-import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 import {
@@ -311,7 +320,9 @@ export async function handleLlmProxyRequest(
     }
   }
 
-  const requestedModel = requestBodyParsed.body.model.trim();
+  // Canonicalize once so routing, policy, and the upstream request all see the same id.
+  requestBodyParsed.body.model = requestBodyParsed.body.model.trim();
+  const requestedModel = requestBodyParsed.body.model;
   const requestedModelLowerCased = requestedModel.toLowerCase();
 
   const feature = validateFeatureHeader(
@@ -587,8 +598,13 @@ export async function handleLlmProxyRequest(
   }
 
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
-  // Custom LLMs count as free; `getProvider` still refuses callers without access.
-  const isFreeRequestedModel = await isFreeModel(effectiveModelIdLowerCased);
+  const customLlm = await findCustomLlm(effectiveModelIdLowerCased);
+  const isPrivateCustomLlm = customLlm !== null && !isPublicCustomLlm(customLlm.definition);
+  // Anonymous callers cannot use private custom LLMs, so for them a private
+  // custom LLM id must behave exactly like an unknown id.
+  const isPubliclyFreeModel =
+    (customLlm !== null && !isPrivateCustomLlm) ||
+    isFreeModelExcludingCustomLlms(effectiveModelIdLowerCased);
 
   if (!ipAddress) {
     return NextResponse.json(
@@ -604,12 +620,14 @@ export async function handleLlmProxyRequest(
   // the report-only decide call and the usage event, which share this request.
   const clientIp = bareIpLiteral(ipAddress);
 
-  // Custom LLMs are exempt, even when their id matches a free-model pattern.
-  if (isFreeRequestedModel && !(await isCustomLlm(effectiveModelIdLowerCased))) {
+  if (isPubliclyFreeModel) {
     const rateLimitSubject = await resolveFreeModelRateLimitSubject(ipAddress, authPromise);
     if (rateLimitSubject instanceof NextResponse) return rateLimitSubject;
 
-    if (await isFreeModelRateLimited(request, rateLimitSubject)) {
+    // Private custom LLMs are exempt for signed-in callers, even when their id
+    // matches a free-model pattern.
+    const isExempt = isPrivateCustomLlm && rateLimitSubject.kind === 'account';
+    if (!isExempt && (await isFreeModelRateLimited(request, rateLimitSubject))) {
       console.warn(
         `Model rate limit exceeded, ${freeModelRateLimitKey(rateLimitSubject)}, model: ${effectiveModelIdLowerCased}, feature: ${feature ?? 'none'}`
       );
@@ -647,7 +665,7 @@ export async function handleLlmProxyRequest(
     }
 
     // No valid auth
-    if (!isFreeRequestedModel) {
+    if (!isPubliclyFreeModel) {
       return paidModelAuthRequiredResponse();
     }
 
@@ -822,6 +840,7 @@ export async function handleLlmProxyRequest(
 
   const isNonTrialEnterprise = await resolveIsNonTrialEnterprise();
   const ignoredProviders = getIgnoredProviders(effectiveModelIdLowerCased, isNonTrialEnterprise);
+  const requestCostLimit = request.headers.get('x-kilo-max-cost-microdollars');
 
   const providerResult = await getProvider({
     requestedModel: effectiveModelIdLowerCased,
@@ -829,6 +848,7 @@ export async function handleLlmProxyRequest(
     user,
     organizationId,
     botId,
+    boundedSpending: requestCostLimit !== null,
     getRoutingProviderConfig: async () =>
       withIgnoredProviders(
         (await accessCheckResolver.getRoutingProviderConfig?.()) ?? requestBodyParsed.body.provider,
@@ -978,11 +998,32 @@ export async function handleLlmProxyRequest(
     return dataCollectionRequiredResponse();
   }
 
-  const providerNotAllowedError = checkExclusiveModelProviderAllowed(
-    effectiveModelIdLowerCased,
-    requestBodyParsed.body.provider
-  );
-  if (providerNotAllowedError) return providerNotAllowedError;
+  if (customLlm?.definition.public) {
+    // Organization policy replaces the request's provider object, so intersect
+    // the caller's own only/ignore lists, the organization's, and the declared
+    // providers, and forward only that intersection.
+    const declaredProviders = customLlm.definition.public.inference_providers;
+    const eligibleProviders = allowedInferenceProviders(
+      declaredProviders,
+      requestProvider,
+      requestBodyParsed.body.provider
+    );
+    if (eligibleProviders.length === 0) {
+      return inferenceProvidersNotAllowedResponse(declaredProviders);
+    }
+    if (eligibleProviders.length < declaredProviders.length) {
+      requestBodyParsed.body.provider = {
+        ...requestBodyParsed.body.provider,
+        only: eligibleProviders,
+      };
+    }
+  } else {
+    const providerNotAllowedError = checkExclusiveModelProviderAllowed(
+      effectiveModelIdLowerCased,
+      requestBodyParsed.body.provider
+    );
+    if (providerNotAllowedError) return providerNotAllowedError;
+  }
 
   sentryRootSpan()?.setAttribute(
     'openrouter.time_to_request_start_ms',
@@ -1014,7 +1055,6 @@ export async function handleLlmProxyRequest(
   const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
   if (bouncerRejection) return bouncerRejection;
   if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
-  const requestCostLimit = request.headers.get('x-kilo-max-cost-microdollars');
   const requestCostBalance = requestCostLimit !== null ? await balanceAndSettingsPromise : null;
 
   const attempt = await sendUpstreamAttempt({
@@ -1105,7 +1145,33 @@ export async function handleLlmProxyRequest(
 
   const clonedReponse = response.clone(); // reading from body is side-effectful
 
-  accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
+  const accounting = accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
+  const settlementToken = request.headers.get(BRIEFING_SETTLEMENT_HEADER);
+  if (
+    settlementToken &&
+    !isAnonymousContext(user) &&
+    !usageContext.isStreaming &&
+    autoModel === null &&
+    usageContext.session_id?.startsWith('agent-briefing:') &&
+    clientRequestId === usageContext.session_id
+  ) {
+    const generationId = usageContext.session_id;
+    after(
+      accounting
+        .then(usage =>
+          recordBriefingUsage({
+            kiloUserId: user.id,
+            organizationId,
+            generationId,
+            settlementToken,
+            usage,
+          })
+        )
+        .catch(() => {
+          errorExceptInTest('Briefing accounting receipt could not be stored');
+        })
+    );
+  }
 
   const requestLogging = {
     user: maybeUser,

@@ -137,7 +137,7 @@ const config: ExpoConfig = {
   // Keep in lockstep with AGENT_CHANNEL_SPLIT_APP_VERSION in
   // @kilocode/notifications: this is the first build that creates the split
   // agent channels, so older tokens stay on the legacy `agent` channel.
-  version: '1.0.14',
+  version: '1.0.15',
   // Rotation is supported on iOS and Android: `default` resolves to portrait +
   // both landscapes in UISupportedInterfaceOrientations on iOS and all
   // orientations in the Android manifest, satisfying WCAG 1.3.4 (Orientation)
@@ -325,18 +325,11 @@ const config: ExpoConfig = {
         },
         ios: {
           ccacheEnabled: true,
-          // SDK 27 requires the scene lifecycle, including scene-based window and link handling.
-          enableSceneSupport: true,
           // iOS consumes React Native Core prebuilt by default, so the pnpm patch
           // over RCTComponentViewFactory.mm would never compile into the app.
           // The Expo Podfile maps this to ENV['RCT_USE_PREBUILT_RNCORE'] = '0'
           // (KILO-APP-6H; react/react-native#58299).
-          // Compile React Native from the patched source instead of linking the
-          // prebuilt core. The App Store core ships with assertions enabled
-          // (react/react-native#57454), so the Fabric unmount assert must carry
-          // the bounds guard from react/react-native#57865 or a stale child
-          // index SIGABRTs release builds (Kilo-Org/kilocode#14065; see
-          // patches/react-native@0.86.3.patch).
+          // Compile the registration and mounting guards in patches/react-native@0.88.0.patch.
           buildReactNativeFromSource: true,
           // GoogleSignIn is a Swift static lib that imports GoogleUtilities/RecaptchaInterop
           // (pulled transitively alongside expo-iap's AppCheckCore); those pods don't define
@@ -460,11 +453,13 @@ const config: ExpoConfig = {
       },
     ],
     'expo-apple-authentication',
-    // Play flavor (the defaults the plugin already applies). The plugin strips
-    // and re-adds the `missingDimensionStrategy "platform", ...` line on every
-    // prebuild, so its "Added missingDimensionStrategy for play flavor" log line
-    // is expected output, not a misconfiguration.
-    ['expo-iap', { isHorizonEnabled: false, isFireOsEnabled: false }],
+    // Play store, pinned: `modules.horizon` and `modules.amazon.fireOS` are the
+    // flags the plugin reads, so pinning both false keeps a stray
+    // EXPO_IAP_HORIZON or EXPO_IAP_FIREOS from selecting another store. With no
+    // store pinned the plugin logs "No store pin; Gradle picks the store from
+    // the task flavor or the connected debug device", which is expected output,
+    // not a misconfiguration.
+    ['expo-iap', { modules: { horizon: false, amazon: { fireOS: false } } }],
     [
       'expo-tracking-transparency',
       {
@@ -493,6 +488,10 @@ const config: ExpoConfig = {
       },
     ],
     './plugins/withAndroidManifestFix',
+    // Font size, display size, language and direction changes are handled in
+    // place by the running activity, like rotation and dark mode. Without them
+    // Android recreates MainActivity and the app restarts at its first route.
+    './plugins/withAndroidConfigChanges',
     // Window background follows the app theme (values-night aware) so the
     // rotation surface resize never paints a foreign blank frame.
     './plugins/withAndroidRotationSurface',

@@ -1,3 +1,4 @@
+import * as z from 'zod';
 import {
   isOpenRouterProviderConfig,
   type GatewayResponsesRequest,
@@ -44,7 +45,9 @@ import {
   addCacheBreakpoints,
   enableReasoningSummaries,
   fixResponsesRequest,
+  mapReasoningDetailsToReasoning,
   mapReasoningDetailsToReasoningContent,
+  replaceReasoningObjectWithReasoningEffort,
   scrubOpenCodeSpecificProperties,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { isQwenExplicitCacheModel } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
@@ -198,11 +201,7 @@ export function applyPreferredProvider(
  * back to a paid model and be served without being charged. OpenRouter accepts
  * them as `models` on every API and as `fallbacks` on the Messages API.
  */
-export function removeModelsFallback(
-  requestedModel: string,
-  requestToMutate: GatewayRequest,
-  userId: string
-) {
+export function removeModelsFallback(requestedModel: string, requestToMutate: GatewayRequest) {
   const { models, fallbacks } = requestToMutate.body;
   delete requestToMutate.body.models;
   delete requestToMutate.body.fallbacks;
@@ -211,16 +210,29 @@ export function removeModelsFallback(
     return;
   }
   console.warn('[applyProviderSpecificLogic] Removed caller-provided fallback models', {
-    userId,
     model: requestedModel,
     requestKind: requestToMutate.kind,
-    models,
-    fallbacks,
+    modelsPresent: hasFallbackModels(models),
+    modelsCount: Array.isArray(models) ? models.length : null,
+    fallbacksPresent: hasFallbackModels(fallbacks),
+    fallbacksCount: Array.isArray(fallbacks) ? fallbacks.length : null,
   });
 }
 
 function hasFallbackModels(value: unknown) {
   return value !== undefined && value !== null && !(Array.isArray(value) && value.length === 0);
+}
+
+/**
+ * Service tiers the log may name. Every other value, including non-strings and
+ * names inherited from `Object.prototype`, is recorded as `unrecognized` rather
+ * than as the client-supplied value.
+ */
+const loggedServiceTierSchema = z.enum(['auto', 'default', 'flex', 'priority', 'scale']);
+
+function serviceTierForLog(serviceTier: unknown) {
+  const parsed = loggedServiceTierSchema.safeParse(serviceTier);
+  return parsed.success ? parsed.data : 'unrecognized';
 }
 
 export function removeUnsupportedRequestServiceTier(
@@ -243,16 +255,18 @@ export function removeUnsupportedRequestServiceTier(
   console.warn('[applyProviderSpecificLogic] Removed unsupported request-level service tier', {
     model: requestedModel,
     requestKind: requestToMutate.kind,
-    serviceTier,
+    serviceTier: serviceTierForLog(serviceTier),
     reason,
   });
   delete requestToMutate.body.service_tier;
 }
 
 /**
- * Inverse of the reasoning-content response transform: folds
- * client-supplied `reasoning_details` back into the `reasoning_content` string
- * the upstream speaks, so reasoning survives the round trip.
+ * Inverse of the reasoning-content and reasoning response transforms: folds
+ * client-supplied `reasoning_details` back into the `reasoning_content` or
+ * `reasoning` string the upstream speaks, so reasoning survives the round trip.
+ * These upstreams are OpenAI-compatible, so OpenRouter's `reasoning` object is
+ * also replaced with `reasoning_effort`.
  */
 export function applyReasoningDetailsTransform(
   provider: Provider,
@@ -267,7 +281,12 @@ export function applyReasoningDetailsTransform(
       applyGeminiReasoningTransform(requestToMutate.body);
       break;
     case ReasoningDetailsTransform.ReasoningContent:
+      replaceReasoningObjectWithReasoningEffort(requestToMutate);
       mapReasoningDetailsToReasoningContent(requestToMutate.body);
+      break;
+    case ReasoningDetailsTransform.Reasoning:
+      replaceReasoningObjectWithReasoningEffort(requestToMutate);
+      mapReasoningDetailsToReasoning(requestToMutate.body);
       break;
     case null:
       break;
@@ -287,7 +306,7 @@ export async function applyProviderSpecificLogic(
   taskId: string | null,
   isNonTrialEnterprise: boolean
 ) {
-  removeModelsFallback(requestedModel, requestToMutate, userId);
+  removeModelsFallback(requestedModel, requestToMutate);
   if (isFreeModelExcludingCustomLlms(requestedModel)) {
     removePaidServerFeatures(provider, requestedModel, requestToMutate, userId);
   }

@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { Pressable, type ScrollViewInstance, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Animated, { useAnimatedRef } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -57,7 +57,7 @@ function ListDefaultsLine({ list, onPress }: Readonly<{ list: TodoList; onPress:
       className="mx-4 mb-1 min-h-11 flex-row items-center gap-2 py-2 active:opacity-70"
     >
       <Settings2 size={16} color={colors.mutedForeground} />
-      <Text className="min-w-0 flex-1 text-sm leading-5 text-ink2">
+      <Text className="min-w-0 flex-1 text-sm leading-[1.25rem] text-ink2">
         {summary ?? t('todos.list.setDefaults')}
       </Text>
       <DirectionalChevronRight size={16} color={colors.mutedForeground} />
@@ -78,7 +78,7 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
   const { create, update, move, removeWithUndo } = useTodoItemMutations(listId);
   const { review, startNow, startingTodoId } = useStartTodo();
   const [showCompleted, setShowCompleted] = useState(false);
-  const scrollRef = useAnimatedRef<Animated.ScrollView>();
+  const scrollRef = useAnimatedRef<ScrollViewInstance>();
 
   const openItems = useMemo(
     () => (items.data ?? []).filter(item => item.doneAt === null),
@@ -160,8 +160,8 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
     body = (
       <>
         <TodoQuickAdd
-          onAdd={todoTitle => {
-            create.mutate({ listId, title: todoTitle });
+          onAdd={async todoTitle => {
+            await create.mutateAsync({ listId, title: todoTitle });
           }}
         />
         {openItems.length === 0 && doneItems.length === 0 ? (
@@ -236,12 +236,16 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={title}
+        // The list name is user prose, not a UI label, so it keeps a second
+        // line for a natural break; the shared one-line default only suits
+        // fixed labels.
+        titleNumberOfLines={2}
         reserveTitleSpace
         backFallback={LISTS_HREF}
         {...(list
           ? {
               onTitlePress: openSettings,
-              onTitlePressAccessibilityLabel: t('todos.listSettings.title'),
+              onTitlePressAccessibilityHint: t('todos.listSettings.title'),
             }
           : {})}
       />

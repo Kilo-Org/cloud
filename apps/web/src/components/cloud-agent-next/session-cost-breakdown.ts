@@ -26,6 +26,12 @@ export function formatSessionCost(costUsd: number): string {
   return `$${(getDisplayedSessionCostUnits(costUsd) / DISPLAY_UNITS_PER_DOLLAR).toFixed(2)}`;
 }
 
+export function formatSessionTotalCost(costUsd: number): string {
+  return sanitizeNonNegativeCost(costUsd) > 0 && !isRenderableSessionCost(costUsd)
+    ? '<$0.01'
+    : formatSessionCost(costUsd);
+}
+
 export function getDisplayedSessionCostBreakdown(
   sessionCostBreakdown: SessionCostBreakdown
 ): SessionCostBreakdown {

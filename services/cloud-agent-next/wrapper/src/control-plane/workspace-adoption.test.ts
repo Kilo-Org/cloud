@@ -5,7 +5,6 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   emptyWorkspaceDirectory,
-  removeStaleHomes,
   stripGitCredentials,
   truncateWrapperLog,
 } from './workspace-adoption.js';
@@ -132,24 +131,6 @@ describe('emptyWorkspaceDirectory', () => {
     expect((await rejection(emptyWorkspaceDirectory('/workspace')))?.message).toContain(
       'top-level'
     );
-  });
-});
-
-describe('removeStaleHomes', () => {
-  it("removes every home but this route's own", async () => {
-    const homes = path.join(root, 'homes');
-    await fs.mkdir(path.join(homes, 'mine', '.cache'), { recursive: true });
-    await fs.mkdir(path.join(homes, 'previous', '.npm'), { recursive: true });
-    await fs.writeFile(path.join(homes, 'previous', '.npmrc'), 'token');
-    await fs.writeFile(path.join(homes, 'stray-file'), 'x');
-
-    await removeStaleHomes(homes, path.join(homes, 'mine'));
-
-    expect(await fs.readdir(homes)).toEqual(['mine']);
-  });
-
-  it('is a no-op when there is no home root', async () => {
-    expect(await rejection(removeStaleHomes(path.join(root, 'absent'), 'x'))).toBeUndefined();
   });
 });
 

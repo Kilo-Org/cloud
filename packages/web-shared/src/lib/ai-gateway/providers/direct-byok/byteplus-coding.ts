@@ -3,9 +3,10 @@ import {
   isReasoningExplicitlyDisabled,
   replaceReasoningObjectWithReasoningEffort,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
-import type {
-  DirectByokModel,
-  DirectByokProvider,
+import {
+  apiKeyUpstream,
+  type DirectByokModel,
+  type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import {
   effortOptions,
@@ -13,8 +14,6 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
 
 export const BYTEPLUS_CODING_PROVIDER_ID = 'byteplus-coding';
-
-type BytePlusCodingModel = DirectByokModel & { description: string };
 
 export const BYTEPLUS_CODING_MODELS = [
   {
@@ -112,7 +111,7 @@ export const BYTEPLUS_CODING_MODELS = [
     max_completion_tokens: 131072,
     reasoning_options: effortOptions('minimal', 'low', 'medium', 'high'),
   },
-] as const satisfies ReadonlyArray<BytePlusCodingModel>;
+] as const satisfies ReadonlyArray<DirectByokModel>;
 
 export const BYTEPLUS_CODING_MODEL_IDS = BYTEPLUS_CODING_MODELS.map(
   model => `${BYTEPLUS_CODING_PROVIDER_ID}/${model.id}`
@@ -120,10 +119,11 @@ export const BYTEPLUS_CODING_MODEL_IDS = BYTEPLUS_CODING_MODELS.map(
 
 export default {
   id: BYTEPLUS_CODING_PROVIDER_ID,
-  base_url: 'https://ark.ap-southeast.bytepluses.com/api/coding/v3',
-  base_url_overrides: {},
-  supported_chat_apis: ['chat_completions'],
-  reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
+  resolveUpstream: apiKeyUpstream({
+    apiUrl: 'https://ark.ap-southeast.bytepluses.com/api/coding/v3',
+    supportedChatApis: ['chat_completions'],
+    responseTransforms: ReasoningDetailsTransform.ReasoningContent,
+  }),
   transformRequest(context) {
     context.request.body.thinking = {
       type: isReasoningExplicitlyDisabled(context.request) ? 'disabled' : 'enabled',

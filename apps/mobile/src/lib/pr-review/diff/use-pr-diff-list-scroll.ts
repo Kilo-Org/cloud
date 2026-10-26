@@ -4,12 +4,15 @@ import { type Dispatch, type RefObject, type SetStateAction, useEffect, useRef }
 import { announceForA11y } from '@/lib/a11y/announce';
 import { useMotionPolicy } from '@/lib/a11y/motion';
 import { fileHeaderKey, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
+import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 import { subscribeFileNavigatorRequest } from '@/lib/pr-review/file-navigator-bridge';
 
 type UsePrDiffListScrollInput = {
   readonly owner: string;
   readonly repo: string;
   readonly number: number;
+  /** The provider ref (identity rule 17) the navigator bridge keys under. */
+  readonly ref?: ProviderPrRef;
   readonly items: ListItem[];
   readonly listRef: RefObject<FlashListRef<ListItem> | null>;
   readonly setExpanded: Dispatch<SetStateAction<Record<string, boolean>>>;
@@ -24,6 +27,7 @@ export function usePrDiffListScroll({
   owner,
   repo,
   number,
+  ref,
   items,
   listRef,
   setExpanded,
@@ -36,7 +40,7 @@ export function usePrDiffListScroll({
 
   useEffect(
     () =>
-      subscribeFileNavigatorRequest({ owner, repo, number }, request => {
+      subscribeFileNavigatorRequest({ owner, repo, number, ref }, request => {
         const targetKey = fileHeaderKey(request.path);
         const index = itemsRef.current.findIndex(item => item.key === targetKey);
         if (index === -1) {
@@ -52,6 +56,6 @@ export function usePrDiffListScroll({
         // The destination is virtualized, so announce it (D13).
         announceForA11y(request.path);
       }),
-    [owner, repo, number, setExpanded, listRef, scrollAnimated]
+    [owner, repo, number, ref, setExpanded, listRef, scrollAnimated]
   );
 }

@@ -261,7 +261,9 @@ const ACTION_EVIDENCE_FIELDS: Partial<Record<SecurityAuditLogAction, AuditEventE
   [SecurityAuditLogAction.FindingAutoDismissed]: {
     beforeState: ['status'],
     afterState: ['status', 'reason_code'],
-    metadata: ['reason_code', 'source_alert_number'],
+    // `confidence` is the triage confidence that met the auto-dismiss
+    // threshold; the sandbox policy path records none.
+    metadata: ['reason_code', 'source_alert_number', 'confidence'],
   },
   [SecurityAuditLogAction.FindingSuperseded]: {
     beforeState: ['status'],

@@ -15,7 +15,8 @@ import {
   listDiscussions,
   listInbox,
 } from './gitlab-read';
-import { GitLabReviewError } from './gitlab-authorization';
+import { requestGitLabJson } from './gitlab-http';
+import { GitLabApiStatusError, GitLabReviewError } from './gitlab-authorization';
 
 // The bound transport runs through Node https.request; mirror adapter.test.ts.
 jest.mock('https', () => ({
@@ -42,6 +43,7 @@ jest.mock('@/lib/integrations/gitlab-service', () => ({
 }));
 
 jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
+  ...jest.requireActual('@/lib/integrations/platforms/gitlab/adapter'),
   fetchGitLabMergeRequest: (params: unknown) => mockFetchGitLabMergeRequest(params),
   getMRHeadCommit: (...args: unknown[]) => mockGetMRHeadCommit(...args),
   getMRDiffRefs: (...args: unknown[]) => mockGetMRDiffRefs(...args),
@@ -142,6 +144,70 @@ const diffFixture = [
     diff: '@@ -1,2 +1,2 @@\n-old\n+new\n',
   },
 ];
+
+const discussionStateCases = [
+  {
+    name: 'resolved first resolvable note after a non-resolvable note',
+    flags: [
+      { resolvable: false, resolved: false },
+      { resolvable: true, resolved: true },
+      { resolvable: true, resolved: false },
+    ],
+    resolvable: true,
+    resolved: true,
+  },
+  {
+    name: 'unresolved first resolvable note after a non-resolvable note',
+    flags: [
+      { resolvable: false, resolved: true },
+      { resolvable: true, resolved: false },
+      { resolvable: true, resolved: true },
+    ],
+    resolvable: true,
+    resolved: false,
+  },
+  {
+    name: 'missing resolved flag on the first resolvable note',
+    flags: [
+      { resolvable: false, resolved: true },
+      { resolvable: true },
+      { resolvable: true, resolved: true },
+    ],
+    resolvable: true,
+    resolved: false,
+  },
+  {
+    name: 'no resolvable notes despite a resolved flag',
+    flags: [{ resolvable: false, resolved: true }],
+    resolvable: false,
+    resolved: false,
+  },
+  {
+    name: 'no notes',
+    flags: [],
+    resolvable: false,
+    resolved: false,
+  },
+];
+
+function discussionWithState(flags: { resolvable: boolean; resolved?: boolean }[]) {
+  return {
+    id: 'disc-state',
+    individual_note: false,
+    notes: flags.map((flag, index) => ({
+      id: index + 1,
+      body: `Note ${index + 1}`,
+      author: { id: 1, username: 'alice', name: 'Alice' },
+      created_at: '2026-01-02T00:00:00Z',
+      updated_at: '2026-01-02T00:00:00Z',
+      system: false,
+      noteable_id: 100,
+      noteable_type: 'MergeRequest',
+      noteable_iid: 12,
+      ...flag,
+    })),
+  };
+}
 
 let fetchMock: jest.Mock;
 
@@ -542,6 +608,19 @@ describe('listDiscussions', () => {
     expect(page.threads[2]?.comments.map(comment => comment.commentId)).toEqual(['14']);
   });
 
+  it.each(discussionStateCases)('maps discussion state for $name', async testCase => {
+    fetchMock.mockResolvedValue(jsonResponse([discussionWithState(testCase.flags)]));
+
+    const page = await listDiscussions(OWNER, PROJECT_PATH, 12);
+
+    expect(page.threads).toHaveLength(1);
+    expect(page.threads[0]).toMatchObject({
+      threadId: 'disc-state',
+      resolvable: testCase.resolvable,
+      resolved: testCase.resolved,
+    });
+  });
+
   it('reuses the same cursor rule: foreign identity restarts at page 1', async () => {
     const foreign = Buffer.from(
       JSON.stringify({ identity: 'other/repo', page: 9 }),
@@ -725,6 +804,32 @@ describe('listInbox', () => {
 
     expect(page.items).toEqual([]);
   });
+
+  it('reports a provider permission refusal as a reconnect, never as the caller permission', async () => {
+    mockFetchGitLabUser.mockRejectedValue(new GitLabApiStatusError(403, 'GitLab user fetch: 403'));
+
+    const error = await captureRejection(listInbox(OWNER));
+
+    // The inbox lists the account's own review requests: a 403 there is the
+    // connection's, not the organization member's permission.
+    expect(error).toBeInstanceOf(GitLabReviewError);
+    expect(error.kind).toBe('reconnect');
+    expect(error.retryable).toBe(false);
+    expect(error.message).toMatch(/reconnect/i);
+  });
+
+  it('wraps an organization connection refusal with inbox copy', async () => {
+    mockFetchGitLabUser.mockRejectedValue(new GitLabApiStatusError(403, 'GitLab user fetch: 403'));
+
+    const error = await captureRejection(listInbox(ORG_OWNER));
+
+    // The owner-aware classifier resolves the organization connection's 403 to
+    // a reconnect on its own; the inbox keeps copy that names the list the
+    // reader asked for instead of a merge request the request never mentioned.
+    expect(error.kind).toBe('reconnect');
+    expect(error.retryable).toBe(false);
+    expect(error.message).toMatch(/review requests/i);
+  });
 });
 
 describe('getMergeState', () => {
@@ -816,6 +921,21 @@ describe('getMergeState', () => {
       conflicts: false,
       blockedReasons: [],
     });
+  });
+
+  it.each(discussionStateCases)('applies the discussion merge gate for $name', async testCase => {
+    routeResponses({
+      settings: { only_allow_merge_if_all_discussions_are_resolved: true },
+      discussions: [discussionWithState(testCase.flags)],
+    });
+
+    const state = await getMergeState(OWNER, PROJECT_PATH, 12);
+
+    const blocked = testCase.resolvable && !testCase.resolved;
+    expect(state.canMerge).toBe(!blocked);
+    expect(state.blockedReasons).toEqual(
+      blocked ? [{ code: 'other', message: 'Resolve all discussions before merging.' }] : []
+    );
   });
 
   it('treats a 404 approvals endpoint (no approval rules) as no approval gate', async () => {
@@ -1063,5 +1183,97 @@ describe('request transport binds to the resolved address (no DNS rebinding)', (
     expect(error.kind).toBe('not_found');
     expect(error.message).not.toContain('gitlab.example.com');
     expect(error.message).not.toContain('glpat-mock-token');
+  });
+});
+
+describe('plain transport limits the response body', () => {
+  const LIMIT = 10 * 1024 * 1024;
+
+  /** A diffs payload padded with an unescaped run so its JSON is exactly `size` bytes. */
+  function diffBodyOfSize(size: number): Uint8Array<ArrayBuffer> {
+    const undiffed = JSON.stringify([{ ...diffFixture[0], diff: '' }]);
+    const json = JSON.stringify([{ ...diffFixture[0], diff: 'a'.repeat(size - undiffed.length) }]);
+    const body = new Uint8Array(new ArrayBuffer(json.length));
+    body.set(new TextEncoder().encode(json));
+    return body;
+  }
+
+  it('reads a reply at the limit', async () => {
+    const body = diffBodyOfSize(LIMIT);
+    expect(body.byteLength).toBe(LIMIT);
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(
+        new Response(body, {
+          status: 200,
+          headers: {
+            'content-type': 'application/json',
+            'content-length': String(body.byteLength),
+          },
+        })
+      )
+    );
+
+    const page = await listChangedFiles(OWNER, PROJECT_PATH, 12);
+
+    expect(page.files).toHaveLength(1);
+  });
+
+  it('answers a reply one byte over the limit with the retryable error', async () => {
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(diffBodyOfSize(LIMIT + 1));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(
+        new Response(stream, { status: 200, headers: { 'content-type': 'application/json' } })
+      )
+    );
+
+    const error = await captureRejection(listChangedFiles(OWNER, PROJECT_PATH, 12));
+
+    expect(error.kind).toBe('retryable');
+    expect(error.retryable).toBe(true);
+    expect(cancelled).toBe(true);
+  });
+
+  it('answers a declared length over the limit without reading the body', async () => {
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(JSON.stringify(diffFixture)));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(
+        new Response(stream, {
+          status: 200,
+          headers: {
+            'content-type': 'application/json',
+            'content-length': String(LIMIT + 1),
+          },
+        })
+      )
+    );
+
+    const error = await captureRejection(listChangedFiles(OWNER, PROJECT_PATH, 12));
+
+    expect(error.kind).toBe('retryable');
+    expect(cancelled).toBe(true);
+  });
+
+  it('still returns undefined for a 204 with no body', async () => {
+    fetchMock.mockImplementation(() => Promise.resolve(new Response(null, { status: 204 })));
+
+    await expect(
+      requestGitLabJson({ accessToken: 'glpat-mock-token', instanceUrl: INSTANCE_URL }, '/api/v4/x')
+    ).resolves.toBeUndefined();
   });
 });

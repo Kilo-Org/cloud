@@ -1,10 +1,13 @@
 import { env, runInDurableObject } from 'cloudflare:test';
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   decodeKiloSdkMessagesCursor,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES,
   MAX_SESSION_DIFF_READ_BYTES,
+  getSessionShareExpiresAt,
+  sessionShareDurationSchema,
 } from '@kilocode/session-ingest-contracts';
 import {
   KILO_SDK_HISTORY_BOUNDED_MESSAGE_SCAN_ROW_WORK_CAP,
@@ -221,6 +224,523 @@ describe('SessionIngestDO integration', () => {
       expect(snapshot.messages[1].info.id).toBe('msg_2');
     });
 
+    it('exports only content persisted before the shared boundary and drops the session diff', async () => {
+      const sessionId = 'ses_roundtrip_shared_0000000006';
+      const publicId = '11111111-1111-4111-8111-111111111111';
+      const stub = getStub(kiloUserId, sessionId);
+
+      await stub.ingest(
+        [
+          { type: 'session', data: { title: 'Shared Session' } },
+          {
+            type: 'message',
+            data: {
+              id: 'msg_1',
+              role: 'user',
+              content: 'public',
+              summary: { diffs: [{ file: 'intentional.ts', after: 'A' }] },
+            },
+          },
+          { type: 'part', data: { id: 'part_1', messageID: 'msg_1', type: 'text', text: 'A' } },
+          { type: 'session_diff', data: [{ file: 'shared.ts', patch: 'A' }] },
+        ],
+        kiloUserId,
+        sessionId,
+        1,
+        1000
+      );
+      await stub.captureShareInfo(publicId);
+      // Private content appended after the share boundary.
+      await stub.ingest(
+        [
+          { type: 'message', data: { id: 'msg_2', role: 'assistant', content: 'private' } },
+          { type: 'part', data: { id: 'part_2', messageID: 'msg_2', type: 'text', text: 'B' } },
+          { type: 'session_diff', data: [{ file: 'private.ts', patch: 'private' }] },
+        ],
+        kiloUserId,
+        sessionId,
+        1,
+        3000
+      );
+
+      const shared = JSON.parse(
+        await stub
+          .getSharedSessionStream({ publicId, ingestedBeforeMs: 2000 })
+          .then(s => new Response(s).text())
+      );
+
+      expect(shared.info).toEqual({ title: 'Shared Session' });
+      expect(
+        shared.messages.map((m: { info: { id: string }; parts: Array<{ id: string }> }) => [
+          m.info.id,
+          m.parts.map(p => p.id),
+        ])
+      ).toEqual([['msg_1', ['part_1']]]);
+      expect(shared.messages[0].info.summary).toEqual({
+        diffs: [{ file: 'intentional.ts', after: 'A' }],
+      });
+      expect(shared.sessionDiff).toEqual([]);
+      expect(JSON.stringify(shared)).not.toContain('private');
+    });
+
+    it.each(['inline', 'r2'])(
+      'exports later messages in a live share with projected %s session info',
+      async storage => {
+        const sessionId = `ses_live_share_${crypto.randomUUID()}`;
+        const key = `items/${kiloUserId}/${sessionId}/session/current`;
+        const stub = getStub(kiloUserId, sessionId);
+        const info = {
+          title: 'Current title',
+          summary: { additions: 2, diffs: [{ file: 'cumulative-private.ts', after: 'private' }] },
+        };
+        try {
+          await stub.ingest(
+            [
+              { type: 'session', data: { title: 'Original title' } },
+              { type: 'message', data: { id: 'msg_1', role: 'user' } },
+            ],
+            kiloUserId,
+            sessionId,
+            1,
+            1000
+          );
+          const before = await stub
+            .getLiveSharedSessionStream()
+            .then(stream => new Response(stream).json());
+          expect(before).toMatchObject({ messages: [{ info: { id: 'msg_1' } }] });
+
+          if (storage === 'r2') await env.SESSION_INGEST_R2.put(key, JSON.stringify(info));
+          await stub.ingest(
+            [
+              { type: 'session', data: storage === 'r2' ? {} : info },
+              {
+                type: 'message',
+                data: {
+                  id: 'msg_2',
+                  role: 'assistant',
+                  summary: { diffs: [{ file: 'intentional.ts', after: 'included' }] },
+                },
+              },
+              {
+                type: 'part',
+                data: { id: 'part_2', messageID: 'msg_2', type: 'text', text: 'Later' },
+              },
+              { type: 'session_diff', data: [{ file: 'cumulative-private.ts', patch: 'private' }] },
+            ],
+            kiloUserId,
+            sessionId,
+            1,
+            3000,
+            storage === 'r2' ? { session: key } : undefined
+          );
+
+          const shared = JSON.parse(
+            await stub.getLiveSharedSessionStream().then(stream => new Response(stream).text())
+          );
+          expect(shared.info).toEqual({ title: 'Current title', summary: { additions: 2 } });
+          expect(shared.messages).toHaveLength(2);
+          expect(shared.messages[1].info).toMatchObject({
+            id: 'msg_2',
+            summary: { diffs: [{ file: 'intentional.ts', after: 'included' }] },
+          });
+          expect(shared.messages[1].parts).toEqual([
+            { id: 'part_2', messageID: 'msg_2', type: 'text', text: 'Later' },
+          ]);
+          expect(shared.sessionDiff).toEqual([]);
+          expect(JSON.stringify(shared)).not.toContain('cumulative-private.ts');
+
+          const ownerExport = JSON.parse(
+            await stub.getAllStream().then(stream => new Response(stream).text())
+          );
+          expect(ownerExport.info).toEqual(info);
+          expect(ownerExport.sessionDiff).toEqual([
+            { file: 'cumulative-private.ts', patch: 'private' },
+          ]);
+        } finally {
+          await stub.clear();
+          await env.SESSION_INGEST_R2.delete(key);
+        }
+      }
+    );
+
+    it.each([
+      ['missing', 'retryable_failure'],
+      ['oversized', 'too_large'],
+      ['invalid', 'invalid_data'],
+    ])('keeps live share messages readable with %s session info', async (kind, expectedKind) => {
+      const sessionId = `ses_live_share_unavailable_${crypto.randomUUID()}`;
+      const key = `items/${kiloUserId}/${sessionId}/session/current`;
+      const stub = getStub(kiloUserId, sessionId);
+      try {
+        if (kind === 'oversized') {
+          await env.SESSION_INGEST_R2.put(
+            key,
+            JSON.stringify({ title: 'x'.repeat(MAX_KILO_SDK_SESSION_SNAPSHOT_BYTES + 1) })
+          );
+        } else if (kind === 'invalid') {
+          await env.SESSION_INGEST_R2.put(key, 'invalid JSON');
+        }
+        await stub.ingest(
+          [
+            { type: 'session', data: {} },
+            { type: 'message', data: { id: 'msg_1', role: 'user' } },
+            {
+              type: 'part',
+              data: { id: 'part_1', messageID: 'msg_1', type: 'text', text: 'Readable' },
+            },
+            { type: 'session_diff', data: [{ file: 'cumulative-private.ts', patch: 'private' }] },
+          ],
+          kiloUserId,
+          sessionId,
+          1,
+          1000,
+          { session: key }
+        );
+        expect(await stub.readKiloSdkSessionSnapshot()).toMatchObject({ kind: expectedKind });
+
+        const shared = JSON.parse(
+          await stub.getLiveSharedSessionStream().then(stream => new Response(stream).text())
+        );
+        expect(shared.info).toEqual({});
+        expect(shared.messages).toMatchObject([
+          { info: { id: 'msg_1' }, parts: [{ id: 'part_1', text: 'Readable' }] },
+        ]);
+        expect(shared.sessionDiff).toEqual([]);
+        await runInDurableObject(stub, async instance => {
+          await expect(instance.captureShareInfo(crypto.randomUUID())).rejects.toThrow(
+            kind === 'oversized' ? 'Share snapshot is too large' : 'Share snapshot is unavailable'
+          );
+        });
+      } finally {
+        await stub.clear();
+        await env.SESSION_INGEST_R2.delete(key);
+      }
+    });
+
+    it('does not expose later updates to an item that existed at the boundary', async () => {
+      const sessionId = 'ses_roundtrip_shared_update_000007';
+      const publicId = '22222222-2222-4222-8222-222222222222';
+      const stub = getStub(kiloUserId, sessionId);
+
+      await stub.ingest(
+        [
+          { type: 'session', data: { title: 'Updated Shared Session' } },
+          { type: 'message', data: { id: 'msg_1', role: 'user', content: 'public' } },
+          { type: 'part', data: { id: 'part_1', messageID: 'msg_1', type: 'text', text: 'A' } },
+        ],
+        kiloUserId,
+        sessionId,
+        1,
+        1000
+      );
+      await stub.captureShareInfo(publicId);
+      await stub.ingest(
+        [{ type: 'part', data: { id: 'part_1', messageID: 'msg_1', type: 'text', text: 'B' } }],
+        kiloUserId,
+        sessionId,
+        1,
+        3000
+      );
+
+      const shared = JSON.parse(
+        await stub
+          .getSharedSessionStream({ publicId, ingestedBeforeMs: 2000 })
+          .then(s => new Response(s).text())
+      );
+
+      expect(shared.messages).toHaveLength(1);
+      expect(shared.messages[0].info.id).toBe('msg_1');
+      expect(shared.messages[0].parts).toEqual([]);
+      expect(JSON.stringify(shared)).not.toContain('B');
+    });
+
+    it('freezes the shared session info and drops its cumulative diff', async () => {
+      const sessionId = 'ses_roundtrip_shared_info_000008';
+      const publicId = '33333333-3333-4333-8333-333333333333';
+      const stub = getStub(kiloUserId, sessionId);
+
+      await stub.ingest(
+        [
+          {
+            type: 'session',
+            data: {
+              title: 'Public title',
+              metadata: { goal: 'public goal' },
+              summary: {
+                additions: 1,
+                deletions: 0,
+                files: 1,
+                diffs: [{ file: 'public.ts', after: 'public' }],
+              },
+            },
+          },
+        ],
+        kiloUserId,
+        sessionId,
+        1,
+        1000
+      );
+      await stub.captureShareInfo(publicId);
+      await stub.ingest(
+        [
+          {
+            type: 'session',
+            data: {
+              title: 'Private title',
+              metadata: { goal: 'private goal' },
+              summary: { additions: 9, deletions: 9, files: 9 },
+            },
+          },
+        ],
+        kiloUserId,
+        sessionId,
+        1,
+        3000
+      );
+
+      const shared = JSON.parse(
+        await stub
+          .getSharedSessionStream({ publicId, ingestedBeforeMs: 2000 })
+          .then(s => new Response(s).text())
+      );
+
+      expect(shared.info).toEqual({
+        title: 'Public title',
+        metadata: { goal: 'public goal' },
+        summary: { additions: 1, deletions: 0, files: 1 },
+      });
+      expect(JSON.stringify(shared)).not.toContain('Private');
+      expect(JSON.stringify(shared)).not.toContain('public.ts');
+
+      await stub.deleteShareInfo(publicId);
+      const cleared = JSON.parse(
+        await stub
+          .getSharedSessionStream({ publicId, ingestedBeforeMs: 2000 })
+          .then(s => new Response(s).text())
+      );
+      expect(cleared.info).toEqual({});
+      expect(cleared.messages).toEqual([]);
+    });
+
+    it.each([
+      ['source', MAX_KILO_SDK_SESSION_SNAPSHOT_BYTES + 1],
+      ['projected row', MAX_INGEST_ITEM_BYTES + 1],
+    ])('rejects an oversized %s before persisting share info', async (_kind, bytes) => {
+      const sessionId = `ses_share_oversized_${crypto.randomUUID()}`;
+      const publicId = crypto.randomUUID();
+      const key = `test/share-info/${sessionId}`;
+      const stub = getStub(kiloUserId, sessionId);
+      try {
+        await env.SESSION_INGEST_R2.put(key, JSON.stringify({ title: 'x'.repeat(bytes) }));
+        await runInDurableObject(stub, async (_instance, state) => {
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data, item_data_r2_key, ingested_at) VALUES (?, ?, ?, ?, ?)',
+            'session',
+            'session',
+            '{}',
+            key,
+            1000
+          );
+        });
+        await runInDurableObject(stub, async instance => {
+          await expect(instance.captureShareInfo(publicId)).rejects.toThrow(
+            'Share snapshot is too large'
+          );
+        });
+        await runInDurableObject(stub, async (_instance, state) => {
+          expect([
+            ...state.storage.sql.exec(
+              'SELECT key FROM ingest_meta WHERE key = ?',
+              `shareInfo:${publicId}`
+            ),
+          ]).toEqual([]);
+        });
+      } finally {
+        await stub.clear();
+        await env.SESSION_INGEST_R2.delete(key);
+      }
+    });
+
+    it('projects an R2-backed session before checking its stored snapshot size', async () => {
+      const sessionId = `ses_share_project_${crypto.randomUUID()}`;
+      const publicId = crypto.randomUUID();
+      const key = `test/share-info/${sessionId}`;
+      const stub = getStub(kiloUserId, sessionId);
+      try {
+        await env.SESSION_INGEST_R2.put(
+          key,
+          JSON.stringify({
+            title: 'Shared title',
+            summary: { diffs: ['x'.repeat(3 * 1024 * 1024)], additions: 1 },
+          })
+        );
+        await runInDurableObject(stub, async (_instance, state) => {
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data, item_data_r2_key, ingested_at) VALUES (?, ?, ?, ?, ?)',
+            'session',
+            'session',
+            '{}',
+            key,
+            1000
+          );
+        });
+        await stub.captureShareInfo(publicId);
+        const shared = JSON.parse(
+          await stub
+            .getSharedSessionStream({ publicId, ingestedBeforeMs: Date.now() })
+            .then(s => new Response(s).text())
+        );
+        expect(shared.info).toEqual({ title: 'Shared title', summary: { additions: 1 } });
+      } finally {
+        await stub.clear();
+        await env.SESSION_INGEST_R2.delete(key);
+      }
+    });
+
+    it.each(sessionShareDurationSchema.options)(
+      'stores snapshot retention for %s',
+      async duration => {
+        const sessionId = `ses_retention_${duration}_${crypto.randomUUID()}`;
+        const publicId = crypto.randomUUID();
+        const stub = getStub(kiloUserId, sessionId);
+        await stub.ingest(
+          [{ type: 'session', data: { title: 'Shared title' } }],
+          kiloUserId,
+          sessionId,
+          1,
+          1000
+        );
+        const capturedAt = await stub.captureShareInfo(publicId, duration);
+        const expiresAt = getSessionShareExpiresAt(duration, Math.floor(capturedAt / 1000));
+        await runInDurableObject(stub, async (_instance, state) => {
+          const [row] = [
+            ...state.storage.sql.exec<{ value: string }>(
+              'SELECT value FROM ingest_meta WHERE key = ?',
+              `shareInfo:${publicId}`
+            ),
+          ];
+          expect(JSON.parse(row.value)).toMatchObject({
+            capturedAt,
+            expiresAt: expiresAt === null ? null : expiresAt * 1000,
+          });
+        });
+      }
+    );
+
+    it('keeps permanent snapshot info after 30 days and removes expired finite snapshots', async () => {
+      const sessionId = 'ses_permanent_snapshot_retention_001';
+      const permanentId = crypto.randomUUID();
+      const expiredId = crypto.randomUUID();
+      const stub = getStub(kiloUserId, sessionId);
+      await stub.ingest(
+        [{ type: 'session', data: { title: 'Original title' } }],
+        kiloUserId,
+        sessionId,
+        1,
+        1000
+      );
+      await stub.captureShareInfo(permanentId, 'forever');
+      await runInDurableObject(stub, async (_instance, state) => {
+        const capturedAt = Date.now() - 365 * 24 * 60 * 60 * 1000;
+        state.storage.sql.exec(
+          'UPDATE ingest_meta SET value = ? WHERE key = ?',
+          JSON.stringify({
+            capturedAt,
+            expiresAt: null,
+            info: JSON.stringify({ title: 'Original title' }),
+          }),
+          `shareInfo:${permanentId}`
+        );
+        state.storage.sql.exec(
+          'INSERT INTO ingest_meta (key, value) VALUES (?, ?)',
+          `shareInfo:${expiredId}`,
+          JSON.stringify({
+            capturedAt,
+            expiresAt: Date.now() - 1,
+            info: '{}',
+          })
+        );
+      });
+      await stub.captureShareInfo(crypto.randomUUID());
+      const shared = JSON.parse(
+        await stub
+          .getSharedSessionStream({ publicId: permanentId, ingestedBeforeMs: 2000 })
+          .then(s => new Response(s).text())
+      );
+      expect(shared.info).toEqual({ title: 'Original title' });
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect([
+          ...state.storage.sql.exec(
+            'SELECT key FROM ingest_meta WHERE key = ?',
+            `shareInfo:${expiredId}`
+          ),
+        ]).toEqual([]);
+        expect([
+          ...state.storage.sql.exec(
+            'SELECT key FROM ingest_meta WHERE key = ?',
+            `shareInfo:${permanentId}`
+          ),
+        ]).toHaveLength(1);
+      });
+      await stub.deleteShareInfo(permanentId);
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect([
+          ...state.storage.sql.exec(
+            'SELECT key FROM ingest_meta WHERE key = ?',
+            `shareInfo:${permanentId}`
+          ),
+        ]).toEqual([]);
+      });
+    });
+
+    it('prunes expired share info snapshots when a new share is captured', async () => {
+      const sessionId = 'ses_roundtrip_shared_retention_000009';
+      const publicId = '44444444-4444-4444-8444-444444444444';
+      const stalePublicId = '55555555-5555-4555-8555-555555555555';
+      const stub = getStub(kiloUserId, sessionId);
+
+      await stub.ingest(
+        [{ type: 'session', data: { title: 'Retained title' } }],
+        kiloUserId,
+        sessionId,
+        1,
+        1000
+      );
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          'INSERT INTO ingest_meta (key, value) VALUES (?, ?)',
+          `shareInfo:${stalePublicId}`,
+          JSON.stringify({
+            capturedAt: Date.now() - 31 * 24 * 60 * 60 * 1000,
+            info: JSON.stringify({ title: 'Stale title' }),
+          })
+        );
+      });
+      await stub.captureShareInfo(publicId);
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect([
+          ...state.storage.sql.exec(
+            'SELECT key FROM ingest_meta WHERE key = ?',
+            `shareInfo:${stalePublicId}`
+          ),
+        ]).toEqual([]);
+      });
+
+      const current = JSON.parse(
+        await stub
+          .getSharedSessionStream({ publicId, ingestedBeforeMs: 2000 })
+          .then(s => new Response(s).text())
+      );
+      expect(current.info).toEqual({ title: 'Retained title' });
+
+      const stale = JSON.parse(
+        await stub
+          .getSharedSessionStream({ publicId: stalePublicId, ingestedBeforeMs: 2000 })
+          .then(s => new Response(s).text())
+      );
+      expect(stale.info).toEqual({});
+    });
+
     it('exports only the transcript up to an inclusive message cut and drops the session diff', async () => {
       const sessionId = 'ses_roundtrip_cut_0000000005';
       const stub = getStub(kiloUserId, sessionId);
@@ -261,6 +781,400 @@ describe('SessionIngestDO integration', () => {
       const full = JSON.parse(await stub.getAllStream().then(s => new Response(s).text()));
       expect(full.messages).toHaveLength(3);
       expect(full.sessionDiff).toEqual([{ file: 'a.ts', additions: 1, deletions: 0 }]);
+    });
+  });
+
+  describe('part identity layouts', () => {
+    const message = (sessionId: string) => ({
+      id: 'msg_a',
+      sessionID: sessionId,
+      role: 'user' as const,
+      time: { created: 100 },
+    });
+    const part = (sessionId: string, text: string) => ({
+      id: 'prt_1',
+      sessionID: sessionId,
+      messageID: 'msg_a',
+      type: 'text' as const,
+      text,
+    });
+
+    it('stores a part under its own identity next to its message', async () => {
+      const sessionId = 'ses_part_layout_store_0000001';
+      const stub = getStub(kiloUserId, sessionId);
+      await stub.ingest(
+        [
+          { type: 'message', data: message(sessionId) },
+          { type: 'part', data: part(sessionId, 'hello') },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      const rows = await runInDurableObject(stub, async (_instance, state) =>
+        state.storage.sql
+          .exec<{ item_id: string; item_type: string }>(
+            'SELECT item_id, item_type FROM ingest_items ORDER BY item_id'
+          )
+          .toArray()
+      );
+      expect(rows).toEqual([
+        { item_id: 'message/msg_a', item_type: 'message' },
+        { item_id: 'part/msg_a/prt_1', item_type: 'part' },
+      ]);
+    });
+
+    it('returns an older-layout part row with its message', async () => {
+      const sessionId = 'ses_part_layout_previous_0001';
+      const stub = getStub(kiloUserId, sessionId);
+      await stub.ingest([{ type: 'message', data: message(sessionId) }], kiloUserId, sessionId, 1);
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+          'msg_a/prt_1',
+          'part',
+          JSON.stringify(part(sessionId, 'stored earlier')),
+          1000
+        );
+      });
+
+      await expect(stub.readKiloSdkMessages({ limit: 1 })).resolves.toEqual({
+        messages: [{ info: message(sessionId), parts: [part(sessionId, 'stored earlier')] }],
+        nextCursor: null,
+        omittedItemCount: 0,
+      });
+
+      const exported = JSON.parse(await stub.getAllStream().then(s => new Response(s).text())) as {
+        messages: Array<{ parts: Array<{ id: string }> }>;
+      };
+      expect(exported.messages.flatMap(entry => entry.parts.map(p => p.id))).toEqual(['prt_1']);
+    });
+
+    it('keeps one stored row per part', async () => {
+      const sessionId = 'ses_part_layout_converge_001';
+      const stub = getStub(kiloUserId, sessionId);
+      await stub.ingest([{ type: 'message', data: message(sessionId) }], kiloUserId, sessionId, 1);
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+          'msg_a/prt_1',
+          'part',
+          JSON.stringify(part(sessionId, 'stale')),
+          1000
+        );
+      });
+      await stub.ingest(
+        [{ type: 'part', data: part(sessionId, 'fresh') }],
+        kiloUserId,
+        sessionId,
+        1,
+        2000
+      );
+
+      const rows = await runInDurableObject(stub, async (_instance, state) =>
+        state.storage.sql
+          .exec<{ item_id: string }>(
+            'SELECT item_id FROM ingest_items WHERE item_type = ? ORDER BY item_id',
+            'part'
+          )
+          .toArray()
+      );
+      expect(rows).toEqual([{ item_id: 'part/msg_a/prt_1' }]);
+      await expect(stub.readKiloSdkMessages({ limit: 1 })).resolves.toEqual({
+        messages: [{ info: message(sessionId), parts: [part(sessionId, 'fresh')] }],
+        nextCursor: null,
+        omittedItemCount: 0,
+      });
+    });
+
+    it('deletes the previous-layout body when the stored row is replaced', async () => {
+      const sessionId = 'ses_part_layout_body_00000001';
+      const stub = getStub(kiloUserId, sessionId);
+      const previousKey = `items/${kiloUserId}/${sessionId}/msg_a/prt_1/earlier`;
+      await stub.ingest([{ type: 'message', data: message(sessionId) }], kiloUserId, sessionId, 1);
+      try {
+        await env.SESSION_INGEST_R2.put(previousKey, '{}');
+        await runInDurableObject(stub, async (_instance, state) => {
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data, item_data_r2_key, ingested_at) ' +
+              'VALUES (?, ?, ?, ?, ?)',
+            'msg_a/prt_1',
+            'part',
+            '{}',
+            previousKey,
+            1000
+          );
+        });
+
+        await stub.ingest(
+          [{ type: 'part', data: part(sessionId, 'fresh') }],
+          kiloUserId,
+          sessionId,
+          1,
+          2000
+        );
+
+        const rows = await runInDurableObject(stub, async (_instance, state) =>
+          state.storage.sql
+            .exec<{ item_id: string; item_data_r2_key: string | null }>(
+              'SELECT item_id, item_data_r2_key FROM ingest_items WHERE item_type = ?',
+              'part'
+            )
+            .toArray()
+        );
+        expect(rows).toEqual([{ item_id: 'part/msg_a/prt_1', item_data_r2_key: null }]);
+        await vi.waitFor(async () => {
+          await expect(env.SESSION_INGEST_R2.head(previousKey)).resolves.toBeNull();
+        });
+      } finally {
+        await env.SESSION_INGEST_R2.delete(previousKey);
+      }
+    });
+
+    it('preserves the most recent part value across persisted layouts', async () => {
+      const sessionId = 'ses_part_layout_delayed_0000001';
+      const stub = getStub(kiloUserId, sessionId);
+      const stagedKey = `items/${kiloUserId}/${sessionId}/part/prt_1/delayed`;
+      await stub.ingest([{ type: 'message', data: message(sessionId) }], kiloUserId, sessionId, 1);
+      try {
+        await runInDurableObject(stub, async (_instance, state) => {
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+            'msg_a/prt_1',
+            'part',
+            JSON.stringify(part(sessionId, 'stored later')),
+            2000
+          );
+        });
+        await env.SESSION_INGEST_R2.put(stagedKey, '{}');
+
+        await stub.ingest(
+          [{ type: 'part', data: part(sessionId, 'delivered late') }],
+          kiloUserId,
+          sessionId,
+          1,
+          1000,
+          { 'part/msg_a/prt_1': stagedKey }
+        );
+
+        const rows = await runInDurableObject(stub, async (_instance, state) =>
+          state.storage.sql
+            .exec<{ item_id: string }>(
+              'SELECT item_id FROM ingest_items WHERE item_type = ? ORDER BY item_id',
+              'part'
+            )
+            .toArray()
+        );
+        expect(rows).toEqual([{ item_id: 'msg_a/prt_1' }]);
+
+        await expect(stub.readKiloSdkMessages({ limit: 1 })).resolves.toEqual({
+          messages: [{ info: message(sessionId), parts: [part(sessionId, 'stored later')] }],
+          nextCursor: null,
+          omittedItemCount: 0,
+        });
+
+        const exported = JSON.parse(
+          await stub.getAllStream().then(s => new Response(s).text())
+        ) as {
+          messages: Array<{ info: { id: string }; parts: Array<{ text: string }> }>;
+        };
+        expect(
+          exported.messages.map(entry => [entry.info.id, entry.parts.map(row => row.text)])
+        ).toEqual([['msg_a', ['stored later']]]);
+
+        await vi.waitFor(async () => {
+          await expect(env.SESSION_INGEST_R2.head(stagedKey)).resolves.toBeNull();
+        });
+      } finally {
+        await env.SESSION_INGEST_R2.delete(stagedKey);
+      }
+    });
+
+    it('stores a part under the part root for every message id', async () => {
+      const sessionId = 'ses_part_layout_root_0000001';
+      const stub = getStub(kiloUserId, sessionId);
+      await stub.ingest(
+        [{ type: 'message', data: { ...message(sessionId), id: 'msg_a' } }],
+        kiloUserId,
+        sessionId,
+        1
+      );
+      await stub.ingest(
+        [
+          {
+            type: 'part',
+            data: { id: 'msg_a', messageID: 'message', type: 'text', text: 'own' },
+          },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      const rows = await runInDurableObject(stub, async (_instance, state) =>
+        state.storage.sql
+          .exec<{ item_id: string; item_type: string; item_data: string }>(
+            'SELECT item_id, item_type, item_data FROM ingest_items ORDER BY item_id'
+          )
+          .toArray()
+      );
+      expect(rows).toEqual([
+        {
+          item_id: 'message/msg_a',
+          item_type: 'message',
+          item_data: JSON.stringify(message(sessionId)),
+        },
+        {
+          item_id: 'part/message/msg_a',
+          item_type: 'part',
+          item_data: JSON.stringify({
+            id: 'msg_a',
+            messageID: 'message',
+            type: 'text',
+            text: 'own',
+          }),
+        },
+      ]);
+    });
+
+    it('exports parts stored under both layouts', async () => {
+      const sessionId = 'ses_part_layout_both_0000001';
+      const stub = getStub(kiloUserId, sessionId);
+      await stub.ingest([{ type: 'message', data: message(sessionId) }], kiloUserId, sessionId, 1);
+      await runInDurableObject(stub, async (_instance, state) => {
+        for (let index = 0; index < 12; index += 1) {
+          const id = `prt_previous_${String(index).padStart(2, '0')}`;
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+            `msg_a/${id}`,
+            'part',
+            JSON.stringify({
+              id,
+              sessionID: sessionId,
+              messageID: 'msg_a',
+              type: 'text',
+              text: id,
+            }),
+            1000 + index
+          );
+        }
+      });
+      await stub.ingest(
+        Array.from({ length: 12 }, (_unused, index) => {
+          const id = `prt_current_${String(index).padStart(2, '0')}`;
+          return {
+            type: 'part' as const,
+            data: { id, sessionID: sessionId, messageID: 'msg_a', type: 'text', text: id },
+          };
+        }),
+        kiloUserId,
+        sessionId,
+        1,
+        5000
+      );
+
+      const exported = JSON.parse(await stub.getAllStream().then(s => new Response(s).text())) as {
+        messages: Array<{ parts: Array<{ id: string }> }>;
+      };
+      expect(exported.messages.flatMap(entry => entry.parts.map(part => part.id))).toEqual([
+        ...Array.from(
+          { length: 12 },
+          (_unused, index) => `prt_previous_${String(index).padStart(2, '0')}`
+        ),
+        ...Array.from(
+          { length: 12 },
+          (_unused, index) => `prt_current_${String(index).padStart(2, '0')}`
+        ),
+      ]);
+
+      const read = await stub.readKiloSdkMessages({});
+      if ('kind' in read) throw new Error(`unexpected read failure: ${read.kind}`);
+      expect(read.messages[0]?.parts).toHaveLength(24);
+    });
+
+    it("exports a message's own parts when the ranges share a prefix", async () => {
+      const sessionId = 'ses_part_layout_overlap_000001';
+      const stub = getStub(kiloUserId, sessionId);
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+          'message/part',
+          'message',
+          JSON.stringify({ id: 'part', time: { created: 1 } }),
+          1000
+        );
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+          'part/prt_legacy',
+          'part',
+          JSON.stringify({ id: 'prt_legacy', messageID: 'part', type: 'text', text: 'own' }),
+          1001
+        );
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+          'part/msg_other/prt_other',
+          'part',
+          JSON.stringify({ id: 'prt_other', messageID: 'msg_other', type: 'text', text: 'other' }),
+          1002
+        );
+      });
+
+      const exported = JSON.parse(await stub.getAllStream().then(s => new Response(s).text())) as {
+        messages: Array<{ info: { id: string }; parts: Array<{ id: string }> }>;
+      };
+      expect(
+        exported.messages.map(entry => [entry.info.id, entry.parts.map(part => part.id)])
+      ).toEqual([['part', ['prt_legacy']]]);
+    });
+
+    it('exports only parts persisted before the shared boundary in either layout', async () => {
+      const sessionId = 'ses_part_layout_shared_0000001';
+      const publicId = '33333333-3333-4333-8333-333333333333';
+      const stub = getStub(kiloUserId, sessionId);
+      await stub.ingest(
+        [
+          { type: 'message', data: message(sessionId) },
+          { type: 'part', data: part(sessionId, 'kept') },
+        ],
+        kiloUserId,
+        sessionId,
+        1,
+        1000
+      );
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+          'msg_a/prt_legacy',
+          'part',
+          JSON.stringify({ ...part(sessionId, 'kept earlier'), id: 'prt_legacy' }),
+          1000
+        );
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+          'msg_a/prt_legacy_late',
+          'part',
+          JSON.stringify({ ...part(sessionId, 'later'), id: 'prt_legacy_late' }),
+          3000
+        );
+      });
+      await stub.captureShareInfo(publicId);
+      await stub.ingest(
+        [{ type: 'part', data: { ...part(sessionId, 'later'), id: 'prt_2' } }],
+        kiloUserId,
+        sessionId,
+        1,
+        3000
+      );
+
+      const shared = JSON.parse(
+        await stub
+          .getSharedSessionStream({ publicId, ingestedBeforeMs: 2000 })
+          .then(s => new Response(s).text())
+      ) as { messages: Array<{ parts: Array<{ id: string }> }> };
+      expect(shared.messages.map(entry => entry.parts.map(partRow => partRow.id))).toEqual([
+        ['prt_1', 'prt_legacy'],
+      ]);
     });
   });
 
@@ -692,7 +1606,7 @@ describe('SessionIngestDO integration', () => {
         sessionId,
         1,
         1000,
-        { 'msg_user_01/prt_user_01': `items/${sessionId}/part/missing` }
+        { 'part/msg_user_01/prt_user_01': `items/${sessionId}/part/missing` }
       );
 
       expect(await stub.readKiloSdkMessages({ limit: 1 })).toEqual({
@@ -736,6 +1650,44 @@ describe('SessionIngestDO integration', () => {
 
       const earlier = await stub.readKiloSdkMessages({ limit: 2, before: latest.nextCursor });
       expect(earlier.messages.map(message => message.info.id)).toEqual(['msg_100', 'msg_200']);
+      expect(earlier.nextCursor).toBeNull();
+    });
+
+    it('omits a message identity outside the cursor contract from a bounded page', async () => {
+      const sessionId = 'ses_sdk_page_cursor_fit_0001';
+      const stub = getStub(kiloUserId, sessionId);
+      const longId = `msg${'z'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES)}`;
+      const message = (id: string, created: number) => ({
+        id,
+        sessionID: sessionId,
+        role: 'user' as const,
+        time: { created },
+        agent: 'build',
+        model: { providerID: 'provider', modelID: 'model' },
+      });
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        for (const info of [
+          message('msg_1_old', 100),
+          message('msg_2_mid', 200),
+          message(longId, 300),
+        ]) {
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data) VALUES (?, ?, ?)',
+            `message/${info.id}`,
+            'message',
+            JSON.stringify(info)
+          );
+        }
+      });
+
+      const latest = await stub.readKiloSdkMessages({ limit: 1 });
+      expect(latest.messages.map(entry => entry.info.id)).toEqual(['msg_2_mid']);
+      expect(latest.omittedItemCount).toBe(1);
+      expect(latest.nextCursor).toBeTruthy();
+
+      const earlier = await stub.readKiloSdkMessages({ limit: 1, before: latest.nextCursor! });
+      expect(earlier.messages.map(entry => entry.info.id)).toEqual(['msg_1_old']);
       expect(earlier.nextCursor).toBeNull();
     });
 
@@ -1623,7 +2575,7 @@ describe('SessionIngestDO integration', () => {
         1
       );
       await stub.ingest([{ type: 'part', data: oversizedPart }], kiloUserId, sessionId, 1, 1000, {
-        [`${info.id}/${oversizedPart.id}`]: oversizedKey,
+        [`part/${info.id}/${oversizedPart.id}`]: oversizedKey,
       });
 
       await env.SESSION_INGEST_R2.put(
@@ -1672,7 +2624,7 @@ describe('SessionIngestDO integration', () => {
         sessionId,
         1,
         1000,
-        { [`${info.id}/${part.id}`]: key }
+        { [`part/${info.id}/${part.id}`]: key }
       );
 
       await expect(stub.readKiloSdkMessages({ limit: 1 })).resolves.toEqual({

@@ -12,7 +12,11 @@ import {
 } from 'react';
 
 type Route = { pathname: string; params: Record<string, string> };
-type Router = { push: (href: string) => void; back: () => void };
+type Router = {
+  push: (href: string) => void;
+  replace: (href: string) => void;
+  back: () => void;
+};
 type RouteContextValue = { router: Router; params: Record<string, string>; focused: boolean };
 
 const RouteContext = createContext<RouteContextValue | null>(null);
@@ -57,6 +61,11 @@ export function PickerRouteStack({
         }
         const params = Object.fromEntries(url.searchParams);
         setRoutes(current => [...current, { pathname: url.pathname, params }]);
+      },
+      replace: href => {
+        const url = new URL(href, 'https://test.invalid');
+        const params = Object.fromEntries(url.searchParams);
+        setRoutes(current => [...current.slice(0, -1), { pathname: url.pathname, params }]);
       },
       back: () => {
         setRoutes(current => current.slice(0, -1));

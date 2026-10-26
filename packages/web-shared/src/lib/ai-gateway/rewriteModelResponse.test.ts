@@ -818,6 +818,39 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       }
     });
 
+    test.each([true, false])('drops incomplete chunk usage (isFree=%s)', async isFree => {
+      const upstream = sseResponse(
+        'data: {"id":"gen-1","choices":[{"index":0,"delta":{"content":"hi"}}],"usage":{"extra_properties":{"google":{"traffic_type":"ON_DEMAND"}}}}\n\n' +
+          'data: {"id":"gen-1","choices":[],"usage":{"prompt_tokens":0,"completion_tokens":1,"total_tokens":1,"cost":0.01}}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: { ...freeUsageContext, is_free: isFree },
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const output = await readOutputStream(result);
+      expect(dataObjects(output)).toEqual([
+        { id: 'gen-1', choices: [{ index: 0, delta: { content: 'hi' } }] },
+        {
+          id: 'gen-1',
+          choices: [],
+          usage: {
+            prompt_tokens: 0,
+            completion_tokens: 1,
+            total_tokens: 1,
+            cost: isFree ? 0 : 0.01,
+            is_byok: false,
+          },
+        },
+      ]);
+      expect(dataPayloads(output).at(-1)).toBe('[DONE]');
+    });
+
     test.each([
       ['ResponseAborted', 'upstream_disconnect'],
       ['TimeoutError', 'timeout'],
@@ -1476,6 +1509,89 @@ describe('rewriteModelResponse_Responses', () => {
     expect(json.usage.cost).toBe(0);
     expect(json.usage.is_byok).toBe(false);
     expect(json.usage.prompt_tokens_details.cached_tokens).toBe(0);
+  });
+
+  test('restores the id of output items that only carry item_id in JSON responses', async () => {
+    const upstream = jsonResponse({
+      id: 'resp_1',
+      output: [
+        {
+          type: 'function_call',
+          item_id: 'fc_1',
+          call_id: 'call_1',
+          name: 'read',
+          arguments: '{}',
+        },
+        { type: 'message', id: 'msg_1', item_id: 'other_id', content: [] },
+      ],
+    });
+
+    const result = await rewriteModelResponse_Responses({
+      response: upstream,
+      usageContext: { ...freeUsageContext, api_kind: 'responses' },
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+
+    expect(await result.json()).toMatchObject({
+      output: [
+        { id: 'fc_1', item_id: 'fc_1' },
+        { id: 'msg_1', item_id: 'other_id' },
+      ],
+    });
+  });
+
+  test('restores the id of output items that only carry item_id in streams', async () => {
+    const upstream = sseResponse(
+      'data: {"type":"response.function_call_arguments.delta","sequence_number":1,"item_id":"fc_1","delta":"{}"}\n\n' +
+        'data: {"type":"response.output_item.done","sequence_number":2,"item":{"type":"function_call","item_id":"fc_1","call_id":"call_1","name":"read","arguments":"{}"}}\n\n' +
+        'data: {"type":"response.output_item.done","sequence_number":3,"item":{"type":"message","id":"msg_1","item_id":"other_id"}}\n\n' +
+        'data: {"type":"response.completed","sequence_number":4,"response":{"output":[{"type":"function_call","item_id":"fc_1","call_id":"call_1"},{"type":"message","id":"msg_1","item_id":"other_id"}]}}\n\n'
+    );
+
+    const result = await rewriteModelResponse_Responses({
+      response: upstream,
+      usageContext: { ...freeUsageContext, api_kind: 'responses' },
+      capture: null,
+      vercelRequestId: null,
+      reasoningEffort: null,
+    });
+    expect(dataObjects(await readOutputStream(result))).toEqual([
+      {
+        type: 'response.function_call_arguments.delta',
+        sequence_number: 1,
+        item_id: 'fc_1',
+        delta: '{}',
+      },
+      {
+        type: 'response.output_item.done',
+        sequence_number: 2,
+        item: {
+          type: 'function_call',
+          id: 'fc_1',
+          item_id: 'fc_1',
+          call_id: 'call_1',
+          name: 'read',
+          arguments: '{}',
+        },
+      },
+      {
+        type: 'response.output_item.done',
+        sequence_number: 3,
+        item: { type: 'message', id: 'msg_1', item_id: 'other_id' },
+      },
+      {
+        type: 'response.completed',
+        sequence_number: 4,
+        response: {
+          output: [
+            { type: 'function_call', id: 'fc_1', item_id: 'fc_1', call_id: 'call_1' },
+            { type: 'message', id: 'msg_1', item_id: 'other_id' },
+          ],
+        },
+      },
+    ]);
   });
 
   test('zeroes nested free response cost and closes after the completed event', async () => {

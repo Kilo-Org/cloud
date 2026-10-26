@@ -38,7 +38,7 @@ import {
   setAdminAccessSinkForTest,
   type AdminAccessEvent,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
-import { kilocode_users, organizations } from '@kilocode/db/schema';
+import { device_sessions, kilocode_users, organizations } from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { markOrganizationAsDeleted } from '@kilocode/web-shared/lib/organizations/organizations';
@@ -55,6 +55,10 @@ import {
 import { signKiloToken } from '@kilocode/worker-utils/kilo-token';
 import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import {
+  DEVICE_SESSION_CACHE_TTL_MS,
+  resetDeviceSessionCacheForTest,
+} from '@kilocode/web-shared/lib/auth/device-session-cache';
 
 // Same namespace UUID used in user.server.ts
 const USER_UUID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
@@ -63,6 +67,11 @@ beforeEach(() => {
   mockHeaders.mockReset();
   mockGetServerSession.mockReset();
   mockRedirect.mockClear();
+  resetDeviceSessionCacheForTest();
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 function signPolicyClaims(claims: Record<string, unknown>, secret = NEXTAUTH_SECRET): string {
@@ -671,15 +680,75 @@ describe('getUserFromAuth', () => {
       google_user_email: `api-token-device-session-${crypto.randomUUID()}@example.com`,
       api_token_pepper: 'device-session-pepper',
     });
-    const deviceSessionId = crypto.randomUUID();
-    const token = generateApiToken(user, { deviceSessionId });
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: user.id })
+      .returning({ id: device_sessions.id });
+    const token = generateApiToken(user, { deviceSessionId: session!.id });
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     const result = await getUserFromAuth({ adminOnly: false });
 
     expect(result.authFailedResponse).toBeNull();
     expect(result.user?.id).toBe(user.id);
-    expect(result.deviceSessionId).toBe(deviceSessionId);
+    expect(result.deviceSessionId).toBe(session!.id);
+  });
+
+  test('rejects a bearer token whose device session was revoked', async () => {
+    const user = await insertTestUser({
+      google_user_email: `api-token-revoked-session-${crypto.randomUUID()}@example.com`,
+      api_token_pepper: 'revoked-session-pepper',
+    });
+    const [session] = await db
+      .insert(device_sessions)
+      .values({
+        kilo_user_id: user.id,
+        revoked_at: new Date().toISOString(),
+        revoked_reason: 'logout',
+      })
+      .returning({ id: device_sessions.id });
+    const token = generateApiToken(user, { deviceSessionId: session!.id });
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(true);
+  });
+
+  test('serves the cached session answer, then rechecks it after the revocation window', async () => {
+    const user = await insertTestUser({
+      google_user_email: `api-token-session-window-${crypto.randomUUID()}@example.com`,
+      api_token_pepper: 'session-window-pepper',
+    });
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: user.id })
+      .returning({ id: device_sessions.id });
+    const token = generateApiToken(user, { deviceSessionId: session!.id });
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    let clock = Date.now();
+    jest.spyOn(Date, 'now').mockImplementation(() => clock);
+
+    expect((await getUserFromAuth({ adminOnly: false })).user?.id).toBe(user.id);
+
+    // Revoked without the app's invalidation, as another instance would.
+    await db
+      .update(device_sessions)
+      .set({ revoked_at: new Date().toISOString(), revoked_reason: 'logout' })
+      .where(eq(device_sessions.id, session!.id));
+
+    // Inside the window the cached answer is served without a database read.
+    expect((await getUserFromAuth({ adminOnly: false })).user?.id).toBe(user.id);
+
+    clock += DEVICE_SESSION_CACHE_TTL_MS;
+    const afterWindow = await getUserFromAuth({ adminOnly: false });
+
+    expect(afterWindow.authFailedResponse?.status).toBe(401);
+    expect(afterWindow.user).toBeNull();
+    expect(afterWindow.credentialsRejected).toBe(true);
   });
 
   test('web-session branch leaves deviceSessionId undefined', async () => {
@@ -1088,7 +1157,6 @@ describe('credential exchange bearer authentication guard', () => {
   });
 
   test.each([
-    ['device session', { deviceSessionId: '' }],
     ['bot', { botId: '' }],
     ['organization', { organizationId: '' }],
     ['token source', { tokenSource: '' }],
@@ -1114,6 +1182,63 @@ describe('credential exchange bearer authentication guard', () => {
     );
 
     expect(result.authFailedResponse?.status).toBe(401);
+  });
+
+  test('exchanges a five-year bearer token bound to its device session', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'session-exchange-pepper' });
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: user.id })
+      .returning({ id: device_sessions.id });
+    const now = Math.floor(Date.now() / 1000);
+    const token = signPolicyClaims({
+      version: 3,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      iat: now,
+      exp: now + 157_680_000,
+      deviceSessionId: session!.id,
+    });
+
+    const result = await getUserFromBearerForCredentialExchange(
+      new Headers({ authorization: `Bearer ${token}` }),
+      { legacy: 'five-year-api' }
+    );
+
+    expect(result.authFailedResponse).toBeNull();
+    expect(result.user?.id).toBe(user.id);
+    expect(result.deviceSessionId).toBe(session!.id);
+  });
+
+  test('refuses to exchange a five-year bearer token whose device session is revoked', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'revoked-exchange-pepper' });
+    const [session] = await db
+      .insert(device_sessions)
+      .values({
+        kilo_user_id: user.id,
+        revoked_at: new Date().toISOString(),
+        revoked_reason: 'logout',
+      })
+      .returning({ id: device_sessions.id });
+    const now = Math.floor(Date.now() / 1000);
+    const token = signPolicyClaims({
+      version: 3,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      iat: now,
+      exp: now + 157_680_000,
+      deviceSessionId: session!.id,
+    });
+
+    const result = await getUserFromBearerForCredentialExchange(
+      new Headers({ authorization: `Bearer ${token}` }),
+      { legacy: 'five-year-api' }
+    );
+
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.user).toBeNull();
   });
 
   test.each([

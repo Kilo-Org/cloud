@@ -1,3 +1,5 @@
+import '@/tests/setup/mock-device-session-realtime';
+
 import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {

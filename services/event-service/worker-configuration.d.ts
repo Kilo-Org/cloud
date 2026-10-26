@@ -9,6 +9,7 @@ declare namespace Cloudflare {
 	interface Env {
 		HYPERDRIVE: Hyperdrive;
 		NEXTAUTH_SECRET: SecretsStoreSecret;
+		INTERNAL_API_SECRET: SecretsStoreSecret;
 		WORKER_ENV: "production";
 		USER_SESSION_DO: DurableObjectNamespace<import("./src/index").UserSessionDO>;
 		CONNECTION_TICKET_DO: DurableObjectNamespace<import("./src/index").ConnectionTicketDO>;

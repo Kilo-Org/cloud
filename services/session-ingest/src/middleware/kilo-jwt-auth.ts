@@ -5,6 +5,7 @@ import {
   SESSION_INGEST_USER_DELETION_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { verifyKiloBearerAgainstCurrentPepper } from '@kilocode/worker-utils/kilo-token-auth';
+import { findActiveDeviceSession } from '@kilocode/worker-utils/device-session-auth';
 import {
   CloudAgentNextRuntimeAuthorizationClaimSchema,
   RUNTIME_PROXY_ATTESTATION_HEADER,
@@ -17,6 +18,7 @@ import { resolveConnectionTicket } from '../dos/connection-ticket';
 
 export type KiloJwtAuthVariables = {
   user_id: string;
+  device_session_id?: string;
   deletionAudience?: boolean;
 };
 
@@ -41,12 +43,45 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
     }
 
     const resolved = resolveConnectionTicket(c.env.CONNECTION_TICKET_DO, ticket);
-    const consumed = resolved ? await resolved.stub.consume(resolved.secret) : null;
-    if (!consumed) {
+    const inspected = resolved ? await resolved.stub.inspect(resolved.secret) : null;
+    if (!inspected || !resolved) {
       return c.json({ success: false, error: 'Invalid or expired ticket' }, 401);
     }
 
+    if (inspected.deviceSessionId !== undefined) {
+      let active: boolean;
+      try {
+        active = await findActiveDeviceSession(
+          c.env.HYPERDRIVE.connectionString,
+          inspected.deviceSessionId,
+          inspected.userId
+        );
+      } catch (error) {
+        console.error('Auth infrastructure failure', {
+          operation: 'ticket-device-session-lookup',
+          errorClass: error instanceof Error ? error.name : typeof error,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        });
+        return c.json({ success: false, error: 'Service temporarily unavailable' }, 503);
+      }
+      if (!active) {
+        await resolved.stub.consume(resolved.secret);
+        return c.json({ success: false, error: 'Invalid or expired ticket' }, 401);
+      }
+    }
+
+    const consumed = await resolved.stub.consume(resolved.secret);
+    if (
+      !consumed ||
+      consumed.userId !== inspected.userId ||
+      consumed.deviceSessionId !== inspected.deviceSessionId
+    ) {
+      return c.json({ success: false, error: 'Invalid or expired ticket' }, 401);
+    }
     c.set('user_id', consumed.userId);
+    if (consumed.deviceSessionId !== undefined) {
+      c.set('device_session_id', consumed.deviceSessionId);
+    }
     return next();
   }
 
@@ -131,6 +166,9 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
   }
 
   c.set('user_id', auth.userId);
+  if (auth.deviceSessionId !== undefined) {
+    c.set('device_session_id', auth.deviceSessionId);
+  }
   c.set('deletionAudience', deletionAudience);
   return next();
 });

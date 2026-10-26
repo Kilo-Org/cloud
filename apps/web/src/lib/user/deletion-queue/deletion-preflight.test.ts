@@ -1,3 +1,4 @@
+import '@/tests/setup/mock-device-session-realtime';
 import { eq } from 'drizzle-orm';
 import { user_deletion_requests } from '@kilocode/db/schema';
 import {

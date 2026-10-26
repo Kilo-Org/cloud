@@ -1,5 +1,6 @@
 import type { Context, Next } from 'hono';
 import { getCookie } from 'hono/cookie';
+import { findActiveDeviceSession } from '@kilocode/worker-utils/device-session-auth';
 import { timingSafeEqual } from '@kilocode/encryption';
 import type { AppEnv } from '../types';
 import { KILOCLAW_AUTH_COOKIE } from '../config';
@@ -14,7 +15,8 @@ import { getWorkerDb, findPepperByUserId } from '../db';
  * 3. Verify HS256 with NEXTAUTH_SECRET; check version and env
  * 4. Validate apiTokenPepper against DB via Hyperdrive
  * 5. Reject the request when the user is blocked
- * 6. Set ctx.userId, ctx.authToken on context
+ * 6. Validate any device session against its current record and owner
+ * 7. Set ctx.userId, ctx.authToken on context
  */
 export async function authMiddleware(c: Context<AppEnv>, next: Next) {
   const secret = c.env.NEXTAUTH_SECRET;
@@ -74,6 +76,22 @@ export async function authMiddleware(c: Context<AppEnv>, next: Next) {
   } catch (err) {
     console.error('[auth] Pepper validation failed:', err);
     return c.json({ error: 'Authentication service unavailable' }, 500);
+  }
+
+  if (result.deviceSessionId !== undefined) {
+    try {
+      const active = await findActiveDeviceSession(
+        c.env.HYPERDRIVE.connectionString,
+        result.deviceSessionId,
+        result.userId
+      );
+      if (!active) return c.json({ error: 'Token revoked' }, 401);
+    } catch (error) {
+      console.error('[auth] Device session validation failed', {
+        errorClass: error instanceof Error ? error.name : typeof error,
+      });
+      return c.json({ error: 'Authentication service unavailable' }, 503);
+    }
   }
 
   c.set('userId', result.userId);

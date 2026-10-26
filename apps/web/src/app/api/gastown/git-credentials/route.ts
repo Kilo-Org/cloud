@@ -16,6 +16,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { resolveGitCredentialsFromIntegration } from '@/lib/gastown/git-credentials';
 import { validateAuthorizationHeader } from '@kilocode/web-shared/lib/tokens';
+import { isActiveDeviceSession } from '@kilocode/worker-utils/device-session-auth';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq, and } from 'drizzle-orm';
 import { platform_integrations } from '@kilocode/db';
@@ -25,6 +26,13 @@ export async function POST(request: NextRequest) {
   const authResult = validateAuthorizationHeader(request.headers);
   if ('error' in authResult) {
     return NextResponse.json({ error: authResult.error }, { status: 401 });
+  }
+
+  if (
+    authResult.deviceSessionId !== undefined &&
+    !(await isActiveDeviceSession(db, authResult.deviceSessionId, authResult.kiloUserId))
+  ) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const body = await request.json().catch(() => null);

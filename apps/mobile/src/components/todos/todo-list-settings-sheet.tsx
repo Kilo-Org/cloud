@@ -241,7 +241,11 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
           </View>
           {saving ? <ActivityIndicator color={colors.mutedForeground} /> : null}
           <AccessibleStatus
-            message={saveFailed ? t('todos.listSettings.saveFailed') : null}
+            message={
+              saveFailed
+                ? t(list ? 'todos.listSettings.saveFailed' : 'todos.lists.createFailed')
+                : null
+            }
             className="text-sm"
           />
         </View>

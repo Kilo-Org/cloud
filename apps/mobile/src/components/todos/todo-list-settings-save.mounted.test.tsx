@@ -328,7 +328,7 @@ describe('To-do list settings save', () => {
     });
     expect(state.back).not.toHaveBeenCalled();
     expect(state.replace).not.toHaveBeenCalled();
-    expect(errorLine()).toBe(i18n.t('todos.listSettings.saveFailed'));
+    expect(errorLine()).toBe(i18n.t('todos.lists.createFailed'));
 
     await pressDone();
 

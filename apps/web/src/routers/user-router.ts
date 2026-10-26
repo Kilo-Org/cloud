@@ -1,6 +1,7 @@
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { PAID_CREDIT_EXPIRATION_EFFECTIVE_AT } from '@kilocode/web-shared/lib/config.server';
 import { getPaidCreditPolicyPresentation } from '@kilocode/web-shared/lib/paidCreditPolicy';
+import { invalidateDeviceSession } from '@kilocode/web-shared/lib/auth/device-session-cache';
 import {
   assertUserCanBeSoftDeleted,
   getUserAuthProviders,
@@ -148,6 +149,7 @@ async function revokeOwnedDeviceSession(
         isNull(device_sessions.revoked_at)
       )
     );
+  invalidateDeviceSession(sessionId);
 }
 
 const ViewTypeSchema = z.union([z.literal('personal'), z.literal('all'), z.uuid()]);

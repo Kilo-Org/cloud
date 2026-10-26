@@ -1483,6 +1483,22 @@
       "loadingProposals": "Läser in förslag",
       "couldNotLoadProposals": "Kunde inte läsa in förslagen",
       "noProposals": "Inga förslag",
+      "proposalDetails": "Förslagsdetaljer",
+      "proposalTitle": "Förslagets titel",
+      "rationale": "Motivering",
+      "saveFirst": "Spara dina ändringar innan du öppnar en pull request.",
+      "proposalSaved": "Förslaget har sparats",
+      "proposalDismissed": "Förslaget har avfärdats",
+      "dismissProposalTitle": "Avfärda förslaget?",
+      "dismissProposalMessage": "Förslaget tas bort från den aktiva listan och kan inte återställas.",
+      "prOpened": "Pull request för REVIEW.md har öppnats",
+      "alreadyPresent": "Riktlinjerna finns redan i REVIEW.md",
+      "status": {
+        "edited": "Redigerat",
+        "opening_change_request": "Öppnar PR",
+        "change_request_failed": "PR misslyckades",
+        "superseded": "Finns redan"
+      },
       "noProposalsDescription": "Förslag från granskningsminnet visas här när Kilo har analyserat de projektansvarigas svar."
     },
     "manualReview": {

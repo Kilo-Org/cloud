@@ -36,7 +36,14 @@ import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/li
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 
 const ONE_HOUR_SECONDS = 60 * 60;
-const LEGACY_DEVICE_SESSION_SECONDS = ONE_HOUR_SECONDS;
+/**
+ * Lifetimes a device-bound credential may carry: the one-hour access lifetime
+ * and the fixed long-term lifetime. Both require an active session.
+ */
+const LEGACY_DEVICE_SESSION_LIFETIMES_SECONDS: readonly number[] = [
+  ONE_HOUR_SECONDS,
+  TOKEN_EXPIRY.default,
+];
 
 export type DelegableResource = 'api' | 'gateway' | 'attribution' | 'html-deploy';
 export type ControlResource = 'cloud-agent-next' | 'gastown' | 'wasteland';
@@ -322,7 +329,7 @@ export async function getResourceDelegationAuthority(
   }
   const isLegacyDevice = claims.deviceSessionId !== undefined;
   if (isLegacyDevice) {
-    if (claims.exp - claims.iat !== LEGACY_DEVICE_SESSION_SECONDS) {
+    if (!LEGACY_DEVICE_SESSION_LIFETIMES_SECONDS.includes(claims.exp - claims.iat)) {
       forbidden('Unsupported legacy credential context');
     }
     await assertActiveDeviceSession(claims.deviceSessionId, user.id);

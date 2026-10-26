@@ -152,6 +152,7 @@ function createPurchase(overrides: Partial<Purchase> = {}): Purchase {
     purchaseToken: 'signed-jws',
     quantity: 1,
     store: 'apple',
+    storeId: 'apple',
     transactionDate: Date.now(),
     transactionId: 'tx-1',
     ...overrides,

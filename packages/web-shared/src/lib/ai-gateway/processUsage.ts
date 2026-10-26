@@ -1491,6 +1491,28 @@ export async function processTokenData(
       );
     }
     usageStats = genStats;
+  } else if (
+    generationProvider === OPENROUTER &&
+    usageStats.messageId &&
+    usageStats.is_byok == null &&
+    usageStats.cost_mUsd > 0
+  ) {
+    // OpenRouter transcriptions never report is_byok, so only the generation
+    // lookup can say whether their cost is the full cost or the BYOK fee.
+    captureMessage(
+      'SUSPICIOUS: OpenRouter generation lookup failed, so a cost without BYOK status may be only the BYOK fee',
+      {
+        level: 'error',
+        tags: { source: 'generation_lookup_fallback' },
+        extra: {
+          messageId: usageStats.messageId,
+          model: usageStats.model,
+          requested_model: usageContext.requested_model,
+          api_kind: usageContext.api_kind,
+          cost_mUsd: usageStats.cost_mUsd,
+        },
+      }
+    );
   }
 
   if (

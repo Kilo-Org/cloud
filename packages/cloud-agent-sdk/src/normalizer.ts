@@ -729,6 +729,9 @@ export function normalize(raw: CloudAgentEvent): NormalizedEvent | null {
     data = kilo.data.properties;
   }
 
+  // Cloud delivery is governed by cloud.message.*, not Kilo's execution queue.
+  if (eventType === 'session.queue.changed') return null;
+
   const event = normalizeInnerEvent(eventType, data);
   if (raw.streamEventType === 'connected' && event?.type === 'connected') {
     return { ...event, cloudSessionId: raw.sessionId };

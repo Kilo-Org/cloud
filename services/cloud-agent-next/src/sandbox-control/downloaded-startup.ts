@@ -48,5 +48,5 @@ export async function downloadedStartup(input: {
   }
   if (command.argv.some(arg => new TextEncoder().encode(arg).byteLength >= 128 * 1024))
     throw new ProviderCreationError('invalid_configuration');
-  return command;
+  return { ...command, user: 'root' };
 }

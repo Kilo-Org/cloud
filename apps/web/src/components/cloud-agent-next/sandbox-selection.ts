@@ -1,5 +1,5 @@
 import {
-  getKiloSandboxAllocation,
+  getSandboxAllocation,
   getSandboxAllocationResources,
   type SandboxDestination,
   type SandboxSelectionCapabilities,
@@ -46,13 +46,11 @@ export function formatSandboxProviderName(provider: SandboxDestination['provider
 }
 
 /**
- * Formats the fixed Vercel instance resources. Both accounts run the same
- * hardware, so the Kilo allocation is the existing mapping to the single
- * resource table in worker-utils.
+ * Formats the Vercel BYOC resources from the shared allocation mapping.
  */
 function formatVercelCapacity(instanceType: 'small' | 'large'): string | null {
   const resources = getSandboxAllocationResources(
-    getKiloSandboxAllocation({ provider: { id: 'vercel', account: 'kilo' }, instanceType })
+    getSandboxAllocation({ provider: { id: 'vercel', account: 'byoc' }, instanceType })
   );
   return resources
     ? formatContainerCapacity({

@@ -575,6 +575,18 @@ describe('runtime credential proxy', () => {
         kiloSessionId: 'kilo_1',
       })?.toString()
     ).toBe('https://provider.example.test/api/openrouter/chat/completions');
+    for (const base of ['https://backend.example.test/api', 'http://127.0.0.1:4300/api/']) {
+      expect(
+        resolveRuntimeCredentialProxyRoute({
+          targets: { ...targets, providerBaseUrl: base },
+          route: 'provider',
+          method: 'POST',
+          pathname: '/api/openrouter/chat/completions',
+          search: '?stream=true',
+          kiloSessionId: 'kilo_1',
+        })?.toString()
+      ).toBe(`${base.replace(/\/$/, '')}/openrouter/chat/completions?stream=true`);
+    }
     expect(
       resolveRuntimeCredentialProxyRoute({
         targets: { ...targets, providerBaseUrl: 'https://api.kilo.ai' },

@@ -374,6 +374,10 @@ async function setupVercel(
   await runInDurableObject(stub, async instance => {
     await instance.ensureAllocation({
       provider: 'vercel',
+      byoc: {
+        userId: 'user_123',
+        credentialId: '22222222-2222-4222-8222-222222222222',
+      },
       allocationName: SANDBOX_ID,
       containment: WORKTREE_CREDENTIAL_CONTAINMENT,
     });

@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { GEMINI_THOUGHT_TAG_MARKER } from '@kilocode/web-shared/lib/ai-gateway/reasoning-details-transform';
 import {
   isOpenRouterProviderConfig,
   type GatewayResponsesRequest,
@@ -136,6 +137,10 @@ function applyGeminiReasoningTransform(request: OpenRouterChatCompletionRequest)
         ...(reasoningEffort !== undefined ? { thinking_level: reasoningEffort } : {}),
         include_thoughts: true,
       },
+      // Without streaming, thoughts and answer share one content string, and
+      // only these tags separate them. Streams flag thought chunks instead, and
+      // asking for tags there would also put the closing tag in the answer.
+      ...(request.stream !== true ? { thought_tag_marker: GEMINI_THOUGHT_TAG_MARKER } : {}),
     };
   }
 

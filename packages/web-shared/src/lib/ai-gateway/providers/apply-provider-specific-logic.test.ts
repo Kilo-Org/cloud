@@ -467,6 +467,29 @@ describe('applyReasoningDetailsTransform', () => {
     expect(assistant.reasoning_content).toBeUndefined();
   });
 
+  it.each([
+    [false, { thought_tag_marker: 'think' }],
+    [undefined, { thought_tag_marker: 'think' }],
+    [true, {}],
+  ])(
+    'asks Gemini for thought tags only without streaming (stream: %s)',
+    (stream, expectedMarker) => {
+      const request = makeReasoningRequest();
+      request.body.stream = stream;
+      request.body.reasoning_effort = 'high';
+
+      applyReasoningDetailsTransform(
+        makeProvider(ReasoningDetailsTransform.GeminiThought),
+        request
+      );
+
+      expect((request.body as { google?: unknown }).google).toEqual({
+        thinking_config: { thinking_level: 'high', include_thoughts: true },
+        ...expectedMarker,
+      });
+    }
+  );
+
   it('maps Gemini encrypted details to matching tool-call signatures', () => {
     const request: Extract<GatewayRequest, { kind: 'chat_completions' }> = {
       kind: 'chat_completions',

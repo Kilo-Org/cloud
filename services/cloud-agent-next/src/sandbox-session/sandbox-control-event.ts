@@ -101,7 +101,7 @@ export type SandboxControlSessionEventInput = {
   timestamp?: string;
 };
 
-function publicEventProperties({
+export function publicEventProperties({
   type,
   properties,
 }: SandboxControlSessionEventInput): Record<string, unknown> {

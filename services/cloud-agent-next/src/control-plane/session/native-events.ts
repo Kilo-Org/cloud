@@ -1,6 +1,9 @@
 import { autoCommitRecordSchema } from '@kilocode/worker-utils/cloud-agent-commits';
 import { z } from 'zod';
-import type { SandboxControlSessionEventInput } from '../../sandbox-session/sandbox-control-event.js';
+import {
+  publicEventProperties,
+  type SandboxControlSessionEventInput,
+} from '../../sandbox-session/sandbox-control-event.js';
 import { slimPersistedKilocodeEvent } from '../../shared/ingest-frame.js';
 import type { StoredEvent } from '../../websocket/types.js';
 import type { SessionEventQueries } from './event-queries.js';
@@ -63,7 +66,8 @@ export function persistSessionEvent(input: {
 }): StoredEvent | null {
   const { queries, seed = false } = input;
   let type = input.event.type;
-  let properties = input.event.properties;
+  const liveProperties = publicEventProperties(input.event);
+  let properties = liveProperties;
   let entityId: string | undefined;
   let unique = seed;
   let timestamp =
@@ -193,7 +197,7 @@ export function persistSessionEvent(input: {
     payload: JSON.stringify({
       type: input.event.type,
       event: input.event.type,
-      properties: input.event.properties,
+      properties: liveProperties,
     }),
     timestamp,
     ...(id === 0 ? {} : { mutation_cursor: queries.getUpdateCursor() }),

@@ -1014,6 +1014,22 @@
       "loading": "正在加载审查记忆",
       "loadingProposals": "正在加载建议",
       "noProposals": "暂无建议",
+      "proposalDetails": "建议详情",
+      "proposalTitle": "建议标题",
+      "rationale": "理由",
+      "saveFirst": "请先保存修改，再创建拉取请求。",
+      "proposalSaved": "建议已保存",
+      "proposalDismissed": "建议已忽略",
+      "dismissProposalTitle": "忽略建议？",
+      "dismissProposalMessage": "这条建议将从活跃列表中移除，且无法恢复。",
+      "prOpened": "已创建 REVIEW.md 拉取请求",
+      "alreadyPresent": "REVIEW.md 中已包含这些审查准则",
+      "status": {
+        "edited": "已编辑",
+        "opening_change_request": "正在创建 PR",
+        "change_request_failed": "PR 创建失败",
+        "superseded": "已包含"
+      },
       "noProposalsDescription": "Kilo 分析维护者回复后，审查记忆建议会显示在这里。",
       "off": "审查记忆已关闭。",
       "on": "审查记忆已开启。",
@@ -3730,6 +3746,7 @@
     "title": "配置文件",
     "entrySubtitle": "跨会话重用环境设置",
     "newProfile": "新建配置文件",
+    "openHint": "打开配置文件",
     "emptyTitle": "还没有配置文件",
     "emptyDescription": "创建配置文件以跨会话重复使用环境变量、设置命令和技能。",
     "loadFailed": "无法加载配置文件",
@@ -3961,11 +3978,13 @@
       "namePlaceholder": "缺陷、想法、发布…",
       "emoji": "表情符号",
       "mode": "模式",
-      "defaultsHint": "从此列表启动的会话将使用这些默认设置。"
+      "defaultsHint": "从此列表启动的会话将使用这些默认设置。",
+      "saveFailed": "无法保存列表。请检查网络连接后重试。"
     },
     "list": {
       "addPlaceholder": "添加待办事项",
       "add": "添加待办",
+      "addFailed": "无法添加待办事项。请检查网络连接后重试。",
       "empty": "暂无待办事项",
       "setDefaults": "设置仓库、模式和模型",
       "completed_one": "已完成 ({{count}})",
@@ -4002,7 +4021,9 @@
       "startNewSession": "开始新会话",
       "startNewSessionHint": "长按以开始新会话。",
       "linkSession": "关联会话",
-      "linkFailed": "无法将会话关联到该待办事项"
+      "linkFailed": "无法将会话关联到该待办事项",
+      "moveToAnotherTodo": "移至其他待办事项",
+      "startRefreshFailed": "会话已启动，但此列表未更新。"
     },
     "linkSession": {
       "title": "关联会话",
@@ -4011,6 +4032,7 @@
     },
     "upNext": "接下来",
     "sessionTodo": "待办事项：{{title}}",
+    "openTodoHint": "打开该待办事项。",
     "linkToTodo": "关联到待办事项",
     "candidates": {
       "empty": "暂无未完成的待办事项"

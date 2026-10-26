@@ -2,7 +2,9 @@
 // Edit goal dialog (prose that can hold a long unbroken line). A single-line
 // field scrolls horizontally and clips the start of a long value, so the goal
 // dialog opts into the wrapping field. These tests pin both field contracts:
-// multi-line wraps with a bounded height, single-line keeps its old styling.
+// multi-line wraps with a bounded height, single-line keeps its old styling,
+// and only the single-line field submits from the keyboard's Done key with the
+// same guards as the Save button.
 
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -46,23 +48,29 @@ beforeEach(() => {
   }
 });
 
-/** Resolves the save promise the modal awaits; these tests never press Save. */
+/** Resolves the save promise the modal awaits; tests that never submit use this. */
 async function resolveSave(): Promise<void> {
   await Promise.resolve();
 }
 
-function mount(multiline: boolean): TestRenderer.ReactTestRenderer {
+type MountOverrides = {
+  onSave?: (name: string) => Promise<void>;
+  onClose?: () => void;
+  initialValue?: string;
+};
+
+function mount(multiline: boolean, overrides: MountOverrides = {}): TestRenderer.ReactTestRenderer {
   const holder: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
     holder.current = TestRenderer.create(
       createElement(RenameModal, {
         title: 'Edit goal',
         placeholder: 'Describe the goal',
-        initialValue: LONG_GOAL,
+        initialValue: overrides.initialValue ?? LONG_GOAL,
         multiline,
         maxLength: 500,
-        onSave: resolveSave,
-        onClose: () => undefined,
+        onSave: overrides.onSave ?? resolveSave,
+        onClose: overrides.onClose ?? (() => undefined),
       })
     );
   });
@@ -79,6 +87,9 @@ function fieldProps(renderer: TestRenderer.ReactTestRenderer) {
     multiline?: boolean;
     textAlignVertical?: string;
     defaultValue?: string;
+    returnKeyType?: string;
+    onChangeText?: (value: string) => void;
+    onSubmitEditing?: () => void;
   };
 }
 
@@ -95,5 +106,42 @@ describe('RenameModal field wrapping', () => {
   it('keeps the rename field single-line', () => {
     const props = fieldProps(mount(false));
     expect(props.multiline).toBeFalsy();
+  });
+});
+
+describe('RenameModal keyboard submit', () => {
+  it('marks the single-line field with a Done return key', () => {
+    expect(fieldProps(mount(false)).returnKeyType).toBe('done');
+  });
+
+  it('saves the typed value when the single-line field is submitted', async () => {
+    const onSave = vi.fn<(name: string) => Promise<void>>().mockResolvedValue(undefined);
+    const onClose = vi.fn<() => void>();
+    const renderer = mount(false, { onSave, onClose, initialValue: 'Old name' });
+    act(() => {
+      fieldProps(renderer).onChangeText?.('  New name  ');
+    });
+    await act(async () => {
+      fieldProps(renderer).onSubmitEditing?.();
+      await Promise.resolve();
+    });
+    expect(onSave).toHaveBeenCalledWith('New name');
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('ignores the return key while the value still matches the opening one', async () => {
+    const onSave = vi.fn<(name: string) => Promise<void>>().mockResolvedValue(undefined);
+    const renderer = mount(false, { onSave, initialValue: 'Old name' });
+    await act(async () => {
+      fieldProps(renderer).onSubmitEditing?.();
+      await Promise.resolve();
+    });
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('keeps Return as a new line in the multi-line field', () => {
+    const props = fieldProps(mount(true));
+    expect(props.onSubmitEditing).toBeUndefined();
+    expect(props.returnKeyType).toBeUndefined();
   });
 });

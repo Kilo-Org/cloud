@@ -125,15 +125,15 @@ describe('dispatchAppActionRequest', () => {
     expect(getPendingAppAction()).toBeNull();
   });
 
-  it('reports a cancelled confirmation when the prompt cannot be shown', async () => {
+  it('reports a retryable confirmation failure', async () => {
     const startAgent = vi.fn();
     const result = await dispatchAppActionRequest(
       { action: 'StartAgent', prompt: 'fix the build' },
       { confirmStart: () => Promise.reject(new Error('no alert surface')), startAgent }
     );
-    expect(result).toMatchObject({ ok: false, code: 'start-cancelled', retryable: false });
+    expect(result).toMatchObject({ ok: false, code: 'start-failed', retryable: true });
     expect(startAgent).not.toHaveBeenCalled();
-    expect(mocks.captureException).not.toHaveBeenCalled();
+    expect(mocks.captureException).toHaveBeenCalledOnce();
   });
 
   it('reports a StartAgent failure without parking a session', async () => {
@@ -168,6 +168,46 @@ describe('dispatchAppActionRequest', () => {
       message: i18n.t('agentChat.session.serviceUnavailable'),
     });
     expect(mocks.captureException).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    { prompt: '   ', code: 'empty-prompt' },
+    {
+      prompt: 'Review the build',
+      repository: 'https://git.example.com/owner/repo',
+      code: 'unknown-repository',
+    },
+  ])('classifies $code', async ({ code, ...input }) => {
+    const confirmStart = vi.fn();
+    const startAgent = vi.fn();
+    await expect(
+      dispatchAppActionRequest({ action: 'StartAgent', ...input }, { confirmStart, startAgent })
+    ).resolves.toMatchObject({ ok: false, code, retryable: false });
+    expect(confirmStart).not.toHaveBeenCalled();
+    expect(startAgent).not.toHaveBeenCalled();
+    expect(getPendingAppAction()).toBeNull();
+  });
+
+  it('confirms a continued session', async () => {
+    const confirmStart = vi.fn().mockResolvedValue(true);
+    const result: AppActionResult = {
+      ok: true,
+      action: 'StartAgent',
+      sessionId: 'ses_continued',
+      message: '',
+    };
+    const startAgent = vi.fn().mockResolvedValue(result);
+    await expect(
+      dispatchAppActionRequest(
+        { action: 'StartAgent', prompt: '', sessionId: 'ses_original' },
+        { confirmStart, startAgent }
+      )
+    ).resolves.toEqual(result);
+    expect(confirmStart).toHaveBeenCalledExactlyOnceWith({
+      prompt: '',
+      sessionId: 'ses_original',
+    });
+    expect(takePendingAppAction()).toEqual({ action: 'OpenSession', sessionId: 'ses_continued' });
   });
 
   it('parks OpenNeedsInput for the tabs consumer', async () => {
@@ -321,17 +361,6 @@ describe('registerAppActionDispatcher', () => {
   });
 
   it('answers a blank StartAgent payload with the empty-prompt refusal', async () => {
-    // The OS caller named START_AGENT, so the payload is a request the action
-    // path classifies — not an unrecognized payload the handler throws on. The
-    // refusal is the real result the native side reports through
-    // `completeAppAction`, instead of the entry point timing out.
-    mocks.startAgent.mockResolvedValue({
-      ok: false,
-      action: 'StartAgent',
-      retryable: false,
-      code: 'empty-prompt',
-      message: i18n.t('appActions.start.promptRequired'),
-    });
     const registered: ((payload: unknown) => Promise<AppActionResult>)[] = [];
     mocks.registerNativeAppActionDispatcher.mockImplementation(
       (handler: (payload: unknown) => Promise<AppActionResult>) => {
@@ -347,7 +376,8 @@ describe('registerAppActionDispatcher', () => {
       code: 'empty-prompt',
       message: i18n.t('appActions.start.promptRequired'),
     });
-    expect(mocks.startAgent).toHaveBeenCalledExactlyOnceWith({ prompt: '   ' });
+    expect(mocks.confirmStart).not.toHaveBeenCalled();
+    expect(mocks.startAgent).not.toHaveBeenCalled();
   });
 
   it('works with no native module at all', async () => {

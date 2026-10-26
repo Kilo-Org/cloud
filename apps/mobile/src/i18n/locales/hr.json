@@ -1506,6 +1506,22 @@
       "loadingProposals": "Učitavanje prijedloga",
       "couldNotLoadProposals": "Nije moguće učitati prijedloge.",
       "noProposals": "Nema prijedloga",
+      "proposalDetails": "Pojedinosti prijedloga",
+      "proposalTitle": "Naslov prijedloga",
+      "rationale": "Obrazloženje",
+      "saveFirst": "Spremi izmjene prije otvaranja zahtjeva za povlačenje.",
+      "proposalSaved": "Prijedlog spremljen",
+      "proposalDismissed": "Prijedlog odbačen",
+      "dismissProposalTitle": "Odbaciti prijedlog?",
+      "dismissProposalMessage": "Ovaj će prijedlog biti uklonjen s popisa aktivnih prijedloga i neće se moći vratiti.",
+      "prOpened": "Zahtjev za povlačenje za REVIEW.md otvoren",
+      "alreadyPresent": "Smjernice već postoje u datoteci REVIEW.md",
+      "status": {
+        "edited": "Uređeno",
+        "opening_change_request": "Otvaranje PR-a",
+        "change_request_failed": "Otvaranje PR-a nije uspjelo",
+        "superseded": "Već postoji"
+      },
       "noProposalsDescription": "Prijedlozi memorije pregleda pojavit će se ovdje nakon što Kilo analizira odgovore održavatelja."
     },
     "manualReview": {
@@ -3776,6 +3792,7 @@
     "title": "Profili",
     "entrySubtitle": "Ponovno upotrijebite postavke okruženja kroz sesije",
     "newProfile": "Novi profil",
+    "openHint": "Otvara profil",
     "emptyTitle": "Još nema profila",
     "emptyDescription": "Izradite profil za ponovno korištenje varijabli okoline, naredbi za postavljanje i vještina u više sesija.",
     "loadFailed": "Nije moguće učitati profile",
@@ -4014,11 +4031,13 @@
       "namePlaceholder": "Greške, Ideje, Izdanje…",
       "emoji": "Emotikon",
       "mode": "Način",
-      "defaultsHint": "Sesije pokrenute s ovog popisa koriste ove zadane postavke."
+      "defaultsHint": "Sesije pokrenute s ovog popisa koriste ove zadane postavke.",
+      "saveFailed": "Nije bilo moguće spremiti popis. Provjerite vezu i pokušajte ponovno."
     },
     "list": {
       "addPlaceholder": "Novi zadatak",
       "add": "Dodaj zadatak",
+      "addFailed": "Nije bilo moguće dodati zadatak. Provjerite vezu i pokušajte ponovno.",
       "empty": "Još nema zadataka",
       "setDefaults": "Postavi repozitorij, način i model",
       "completed_one": "Dovršeno ({{count}})",
@@ -4057,7 +4076,9 @@
       "startNewSession": "Započni novu sesiju",
       "startNewSessionHint": "Dugo pritisni za novu sesiju.",
       "linkSession": "Poveži sesiju",
-      "linkFailed": "Sesiju nije bilo moguće povezati sa zadatkom"
+      "linkFailed": "Sesiju nije bilo moguće povezati sa zadatkom",
+      "moveToAnotherTodo": "Premjesti u drugi zadatak",
+      "startRefreshFailed": "Sesija je pokrenuta, ali se ovaj popis nije ažurirao."
     },
     "linkSession": {
       "title": "Povezivanje sesije",
@@ -4066,6 +4087,7 @@
     },
     "upNext": "Sljedeće",
     "sessionTodo": "Zadatak: {{title}}",
+    "openTodoHint": "Otvara zadatak.",
     "linkToTodo": "Poveži sa zadatkom",
     "candidates": {
       "empty": "Nema otvorenih zadataka"

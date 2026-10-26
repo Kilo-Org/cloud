@@ -3,16 +3,12 @@
  *
  * Every function resolves credentials through gitlab-authorization first, so
  * the instance URL and token are always server-derived, and returns the shared
- * s1 DTOs so a provider difference never leaks past this module. Adapter
- * helpers are reused wherever they exist; the remaining GitLab endpoints go
- * through the thin JSON request below, which uses the same URL builder,
- * DNS-pinned transport, and response cap the adapter applies, so a stored
- * self-managed URL cannot re-target the bearer token at another host.
+ * DTOs so provider differences stay within this module. Adapter helpers and
+ * the neutral gitlab-http client share URL validation and pinned transport;
+ * gitlab-discussion supplies the same resolution state used by writes.
  */
 import 'server-only';
 
-import * as http from 'http';
-import * as https from 'https';
 import type {
   ProviderPrChecksResult,
   ProviderPrFile,
@@ -26,35 +22,30 @@ import type {
 } from '@kilocode/app-shared/provider-review';
 import {
   fetchGitLabMergeRequest,
-  fetchGitLabRootTextFileAtRef,
   fetchGitLabUser,
   getMRHeadCommit,
   type GitLabDiscussion,
   type GitLabMergeRequest,
+  type GitLabMergeRequestDetail,
 } from '@/lib/integrations/platforms/gitlab/adapter';
 import {
-  buildGitLabUrl,
-  resolveGitLabUrlSafely,
-  type GitLabResolvedUrl,
-} from '@/lib/integrations/platforms/gitlab/instance-url';
-import { FILE_LINES_MAX } from '@/lib/github-pr-review/dtos';
+  FILE_LINES_MAX,
+  FILE_READ_MAX_BYTES,
+  FILE_READ_TOO_LARGE_MESSAGE,
+} from '@/lib/github-pr-review/dtos';
 import {
   authorizeOwner,
   authorizeProject,
   classifyGitLabError,
   classifyGitLabErrorForOwner,
-  GitLabApiStatusError,
   GitLabReviewError,
   type GitLabProjectAccess,
   type GitLabReviewOwner,
 } from './gitlab-authorization';
+import { getGitLabDiscussionState } from './gitlab-discussion';
+import { requestGitLabJson, requestGitLabText } from './gitlab-http';
 
 const GITLAB_PAGE_SIZE = 50;
-const GITLAB_REQUEST_TIMEOUT_MS = 30_000;
-/** Same response cap the adapter applies, so a hostile instance cannot stream unbounded bytes. */
-const MAX_GITLAB_RESPONSE_BYTES = 10 * 1024 * 1024;
-/** The message both transports use when a reply exceeds the limit. */
-const GITLAB_RESPONSE_TOO_LARGE_MESSAGE = 'GitLab response exceeded size limit';
 /**
  * The diff-page bound for the summary's change counts: GitLab caps a merge
  * request's diff collection at the project's `diff_max_files` setting (1000
@@ -64,25 +55,6 @@ const GITLAB_RESPONSE_TOO_LARGE_MESSAGE = 'GitLab response exceeded size limit';
 const MAX_SUMMARY_DIFFSTAT_PAGES = 20;
 /** The MR-pipeline page bound for the checks list, same bounded-walk rule. */
 const MAX_CHECK_PAGES = 20;
-
-/** The MR detail JSON carries more fields than the adapter's typed subset. */
-type GitLabMergeRequestDetail = GitLabMergeRequest & {
-  created_at?: string;
-  updated_at?: string;
-  project_id?: number;
-  has_conflicts?: boolean;
-  merge_status?: string;
-  head_pipeline?: { id: number; sha: string; ref: string; status: string; web_url: string } | null;
-  references?: { full?: string };
-  // GitLab reports the changed-file total as a string: empty while the MR is
-  // still computing its diff, and capped with a trailing `+` (for example
-  // `1000+`) once it exceeds the project's diff limit. It is never an integer.
-  changes_count?: string | null;
-  // GitLab omits or nulls diff_refs on merge requests without a diff (for
-  // example an empty repository or an unresolved merge ref), so it cannot be
-  // trusted the way the adapter's non-optional type claims.
-  diff_refs?: GitLabMergeRequest['diff_refs'] | null;
-};
 
 type GitLabDiff = {
   old_path: string;
@@ -111,226 +83,6 @@ type GitLabApprovals = {
   approvals_required?: number;
   approvals_left?: number;
 };
-
-/**
- * One JSON request against the authorized instance. The instance URL is the
- * server-derived one from authorizeProject/authorizeOwner. The URL is resolved
- * once with the adapter's guard and the request is then bound to that exact
- * resolved address, so a stored self-managed host cannot be DNS-rebound
- * between the check and the connect.
- */
-export async function requestGitLabJson<T>(
-  access: { accessToken: string; instanceUrl: string },
-  path: string,
-  request: {
-    method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
-    query?: Record<string, string | number | boolean | undefined>;
-    body?: unknown;
-  } = {}
-): Promise<T> {
-  const query = request.query
-    ? (Object.fromEntries(
-        Object.entries(request.query).filter(([, value]) => value !== undefined)
-      ) as Record<string, string | number | boolean>)
-    : undefined;
-  const url = buildGitLabUrl(access.instanceUrl, path, query);
-  try {
-    const response = await fetchGitLabValidated(url, {
-      method: request.method ?? 'GET',
-      headers: {
-        Authorization: `Bearer ${access.accessToken}`,
-        Accept: 'application/json',
-        ...(request.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-      },
-      body: request.body !== undefined ? JSON.stringify(request.body) : undefined,
-      redirect: 'manual',
-      signal: AbortSignal.timeout(GITLAB_REQUEST_TIMEOUT_MS),
-    });
-    if (!response.ok) {
-      // Only the status survives — the provider body is never re-emitted.
-      throw new GitLabApiStatusError(
-        response.status,
-        `GitLab ${request.method ?? 'GET'} request failed: ${response.status}`
-      );
-    }
-    if (response.status === 204) {
-      return undefined as T;
-    }
-    return (await response.json()) as T;
-  } catch (error) {
-    // This layer has no owner: the status travels on the classified error so
-    // the owner-aware caller can weigh a 403 against the connection's owner.
-    throw classifyGitLabError(error);
-  }
-}
-
-/**
- * Resolve the URL once (refusing unsafe hosts), then send the request bound
- * to the resolved address. Only an IP literal or gitlab.com keeps the plain
- * transport — the same split the adapter's fetchGitLabOnce makes. Both
- * transports read the reply within MAX_GITLAB_RESPONSE_BYTES; the plain
- * transport returns it buffered within that limit.
- */
-async function fetchGitLabValidated(url: string, init: RequestInit): Promise<Response> {
-  const resolvedUrl = await resolveGitLabUrlSafely(url);
-  if (!resolvedUrl.address) {
-    return readBoundedGitLabResponse(await fetch(url, { ...init, redirect: 'manual' }));
-  }
-  return fetchGitLabBoundToAddress({ ...resolvedUrl, address: resolvedUrl.address }, init);
-}
-
-/**
- * Read the plain transport's reply within MAX_GITLAB_RESPONSE_BYTES, mirroring
- * fetchGitLabBoundToAddress: a declared length above the limit is answered
- * without reading the body, and the reply is otherwise returned buffered
- * within the limit.
- */
-async function readBoundedGitLabResponse(response: Response): Promise<Response> {
-  // Response rejects a body for these statuses, so they keep their own object.
-  if (response.body === null || [204, 205, 304].includes(response.status)) {
-    return response;
-  }
-
-  const declaredLength = Number(response.headers.get('content-length'));
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_GITLAB_RESPONSE_BYTES) {
-    await response.body.cancel().catch(() => undefined);
-    throw new Error(GITLAB_RESPONSE_TOO_LARGE_MESSAGE);
-  }
-
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let responseBytes = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      responseBytes += value.byteLength;
-      if (responseBytes > MAX_GITLAB_RESPONSE_BYTES) {
-        await reader.cancel().catch(() => undefined);
-        throw new Error(GITLAB_RESPONSE_TOO_LARGE_MESSAGE);
-      }
-      chunks.push(value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-
-  const body = new Uint8Array(responseBytes);
-  let offset = 0;
-  for (const chunk of chunks) {
-    body.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return new Response(body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers: response.headers,
-  });
-}
-
-/**
- * Node-transport mirror of the adapter's fetchGitLabBoundToAddress: the DNS
- * answer from resolveGitLabUrlSafely is the only address the socket can
- * connect to, TLS keeps the original hostname as SNI, and the response is
- * capped. Redirects are never followed (the caller treats a 3xx as an error).
- */
-function fetchGitLabBoundToAddress(
-  { url, address, family }: GitLabResolvedUrl & { address: string },
-  init: RequestInit
-): Promise<Response> {
-  const request = url.protocol === 'https:' ? https.request : http.request;
-  const headers = new Headers(init.headers);
-  const body = typeof init.body === 'string' ? Buffer.from(init.body) : undefined;
-  if (body && !headers.has('content-length')) {
-    headers.set('content-length', String(Buffer.byteLength(body)));
-  }
-
-  return new Promise((resolve, reject) => {
-    const req = request(
-      {
-        protocol: url.protocol,
-        hostname: url.hostname,
-        port: url.port,
-        path: `${url.pathname}${url.search}`,
-        method: init.method ?? 'GET',
-        headers: Object.fromEntries(headers.entries()),
-        family,
-        lookup: (_hostname, _options, callback) => callback(null, address, family ?? 0),
-        ...(url.protocol === 'https:' ? { servername: url.hostname } : {}),
-      },
-      response => {
-        const chunks: Buffer[] = [];
-        let responseBytes = 0;
-        response.on('data', chunk => {
-          const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-          responseBytes += buffer.byteLength;
-          if (responseBytes > MAX_GITLAB_RESPONSE_BYTES) {
-            const error = new Error(GITLAB_RESPONSE_TOO_LARGE_MESSAGE);
-            response.destroy(error);
-            req.destroy(error);
-            reject(error);
-            return;
-          }
-          chunks.push(buffer);
-        });
-        response.on('error', reject);
-        response.on('end', () => {
-          try {
-            const status = response.statusCode ?? 500;
-            const responseBody =
-              status === 204 || status === 205 || status === 304 ? null : Buffer.concat(chunks);
-            const responseHeaders = new Headers();
-            for (const [key, value] of Object.entries(response.headers)) {
-              if (Array.isArray(value)) {
-                for (const item of value) {
-                  responseHeaders.append(key, item);
-                }
-              } else if (value !== undefined) {
-                responseHeaders.set(key, value);
-              }
-            }
-            resolve(
-              new Response(responseBody, {
-                status,
-                statusText: response.statusMessage,
-                headers: responseHeaders,
-              })
-            );
-          } catch (error) {
-            reject(error);
-          }
-        });
-      }
-    );
-
-    req.on('error', reject);
-    req.setTimeout(GITLAB_REQUEST_TIMEOUT_MS, () => {
-      req.destroy(new Error('GitLab request timed out'));
-    });
-
-    const signal = init.signal;
-    if (signal) {
-      if (signal.aborted) {
-        req.destroy(signal.reason);
-        reject(signal.reason);
-        return;
-      }
-      signal.addEventListener(
-        'abort',
-        () => {
-          req.destroy(signal.reason);
-          reject(signal.reason);
-        },
-        { once: true }
-      );
-    }
-
-    if (body) {
-      req.write(body);
-    }
-    req.end();
-  });
-}
 
 function projectSegment(access: Pick<GitLabProjectAccess, 'projectPath'>): string {
   return encodeURIComponent(access.projectPath);
@@ -448,11 +200,7 @@ export async function getMergeRequest(
 ): Promise<ProviderPrSummary> {
   const access = await authorizeProject(owner, projectPath, instanceHint);
   try {
-    // diff_refs are read off the MR response itself: the adapter's
-    // getMRDiffRefs helper dereferences mr.diff_refs.base_sha and crashes the
-    // whole detail load when GitLab omits them, while the mapping below
-    // already tolerates absence.
-    const [mr, headSha] = await Promise.all([
+    const [detail, headSha] = await Promise.all([
       fetchGitLabMergeRequest({
         accessToken: access.accessToken,
         projectId: access.projectPath,
@@ -461,7 +209,6 @@ export async function getMergeRequest(
       }),
       getMRHeadCommit(access.accessToken, access.projectPath, mrIid, access.instanceUrl),
     ]);
-    const detail = mr as GitLabMergeRequestDetail;
     // Counts come from the diffs. Fold every page GitLab will serve — it caps
     // a merge request's diff collection at the project's `diff_max_files`
     // (1000 by default), which the page bound covers — so a large merge
@@ -559,21 +306,15 @@ export async function getFileLines(
 ): Promise<GitLabFileLines> {
   const access = await authorizeProject(owner, projectPath, instanceHint);
   try {
-    const text = await fetchGitLabRootTextFileAtRef(
-      access.accessToken,
-      access.projectPath,
-      path,
-      ref,
-      access.instanceUrl
+    const text = await requestGitLabText(
+      access,
+      `/api/v4/projects/${encodeURIComponent(access.projectPath)}/repository/files/${encodeURIComponent(path)}/raw`,
+      { ref },
+      FILE_READ_MAX_BYTES,
+      FILE_READ_TOO_LARGE_MESSAGE
     );
-    if (text === null) {
-      throw new GitLabReviewError('not_found', 'The file was not found at this ref.');
-    }
     const allLines = text.split('\n');
     const start = Math.max(1, Math.min(startLine, allLines.length));
-    // The window is bounded by the same shared cap the GitHub adapter applies,
-    // so a caller cannot pull an unbounded slice of the file as comment
-    // context (the response transport cap is not a window cap).
     const cappedEnd = Math.min(endLine, startLine + FILE_LINES_MAX - 1);
     const end = Math.max(start, Math.min(cappedEnd, allLines.length));
     return { lines: allLines.slice(start - 1, end), totalLines: allLines.length };
@@ -594,15 +335,13 @@ export type GitLabDiscussionsPage = {
 };
 
 function mapDiscussion(discussion: GitLabDiscussion): GitLabDiscussionThread {
-  const firstNote = discussion.notes[0];
+  const state = getGitLabDiscussionState(discussion.notes);
   const position = discussion.notes.find(note => note.position)?.position;
   const anchorLine = position?.new_line ?? position?.old_line ?? null;
   return {
     threadId: discussion.id,
-    resolved: discussion.notes.some(note => note.resolvable)
-      ? (discussion.notes.find(note => note.resolvable)?.resolved ?? false)
-      : false,
-    resolvable: firstNote?.resolvable ?? false,
+    resolved: state.resolved,
+    resolvable: state.resolvable,
     path: position ? position.new_path || position.old_path : null,
     line: anchorLine,
     side: position ? (position.new_line != null ? 'RIGHT' : 'LEFT') : null,
@@ -827,12 +566,12 @@ export async function getMergeState(
 ): Promise<ProviderPrMergeState> {
   const access = await authorizeProject(owner, projectPath, instanceHint);
   try {
-    const mr = (await fetchGitLabMergeRequest({
+    const mr = await fetchGitLabMergeRequest({
       accessToken: access.accessToken,
       projectId: access.projectPath,
       mrIid,
       instanceUrl: access.instanceUrl,
-    })) as GitLabMergeRequestDetail;
+    });
     const settings = await requestGitLabJson<GitLabProjectSettings>(
       access,
       `/api/v4/projects/${projectSegment(access)}`
@@ -935,9 +674,10 @@ async function hasUnresolvedDiscussions(
       `/api/v4/projects/${projectSegment(access)}/merge_requests/${mrIid}/discussions`,
       { query: { per_page: 100, page } }
     );
-    const unresolved = discussions.some(discussion =>
-      discussion.notes.some(note => note.resolvable && note.resolved === false)
-    );
+    const unresolved = discussions.some(discussion => {
+      const state = getGitLabDiscussionState(discussion.notes);
+      return state.resolvable && !state.resolved;
+    });
     if (unresolved) return true;
     if (discussions.length < 100) break;
   }

@@ -42,10 +42,7 @@ import {
 import type { OrganizationUsageMutationResult } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type { ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import {
-  findKiloExclusiveModel,
-  shouldRedactModelNameInMicrodollarUsage,
-} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { shouldRedactModelNameInMicrodollarUsage } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@kilocode/web-shared/lib/kilo-pass/threshold';
@@ -90,6 +87,7 @@ import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gat
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import {
   computeOpenRouterCostFields,
+  providerReportsIsByok,
   drainSseStream,
   extractVercelGenerationTime,
   extractVercelIsByok,
@@ -97,11 +95,7 @@ import {
   isResponseInterruptedError,
   reportUpstreamStreamError,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
-import {
-  calculateCost_mUsd,
-  type KiloExclusiveModel,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
-import { calculateCustomCost_mUsd } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
 import { enqueueDailyUsageRollupRepair } from './usage-daily-rollup-repairs';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
 import {
@@ -113,6 +107,8 @@ import {
 import { deliverBouncerUsageEventNow } from '@kilocode/web-shared/lib/bouncer/dispatch-usage-event-outbox';
 import { enqueueBouncerUsageEvent } from '@kilocode/db/bouncer-usage-event-outbox';
 import type { BouncerUsageEventEnqueue, UsageRecordRequest } from '@kilocode/usage-contracts';
+
+export { calculateKiloExclusiveCost_mUsd } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
 
 const posthogClient = PostHogClient();
 
@@ -1099,7 +1095,11 @@ export function countAndStoreUsage(
             usesUserCredentials
           )
         : parseResponseText(content =>
-            parseResponsesMicrodollarUsageFromString(content, clonedReponse.status)
+            parseResponsesMicrodollarUsageFromString(
+              content,
+              clonedReponse.status,
+              usageContext.provider
+            )
           );
     }
     if (usageContext.api_kind === 'chat_completions') {
@@ -1113,7 +1113,12 @@ export function countAndStoreUsage(
             usesUserCredentials
           )
         : parseResponseText(content =>
-            parseMicrodollarUsageFromString(content, usageContext.kiloUserId, clonedReponse.status)
+            parseMicrodollarUsageFromString(
+              content,
+              usageContext.kiloUserId,
+              clonedReponse.status,
+              usageContext.provider
+            )
           );
     }
     if (usageContext.api_kind === 'messages') {
@@ -1127,7 +1132,11 @@ export function countAndStoreUsage(
             usesUserCredentials
           )
         : parseResponseText(content =>
-            parseMessagesMicrodollarUsageFromString(content, clonedReponse.status)
+            parseMessagesMicrodollarUsageFromString(
+              content,
+              clonedReponse.status,
+              usageContext.provider
+            )
           );
     }
   }
@@ -1138,13 +1147,15 @@ export function countAndStoreUsage(
 export function processOpenRouterUsage(
   usage: OpenRouterUsage | null | undefined,
   coreProps: NotYetCostedUsageStats,
+  provider: ProviderId,
   vercelProviderMetadata?: VercelProviderMetaData | null
 ): JustTheCostsUsageStats {
   // usage may be null when there's no response (e.g. error), so default to empty object
   const { cost_mUsd, is_byok } = computeOpenRouterCostFields(
     usage ?? {},
     coreProps,
-    'sse_processing'
+    'sse_processing',
+    providerReportsIsByok(provider)
   );
 
   return {
@@ -1288,7 +1299,7 @@ export async function parseMicrodollarUsageFromStream(
     status_code: effectiveStatusCode,
   };
 
-  const costs = processOpenRouterUsage(usage, coreProps, vercelProviderMetadata);
+  const costs = processOpenRouterUsage(usage, coreProps, provider, vercelProviderMetadata);
 
   return { ...coreProps, ...costs };
 }
@@ -1296,7 +1307,8 @@ export async function parseMicrodollarUsageFromStream(
 export function parseMicrodollarUsageFromString(
   fullResponse: string,
   kiloUserId: string,
-  statusCode: number
+  statusCode: number,
+  provider: ProviderId
 ): MicrodollarUsageStats {
   const responseJson = JSON.parse(fullResponse) as
     | (OpenAI.Chat.Completions.ChatCompletion &
@@ -1304,7 +1316,11 @@ export function parseMicrodollarUsageFromString(
         MaybeHasVercelProviderMetaData)
     | null;
 
-  if (responseJson?.usage?.is_byok == null && responseJson?.usage?.cost) {
+  if (
+    providerReportsIsByok(provider) &&
+    responseJson?.usage?.is_byok == null &&
+    responseJson?.usage?.cost
+  ) {
     captureException(new Error('SUSPICIOUS: is_byok is null'), {
       tags: { source: 'string_processing' },
       extra: { responseJson },
@@ -1331,41 +1347,14 @@ export function parseMicrodollarUsageFromString(
     status_code: statusCode,
   };
 
-  const costs = processOpenRouterUsage(responseJson?.usage, coreProps, vercelProviderMetadata);
+  const costs = processOpenRouterUsage(
+    responseJson?.usage,
+    coreProps,
+    provider,
+    vercelProviderMetadata
+  );
 
   return { ...coreProps, ...costs };
-}
-
-export function calculateKiloExclusiveCost_mUsd(
-  model: KiloExclusiveModel,
-  usage: JustTheCostsUsageStats
-): number | undefined {
-  const pricing = model?.pricing;
-  if (!pricing) {
-    return 0;
-  }
-  if (pricing.fallbackOnly && usage.cost_mUsd > 0) {
-    return undefined;
-  }
-  const uncachedInputTokens = usage.inputTokens - usage.cacheHitTokens - usage.cacheWriteTokens;
-  if (uncachedInputTokens < 0) {
-    captureMessage('SUSPICIOUS: negative uncached input tokens', {
-      level: 'error',
-      tags: { source: 'usage_processing' },
-      extra: { model: model.public_id, usage },
-    });
-  }
-  return Math.round(
-    calculateCost_mUsd(
-      {
-        uncachedInputTokens: uncachedInputTokens >= 0 ? uncachedInputTokens : usage.inputTokens,
-        totalOutputTokens: usage.outputTokens,
-        cacheHitTokens: usage.cacheHitTokens,
-        cacheWriteTokens: usage.cacheWriteTokens,
-      },
-      pricing.tiers
-    )
-  );
 }
 
 export async function processTokenData(
@@ -1432,6 +1421,28 @@ export async function processTokenData(
       );
     }
     usageStats = genStats;
+  } else if (
+    generationProvider === OPENROUTER &&
+    usageStats.messageId &&
+    usageStats.is_byok == null &&
+    usageStats.cost_mUsd > 0
+  ) {
+    // OpenRouter transcriptions never report is_byok, so only the generation
+    // lookup can say whether their cost is the full cost or the BYOK fee.
+    captureMessage(
+      'SUSPICIOUS: OpenRouter generation lookup failed, so a cost without BYOK status may be only the BYOK fee',
+      {
+        level: 'error',
+        tags: { source: 'generation_lookup_fallback' },
+        extra: {
+          messageId: usageStats.messageId,
+          model: usageStats.model,
+          requested_model: usageContext.requested_model,
+          api_kind: usageContext.api_kind,
+          cost_mUsd: usageStats.cost_mUsd,
+        },
+      }
+    );
   }
 
   if (
@@ -1441,25 +1452,7 @@ export async function processTokenData(
     usageStats.model = usageContext.requested_model;
   }
 
-  const kiloExclusiveModel = findKiloExclusiveModel(usageContext.requested_model);
-  if (kiloExclusiveModel?.pricing) {
-    const exclusiveCost_mUsd = calculateKiloExclusiveCost_mUsd(kiloExclusiveModel, usageStats);
-    if (exclusiveCost_mUsd !== undefined) {
-      usageStats.market_cost = usageStats.cost_mUsd;
-      usageStats.cost_mUsd = exclusiveCost_mUsd;
-    }
-  }
-
-  const customCost_mUsd = calculateCustomCost_mUsd(usageContext.requested_model, usageStats);
-
-  // Preserve the real cost before zeroing for free/BYOK
-  usageStats.market_cost ??= usageStats.cost_mUsd;
-  usageStats.cost_mUsd = customCost_mUsd ?? usageStats.cost_mUsd;
-
-  if (usageContext.is_free || usageContext.user_byok) {
-    usageStats.cost_mUsd = 0;
-    usageStats.cacheDiscount_mUsd = 0;
-  }
+  applyUsagePricing(usageStats, usageContext);
 
   return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
 }

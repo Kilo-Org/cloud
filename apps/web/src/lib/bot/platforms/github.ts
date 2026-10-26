@@ -45,11 +45,9 @@ function parseGitHubRepositoryFullName(id: string | undefined): string | null {
 
 export function getGitHubRepositoryReference(
   thread: Thread,
-  message: Message
+  message?: Message
 ): GitHubRepositoryReference {
-  // GitHub adapter messages always carry a GitHubRawMessage.raw, but tests
-  // exercise fallback paths with sparse fixtures, so treat raw as partial.
-  const { repository } = (message as Message<Partial<GitHubRawMessage>>).raw;
+  const { repository } = (message as Message<Partial<GitHubRawMessage>> | undefined)?.raw ?? {};
 
   return {
     id: repository?.id ?? null,
@@ -370,9 +368,14 @@ export function createGitHubBotPlatform(githubAdapter: GitHubInstallationLookup)
 
       if (reviewThreadContext) {
         const anchor = reviewThreadContext.comments[0] ?? reviewThreadContext.targetComment;
-        const reviewComments = reviewThreadContext.comments
-          .filter(comment => comment.id.toString() !== triggerMessage.id)
-          .map(formatGitHubReviewComment);
+        const history = reviewThreadContext.comments.filter(
+          comment => comment.id.toString() !== triggerMessage.id
+        );
+        if (history.length > BOT_CONTEXT_MESSAGE_LIMIT) {
+          // Keep the opening context alongside the latest discussion.
+          history.splice(1, history.length - BOT_CONTEXT_MESSAGE_LIMIT);
+        }
+        const reviewComments = history.map(formatGitHubReviewComment);
 
         lines.push('', 'Pull request review thread:');
 

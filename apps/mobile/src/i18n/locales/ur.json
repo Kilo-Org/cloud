@@ -53,6 +53,7 @@
     "connected": "منسلک",
     "couldNotLoadModels": "ماڈلز لوڈ نہیں ہو سکے۔",
     "couldNotLoadRepositories": "ریپوزٹریز لوڈ نہیں ہو سکیں۔",
+    "noRepositoriesFound": "کوئی ریپوزٹری نہیں ملی",
     "critical": "سنگین",
     "delete": "حذف کریں",
     "deleted": "حذف شدہ",
@@ -87,6 +88,7 @@
     "connect": "منسلک کریں",
     "connectBitbucket": "Bitbucket کو منسلک کریں",
     "connectGitlab": "GitLab کو منسلک کریں",
+    "connectProvider": "فراہم کنندہ منسلک کریں",
     "contentTruncated": "مواد مکمل نہیں دکھایا گیا",
     "copyLink": "لنک کاپی کریں",
     "couldNotLoadOrganizations": "تنظیمیں لوڈ نہیں ہو سکیں۔",
@@ -145,7 +147,8 @@
     "agent": "ایجنٹ",
     "durationMinuteShort": "منٹ",
     "durationHourShort": "گھنٹہ",
-    "changes": "تبدیلیاں"
+    "changes": "تبدیلیاں",
+    "organizationTrialEnded": "تنظیم کا مفت آزمائشی دور ختم ہو چکا ہے اور اس کا کوئی فعال پلان نہیں ہے۔ تنظیم کا مالک kilo.ai پر بلنگ اپ ڈیٹ کر سکتا ہے، پھر دوبارہ کوشش کریں۔"
   },
   "language": {
     "restarting": "منتخب زبان لاگو کرنے کے لیے ایپ دوبارہ شروع ہو رہی ہے",
@@ -182,7 +185,7 @@
     "codeArrivalHint": "اگر اس ای میل پتے پر سائن ان کی اجازت ہے تو کوڈ ایک منٹ کے اندر آ جائے گا۔",
     "verifyCode": "کوڈ کی تصدیق کریں",
     "resendCode": "کوڈ دوبارہ بھیجیں",
-    "termsPrefix": "آگے بڑھنے سے آپ ہماری درج ذیل پالیسیوں سے اتفاق کرتے ہیں:",
+    "termsPrefix": "آگے بڑھنے سے آپ ہماری درج ذیل پالیسیوں سے اتفاق کرتے ہیں: ",
     "terms": "شرائط",
     "termsConnector": " اور ",
     "termsSuffix": "۔",
@@ -293,7 +296,8 @@
     "condenseToolCallsSubtitle": "مسلسل ٹول کالز کو ایک قطار میں گروپ کریں جسے آپ کھول سکتے ہیں۔",
     "toolSummaryTranslation": "ٹول خلاصے ترجمہ کریں",
     "toolSummaryTranslationSubtitle": "ہر ٹول خلاصہ کو ایک ماڈل کو بھیجیں تاکہ اسے آپ کی ایپ کی زبان میں ترجمہ کر سکے۔ ترجمہ ناکام ہونے پر اصل دکھایا جاتا ہے۔",
-    "toolSummaryTranslationModelUnavailableNotice": "یہ ماڈل اب پیش نہیں کیا جاتا۔ کوئی دوسرا منتخب کرنے کے لیے $t(common.model) پر ٹیپ کریں۔"
+    "toolSummaryTranslationModelUnavailableNotice": "یہ ماڈل اب پیش نہیں کیا جاتا۔ کوئی دوسرا منتخب کرنے کے لیے $t(common.model) پر ٹیپ کریں۔",
+    "autoExpandThinkingInactiveSubtitle": "سوچ کی تفصیلات چھپی ہوں تو کوئی اثر نہیں ہوگا۔"
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسٹ دستیاب نہیں",
@@ -622,9 +626,15 @@
       "viewOnGitHub": "GitHub پر PR دیکھیں",
       "noChecksReported": "کوئی جانچ رپورٹ نہیں ہوئی",
       "passed": "{{displayCount}} کامیاب",
+      "passed_one": "{{displayCount}} کامیاب",
+      "passed_other": "{{displayCount}} کامیاب",
       "failed": "{{displayCount}} ناکام",
+      "failed_one": "{{displayCount}} ناکام",
+      "failed_other": "{{displayCount}} ناکام",
       "pending": "{{displayCount}} زیر التوا",
       "skipped": "{{displayCount}} چھوڑی گئیں",
+      "skipped_one": "{{displayCount}} چھوڑی گئیں",
+      "skipped_other": "{{displayCount}} چھوڑی گئیں",
       "checksCount": "{{displayCount}} جانچیں",
       "checksCount_one": "{{displayCount}} جانچ",
       "checksCount_other": "{{displayCount}} جانچیں",
@@ -669,7 +679,8 @@
       "gitlabDescription": "موبائل پر مرج ریکویسٹس کا جائزہ لینے کے لیے اپنا GitLab اکاؤنٹ منسلک کریں۔",
       "bitbucketDescription": "موبائل پر پل ریکویسٹس کا جائزہ لینے کے لیے Bitbucket کو اس تنظیم سے منسلک کریں۔",
       "bitbucketOrgOnlyDescription": "اس کی Bitbucket پل ریکویسٹس کا جائزہ لینے کے لیے اوپر موجود اکاؤنٹ کو ایک تنظیم پر تبدیل کریں۔",
-      "contextLine": "{{organization}} کے لیے"
+      "contextLine": "{{organization}} کے لیے",
+      "contextLinePersonal": "ذاتی اکاؤنٹ کے لیے"
     },
     "screen": {
       "title": "#{{number}}",
@@ -1399,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "آپ کو GitLab پر مزید گروپس یا پروجیکٹس تک رسائی دینے کی ضرورت پڑ سکتی ہے۔",
       "installGithubApp": "ریپوزٹریز پر GitHub ایپ انسٹال کریں",
       "installGithubAppDescription": "Kilo کی GitHub ایپ کو ان ریپوزٹریز تک رسائی دیں جن کا آپ جائزہ کروانا چاہتے ہیں۔",
-      "noRepositoriesFound": "کوئی ریپوزٹری نہیں ملی",
       "repositoryAccess": "ریپوزٹری تک رسائی"
     },
     "style": {
@@ -1429,6 +1439,8 @@
       "showMore": "مزید دکھائیں",
       "created": "تخلیق شدہ",
       "started": "شروع ہوا",
+      "reviewEnded": "اختتام پذیر",
+      "severityNitpick": "معمولی تنقیح",
       "tokens": "ٹوکن",
       "tokensInOut": "{{input}} ان پٹ / {{output}} آؤٹ پٹ",
       "council": "جائزہ کمیٹی",
@@ -1452,7 +1464,13 @@
       "sessionError": "سیشن میں خرابی پیش آئی: {{error}}۔",
       "statusWithValue": "حالت: {{status}}",
       "toolName": "ٹول: {{name}}",
-      "toolNameError": "ٹول {{name}} میں خرابی پیش آئی۔"
+      "toolNameError": "ٹول {{name}} میں خرابی پیش آئی۔",
+      "cancelReasonSuperseded": "ایک نیا کمٹ پُش کر دیا گیا تھا، اس لیے یہ جائزہ بدل دیا گیا۔",
+      "cancelReasonIntegrationDisconnected": "{{platform}} منقطع ہو گیا ہے، اس لیے یہ جائزہ منسوخ کر دیا گیا۔ اسے دوبارہ جوڑیں، پھر جائزے کی دوبارہ کوشش کریں۔",
+      "cancelReasonBitbucketReviewerDisabled": "Bitbucket کے لیے Code Reviewer بند کر دیا گیا تھا، اس لیے یہ جائزہ منسوخ کر دیا گیا۔ اسے دوبارہ فعال کریں، پھر جائزے کی دوبارہ کوشش کریں۔",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket کا پُل ریکویسٹ تبدیل ہو گیا، اس لیے یہ جائزہ بدل دیا گیا۔",
+      "cancelReasonCancelled": "یہ جائزہ منسوخ کر دیا گیا۔",
+      "cancelReasonInterrupted": "یہ جائزہ درمیان میں بند ہو گیا۔"
     },
     "reviewMemory": {
       "title": "جائزے کی یادداشت",
@@ -1466,6 +1484,22 @@
       "loadingProposals": "تجاویز لوڈ ہو رہی ہیں",
       "couldNotLoadProposals": "تجاویز لوڈ نہیں ہو سکیں۔",
       "noProposals": "کوئی تجویز نہیں",
+      "proposalDetails": "تجویز کی تفصیلات",
+      "proposalTitle": "تجویز کا عنوان",
+      "rationale": "وجہ",
+      "saveFirst": "پل ریکویسٹ کھولنے سے پہلے اپنی تبدیلیاں محفوظ کریں۔",
+      "proposalSaved": "تجویز محفوظ ہو گئی",
+      "proposalDismissed": "تجویز مسترد کر دی گئی",
+      "dismissProposalTitle": "تجویز مسترد کریں؟",
+      "dismissProposalMessage": "یہ تجویز فعال فہرست سے ہٹا دی جائے گی اور اسے بحال نہیں کیا جا سکے گا۔",
+      "prOpened": "REVIEW.md کے لیے پل ریکویسٹ کھول دی گئی",
+      "alreadyPresent": "ہدایات REVIEW.md میں پہلے سے موجود ہیں",
+      "status": {
+        "edited": "ترمیم شدہ",
+        "opening_change_request": "PR کھولی جا رہی ہے",
+        "change_request_failed": "PR کھولنے میں ناکامی",
+        "superseded": "پہلے سے موجود"
+      },
       "noProposalsDescription": "جب Kilo دیکھ بھال کرنے والوں کے جوابات کا تجزیہ کرے گا تو جائزے کی یادداشت سے حاصل کردہ تجاویز یہاں ظاہر ہوں گی۔"
     },
     "manualReview": {
@@ -1473,13 +1507,20 @@
       "invalidUrl": "پل ریکویسٹ کا درست URL درج کریں۔",
       "couldNotCheckProviderStatus": "فراہم کنندہ کی حالت کی جانچ نہیں ہو سکی۔",
       "couldNotLoadProviders": "آپ کے منسلک فراہم کنندگان لوڈ نہیں ہو سکے۔ براہ کرم دوبارہ کوشش کریں۔",
-      "connectProvider": "فراہم کنندہ منسلک کریں",
       "connectProviderDescription": "پل ریکویسٹ کا دستی جائزہ شروع کرنے کے لیے GitHub منسلک کریں۔",
       "pullRequestUrl": "پل ریکویسٹ کا URL",
       "instructions": "ہدایات (اختیاری)",
       "instructionsPlaceholder": "جائزے میں توجہ طلب کوئی خاص بات…",
       "starting": "جائزہ شروع ہو رہا ہے…",
-      "start": "جائزہ شروع کریں"
+      "start": "جائزہ شروع کریں",
+      "startNotFound": "وہ {{requestNoun}} {{provider}} سے نہیں پڑھی جا سکی۔ URL چیک کریں اور یقین دلی کریں کہ ریپازٹری قابل رسائی ہے۔",
+      "startRateLimited": "فی الحال {{provider}} پر درخواستوں کی حد لگی ہے۔ چند منٹ بعد دوبارہ کوشش کریں۔",
+      "startNotAllowed": "آپ کے پاس اس {{requestNoun}} کا جائزہ شروع کرنے کی رسائی نہیں ہے۔ اپنی اجازتیں اور اپنی تنظیم کا پلان چیک کریں۔",
+      "startProviderNeedsAttention": "دستی جائزوں کے لیے معیاری {{provider}} کنکشن درکار ہے۔ اسے منسلک کریں اور دوبارہ کوشش کریں۔",
+      "startAlreadyRunning": "اس {{requestNoun}} کا جائزہ پہلے ہی جاری ہے۔",
+      "startRejected": "اس {{requestNoun}} کا جائزہ نہیں لیا جا سکتا۔ یقینی بنائیں کہ یہ اوپن ہے، ڈرافٹ نہیں ہے، اور URL درست ہے۔",
+      "startProviderUnavailable": "{{provider}} سے اس {{requestNoun}} کو پڑھنے کے لیے رابطہ نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
+      "startFailed": "جائزہ شروع نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔"
     },
     "notConnectedReadOnly": "{{platform}} منسلک نہیں ہے۔ صرف تنظیم کے مالک اور منتظم اسے منسلک کر سکتے ہیں۔",
     "gitlab": {
@@ -1593,8 +1634,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "کوئی فلٹر دستیاب نہیں",
-      "noFiltersDescription": "واپس جائیں اور مسائل کی فہرست سے فلٹرز دوبارہ کھولیں۔",
       "title": "مسائل کے فلٹرز",
       "reset": "اصل حالت بحال کریں",
       "severity": "شدت",
@@ -1731,7 +1770,7 @@
       "deadlinePassed": "آخری تاریخ گزر گئی",
       "deadlinePassedDetail": "{{critical}} سنگین، {{high}} زیادہ",
       "dueThisWeek": "اس ہفتے مہلت ختم ہو گی",
-      "dueThisWeekDetail": "{{exploitable}} مسائل سے حملہ آوروں کے فائدہ اٹھانے کی تصدیق",
+      "dueThisWeekDetail": "ان میں سے {{exploitable}} مسائل سے حملہ آوروں کے فائدہ اٹھانے کی تصدیق",
       "noDeadline": "کوئی آخری تاریخ نہیں",
       "reviewSlaAssignment": "SLA مقرر کرنے کا جائزہ لیں",
       "allOpenFindingsTracked": "تمام غیر حل شدہ مسائل کی نگرانی جاری"
@@ -1891,11 +1930,17 @@
       "actorSystem": "Kilo سسٹم",
       "couldNotLoad": "آڈٹ رپورٹ لوڈ نہیں ہو سکی۔",
       "events": "واقعات",
+      "eventConfidence": "اعتماد: {{confidence}}",
+      "eventReason": "وجہ: {{reason}}",
+      "eventsCount_one": "{{displayCount}} واقعہ",
+      "eventsCount_other": "{{displayCount}} واقعات",
       "generated": "رپورٹ {{generatedAt}} کو تیار کی گئی۔",
       "noActivity": "کوئی درج شدہ سرگرمی نہیں",
       "noActivityDescription": "Kilo میں {{start}} سے {{end}} تک سکیورٹی مسائل سے متعلق کوئی قابلِ رپورٹ سرگرمی نہیں ہے۔",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "ریپوزٹری درج نہیں",
+      "reasonUnknown": "ناقابلِ شناخت وجہ",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "رپورٹ کا خلاصہ",
       "title": "آڈٹ رپورٹ",
       "unavailable": "آڈٹ رپورٹ دستیاب نہیں",
@@ -1948,8 +1993,9 @@
       "couldNotLoad": "سکیورٹی ایجنٹ لوڈ نہیں ہو سکا۔",
       "installApp": "GitHub ایپ انسٹال کریں",
       "reauthorizeButton": "GitHub ایپ کو دوبارہ اجازت دیں",
-      "reauthorizeDescription": "سکیورٹی ایجنٹ کو Dependabot کی اطلاعات تک رسائی کے لیے vulnerability_alerts کی اجازت درکار ہے۔ یہ اجازت دینے کے لیے GitHub ایپ کو دوبارہ مجاز بنائیں۔",
+      "reauthorizeDescription": "سکیورٹی ایجنٹ کو Dependabot کی اطلاعات پڑھنے کے لیے اجازت درکار ہے۔ یہ اجازت دینے کے لیے GitHub ایپ کو دوبارہ مجاز بنائیں۔",
       "reauthorizeTitle": "اضافی اجازتیں درکار ہیں",
+      "retryFailed": "سکیورٹی ایجنٹ اب بھی لوڈ نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
       "setupFailed": "GitHub سیٹ اپ شروع نہیں ہو سکا۔ براہ کرم دوبارہ کوشش کریں۔"
     },
     "queuedActionUntracked": "قطار میں شامل ایک کارروائی کی حالت معلوم نہیں ہو سکی۔ تازہ ترین حالت دیکھنے کے لیے صفحہ تازہ کریں۔",
@@ -2112,7 +2158,8 @@
       "dollar_other": "ڈالر",
       "costSpoken": "لاگت {{cost}}",
       "costSpokenWithTime": "لاگت {{cost}}، {{time}}",
-      "pullRequest": "پل ریکویسٹ {{number}}"
+      "pullRequest": "پل ریکویسٹ {{number}}",
+      "spokenJoiner": "، اور"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub نہیں کھل سکا",
@@ -2140,8 +2187,8 @@
       "title": "سیشن",
       "copyErrorDetails": "خرابی کی تفصیلات کاپی کریں",
       "backToSessions": "سیشنز پر واپس جائیں",
-      "follow": "لاک اسکرین پر فالو کریں",
-      "unfollow": "لاک اسکرین پر فالو کرنا بند کریں",
+      "follow": "سیشن کو فالو کریں",
+      "unfollow": "سیشن کو فالو کرنا بند کریں",
       "couldNotLoad": "سیشن لوڈ نہیں ہو سکا۔",
       "failedToLoadDetails": "سیشن کی تفصیلات لوڈ نہیں ہو سکیں۔",
       "failedToStopExecution": "کام کو روکا نہیں جا سکا۔",
@@ -2248,7 +2295,6 @@
       "couldNotLoadEnvironment": "آپ کا ماحول لوڈ نہیں ہو سکا۔",
       "retryLoadingEnvironment": "ماحول دوبارہ لوڈ کرنے کی کوشش کریں",
       "defaultEnvironment": "پہلے سے طے شدہ ماحول",
-      "environmentSummary": "{{commands}} کمانڈز · {{mcp}} MCP · {{skills}} مہارتیں · {{agents}} ایجنٹ",
       "leaveChanges": "تبدیلیاں رہنے دیں",
       "commitAndPush": "کمٹ اور پش کریں",
       "startSession": "سیشن شروع کریں",
@@ -2467,7 +2513,71 @@
       "preparationComplete": "تیاری مکمل",
       "preparationFailed": "تیاری ناکام",
       "setupCommand": "سیٹ اپ کمانڈ {{index}}",
-      "setupCommandOf": "سیٹ اپ کی کمانڈ {{index}}، کل {{displayCount}}"
+      "setupCommandOf": "سیٹ اپ کی کمانڈ {{index}}، کل {{displayCount}}",
+      "stepWorkspaceSetup": "ورک اسپیس سیٹ اپ",
+      "stepDiskCheck": "ڈسک جانچ",
+      "stepCloning": "ریپوزٹری کلون کی جا رہی ہے",
+      "stepBranch": "برانچ سیٹ کی جا رہی ہے",
+      "stepDevcontainerSetup": "ڈیو کنٹینر سیٹ اپ",
+      "stepWorkspaceRestore": "ورک اسپیس بحال کیا جا رہا ہے",
+      "stepWorkspaceBackup": "ورک اسپیس محفوظ کیا جا رہا ہے",
+      "stepSandboxProvision": "سینڈ باکس فراہم کیا جا رہا ہے",
+      "stepSandboxBoot": "سینڈ باکس شروع کیا جا رہا ہے",
+      "stepSnapshotFallback": "اسنیپ شاٹ کے بغیر دوبارہ کوشش",
+      "stepKiloServer": "Kilo شروع کیا جا رہا ہے",
+      "stepKiloSession": "سیشن تیار کیا جا رہا ہے",
+      "stepRestoreIncomplete": "سیشن بحالی نامکمل",
+      "stepReady": "ماحول تیار ہے",
+      "stepFailed": "ماحول کا سیٹ اپ ناکام رہا",
+      "stepUnknown": "ماحول کا سیٹ اپ",
+      "detailCreatingSandbox": "سینڈ باکس بنایا جا رہا ہے",
+      "detailUpdatingRepository": "ریپوزٹری اپ ڈیٹ کی جا رہی ہے",
+      "detailCheckingOutBranch": "برانچ چیک آؤٹ کی جا رہی ہے",
+      "detailRunningSetupCommands": "سیٹ اپ کی کمانڈز چلائی جا رہی ہیں",
+      "detailSavingRepository": "تیزی سے شروع کرنے کے لیے ریپوزٹری محفوظ کی جا رہی ہے",
+      "detailStartingKiloRuntime": "Kilo رن ٹائم شروع کیا جا رہا ہے",
+      "detailPreparingKiloSession": "Kilo سیشن تیار کیا جا رہا ہے",
+      "detailWaitingForPreviousSandbox": "پچھلے سینڈ باکس کے بند ہونے کا انتظار",
+      "detailRetryingSandboxCreation": "سینڈ باکس کی تخلیق کی دوبارہ کوشش",
+      "detailPreviousSnapshotFailed": "پچھلے اسنیپ شاٹ سے شروعات ناکام رہی۔ اسنیپ شاٹ کے بغیر دوبارہ کوشش۔",
+      "detailSnapshotStartupFailed": "اسنیپ شاٹ سے شروعات ناکام رہی۔ اسنیپ شاٹ کے بغیر دوبارہ کوشش۔",
+      "detailStartingSandboxWithoutSnapshot": "اسنیپ شاٹ کے بغیر سینڈ باکس شروع کیا جا رہا ہے",
+      "detailSettingUpWorkspace": "ورک اسپیس سیٹ اپ کیا جا رہا ہے",
+      "detailRestoringSession": "سیشن بحال کیا جا رہا ہے",
+      "detailWarmWorkspaceReused": "وارم ورک اسپیس دوبارہ استعمال کیا گیا",
+      "detailRetryingClone": "کلون کی دوبارہ کوشش (کوشش {{attempt}} از {{total}})",
+      "detailSetupCommandFailed": "سیٹ اپ کمانڈ {{index}} ناکام رہی",
+      "detailSetupCommandTimedOut": "سیٹ اپ کمانڈ {{index}} کا وقت ختم ہو گیا",
+      "detailColdRestore": "کول بحالی، اسنیپ شاٹ لاگو، {{total}} میں سے {{applied}} فائلیں بحال ہوئیں",
+      "detailProgressPercent": "{{percent}}% مکمل",
+      "detailRestoreIncompleteReport": "سیشن بحالی نامکمل: {{total}} میں سے {{skipped}} فائلیں بحال نہیں ہوئیں ({{reasons}})۔",
+      "detailRestoreIncompleteMissing": "غیر موجود: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} اور {{omitted}} مزید",
+      "detailReasonPatchFailed": "پیچ لاگو نہیں ہو سکا",
+      "detailReasonOutsideWorkspace": "راستہ ورک اسپیس سے باہر ہے",
+      "detailReasonMissingContent": "اسنیپ شاٹ میں فائل کا مواد موجود نہیں تھا",
+      "detailReasonIndexResetFailed": "ناکاب لاگو کے بعد انڈیکس ری سیٹ نہیں ہو سکا",
+      "detailReasonUnlinkFailed": "فائل حذف نہیں کی جا سکی",
+      "detailReasonWriteFailed": "فائل تحریر نہیں کی جا سکی",
+      "detailReasonUnknown": "ایک نامعلوم وجہ",
+      "detailUnknown": "ابھی تیاری جاری ہے",
+      "errorPreparationTimeout": "ماحول کی تیاری کا وقت ختم ہو گیا",
+      "errorWorkspaceSetupFailed": "ورک اسپیس سیٹ اپ ناکام رہا",
+      "errorCredentialUpgradeRequired": "اس سیشن میں ایک ضروری کریڈنشل اپ گریڈ موجود نہیں ہے۔ جاری رکھنے کے لیے نیا سیشن شروع کریں۔",
+      "errorAgentUnavailable": "ایجنٹ دستیاب نہیں رہی",
+      "errorBillingBlocked": "سینڈ باکس بلنگ کے لیے اضافی کریڈٹس درکار ہیں",
+      "errorBillingUnavailable": "سینڈ باکس بلنگ یا گنجائش کی تصدیق دستیاب نہیں ہے۔ تھوڑی دیر بعد دوبارہ کوشش کریں۔",
+      "errorContainerLimitReached": "کنٹینر کی حد پوری ہو گئی۔ نیا کنٹینر شروع کرنے سے پہلے کسی موجودہ کنٹینر کو روکیں۔",
+      "errorInvalidConfiguration": "سینڈ باکس کی کنفیگریشن غلط یا غیر حمایت یافتہ ہے",
+      "errorRuntimeArtifactUnauthorized": "رن ٹائم ڈاؤن لوڈ کی اجازت نہیں ملی",
+      "errorRuntimeArtifactInvalid": "رن ٹائم آرٹی فیکٹ کی تصدیق ناکام رہی",
+      "errorRuntimeCliProbeFailed": "رن ٹائم CLI کی تصدیق ناکام رہی",
+      "errorRuntimeSupervisorMissing": "رن ٹائم سپر وائزر موجود نہیں ہے",
+      "errorConnectionLost": "سینڈ باکس کنکشن منقطع ہو گیا",
+      "errorSandboxLost": "سینڈ باکس کھو گیا",
+      "errorAgentRestarted": "ایجنٹ دوبارہ شروع ہو گئی",
+      "errorSandboxOutOfMemory": "سینڈ باکس کی میموری ختم ہو گئی",
+      "errorPreparationDidNotComplete": "تیاری مکمل نہیں ہوئی"
     },
     "permissionCard": {
       "title": "اجازت درکار ہے",
@@ -2479,7 +2589,10 @@
       "allowOnceAccessibility": "ایک بار اجازت دیں",
       "alwaysAllow": "ہمیشہ اجازت دیں",
       "alwaysAllowAccessibility": "ہمیشہ اجازت دیں",
-      "retrying": "دوبارہ کوشش ہو رہی ہے…"
+      "retrying": "دوبارہ کوشش ہو رہی ہے…",
+      "retryDeny": "اجازت نہ دینے کی دوبارہ کوشش کریں",
+      "retryAllowOnce": "ایک بار اجازت دینے کی دوبارہ کوشش کریں",
+      "retryAlwaysAllow": "ہمیشہ اجازت دینے کی دوبارہ کوشش کریں"
     },
     "questionCard": {
       "title": "ایجنٹ کو جواب درکار ہے",
@@ -2855,7 +2968,6 @@
   },
   "voiceInput": {
     "listening": "سن رہے ہیں...",
-    "staysOff": "آن لائن آواز کو متن میں بدلنے کی اجازت ملنے تک آواز سے لکھنے کی سہولت بند رہے گی۔",
     "onlineTitle": "آواز کو آن لائن متن میں بدلا جاتا ہے",
     "onlineMessage": "یہ ڈیوائس آف لائن آواز کو متن میں نہیں بدل سکتی۔ آپ کی ریکارڈنگ متن میں بدلنے کے لیے {{provider}} کو بھیجی جاتی ہے۔ Kilo آواز محفوظ نہیں کرتا۔",
     "allow": "اجازت دیں",
@@ -3031,22 +3143,16 @@
     "boundary": {
       "backToProfile": "پروفائل پر واپس جائیں",
       "loadErrorMessage": "اپنا انٹرنیٹ کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
-
       "chooseAccount": "ایک اکاؤنٹ منتخب کریں",
       "loadErrorTitle": "آپ کی تنظیمیں لوڈ نہیں ہو سکیں۔",
       "membershipLostNotice": "آپ کو اب اس تنظیم تک رسائی حاصل نہیں ہے۔ {{target}} پر منتقل کر دیا گیا۔",
       "noOrganization": "کوئی تنظیم نہیں",
-
       "noOrganizationDescription": "یہ اکاؤنٹ کسی تنظیم کا حصہ نہیں ہے۔ ممبر دعوتیں اور کم بیلنس انتباہات جیسی تنظیمی خصوصیات استعمال کرنے کے لیے ویب پر ایک تنظیم بنائیں یا اس میں شامل ہوں۔",
-
       "openWebOrganizations": "ویب پر تنظیمیں کھولیں",
-
       "organizationUnavailable": "تنظیم دستیاب نہیں ہے۔",
       "selectDescriptionWithOrganizations": "آپ ایک یا زیادہ تنظیموں سے تعلق رکھتے ہیں۔ وہ اکاؤنٹ منتخب کریں جو یہ اسکرین استعمال کرے۔",
-
       "selectOrganization": "ایک تنظیم منتخب کریں",
       "unavailableDescription": "یہ تنظیم اب دستیاب نہیں ہے۔ جاری رکھنے کے لیے اپنے پروفائل سے کوئی اور تنظیم منتخب کریں۔",
-
       "unavailableSessionsDescription": "یہ تنظیم اب دستیاب نہیں ہے۔ اس کے سیشنز لوڈ نہیں ہو سکتے۔",
       "accessDeniedDescription": "آپ کو اس تنظیم تک رسائی حاصل نہیں ہے۔"
     },
@@ -3074,7 +3180,11 @@
       "permissionDenied": "آپ کو اراکین کو دعوت دینے کی اجازت نہیں ہے۔",
       "roleMember": "کردار: رکن",
       "sendInvite": "دعوت بھیجیں",
-      "title": "رکن کو دعوت دیں"
+      "title": "رکن کو دعوت دیں",
+      "alreadyInvited": "انہیں پہلے ہی دعوت دے دی گئی ہے یا وہ پہلے سے ہی رکن ہیں۔",
+      "sendError": "دعوت نہیں بھیجی جا سکی۔",
+      "pendingInvitation": "اس ای میل کے لیے پہلے ہی ایک زیرِ التوا دعوت موجود ہے۔",
+      "alreadyMember": "یہ شخص پہلے ہی اس تنظیم کا رکن ہے۔"
     },
     "invoices": {
       "downloadA11y": "انوائس {{number}} ڈاؤن لوڈ کریں",
@@ -3143,7 +3253,13 @@
       "inviteCreated": "دعوت بنائی گئی",
       "pendingInvitations": "زیر التواء دعوتیں",
       "resendInvite": "دعوت دوبارہ بھیجیں",
-      "shareInviteLink": "دعوت کا لنک شیئر کریں"
+      "shareInviteLink": "دعوت کا لنک شیئر کریں",
+      "resendInviteError": "دعوت دوبارہ نہیں بھیجی جا سکی۔",
+      "inviteNotResendable": "یہ دعوت اب دوبارہ نہیں بھیجی جا سکتی۔",
+      "ownerAuthority": "صرف تنظیم کا مالک ہی مالکان کا انتظام کر سکتا ہے۔",
+      "ownRoleChange": "آپ اپنا کردار تبدیل نہیں کر سکتے۔",
+      "inviteExpired": "یہ دعوت کی میعاد ختم ہو گئی ہے۔",
+      "inviteAccepted": "یہ دعوت پہلے ہی قبول کی جا چکی ہے۔"
     },
     "usageStats": {
       "inputTokens": "ان پٹ ٹوکن",
@@ -3256,7 +3372,7 @@
     "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔",
     "openSession": "کھولیں",
     "finished": "مکمل",
-    "followFailed": "اس ایجنٹ کو لاک اسکرین پر نہیں دکھایا جا سکا۔",
+    "followFailed": "اس سیشن کو فالو نہیں کیا جا سکا۔",
     "approveFailed": "منظور نہیں کیا جا سکا۔ دوبارہ کوشش کرنے کے لیے $t(common.approve) پر ٹیپ کریں۔",
     "checked": "آخری تصدیق",
     "lastKnown": "آخری معلوم حالت",
@@ -3291,7 +3407,8 @@
     "noneChosen": "کوئی نہیں چنا گیا",
     "emptyTitle": "متن میں بدلنے کا کوئی ماڈل موجود نہیں",
     "emptyDescription": "Kilo Gateway فی الحال متن میں بدلنے کا کوئی ماڈل نہیں دیتا۔",
-    "loadFailed": "متن میں بدلنے والے ماڈلز لوڈ نہیں ہو سکے۔"
+    "loadFailed": "متن میں بدلنے والے ماڈلز لوڈ نہیں ہو سکے۔",
+    "choose": "ماڈل منتخب کریں"
   },
   "voiceLanguage": {
     "title": "آواز سے لکھنے کی زبان",
@@ -3506,6 +3623,7 @@
       "fromHuggingFace": "Hugging Face سے",
       "loading": "ماڈلز لوڈ ہو رہے ہیں",
       "noResults": "کوئی ماڈل نہیں ملا",
+      "noResultsForQuery": "\"{{query}}\" کے لیے کوئی ماڈل نہیں ملا",
       "noFits": "کوئی ماڈل اس آلے کے موافق نہیں",
       "noFitsDescription": "بڑے ماڈلز $t(common.all) ٹیب میں ہیں۔",
       "fit": {
@@ -3536,8 +3654,6 @@
       "quantizations": "کوانٹائزیشنز",
       "quantizationsHelp": "چھوٹی فائلیں کم میموری اور اسٹوریج استعمال کرتی ہیں۔ بڑی فائلیں عموماً بہتر جوابات دیتی ہیں۔",
       "quantDetail": "{{size}} ڈاؤن لوڈ · تقریباً {{memory}} میموری",
-      "downloadQuant": "{{quant}} ڈاؤن لوڈ کریں",
-      "downloadModelA11y": "{{name}} ڈاؤن لوڈ کریں",
       "detailsA11y": "تفصیلات: {{name}}",
       "loadingModel": "ماڈل کی تفصیلات لوڈ ہو رہی ہیں",
       "couldNotLoadModel": "یہ ماڈل لوڈ نہیں ہو سکا",
@@ -3582,13 +3698,17 @@
     },
     "reasoningEffort": {
       "modelFlag": "یہ ماڈل غور کی سطح کو سپورٹ کرتا ہے"
-    }
+    },
+    "creditsRequired": "اس پیغام کو بھیجنے کے لیے کافی کریڈٹس نہیں ہیں۔ کریڈٹس شامل کریں اور دوبارہ کوشش کریں۔"
   },
   "settingsTools": {
     "confirmTitle": "اس تبدیلی کی تصدیق کریں؟"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "آپ کی سب سے حالیہ ریپوزٹری",
+      "confirmMessage": "ریپوزٹری: {{repository}}۔ درخواست: {{prompt}}۔",
+      "confirmTitle": "کیا یہ ایجنٹ شروع کریں؟",
       "promptRequired": "ایجنٹ شروع کرنے کے لیے پرامپٹ درکار ہے۔ ایک پرامپٹ شامل کریں اور اسے دوبارہ چلائیں۔",
       "repositoryRequired": "ایجنٹ شروع کرنے کے لیے ریپوزٹری درکار ہے۔ Kilo کھولیں، کوئی ریپوزٹری منتخب کریں، پھر اسے دوبارہ چلائیں۔",
       "repositoryUnknown": "Kilo، {{repository}} کو GitHub یا GitLab ریپوزٹری کے طور پر نہیں پہچانتا۔ Kilo میں کوئی دوسری ریپوزٹری منتخب کریں۔",
@@ -3618,7 +3738,9 @@
     "spend24h": "گزشتہ 24 گھنٹوں کا خرچ",
     "multiplierError": "1 یا اس سے زیادہ کا ضرب درج کریں",
     "permissionDenied": "آپ کو اخراجات کی تنبیہات کا انتظام کرنے کی اجازت نہیں ہے۔",
-    "pushOffByCategory": "اطلاعات میں بند"
+    "pushOffByCategory": "اطلاعات میں بند",
+    "multiplierMaxError": "{{max}} یا اس سے کم کا ضرب درج کریں",
+    "thresholdMaxError": "{{max}} یا اس سے کم رقم درج کریں۔"
   },
   "profiles": {
     "title": "پروفائلز",
@@ -3635,9 +3757,10 @@
       "skills_other": "{{count}} ہنر",
       "commands_one": "{{count}} کمانڈ",
       "commands_other": "{{count}} کمانڈز",
-      "varsShort": "{{count}}م",
-      "skillsShort": "{{count}}ہ",
-      "commandsShort": "{{count}}ک"
+      "setupCommands_one": "{{count}} سیٹ اپ کمانڈ",
+      "setupCommands_other": "{{count}} سیٹ اپ کمانڈز",
+      "agents_one": "{{count}} ایجنٹ",
+      "agents_other": "{{count}} ایجنٹس"
     },
     "nameLabel": "پروفائل کا نام",
     "namePlaceholder": "جیسے بیک اینڈ ڈیبگنگ",
@@ -3665,6 +3788,8 @@
     "keyTooLong": "چابی 256 حروف یا اس سے کم ہونی چاہیے",
     "keyDuplicate": "یہ چابی پہلے سے پروفائل میں موجود ہے",
     "valueLabel": "قدر",
+    "valueRequired": "قدر درج کریں۔",
+    "tooLong": "زیادہ سے زیادہ {{max}} حروف استعمال کریں",
     "secrets": {
       "markSecret": "خفیہ کے طور پر نشان زد کریں۔",
       "masked": "پوشیدہ قدر",
@@ -3715,7 +3840,7 @@
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "سرور کا نام درج کریں۔",
-      "nameInvalid": "نام صرف حروف، اعداد، انڈر سکور اور ڈیشز کا استعمال کر سکتا ہے۔",
+      "nameInvalid": "نام صرف ASCII حروف، اعداد، انڈر سکور اور ڈیشز کا استعمال کر سکتا ہے، زیادہ سے زیادہ 100 حروف۔",
       "commandRequired": "ایک کمانڈ درج کریں۔",
       "commandTooLong": "زیادہ سے زیادہ 50 دلائل استعمال کریں، ہر ایک 500 حروف کا",
       "urlRequired": "ایک URL درج کریں۔",
@@ -3743,14 +3868,14 @@
       "stepsPlaceholder": "مثلاً 50",
       "temperature": "درجہ حرارت",
       "temperaturePlaceholder": "مثلاً 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "مثلاً 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "میرا ایجنٹ",
       "promptPlaceholder": "آپ ایک...",
       "tools": "اوزار",
       "visibility": "مرئیت",
-      "visibilityPrimary": "پرائمری - چننے والے میں دکھایا گیا ہے۔",
+      "visibilityPrimary": "پرائمری — چننے والے میں دکھایا گیا ہے۔",
       "visibilitySubagent": "Subagent — صرف دوسروں سے کال کی جا سکتی ہے۔",
       "visibilityAll": "سبھی — دونوں",
       "modePrimary": "صرف پرائمری",
@@ -3760,7 +3885,7 @@
       "deleteFailed": "ایجنٹ حذف نہیں کیا جا سکا",
       "nameRequired": "ایجنٹ کا نام درج کریں۔",
       "slugRequired": "ایک ایجنٹ سلگ درج کریں۔",
-      "slugInvalid": "سلگ کا آغاز ایک حرف سے ہونا چاہیے اور صرف چھوٹے حروف، ہندسوں اور ڈیشز کا استعمال کرنا چاہیے۔",
+      "slugInvalid": "سلگ کا آغاز ایک چھوٹے ASCII حرف سے ہونا چاہیے اور صرف چھوٹے ASCII حروف، ہندسوں اور ڈیشز کا استعمال کرنا چاہیے، زیادہ سے زیادہ 50 حروف۔",
       "slugConflict": "وہ سلگ پہلے ہی کسی بلٹ ان ایجنٹ یا اس پروفائل میں کسی دوسرے ایجنٹ کے زیر استعمال ہے",
       "edit": "ایجنٹ میں ترمیم کریں۔"
     },
@@ -3805,7 +3930,9 @@
       "pinFailed": "ریپو کو پن نہیں کیا جا سکا",
       "unboundToast": "ریپو انباؤنڈ",
       "unbindFailed": "ریپو کو بند نہیں کیا جا سکا"
-    }
+    },
+    "variablesDeleteFailed": "متغیر حذف نہیں کیا جا سکا",
+    "deleteCommand": "کمانڈ {{position}} کو حذف کریں"
   },
   "credits": {
     "title": "کریڈٹس خریدیں",
@@ -3841,7 +3968,8 @@
       "archive": "آرکائیو کریں",
       "unarchive": "آرکائیو سے نکالیں",
       "deleteTitle": "{{name}} حذف کریں؟",
-      "deleteMessage": "اس کے کام بھی حذف ہو جائیں گے۔ ان کے سیشن باقی رہیں گے۔"
+      "deleteMessage": "اس کے کام بھی حذف ہو جائیں گے۔ ان کے سیشن باقی رہیں گے۔",
+      "createFailed": "فہرست نہیں بن سکی"
     },
     "listSettings": {
       "title": "فہرست کی ترتیبات",
@@ -3909,20 +4037,20 @@
     }
   },
   "agentBriefing": {
-    "title": "صبح کی بریفنگ",
+    "title": "ایجنٹ بریفنگ",
     "atLeast": "≥{{value}}",
     "coverageHint": "کچھ پرانی سرگرمی غائب ہو سکتی ہے۔ ≥ کا مطلب ہے کم از کم اتنا؛ نامعلوم کا مطلب صفر نہیں۔",
     "available": "دستیاب بریفنگز",
     "history": "بریفنگ کی تاریخ",
-    "historyHint": "رپورٹس 30 دن تک رکھی جاتی ہیں، بشمول مسترد شدہ رپورٹس۔",
+    "historyHint": "بریفنگز 30 دن تک رکھی جاتی ہیں، بشمول مسترد شدہ بریفنگز۔",
     "settings": "بریفنگ کی ترتیبات",
-    "empty": "رات بھر کوئی سرگرمی نہیں",
-    "emptyHint": "فعال رات کے بعد آپ کے کلاؤڈ اور CLI کوڈنگ سیشن یہاں نظر آئیں گے۔",
+    "empty": "اس بریفنگ کی مدت میں کوئی سرگرمی نہیں",
+    "emptyHint": "جب کسی شیڈول شدہ بریفنگ میں سرگرمی ہو تو آپ کے کلاؤڈ اور CLI کوڈنگ سیشنز یہاں ظاہر ہوں گے۔",
     "loadError": "بریفنگز لوڈ نہیں ہو سکیں",
-    "sessions": "رات بھر فعال",
+    "sessions": "اس مدت میں فعال سیشنز",
     "pullRequests": "کھولے گئے PRs",
     "blockers": "نئی رکاوٹیں",
-    "spend": "رات بھر کا خرچ",
+    "spend": "اس مدت میں خرچ",
     "view": "بریفنگ پڑھیں",
     "viewWithPreview": "$t(agentBriefing.view)۔ {{preview}}",
     "scheduleTimeLabel": "{{label}}، {{time}}",
@@ -3940,20 +4068,20 @@
     "summaryCharge": "AI چارج {{cost}}",
     "summaryChargePending": "AI چارج کی تصدیق زیر التوا ہے",
     "generate": "خلاصہ بنائیں",
-    "retrySummary": "ادا شدہ خلاصہ دوبارہ آزمائیں",
+    "retrySummary": "ادائیگی والے خلاصے کے لیے دوبارہ کوشش کریں",
     "sources": "شواہد اور آرٹیفیکٹس",
     "timezone": "بریفنگ کا ٹائم زون",
     "deviceTimezone": "ڈیوائس کا ٹائم زون استعمال کریں",
-    "timezoneHint": "IANA ٹائم زون، مثلاً Europe/Berlin۔ شیڈول کی تبدیلیاں آئندہ راتوں پر لاگو ہوں گی۔",
-    "nightStart": "رات کا آغاز",
-    "morningStart": "رات کا اختتام / صبح کا آغاز",
-    "morningEnd": "صبح کا اختتام",
-    "timeHint": "صبح ختم ہونے پر ہوم کارڈ لائیو اسٹیٹس بحال کر دیتا ہے، آف لائن بھی۔",
-    "invalidSchedule": "درست ٹائم زون اور غیر خالی، غیر متداخل رات اور صبح کے اوقات منتخب کریں۔",
-    "notificationsHint": "پہلی رپورٹ تیار ہونے پر ہر صبح ایک عمومی اطلاع۔ ادا شدہ AI خلاصوں سے آزاد۔",
+    "timezoneHint": "IANA ٹائم زون، مثلاً Europe/Berlin۔ شیڈول کی تبدیلیاں آئندہ بریفنگز پر لاگو ہوں گی۔",
+    "nightStart": "بریفنگ کی مدت کا آغاز",
+    "morningStart": "بریفنگ تیار ہونے کا وقت",
+    "morningEnd": "بریفنگ کی دستیابی کا اختتامی وقت",
+    "timeHint": "بریفنگ کی مدت ختم ہونے پر ہوم کارڈ لائیو اسٹیٹس بحال کر دیتا ہے، آف لائن بھی۔",
+    "invalidSchedule": "درست ٹائم زون اور بریفنگ کے لیے ایسی مدت منتخب کریں جس کا اختتام آغاز کے بعد ہو۔",
+    "notificationsHint": "ہر شیڈول شدہ بریفنگ پر ایک عمومی اطلاع۔ ادائیگی والے AI خلاصوں سے آزاد۔",
     "notificationPermission": "اپنی بریفنگ وصول کرنے کے لیے $t(common.notifications) میں ڈیوائس اطلاعات فعال کریں۔",
-    "aiOptIn": "ادا شدہ AI خلاصے",
-    "aiHint": "صرف اس سیاق کے لیے اختیاری۔ منتخب، ترمیم شدہ اقتباسات اور منظم حقائق آپ کی ایپ کی زبان میں آپ کے ماڈل کو بھیجے جاتے ہیں۔ چارجز اس سیاق کے بیلنس سے کٹتے ہیں۔",
+    "aiOptIn": "ادائیگی والے AI خلاصے",
+    "aiHint": "صرف اس سیاق کے لیے اختیاری۔ منتخب اقتباسات، جن سے حساس معلومات ہٹا دی گئی ہیں، اور منظم حقائق آپ کی ایپ کی زبان میں آپ کے ماڈل کو بھیجے جاتے ہیں۔ چارجز اس سیاق کے بیلنس سے کٹتے ہیں۔",
     "defaultModel": "Kilo کا ڈیفالٹ ماڈل استعمال کریں",
     "duration": "وقت کی حد (منٹ)",
     "spendLimit": "خرچ کی حد (USD)",
@@ -3961,14 +4089,14 @@
     "invalidSafeguards": "مثبت اور محدود وقت اور خرچ کی حدیں درج کریں۔",
     "estimate": "تخمینہ {{estimate}} · زیادہ سے زیادہ {{maximum}}",
     "estimateUnavailable": "ان ترتیبات کے لیے ادائیگی والا خلاصہ دستیاب نہیں ہے۔",
-    "confirmPaid": "{{context}} کے لیے ادا شدہ خلاصے فعال کریں؟",
-    "confirmGeneration": "ادا شدہ خلاصہ بنائیں؟",
+    "confirmPaid": "{{context}} کے لیے ادائیگی والے خلاصے فعال کریں؟",
+    "confirmGeneration": "ادائیگی والا خلاصہ بنائیں؟",
     "paidDisclosure": "تخمینہ {{estimate}}، زیادہ سے زیادہ {{maximum}}، {{minutes}} منٹ کی حد کے ساتھ۔ تیاری ناکام ہونے پر بھی چارجز لاگو ہوں گے۔",
-    "enable": "ادا شدہ خلاصے فعال کریں",
+    "enable": "ادائیگی والے خلاصے فعال کریں",
     "contextSettings": "AI ترتیبات · {{context}}",
     "allContexts": "ذاتی اور تنظیمی بریفنگز الگ الگ رہتی ہیں۔",
     "create": "بریفنگ بنائیں",
-    "oneOff": "صرف ایک بار",
+    "oneOff": "درخواست پر",
     "createdAt": "{{time}} کو بنائی گئی",
     "chooseContext": "ایک سیاق منتخب کریں",
     "period": "بریفنگ کی مدت",
@@ -3990,13 +4118,22 @@
     "emptyPeriod": "اس مدت میں کوئی سرگرمی نہیں ملی۔ نہ AI خلاصہ بنے گا، نہ چارجز لاگو ہوں گے۔",
     "emptyHistory": "کوئی محفوظ شدہ بریفنگ نہیں",
     "historicalStateHint": "سیشن کی حالت منتخب مدت کے اختتام کی عکاسی کرتی ہے، موجودہ براہ راست حالت کی نہیں۔",
-    "oneOffHint": "AI کو منتخب شواہد آپ کی ایپ کی زبان میں، حساس معلومات ہٹا کر دیے جاتے ہیں۔ صرف ایک بار بننے والی یہ رپورٹ آپ کے صبح کے شیڈول یا AI کی ترجیحات کو تبدیل نہیں کرتی۔",
+    "oneOffHint": "AI کو منتخب شواہد آپ کی ایپ کی زبان میں، حساس معلومات ہٹا کر دیے جاتے ہیں۔ یہ درخواست پر تیار ہونے والی بریفنگ آپ کی شیڈول شدہ بریفنگ یا AI کی ترجیحات کو تبدیل نہیں کرتی۔",
     "createOffline": "بریفنگ کا جائزہ لینے یا بنانے کے لیے آن لائن ہوں۔ معاوضے والی درخواستیں آف لائن ہونے پر کبھی قطار میں نہیں رکھی جاتیں۔",
     "estimateInputTooLarge": "اس مدت میں منتخب ماڈل کی گنجائش سے زیادہ شواہد ہیں۔",
     "estimatePermissionUnavailable": "آپ کو اس سیاق کا بیلنس استعمال کرنے کی اجازت نہیں ہے۔",
+    "createFailed": "یہ بریفنگ نہیں بن سکی۔",
+    "reviewFailed": "اس بریفنگ کا جائزہ نہیں لیا جا سکا۔",
     "estimatePricingUnavailable": "اس ماڈل کی قیمت دستیاب نہیں ہے۔",
     "estimateBalanceUnavailable": "ادائیگی والے خلاصے کے لیے بیلنس کافی نہیں ہے۔",
-    "estimateModelNotAllowed": "یہ ماڈل یہاں کی اجازت نہیں رکھتا۔",
-    "estimateSpendLimitTooLow": "اس خلاصے کی اجازت کے لیے خرچ کی حفاظتی حد بڑھائیں۔"
+    "estimateModelNotAllowed": "اس ماڈل کو یہاں استعمال کرنے کی اجازت نہیں ہے۔",
+    "estimateSpendLimitTooLow": "اس خلاصے کی اجازت کے لیے خرچ کی حفاظتی حد بڑھائیں۔",
+    "saved": "بریفنگ کی ترتیبات محفوظ کر لی گئیں۔",
+    "preparing": "آپ کی بریفنگ تیار کی جا رہی ہے…",
+    "preparationHint": "سرگرمی جمع کیے جانے کے دوران آپ یہاں سے جا سکتے ہیں اور واپس آ سکتے ہیں۔ جب تک آپ بریفنگ کا جائزہ لے کر تخمینے کی تصدیق نہیں کرتے، نہ AI کا کام شروع ہوگا اور نہ کوئی چارج لگے گا۔",
+    "resumeReview": "جائزہ جاری رکھیں",
+    "preparationFailed": "اس بریفنگ کے لیے سرگرمی جمع نہیں کی جا سکی۔ دوبارہ کوشش کریں۔",
+    "preparationTimedOut": "سرگرمی جمع کرنے میں بہت زیادہ وقت لگ گیا۔ دوبارہ کوشش کریں۔",
+    "preparationDrafts": "تصدیق کی منتظر بریفنگز"
   }
 }

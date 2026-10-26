@@ -74,8 +74,8 @@
     "CONTAINER_BILLING_HEARTBEAT_SECONDS": "300",
     "RUNTIME_ISOLATION_ENABLED": "true",
     "SANDBOX_SELECTION_IDS": "9d278969-5453-4ae3-a51f-a8d2274a7b56,30f1620a-4aad-4456-bf4d-550f335e6f55",
-    "CONTAINER_REPO_SNAPSHOT_IDS": "",
     "CLOUDFLARE_CONTAINERS_ORG_IDS": "*",
+    "ENVIRONMENT_SNAPSHOT_ORG_IDS": "9d278969-5453-4ae3-a51f-a8d2274a7b56",
     "PREVIEW_HOST_SUFFIX": "cloud-agent.kiloapps.ai",
     "PREVIEW_ENABLED_IDS": "*",
     "VERCEL_SANDBOX_ORG_IDS": "",
@@ -194,7 +194,7 @@
         "disk_mb": 20000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
+        "KILOCODE_CLI_VERSION": "7.8.17",
       },
       "max_instances": 40,
       "rollout_active_grace_period": 1800,
@@ -208,7 +208,7 @@
         "disk_mb": 10000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
+        "KILOCODE_CLI_VERSION": "7.8.17",
       },
       "max_instances": 5,
       "rollout_active_grace_period": 1800,
@@ -222,7 +222,7 @@
         "disk_mb": 10000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
+        "KILOCODE_CLI_VERSION": "7.8.17",
       },
       "max_instances": 5,
       "rollout_active_grace_period": 1800,
@@ -236,7 +236,7 @@
         "disk_mb": 8000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
+        "KILOCODE_CLI_VERSION": "7.8.17",
       },
       "max_instances": 5,
       "rollout_active_grace_period": 1800,
@@ -250,7 +250,7 @@
         "disk_mb": 20000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
+        "KILOCODE_CLI_VERSION": "7.8.17",
       },
       "max_instances": 300,
       "rollout_active_grace_period": 1800,
@@ -264,7 +264,7 @@
         "disk_mb": 20000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
+        "KILOCODE_CLI_VERSION": "7.8.17",
       },
       "max_instances": 1500,
       "rollout_active_grace_period": 1800,
@@ -278,7 +278,7 @@
         "disk_mb": 20000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.8.1",
+        "KILOCODE_CLI_VERSION": "7.8.17",
       },
       "max_instances": 1500,
       "rollout_active_grace_period": 1800,
@@ -290,7 +290,7 @@
       "images": {
         "app": {
           "dockerfile": "./Dockerfile.containers",
-          "build_vars": { "KILOCODE_CLI_VERSION": "7.8.1" },
+          "build_vars": { "KILOCODE_CLI_VERSION": "7.8.17" },
         },
       },
     },
@@ -345,6 +345,10 @@
         "class_name": "SandboxContainers",
         "name": "SANDBOX_CONTAINERS",
       },
+      {
+        "class_name": "EnvironmentBuild",
+        "name": "ENVIRONMENT_BUILD",
+      },
     ],
   },
   "migrations": [
@@ -396,6 +400,10 @@
       "new_sqlite_classes": ["SandboxContainers"],
       "tag": "v11",
     },
+    {
+      "new_sqlite_classes": ["EnvironmentBuild"],
+      "tag": "v12",
+    },
   ],
   /**
    * Hyperdrive Bindings
@@ -411,9 +419,6 @@
   "kv_namespaces": [
     {
       "binding": "SHARED_SANDBOX_OVERRIDES",
-    },
-    {
-      "binding": "REPO_SNAPSHOTS",
     },
   ],
 
@@ -470,9 +475,6 @@
         {
           "binding": "SHARED_SANDBOX_OVERRIDES",
         },
-        {
-          "binding": "REPO_SNAPSHOTS",
-        },
       ],
       "vars": {
         "KILOCODE_BACKEND_BASE_URL": "http://localhost:3000",
@@ -498,6 +500,7 @@
         "RUNTIME_ISOLATION_ENABLED": "true",
         "SANDBOX_SELECTION_IDS": "*",
         "CLOUDFLARE_CONTAINERS_ORG_IDS": "*",
+        "ENVIRONMENT_SNAPSHOT_ORG_IDS": "",
         "PREVIEW_ENABLED_IDS": "*",
         "VERCEL_SANDBOX_ORG_IDS": "",
         "VERCEL_PROJECT_ID": "",
@@ -556,7 +559,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
+            "KILOCODE_CLI_VERSION": "7.8.17",
           },
           "max_instances": 10,
           "rollout_active_grace_period": 60,
@@ -566,7 +569,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
+            "KILOCODE_CLI_VERSION": "7.8.17",
           },
           "max_instances": 6,
           "rollout_active_grace_period": 60,
@@ -576,7 +579,7 @@
           "image": "./Dockerfile.dind",
           "instance_type": "standard-3",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
+            "KILOCODE_CLI_VERSION": "7.8.17",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,
@@ -590,7 +593,7 @@
             "disk_mb": 8000,
           },
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
+            "KILOCODE_CLI_VERSION": "7.8.17",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,
@@ -600,7 +603,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
+            "KILOCODE_CLI_VERSION": "7.8.17",
           },
           "max_instances": 10,
           "rollout_active_grace_period": 60,
@@ -610,7 +613,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
+            "KILOCODE_CLI_VERSION": "7.8.17",
           },
           "max_instances": 6,
           "rollout_active_grace_period": 60,
@@ -624,7 +627,7 @@
             "disk_mb": 8000,
           },
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.8.1",
+            "KILOCODE_CLI_VERSION": "7.8.17",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,
@@ -636,7 +639,7 @@
           "images": {
             "app": {
               "dockerfile": "./Dockerfile.containers",
-              "build_vars": { "KILOCODE_CLI_VERSION": "7.8.1" },
+              "build_vars": { "KILOCODE_CLI_VERSION": "7.8.17" },
             },
           },
         },
@@ -690,6 +693,10 @@
           {
             "class_name": "SandboxContainers",
             "name": "SANDBOX_CONTAINERS",
+          },
+          {
+            "class_name": "EnvironmentBuild",
+            "name": "ENVIRONMENT_BUILD",
           },
         ],
       },

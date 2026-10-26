@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Switch, View } from 'react-native';
+import { View } from 'react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
 
 import { CenteredState } from '@/components/centered-state';
@@ -15,13 +15,15 @@ import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-overview-skeleton';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
+import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
+import { useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
-import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import {
   classifyProviderState,
   useBitbucketReadiness,
@@ -52,8 +54,11 @@ export function BitbucketOverview({
   const readiness = useBitbucketReadiness(scope);
   const save = useSaveReviewConfig(scope, 'bitbucket');
   const { models, isLoading: modelsLoading } = useReviewerModels(scope);
-  // A successful probe can confirm online while NetInfo still pauses queries.
-  const isConnectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
+  const { reducedMotion } = useMotionPolicy();
+  // The body of the config read has exactly one surface: rows from cache, an
+  // error with retry, or a loading state -- never the header over an empty
+  // scroll area.
+  const configBody = useReviewConfigBody(config);
   const providerState = classifyProviderState({
     isLoading: readiness.isLoading,
     isError: readiness.isError,
@@ -77,29 +82,20 @@ export function BitbucketOverview({
     );
   }
 
-  const isLoading = providerState.status === 'loading' || config.isLoading || permissionLoading;
+  const isLoading = providerState.status === 'loading' || permissionLoading;
   const connected = providerState.status === 'connected';
 
-  // A connected workspace whose config has nothing to show (no cached data
-  // and either a failed fetch or a paused one — `config.isLoading` is false
-  // while a query is paused by NetInfo, which used to render a header over
-  // blank space) surfaces a retry instead. A paused query with cached config
-  // data, and a background refetch failure with data already cached, both
-  // fall through to the normal content below, unaffected.
-  const configError = !isLoading && connected && config.data == null && config.isError;
-  const configPaused =
-    !isLoading && connected && config.data == null && config.fetchStatus === 'paused';
-  const configUnavailable = configError || (configPaused && isConnectivityKnown);
-  const configPausedUnknown = configPaused && !isConnectivityKnown;
-  if (configUnavailable) {
+  // A connected workspace whose config read failed (no cache to fall back on),
+  // or whose idle read could not be restarted, has nothing to show: surface a
+  // retry instead. Cached config keeps the rows through a background refetch
+  // failure, and an unsettled connectivity still waits on the skeleton.
+  if (!isLoading && connected && (configBody.body.status === 'error' || configBody.exhausted)) {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
         <QueryError
-          variant={config.isError ? 'server' : 'offline'}
-          onRetry={() => {
-            void config.refetch();
-          }}
+          variant={configBody.body.status === 'error' ? configBody.body.variant : 'server'}
+          onRetry={configBody.body.status === 'error' ? configBody.body.refetch : configBody.retry}
           isRetrying={config.isFetching}
         />
       </View>
@@ -165,13 +161,16 @@ export function BitbucketOverview({
         keyboardShouldPersistTaps="handled"
       >
         <Animated.View layout={LinearTransition}>
-          {/* A paused query with no cached data still waits: while connectivity is
-             unsettled the error branch above cannot know the pause is real, so the
-             skeleton keeps the body honest instead of rendering blank. */}
-          {(isLoading || configPausedUnknown) && <PlatformOverviewSkeleton />}
+          {/* Every read state paints something: while connectivity is unsettled a
+             paused read keeps the skeleton, and a pending read that nothing is
+             fetching also keeps it until its restart runs. */}
+          {(isLoading || configBody.body.status === 'loading') && <PlatformOverviewSkeleton />}
 
-          {!isLoading && connected && config.data != null && rows != null && (
-            <Animated.View entering={FadeIn.duration(200)} className="gap-6">
+          {!isLoading && data != null && rows != null && (
+            <Animated.View
+              entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(200))}
+              className="gap-6"
+            >
               {readiness.data?.ready === false && (
                 <View className="items-center gap-2 rounded-lg bg-secondary p-4">
                   <Text className="text-center text-xs text-muted-foreground">

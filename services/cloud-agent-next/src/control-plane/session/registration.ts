@@ -317,5 +317,11 @@ export function buildControlPlaneSessionRegistration(
     ...(encryptedMcpServers === undefined ? {} : { mcpServers: encryptedMcpServers }),
     ...(encryptedSecrets === undefined ? {} : { encryptedSecrets }),
   };
-  return { sandboxId, spec, credentials, sandboxSelection: { ...sandboxSelection, containment } };
+  return {
+    sandboxId,
+    spec,
+    credentials,
+    sandboxSelection: { ...sandboxSelection, containment },
+    ...(metadata.environment ? { environment: metadata.environment } : {}),
+  };
 }

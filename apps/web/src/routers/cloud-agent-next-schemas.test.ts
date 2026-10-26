@@ -638,6 +638,18 @@ describe('basePrepareSessionNextSchema cloneFromKiloSessionId union', () => {
     expect(result.success).toBe(true);
   });
 
+  it('drops a client environmentId: the server resolves the environment from the repository', () => {
+    const result = personalPrepareSessionNextSchema.parse({
+      githubRepo: 'acme/repo',
+      prompt: 'Use environment',
+      mode: 'code',
+      model: 'kilo/test-model',
+      environmentId: '123e4567-e89b-12d3-a456-426614174099',
+    });
+
+    expect(result).not.toHaveProperty('environmentId');
+  });
+
   it('does not accept client provenance from public session preparation input', () => {
     const result = basePrepareSessionNextSchema.parse({
       githubRepo: 'acme/repo',
@@ -660,6 +672,7 @@ describe('send-time attachment filenames', () => {
   };
   const sendInput = {
     cloudAgentSessionId: 'agent_12345678-1234-4234-9234-123456789abc',
+    messageId: 'msg_123456789abc123456789ABCDE',
     payload: { type: 'prompt', prompt: '', mode: 'code', model: 'kilo/test-model' },
   };
   const attachmentsWith = (extension: string) => ({

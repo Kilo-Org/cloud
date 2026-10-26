@@ -17,7 +17,7 @@ describe('runtime distribution contract', () => {
   it('pins the shared toolchain versions', () => {
     expect(RUNTIME_DISTRIBUTION).toEqual({
       nodeMajor: '24',
-      bun: '1.3.14',
+      bun: '1.4.4',
       pnpm: '12.14.0',
       glab: '1.124.0',
       gh: '2.102.0',
@@ -30,6 +30,7 @@ describe('runtime distribution contract', () => {
       'src/bitbucket-review-cli.ts',
       'src/github-review-publish-mcp.ts',
       'src/control-plane/main.ts',
+      'src/environment-builder/main.ts',
     ]);
     expect(new Set(WRAPPER_BUNDLES.map(bundle => bundle.installName)).size).toBe(
       WRAPPER_BUNDLES.length
@@ -43,6 +44,7 @@ describe('runtime distribution contract', () => {
       'bb',
       'github-review-publish-mcp',
       'kilocode-control-plane-wrapper.js',
+      'kilocode-environment-builder.js',
       'kilocode-control-plane-supervisor.sh',
       'kilo-git-credential',
     ]);
@@ -70,7 +72,7 @@ describe('runtime distribution contract', () => {
       }))
     );
     const script = runtimeVerificationScript(artifacts);
-    expect(script).toContain(`test "$(bun --version)" = '1.3.14'`);
+    expect(script).toContain(`test "$(bun --version)" = '1.4.4'`);
     expect(script).toContain(`test "$(pnpm --version)" = '12.14.0'`);
     expect(script).toContain('grep -oE');
     expect(script).not.toContain('grep -qF');

@@ -1,10 +1,10 @@
 import * as z from 'zod';
 import {
-  CustomRouterScopeSchema,
   customRouterEntryKey,
   customRouterModelId,
   type GatewayCustomRouterEntry,
 } from './custom-router';
+import { OwnerTypeSchema } from './owner';
 import { AutoRoutingModeSchema, type AutoRouter, type AutoRoutingMode } from './router';
 import { MAX_POOL_ENTRIES } from './routing-table';
 
@@ -15,7 +15,7 @@ export const CONVERTED_ROUTER_BASE: AutoRouter = 'efficient';
 export const MAX_OWNER_POOL_CONVERSIONS_PER_REQUEST = 5;
 
 export const OwnerPoolConversionOwnerSchema = z.object({
-  type: CustomRouterScopeSchema,
+  type: OwnerTypeSchema,
   id: z.string().trim().min(1),
 });
 export type OwnerPoolConversionOwner = z.infer<typeof OwnerPoolConversionOwnerSchema>;

@@ -45,7 +45,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 
 import { useRootNavigationReady } from '@/lib/navigation-ready';
 import { useTranslation } from 'react-i18next';
-import { View, type ViewInstance } from 'react-native';
+import { I18nManager, View, type ViewInstance } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
@@ -68,7 +68,7 @@ import { subscribeToConsentChanges } from '@/lib/consent';
 import { shouldStartAnalytics } from '@/lib/analytics-consent';
 import { isPostHogReady, subscribeToPostHogReady } from '@/lib/analytics/posthog';
 import { drainStartupTimings } from '@/lib/startup-drain';
-import { markStartup, markStartupComplete } from '@/lib/startup-timing';
+import { isStartupComplete, markStartup, markStartupComplete } from '@/lib/startup-timing';
 import { prefetchCurrentUser } from '@/lib/startup-prefetch';
 import { useAnalyticsConsentGate } from '@/lib/hooks/use-analytics-consent-gate';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
@@ -87,7 +87,16 @@ import {
   useThemePreference,
 } from '@/lib/hooks/use-theme-preference';
 import { i18n } from '@/i18n';
-import { syncRtl } from '@/i18n/rtl';
+import {
+  clearDirectionAttemptAsync,
+  readDirectionAttemptAsync,
+  writeDirectionAttemptAsync,
+} from '@/i18n/direction-attempt';
+import { isRtlLanguage, syncRtl } from '@/i18n/rtl';
+import {
+  retryLanguageStartupDirectionAsync,
+  runLanguageStartupDirectionAsync,
+} from '@/i18n/startup-direction-run';
 import { type LanguageReturnTarget, readLanguageReturnTarget } from '@/i18n/return-target';
 import {
   getResolvedLanguage,
@@ -130,6 +139,7 @@ import {
   consumeLastRouteForRepair,
   getLastRouteHydrationVersion,
   isLastRouteHydrated,
+  prepareLastRouteRepair,
   subscribeLastRoute,
 } from '@/lib/last-route';
 import { shouldRepairRestoredRoute } from '@/lib/last-route-repair';
@@ -283,9 +293,8 @@ function RootLayoutNav({
   const [optionalConsent, setOptionalConsentState] = useState(false);
   const [consentCheckError, setConsentCheckError] = useState<unknown>(null);
   const [consentCheckRetryKey, setConsentCheckRetryKey] = useState(0);
-  // Flipped by every splash-hide site below, so the app_startup drain can
-  // depend on "startup finished" as an ordinary dependency.
-  const [startupFinished, setStartupFinished] = useState(false);
+  // A recreated activity has no splash once this runtime completed startup.
+  const [startupFinished, setStartupFinished] = useState(isStartupComplete);
   // Reactive snapshot so the drain effect re-triggers when the PostHog
   // client becomes ready after async init.
   const postHogReady = useSyncExternalStore(subscribeToPostHogReady, isPostHogReady);
@@ -451,19 +460,28 @@ function RootLayoutNav({
 
     const prepareLanguage = async () => {
       const resolved = getResolvedLanguage();
-      let reloadFailed = false;
-      if (syncRtl(resolved)) {
-        try {
-          await reloadAppAsync();
-          // The native reload tears down this JS context; nothing below runs.
-          return;
-        } catch {
-          // Reload failed: keep going so the language still loads, then show
-          // the Retry/Continue screen instead of first-painting in the wrong
-          // direction.
-          reloadFailed = true;
+      const direction = await runLanguageStartupDirectionAsync(
+        {
+          language: resolved,
+          isRtl: I18nManager.isRTL,
+          shouldBeRtl: isRtlLanguage(resolved),
+        },
+        {
+          syncRtl,
+          readAttempt: readDirectionAttemptAsync,
+          writeAttempt: writeDirectionAttemptAsync,
+          clearAttempt: clearDirectionAttemptAsync,
+          reload: reloadAppAsync,
         }
+      );
+      if (direction === 'reloaded') {
+        // The native reload tears down this JS context; nothing below runs.
+        return;
       }
+      // A direction that could not be applied still loads the language, then
+      // shows the Retry/Continue screen instead of first-painting in the wrong
+      // direction.
+      const reloadFailed = direction === 'retry';
       // Reopen the screen the user was on before an RTL reload. Read once,
       // after the reload path, so the helper's one-shot delete is the only read.
       // On a failed reload the key stays in SecureStore, so Retry's successful
@@ -1221,13 +1239,14 @@ function RootLayoutNav({
     return (
       <LanguageReloadErrorScreen
         onRetry={() => {
-          void (async () => {
-            try {
-              await reloadAppAsync();
-            } catch {
-              // Reload failed: the screen stays so the user can retry or continue.
-            }
-          })();
+          // A retry is the user asking for another attempt, not the automatic
+          // relaunch the record guards against. The runner drops the record
+          // first; a reload failure leaves this screen up so the user can retry
+          // or continue.
+          void retryLanguageStartupDirectionAsync({
+            clearAttempt: clearDirectionAttemptAsync,
+            reload: reloadAppAsync,
+          });
         }}
         onContinue={() => {
           setLanguageReloadFailed(false);
@@ -1385,7 +1404,14 @@ function RootLayout() {
 }
 
 function RootErrorBoundary({ retry }: ErrorBoundaryProps) {
-  return <RuntimeErrorScreen onRetry={() => void retry()} />;
+  return (
+    <RuntimeErrorScreen
+      onRetry={() => {
+        prepareLastRouteRepair();
+        void retry();
+      }}
+    />
+  );
 }
 
 export const ErrorBoundary = Sentry.wrapExpoRouterErrorBoundary(RootErrorBoundary);

@@ -32,6 +32,7 @@ import {
   withAuthCors,
 } from '../auth/http';
 import { orgPickerFormSchema, orgPickerQuerySchema, pairingStatusQuerySchema } from '../schemas';
+import { flowCookieHeader, flowCookieToken, PENDING_TTL_SECONDS } from './flow-cookie';
 import type { McpAnalytics } from '../analytics';
 import type { OAuthStoreApi, PendingAuthorization } from '../store/oauth-store';
 import type { AuthenticatorEnrollmentApi } from '../types';
@@ -40,6 +41,9 @@ import {
   fetchOrgOptions,
   fetchUserIsAdmin,
   pollKiloPairing,
+  redirectOriginOf,
+  type KiloPollOutcome,
+  type RequestingClient,
 } from './kilo-pairing';
 import {
   PERSONAL_ORG_ID,
@@ -48,9 +52,6 @@ import {
   type AuthenticatorView,
   type OrgOption,
 } from './pages';
-
-/** Pending records are short-lived: 10 minutes to complete sign-in. */
-export const PENDING_TTL_SECONDS = 600;
 
 /** Operator-facing copy for a record that can no longer be acted on. */
 const STALE_REQUEST_MESSAGE =
@@ -139,6 +140,22 @@ function isPaired(record: PendingAuthorization): record is PendingAuthorization 
   );
 }
 
+/**
+ * Whether an approved pairing answers exactly the client this authorization was
+ * started for: the approver confirmed that client, and the client id and
+ * redirect origin come back unchanged. A missing description never matches.
+ */
+function approvalConfirmsRequestingClient(
+  record: PendingAuthorization,
+  approval: Extract<KiloPollOutcome, { status: 'approved' }>
+): boolean {
+  if (!approval.clientConfirmed) return false;
+  const requesting = approval.requestingClient;
+  if (requesting === null) return false;
+  if (requesting.clientId !== record.authRequest.clientId) return false;
+  return requesting.redirectOrigin === redirectOriginOf(record.authRequest.redirectUri);
+}
+
 /** Rebuild the client's original /authorize request from the stored library request. */
 function restartAuthorizeUrl(authRequest: AuthRequest, origin: string): string {
   const url = new URL(AUTH_PATHS.authorize, origin);
@@ -211,7 +228,29 @@ async function handleAuthorize(request: Request, env: Env, deps: ConsentDeps): P
     return errorPage('invalid_request', 'Unknown OAuth client.');
   }
 
-  const pairing = await createKiloPairing(deps, request);
+  // The client the approval page presents and the approver confirms. A
+  // redirect URI without an absolute origin cannot be presented, so it is
+  // refused here rather than approved blind.
+  const redirectOrigin = redirectOriginOf(authRequest.redirectUri);
+  if (redirectOrigin === null) {
+    deps.analytics?.oauthSignIn({
+      phase: 'failed',
+      identity: null,
+      clientId: authRequest.clientId,
+      reason: 'invalid_request',
+    });
+    return errorPage(
+      'invalid_request',
+      'This client registered a redirect URI that cannot be shown to the person approving it. Correct the client registration, then retry.'
+    );
+  }
+
+  const requestingClient: RequestingClient = {
+    clientId: authRequest.clientId,
+    clientName: client.clientName ?? '',
+    redirectOrigin,
+  };
+  const pairing = await createKiloPairing(deps, request, requestingClient);
   if (!pairing.ok) {
     // Retryable unhappy path: nothing was created; tell the user exactly what
     // to do (wait vs check connection) and send them back to the client.
@@ -224,16 +263,25 @@ async function handleAuthorize(request: Request, env: Env, deps: ConsentDeps): P
     const description =
       pairing.kind === 'rate_limited'
         ? 'Too many pending Kilo sign-in requests from your network right now. Wait a few minutes, then retry from your MCP client.'
-        : 'Kilo sign-in could not be reached. Check your connection, then retry from your MCP client.';
+        : pairing.kind === 'client_unconfirmed'
+          ? 'Kilo sign-in could not confirm this app right now. Wait a few minutes, then retry from your MCP client.'
+          : 'Kilo sign-in could not be reached. Check your connection, then retry from your MCP client.';
     return errorPage('temporarily_unavailable', description, 503);
   }
 
   const now = deps.now?.() ?? new Date();
   const id = crypto.randomUUID();
+  // The flow token binds the whole consent flow to the browser that opened
+  // /authorize: the status and picker routes refuse a request whose cookie
+  // does not match. The pending id alone is polled by, and handed to, the
+  // user agent of the request initiator, so it cannot prove who is asking.
+  const flowToken = crypto.randomUUID();
   await deps.store.createPendingAuthorization({
     id,
     authRequest,
     deviceAuthCode: pairing.pairingCode,
+    userCode: pairing.userCode,
+    flowToken,
     createdAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + PENDING_TTL_SECONDS * 1000).toISOString(),
   });
@@ -245,13 +293,15 @@ async function handleAuthorize(request: Request, env: Env, deps: ConsentDeps): P
     clientId: authRequest.clientId,
   });
 
-  return consentPage({
+  const page = consentPage({
     clientName: client.clientName ?? 'your MCP client',
     scope: MCP_SCOPE,
-    webSignInUrl: `${deps.webBaseUrl.replace(/\/$/, '')}/device-auth?code=${encodeURIComponent(pairing.pairingCode)}`,
+    webSignInUrl: `${deps.webBaseUrl.replace(/\/$/, '')}/device-auth?code=${encodeURIComponent(pairing.userCode)}`,
     statusUrl: `${AUTH_PATHS.pairingStatus}?id=${encodeURIComponent(id)}`,
     restartUrl: request.url,
   });
+  page.headers.append('Set-Cookie', flowCookieHeader(id, flowToken));
+  return page;
 }
 
 async function handlePairingStatus(request: Request, deps: ConsentDeps): Promise<Response> {
@@ -268,6 +318,12 @@ async function handlePairingStatus(request: Request, deps: ConsentDeps): Promise
   const nowIso = now.toISOString();
   const record = await deps.store.getPendingAuthorization(id);
   if (!record || record.expiresAt <= nowIso || record.status === 'completed') {
+    return authJsonResponse({ status: 'unknown' } satisfies PairingStatus);
+  }
+  // The poll must present the flow cookie recorded for this id: any other
+  // caller gets the same `unknown` an expired record gets, and the record is
+  // left untouched.
+  if (flowCookieToken(request.headers.get('Cookie'), id) !== record.flowToken) {
     return authJsonResponse({ status: 'unknown' } satisfies PairingStatus);
   }
   const clientId = record.authRequest.clientId;
@@ -325,6 +381,26 @@ async function handlePairingStatus(request: Request, deps: ConsentDeps): Promise
       return authJsonResponse({ status: 'expired' } satisfies PairingStatus);
     }
     case 'approved': {
+      // The approval only applies to the client this authorization was started
+      // for: the approver saw and confirmed it, and the same client and
+      // redirect origin come back. Anything else is refused here, before the
+      // paired identity is stored, and the record is closed so no poll can
+      // complete it later.
+      if (!approvalConfirmsRequestingClient(record, upstream)) {
+        const transitioned = await deps.store.denyPendingAuthorization(
+          record.deviceAuthCode,
+          nowIso
+        );
+        if (transitioned) {
+          deps.analytics?.oauthSignIn({
+            phase: 'failed',
+            identity: null,
+            clientId,
+            reason: 'client_not_confirmed',
+          });
+        }
+        return authJsonResponse({ status: 'denied' } satisfies PairingStatus);
+      }
       // Persist BEFORE any further poll: the upstream answer is single-use.
       await deps.store.recordPairingApproval(
         record.deviceAuthCode,
@@ -366,6 +442,12 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
   ) {
     return errorPage('invalid_request', STALE_REQUEST_MESSAGE);
   }
+  // The picker is served to, and submitted from, the browser that presents
+  // the flow cookie recorded for this id. Any other caller gets the same
+  // page a stale id gets, and the record is left untouched.
+  if (flowCookieToken(request.headers.get('Cookie'), id) !== record.flowToken) {
+    return errorPage('invalid_request', STALE_REQUEST_MESSAGE);
+  }
 
   const client: ClientInfo | null = await env.OAUTH_PROVIDER.lookupClient(
     record.authRequest.clientId
@@ -374,12 +456,13 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
   const actionUrl = `${AUTH_PATHS.orgPicker}?id=${encodeURIComponent(id)}`;
 
   if (!isPaired(record)) {
-    // Kilo sign-in not finished for this record: send the user back through
-    // the consent page for the SAME pairing (the device-auth code is stored).
+    if (record.userCode === null) {
+      return errorPage('invalid_request', STALE_REQUEST_MESSAGE);
+    }
     return consentPage({
       clientName,
       scope: MCP_SCOPE,
-      webSignInUrl: `${deps.webBaseUrl.replace(/\/$/, '')}/device-auth?code=${encodeURIComponent(record.deviceAuthCode)}`,
+      webSignInUrl: `${deps.webBaseUrl.replace(/\/$/, '')}/device-auth?code=${encodeURIComponent(record.userCode)}`,
       statusUrl: `${AUTH_PATHS.pairingStatus}?id=${encodeURIComponent(id)}`,
       restartUrl: restartAuthorizeUrl(record.authRequest, url.origin),
     });
@@ -391,10 +474,14 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
   // check is 'not eligible'; on the GET it also explains why the option is
   // missing so the reload is an informed retry. The authenticator read is part
   // of the same option: read on the POST too (not just the GET) so every render
-  // for an eligible admin carries the subsection, and a throw fails closed
+  // for an eligible admin carries the option, and a throw fails closed
   // exactly like a thrown admin check — no checkbox, no subsection, org list
   // and Connect intact. A throw is an internal failure of the admin option,
-  // never a reason to block a plain connection.
+  // never a reason to block a plain connection. The enrollment material itself
+  // (secret + otpauth URI) is never in a GET body: the browser is bound by the
+  // flow cookie, and the reveal is an explicit POST action (`enroll=1`) — the
+  // enrolment subsection renders only on that response or on a refused opt-in
+  // submit, never on the plain picker GET.
   let adminEligible = false;
   let adminCheckFailed = false;
   let adminNotice: string | null = null;
@@ -555,13 +642,23 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
 
   if (request.method === 'GET') {
     // Retryable unhappy: the org list is a live read, so the personal context
-    // stays selectable and the same submit completes the flow on retry.
+    // stays selectable and the same submit completes the flow on retry. No
+    // enrollment material here: the secret renders only on an explicit
+    // enrollment action (below) or a refused opt-in submit.
     return orgListPage(null);
   }
 
   // POST. The personal context is always valid for an approved Kilo login, so
   // it must not depend on the live membership read.
   const form = await request.formData().catch(() => null);
+  // The explicit enrollment action: show the authenticator setup material in
+  // this response and touch nothing else. Only when the submit carries no
+  // organization choice — a submit that does choose is parsed below, and its
+  // refused branches reveal the subsection themselves. `approvePendingAuthorization`
+  // never runs here, so the same page can be submitted with a choice after.
+  if (form?.get('enroll') === '1' && form?.get('organization_id') === null) {
+    return orgListPage(null, true);
+  }
   // Read the opt-in and the code tolerantly: only a string is inspected, so a
   // non-text form value cannot fail the whole parse.
   const adminField = form?.get('admin_enabled');

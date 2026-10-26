@@ -15,6 +15,11 @@ import {
   getSandboxAllocationRequest,
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
+import type {
+  CloudAgentWorkspaceSummary,
+  CloudAgentWorkspacesPage,
+  GetCloudAgentWorkspaceResult,
+} from '@kilocode/session-ingest-contracts';
 import { mintApiToken, mintStreamTicket } from './auth.js';
 import { resolveFakeAdminToken } from './fake-llm-admin.js';
 import { FAKE_SCOPE_MARKER_PREFIX, isFakeScopeToken } from './fake-llm-core.js';
@@ -211,6 +216,32 @@ export async function trpcCall<T>(
   const envelope = z.object({ result: z.object({ data: z.unknown() }) }).parse(parsed);
   return envelope.result.data as T;
 }
+
+export function listHostedWorkspaces(
+  config: DriverConfig,
+  input: { repositoryUrl?: string; limit?: number; sessionLimit?: number },
+  signal?: AbortSignal
+): Promise<CloudAgentWorkspacesPage> {
+  return trpcCall<CloudAgentWorkspacesPage>(config, 'listHostedWorkspaces', input, {
+    method: 'GET',
+    signal,
+  });
+}
+
+export function getHostedWorkspace(
+  config: DriverConfig,
+  workspaceId: string,
+  signal?: AbortSignal
+): Promise<GetCloudAgentWorkspaceResult> {
+  return trpcCall<GetCloudAgentWorkspaceResult>(
+    config,
+    'getHostedWorkspace',
+    { workspaceId, sessionLimit: 100 },
+    { method: 'GET', signal }
+  );
+}
+
+export type { CloudAgentWorkspaceSummary };
 
 export type StartSessionResult = {
   cloudAgentSessionId: string;

@@ -2,11 +2,29 @@
 
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Boxes, GitBranch, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
+import {
+  Boxes,
+  GitBranch,
+  Hammer,
+  Loader2,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Square,
+  Trash2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,11 +47,14 @@ import { useTRPC } from '@/lib/trpc/utils';
 import {
   useCloudAgentEnvironmentMutations,
   useCloudAgentEnvironmentsForOwner,
+  useEnvironmentBuildStatus,
   type EnvironmentRepository,
   type EnvironmentSummary,
 } from '@/hooks/useCloudAgentEnvironments';
 import { findRepositoryEnvironment, formatEnvironmentCounts } from '../environment-display';
 import { EnvironmentDialog } from '../EnvironmentDialog';
+import { useEnvironmentBuildControl } from '../EnvironmentBuildPanel';
+import { buildAction, snapshotBadge } from '../environment-build-display';
 
 type EnvironmentsSectionProps = {
   organizationId?: string;
@@ -140,7 +161,8 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
         <div>
           <h3 className="text-sm font-medium">Environments</h3>
           <p className="text-muted-foreground text-xs">
-            Saved repository setup, applied to new sessions automatically.
+            Each repository can have one environment: setup commands, variables, secrets, and a
+            sandbox size. New sessions in the repository use it automatically.
           </p>
         </div>
         {canManage && (
@@ -229,6 +251,7 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
             <EnvironmentRow
               key={environment.id}
               environment={environment}
+              organizationId={organizationId}
               canManage={canManage}
               onEdit={() => openEdit(environment.id)}
               onDelete={() => setPendingDelete(environment)}
@@ -244,6 +267,7 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
         repository={dialogRepository}
         repositoryLabel={dialogRepository ? repositoryLabel(dialogRepository) : undefined}
         environmentId={dialogEnvironmentId}
+        canManage={canManage}
         onSaved={() => setDialogOpen(false)}
         onDeleted={() => setDialogOpen(false)}
       />
@@ -279,27 +303,36 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
 
 function EnvironmentRow({
   environment,
+  organizationId,
   canManage,
   onEdit,
   onDelete,
 }: {
   environment: EnvironmentSummary;
+  organizationId?: string;
   canManage: boolean;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   const meta = formatEnvironmentCounts(environment);
+  const { data: buildStatus } = useEnvironmentBuildStatus(environment.id, { organizationId });
+  const badge = snapshotBadge(buildStatus, Date.now());
   return (
     <div className="flex items-start gap-2 rounded-lg border px-3 py-2.5">
       <Boxes className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="truncate text-sm font-medium" title={environment.name}>
             {environment.name}
           </span>
           <Badge variant="secondary" className="shrink-0 text-[10px]">
             {platformLabel(environment.platform)}
           </Badge>
+          {badge && (
+            <Badge variant="outline" className="shrink-0 text-[10px]">
+              {badge}
+            </Badge>
+          )}
         </div>
         <p className="text-muted-foreground truncate text-xs" title={environment.repoFullName}>
           {environment.repoFullName}
@@ -307,28 +340,81 @@ function EnvironmentRow({
         {meta && <p className="text-muted-foreground text-xs">{meta}</p>}
       </div>
       {canManage && (
-        <div className="flex shrink-0 items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-muted-foreground h-7 w-7"
-            title={`Edit ${environment.name}`}
-            onClick={onEdit}
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-muted-foreground hover:text-destructive h-7 w-7"
-            title={`Delete ${environment.name}`}
-            onClick={onDelete}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        </div>
+        <EnvironmentRowMenu
+          environment={environment}
+          organizationId={organizationId}
+          buildStatus={buildStatus}
+          onEdit={onEdit}
+          onDelete={onDelete}
+        />
       )}
     </div>
+  );
+}
+
+function EnvironmentRowMenu({
+  environment,
+  organizationId,
+  buildStatus,
+  onEdit,
+  onDelete,
+}: {
+  environment: EnvironmentSummary;
+  organizationId?: string;
+  buildStatus: ReturnType<typeof useEnvironmentBuildStatus>['data'];
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const control = useEnvironmentBuildControl({
+    organizationId,
+    environmentId: environment.id,
+    status: buildStatus,
+  });
+  const action = buildAction(buildStatus, { canManage: true, hasUnsavedChanges: false });
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground h-7 w-7 shrink-0"
+          title={`Actions for ${environment.name}`}
+          aria-label={`Actions for ${environment.name}`}
+        >
+          <MoreHorizontal className="h-3.5 w-3.5" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onSelect={onEdit}>
+          <Pencil className="h-3.5 w-3.5" />
+          Edit
+        </DropdownMenuItem>
+        {(action.kind === 'build' || action.kind === 'refresh') && (
+          <DropdownMenuItem disabled={control.isPending} onSelect={() => void control.start()}>
+            {action.kind === 'refresh' ? (
+              <RefreshCw className="h-3.5 w-3.5" />
+            ) : (
+              <Hammer className="h-3.5 w-3.5" />
+            )}
+            {action.kind === 'refresh' ? 'Refresh snapshot' : 'Build snapshot'}
+          </DropdownMenuItem>
+        )}
+        {action.kind === 'cancel' && (
+          <DropdownMenuItem
+            disabled={control.isPending}
+            onSelect={() => control.cancel(action.buildId)}
+          >
+            <Square className="h-3.5 w-3.5" />
+            Cancel build
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="destructive" onSelect={onDelete}>
+          <Trash2 className="h-3.5 w-3.5" />
+          Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

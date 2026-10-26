@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { fitsKiloSdkMessagesCursorId, messageIdSchema } from '@kilocode/session-ingest-contracts';
 
 // Session ingest payload.
 // Intentionally minimal validation: enforce only identity fields needed for compaction.
@@ -19,10 +20,24 @@ const RESERVED_IDENTITY_SEGMENTS: Record<string, true> = {
   agent_notification: true,
 };
 
-const identitySegmentSchema = storageKeySegmentSchema.refine(
-  segment => !Object.hasOwn(RESERVED_IDENTITY_SEGMENTS, segment),
-  { message: 'storage key segments must not repeat an item-type root' }
-);
+function isNotReservedIdentitySegment(segment: string): boolean {
+  return !Object.hasOwn(RESERVED_IDENTITY_SEGMENTS, segment);
+}
+
+const identitySegmentSchema = storageKeySegmentSchema.refine(isNotReservedIdentitySegment, {
+  message: 'storage key segments must not repeat an item-type root',
+});
+
+// Message ids are re-emitted as history cursors and already have to satisfy
+// the message id format when history is read, so ingest applies the whole
+// cursor id contract rather than keeping its own.
+const messageStorageKeySegmentSchema = messageIdSchema
+  .refine(fitsKiloSdkMessagesCursorId, {
+    message: 'message ids must fit the message cursor id byte limit',
+  })
+  .refine(isNotReservedIdentitySegment, {
+    message: 'storage key segments must not repeat an item-type root',
+  });
 
 export const SessionItemSchema = z.discriminatedUnion('type', [
   z.object({
@@ -41,7 +56,7 @@ export const SessionItemSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('message'),
     data: z.looseObject({
-      id: identitySegmentSchema,
+      id: messageStorageKeySegmentSchema,
     }),
   }),
   z.object({

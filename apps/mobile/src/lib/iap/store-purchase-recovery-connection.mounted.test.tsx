@@ -136,6 +136,7 @@ describe('StorePurchaseRecoveryMount connection lifecycle', () => {
     const purchase = createPurchase({
       productId: 'credits_usd10',
       store: 'google',
+      storeId: 'play',
       purchaseToken: 'play-token',
     });
     mockedIap.getAvailablePurchases.mockImplementation(async () => {

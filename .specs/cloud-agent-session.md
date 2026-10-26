@@ -36,6 +36,9 @@ they appear in all capitals, as shown here.
 - **Repository environment**: an optional saved setup for one repository --
   setup commands, plaintext variables, secrets, and a sandbox size -- distinct
   from the sandbox Environment. An owner has at most one per repository.
+- **Environment snapshot**: a prepared copy of a repository environment's
+  default branch after its saved setup, built from the base image on request
+  or for a session, that later sessions of that environment start from.
 - **Worktree**: a group of independent browser chats that share the same
   checked-out repository files while their environment exists.
 - **Preparation**: visible setup of that environment -- clone, branch, setup
@@ -112,7 +115,7 @@ repository.
    setup command's output.
 2. Steps the user MUST be able to see when they run: cloning the repository,
    using a prepared repository, checking out the branch, restoring a previous
-   workspace, running setup commands, saving the repository for faster starts.
+   workspace, running setup commands.
 3. Preparation that only acquired and booted an environment -- warm reuse, no
    real provisioning -- MUST NOT leave a completed preparation row.
 4. Running and failed preparation MUST always be visible. Failed preparation,
@@ -132,6 +135,38 @@ repository.
    when the session is writable and its
    transport permits sending. A later submission MUST use fresh message and
    preparation-attempt identities.
+
+### Environment snapshots
+
+1. A session MUST NOT save its workspace as a snapshot. Only an environment
+   build MAY create an environment snapshot.
+2. A session that uses a repository environment MAY start from that
+   environment's published snapshot when the owner, repository, sandbox image
+   and runtime match and the snapshot revision is not newer than the
+   session's configuration revision. Otherwise, and when the lookup is unavailable, it MUST start from
+   the base image. The lookup MUST NOT delay the start by more than 15 seconds
+   and MUST NOT wait for a build.
+3. A session that starts from a snapshot MUST still run setup with the
+   configuration admitted for that session. Cached files MAY retain earlier
+   values, including secrets.
+4. When a session starts from an older snapshot revision, preparation MUST
+   show the snapshot revision, the session's revision, and the actual
+   replacement build status, including a skipped build or backoff.
+5. If a snapshot start fails, the session MUST start once from the base image
+   within the same preparation deadline.
+6. A snapshot MUST NOT contain git or build credentials, reflogs, or a Kilo
+   home.
+7. Organization managers and personal owners MAY build, refresh, or cancel a
+   build and read its redacted log. Members MAY read the build status only. A
+   build MUST use saved settings only; the UI MUST require saving first.
+8. A build whose revision changes before publication MUST NOT publish. A
+   failed refresh MUST NOT remove the previous snapshot. Deleting the
+   environment MUST cancel its builds.
+9. Automatic builds started by sessions MUST back off after repeated failures
+   of one revision. A manual build MUST stay available during backoff.
+10. Environment, profile, and launch screens MUST show a non-blocking notice
+    that sessions can reuse a snapshot and cached files may retain earlier
+    values. The notice MUST NOT block a save or a launch or show a value.
 
 ### Turn
 
@@ -495,6 +530,12 @@ The following use SHOULD and are not enforced today:
 - Profile setup commands do not run while an environment applies, so a setup
   moved into the environment never runs twice.
 - Saving a sandbox size that the owner cannot use for the repository fails.
+### 2026-10-16 -- Environment snapshots
+
+- Added environment snapshots: built from saved environment settings on the
+  base image, consumed by sessions of the same environment and an equal or
+  newer revision, with a bounded lookup and one fresh fallback.
+- Removed session capture and the "saving the repository" preparation step.
 
 ### 2026-10-07 -- Repository environments
 

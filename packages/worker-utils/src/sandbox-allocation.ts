@@ -51,7 +51,7 @@ const cloudflareAllocationRequestSchema = z
 
 const vercelAllocationRequestSchema = z
   .object({
-    provider: z.object({ id: z.literal('vercel'), account: z.enum(['kilo', 'byoc']) }).strict(),
+    provider: z.object({ id: z.literal('vercel'), account: z.literal('byoc') }).strict(),
     instanceType: z.enum(['small', 'large']),
   })
   .strict();
@@ -113,11 +113,11 @@ const allocationRequests = {
     instanceType: 'standard-4',
   },
   'vercel-small': {
-    provider: { id: 'vercel', account: 'kilo' },
+    provider: { id: 'vercel', account: 'byoc' },
     instanceType: 'small',
   },
   'vercel-large': {
-    provider: { id: 'vercel', account: 'kilo' },
+    provider: { id: 'vercel', account: 'byoc' },
     instanceType: 'large',
   },
 } as const satisfies Record<SandboxAllocation, SandboxAllocationRequest>;
@@ -136,7 +136,7 @@ export function getSandboxAllocationKey(
   return `${allocation.provider.id}:${allocation.provider.account}:${allocation.instanceType}`;
 }
 
-export function getKiloSandboxAllocation(
+export function getSandboxAllocation(
   request: SandboxAllocationRequest
 ): SandboxAllocation | undefined {
   const key = getSandboxAllocationKey(request);
@@ -261,7 +261,7 @@ export function isSandboxAllocationAvailable(
       allocation === 'cloudflare-single' ||
       capabilities.options.some(
         option =>
-          getKiloSandboxAllocation(option.allocation) === allocation &&
+          getSandboxAllocation(option.allocation) === allocation &&
           option.unavailableReason === undefined &&
           option.repositoryUnavailableReason === undefined
       ))

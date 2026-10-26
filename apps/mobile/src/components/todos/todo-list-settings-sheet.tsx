@@ -10,7 +10,6 @@ import { RepoSelector } from '@/components/agents/repo-selector';
 import { PickerSheet } from '@/components/picker-sheet';
 import { NameField } from '@/components/todos/list-settings-name-field';
 import { ListSettingsPendingSheet } from '@/components/todos/list-settings-pending-sheet';
-import { QueryError } from '@/components/query-error';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Input } from '@/components/ui/input';
@@ -175,7 +174,6 @@ function ListSettingsForm({ list, organizationId, afterCreate }: Readonly<ListSe
                 onSubmitEditing={() => {
                   void save();
                 }}
-                returnKeyType="done"
                 maxLength={TODO_LIST_NAME_MAX_LENGTH}
                 placeholder={t('todos.listSettings.namePlaceholder')}
                 accessibilityLabel={t('todos.listSettings.name')}

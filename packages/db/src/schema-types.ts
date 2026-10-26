@@ -896,6 +896,9 @@ export const AdminActionAuditAction = z.enum([
   'organization.gitlab_webhook_secret.rotate',
   'organization.bitbucket.update',
   'organization.webhook_session.share',
+  'credit_campaign.create',
+  'credit_campaign.update',
+  'credit_campaign.set_active',
 ]);
 
 export type AdminActionAuditAction = z.infer<typeof AdminActionAuditAction>;
@@ -1272,6 +1275,7 @@ export const AuditLogAction = z.enum([
   'organization.mode.create', // ✅
   'organization.mode.update', // ✅
   'organization.mode.delete', // ✅
+  'organization.webhook_trigger.update',
   'organization.group.create',
   'organization.group.update',
   'organization.group.delete',
@@ -1339,23 +1343,6 @@ export const REVIEW_MEMORY_PROPOSAL_STATUSES = [
 export type ReviewMemoryProposalStatus = (typeof REVIEW_MEMORY_PROPOSAL_STATUSES)[number];
 
 export type ReviewMemoryEvidenceItem = { excerpt: string; prNumber: number | null };
-
-// --- Deployment types ---
-
-export const providerSchema = z.enum(['github', 'git', 'app-builder']);
-
-export type Provider = z.infer<typeof providerSchema>;
-
-export const buildStatusSchema = z.enum([
-  'queued',
-  'building',
-  'deploying',
-  'deployed',
-  'failed',
-  'cancelled',
-]);
-
-export type BuildStatus = z.infer<typeof buildStatusSchema>;
 
 // --- Code Reviewer analytics ---
 
@@ -2200,10 +2187,13 @@ export type DirectByokModelFlag = z.infer<typeof DirectByokModelFlagSchema>;
 export const DirectByokModelSchema = z.object({
   id: z.string(),
   name: z.string(),
+  description: z.string().optional(),
   flags: z.array(DirectByokModelFlagSchema).readonly().optional(),
   context_length: z.number(),
   max_completion_tokens: z.number(),
   reasoning_options: z.array(ReasoningOptionSchema).optional(),
+  /** The OpenRouter catalog model ID that models.dev identifies as the same model. */
+  catalog_model_id: z.string().optional(),
 });
 
 export const DirectByokModelArraySchema = z.array(DirectByokModelSchema);
@@ -2331,16 +2321,6 @@ export const CustomLlmCredentialsSchema = z.discriminatedUnion('type', [
 
 export type CustomLlmCredentials = z.infer<typeof CustomLlmCredentialsSchema>;
 
-export const CustomLlmDefinitionSchema = z.object({
-  ...CustomLlmMetadataSchema.shape,
-  ...CustomLlmApiConfigSchema.shape,
-  display_name: z.string(),
-  organization_ids: z.array(z.uuid()),
-  group_ids: z.array(z.uuid()).optional(),
-});
-
-export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
-
 export const GatewayModelIdSchema = z
   .string()
   .trim()
@@ -2356,6 +2336,51 @@ export const CustomLlmPublicIdSchema = GatewayModelIdSchema.refine(
 ).refine(id => !RESERVED_CUSTOM_LLM_PUBLIC_ID_PREFIXES.some(prefix => id.startsWith(prefix)), {
   message: `public_id must not start with ${RESERVED_CUSTOM_LLM_PUBLIC_ID_PREFIXES.join(', ')}`,
 });
+
+export const CustomLlmInferenceProviderSlugSchema = z
+  .string()
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'must be a lowercase provider slug such as "acme-ai"');
+
+/**
+ * Makes a custom LLM available to every user, including anonymous ones. Like
+ * every custom LLM it is free; unlike private ones it is subject to
+ * organization provider allow lists.
+ */
+export const CustomLlmPublicSchema = z.object({
+  /** Provider slugs the upstream may serve this model from. They are listed in
+   * the models-by-provider snapshot and enforced against provider allow lists.
+   * A slug that OpenRouter does not know becomes a synthesized provider. */
+  inference_providers: z.array(CustomLlmInferenceProviderSlugSchema).min(1),
+  /** Shown in model pickers instead of the private custom LLM disclaimer. */
+  description: z.string().trim().min(1),
+});
+
+export type CustomLlmPublic = z.infer<typeof CustomLlmPublicSchema>;
+
+export const CustomLlmDefinitionSchema = z
+  .object({
+    ...CustomLlmMetadataSchema.shape,
+    ...CustomLlmApiConfigSchema.shape,
+    display_name: z.string(),
+    /** Without organization or group grants, a private custom LLM is stored but reachable by nobody. */
+    organization_ids: z.array(z.uuid()).optional(),
+    group_ids: z.array(z.uuid()).optional(),
+    public: CustomLlmPublicSchema.optional(),
+  })
+  .superRefine((definition, ctx) => {
+    if (!definition.public) return;
+    for (const key of ['organization_ids', 'group_ids'] as const) {
+      if (definition[key] !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [key],
+          message: `${key} must not be set when public is set`,
+        });
+      }
+    }
+  });
+
+export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 
 export const AutoFreeModelSchema = z.object({
   model: GatewayModelIdSchema,
@@ -2434,6 +2459,74 @@ export const VercelModelIdOverridesConfigSchema = z.object({
 });
 
 export type VercelModelIdOverridesConfig = z.infer<typeof VercelModelIdOverridesConfigSchema>;
+
+export const PREFERRED_PROVIDER_ORDER_MAX_RULES = 200;
+export const PREFERRED_PROVIDER_ORDER_MAX_PROVIDERS = 20;
+
+/** An OpenRouter provider slug, optionally with an endpoint variant such as `minimax/fp8`. */
+export const PreferredProviderSlugSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^[a-z0-9.-]+(\/[a-z0-9.-]+)?$/,
+    'Provider slugs may only contain lowercase letters, digits, . and -, with at most one /'
+  );
+
+const PreferredProviderOrderSubstringSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^[a-z0-9./:~-]+$/,
+    'Substrings may only contain lowercase letters, digits, and . / : ~ -'
+  );
+
+function uniqueStringArray<T extends z.ZodString>(item: T, label: string) {
+  return z.array(item).superRefine((values, ctx) => {
+    const seen = new Set<string>();
+    for (const [index, value] of values.entries()) {
+      if (seen.has(value)) {
+        ctx.addIssue({ code: 'custom', message: `Duplicate ${label} "${value}"`, path: [index] });
+      }
+      seen.add(value);
+    }
+  });
+}
+
+/**
+ * Matches a model ID that contains at least one `includes` substring and no
+ * `excludes` substring.
+ */
+export const PreferredProviderOrderRuleSchema = z
+  .object({
+    includes: uniqueStringArray(PreferredProviderOrderSubstringSchema, 'substring').min(1),
+    excludes: uniqueStringArray(PreferredProviderOrderSubstringSchema, 'substring').optional(),
+    providers: uniqueStringArray(PreferredProviderSlugSchema, 'provider')
+      .min(1)
+      .max(PREFERRED_PROVIDER_ORDER_MAX_PROVIDERS),
+  })
+  .superRefine(({ includes, excludes }, ctx) => {
+    for (const [index, exclude] of (excludes ?? []).entries()) {
+      if (includes.includes(exclude)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `"${exclude}" is both included and excluded`,
+          path: ['excludes', index],
+        });
+      }
+    }
+  });
+
+export type PreferredProviderOrderRule = z.infer<typeof PreferredProviderOrderRuleSchema>;
+
+/**
+ * Ordered rules: the first matching rule decides the provider order. Stored as
+ * an array because jsonb does not keep object key order.
+ */
+export const PreferredProviderOrderConfigSchema = z.object({
+  rules: z.array(PreferredProviderOrderRuleSchema).max(PREFERRED_PROVIDER_ORDER_MAX_RULES),
+});
+
+export type PreferredProviderOrderConfig = z.infer<typeof PreferredProviderOrderConfigSchema>;
 
 // --- StoredModel ---
 

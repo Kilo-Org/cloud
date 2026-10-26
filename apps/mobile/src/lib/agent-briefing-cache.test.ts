@@ -65,6 +65,9 @@ const deniedListKey = [
 function report(id: string, organizationId: string | null): BriefingReport {
   return {
     id,
+    kind: 'scheduled',
+    createdAt: '2026-10-15T08:00:00Z',
+    timezone: 'UTC',
     context: {
       id: organizationId ?? 'personal',
       organizationId,
@@ -211,6 +214,53 @@ describe('scoped briefing cache access loss', () => {
     expect(storage.values.get(diskKey)).toBe('existing-offline-cache');
     expect(storage.setItem).not.toHaveBeenCalled();
     expect(storage.removeItem).not.toHaveBeenCalled();
+    client.clear();
+  });
+
+  it('removes inaccessible preparation results and prunes every page of unconfirmed drafts', async () => {
+    const client = clientWithReports([]);
+    const preparationKey = [
+      ['agentBriefing', 'oneOffPreparation'],
+      { type: 'query', input: { reportId: 'denied' } },
+    ] as const;
+    const draftsKey = [
+      ['agentBriefing', 'oneOffDrafts'],
+      { type: 'infinite', input: { limit: 20 } },
+    ] as const;
+    const allowed = {
+      id: 'allowed',
+      context: { id: 'personal', organizationId: null, name: 'Personal' },
+    };
+    const denied = {
+      id: 'denied',
+      context: { id: 'denied', organizationId: 'denied', name: 'Denied' },
+    };
+    client.setQueryData(preparationKey, {
+      draft: denied,
+      prepared: { report: report('denied', 'denied'), estimate: { estimateToken: 'private' } },
+    });
+    client.setQueryData(draftsKey, {
+      pages: [
+        { drafts: [denied, allowed], nextCursor: 'cursor' },
+        { drafts: [denied], nextCursor: null },
+      ],
+      pageParams: [undefined, 'cursor'],
+    });
+    await expect(
+      purgeInaccessibleBriefingCache(
+        client,
+        { userId: 'user-1', authEpoch: currentAuthEpoch() },
+        []
+      )
+    ).resolves.toBe(true);
+    expect(client.getQueryData(preparationKey)).toBeUndefined();
+    expect(client.getQueryData(draftsKey)).toEqual({
+      pages: [
+        { drafts: [allowed], nextCursor: 'cursor' },
+        { drafts: [], nextCursor: null },
+      ],
+      pageParams: [undefined, 'cursor'],
+    });
     client.clear();
   });
 

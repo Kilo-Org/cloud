@@ -1,8 +1,6 @@
 import { containedKiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
-import { kiloTokenPayload } from '@kilocode/worker-utils/kilo-token';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
-import { resolveSecret } from '../auth.js';
 import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import { deriveKiloSandboxTargets, type KiloTargetEnv } from '../kilo/kilo-targets.js';
 import {
@@ -17,7 +15,6 @@ import {
   issueCloudAgentBitbucketSessionCapability,
   issueCloudAgentGitHubSessionCapability,
   issueCloudAgentGitLabSessionCapability,
-  issueCloudAgentKiloSessionCapability,
   authorizeCloudAgentGitHubRepo,
   resolveCloudAgentGitHubAuthForRepo,
   resolveManagedGitLabToken,
@@ -30,6 +27,7 @@ import {
   runtimeCredentialProxyFacadeBaseUrl,
 } from '../runtime-credential-proxy.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../shared/runtime-environment.js';
+import { SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE } from '../shared/credential-upgrade.js';
 import type { GitHubReviewTarget } from '../shared/github-review-target.js';
 import type {
   ControlPlaneCredentialRepository,
@@ -46,25 +44,11 @@ import {
 } from '../types.js';
 import { brokerGrantFailure, type GrantDiagnostic } from './grant-diagnostic.js';
 import { createControlPlaneCredential, parseControlPlaneCredential } from './managed-credential.js';
-import {
-  buildKiloCredentialInjectionRules,
-  buildVercelCredentialNetworkPolicy,
-  findMatchingCredentialInjectionRule,
-} from './vercel-network-policy.js';
+import { buildVercelCredentialNetworkPolicy } from './vercel-network-policy.js';
 
 const WORKTREE_LEASE_MS = 4 * 60 * 60 * 1000;
 const CAPABILITY_CACHE_MS = 3 * 60 * 60 * 1000;
 const timestampSchema = z.number().int().nonnegative();
-const KILO_TOKEN_REFRESH_MARGIN_MS = 60 * 1000;
-const cloudAgentTokenSchema = kiloTokenPayload
-  .pick({ version: true, kiloUserId: true, env: true })
-  .extend({
-    apiTokenPepper: z.string().nullable(),
-    tokenSource: z.literal('cloud-agent'),
-    iat: timestampSchema,
-    exp: timestampSchema,
-  })
-  .strict();
 const tokenSchema = z
   .string()
   .min(1)
@@ -175,7 +159,7 @@ const scmSchema = z
   })
   .strict();
 
-export const sessionCredentialGrantSchema = z
+const sessionCredentialGrantShape = z
   .object({
     version: z.literal(1),
     containmentEnabled: z.boolean().optional(),
@@ -218,127 +202,149 @@ export const sessionCredentialGrantSchema = z
     preparedAt: timestampSchema,
     expiresAt: timestampSchema,
   })
-  .strict()
-  .superRefine((grant, context) => {
-    const reject = () => context.addIssue({ code: 'custom', message: 'Invalid credential grant' });
+  .strict();
+
+function refinePersistedSessionCredentialGrant(
+  grant: z.infer<typeof sessionCredentialGrantShape>,
+  context: z.RefinementCtx
+): void {
+  const reject = () => context.addIssue({ code: 'custom', message: 'Invalid credential grant' });
+  if (
+    grant.expiresAt <= grant.preparedAt ||
+    grant.expiresAt - grant.preparedAt > WORKTREE_LEASE_MS ||
+    (grant.kilo.tokenSelectedAt !== undefined && grant.kilo.tokenSelectedAt > grant.preparedAt) ||
+    new Set(grant.members.map(member => member.sessionId)).size !== grant.members.length ||
+    new Set(grant.members.map(member => member.kiloSessionId)).size !== grant.members.length ||
+    (grant.containmentEnabled !== false &&
+      providerUsesOutboundCredentialProxy(grant.provider) &&
+      !grant.outboundContainerId)
+  ) {
+    reject();
+  }
+  if (grant.containmentEnabled === false) {
+    // A direct grant may only carry the session-bound runtime proxy. Without
+    // containment there is no outbound broker boundary for a Kilo capability,
+    // and a native user token must never be projected into a sandbox.
+    const legacyDirect =
+      grant.kilo.alias === undefined &&
+      grant.kilo.runtimeProxy === undefined &&
+      Object.keys(grant.kilo.capabilities).length === 0;
     if (
-      grant.expiresAt <= grant.preparedAt ||
-      grant.expiresAt - grant.preparedAt > WORKTREE_LEASE_MS ||
-      (grant.kilo.tokenSelectedAt !== undefined && grant.kilo.tokenSelectedAt > grant.preparedAt) ||
-      new Set(grant.members.map(member => member.sessionId)).size !== grant.members.length ||
-      new Set(grant.members.map(member => member.kiloSessionId)).size !== grant.members.length ||
-      (grant.containmentEnabled !== false &&
-        providerUsesOutboundCredentialProxy(grant.provider) &&
-        !grant.outboundContainerId)
+      !legacyDirect &&
+      (grant.kilo.alias === undefined ||
+        grant.kilo.runtimeProxy === undefined ||
+        Object.keys(grant.kilo.capabilities).length > 0)
+    )
+      reject();
+  }
+  if (grant.containmentEnabled !== false || grant.kilo.runtimeProxy !== undefined) {
+    const kiloAlias = grant.kilo.alias && parseControlPlaneCredential(grant.kilo.alias);
+    if (!kiloAlias || kiloAlias.sandboxId !== grant.sandboxId || kiloAlias.purpose !== 'kilo') {
+      reject();
+    }
+  }
+  const targets = deriveKiloSandboxTargets(
+    {
+      KILOCODE_BACKEND_BASE_URL: grant.kilo.targets.backendBaseUrl,
+      KILO_OPENROUTER_BASE: grant.kilo.targets.providerBaseUrl,
+      KILO_SESSION_INGEST_URL: grant.kilo.targets.sessionIngestBaseUrl,
+    },
+    grant.kilo.token,
+    { requireHttps: grant.provider === 'vercel' }
+  );
+  if (!targets.success || JSON.stringify(targets.targets) !== JSON.stringify(grant.kilo.targets)) {
+    reject();
+  }
+  for (const [sessionId, capability] of Object.entries(grant.kilo.capabilities)) {
+    if (
+      !grant.members.some(member => member.sessionId === sessionId) ||
+      !capability.credential.startsWith('kka1.') ||
+      !providerUsesOutboundCredentialProxy(grant.provider)
     ) {
       reject();
     }
-    if (grant.containmentEnabled === false) {
-      if (
-        (grant.kilo.alias !== undefined && grant.kilo.runtimeProxy === undefined) ||
-        Object.keys(grant.kilo.capabilities).length > 0
+  }
+  if (grant.kilo.runtimeProxy) {
+    const members = grant.kilo.runtimeProxy.members;
+    if (
+      !deriveRuntimeProxyTargets(grant.kilo.runtimeProxy.targets) ||
+      Object.keys(grant.kilo.capabilities).length > 0 ||
+      new Set(members.map(member => member.sessionId)).size !== members.length ||
+      new Set(members.map(member => member.kiloSessionId)).size !== members.length ||
+      members.some(
+        member =>
+          !grant.members.some(
+            expected =>
+              expected.sessionId === member.sessionId &&
+              expected.kiloSessionId === member.kiloSessionId
+          )
       )
-        reject();
-    }
-    if (grant.containmentEnabled !== false || grant.kilo.runtimeProxy !== undefined) {
-      const kiloAlias = grant.kilo.alias && parseControlPlaneCredential(grant.kilo.alias);
-      if (!kiloAlias || kiloAlias.sandboxId !== grant.sandboxId || kiloAlias.purpose !== 'kilo') {
-        reject();
-      }
-    }
-    const targets = deriveKiloSandboxTargets(
-      {
-        KILOCODE_BACKEND_BASE_URL: grant.kilo.targets.backendBaseUrl,
-        KILO_OPENROUTER_BASE: grant.kilo.targets.providerBaseUrl,
-        KILO_SESSION_INGEST_URL: grant.kilo.targets.sessionIngestBaseUrl,
-      },
-      grant.kilo.token,
-      { requireHttps: grant.provider === 'vercel' }
-    );
-    if (
-      !targets.success ||
-      JSON.stringify(targets.targets) !== JSON.stringify(grant.kilo.targets)
     ) {
       reject();
     }
-    for (const [sessionId, capability] of Object.entries(grant.kilo.capabilities)) {
-      if (
-        !grant.members.some(member => member.sessionId === sessionId) ||
-        !capability.credential.startsWith('kka1.') ||
-        !providerUsesOutboundCredentialProxy(grant.provider)
-      ) {
-        reject();
-      }
-    }
-    if (grant.kilo.runtimeProxy) {
-      const members = grant.kilo.runtimeProxy.members;
-      if (
-        !deriveRuntimeProxyTargets(grant.kilo.runtimeProxy.targets) ||
-        Object.keys(grant.kilo.capabilities).length > 0 ||
-        new Set(members.map(member => member.sessionId)).size !== members.length ||
-        new Set(members.map(member => member.kiloSessionId)).size !== members.length ||
-        members.some(
-          member =>
-            !grant.members.some(
-              expected =>
-                expected.sessionId === member.sessionId &&
-                expected.kiloSessionId === member.kiloSessionId
-            )
-        )
-      ) {
-        reject();
-      }
-    }
-    if (grant.repository && grant.repository.type !== 'git') {
-      if (grant.scm?.purpose !== grant.repository.type) reject();
-    } else if (grant.scm) {
+  }
+  if (grant.repository && grant.repository.type !== 'git') {
+    if (grant.scm?.purpose !== grant.repository.type) reject();
+  } else if (grant.scm) {
+    reject();
+  }
+  if (!grant.scm) return;
+  if (grant.scm.author && grant.scm.purpose !== 'github') reject();
+  if (grant.containmentEnabled === false) {
+    if (
+      grant.scm.alias !== undefined ||
+      grant.scm.capability !== undefined ||
+      !grant.scm.nativeToken ||
+      (grant.scm.purpose === 'gitlab') !== (grant.scm.gitlab !== undefined)
+    ) {
       reject();
     }
-    if (!grant.scm) return;
-    if (grant.scm.author && grant.scm.purpose !== 'github') reject();
-    if (grant.containmentEnabled === false) {
-      if (
-        grant.scm.alias !== undefined ||
-        grant.scm.capability !== undefined ||
-        !grant.scm.nativeToken ||
-        (grant.scm.purpose === 'gitlab') !== (grant.scm.gitlab !== undefined)
-      ) {
-        reject();
-      }
-      return;
-    }
-    const alias = grant.scm.alias && parseControlPlaneCredential(grant.scm.alias);
-    if (!alias || alias.sandboxId !== grant.sandboxId || alias.purpose !== grant.scm.purpose) {
+    return;
+  }
+  const alias = grant.scm.alias && parseControlPlaneCredential(grant.scm.alias);
+  if (!alias || alias.sandboxId !== grant.sandboxId || alias.purpose !== grant.scm.purpose) {
+    reject();
+  }
+  if (grant.provider === 'vercel') {
+    if (
+      grant.scm.purpose !== 'github' ||
+      !grant.scm.nativeToken ||
+      grant.scm.capability ||
+      grant.scm.gitlab
+    ) {
       reject();
     }
-    if (grant.provider === 'vercel') {
-      if (
-        grant.scm.purpose !== 'github' ||
-        !grant.scm.nativeToken ||
-        grant.scm.capability ||
-        grant.scm.gitlab
-      ) {
-        reject();
-      }
-    } else {
-      const prefixes = { github: 'kgh2.', gitlab: 'kgl2.', bitbucket: 'kbb1.' };
-      if (
-        grant.scm.nativeToken ||
-        !grant.scm.capability?.credential.startsWith(prefixes[grant.scm.purpose]) ||
-        (grant.scm.purpose === 'gitlab') !== (grant.scm.gitlab !== undefined) ||
-        (grant.scm.gitlab !== undefined &&
-          (!grant.scm.gitlab.projectPath ||
-            !grant.scm.gitlab.integrationId ||
-            !grant.scm.gitlab.authType ||
-            !grant.scm.gitlab.identity))
-      ) {
-        reject();
-      }
+  } else {
+    const prefixes = { github: 'kgh2.', gitlab: 'kgl2.', bitbucket: 'kbb1.' };
+    if (
+      grant.scm.nativeToken ||
+      !grant.scm.capability?.credential.startsWith(prefixes[grant.scm.purpose]) ||
+      (grant.scm.purpose === 'gitlab') !== (grant.scm.gitlab !== undefined) ||
+      (grant.scm.gitlab !== undefined &&
+        (!grant.scm.gitlab.projectPath ||
+          !grant.scm.gitlab.integrationId ||
+          !grant.scm.gitlab.authType ||
+          !grant.scm.gitlab.identity))
+    ) {
+      reject();
     }
-  });
+  }
+}
+
+/** Old grants remain readable for session inspection and cleanup. */
+export const persistedSessionCredentialGrantSchema = sessionCredentialGrantShape.superRefine(
+  refinePersistedSessionCredentialGrant
+);
+
+export const sessionCredentialGrantSchema = persistedSessionCredentialGrantSchema.superRefine(
+  (grant, context) => {
+    if (!hasRuntimeCredentialProxy(grant)) {
+      context.addIssue({ code: 'custom', message: 'Runtime credential proxy required' });
+    }
+  }
+);
 
 export type SessionCredentialGrant = z.infer<typeof sessionCredentialGrantSchema>;
-type CredentialMember = z.infer<typeof memberSchema>;
 type CredentialRepository = z.infer<typeof repositorySchema>;
 type ScmGrant = z.infer<typeof scmSchema>;
 type CachedCapability = z.infer<typeof capabilitySchema>;
@@ -351,6 +357,13 @@ export function isContainedSessionCredentialGrant(
   grant: SessionCredentialGrant
 ): grant is ContainedSessionCredentialGrant {
   return grant.containmentEnabled !== false;
+}
+
+/** Only modern grants can authorize execution; old grants are cleanup-only. */
+export function hasRuntimeCredentialProxy(grant: SessionCredentialGrant): boolean {
+  return (
+    grant.kilo.runtimeProxy !== undefined && kiloTokenHasRuntimeAuthorization(grant.kilo.token)
+  );
 }
 
 type CredentialEnv = Parameters<typeof getOutboundContainerId>[0] &
@@ -378,8 +391,38 @@ function invalidCredentials(): never {
   throw new Error('Invalid contained worktree credentials');
 }
 
+/**
+ * The session has no modern runtime authorization. Execution requires a new
+ * session; persisted metadata and grants remain available for cleanup.
+ */
+export { SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE };
+
+export class SessionCredentialUpgradeRequiredError extends Error {
+  constructor() {
+    super(SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE);
+    this.name = 'SessionCredentialUpgradeRequiredError';
+  }
+}
+
 function validateGrant(value: unknown, diagnostic?: GrantDiagnostic): SessionCredentialGrant {
   const parsed = sessionCredentialGrantSchema.safeParse(value);
+  if (!parsed.success) {
+    diagnostic?.record({ grantPhase: 'validation', grantFailureReason: 'invalid_grant' });
+    invalidCredentials();
+  }
+  return parsed.data;
+}
+
+/**
+ * Persisted grants may predate the direct containment-off removal. Accept the
+ * readable legacy shape here; callers still deny it before projecting anything
+ * into a sandbox.
+ */
+function validatePersistedGrant(
+  value: unknown,
+  diagnostic?: GrantDiagnostic
+): SessionCredentialGrant {
+  const parsed = persistedSessionCredentialGrantSchema.safeParse(value);
   if (!parsed.success) {
     diagnostic?.record({ grantPhase: 'validation', grantFailureReason: 'invalid_grant' });
     invalidCredentials();
@@ -609,47 +652,6 @@ function isCapabilityCurrent(
   );
 }
 
-async function refreshKiloCapability(
-  env: CredentialEnv,
-  grant: SessionCredentialGrant,
-  member: CredentialMember,
-  outboundContainerId: string,
-  now: number,
-  diagnostic?: GrantDiagnostic
-): Promise<SessionCredentialGrant> {
-  if (isCapabilityCurrent(grant.kilo.capabilities[member.sessionId], outboundContainerId, now)) {
-    return grant;
-  }
-  const issued = await issueCloudAgentKiloSessionCapability(env, {
-    userId: grant.userId,
-    cloudAgentSessionId: member.sessionId,
-    kiloSessionId: member.kiloSessionId,
-    outboundContainerId,
-    userToken: grant.kilo.token,
-    targets: grant.kilo.targets,
-  });
-  if (!issued.success) {
-    diagnostic?.record(brokerGrantFailure('broker_issuance', issued.error.reason));
-    throw new Error('Kilo capability issuance is unavailable');
-  }
-  return {
-    ...grant,
-    kilo: {
-      ...grant.kilo,
-      capabilities: {
-        ...grant.kilo.capabilities,
-        [member.sessionId]: cachedCapability(
-          issued.value.capability,
-          'kka1.',
-          outboundContainerId,
-          now,
-          diagnostic
-        ),
-      },
-    },
-  };
-}
-
 async function refreshScmCapability(
   env: CredentialEnv,
   grant: SessionCredentialGrant,
@@ -785,62 +787,6 @@ async function refreshScmCapability(
   return { ...grant, scm };
 }
 
-async function selectDirectKiloToken(
-  env: CredentialEnv,
-  token: string,
-  existing: SessionCredentialGrant | undefined,
-  now: number,
-  diagnostic?: GrantDiagnostic
-): Promise<string> {
-  const decoded = jwt.decode(token);
-  if (decoded !== null && typeof decoded === 'object') {
-    if ('runtimeAdmission' in decoded) {
-      diagnostic?.record({ grantPhase: 'validation', grantFailureReason: 'direct_token_rejected' });
-      invalidCredentials();
-    }
-    if ('runtimeAuthorization' in decoded) {
-      diagnostic?.record({ grantPhase: 'validation', grantFailureReason: 'direct_token_rejected' });
-      invalidCredentials();
-    }
-    if ('aud' in decoded || 'tokenPurpose' in decoded || 'credentialExchange' in decoded) {
-      diagnostic?.record({ grantPhase: 'validation', grantFailureReason: 'direct_token_rejected' });
-      invalidCredentials();
-    }
-  }
-  if (
-    !existing ||
-    existing.kilo.token === token ||
-    existing.expiresAt <= now ||
-    now >= (existing.kilo.tokenSelectedAt ?? existing.preparedAt) + WORKTREE_LEASE_MS
-  ) {
-    return token;
-  }
-  const secret = await resolveSecret(env.NEXTAUTH_SECRET);
-  if (!secret) return token;
-  try {
-    const options: jwt.VerifyOptions = { algorithms: ['HS256'], clockTimestamp: now / 1000 };
-    const current = cloudAgentTokenSchema.parse(jwt.verify(existing.kilo.token, secret, options));
-    const incoming = cloudAgentTokenSchema.parse(jwt.verify(token, secret, options));
-    if (
-      current.kiloUserId !== existing.userId ||
-      current.iat * 1000 > now ||
-      incoming.iat * 1000 > now ||
-      current.exp <= current.iat ||
-      incoming.exp <= incoming.iat ||
-      current.exp * 1000 <= now + KILO_TOKEN_REFRESH_MARGIN_MS
-    ) {
-      return token;
-    }
-    const authorization = cloudAgentTokenSchema.omit({ iat: true, exp: true }).strip();
-    return JSON.stringify(authorization.parse(current)) ===
-      JSON.stringify(authorization.parse(incoming))
-      ? existing.kilo.token
-      : token;
-  } catch {
-    return token;
-  }
-}
-
 /**
  * The environment key names the grant projection in `preparedPayload` owns. The
  * frame builder restores any of these that the pre-overlay spec already carried
@@ -879,10 +825,8 @@ function preparedPayload(input: {
   // token. The emitted `git` comes only from the issued grant below (B3 review 2, N3).
   const { git: _inputGit, ...payloadWithoutGit } = payload;
   const contained = isContainedSessionCredentialGrant(grant);
-  const kiloToken =
-    contained || grant.kilo.runtimeProxy
-      ? (grant.kilo.alias ?? invalidCredentials())
-      : grant.kilo.token;
+  if (!hasRuntimeCredentialProxy(grant)) throw new SessionCredentialUpgradeRequiredError();
+  const kiloToken = grant.kilo.alias ?? invalidCredentials();
   const scmToken = contained ? grant.scm?.alias : grant.scm?.nativeToken;
   let githubReviewTarget: GitHubReviewTarget | undefined;
   const reviewRepository = input.source.repository;
@@ -1159,23 +1103,6 @@ export function kiloTokenHasRuntimeAuthorization(token: string): boolean {
   );
 }
 
-function sameKiloBackingAuthorization(first: string, second: string): boolean {
-  if (first === second) return true;
-  const authorization = (token: string) => {
-    const decoded = jwt.decode(token);
-    if (decoded === null || typeof decoded !== 'object') return null;
-    return JSON.stringify(
-      Object.fromEntries(
-        Object.entries(decoded)
-          .filter(([key]) => key !== 'iat' && key !== 'exp')
-          .sort(([a], [b]) => a.localeCompare(b))
-      )
-    );
-  };
-  const firstAuthorization = authorization(first);
-  return firstAuthorization !== null && firstAuthorization === authorization(second);
-}
-
 /**
  * The metadata-free grant core. Both the legacy `prepareSessionCredentials`
  * (below) and the V2 Sandbox DO feed it the same minimal inputs, so issuance,
@@ -1227,6 +1154,13 @@ export async function prepareCredentialGrant(
     });
     invalidCredentials();
   }
+  const modernRuntimeAuthorization = kiloTokenHasRuntimeAuthorization(token.data);
+  diagnostic?.fact({
+    tokenClass: modernRuntimeAuthorization ? 'runtime_authorized' : 'legacy',
+  });
+  if (!modernRuntimeAuthorization) {
+    throw new SessionCredentialUpgradeRequiredError();
+  }
   const provider = input.provider;
   const containmentEnabled = input.containmentEnabled;
   const targets = deriveKiloSandboxTargets(env, token.data, {
@@ -1237,7 +1171,10 @@ export async function prepareCredentialGrant(
     invalidCredentials();
   }
   const existing =
-    input.existing === undefined ? undefined : validateGrant(input.existing, diagnostic);
+    input.existing === undefined ? undefined : validatePersistedGrant(input.existing, diagnostic);
+  if (existing && !hasRuntimeCredentialProxy(existing)) {
+    throw new SessionCredentialUpgradeRequiredError();
+  }
   const directory = input.directory;
   if (!directory) {
     diagnostic?.record({ grantPhase: 'validation', grantFailureReason: 'invalid_directory' });
@@ -1298,34 +1235,15 @@ export async function prepareCredentialGrant(
     });
     invalidCredentials();
   }
-  const modernRuntimeAuthorization = kiloTokenHasRuntimeAuthorization(token.data);
-  diagnostic?.fact({
-    tokenClass: modernRuntimeAuthorization ? 'runtime_authorized' : 'legacy',
-  });
-  if (
-    existing &&
-    ((existing.kilo.runtimeProxy !== undefined) !== modernRuntimeAuthorization ||
-      (!modernRuntimeAuthorization &&
-        !sameKiloBackingAuthorization(existing.kilo.token, token.data)))
-  ) {
-    diagnostic?.record({
-      grantPhase: 'compatibility',
-      grantFailureReason: 'backing_authorization_mismatch',
-    });
-    invalidCredentials();
-  }
-  const modernRuntimeProxy = modernRuntimeAuthorization ? runtimeProxyTargets(env) : null;
-  if (modernRuntimeAuthorization && !modernRuntimeProxy) {
+  const modernRuntimeProxy = runtimeProxyTargets(env);
+  if (!modernRuntimeProxy) {
     diagnostic?.record({
       grantPhase: 'configuration',
       grantFailureReason: 'runtime_proxy_targets_unavailable',
     });
     invalidCredentials();
   }
-  const kiloToken =
-    containmentEnabled || modernRuntimeProxy
-      ? token.data
-      : await selectDirectKiloToken(env, token.data, existing, now, diagnostic);
+  const kiloToken = token.data;
   let grant: SessionCredentialGrant = {
     version: 1,
     ...(!containmentEnabled ? { containmentEnabled: false as const } : {}),
@@ -1341,31 +1259,14 @@ export async function prepareCredentialGrant(
       : [...members, member.data],
     ...(repository ? { repository } : {}),
     kilo: {
-      ...(containmentEnabled || modernRuntimeProxy
-        ? { alias: existing?.kilo.alias ?? createControlPlaneCredential(sandboxId, 'kilo') }
-        : {}),
+      alias: existing?.kilo.alias ?? createControlPlaneCredential(sandboxId, 'kilo'),
       token: kiloToken,
-      ...(!containmentEnabled
-        ? {
-            tokenSelectedAt:
-              existing?.kilo.token === kiloToken
-                ? (existing.kilo.tokenSelectedAt ?? existing.preparedAt)
-                : now,
-          }
-        : {}),
       targets: targets.targets,
-      ...(modernRuntimeProxy
-        ? {
-            runtimeProxy: {
-              targets: modernRuntimeProxy,
-              members: existing?.kilo.runtimeProxy?.members ?? [],
-            },
-          }
-        : {}),
-      capabilities:
-        !input.refreshBacking && !modernRuntimeProxy && existing?.kilo.token === kiloToken
-          ? existing.kilo.capabilities
-          : {},
+      runtimeProxy: {
+        targets: modernRuntimeProxy,
+        members: existing?.kilo.runtimeProxy?.members ?? [],
+      },
+      capabilities: {},
     },
     ...(existing?.scm ? { scm: existing.scm } : {}),
     preparedAt: now,
@@ -1384,16 +1285,6 @@ export async function prepareCredentialGrant(
         grantFailureReason: 'outbound_container_unavailable',
       });
       invalidCredentials();
-    }
-    if (!modernRuntimeProxy) {
-      grant = await refreshKiloCapability(
-        env,
-        grant,
-        member.data,
-        outboundContainerId,
-        now,
-        diagnostic
-      );
     }
     grant = await refreshScmCapability(
       env,
@@ -1437,18 +1328,6 @@ export async function prepareCredentialGrant(
     };
   }
   if (provider === 'vercel') buildControlNetworkPolicy([grant]);
-  else {
-    buildKiloCredentialInjectionRules(
-      {
-        token: grant.kilo.token,
-        placeholder: grant.kilo.alias,
-        targets: grant.kilo.targets,
-        rootSessionIds: grant.members.map(current => current.kiloSessionId),
-        organizationId: grant.orgId,
-      },
-      { requireHttps: false }
-    );
-  }
   return {
     grant,
     payload: preparedPayload({
@@ -1606,10 +1485,8 @@ export function sessionCredentialsPayloadFromGrant(
   };
 } {
   const contained = isContainedSessionCredentialGrant(grant);
-  const kiloToken =
-    contained || grant.kilo.runtimeProxy
-      ? (grant.kilo.alias ?? invalidCredentials())
-      : grant.kilo.token;
+  if (!hasRuntimeCredentialProxy(grant)) throw new SessionCredentialUpgradeRequiredError();
+  const kiloToken = grant.kilo.alias ?? invalidCredentials();
   const scmToken = contained ? grant.scm?.alias : grant.scm?.nativeToken;
   // The runtime credential proxy facade and the route's handle (the scope's
   // shared canonical handle for an adopted worktree scope, or a per-session one
@@ -1748,66 +1625,18 @@ export async function resolveSessionCredential(input: {
   ) {
     return null;
   }
-  const expected = alias.purpose === 'kilo' ? grant.kilo.alias : grant.scm?.alias;
   if (
-    input.credential !== expected ||
-    (alias.purpose !== 'kilo' && alias.purpose !== grant.scm?.purpose)
+    alias.purpose === 'kilo' ||
+    input.credential !== grant.scm?.alias ||
+    alias.purpose !== grant.scm?.purpose
   ) {
     return null;
   }
   const url = safeUrl(input.url);
-  if (!url) return null;
+  if (!url || url.protocol !== 'https:') return null;
   try {
-    if (alias.purpose !== 'kilo') {
-      if (url.protocol !== 'https:') return null;
-      grant = await refreshScmCapability(input.env, grant, input.outboundContainerId, now);
-      return grant.scm?.capability ? { grant, credential: grant.scm.capability.credential } : null;
-    }
-    if (grant.kilo.runtimeProxy) return null;
-    if (!Object.values(grant.kilo.targets).some(target => new URL(target).origin === url.origin)) {
-      return null;
-    }
-    const rules = buildKiloCredentialInjectionRules(
-      {
-        token: grant.kilo.token,
-        placeholder: grant.kilo.alias,
-        targets: grant.kilo.targets,
-        rootSessionIds: grant.members.map(member => member.kiloSessionId),
-        organizationId: grant.orgId,
-      },
-      { requireHttps: false }
-    );
-    const rule = findMatchingCredentialInjectionRule(rules, {
-      url,
-      method: input.method,
-      headers: new Headers({ authorization: `Bearer ${input.credential}` }),
-    });
-    if (
-      rule?.headers.authorization !== `Bearer ${grant.kilo.token}` ||
-      rule.headers.host !== url.host
-    ) {
-      return null;
-    }
-    const ingest = new URL(grant.kilo.targets.sessionIngestBaseUrl);
-    const member =
-      grant.members.find(
-        current =>
-          url.origin === ingest.origin &&
-          (url.pathname ===
-            `${ingest.pathname.replace(/\/+$/, '')}/api/session/${current.kiloSessionId}/export` ||
-            url.pathname ===
-              `${ingest.pathname.replace(/\/+$/, '')}/api/session/${current.kiloSessionId}/ingest`)
-      ) ?? grant.members[0];
-    if (!member) return null;
-    grant = await refreshKiloCapability(input.env, grant, member, input.outboundContainerId, now);
-    const capability = grant.kilo.capabilities[member.sessionId];
-    return capability
-      ? {
-          grant,
-          credential: capability.credential,
-          ...(grant.orgId ? { organizationId: grant.orgId } : {}),
-        }
-      : null;
+    grant = await refreshScmCapability(input.env, grant, input.outboundContainerId, now);
+    return grant.scm?.capability ? { grant, credential: grant.scm.capability.credential } : null;
   } catch {
     return null;
   }

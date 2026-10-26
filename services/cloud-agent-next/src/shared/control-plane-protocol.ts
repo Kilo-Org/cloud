@@ -1,3 +1,4 @@
+import { setupCommandsSchema } from './setup-script.js';
 import {
   RuntimeSkillsSchema,
   RuntimeAgentsSchema,
@@ -103,6 +104,7 @@ export type ControlPlaneSetupEvent = z.infer<typeof controlPlaneSetupEventSchema
 export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'preparation_timeout',
   'workspace_setup_failed',
+  'credential_upgrade_required',
   'agent_unavailable',
   'billing_blocked',
   'billing_unavailable',
@@ -316,7 +318,7 @@ export const controlPlaneRouteSpecSchema = z
      * only the encrypted envelopes.
      */
     mcp: sessionAttachMcpServersSchema.optional(),
-    setupCommands: z.array(z.string().max(500)).max(20).optional(),
+    setupCommands: setupCommandsSchema.optional(),
     runtimeSkills: RuntimeSkillsSchema.optional(),
     runtimeAgents: RuntimeAgentsSchema.optional(),
     kiloCommands: RuntimeKiloCommandsSchema.optional(),
@@ -990,10 +992,7 @@ const controlPlaneWorktreeResultFrameSchema = z.discriminatedUnion('ok', [
 
 /**
  * Worktree-deletion payload (R2, spec §6 "Billing, credentials and deletion").
- * Same contract the legacy plane sends for `worktree.prepareDeletion` and
- * `worktree.delete` (`worktreeDeletePayloadSchema`), so the wrapper can reuse
- * `control/delete-worktree.ts` unchanged. Both requests answer with the shared
- * `worktree.result` frame.
+ * Both deletion requests answer with the shared `worktree.result` frame.
  */
 export const controlPlaneWorktreeDeletionPayloadSchema = z
   .object({

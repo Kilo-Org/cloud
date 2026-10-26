@@ -102,16 +102,18 @@ export type SearchRestoreDecision = {
 
 /**
  * Decides whether a restored search draft should seed the input. Seeds only
- * after the load settles AND only when the user has not typed yet. A settled
- * empty value (including the empty string persisted by a clear) seeds an empty
- * query, so a previously committed non-empty query is never reloaded.
+ * after the load settles AND only when the user has not touched the field yet
+ * (typed into it, or cleared it). A settled empty value (including the empty
+ * string persisted by a clear) seeds an empty query, so a previously committed
+ * non-empty query is never reloaded; a settle that lands after a clear is
+ * ignored rather than restoring the text the user just removed.
  */
 export function resolveSearchRestoreDecision(input: {
   settled: boolean;
-  hasTyped: boolean;
+  hasInteracted: boolean;
   restoredQuery: string | null;
 }): SearchRestoreDecision {
-  if (!input.settled || input.hasTyped) {
+  if (!input.settled || input.hasInteracted) {
     return { shouldSeed: false, query: '', hasText: false, shouldRemount: false };
   }
   const query = input.restoredQuery ?? '';

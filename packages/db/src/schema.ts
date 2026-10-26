@@ -125,6 +125,7 @@ import type {
   AutoFreeConfig,
   GatewayModelListConfig,
   VercelModelIdOverridesConfig,
+  PreferredProviderOrderConfig,
   KiloClawAdminAuditAction,
   AdminActionAuditAction,
   AdminActionAuditTargetType,
@@ -148,8 +149,6 @@ import type {
   AuthProviderId,
   PlatformRepository,
   IntegrationPermissions,
-  BuildStatus,
-  Provider,
   CodeReviewAgentConfig,
   ManualCodeReviewConfig,
   CodeReviewType,
@@ -4735,192 +4734,6 @@ export const slack_oauth_credentials = pgTable(
 export type SlackOAuthCredential = typeof slack_oauth_credentials.$inferSelect;
 export type NewSlackOAuthCredential = typeof slack_oauth_credentials.$inferInsert;
 
-// User Deployments
-
-export const deployments = pgTable(
-  'deployments',
-  {
-    id: uuid()
-      .default(sql`pg_catalog.gen_random_uuid()`)
-      .primaryKey()
-      .notNull(),
-    created_by_user_id: text(),
-    owned_by_user_id: text().references(() => kilocode_users.id),
-    owned_by_organization_id: uuid().references(() => organizations.id),
-    deployment_slug: text().notNull(),
-    internal_worker_name: text().notNull(), // Actual CF worker name
-    repository_source: text().notNull(),
-    branch: text().notNull(),
-    deployment_url: text().notNull(),
-    platform_integration_id: uuid(),
-    source_type: text().notNull().default('github').$type<Provider>(),
-    git_auth_token: text(),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    last_deployed_at: timestamp({ withTimezone: true, mode: 'string' }),
-    last_build_id: uuid().notNull(),
-    threat_status: text().$type<'pending_scan' | 'safe' | 'flagged'>(),
-    created_from: text().$type<'deploy' | 'app-builder'>(),
-  },
-  table => [
-    index('idx_deployments_owned_by_user_id').on(table.owned_by_user_id),
-    index('idx_deployments_owned_by_organization_id').on(table.owned_by_organization_id),
-    index('idx_deployments_platform_integration_id').on(table.platform_integration_id),
-    index('idx_deployments_repository_source_branch').on(table.repository_source, table.branch),
-    unique('UQ_deployments_deployment_slug').on(table.deployment_slug),
-    index('idx_deployments_threat_status_pending')
-      .on(table.threat_status)
-      .where(sql`${table.threat_status} = 'pending_scan'`),
-    check(
-      'deployments_owner_check',
-      sql`(
-        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
-        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
-      )`
-    ),
-    check(
-      'deployments_source_type_check',
-      sql`${table.source_type} IN ('github', 'git', 'app-builder')`
-    ),
-  ]
-);
-
-export type Deployment = typeof deployments.$inferSelect;
-
-export const deployments_ephemeral = pgTable(
-  'deployments_ephemeral',
-  {
-    id: uuid()
-      .default(sql`pg_catalog.gen_random_uuid()`)
-      .primaryKey()
-      .notNull(),
-    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
-    source_type: text().notNull().$type<'html'>(),
-    internal_worker_name: text().notNull(),
-    deployment_slug: text(),
-    status: text().notNull().$type<'pending' | 'active' | 'cleanup_retry'>(),
-    expires_at: timestamp({ withTimezone: true, mode: 'string' }),
-    next_cleanup_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    cleanup_claim_token: uuid(),
-    cleanup_claimed_until: timestamp({ withTimezone: true, mode: 'string' }),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-  },
-  table => [
-    unique('UQ_deployments_ephemeral_internal_worker_name').on(table.internal_worker_name),
-    unique('UQ_deployments_ephemeral_deployment_slug').on(table.deployment_slug),
-    index('idx_deployments_ephemeral_owned_by_user_id').on(table.owned_by_user_id),
-    index('idx_deployments_ephemeral_next_cleanup_at').on(table.next_cleanup_at),
-    check('deployments_ephemeral_source_type_check', sql`${table.source_type} IN ('html')`),
-    check(
-      'deployments_ephemeral_status_check',
-      sql`${table.status} IN ('pending', 'active', 'cleanup_retry')`
-    ),
-    check(
-      'deployments_ephemeral_claim_fields_check',
-      sql`(${table.cleanup_claim_token} IS NULL) = (${table.cleanup_claimed_until} IS NULL)`
-    ),
-    check(
-      'deployments_ephemeral_active_fields_check',
-      sql`${table.status} <> 'active' OR (${table.deployment_slug} IS NOT NULL AND ${table.expires_at} IS NOT NULL)`
-    ),
-  ]
-);
-
-export const deployment_env_vars = pgTable(
-  'deployment_env_vars',
-  {
-    id: uuid()
-      .default(sql`pg_catalog.gen_random_uuid()`)
-      .primaryKey()
-      .notNull(),
-    deployment_id: uuid()
-      .notNull()
-      .references(() => deployments.id, { onDelete: 'cascade' }),
-    key: text().notNull(),
-    value: text().notNull(),
-    is_secret: boolean().notNull().default(false),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [
-    index('idx_deployment_env_vars_deployment_id').on(table.deployment_id),
-    unique('UQ_deployment_env_vars_deployment_key').on(table.deployment_id, table.key),
-  ]
-);
-
-export type DeploymentEnvVar = typeof deployment_env_vars.$inferSelect;
-
-export const deployment_builds = pgTable(
-  'deployment_builds',
-  {
-    id: uuid()
-      .default(sql`gen_random_uuid()`)
-      .primaryKey()
-      .notNull(),
-    deployment_id: uuid()
-      .notNull()
-      .references(() => deployments.id, { onDelete: 'cascade' }),
-    status: text().notNull().$type<BuildStatus>(),
-    started_at: timestamp({ withTimezone: true, mode: 'string' }),
-    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-  },
-  table => [
-    index('idx_deployment_builds_deployment_id').on(table.deployment_id),
-    index('idx_deployment_builds_status').on(table.status),
-  ]
-);
-
-export type DeploymentBuild = typeof deployment_builds.$inferSelect;
-
-export const deployment_events = pgTable(
-  'deployment_events',
-  {
-    build_id: uuid()
-      .notNull()
-      .references(() => deployment_builds.id, { onDelete: 'cascade' }),
-    event_id: integer().notNull(),
-    event_type: text().notNull().default('log').$type<'log' | 'status_change'>(),
-    timestamp: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    payload: jsonb().notNull(),
-  },
-  table => [
-    primaryKey({ columns: [table.build_id, table.event_id] }),
-    index('idx_deployment_events_build_id').on(table.build_id),
-    index('idx_deployment_events_timestamp').on(table.timestamp),
-    index('idx_deployment_events_type').on(table.event_type),
-  ]
-);
-
-export type DeploymentEvent = typeof deployment_events.$inferSelect;
-
-export const deployment_threat_detections = pgTable(
-  'deployment_threat_detections',
-  {
-    id: uuid()
-      .default(sql`gen_random_uuid()`)
-      .primaryKey()
-      .notNull(),
-    deployment_id: uuid()
-      .notNull()
-      .references(() => deployments.id, { onDelete: 'cascade' }),
-    build_id: uuid().references(() => deployment_builds.id, {
-      onDelete: 'set null',
-    }),
-    threat_type: text().notNull(), // 'MALWARE' | 'SOCIAL_ENGINEERING' | 'UNWANTED_SOFTWARE' or comma-separated
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-  },
-  table => [
-    index('idx_deployment_threat_detections_deployment_id').on(table.deployment_id),
-    index('idx_deployment_threat_detections_created_at').on(table.created_at),
-  ]
-);
-
-export type DeploymentThreatDetection = typeof deployment_threat_detections.$inferSelect;
-
 export const code_indexing_search = pgTable(
   'code_indexing_search',
   {
@@ -5174,7 +4987,7 @@ export const cloud_agent_webhook_triggers = pgTable(
     is_active: boolean('is_active').notNull().default(true),
     // Profile reference - resolved at runtime in the worker via Hyperdrive
     // ON DELETE RESTRICT prevents deletion of profiles referenced by triggers
-    // Nullable — only required when target_type = 'cloud_agent'
+    // Optional. Runtime resolves repository and default profiles when omitted.
     profile_id: uuid('profile_id').references(() => agent_environment_profiles.id, {
       onDelete: 'restrict',
     }),
@@ -5207,12 +5020,12 @@ export const cloud_agent_webhook_triggers = pgTable(
         (${table.user_id} IS NULL AND ${table.organization_id} IS NOT NULL)
       )`
     ),
-    // Cloud Agent triggers require github_repo and profile_id
+    // Cloud Agent triggers require github_repo
     check(
       'CHK_cloud_agent_webhook_triggers_cloud_agent_fields',
       sql`(
         ${table.target_type} != 'cloud_agent' OR
-        (${table.github_repo} IS NOT NULL AND ${table.profile_id} IS NOT NULL)
+        ${table.github_repo} IS NOT NULL
       )`
     ),
     // KiloClaw Chat triggers require kiloclaw_instance_id
@@ -5683,6 +5496,7 @@ export const contributor_champion_memberships = pgTable(
     enrolled_at: timestamp({ withTimezone: true, mode: 'string' }),
     credit_amount_microdollars: bigint({ mode: 'number' }).default(0).notNull(),
     credits_last_granted_at: timestamp({ withTimezone: true, mode: 'string' }),
+    credits_window_granted_microdollars: bigint({ mode: 'number' }).default(0).notNull(),
     linked_kilo_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -5737,6 +5551,7 @@ export const ai_gateway_config = pgTable(
     preferred_models: jsonb().$type<GatewayModelListConfig>(),
     unavailable_models: jsonb().$type<GatewayModelListConfig>(),
     vercel_model_id_overrides: jsonb().$type<VercelModelIdOverridesConfig>(),
+    preferred_provider_order: jsonb().$type<PreferredProviderOrderConfig>(),
   },
   table => [check('ai_gateway_config_singleton', sql`${table.id} = 1`)]
 );
@@ -6937,6 +6752,14 @@ export const device_auth_requests = pgTable(
     device_code_hash: text(),
     user_agent: text(),
     ip_address: text(),
+    /** The OAuth client the request asks to connect, when the requester names one. */
+    requesting_client_id: text(),
+    /** Display name of that client, as it is shown on the approval page. */
+    requesting_client_name: text(),
+    /** Origin (or app scheme) the approved code is delivered to, as shown to the approver. */
+    requesting_redirect_origin: text(),
+    /** When the approver confirmed that exact client; null until then. */
+    client_confirmed_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -6952,7 +6775,7 @@ export const device_auth_requests = pgTable(
       .on(table.device_code_hash)
       .concurrently()
       .where(sql`${table.device_code_hash} IS NOT NULL`),
-    index('IDX_device_auth_requests_user_code')
+    uniqueIndex('UQ_device_auth_requests_user_code')
       .on(table.user_code)
       .concurrently()
       .where(sql`${table.user_code} IS NOT NULL`),
@@ -7004,91 +6827,6 @@ export const device_refresh_tokens = pgTable(
 );
 
 export type DeviceRefreshToken = typeof device_refresh_tokens.$inferSelect;
-
-// App Builder Projects
-export const app_builder_projects = pgTable(
-  'app_builder_projects',
-  {
-    id: uuid()
-      .default(sql`gen_random_uuid()`)
-      .primaryKey()
-      .notNull(),
-    created_by_user_id: text(),
-    owned_by_user_id: text().references(() => kilocode_users.id),
-    owned_by_organization_id: uuid().references(() => organizations.id),
-    session_id: text(), // Cloud Agent session ID
-    title: text().notNull(),
-    model_id: text().notNull(),
-    template: text(), // nullable - null means default template (nextjs-starter)
-    deployment_id: uuid().references(() => deployments.id, {
-      onDelete: 'set null',
-    }),
-    last_message_at: timestamp({ withTimezone: true, mode: 'string' }),
-    // Git platform migration fields (GitHub, GitLab, etc.)
-    git_repo_full_name: text(), // "owner/repo" after migration
-    git_platform_integration_id: uuid().references(() => platform_integrations.id, {
-      onDelete: 'set null',
-    }), // platform_integrations.platform tells us which platform (github, gitlab, etc.)
-    migrated_at: timestamp({ withTimezone: true, mode: 'string' }),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' })
-      .defaultNow()
-      .notNull()
-      .$onUpdateFn(() => sql`now()`),
-  },
-  table => [
-    index('IDX_app_builder_projects_created_by_user_id').on(table.created_by_user_id),
-    index('IDX_app_builder_projects_owned_by_user_id').on(table.owned_by_user_id),
-    index('IDX_app_builder_projects_owned_by_organization_id').on(table.owned_by_organization_id),
-    index('IDX_app_builder_projects_created_at').on(table.created_at),
-    index('IDX_app_builder_projects_last_message_at').on(table.last_message_at),
-    index('IDX_app_builder_projects_git_repo_integration')
-      .on(table.git_repo_full_name, table.git_platform_integration_id)
-      .where(isNotNull(table.git_repo_full_name)),
-    check(
-      'app_builder_projects_owner_check',
-      sql`(
-        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
-        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
-      )`
-    ),
-  ]
-);
-
-export type AppBuilderProject = typeof app_builder_projects.$inferSelect;
-
-// App Builder Project Sessions - tracks all Cloud Agent sessions per project
-export const AppBuilderSessionReason = {
-  Initial: 'initial', // First session created with project
-  GitHubMigration: 'github_migration', // New session after migrating to GitHub
-  Upgrade: 'upgrade', // New session after worker version upgrade (v1→v2)
-  ModelVisionChange: 'model_vision_change', // New session after switching between vision and text-only models
-  UserInitiated: 'user_initiated', // New session explicitly started by the user via "New Chat"
-} satisfies Record<string, string>;
-
-export const app_builder_project_sessions = pgTable(
-  'app_builder_project_sessions',
-  {
-    id: uuid()
-      .default(sql`gen_random_uuid()`)
-      .primaryKey()
-      .notNull(),
-    project_id: uuid()
-      .references(() => app_builder_projects.id, { onDelete: 'cascade' })
-      .notNull(),
-    cloud_agent_session_id: text().notNull(), // "agent_xxx"
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-    ended_at: timestamp({ withTimezone: true, mode: 'string' }), // null = current/active session
-    reason: text().notNull(), // 'initial', 'github_migration', 'upgrade', etc.
-    worker_version: text().notNull().default('v2'), // 'v1' (legacy/R2 only) or 'v2' (cloud-agent-next)
-  },
-  table => [
-    index('IDX_app_builder_project_sessions_project_id').on(table.project_id),
-    unique('UQ_app_builder_project_sessions_cloud_agent_session_id').on(
-      table.cloud_agent_session_id
-    ),
-  ]
-);
 
 export const app_reported_messages = pgTable('app_reported_messages', {
   report_id: uuid()
@@ -8168,7 +7906,7 @@ export const agent_environment_profiles = pgTable(
 
 export type AgentEnvironmentProfile = typeof agent_environment_profiles.$inferSelect;
 
-// Single table for both env vars and secrets - matches deployment_env_vars pattern
+// Single table for both env vars and secrets
 export const agent_environment_profile_vars = pgTable(
   'agent_environment_profile_vars',
   {
@@ -8217,6 +7955,147 @@ export const agent_environment_profile_commands = pgTable(
 );
 
 export type AgentEnvironmentProfileCommand = typeof agent_environment_profile_commands.$inferSelect;
+
+// ============ CLOUD AGENT REPOSITORY ENVIRONMENTS ============
+// A repository environment is a saved, owner-scoped setup for one repository.
+// It is distinct from an agent environment profile: a profile holds personal
+// preferences, an environment holds how one repository is set up and shared.
+// Identity columns are never compared across platforms: GitHub uses the
+// lowercased repo path, GitLab the canonical credential-free clone URL, and
+// Bitbucket the workspace/repository UUID pair.
+
+export const cloud_agent_environments = pgTable(
+  'cloud_agent_environments',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    // Ownership: exactly one must be set (org XOR user) - matches the profile pattern.
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    created_by_user_id: text(), // Audit trail: the user who created this environment.
+
+    name: text().notNull(),
+    platform: text({ enum: ['github', 'gitlab', 'bitbucket'] }).notNull(),
+    repo_full_name: text().notNull(),
+    gitlab_clone_url: text(),
+    bitbucket_workspace_uuid: uuid(),
+    bitbucket_repository_uuid: uuid(),
+
+    // Ordered setup commands run after clone. Array order is the run order.
+    commands: text().array().default([]).notNull(),
+    // Saved sandbox allocation key for this repository's sessions; null uses the
+    // owner's default.
+    sandbox_allocation: text(),
+
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    // One environment per repository identity and owner.
+    uniqueIndex('UQ_cloud_agent_environments_github_user')
+      .on(table.owned_by_user_id, table.repo_full_name)
+      .where(sql`${table.platform} = 'github' AND ${table.owned_by_user_id} IS NOT NULL`),
+    uniqueIndex('UQ_cloud_agent_environments_github_org')
+      .on(table.owned_by_organization_id, table.repo_full_name)
+      .where(sql`${table.platform} = 'github' AND ${table.owned_by_organization_id} IS NOT NULL`),
+    uniqueIndex('UQ_cloud_agent_environments_gitlab_user')
+      .on(table.owned_by_user_id, table.gitlab_clone_url)
+      .where(sql`${table.platform} = 'gitlab' AND ${table.owned_by_user_id} IS NOT NULL`),
+    uniqueIndex('UQ_cloud_agent_environments_gitlab_org')
+      .on(table.owned_by_organization_id, table.gitlab_clone_url)
+      .where(sql`${table.platform} = 'gitlab' AND ${table.owned_by_organization_id} IS NOT NULL`),
+    uniqueIndex('UQ_cloud_agent_environments_bitbucket_user')
+      .on(table.owned_by_user_id, table.bitbucket_workspace_uuid, table.bitbucket_repository_uuid)
+      .where(sql`${table.platform} = 'bitbucket' AND ${table.owned_by_user_id} IS NOT NULL`),
+    uniqueIndex('UQ_cloud_agent_environments_bitbucket_org')
+      .on(
+        table.owned_by_organization_id,
+        table.bitbucket_workspace_uuid,
+        table.bitbucket_repository_uuid
+      )
+      .where(
+        sql`${table.platform} = 'bitbucket' AND ${table.owned_by_organization_id} IS NOT NULL`
+      ),
+    index('IDX_cloud_agent_environments_user_id').on(table.owned_by_user_id),
+    index('IDX_cloud_agent_environments_org_id').on(table.owned_by_organization_id),
+    check(
+      'cloud_agent_environments_owner_check',
+      sql`(
+        (${table.owned_by_user_id} IS NOT NULL AND ${table.owned_by_organization_id} IS NULL) OR
+        (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
+      )`
+    ),
+    check(
+      'cloud_agent_environments_platform_check',
+      sql`${table.platform} IN ('github', 'gitlab', 'bitbucket')`
+    ),
+    check(
+      'cloud_agent_environments_github_identity_check',
+      sql`(
+        (${table.platform} = 'github') = (
+          ${table.gitlab_clone_url} IS NULL AND
+          ${table.bitbucket_workspace_uuid} IS NULL AND
+          ${table.bitbucket_repository_uuid} IS NULL
+        )
+      )`
+    ),
+    check(
+      'cloud_agent_environments_gitlab_identity_check',
+      sql`(
+        (${table.platform} = 'gitlab') = (
+          ${table.gitlab_clone_url} IS NOT NULL AND
+          ${table.bitbucket_workspace_uuid} IS NULL AND
+          ${table.bitbucket_repository_uuid} IS NULL
+        )
+      )`
+    ),
+    check(
+      'cloud_agent_environments_bitbucket_identity_check',
+      sql`(
+        (${table.platform} = 'bitbucket') = (
+          ${table.bitbucket_workspace_uuid} IS NOT NULL AND
+          ${table.bitbucket_repository_uuid} IS NOT NULL AND
+          ${table.gitlab_clone_url} IS NULL
+        )
+      )`
+    ),
+  ]
+);
+
+export type CloudAgentEnvironment = typeof cloud_agent_environments.$inferSelect;
+
+// Single table for both env vars and secrets - matches the profile var table.
+export const cloud_agent_environment_vars = pgTable(
+  'cloud_agent_environment_vars',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    environment_id: uuid()
+      .notNull()
+      .references(() => cloud_agent_environments.id, { onDelete: 'cascade' }),
+    key: text().notNull(),
+    value: text().notNull(), // Plaintext if is_secret=false, RSA+AES envelope JSON if is_secret=true
+    is_secret: boolean().notNull().default(false),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_cloud_agent_environment_vars_environment_id').on(table.environment_id),
+    unique('UQ_cloud_agent_environment_vars_environment_key').on(table.environment_id, table.key),
+  ]
+);
+
+export type CloudAgentEnvironmentVar = typeof cloud_agent_environment_vars.$inferSelect;
 
 // ============ AGENT ENVIRONMENT PROFILE REPO BINDINGS ============
 // Bind a single environment profile to a repository so sessions auto-inherit it
@@ -8517,41 +8396,6 @@ export const agent_environment_profile_instructions = pgTable(
 
 export type AgentEnvironmentProfileInstruction =
   typeof agent_environment_profile_instructions.$inferSelect;
-
-// ============ APP BUILDER FEEDBACK ============
-
-export const app_builder_feedback = pgTable(
-  'app_builder_feedback',
-  {
-    id: uuid()
-      .default(sql`pg_catalog.gen_random_uuid()`)
-      .primaryKey()
-      .notNull(),
-    kilo_user_id: text().references(() => kilocode_users.id, {
-      onDelete: 'set null',
-      onUpdate: 'cascade',
-    }),
-    project_id: uuid().references(() => app_builder_projects.id, {
-      onDelete: 'cascade',
-    }),
-    session_id: text(),
-    model: text(),
-    preview_status: text(),
-    is_streaming: boolean(),
-    message_count: integer(),
-    feedback_text: text().notNull(),
-    recent_messages: jsonb().$type<{ role: string; text: string; ts: number }[]>(),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-  },
-  table => [
-    index('IDX_app_builder_feedback_created_at').on(table.created_at),
-    index('IDX_app_builder_feedback_kilo_user_id').on(table.kilo_user_id),
-    index('IDX_app_builder_feedback_project_id').on(table.project_id),
-  ]
-);
-
-export type AppBuilderFeedback = typeof app_builder_feedback.$inferSelect;
-export type NewAppBuilderFeedback = typeof app_builder_feedback.$inferInsert;
 
 // ============ CLOUD AGENT FEEDBACK ============
 
@@ -10057,6 +9901,79 @@ export const user_notification_preferences = pgTable('user_notification_preferen
 export type UserNotificationPreference = typeof user_notification_preferences.$inferSelect;
 export type NewUserNotificationPreference = typeof user_notification_preferences.$inferInsert;
 
+// ─── Notification History ─────────────────────────────────────────────
+//
+// One row per accepted push, written by the notifications worker after the
+// provider (or the local push sink) accepts it. Rows are account-wide rather
+// than per device, so history survives a reinstall, and they hold the content
+// the push carried — the rendered copy lives on the client, which re-renders
+// from `i18n_key`/`i18n_params` in the reader's language and falls back to
+// `fallback_title`/`fallback_body`. Rows never enter a log line.
+//
+// `idempotency_key` is the dispatch key. The worker dedupes on it only for a
+// limited window (an hour, or two days for briefings) and several producers
+// reuse one key for distinct events — `low-balance:<organizationId>` for every
+// later crossing of the same threshold, for instance. The row identity is
+// therefore the dispatch instance: the key plus `dedupe_bucket`, the acceptance
+// hour. A retry of one dispatch lands in the same bucket and adds nothing, while
+// a genuine later dispatch of the same key records its own row. A scheduled
+// prune drops rows older than the 90-day retention window; the query applies the
+// same window.
+
+export const user_notification_history = pgTable(
+  'user_notification_history',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    // Notification-settings key the push belongs to; null for kinds that have
+    // no category (agent briefings).
+    category: text(),
+    // The `data.type` discriminator of the push.
+    push_type: text().notNull(),
+    // The push `data` object, kept whole so a row can reopen the same
+    // destination a push tap opens.
+    payload: jsonb().$type<Record<string, unknown>>().notNull(),
+    i18n_key: text(),
+    i18n_params: jsonb().$type<Record<string, string>>(),
+    fallback_title: text().notNull(),
+    fallback_body: text().notNull(),
+    idempotency_key: text().notNull(),
+    // Acceptance hour of the dispatch (`floor(epochMs / 3600000)`). Part of the
+    // row identity so a retry is absorbed while a later dispatch of the same
+    // configurable key still records its own row; see the comment above.
+    dedupe_bucket: integer().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    // One row per accepted dispatch: a retry of the same dispatch in the same
+    // hour adds nothing, while a later dispatch of the same key does.
+    uniqueIndex('UQ_user_notification_history_user_idempotency').on(
+      table.user_id,
+      table.idempotency_key,
+      table.dedupe_bucket
+    ),
+    // Newest-first page of one user's history.
+    index('IDX_user_notification_history_user_created').on(table.user_id, table.created_at),
+    // Same page with a category chip selected.
+    index('IDX_user_notification_history_user_category_created').on(
+      table.user_id,
+      table.category,
+      table.created_at
+    ),
+    // The retention prune reads the expired prefix across every account, so it
+    // needs a `created_at`-first index; the user-prefixed ones cannot serve it.
+    index('IDX_user_notification_history_created_at').on(table.created_at),
+  ]
+);
+
+export type UserNotificationHistory = typeof user_notification_history.$inferSelect;
+export type NewUserNotificationHistory = typeof user_notification_history.$inferInsert;
+
 // ─── Spend Alerts ─────────────────────────────────────────────────────
 // Owner-scoped spend alert configuration, the hourly counter the sweep rolls
 // up, and the durable delivery outbox. `scope_key` is `user:<kilocode_users.id>`
@@ -11365,7 +11282,13 @@ export const agent_briefing_reports = pgTable(
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     context_key: text().notNull(),
     organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
-    local_date: text().notNull(),
+    kind: text().$type<'scheduled' | 'one_off'>().notNull().default('scheduled'),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
+    timezone: text(),
+    language: text(),
+    evidence_recorded_before: timestamp({ withTimezone: true, mode: 'string' }),
+    // NULL leaves one-off reports outside the scheduled uniqueness key.
+    local_date: text(),
     night_start_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     cutoff_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     morning_end_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),

@@ -230,8 +230,26 @@ const exchangeSafeClaimNames: ReadonlySet<string> = new Set([
   'deviceAuthRequestCode',
 ] satisfies (keyof KiloTokenPolicyClaims)[]);
 
+const legacyExchangeSafeClaimNames: Record<string, true> = {
+  ...Object.fromEntries([...exchangeSafeClaimNames].map(name => [name, true] as const)),
+  deviceSessionId: true,
+};
+
 function hasOnlyExchangeSafeClaims(claimNames: readonly string[]): boolean {
   return claimNames.every(name => exchangeSafeClaimNames.has(name));
+}
+
+/** `kilo-api` on its own, as a scalar audience or a single-element array. */
+function hasSoleKiloApiAudience(audience: unknown): boolean {
+  if (typeof audience === 'string') return audience === KILO_API_AUDIENCE;
+  return Array.isArray(audience) && audience.length === 1 && audience[0] === KILO_API_AUDIENCE;
+}
+
+function hasExchangeSafeCredentialClaims(
+  claims: { apiTokenPepper?: unknown },
+  claimNames: readonly string[]
+): boolean {
+  return claims.apiTokenPepper !== undefined && hasOnlyExchangeSafeClaims(claimNames);
 }
 
 export function isKiloCredentialExchangeEligible(
@@ -244,20 +262,15 @@ export function isKiloCredentialExchangeEligible(
   const now = Math.floor(Date.now() / 1000);
   if (claims.iat > now || claims.exp <= now || claims.exp <= claims.iat) return false;
   if (claims.apiTokenPepper === undefined) return false;
-  if (!hasOnlyExchangeSafeClaims(auth.claimNames)) return false;
   if (claims.tokenPurpose !== undefined || claims.credentialExchange !== undefined) {
-    const soleAudience =
-      typeof claims.aud === 'string'
-        ? claims.aud
-        : claims.aud?.length === 1
-          ? claims.aud[0]
-          : undefined;
+    if (!hasOnlyExchangeSafeClaims(auth.claimNames)) return false;
     return (
       claims.tokenPurpose === 'human-api' &&
       claims.credentialExchange === true &&
-      soleAudience === KILO_API_AUDIENCE
+      hasSoleKiloApiAudience(claims.aud)
     );
   }
+  if (!auth.claimNames.every(name => legacyExchangeSafeClaimNames[name] === true)) return false;
   return (
     policy.legacy === 'five-year-api' &&
     claims.aud === undefined &&
@@ -299,11 +312,8 @@ const modernClaims = policyClaims
       .filter(([, value]) => value !== undefined)
       .map(([name]) => name);
     if (
-      (typeof claims.aud === 'string'
-        ? claims.aud !== KILO_API_AUDIENCE
-        : claims.aud.length !== 1 || claims.aud[0] !== KILO_API_AUDIENCE) ||
-      claims.apiTokenPepper === undefined ||
-      !hasOnlyExchangeSafeClaims(serializedClaimNames)
+      !hasSoleKiloApiAudience(claims.aud) ||
+      !hasExchangeSafeCredentialClaims(claims, serializedClaimNames)
     ) {
       ctx.addIssue({
         code: 'custom',

@@ -4635,7 +4635,7 @@ export class TownDO extends DurableObject<Env> {
    * requests that reset the container's sleepAfter timer (#1409).
    */
   private async refreshContainerToken(): Promise<void> {
-    // Skip if no active work AND no actively-running mayor — the container is
+    // Skip if no running agent AND no actively-running mayor — the container is
     // sleeping (or about to) and doesn't need a fresh token. The token will be
     // refreshed when work is next dispatched (ensureContainerToken is called in
     // startAgentInContainer at container-dispatch.ts) and on the warm-send path
@@ -4645,7 +4645,7 @@ export class TownDO extends DurableObject<Env> {
     // /refresh-token pings that reset sleepAfter (#1409).
     const mayor = agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null;
     const mayorAlive = mayor && (mayor.status === 'working' || mayor.status === 'stalled');
-    if (!this.hasActiveWork() && !mayorAlive) return;
+    if (!scheduling.hasRunningAgents(this.sql) && !mayorAlive) return;
 
     const TOKEN_REFRESH_INTERVAL_MS = 60 * 60_000;
     const now = Date.now();
@@ -4671,7 +4671,7 @@ export class TownDO extends DurableObject<Env> {
    */
   private async stopContainerIfIdle(): Promise<void> {
     await _stopContainerIfIdle({
-      hasActiveWork: () => this.hasActiveWork(),
+      hasRunningAgents: () => scheduling.hasRunningAgents(this.sql),
       isDraining: () => this._draining || this.containerStartsBlocked(),
       getMayor: () => agents.listAgents(this.sql, { role: 'mayor' })[0] ?? null,
       getTownId: () => this.townId,
@@ -5094,16 +5094,13 @@ export class TownDO extends DurableObject<Env> {
     }
   }
 
-  private async ensureContainerReady(
-    cachedRigList?: rigs.RigRecord[],
-    cachedActiveWork?: boolean
-  ): Promise<void> {
+  private async ensureContainerReady(cachedRigList?: rigs.RigRecord[]): Promise<void> {
     if (this.containerStartsBlocked()) return;
     const rigList = cachedRigList ?? rigs.listRigs(this.sql);
     if (rigList.length === 0) return;
 
-    const hasWork = cachedActiveWork ?? this.hasActiveWork();
-    if (!hasWork && !this._draining) {
+    // Other active work starts the container when it is dispatched.
+    if (!scheduling.hasRunningAgents(this.sql) && !this._draining) {
       const newestRigAge = rigList.reduce((min, r) => {
         const age = Date.now() - new Date(r.created_at).getTime();
         return Math.min(min, age);

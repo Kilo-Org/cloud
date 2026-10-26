@@ -132,7 +132,7 @@ describe('ImagesSchema', () => {
 
   it('rejects client-provided R2 service prefixes', () => {
     const result = ImagesSchema.safeParse({
-      path: 'app-builder/123e4567-e89b-12d3-a456-426614174000',
+      path: 'images/123e4567-e89b-12d3-a456-426614174000',
       files: ['123e4567-e89b-12d3-a456-426614174001.png'],
     });
 
@@ -449,7 +449,7 @@ describe('MetadataSchema', () => {
         },
       },
     ],
-    ['setupCommands', ['pnpm install'], ['x'.repeat(501)]],
+    ['setupCommands', ['pnpm install'], ['x'.repeat(16_001)]],
     [
       'mcpServers',
       { docs: { type: 'remote', url: 'https://example.com/mcp' } },
@@ -653,7 +653,7 @@ describe('MetadataSchema', () => {
     });
 
     it('should accept commands at maximum length', () => {
-      const longCommand = 'A'.repeat(500);
+      const longCommand = 'A'.repeat(16_000);
 
       const metadata = {
         version: 1,
@@ -691,8 +691,8 @@ describe('MetadataSchema', () => {
   });
 
   describe('command too long', () => {
-    it('should reject commands exceeding 500 characters', () => {
-      const longCommand = 'A'.repeat(501);
+    it('should reject commands exceeding 16,000 characters', () => {
+      const longCommand = 'A'.repeat(16_001);
 
       const metadata = {
         version: 1,

@@ -2,9 +2,11 @@ import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { BriefingScorecard } from './briefing-card';
+import { BriefingFilterControls } from './briefing-filter-controls';
+import { BriefingPeriodLabel } from './briefing-period-label';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -94,64 +96,26 @@ export function BriefingListScreen() {
         }
       />
       <View className="gap-3 px-4 pb-3">
-        <View className="flex-row flex-wrap gap-2">
-          <Button
-            variant={!history ? 'secondary' : 'ghost'}
-            size="sm"
-            onPress={() => {
-              setHistory(false);
-            }}
-          >
-            <Text>{t('agentBriefing.available')}</Text>
-          </Button>
-          <Button
-            variant={history ? 'secondary' : 'ghost'}
-            size="sm"
-            onPress={() => {
-              setHistory(true);
-            }}
-          >
-            <Text>{t('agentBriefing.history')}</Text>
-          </Button>
-        </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerClassName="gap-2"
+        <Button
+          disabled={!access.enabled}
+          onPress={() => {
+            const context = organizationId === null ? 'personal' : organizationId;
+            const destination: Href = {
+              pathname: `${BRIEFING_PATH}/create`,
+              params: context === undefined ? {} : { context },
+            };
+            router.push(destination);
+          }}
         >
-          <Button
-            variant={organizationId === undefined ? 'secondary' : 'ghost'}
-            size="sm"
-            onPress={() => {
-              setOrganizationId(undefined);
-            }}
-          >
-            <Text>{t('common.all')}</Text>
-          </Button>
-          <Button
-            variant={organizationId === null ? 'secondary' : 'ghost'}
-            size="sm"
-            onPress={() => {
-              setOrganizationId(null);
-            }}
-          >
-            <Text>{t('common.personal')}</Text>
-          </Button>
-          {memberships.data
-            ?.filter(org => access.canRead(org.organizationId))
-            .map(org => (
-              <Button
-                key={org.organizationId}
-                variant={organizationId === org.organizationId ? 'secondary' : 'ghost'}
-                size="sm"
-                onPress={() => {
-                  setOrganizationId(org.organizationId);
-                }}
-              >
-                <Text>{org.organizationName}</Text>
-              </Button>
-            ))}
-        </ScrollView>
+          <Text>{t('agentBriefing.create')}</Text>
+        </Button>
+        <BriefingFilterControls
+          history={history}
+          onSelectHistory={setHistory}
+          organizationId={organizationId}
+          organizations={memberships.data?.filter(org => access.canRead(org.organizationId)) ?? []}
+          onSelectOrganization={setOrganizationId}
+        />
         <Text className="text-xs text-muted-foreground">
           {t(history ? 'agentBriefing.historyHint' : 'agentBriefing.allContexts')}
         </Text>
@@ -204,12 +168,12 @@ export function BriefingListScreen() {
                 <Text>
                   {item.context.organizationId === null ? t('common.personal') : item.context.name}
                 </Text>
-                <Text className="text-xs text-muted-foreground">
-                  {item.localDate}
-                  {item.revised
-                    ? ` · ${t('agentBriefing.revised', { revision: item.revision })}`
-                    : ''}
-                </Text>
+                <BriefingPeriodLabel report={item} />
+                {item.revised ? (
+                  <Text className="text-xs text-muted-foreground">
+                    {t('agentBriefing.revised', { revision: item.revision })}
+                  </Text>
+                ) : null}
                 {item.dismissedAt || dismissals.data?.some(entry => entry.reportId === item.id) ? (
                   <Text className="text-xs text-muted-foreground">{t('common.dismissed')}</Text>
                 ) : null}
@@ -219,9 +183,11 @@ export function BriefingListScreen() {
           )}
           ListEmptyComponent={
             <View className="gap-2 p-8">
-              <Text className="text-center">{t('agentBriefing.empty')}</Text>
+              <Text className="text-center">
+                {t(history ? 'agentBriefing.emptyHistory' : 'agentBriefing.empty')}
+              </Text>
               <Text className="text-center text-sm text-muted-foreground">
-                {t('agentBriefing.emptyHint')}
+                {t(history ? 'agentBriefing.historyHint' : 'agentBriefing.emptyHint')}
               </Text>
             </View>
           }

@@ -66,6 +66,7 @@ vi.mock('./db', async importOriginal => {
     syncPlatformRegistryRows: vi.fn(),
     getLatestRoutingTable: vi.fn(),
     countCurrentProfilesByStatus: vi.fn(),
+    listCurrentPlatformProfileStatuses: vi.fn(),
     getSummariesForRuns: vi.fn(),
     getRoutingCaseResultsForEntries: vi.fn().mockResolvedValue([]),
     listReadyCurrentProfilesForEntries: vi.fn(),
@@ -125,6 +126,7 @@ import {
   syncPlatformRegistryRows,
   getLatestRoutingTable,
   countCurrentProfilesByStatus,
+  listCurrentPlatformProfileStatuses,
   getSummariesForRuns,
   listReadyCurrentProfilesForEntries,
   listLaneFailures,
@@ -336,6 +338,9 @@ beforeEach(() => {
   ];
   vi.mocked(syncSubscriptionSnapshot).mockResolvedValue(snapshot);
   vi.mocked(servingSubscriptionSnapshot).mockResolvedValue(snapshot);
+  vi.mocked(listCurrentPlatformProfileStatuses).mockResolvedValue([
+    { model, variant: 'max', status: 'ready' },
+  ]);
   vi.mocked(listReadyCurrentProfilesForEntries).mockResolvedValue([]);
   vi.mocked(getSummariesForRuns).mockResolvedValue([]);
   vi.mocked(countCurrentProfilesByStatus).mockResolvedValue([]);

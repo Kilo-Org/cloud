@@ -3,10 +3,18 @@
  * one remote CLI session into normalized transport events and commands.
  */
 import { normalizeCliEvent, isChatEvent } from './normalizer';
-import { partSettledAt } from './part-utils';
+import {
+  replaySnapshotPage,
+  sessionSnapshotFailureMessage,
+  snapshotPageFromSnapshot,
+} from './snapshot-page';
 import { parseRemoteCommandCatalog, type RemoteCommandState } from './remote-command-catalog';
-import { parseCreateSessionResponse } from './create-session';
-import { cloudAgentSdkRuntime } from './runtime';
+import {
+  buildCreateSessionWireData,
+  createSessionWireMutationIds,
+  hasExtendedCreateSessionFields,
+  parseCreateSessionResponse,
+} from './create-session';
 import { parseExitSessionResponse } from './exit-session';
 import {
   cliConnectionDataSchema,
@@ -37,30 +45,6 @@ import {
 
 /** Delivered error string for old-CLI strict-parse rejection of extended create_session. */
 const INVALID_CREATE_SESSION_COMMAND = 'invalid create_session command';
-
-/**
- * Build `create_session` wire data: always `protocolVersion: 1`, plus any
- * defined inheritance fields (Decision 5 shape).
- */
-function buildCreateSessionWireData(input?: CreateRemoteSessionInput): {
-  protocolVersion: 1;
-  agent?: string;
-  model?: { providerID: string; modelID: string; variant?: string };
-  orgId?: string;
-  directory?: string;
-  cloneFromKiloSessionId?: string;
-} {
-  return {
-    protocolVersion: 1,
-    ...(input?.agent !== undefined ? { agent: input.agent } : {}),
-    ...(input?.model !== undefined ? { model: input.model } : {}),
-    ...(input?.orgId !== undefined ? { orgId: input.orgId } : {}),
-    ...(input?.directory !== undefined ? { directory: input.directory } : {}),
-    ...(input?.cloneFromKiloSessionId !== undefined
-      ? { cloneFromKiloSessionId: input.cloneFromKiloSessionId }
-      : {}),
-  };
-}
 
 type CliLiveTransportConfig = {
   kiloSessionId: KiloSessionId;
@@ -235,6 +219,19 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       config.onRemoteCommandStateChange?.(next);
     }
 
+    function isCurrentDiscoveryRequest(
+      currentRequestGeneration: number,
+      expectedOwnerConnectionId: string,
+      expectedGeneration: number,
+      expectedRequestGeneration: number
+    ): boolean {
+      return (
+        expectedGeneration === generation &&
+        expectedRequestGeneration === currentRequestGeneration &&
+        ownerConnectionId === expectedOwnerConnectionId
+      );
+    }
+
     function canExitSession(): boolean {
       return (
         remoteCommandState.canExitSession === true && remoteCommandState.ownerConnectionId !== null
@@ -274,23 +271,15 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         refresh: nextOwnerConnectionId ? 'loading' : 'idle',
       });
       // Owner replacement clears the command cache; emit an empty catalog
-      // event and the matching idle state so consumers can re-render.
-      if (previousOwnerConnectionId) {
-        publishCommands([]);
-        publishRemoteCommandState({
-          ownerConnectionId: nextOwnerConnectionId,
-          refresh: 'idle',
-          commands: snapshotCommands(),
-          canExitSession: undefined,
-        });
-      } else {
-        publishRemoteCommandState({
-          ownerConnectionId: nextOwnerConnectionId,
-          refresh: 'idle',
-          commands: snapshotCommands(),
-          canExitSession: undefined,
-        });
-      }
+      // event and the matching idle state so consumers can re-render. A
+      // transition from no owner preserves whatever cache exists.
+      if (previousOwnerConnectionId) publishCommands([]);
+      publishRemoteCommandState({
+        ownerConnectionId: nextOwnerConnectionId,
+        refresh: 'idle',
+        commands: snapshotCommands(),
+        canExitSession: undefined,
+      });
       // A CLI handoff or a permanent drop invalidates whatever the prior
       // owner reported. The session manager's gate is optimistic, so it keeps
       // the feature available until the new owner's next heartbeat /
@@ -312,9 +301,12 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       expectedRequestGeneration: number
     ): void {
       if (
-        expectedGeneration !== generation ||
-        expectedRequestGeneration !== catalogRequestGeneration ||
-        ownerConnectionId !== expectedOwnerConnectionId
+        !isCurrentDiscoveryRequest(
+          catalogRequestGeneration,
+          expectedOwnerConnectionId,
+          expectedGeneration,
+          expectedRequestGeneration
+        )
       ) {
         return;
       }
@@ -373,9 +365,12 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         .then(
           result => {
             if (
-              expectedGeneration !== generation ||
-              expectedRequestGeneration !== catalogRequestGeneration ||
-              ownerConnectionId !== expectedOwnerConnectionId
+              !isCurrentDiscoveryRequest(
+                catalogRequestGeneration,
+                expectedOwnerConnectionId,
+                expectedGeneration,
+                expectedRequestGeneration
+              )
             ) {
               return;
             }
@@ -444,9 +439,12 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
       clearCatalog: boolean
     ): void {
       if (
-        expectedGeneration !== generation ||
-        expectedRequestGeneration !== commandCatalogRequestGeneration ||
-        ownerConnectionId !== expectedOwnerConnectionId
+        !isCurrentDiscoveryRequest(
+          commandCatalogRequestGeneration,
+          expectedOwnerConnectionId,
+          expectedGeneration,
+          expectedRequestGeneration
+        )
       ) {
         return;
       }
@@ -536,9 +534,12 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         .then(
           result => {
             if (
-              expectedGeneration !== generation ||
-              expectedRequestGeneration !== commandCatalogRequestGeneration ||
-              ownerConnectionId !== expectedOwnerConnectionId
+              !isCurrentDiscoveryRequest(
+                commandCatalogRequestGeneration,
+                expectedOwnerConnectionId,
+                expectedGeneration,
+                expectedRequestGeneration
+              )
             ) {
               return;
             }
@@ -580,23 +581,6 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             commandCatalogRequestInFlight = null;
           }
         });
-    }
-
-    function replayPage(page: SessionSnapshotPage): void {
-      sink.onServiceEvent({ type: 'session.created', info: page.info });
-
-      for (const msg of page.messages) {
-        sink.onChatEvent({ type: 'message.updated', info: msg.info });
-
-        for (const part of msg.parts) {
-          const settledAt = partSettledAt(part);
-          sink.onChatEvent({
-            type: 'message.part.updated',
-            part,
-            ...(settledAt === undefined ? {} : { time: settledAt }),
-          });
-        }
-      }
     }
 
     function handleEventMessage(
@@ -831,10 +815,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           bufferedCliEvents = [];
 
           if (!config.fetchSnapshot && !config.fetchSnapshotPage) {
-            bufferedCliEvents = [
-              ...bufferedEventsFromSupersededSnapshot,
-              ...(bufferedCliEvents ?? []),
-            ];
+            bufferedCliEvents = [...bufferedEventsFromSupersededSnapshot];
             bufferedEventsFromSupersededSnapshot = [];
             drainBufferedCliEvents();
             return;
@@ -851,7 +832,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
               config.onInitialPageLoaded?.(page);
             }
             bufferedEventsFromSupersededSnapshot = [];
-            replayPage(page);
+            replaySnapshotPage(sink, page);
             drainBufferedCliEvents();
           };
           const onError = (error: unknown): void => {
@@ -877,31 +858,20 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             void config.fetchSnapshotPage(config.kiloSessionId, {}).then(page => {
               if (page && page.kind === 'success') {
                 onPage(page);
-              } else {
-                onError(
-                  new Error(
-                    page === null
-                      ? 'Session not found'
-                      : page.kind === 'retryable_failure'
-                        ? 'Session history temporarily unavailable'
-                        : page.kind === 'too_large'
-                          ? 'Session history too large to load'
-                          : 'Session history is unavailable'
-                  )
-                );
+                return;
               }
+              if (page === null) {
+                onError(new Error('Session not found'));
+                return;
+              }
+              onError(new Error(sessionSnapshotFailureMessage(page.kind)));
             }, onError);
             return;
           }
 
           if (config.fetchSnapshot) {
             void config.fetchSnapshot(config.kiloSessionId).then(snapshot => {
-              onPage({
-                info: snapshot.info,
-                messages: snapshot.messages,
-                nextCursor: null,
-                omittedItemCount: 0,
-              });
+              onPage(snapshotPageFromSnapshot(snapshot));
             }, onError);
           }
         };
@@ -979,17 +949,13 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         // snapshotted before the await and SESSION_OWNER_CHANGED is handled.
         // Extended fields degrade via a single bare retry on the exact
         // old-CLI delivered error; other failures are hard rejects.
-        const mutationId = input?.mutationId ?? cloudAgentSdkRuntime.randomUUID();
         const wireData = buildCreateSessionWireData(input);
-        const hasExtendedFields =
-          wireData.agent !== undefined ||
-          wireData.model !== undefined ||
-          wireData.orgId !== undefined ||
-          wireData.directory !== undefined;
+        const wireMutationIds = createSessionWireMutationIds(input?.mutationId);
+        const hasExtendedFields = hasExtendedCreateSessionFields(wireData);
         const hasCloneField = input?.cloneFromKiloSessionId !== undefined;
         let result: unknown;
         try {
-          result = await sendCommand('create_session', wireData, mutationId);
+          result = await sendCommand('create_session', wireData, wireMutationIds.extended);
         } catch (error) {
           // Only bare-retry when extended fields made the original wire differ
           // from `{ protocolVersion: 1 }`; otherwise the retry is identical.
@@ -1005,7 +971,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
             result = await sendCommand(
               'create_session',
               { protocolVersion: 1 },
-              cloudAgentSdkRuntime.randomUUID()
+              wireMutationIds.bare
             );
           } else {
             throw error;

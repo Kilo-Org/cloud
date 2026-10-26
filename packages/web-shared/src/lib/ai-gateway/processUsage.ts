@@ -90,11 +90,13 @@ import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gat
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import {
   computeOpenRouterCostFields,
+  providerReportsIsByok,
   drainSseStream,
   extractVercelGenerationTime,
   extractVercelIsByok,
   extractVercelUpstreamId,
   isResponseInterruptedError,
+  reportUpstreamStreamError,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import {
   calculateCost_mUsd,
@@ -889,8 +891,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
   const result = await executor.execute<{
     usage_id: string;
     usage_created_at: string;
-    new_microdollars_used: number | null;
-    kilo_pass_threshold: number | null;
+    new_microdollars_used: string | null;
+    kilo_pass_threshold: string | null;
   }>(sql`
           WITH microdollar_usage_ins AS (
             INSERT INTO microdollar_usage (
@@ -1083,6 +1085,9 @@ export function countAndStoreUsage(
     }
   };
 
+  const usesUserCredentials =
+    usageContext.user_byok || usageContext.provider === OPENAI_CHATGPT_PROVIDER_ID;
+
   if (clonedReponse.body) {
     if (usageContext.api_kind === 'responses') {
       usageStatsPromise = usageContext.isStreaming
@@ -1091,10 +1096,15 @@ export function countAndStoreUsage(
             usageContext.kiloUserId,
             openrouterRequestSpan,
             usageContext.provider,
-            clonedReponse.status
+            clonedReponse.status,
+            usesUserCredentials
           )
         : parseResponseText(content =>
-            parseResponsesMicrodollarUsageFromString(content, clonedReponse.status)
+            parseResponsesMicrodollarUsageFromString(
+              content,
+              clonedReponse.status,
+              usageContext.provider
+            )
           );
     }
     if (usageContext.api_kind === 'chat_completions') {
@@ -1104,10 +1114,16 @@ export function countAndStoreUsage(
             usageContext.kiloUserId,
             openrouterRequestSpan,
             usageContext.provider,
-            clonedReponse.status
+            clonedReponse.status,
+            usesUserCredentials
           )
         : parseResponseText(content =>
-            parseMicrodollarUsageFromString(content, usageContext.kiloUserId, clonedReponse.status)
+            parseMicrodollarUsageFromString(
+              content,
+              usageContext.kiloUserId,
+              clonedReponse.status,
+              usageContext.provider
+            )
           );
     }
     if (usageContext.api_kind === 'messages') {
@@ -1117,10 +1133,15 @@ export function countAndStoreUsage(
             usageContext.kiloUserId,
             openrouterRequestSpan,
             usageContext.provider,
-            clonedReponse.status
+            clonedReponse.status,
+            usesUserCredentials
           )
         : parseResponseText(content =>
-            parseMessagesMicrodollarUsageFromString(content, clonedReponse.status)
+            parseMessagesMicrodollarUsageFromString(
+              content,
+              clonedReponse.status,
+              usageContext.provider
+            )
           );
     }
   }
@@ -1131,13 +1152,15 @@ export function countAndStoreUsage(
 export function processOpenRouterUsage(
   usage: OpenRouterUsage | null | undefined,
   coreProps: NotYetCostedUsageStats,
+  provider: ProviderId,
   vercelProviderMetadata?: VercelProviderMetaData | null
 ): JustTheCostsUsageStats {
   // usage may be null when there's no response (e.g. error), so default to empty object
   const { cost_mUsd, is_byok } = computeOpenRouterCostFields(
     usage ?? {},
     coreProps,
-    'sse_processing'
+    'sse_processing',
+    providerReportsIsByok(provider)
   );
 
   return {
@@ -1158,7 +1181,8 @@ export async function parseMicrodollarUsageFromStream(
   kiloUserId: string,
   openrouterRequestSpan: Span | undefined,
   provider: ProviderId,
-  statusCode: number
+  statusCode: number,
+  usesUserCredentials: boolean
 ): Promise<MicrodollarUsageStats> {
   // End the request span immediately as this function starts
   openrouterRequestSpan?.end();
@@ -1213,20 +1237,19 @@ export async function parseMicrodollarUsageFromStream(
         if (typeof error.code === 'number') {
           effectiveStatusCode = error.code;
         }
-        if (error.message === 'Upstream error from Nvidia: Service temporarily overloaded') {
-          console.info(`OpenRouter error: ${error.message}`, {
-            source: 'sse_processing',
+        reportUpstreamStreamError({
+          label: 'OpenRouter error',
+          source: 'sse_processing',
+          error,
+          usesUserCredentials,
+          logContext: {
             provider,
-            code: error.code,
+            inference_provider: json.provider ?? inference_provider,
             messageId: json.id ?? messageId,
             model: json.model ?? model,
-          });
-        } else {
-          captureException(new Error(`OpenRouter error: ${error.message}`), {
-            tags: { source: 'sse_processing' },
-            extra: { json, event },
-          });
-        }
+          },
+          sentryExtra: { json, event },
+        });
       }
 
       model = json.model ?? model;
@@ -1281,7 +1304,7 @@ export async function parseMicrodollarUsageFromStream(
     status_code: effectiveStatusCode,
   };
 
-  const costs = processOpenRouterUsage(usage, coreProps, vercelProviderMetadata);
+  const costs = processOpenRouterUsage(usage, coreProps, provider, vercelProviderMetadata);
 
   return { ...coreProps, ...costs };
 }
@@ -1289,7 +1312,8 @@ export async function parseMicrodollarUsageFromStream(
 export function parseMicrodollarUsageFromString(
   fullResponse: string,
   kiloUserId: string,
-  statusCode: number
+  statusCode: number,
+  provider: ProviderId
 ): MicrodollarUsageStats {
   const responseJson = JSON.parse(fullResponse) as
     | (OpenAI.Chat.Completions.ChatCompletion &
@@ -1297,7 +1321,11 @@ export function parseMicrodollarUsageFromString(
         MaybeHasVercelProviderMetaData)
     | null;
 
-  if (responseJson?.usage?.is_byok == null && responseJson?.usage?.cost) {
+  if (
+    providerReportsIsByok(provider) &&
+    responseJson?.usage?.is_byok == null &&
+    responseJson?.usage?.cost
+  ) {
     captureException(new Error('SUSPICIOUS: is_byok is null'), {
       tags: { source: 'string_processing' },
       extra: { responseJson },
@@ -1324,7 +1352,12 @@ export function parseMicrodollarUsageFromString(
     status_code: statusCode,
   };
 
-  const costs = processOpenRouterUsage(responseJson?.usage, coreProps, vercelProviderMetadata);
+  const costs = processOpenRouterUsage(
+    responseJson?.usage,
+    coreProps,
+    provider,
+    vercelProviderMetadata
+  );
 
   return { ...coreProps, ...costs };
 }
@@ -1425,6 +1458,28 @@ export async function processTokenData(
       );
     }
     usageStats = genStats;
+  } else if (
+    generationProvider === OPENROUTER &&
+    usageStats.messageId &&
+    usageStats.is_byok == null &&
+    usageStats.cost_mUsd > 0
+  ) {
+    // OpenRouter transcriptions never report is_byok, so only the generation
+    // lookup can say whether their cost is the full cost or the BYOK fee.
+    captureMessage(
+      'SUSPICIOUS: OpenRouter generation lookup failed, so a cost without BYOK status may be only the BYOK fee',
+      {
+        level: 'error',
+        tags: { source: 'generation_lookup_fallback' },
+        extra: {
+          messageId: usageStats.messageId,
+          model: usageStats.model,
+          requested_model: usageContext.requested_model,
+          api_kind: usageContext.api_kind,
+          cost_mUsd: usageStats.cost_mUsd,
+        },
+      }
+    );
   }
 
   if (

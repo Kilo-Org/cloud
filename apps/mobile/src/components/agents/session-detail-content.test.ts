@@ -176,6 +176,14 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
   useIsFocused: () => true,
+  usePreventRemove: vi.fn(),
+  useNavigation: () => ({
+    getState: () => ({
+      index: 1,
+      routes: [{ name: '(tabs)' }, { name: 'agent-chat/[session-id]' }],
+    }),
+    addListener: () => () => undefined,
+  }),
   useRouter: () => ({
     canGoBack: () => navigationRoutes.length > 1,
     back: () => {
@@ -452,7 +460,7 @@ vi.mock('@/lib/analytics/posthog', () => ({
   SESSION_VIEWED_EVENT: 'viewed',
 }));
 vi.mock('@/lib/a11y/announce', () => ({
-  moveA11yFocus: () => false,
+  requestA11yFocus: () => false,
   announceForA11y: vi.fn(),
 }));
 // `test-user` by default; the last-opened test flips it to `undefined` to model
@@ -522,6 +530,9 @@ vi.mock('@/lib/hooks/use-session-model-options', () => {
 // stands it in as a no-op.
 vi.mock('@/lib/hooks/use-remote-model-catalog-retry', () => ({
   useRemoteModelCatalogRetry: vi.fn(),
+}));
+vi.mock('@/lib/hooks/use-session-raise-reader', () => ({
+  useSessionRaiseReader: () => () => null,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 vi.mock('@/lib/persist/drafts', () => ({ agentComposerDraftKey: (id: string) => id }));
@@ -699,24 +710,22 @@ function toolRunMessage(
 ): StoredMessage {
   const message = assistantMessage(messageId);
   message.info = { ...message.info, sessionID: sessionId };
-  message.parts = partIds.map(
-    (partId, index): ToolPart => ({
-      id: partId,
-      sessionID: sessionId,
-      messageID: messageId,
-      type: 'tool',
-      callID: `call-${partId}`,
-      tool: 'read',
-      state: {
-        status: 'completed',
-        input: { filePath: `/repo/${partId}.ts` },
-        output: '',
-        title: 'read',
-        metadata: {},
-        time: { start: index, end: index + 1 },
-      },
-    })
-  );
+  message.parts = partIds.map((partId, index): ToolPart => ({
+    id: partId,
+    sessionID: sessionId,
+    messageID: messageId,
+    type: 'tool',
+    callID: `call-${partId}`,
+    tool: 'read',
+    state: {
+      status: 'completed',
+      input: { filePath: `/repo/${partId}.ts` },
+      output: '',
+      title: 'read',
+      metadata: {},
+      time: { start: index, end: index + 1 },
+    },
+  }));
   return message;
 }
 
@@ -919,7 +928,6 @@ async function mountDetails(
         variant: null,
         repository: null,
         isInitiated: true,
-        needsLegacyPrepare: false,
         isPreparingAsync: false,
         prompt: null,
         initialMessageId: null,
@@ -1120,7 +1128,6 @@ describe('SessionDetailContent display scope', () => {
     expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(
       'min-h-21'
     );
-    expect(header.props.context).toBeUndefined();
     expect(header.findAllByType(ContextControl)).toHaveLength(0);
     // The PR link shares the goal row now, so the header row holds no badge.
     expect(header.findAllByType('SessionPrBadge')).toHaveLength(0);
@@ -1128,12 +1135,14 @@ describe('SessionDetailContent display scope', () => {
       header.findAll(node => node.props.accessibilityHint === i18n.t('profile.selectAccount'))
     ).toHaveLength(0);
     expect(header.findByProps({ accessibilityLabel: i18n.t('common.goBack') })).toBeDefined();
-    const { onPress } = header.findByProps({
-      accessibilityLabel: i18n.t('agentChat.session.renameAccessibility', {
+    const rename = header.findByProps({
+      accessibilityLabel: `Root ${ROOT_ID}`,
+      accessibilityHint: i18n.t('agentChat.session.renameAccessibility', {
         title: `Root ${ROOT_ID}`,
       }),
-    }).props as { onPress: () => void };
-    act(onPress);
+    });
+    expect(rename.props.accessibilityLabel).toBe(`Root ${ROOT_ID}`);
+    act(rename.props.onPress as () => void);
     expect(openRenameModal).toHaveBeenCalledOnce();
     pressHeaderBack(renderer);
     expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)/']);
@@ -1179,7 +1188,7 @@ describe('session detail active-profile indicator', () => {
     act(() => {
       (chip.props.onPress as () => void)();
     });
-    expect(navigationRoutes.at(-1)).toBe('/(app)/(tabs)/(3_profile)/profiles/p1');
+    expect(navigationRoutes.at(-1)).toBe('/(app)/profile-management/p1');
   });
 
   it.each(['user', 'organization'] as const)(
@@ -1204,7 +1213,7 @@ describe('session detail active-profile indicator', () => {
         (chip.props.onPress as () => void)();
       });
       expect(navigationRoutes.at(-1)).toBe(
-        `/(app)/(tabs)/(3_profile)/profiles/p1${ownerType === 'organization' ? '?organizationId=org-a' : ''}`
+        `/(app)/profile-management/p1${ownerType === 'organization' ? '?organizationId=org-a' : ''}`
       );
     }
   );
@@ -1232,7 +1241,7 @@ describe('session detail active-profile indicator', () => {
     act(() => {
       (chip.props.onPress as () => void)();
     });
-    expect(navigationRoutes.at(-1)).toBe('/(app)/(tabs)/(3_profile)/profiles/p-recorded');
+    expect(navigationRoutes.at(-1)).toBe('/(app)/profile-management/p-recorded');
   });
 
   it('falls back to the effective default only when the session recorded no profile', async () => {
@@ -2722,6 +2731,23 @@ describe('session detail zero-render transcript guard (mobile-app e2-open)', () 
     return { info: { ...message.info, sessionID: ROOT_ID }, parts: [] };
   }
 
+  it('shows the empty state instead of an empty user bubble for a stored session', async () => {
+    // A stored session opened read-only has no live writer. A user message whose
+    // parts never reached session ingest rendered as an empty bubble under a time
+    // marker (stored-session finding); the row must not exist at all.
+    const phantom: StoredMessage = {
+      info: { ...userMessage('msg-phantom').info, sessionID: ROOT_ID },
+      parts: [],
+    };
+    const view = await mountDetails([phantom]);
+
+    expect(messageLists(view.renderer)).toHaveLength(0);
+    expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
+      title: i18n.t('agentChat.session.emptyTitle'),
+    });
+    expect(view.requestedIds()).toEqual([ROOT_ID]);
+  });
+
   it('shows the empty state instead of a zero-item list when no stored message renders', async () => {
     const view = await mountDetails([blankAssistantMessage('msg-blank')]);
     expect(messageLists(view.renderer)).toHaveLength(0);
@@ -4176,25 +4202,49 @@ describe('session detail duplicate failure state', () => {
     expect(labels).toContain(i18n.t('agentChat.messageBubble.copyToComposer'));
   });
 
-  it('keeps the footer line when the transcript drops the failed row it names', async () => {
-    // A failed assistant row whose parts render nothing is dropped by
-    // `mergeSessionTranscript`; it owns no row, so the footer is the failure's
-    // only surface and must not be suppressed by it.
-    const dropped = rootFailedAssistantMessage('partial reply');
-    dropped.parts = [];
-    const view = await mountDetails([rootUserMessage('please refactor'), dropped]);
-    act(() => {
-      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
-        view.manager.atoms.statusIndicator,
-        { type: 'error', message: 'simulated error', timestamp: 0 }
+  it.each([false, true])(
+    'keeps a response that failed before producing content recoverable after reopen (condensed: %s)',
+    async condensed => {
+      goalMountOptions.resolvedType = 'cloud-agent';
+      sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+      condensePreference.value = condensed;
+      const prompt = 'أجب بكلمة جاهز. لا تستخدم الأدوات.';
+      const failed = rootFailedAssistantMessage('');
+      failed.parts = [];
+      const view = await mountDetails([rootUserMessage(prompt), failed]);
+
+      expect(renderedText(view.renderer.root)).toContain(
+        i18n.t('agentChat.messageFailure.assistantTitle')
       );
-    });
-    const nodes = indicatorNodes(view);
-    expect(nodes).toHaveLength(1);
-    expect(nodes[0]?.props).toMatchObject({
-      indicator: { message: 'simulated error' },
-    });
-  });
+      expect(indicatorNodes(view)).toHaveLength(0);
+      const retry = view.renderer.root.find(
+        node =>
+          Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+      );
+      act(() => {
+        (retry.props.onPress as () => void)();
+      });
+      await waitFor(
+        () =>
+          view.store.get(view.manager.atoms.messagesList).filter(row => row.info.role === 'user')
+            .length === 2
+      );
+      const prompts = view.store
+        .get(view.manager.atoms.messagesList)
+        .filter(row => row.info.role === 'user')
+        .map(row =>
+          row.parts
+            .filter(part => part.type === 'text')
+            .map(part => part.text)
+            .join('')
+        );
+      expect(prompts).toEqual([prompt, prompt]);
+      expect(
+        view.store.get(view.manager.atoms.messagesList).find(row => row.info.id === ASSISTANT_ID)
+          ?.info
+      ).toMatchObject({ role: 'assistant', error: { name: 'APIError' } });
+    }
+  );
 
   it('draws the fixed footer on an opaque, non-absolute surface above the transcript', async () => {
     // Explorer `session-working` showed the fixed footer line printed over the

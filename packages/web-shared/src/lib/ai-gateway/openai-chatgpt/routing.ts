@@ -55,6 +55,13 @@ const METADATA_VALUE_LIMIT = 512;
 const MIN_MAX_OUTPUT_TOKENS = 16;
 
 /**
+ * api.openai.com rejects these with `unknown_parameter`. `enabled`, `exclude`
+ * and `max_tokens` are OpenRouter's reasoning extensions; `generate_summary` is
+ * OpenAI's deprecated name for `summary`, which the gateway always sets.
+ */
+const UNSUPPORTED_REASONING_FIELDS = ['enabled', 'exclude', 'max_tokens', 'generate_summary'];
+
+/**
  * Adds the required traceability keys to the request metadata, keeping any
  * caller-supplied entries. `session_id` is the gateway's identifier for one
  * run, which is what `subscription_sharing_activity_id` expects; it is optional
@@ -296,6 +303,11 @@ export function buildOpenAiChatGptProvider(
         body.max_output_tokens < MIN_MAX_OUTPUT_TOKENS
       ) {
         body.max_output_tokens = MIN_MAX_OUTPUT_TOKENS;
+      }
+      if (body.reasoning) {
+        for (const field of UNSUPPORTED_REASONING_FIELDS) {
+          Reflect.deleteProperty(body.reasoning, field);
+        }
       }
       // OpenAI requires this traceability metadata on every delegated Responses
       // request, including later turns. Without it the request is rejected once

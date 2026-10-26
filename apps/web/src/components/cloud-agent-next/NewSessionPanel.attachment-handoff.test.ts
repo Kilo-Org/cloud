@@ -12,6 +12,7 @@ const mockQueryClient = {
   setQueryData: jest.fn(),
   invalidateQueries: jest.fn(),
   fetchQuery: jest.fn(async () => ({ status: 'unavailable', repositories: [] })),
+  query: jest.fn(async () => ({ status: 'unavailable', repositories: [] })),
 };
 const mockCreateLocalSession = jest.fn((_draft: unknown) => 'local-session-1');
 const mockReleaseMutate = jest.fn(async (_input: unknown) => undefined);
@@ -138,18 +139,6 @@ jest.mock('./local-sessions/LocalSessionsProvider', () => ({
   }),
 }));
 
-jest.mock('./useSandboxPicker', () => ({
-  useSandboxPicker: () => ({
-    picker: { allocation: undefined },
-    groups: [],
-    error: null,
-    isVisible: false,
-    query: { isPending: false, isSuccess: false, isError: false, isFetching: false },
-    choose: jest.fn(),
-    chooseDefault: jest.fn(),
-  }),
-}));
-
 jest.mock('@/hooks/useCloudAgentProfiles', () => ({
   useProfiles: () => ({ data: [] }),
   useCombinedProfiles: () => ({ data: undefined }),
@@ -214,7 +203,7 @@ jest.mock('./BrowseCommandsDialog', () => ({ BrowseCommandsDialog: () => null })
 jest.mock('./MobileToolbarPopover', () => ({ MobileToolbarPopover: () => null }));
 jest.mock('./MobileSidebarToggle', () => ({ MobileSidebarToggle: () => null }));
 jest.mock('./AttachmentPreviewStrip', () => ({ AttachmentPreviewStrip: () => null }));
-jest.mock('./NewSessionSandboxSelect', () => ({ NewSessionSandboxSelect: () => null }));
+jest.mock('./RepositoryEnvironmentChip', () => ({ RepositoryEnvironmentChip: () => null }));
 jest.mock('./RepositoryProviderOnboardingPanel', () => ({
   RepositoryProviderOnboardingPanel: () => null,
 }));

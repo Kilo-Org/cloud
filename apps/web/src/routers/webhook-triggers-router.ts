@@ -1,6 +1,10 @@
+import { webhookBodySchema } from '@kilocode/worker-utils/webhook-body-validation';
 import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { generateCloudAgentToken } from '@kilocode/web-shared/lib/tokens';
+import { canManageOrganization } from '@kilocode/app-shared/organizations';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import { and, eq, isNull } from 'drizzle-orm';
@@ -9,13 +13,28 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { isUniqueViolation } from '@/lib/db-errors';
 import {
   cloud_agent_webhook_triggers,
+  organization_memberships,
   agent_environment_profiles,
   kiloclaw_instances,
+  organizations,
   type User,
 } from '@kilocode/db/schema';
+import {
+  getKiloSandboxAllocation,
+  isSandboxAllocationAvailable,
+  sandboxAllocationSchema,
+  type SandboxAllocation,
+  type SandboxSelectionCapabilities,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import { resolveCloudAgentSessionIds } from '@/lib/webhook-session-resolution';
 import { getWebhookRequestLogs } from '@/lib/webhook-request-logs';
-import { triggerIdSchema, triggerIdCreateSchema } from '@/lib/webhook-trigger-validation';
+import {
+  triggerIdSchema,
+  triggerIdCreateSchema,
+  MIN_CREATOR_WEBHOOK_SECRET_LENGTH,
+  CREATOR_WEBHOOK_SECRET_LENGTH_MESSAGE,
+  type WebhookTriggerEditRestriction,
+} from '@/lib/webhook-trigger-validation';
 import {
   validateCronExpression,
   enforcesMinimumInterval,
@@ -32,6 +51,8 @@ import {
   type EnrichedCapturedRequest,
 } from '@/lib/webhook-agent/webhook-agent-client';
 
+const TRIGGER_WRITE_ROLES: OrganizationRole[] = ['owner', 'admin', 'member'];
+
 // Input schemas
 const variantSchema = z
   .string()
@@ -42,6 +63,7 @@ export const WebhookTriggerCreateInput = z
   .object({
     triggerId: triggerIdCreateSchema,
     organizationId: z.string().uuid().optional(),
+    runAsCreator: z.boolean().optional(),
     targetType: z.enum(['cloud_agent', 'kiloclaw_chat']).default('cloud_agent'),
     // KiloClaw Chat target fields
     kiloclawInstanceId: z.string().uuid().optional(),
@@ -50,8 +72,9 @@ export const WebhookTriggerCreateInput = z
     mode: z.enum(['architect', 'code', 'ask', 'debug', 'orchestrator']).optional(),
     model: z.string().min(1, 'Model is required').optional(),
     variant: variantSchema.optional(),
-    sandboxAllocation: z.literal('isolated-standard').optional(),
-    profileId: z.string().uuid().optional(),
+    sandboxAllocation: sandboxAllocationSchema.optional(),
+    profileId: z.string().uuid().nullable().optional(),
+    bodySchema: webhookBodySchema.nullable().optional(),
     // Shared fields
     promptTemplate: z
       .string()
@@ -71,6 +94,39 @@ export const WebhookTriggerCreateInput = z
     cronTimezone: z.string().max(50).optional().default('UTC'),
   })
   .superRefine((data, ctx) => {
+    if (
+      data.bodySchema != null &&
+      (data.targetType !== 'cloud_agent' || data.activationMode !== 'webhook')
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Body validation is only available for Cloud Agent webhooks',
+        path: ['bodySchema'],
+      });
+    }
+    if (data.runAsCreator) {
+      if (!data.organizationId || data.targetType !== 'cloud_agent') {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Run as creator is only available for organization Cloud Agent triggers',
+          path: ['runAsCreator'],
+        });
+      }
+      if (data.activationMode === 'webhook' && !data.webhookAuth) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Webhook authentication is required when running as the creator',
+          path: ['webhookAuth'],
+        });
+      }
+      if (data.webhookAuth && data.webhookAuth.secret.length < MIN_CREATOR_WEBHOOK_SECRET_LENGTH) {
+        ctx.addIssue({
+          code: 'custom',
+          message: CREATOR_WEBHOOK_SECRET_LENGTH_MESSAGE,
+          path: ['webhookAuth', 'secret'],
+        });
+      }
+    }
     if (data.activationMode === 'scheduled') {
       if (!data.cronExpression) {
         ctx.addIssue({
@@ -115,8 +171,6 @@ export const WebhookTriggerCreateInput = z
       if (!data.mode) ctx.addIssue({ code: 'custom', message: 'Mode is required', path: ['mode'] });
       if (!data.model)
         ctx.addIssue({ code: 'custom', message: 'Model is required', path: ['model'] });
-      if (!data.profileId)
-        ctx.addIssue({ code: 'custom', message: 'Profile is required', path: ['profileId'] });
     }
     if (data.targetType === 'kiloclaw_chat') {
       if (!data.kiloclawInstanceId)
@@ -144,9 +198,10 @@ export const WebhookTriggerUpdateInput = z
     mode: z.enum(['architect', 'code', 'ask', 'debug', 'orchestrator']).optional(),
     model: z.string().min(1).optional(),
     variant: variantSchema.nullable().optional(),
-    sandboxAllocation: z.literal('isolated-standard').nullable().optional(),
+    sandboxAllocation: sandboxAllocationSchema.nullable().optional(),
     promptTemplate: z.string().min(1).max(10000).optional(),
-    profileId: z.string().uuid().optional(),
+    profileId: z.string().uuid().nullable().optional(),
+    bodySchema: webhookBodySchema.nullable().optional(),
     autoCommit: z.boolean().nullable().optional(),
     condenseOnComplete: z.boolean().nullable().optional(),
     isActive: z.boolean().optional(),
@@ -236,6 +291,61 @@ async function cleanupOrphanDbRecord(dbTriggerId: string, triggerId: string): Pr
     .where(eq(cloud_agent_webhook_triggers.id, dbTriggerId));
 }
 
+function assertCanRunAsExecutionUser(
+  executionUserId: string | null | undefined,
+  userId: string
+): void {
+  if (executionUserId && executionUserId !== userId) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Only the creator can run a trigger that runs as its creator',
+    });
+  }
+}
+
+function assertCanEditExecutionUserTrigger(
+  executionUserId: string | null | undefined,
+  userId: string,
+  actorRole: OrganizationRole | undefined
+): void {
+  if (!executionUserId || executionUserId === userId) {
+    return;
+  }
+  if (actorRole && canManageOrganization(actorRole)) {
+    return;
+  }
+  throw new TRPCError({
+    code: 'FORBIDDEN',
+    message:
+      'Only the creator, an organization owner, or an admin can edit a trigger that runs as its creator',
+  });
+}
+
+async function getOrganizationTriggerExecutionUserId(
+  organizationId: string,
+  triggerId: string,
+  dbTriggerId: string
+): Promise<string | null> {
+  const result = await getWorkerTrigger(undefined, organizationId, triggerId);
+  if (result.found === 'error') {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Unable to verify trigger execution identity',
+    });
+  }
+  if (!result.found) {
+    await cleanupOrphanDbRecord(dbTriggerId, triggerId);
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Trigger not found' });
+  }
+  return result.config.executionUserId ?? null;
+}
+
+function assertCreatorWebhookSecretStrength(secret: string): void {
+  if (secret.trim().length < MIN_CREATOR_WEBHOOK_SECRET_LENGTH) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: CREATOR_WEBHOOK_SECRET_LENGTH_MESSAGE });
+  }
+}
+
 /**
  * Helper to validate profile ownership.
  * Throws NOT_FOUND if the profile is missing or not accessible by the owner.
@@ -268,23 +378,96 @@ async function assertProfileOwnership(
   }
 }
 
-async function canSetSandboxAllocation(user: User, organizationId?: string): Promise<boolean> {
-  if (!organizationId) return false;
-  const capabilities = await createCloudAgentNextClient(
-    generateCloudAgentToken(user)
-  ).getSandboxSelectionOptions({ kilocodeOrganizationId: organizationId });
-  return capabilities.enabled;
+function sandboxSelectionInput(organizationId: string, githubRepo?: string) {
+  return {
+    kilocodeOrganizationId: organizationId,
+    ...(githubRepo ? { repositoryType: 'github' as const, repositoryFullName: githubRepo } : {}),
+  };
+}
+
+async function getSandboxSelection(
+  user: User,
+  organizationId?: string,
+  githubRepo?: string
+): Promise<SandboxSelectionCapabilities | undefined> {
+  if (!organizationId) return undefined;
+  return createCloudAgentNextClient(generateCloudAgentToken(user)).getSandboxSelectionOptions(
+    sandboxSelectionInput(organizationId, githubRepo)
+  );
+}
+
+async function assertOrganizationExists(organizationId: string | undefined): Promise<string> {
+  if (!organizationId) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Sandbox selection requires an organization',
+    });
+  }
+
+  const [organization] = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)));
+
+  if (!organization) {
+    throw new TRPCError({
+      code: 'NOT_FOUND',
+      message: 'Organization not found',
+    });
+  }
+
+  return organizationId;
+}
+
+async function assertSandboxAllocationAvailable(
+  user: User,
+  organizationId: string | undefined,
+  sandboxAllocation: SandboxAllocation,
+  githubRepo: string | undefined
+): Promise<void> {
+  const selectedOrganizationId = await assertOrganizationExists(organizationId);
+  const capabilities = await getSandboxSelection(user, selectedOrganizationId, githubRepo);
+
+  if (!capabilities?.enabled) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Sandbox selection requires an enabled organization',
+    });
+  }
+
+  if (isSandboxAllocationAvailable(capabilities, sandboxAllocation)) return;
+
+  const option = capabilities.options.find(
+    candidate => getKiloSandboxAllocation(candidate.allocation) === sandboxAllocation
+  );
+  const unavailableReason = option?.unavailableReason ?? option?.repositoryUnavailableReason;
+
+  throw new TRPCError({
+    code: 'BAD_REQUEST',
+    message: unavailableReason ?? 'Sandbox allocation is not available',
+  });
 }
 
 export const webhookTriggersRouter = createTRPCRouter({
   capabilities: baseProcedure
-    .input(z.object({ organizationId: z.string().uuid().optional() }))
+    .input(
+      z.object({
+        organizationId: z.string().uuid().optional(),
+        githubRepo: z.string().min(1).max(500).optional(),
+      })
+    )
     .query(async ({ ctx, input }) => {
       if (input.organizationId) {
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
+      const sandboxSelection = await getSandboxSelection(
+        ctx.user,
+        input.organizationId,
+        input.githubRepo
+      );
       return {
-        canSetSandboxAllocation: await canSetSandboxAllocation(ctx.user, input.organizationId),
+        canSetSandboxAllocation: sandboxSelection?.enabled ?? false,
+        sandboxSelection,
       };
     }),
 
@@ -364,9 +547,20 @@ export const webhookTriggersRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const userId = ctx.user.id;
 
-      // Verify org membership if organizationId provided
+      let actorRole: OrganizationRole | undefined;
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        try {
+          actorRole = await ensureOrganizationAccess(
+            ctx,
+            input.organizationId,
+            TRIGGER_WRITE_ROLES
+          );
+        } catch (error) {
+          if (!(error instanceof TRPCError) || error.code !== 'UNAUTHORIZED') {
+            throw error;
+          }
+          actorRole = await ensureOrganizationAccess(ctx, input.organizationId);
+        }
       }
 
       // Verify ownership via PostgreSQL
@@ -407,9 +601,29 @@ export const webhookTriggersRouter = createTRPCRouter({
         input.triggerId
       );
 
+      const executionUserId = workerResult.config.executionUserId ?? null;
+      const canEdit =
+        !input.organizationId ||
+        (actorRole !== undefined &&
+          TRIGGER_WRITE_ROLES.includes(actorRole) &&
+          (!executionUserId || executionUserId === userId || canManageOrganization(actorRole)));
+      const canRun = !input.organizationId
+        ? !executionUserId || executionUserId === userId
+        : actorRole !== undefined &&
+          TRIGGER_WRITE_ROLES.includes(actorRole) &&
+          (!executionUserId || executionUserId === userId);
+      const canEditReason: WebhookTriggerEditRestriction = canEdit
+        ? null
+        : executionUserId && executionUserId !== userId
+          ? 'creator_run'
+          : 'role';
+
       return {
         ...workerResult.config,
         inboundUrl,
+        canEdit,
+        canEditReason,
+        canRun,
       };
     }),
 
@@ -423,17 +637,34 @@ export const webhookTriggersRouter = createTRPCRouter({
 
     // Verify org membership if organizationId provided
     if (input.organizationId) {
-      await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'member']);
+      await ensureOrganizationAccess(ctx, input.organizationId, TRIGGER_WRITE_ROLES);
     }
 
-    if (
-      input.sandboxAllocation &&
-      !(await canSetSandboxAllocation(ctx.user, input.organizationId))
-    ) {
-      throw new TRPCError({
-        code: 'FORBIDDEN',
-        message: 'Sandbox selection requires an enabled organization',
-      });
+    if (input.runAsCreator && input.organizationId) {
+      const memberships = await db
+        .select({ id: organization_memberships.id })
+        .from(organization_memberships)
+        .where(
+          and(
+            eq(organization_memberships.organization_id, input.organizationId),
+            eq(organization_memberships.kilo_user_id, userId)
+          )
+        );
+      if (!memberships.length) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Run as creator requires direct organization membership',
+        });
+      }
+    }
+
+    if (input.sandboxAllocation !== undefined) {
+      await assertSandboxAllocationAvailable(
+        ctx.user,
+        input.organizationId,
+        input.sandboxAllocation,
+        input.githubRepo
+      );
     }
 
     // KiloClaw Chat triggers are personal only — org-scoped triggers would fail at delivery
@@ -445,14 +676,12 @@ export const webhookTriggersRouter = createTRPCRouter({
     }
 
     // Target-specific validation (superRefine guarantees required fields per target type)
-    if (input.targetType === 'cloud_agent') {
-      if (!input.profileId) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Profile is required for Cloud Agent triggers',
-        });
-      }
-      await assertProfileOwnership(userId, input.organizationId, input.profileId);
+    if (input.targetType === 'cloud_agent' && input.profileId) {
+      await assertProfileOwnership(
+        userId,
+        input.runAsCreator ? undefined : input.organizationId,
+        input.profileId
+      );
     }
     if (input.targetType === 'kiloclaw_chat') {
       if (!input.kiloclawInstanceId) {
@@ -519,6 +748,7 @@ export const webhookTriggersRouter = createTRPCRouter({
         input.triggerId,
         {
           targetType: input.targetType,
+          executionUserId: input.runAsCreator ? userId : undefined,
           kiloclawInstanceId: input.kiloclawInstanceId,
           githubRepo: input.githubRepo,
           mode: input.mode,
@@ -527,6 +757,7 @@ export const webhookTriggersRouter = createTRPCRouter({
           sandboxAllocation: input.sandboxAllocation,
           promptTemplate: input.promptTemplate,
           profileId: input.profileId,
+          bodySchema: input.bodySchema,
           autoCommit: input.autoCommit,
           condenseOnComplete: input.condenseOnComplete,
           webhookAuth: input.webhookAuth,
@@ -599,13 +830,26 @@ export const webhookTriggersRouter = createTRPCRouter({
   update: baseProcedure.input(WebhookTriggerUpdateInput).mutation(async ({ ctx, input }) => {
     const userId = ctx.user.id;
 
-    // Verify org membership if organizationId provided
+    let actorRole: OrganizationRole | undefined;
     if (input.organizationId) {
-      await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'member']);
+      actorRole = await ensureOrganizationAccess(ctx, input.organizationId, TRIGGER_WRITE_ROLES);
     }
 
     // Verify ownership via PostgreSQL
     const dbTrigger = await assertTriggerOwnership(userId, input.triggerId, input.organizationId);
+
+    let executionUserId: string | null = null;
+    if (input.organizationId) {
+      executionUserId = await getOrganizationTriggerExecutionUserId(
+        input.organizationId,
+        input.triggerId,
+        dbTrigger.id
+      );
+      assertCanEditExecutionUserTrigger(executionUserId, userId, actorRole);
+      if (executionUserId && input.webhookAuth?.secret) {
+        assertCreatorWebhookSecretStrength(input.webhookAuth.secret);
+      }
+    }
 
     if (input.sandboxAllocation !== undefined && dbTrigger.target_type === 'kiloclaw_chat') {
       throw new TRPCError({
@@ -614,19 +858,32 @@ export const webhookTriggersRouter = createTRPCRouter({
       });
     }
 
+    if (input.sandboxAllocation !== undefined && input.sandboxAllocation !== null) {
+      await assertSandboxAllocationAvailable(
+        ctx.user,
+        input.organizationId,
+        input.sandboxAllocation,
+        dbTrigger.github_repo ?? undefined
+      );
+    }
+
     if (
-      input.sandboxAllocation &&
-      !(await canSetSandboxAllocation(ctx.user, input.organizationId))
+      input.bodySchema != null &&
+      (dbTrigger.target_type !== 'cloud_agent' || dbTrigger.activation_mode !== 'webhook')
     ) {
       throw new TRPCError({
-        code: 'FORBIDDEN',
-        message: 'Sandbox selection requires an enabled organization',
+        code: 'BAD_REQUEST',
+        message: 'Body validation is only available for Cloud Agent webhooks',
       });
     }
 
     // Validate profile ownership if profileId provided
     if (input.profileId) {
-      await assertProfileOwnership(userId, input.organizationId, input.profileId);
+      await assertProfileOwnership(
+        executionUserId ?? userId,
+        executionUserId ? undefined : input.organizationId,
+        input.profileId
+      );
     }
 
     const hasUpdates = [
@@ -636,6 +893,7 @@ export const webhookTriggersRouter = createTRPCRouter({
       input.sandboxAllocation,
       input.promptTemplate,
       input.profileId,
+      input.bodySchema,
       input.autoCommit,
       input.condenseOnComplete,
       input.isActive,
@@ -663,6 +921,7 @@ export const webhookTriggersRouter = createTRPCRouter({
       promptTemplate: input.promptTemplate,
       isActive: input.isActive,
       profileId: input.profileId,
+      bodySchema: input.bodySchema,
       autoCommit: input.autoCommit,
       condenseOnComplete: input.condenseOnComplete,
       webhookAuth: input.webhookAuth,
@@ -709,6 +968,17 @@ export const webhookTriggersRouter = createTRPCRouter({
       })
       .where(eq(cloud_agent_webhook_triggers.id, dbTrigger.id));
 
+    if (input.organizationId && executionUserId && executionUserId !== userId) {
+      await createAuditLog({
+        action: 'organization.webhook_trigger.update',
+        actor_email: ctx.user.google_user_email,
+        actor_id: ctx.user.id,
+        actor_name: ctx.user.google_user_name,
+        message: `Updated organization webhook trigger "${input.triggerId}", which runs as another member`,
+        organization_id: input.organizationId,
+      });
+    }
+
     // Build inbound URL
     const inboundUrl = buildInboundUrl(
       input.organizationId ? undefined : userId,
@@ -726,10 +996,19 @@ export const webhookTriggersRouter = createTRPCRouter({
     const userId = ctx.user.id;
 
     if (input.organizationId) {
-      await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'member']);
+      await ensureOrganizationAccess(ctx, input.organizationId, TRIGGER_WRITE_ROLES);
     }
 
-    await assertTriggerOwnership(userId, input.triggerId, input.organizationId);
+    const dbTrigger = await assertTriggerOwnership(userId, input.triggerId, input.organizationId);
+
+    if (input.organizationId) {
+      const executionUserId = await getOrganizationTriggerExecutionUserId(
+        input.organizationId,
+        input.triggerId,
+        dbTrigger.id
+      );
+      assertCanRunAsExecutionUser(executionUserId, userId);
+    }
 
     const result = await invokeWorkerScheduledTrigger(
       input.organizationId ? undefined : userId,
@@ -775,7 +1054,7 @@ export const webhookTriggersRouter = createTRPCRouter({
 
       // Verify org membership if organizationId provided
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId, ['owner', 'member']);
+        await ensureOrganizationAccess(ctx, input.organizationId, TRIGGER_WRITE_ROLES);
       }
 
       // Verify ownership via PostgreSQL

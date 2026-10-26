@@ -12,7 +12,7 @@ import { republishAnsweredAsk } from '@/lib/glanceable/republish-ask';
 import { readWaitingAsk, recordWaitingAsk } from '@/lib/glanceable/waiting-ask';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
-import { ActiveAgentsLiveActivity, LIVE_ACTIVITY_NAME } from './active-agents-live-activity';
+import { getActiveAgentsLiveActivity, LIVE_ACTIVITY_NAME } from './active-agents-live-activity';
 import {
   renderStoredSnapshotWithNotice,
   setGlanceableActionApproving,
@@ -73,9 +73,9 @@ function isActiveAgentsLiveActivity(source: string): boolean {
     return true;
   }
   try {
-    return ActiveAgentsLiveActivity.getInstances(true).some(
-      instance => instance.getId() === source
-    );
+    return getActiveAgentsLiveActivity()
+      .getInstances(true)
+      .some(instance => instance.getId() === source);
   } catch {
     // An unreadable or unsupported surface is not an identity: dropping the
     // press beats answering a target that may belong to another layout.

@@ -70,10 +70,6 @@ import { parseAdminResponse } from './admin-fetch';
 import { SchedulerConfigCard } from './SchedulerConfigCard';
 import { useSystemOneModelOptions } from './system-one-models';
 
-// ---------------------------------------------------------------------------
-// Pure helpers (exported for unit tests)
-// ---------------------------------------------------------------------------
-
 export function formatAccuracy(n: number): string {
   return `${(n * 100).toFixed(1)}%`;
 }
@@ -218,20 +214,41 @@ export function policyOverridesFromForm(
   return Object.keys(overrides).length > 0 ? overrides : null;
 }
 
-// ---------------------------------------------------------------------------
-// Model picker helpers (exported for unit tests)
-// ---------------------------------------------------------------------------
-
 /** Pins a saved model id that is absent from the eligible catalog so it stays selectable. */
 export function pinnedModelFor(id: string): ModelOption {
   return { id, name: id };
 }
 
+/** The registry measures an alias under its concrete target, so coverage reads the target's entries. */
+export type BenchmarkModelOption = ModelOption & { measuredModelId?: string };
+
+type BenchmarkCatalogModel = Parameters<typeof toEligibleModelOptions>[0][number] & {
+  alias_target?: string;
+  opencode?: { variants?: Parameters<typeof getReasoningVariantKeys>[0] } | null;
+};
+
+/** Mirrors `platformRegistryEntries`: an alias counts only through a concrete catalog target. */
+export function toBenchmarkModelOptions(models: BenchmarkCatalogModel[]): BenchmarkModelOption[] {
+  const byId = new Map(models.map(model => [model.id, model]));
+  return toEligibleModelOptions(models).map(option => {
+    const measured = option.id.startsWith('~')
+      ? byId.get(byId.get(option.id)?.alias_target ?? '')
+      : byId.get(option.id);
+    if (measured === undefined || measured.id.startsWith('~')) return option;
+    return {
+      ...option,
+      measuredModelId: measured.id,
+      reasoningVariants: getReasoningVariantKeys(measured.opencode?.variants),
+    };
+  });
+}
+
 export function effortCoverageForModel(
-  model: ModelOption | undefined,
+  model: BenchmarkModelOption | undefined,
   entries?: BenchmarkRegistryResponse['platformEntries']
 ): string {
   if (model?.reasoningVariants === undefined) return 'Effort coverage unavailable';
+  const measuredModelId = model.measuredModelId ?? model.id;
   const efforts: (string | null)[] =
     model.reasoningVariants.length > 0 ? model.reasoningVariants : [null];
   const supported =
@@ -241,7 +258,8 @@ export function effortCoverageForModel(
   if (entries === undefined) return `${supported} · Measurement status unavailable`;
   const statuses = efforts.map(variant => ({
     variant,
-    status: entries.find(entry => entry.model === model.id && entry.variant === variant)?.status,
+    status: entries.find(entry => entry.model === measuredModelId && entry.variant === variant)
+      ?.status,
   }));
   const measured = statuses.filter(entry => entry.status === 'ready').length;
   const outstanding = statuses
@@ -249,10 +267,6 @@ export function effortCoverageForModel(
     .map(entry => `${entry.variant ?? 'default'}: ${entry.status ?? 'not measured'}`);
   return `${supported} · ${measured} of ${efforts.length} measured${outstanding.length > 0 ? ` · ${outstanding.join(', ')}` : ''}`;
 }
-
-// ---------------------------------------------------------------------------
-// Fetch helpers
-// ---------------------------------------------------------------------------
 
 async function fetchBenchmarkConfig(router: AutoRouter) {
   const response = await fetch(`/admin/api/auto-routing/benchmark-config?router=${router}`);
@@ -338,10 +352,6 @@ async function fetchBenchmarkRoutingTable(router: AutoRouter) {
     BenchmarkRoutingTableResponseSchema
   );
 }
-
-// ---------------------------------------------------------------------------
-// Local form state type for decider model rows
-// ---------------------------------------------------------------------------
 
 type DeciderModelRow = BenchmarkPlatformModel;
 
@@ -474,10 +484,6 @@ export function formStateToConfig(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Config editor sub-component
-// ---------------------------------------------------------------------------
-
 function ConfigSectionHeading({ title, description }: { title: string; description: string }) {
   return (
     <div className="mt-4 flex flex-col gap-0.5">
@@ -594,7 +600,7 @@ function BenchmarkConfigEditor({
   config: BenchmarkConfig | null;
   router: AutoRouter;
   onSaved: (next: { config: BenchmarkConfig | null }) => void;
-  modelOptions: ModelOption[];
+  modelOptions: BenchmarkModelOption[];
   modelsLoading: boolean;
   modelsError?: string;
   classifierModelOptions: ModelOption[];
@@ -1139,10 +1145,6 @@ function BenchmarkConfigEditor({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Run summaries expandable table
-// ---------------------------------------------------------------------------
-
 function RunSummariesTable({ run, id }: { run: BenchmarkRun; id: string }) {
   const isDecider = run.kind === 'decider';
 
@@ -1225,10 +1227,6 @@ function RunSummariesTable({ run, id }: { run: BenchmarkRun; id: string }) {
     </TableRow>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Runs table
-// ---------------------------------------------------------------------------
 
 function statusBadgeVariant(
   status: BenchmarkRun['status']
@@ -1342,10 +1340,6 @@ function BenchmarkRunsTable({ runs }: { runs: BenchmarkRun[] }) {
     </>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Routing table view
-// ---------------------------------------------------------------------------
 
 function RoutingTableSummary({ table }: { table: BenchmarkRoutingTableResponse['table'] }) {
   if (!table) return null;
@@ -1469,10 +1463,6 @@ export function RoutingTableView({ data }: { data: BenchmarkRoutingTableResponse
   );
 }
 
-// ---------------------------------------------------------------------------
-// Registry summary
-// ---------------------------------------------------------------------------
-
 const REGISTRY_STATUSES = ['pending', 'running', 'ready', 'failed'] as const;
 
 function RegistrySummary({
@@ -1529,26 +1519,16 @@ function RegistrySummary({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main exported section component
-// ---------------------------------------------------------------------------
-
 export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
   const queryClient = useQueryClient();
   const [forceRerun, setForceRerun] = useState(false);
   const [runFilter, setRunFilter] = useState<RunFilter>('all');
 
   const modelsQuery = useModelSelectorList(undefined);
-  const modelOptions = useMemo(() => {
-    const models = modelsQuery.data?.data ?? [];
-    const coverage = new Map(
-      models.map(model => [model.id, getReasoningVariantKeys(model.opencode?.variants)])
-    );
-    return toEligibleModelOptions(models).map(model => ({
-      ...model,
-      reasoningVariants: coverage.get(model.id),
-    }));
-  }, [modelsQuery.data?.data]);
+  const modelOptions = useMemo(
+    () => toBenchmarkModelOptions(modelsQuery.data?.data ?? []),
+    [modelsQuery.data?.data]
+  );
   const modelsError = modelsQuery.error instanceof Error ? modelsQuery.error.message : undefined;
   const catalogModels = modelsQuery.error ? undefined : modelsQuery.data?.data;
   const catalogModalities = useMemo(
@@ -1592,7 +1572,6 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
     queryFn: () => fetchBenchmarkRuns('all', router),
   });
 
-  // Poll runs every 30s while any run is 'running'
   const hasRunningRun = allRunsQuery.data?.runs.some(r => r.status === 'running') ?? false;
   const refetchRuns = runsQuery.refetch;
   const refetchAllRuns = allRunsQuery.refetch;

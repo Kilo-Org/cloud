@@ -10,7 +10,7 @@ import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
-import { Platform, type Text as RNText, View } from 'react-native';
+import { Platform, type TextInstance, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -49,6 +49,7 @@ import {
   getContextSheetMountState,
 } from '@/components/agents/context-usage-display';
 import { resolveSessionComposerDisabled } from '@/components/agents/session-composer-disabled';
+import { usePickerAboveLeaveGuard } from '@/components/agents/use-picker-above-guard';
 import {
   resolveComposerSendDisabledReason,
   resolveComposerSendDisabledReasonTone,
@@ -185,8 +186,9 @@ import {
   MESSAGE_SENT_EVENT,
   SESSION_VIEWED_EVENT,
 } from '@/lib/analytics/posthog';
-import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
+import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { useMotionPolicy } from '@/lib/a11y/motion';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
@@ -207,6 +209,7 @@ import {
   useSessionModelOptions,
 } from '@/lib/hooks/use-session-model-options';
 import { useRemoteModelCatalogRetry } from '@/lib/hooks/use-remote-model-catalog-retry';
+import { useSessionRaiseReader } from '@/lib/hooks/use-session-raise-reader';
 import {
   buildContinueHref,
   buildContinuePrefillParams,
@@ -284,6 +287,9 @@ export function SessionDetailContent({
   // Session-route navigation only: `replace` in one native-stack commit crashes
   // Android Fabric (KILO-APP-25). Other `router` uses here are unaffected.
   const sessionRouter = useStackSafeReplace();
+  // A Back that lands while one of the composer's pickers is still opening is
+  // delivered to this screen by the native stack; it closes the picker instead.
+  usePickerAboveLeaveGuard();
   const [childSessionSheet, setChildSessionSheet] = useState<ChildSessionSheetMountState>({
     sheet: null,
     visible: false,
@@ -483,6 +489,7 @@ export function SessionDetailContent({
   const analyticsSurface: AnalyticsSurface = fetchedData?.cloudAgentSessionId
     ? 'cloud-agent'
     : 'remote-session';
+  const readObservedRaise = useSessionRaiseReader();
 
   const {
     isAnswering,
@@ -498,6 +505,7 @@ export function SessionDetailContent({
     activeQuestion,
     activePermission,
     surface: analyticsSurface,
+    readObservedRaise,
   });
 
   const autoApproveState = resolveSessionAutoApproveState({
@@ -556,10 +564,14 @@ export function SessionDetailContent({
   });
   const openSessionProfileEditor = () => {
     if (sessionProfile) {
+      // The session screen is on the root `(app)` Stack: the profile editor has
+      // to join it there, or Back would land on the Profile tab root instead of
+      // this session.
       router.push(
         getProfileOverviewPath(
           sessionProfile.id,
-          profileOrganizationId(organizationId, sessionProfile)
+          profileOrganizationId(organizationId, sessionProfile),
+          'app'
         )
       );
     }
@@ -1104,6 +1116,11 @@ export function SessionDetailContent({
     [displayedMessages, detailsMessageId, pendingMessages, isStreaming]
   );
 
+  // While a stored session is read-only, no live writer supplies its parts.
+  // Omit user rows that render nothing; if the manager later resolves a live
+  // transport, the next build restores the normal streaming behavior.
+  const dropUnrenderableUserRows = activeSessionType === 'read-only';
+
   const baseTranscript = useMemo(() => {
     // A superseded submission's preparation goes with its row: dropping only
     // the row would leave `mergeSessionTranscript` re-emitting the attempt at
@@ -1114,8 +1131,17 @@ export function SessionDetailContent({
         : preparationAttempts.filter(
             attempt => !supersededMessageIds.has(attempt.triggerMessageId)
           );
-    return mergeSessionTranscript(displayedMessages, attempts, pendingMessages);
-  }, [displayedMessages, preparationAttempts, pendingMessages, supersededMessageIds]);
+    return mergeSessionTranscript(displayedMessages, attempts, {
+      deliveryStates: pendingMessages,
+      dropUnrenderableUserRows,
+    });
+  }, [
+    displayedMessages,
+    preparationAttempts,
+    pendingMessages,
+    supersededMessageIds,
+    dropUnrenderableUserRows,
+  ]);
   // Condensing is opt-in: with the preference off the derived transcript is the
   // same array identity, so nothing below re-renders differently.
   //
@@ -1741,6 +1767,11 @@ export function SessionDetailContent({
   // footer's error line must not state the same failure a second time (explorer
   // finding: the same failure stated three times), so a status error the row
   // already carries is dropped — a classified one the row does not carry stays.
+  // `getLanguageSnapshot()` re-resolves the captured copy (`selectMessageFailure`
+  // resolves titles through module-level `i18n.t`) when the app language changes
+  // while the session is mounted; the failure is otherwise stable on its message
+  // inputs.
+  const languageSnapshot = getLanguageSnapshot();
   const footerMessageFailure = useMemo(
     () =>
       lastVisibleMessageFailure({
@@ -1748,13 +1779,17 @@ export function SessionDetailContent({
         messages,
         pendingMessages,
         canceledQueuedMessages,
+        dropUnrenderableUserRows,
       }),
-    // `getLanguageSnapshot()` re-resolves the captured copy (`selectMessageFailure`
-    // resolves titles through module-level `i18n.t`) when the app language
-    // changes while the session is mounted; the failure is otherwise stable on
-    // its message inputs.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- language drives the resolved copy inside selectMessageFailure
-    [displayedMessages, messages, pendingMessages, canceledQueuedMessages, getLanguageSnapshot()]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the captured copy is language-driven, not message-derived
+    [
+      displayedMessages,
+      messages,
+      pendingMessages,
+      canceledQueuedMessages,
+      dropUnrenderableUserRows,
+      languageSnapshot,
+    ]
   );
   const footerStatusIndicator =
     statusIndicator !== null &&
@@ -1900,7 +1935,7 @@ export function SessionDetailContent({
   // node that no longer exists. We track the previous blocking kind and
   // only fire on the non-none → none transition (i.e. the user satisfied
   // the card), not on the very first mount.
-  const transcriptRef = useRef<RNText | null>(null);
+  const transcriptRef = useRef<TextInstance | null>(null);
   const previousBlockingInteractionRef = useRef<typeof blockingInteraction>('none');
   useEffect(() => {
     const wasBlocking = previousBlockingInteractionRef.current !== 'none';
@@ -1909,11 +1944,13 @@ export function SessionDetailContent({
     if (!wasBlocking || isBlocking) {
       return undefined;
     }
-    if (moveA11yFocus(transcriptRef)) {
+    // `false` means the transcript had no node handle yet; retry once it has
+    // mounted. A dispatched request the platform ignores is not retryable.
+    if (requestA11yFocus(transcriptRef)) {
       return undefined;
     }
     const handle = setTimeout(() => {
-      moveA11yFocus(transcriptRef);
+      requestA11yFocus(transcriptRef);
     }, 50);
     return () => {
       clearTimeout(handle);
@@ -2274,7 +2311,7 @@ export function SessionDetailContent({
             {...(rename.isTitleInteractive
               ? {
                   onTitlePress: rename.openModal,
-                  onTitlePressAccessibilityLabel: t('agentChat.session.renameAccessibility', {
+                  onTitlePressAccessibilityHint: t('agentChat.session.renameAccessibility', {
                     title: rename.title,
                   }),
                 }
@@ -2285,7 +2322,7 @@ export function SessionDetailContent({
               entering={FadeIn.duration(200)}
               exiting={FadeOut.duration(150)}
               layout={reducedMotion ? undefined : LinearTransition.duration(150)}
-              className="px-4 pb-1"
+              className="px-4 pb-3"
             >
               <ActiveProfileIndicator
                 state={sessionProfileIndicatorState}
@@ -2570,7 +2607,7 @@ export function SessionDetailContent({
             </Text>
             <Button
               variant="outline"
-              size="sm"
+              size="action"
               accessibilityLabel={t('agentChat.session.continueInNewSession')}
               onPress={handleContinueInNewSession}
             >
@@ -2714,6 +2751,7 @@ export function SessionDetailContent({
             </Text>
             <Button
               variant="outline"
+              size="action"
               accessibilityLabel={t('common.retry')}
               loading={slowRetryPending}
               onPress={() => {
@@ -2760,12 +2798,14 @@ export function SessionDetailContent({
             action={
               <Button
                 variant="outline"
+                size="action"
                 onPress={() => {
                   void manager.loadOlderMessages();
                 }}
                 loading={isLoadingOlderMessages}
                 accessibilityLabel={t('common.retry')}
                 accessibilityHint={t('agentChat.olderMessages.retryHint')}
+                className={STATE_ACTION_CLASS}
               >
                 <Text>{t('common.retry')}</Text>
               </Button>

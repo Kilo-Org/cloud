@@ -19,7 +19,6 @@ RUN echo "apt cache bust: ${APT_CACHE_BUST}" \
     && apt-get install -y --no-install-recommends \
        ca-certificates curl gnupg git xz-utils unzip jq ripgrep rsync zstd \
        build-essential python3 ffmpeg tmux chromium \
-    && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' libbrotli1)" ge 1.1.0-2+deb13u1 \
     && update-ca-certificates \
     && ARCH="$(dpkg --print-architecture)" \
     && case "${ARCH}" in \

@@ -3,6 +3,7 @@ import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits'
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { REPO_PLATFORM_LABEL_KEYS } from '@/lib/picker-bridge';
 
 import { type AppActionRequest, type AppActionResult } from './app-action-contract';
 import {
@@ -129,7 +130,7 @@ describe('dispatchAppActionRequest', () => {
     );
     expect(confirmStart).toHaveBeenCalledExactlyOnceWith({
       prompt: 'inspect this project',
-      repository: 'GitLab: group/sub/project',
+      repository: `${i18n.t(REPO_PLATFORM_LABEL_KEYS.gitlab)}: group/sub/project`,
     });
     expect(startAgent).toHaveBeenCalledExactlyOnceWith({
       prompt: 'inspect this project',
@@ -137,6 +138,27 @@ describe('dispatchAppActionRequest', () => {
       resolvedRepository: repository,
     });
     expect(order).toEqual(['resolve', 'confirm', 'start']);
+  });
+
+  it('uses the localized repository provider label', async () => {
+    const repository = {
+      platform: 'bitbucket',
+      fullName: 'workspace/project',
+      isPrivate: false,
+    } as const;
+    const confirmStart = vi.fn().mockResolvedValue(false);
+    await dispatchAppActionRequest(
+      { action: 'StartAgent', prompt: 'inspect this project' },
+      {
+        resolveRepository: () => Promise.resolve({ ok: true, repository }),
+        confirmStart,
+        startAgent: vi.fn(),
+      }
+    );
+    expect(confirmStart).toHaveBeenCalledExactlyOnceWith({
+      prompt: 'inspect this project',
+      repository: `${i18n.t(REPO_PLATFORM_LABEL_KEYS.bitbucket)}: workspace/project`,
+    });
   });
 
   it('returns repository resolution refusals', async () => {

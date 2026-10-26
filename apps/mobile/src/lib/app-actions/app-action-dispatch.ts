@@ -9,6 +9,7 @@
 import { type NewSessionRepository } from '@/components/agents/new-session-repository-state';
 
 import { i18n } from '@/i18n';
+import { REPO_PLATFORM_LABEL_KEYS } from '@/lib/picker-bridge';
 
 import {
   appActionHref,
@@ -185,7 +186,7 @@ async function runStartAgent(
         return resolution.result;
       }
       resolvedRepository = resolution.repository;
-      const provider = resolution.repository.platform === 'github' ? 'GitHub' : 'GitLab';
+      const provider = i18n.t(REPO_PLATFORM_LABEL_KEYS[resolution.repository.platform]);
       confirmedInput = {
         ...input,
         repository: `${provider}: ${resolution.repository.fullName}`,

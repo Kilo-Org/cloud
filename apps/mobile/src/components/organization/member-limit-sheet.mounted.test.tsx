@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
+import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { InviteMemberSheet } from './invite-member-sheet';
@@ -237,6 +238,40 @@ const blankWithoutLimitMessage = i18n.t('organization.memberLimit.blankWithoutLi
   max: formatNumber(2000, i18n.language),
 });
 
+describe('MemberLimitSheet error copy', () => {
+  function accessibleStatusMessages(renderer: TestRenderer.ReactTestRenderer): (string | null)[] {
+    return renderer.root
+      .findAll(node => String(node.type) === 'AccessibleStatus')
+      .map(node => propsOf(node).message as string | null);
+  }
+
+  it('explains a lapsed organization plan instead of echoing the server sentence', async () => {
+    updateMember.isError = true;
+    updateMember.error = Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+      data: { code: 'FORBIDDEN', message: ORGANIZATION_TRIAL_EXPIRED_MESSAGE },
+    });
+    const { renderer, unmount } = await mountLimitForm(1200);
+
+    const messages = accessibleStatusMessages(renderer);
+    expect(messages).toContain(i18n.t('common.organizationTrialEnded'));
+    expect(messages).not.toContain(ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
+    unmount();
+  });
+
+  it('never shows an unexplained server sentence', async () => {
+    updateMember.isError = true;
+    updateMember.error = Object.assign(new Error('Failed to update user role'), {
+      data: { code: 'NOT_FOUND', message: 'Failed to update user role' },
+    });
+    const { renderer, unmount } = await mountLimitForm(1200);
+
+    const messages = accessibleStatusMessages(renderer);
+    expect(messages).toContain(i18n.t('common.couldNotSaveSetting'));
+    expect(messages).not.toContain('Failed to update user role');
+    unmount();
+  });
+});
+
 describe('MemberLimitSheet validation', () => {
   it('shows the range error on an above-maximum amount and keeps save disabled', async () => {
     const { renderer, unmount } = await mountLimitForm(1200);
@@ -266,6 +301,23 @@ describe('MemberLimitSheet validation', () => {
     expect(formField(renderer).error).toBeUndefined();
     expect(saveButton(renderer).disabled).toBe(false);
     unmount();
+  });
+
+  it('enables save for an amount typed with Arabic-Indic digits under the Arabic UI', async () => {
+    await i18n.changeLanguage('ar');
+    try {
+      const { renderer, unmount } = await mountLimitForm(1200);
+
+      act(() => {
+        (formField(renderer).onChangeText as (value: string) => void)('٢٥');
+      });
+
+      expect(formField(renderer).error).toBeUndefined();
+      expect(saveButton(renderer).disabled).toBe(false);
+      unmount();
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 
   it('explains a blank field on a member with no limit only after interaction', async () => {

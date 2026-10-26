@@ -21,8 +21,11 @@ import {
   downloadProgress,
   expectedBytes,
   mayRetryTransfer,
+  requestPause,
+  requestResume,
   transferResult,
   transfersOf,
+  transferStart,
 } from './gguf-transfers';
 import { verifyModel } from './gguf-verify';
 
@@ -89,10 +92,7 @@ export function ggufDownloads({
 
   /** Starts the transfer at the current step from zero. */
   const begin = (download: Active) => {
-    const { url, part, expected } = currentTransfer(download);
-    download.written = 0;
-    download.total = expected ?? 0;
-    download.resuming = false;
+    const { url, part } = transferStart(download);
     const progress = onProgress(() => download);
     download.task = storage.createDownload(url, part, progress);
     publish();
@@ -208,7 +208,19 @@ export function ggufDownloads({
       return;
     }
     if (outcome.value === null) {
+      // A cancel or a low-space stop that raced the pause wins: the task reports
+      // itself paused, but the download was already meant to end, so it does.
+      if (download.stop === 'cancel') {
+        discard(download);
+        publish();
+        return;
+      }
+      if (download.stop === 'space') {
+        fail(download, 'space');
+        return;
+      }
       download.phase = 'paused';
+      download.pausing = false;
       publish();
       return;
     }
@@ -283,17 +295,15 @@ export function ggufDownloads({
     },
     pause: (fileId: string) => {
       const download = active;
-      if (download?.fileId === fileId && download.phase === 'downloading') {
-        download.task.pause();
+      if (download?.fileId === fileId && requestPause(download)) {
+        publish();
       }
     },
     resume: (fileId: string) => {
       const download = active;
-      if (download?.fileId !== fileId || download.phase !== 'paused') {
+      if (download?.fileId !== fileId || !requestResume(download)) {
         return;
       }
-      download.phase = 'downloading';
-      download.resuming = true;
       publish();
       void settle(download, download.task.resumeAsync());
     },

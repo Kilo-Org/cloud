@@ -16,6 +16,31 @@ import { toGuiCreditCategory } from '@kilocode/web-shared/lib/PromoCreditCategor
 import { promoCreditCategoriesByKey } from '@kilocode/web-shared/lib/promoCreditCategories';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
+import * as z from 'zod';
+import {
+  DEFAULT_PAGE_SIZE,
+  MAX_PAGE_NUMBER,
+  PAGE_SIZE_OPTIONS,
+} from '@kilocode/web-shared/types/pagination';
+
+const creditCategoryUsersQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).max(MAX_PAGE_NUMBER).default(1),
+  limit: z.coerce
+    .number()
+    .int()
+    .refine(limit => PAGE_SIZE_OPTIONS.some(option => option === limit))
+    .default(DEFAULT_PAGE_SIZE),
+});
+
+// Postgres LIKE treats backslash as the default escape character.
+const escapeLikePattern = (value: string) => value.replace(/[%_\\]/g, '\\$&');
+
+// An absent or empty query parameter keeps the default value.
+const readOptionalParam = (searchParams: URLSearchParams, name: string) => {
+  const value = searchParams.get(name);
+  if (value === null || value.trim() === '') return undefined;
+  return value;
+};
 
 export async function GET(
   request: NextRequest,
@@ -30,9 +55,15 @@ export async function GET(
 
   const { key } = await params;
   const searchParams = request.nextUrl.searchParams;
-  const page = parseInt(searchParams.get('page') || '1');
-  const limit = parseInt(searchParams.get('limit') || '25');
-  const search = searchParams.get('search') || '';
+  const parsedQuery = creditCategoryUsersQuerySchema.safeParse({
+    page: readOptionalParam(searchParams, 'page'),
+    limit: readOptionalParam(searchParams, 'limit'),
+  });
+  if (!parsedQuery.success) {
+    return NextResponse.json({ error: 'Invalid pagination parameters' }, { status: 400 });
+  }
+  const { page, limit } = parsedQuery.data;
+  const search = escapeLikePattern(searchParams.get('search') || '');
   const sortBy = searchParams.get('sortBy') || 'created_at';
   const sortOrder = searchParams.get('sortOrder') || 'desc';
 

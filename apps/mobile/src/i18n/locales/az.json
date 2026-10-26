@@ -53,6 +53,7 @@
     "connected": "Qoşulub",
     "couldNotLoadModels": "Modelləri yükləmək mümkün olmadı.",
     "couldNotLoadRepositories": "Repozitoriyaları yükləmək mümkün olmadı.",
+    "noRepositoriesFound": "Repozitoriya tapılmadı",
     "critical": "Kritik",
     "delete": "Sil",
     "deleted": "Silindi",
@@ -87,6 +88,7 @@
     "connect": "Qoşul",
     "connectBitbucket": "Bitbucket hesabını qoş",
     "connectGitlab": "GitLab-ı qoş",
+    "connectProvider": "Provayder qoş",
     "contentTruncated": "Məzmun qısaldılıb",
     "copyLink": "Keçidi kopyala",
     "couldNotLoadOrganizations": "Təşkilatları yükləmək mümkün olmadı.",
@@ -145,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Dəyişikliklər"
+    "changes": "Dəyişikliklər",
+    "organizationTrialEnded": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Təşkilat sahibi kilo.ai ünvanında billinqi yeniləyə və sonra yenidən cəhd edə bilər."
   },
   "language": {
     "restarting": "Dil dəyişikliyini tətbiq etmək üçün yenidən başladılır",
@@ -269,7 +272,6 @@
     "voiceInput": "Səsli daxiletmə",
     "autoExpandThinking": "Düşüncə bölməsini avtomatik aç",
     "autoExpandThinkingSubtitle": "Agent düşünməni bitirdikdə düşüncə bölməsini açıq göstər.",
-    "autoExpandThinkingInactiveSubtitle": "Düşüncə təfərrüatları gizli olanda təsiri yoxdur.",
     "hideThinking": "Düşüncə təfərrüatlarını gizlət",
     "hideThinkingSubtitle": "Agentin düşüncəsini sessiya səhifəsində göstərmə.",
     "keepScreenOn": "Sessiya səhifəsində ikən ekranı açıq saxla",
@@ -294,7 +296,8 @@
     "condenseToolCallsSubtitle": "Ardıcıl alət çağırışlarını aça biləcəyiniz bir sətirdə qruplaşdırın.",
     "toolSummaryTranslation": "Alət xülasələrini tərcümə et",
     "toolSummaryTranslationSubtitle": "Hər alət xülasəsini tətbiq dilinə tərcümə etmək üçün modelə göndərin. Tərcümə uğursuz olarsa, orijinal göstərilir.",
-    "toolSummaryTranslationModelUnavailableNotice": "Bu model artıq təklif edilmir. Başqasını seçmək üçün $t(common.model) üzərinə toxunun."
+    "toolSummaryTranslationModelUnavailableNotice": "Bu model artıq təklif edilmir. Başqasını seçmək üçün $t(common.model) üzərinə toxunun.",
+    "autoExpandThinkingInactiveSubtitle": "Düşüncə təfərrüatları gizli olanda təsiri yoxdur."
   },
   "prReview": {
     "pullRequestUnavailable": "Birləşdirmə sorğusu əlçatan deyil",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "GitLab-da daha çox qrupa və ya layihəyə giriş icazəsi verməyin lazım ola bilər.",
       "installGithubApp": "GitHub tətbiqini repozitoriyalarda quraşdır",
       "installGithubAppDescription": "Kilo GitHub tətbiqinə yoxlanmasını istədiyin repozitoriyalara giriş icazəsi ver.",
-      "noRepositoriesFound": "Repozitoriya tapılmadı",
       "repositoryAccess": "repozitoriyaya giriş"
     },
     "style": {
@@ -1434,15 +1436,11 @@
       "findingsUnavailable": "Bu kod yoxlaması uğursuz olduğu üçün nəticələr əlçatan deyil.",
       "serviceUnavailable": "Kod yoxlaması xidmətinə qoşulmaq mümkün olmadı. Xidmət əlçatan olduqda yoxlamanı təkrarla.",
       "reviewFailed": "Kod yoxlaması uğursuz oldu. Zəhmət olmasa, yenidən cəhd et.",
-      "cancelReasonSuperseded": "Daha yeni bir commit push edildiyi üçün bu yoxlama əvəz edildi.",
-      "cancelReasonIntegrationDisconnected": "{{platform}} qoşulmayıb, bu səbəbdən bu yoxlama ləğv edildi. Onu yenidən qoş, sonra yoxlamanı təkrarla.",
-      "cancelReasonBitbucketReviewerDisabled": "Bitbucket üçün Code Reviewer deaktiv edildiyindən bu yoxlama ləğv edildi. Onu yenidən aktivləşdir, sonra yoxlamanı təkrarla.",
-      "cancelReasonBitbucketPullRequestChanged": "Bitbucket pull request-i dəyişdiyindən bu yoxlama əvəz edildi.",
-      "cancelReasonCancelled": "Bu yoxlama ləğv edildi.",
-      "cancelReasonInterrupted": "Bu yoxlama kəsildi.",
       "showMore": "Daha çox göstər",
       "created": "Yaradılıb",
       "started": "Başlanıb",
+      "reviewEnded": "Bitib",
+      "severityNitpick": "Xırda qeyd",
       "tokens": "Token",
       "tokensInOut": "{{input}} giriş / {{output}} çıxış",
       "council": "Şura",
@@ -1466,7 +1464,13 @@
       "sessionError": "Sessiyada xəta baş verdi: {{error}}.",
       "statusWithValue": "Vəziyyət: {{status}}",
       "toolName": "Alət: {{name}}",
-      "toolNameError": "{{name}} alətində xəta baş verdi."
+      "toolNameError": "{{name}} alətində xəta baş verdi.",
+      "cancelReasonSuperseded": "Daha yeni bir commit push edildiyi üçün bu yoxlama əvəz edildi.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} qoşulmayıb, bu səbəbdən bu yoxlama ləğv edildi. Onu yenidən qoş, sonra yoxlamanı təkrarla.",
+      "cancelReasonBitbucketReviewerDisabled": "Bitbucket üçün Code Reviewer deaktiv edildiyindən bu yoxlama ləğv edildi. Onu yenidən aktivləşdir, sonra yoxlamanı təkrarla.",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket pull request-i dəyişdiyindən bu yoxlama əvəz edildi.",
+      "cancelReasonCancelled": "Bu yoxlama ləğv edildi.",
+      "cancelReasonInterrupted": "Bu yoxlama kəsildi."
     },
     "reviewMemory": {
       "title": "Yoxlama yaddaşı",
@@ -1480,6 +1484,22 @@
       "loadingProposals": "Təkliflər yüklənir",
       "couldNotLoadProposals": "Təklifləri yükləmək mümkün olmadı.",
       "noProposals": "Təklif yoxdur",
+      "proposalDetails": "Təklifin təfərrüatları",
+      "proposalTitle": "Təklifin başlığı",
+      "rationale": "Əsaslandırma",
+      "saveFirst": "Pull sorğusu açmazdan əvvəl dəyişikliklərini yadda saxla.",
+      "proposalSaved": "Təklif yadda saxlanıldı",
+      "proposalDismissed": "Təklif rədd edildi",
+      "dismissProposalTitle": "Təklif rədd edilsin?",
+      "dismissProposalMessage": "Bu təklif aktiv siyahıdan silinəcək və onu bərpa etmək mümkün olmayacaq.",
+      "prOpened": "REVIEW.md üçün pull sorğusu açıldı",
+      "alreadyPresent": "Təlimatlar artıq REVIEW.md faylında mövcuddur",
+      "status": {
+        "edited": "Redaktə edilib",
+        "opening_change_request": "PR açılır",
+        "change_request_failed": "PR uğursuz oldu",
+        "superseded": "Artıq mövcuddur"
+      },
       "noProposalsDescription": "Kilo layihəyə cavabdeh şəxslərin cavablarını təhlil etdikdən sonra kod yoxlaması yaddaşının təklifləri burada görünəcək."
     },
     "manualReview": {
@@ -1487,7 +1507,6 @@
       "invalidUrl": "Etibarlı PR URL-i daxil et.",
       "couldNotCheckProviderStatus": "Provayderin statusunu yoxlamaq mümkün olmadı.",
       "couldNotLoadProviders": "Qoşduğun provayderləri yükləmək mümkün olmadı. Yenidən cəhd et.",
-      "connectProvider": "Provayder qoş",
       "connectProviderDescription": "PR üçün kod yoxlamasını əl ilə başlatmaq üçün GitHub-u qoş.",
       "pullRequestUrl": "PR URL-i",
       "instructions": "Təlimatlar (istəyə bağlı)",
@@ -1615,8 +1634,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Filtr yoxdur",
-      "noFiltersDescription": "Geri qayıt və tapıntılar siyahısından filtrləri yenidən aç.",
       "title": "Tapıntıların filtrlənməsi",
       "reset": "Sıfırla",
       "severity": "Ciddilik dərəcəsi",
@@ -1913,11 +1930,17 @@
       "actorSystem": "Kilo sistemi",
       "couldNotLoad": "Audit hesabatını yükləmək mümkün olmadı.",
       "events": "Hadisələr",
+      "eventConfidence": "Etibarlılıq: {{confidence}}",
+      "eventReason": "Səbəb: {{reason}}",
+      "eventsCount_one": "{{displayCount}} hadisə",
+      "eventsCount_other": "{{displayCount}} hadisə",
       "generated": "Hesabat {{generatedAt}} tarixində yaradılıb.",
       "noActivity": "Qeyd olunmuş fəaliyyət yoxdur",
       "noActivityDescription": "{{start}} – {{end}} aralığında Kilo-da təhlükəsizlik tapıntıları üzrə hesabata daxil ediləcək fəaliyyət yoxdur.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repozitoriya qeyd olunmayıb",
+      "reasonUnknown": "Tanınmayan səbəb",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Hesabatın xülasəsi",
       "title": "Audit hesabatı",
       "unavailable": "Audit hesabatı mövcud deyil",
@@ -1972,6 +1995,7 @@
       "reauthorizeButton": "GitHub tətbiqinə yenidən icazə ver",
       "reauthorizeDescription": "Təhlükəsizlik agentinə Dependabot bildirişlərini oxumaq üçün icazə lazımdır. Bu icazəni vermək üçün GitHub tətbiqinə yenidən icazə ver.",
       "reauthorizeTitle": "Əlavə icazələr tələb olunur",
+      "retryFailed": "Təhlükəsizlik agentini yenidən yükləmək mümkün olmadı. İnternet bağlantını yoxla və yenidən cəhd et.",
       "setupFailed": "GitHub quraşdırmasını başlatmaq mümkün olmadı. Yenidən cəhd et."
     },
     "queuedActionUntracked": "Növbəyə əlavə edilmiş əməliyyatı artıq izləmək mümkün deyil. Son vəziyyəti görmək üçün yenilə.",
@@ -2134,8 +2158,8 @@
       "dollar_other": "dollar",
       "costSpoken": "xərc: {{cost}}",
       "costSpokenWithTime": "xərc {{cost}}, {{time}}",
-      "spokenJoiner": "və",
-      "pullRequest": "birləşdirmə sorğusu {{number}}"
+      "pullRequest": "birləşdirmə sorğusu {{number}}",
+      "spokenJoiner": "və"
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub açıla bilmədi",
@@ -2163,8 +2187,8 @@
       "title": "Sessiya",
       "copyErrorDetails": "Xətanın təfərrüatlarını kopyala",
       "backToSessions": "Sessiyalara qayıt",
-      "follow": "Kilid ekranında izlə",
-      "unfollow": "Kilid ekranında izləməni dayandır",
+      "follow": "Sessiyanı izlə",
+      "unfollow": "Sessiyanı izləməni dayandır",
       "couldNotLoad": "Sessiyanı yükləmək mümkün olmadı.",
       "failedToLoadDetails": "Sessiyanın təfərrüatlarını yükləmək mümkün olmadı.",
       "failedToStopExecution": "İcranı dayandırmaq mümkün olmadı.",
@@ -2565,7 +2589,10 @@
       "allowOnceAccessibility": "Bir dəfə icazə ver",
       "alwaysAllow": "Həmişə icazə ver",
       "alwaysAllowAccessibility": "Həmişə icazə ver",
-      "retrying": "Yenidən cəhd edilir…"
+      "retrying": "Yenidən cəhd edilir…",
+      "retryDeny": "Yenidən rədd etməyə çalış",
+      "retryAllowOnce": "Yenidən bir dəfə icazə verməyə çalış",
+      "retryAlwaysAllow": "Yenidən həmişə icazə verməyə çalış"
     },
     "questionCard": {
       "title": "Agent cavab gözləyir",
@@ -2941,7 +2968,6 @@
   },
   "voiceInput": {
     "listening": "Dinlənilir...",
-    "staysOff": "Səsin onlayn mətnə çevrilməsinə icazə verənədək səslə daxiletmə deaktiv qalacaq.",
     "onlineTitle": "Nitq onlayn emal olunur",
     "onlineMessage": "Bu cihaz səsi oflayn mətnə çevirə bilmir. Səs yazın mətnə çevrilməsi üçün {{provider}} xidmətinə göndərilir. Kilo səs yazısını saxlamır.",
     "allow": "İcazə ver",
@@ -3117,22 +3143,16 @@
     "boundary": {
       "backToProfile": "Profilə qayıt",
       "loadErrorMessage": "Bağlantını yoxla və yenidən cəhd et.",
-
       "chooseAccount": "Hesab seç",
       "loadErrorTitle": "Təşkilatlarını yükləmək mümkün olmadı.",
       "membershipLostNotice": "Bu təşkilata artıq giriş icazən yoxdur. Keçid edildi: {{target}}.",
       "noOrganization": "Təşkilat yoxdur",
-
       "noOrganizationDescription": "Bu hesab heç bir təşkilatın üzvü deyil. Üzv dəvətləri və aşağı balans xəbərdarlıqları kimi təşkilat funksiyalarından istifadə etmək üçün saytda təşkilat yarat və ya ona qoşul.",
-
       "openWebOrganizations": "Təşkilatları saytda aç",
-
       "organizationUnavailable": "Təşkilat əlçatan deyil.",
       "selectDescriptionWithOrganizations": "Sən bir və ya bir neçə təşkilatın üzvüsən. Bu ekranın istifadə etməli olduğu hesabı seç.",
-
       "selectOrganization": "Təşkilat seç",
       "unavailableDescription": "Bu təşkilat artıq əlçatan deyil. Davam etmək üçün profilindən başqa təşkilat seç.",
-
       "unavailableSessionsDescription": "Bu təşkilat artıq əlçatan deyil. Onun sessiyalarını yükləmək mümkün deyil.",
       "accessDeniedDescription": "Bu təşkilata giriş icazən yoxdur."
     },
@@ -3155,14 +3175,16 @@
       "truncated": "Əvvəlki kredit əməliyyatlarına da baxmaq olar."
     },
     "inviteMember": {
-      "alreadyInvited": "Bu e-poçt ünvanı artıq dəvət olunub və ya artıq üzvdür.",
       "emailError": "Düzgün e-poçt ünvanı daxil et.",
       "emailPlaceholder": "ad@sirket.com",
       "permissionDenied": "Üzv dəvət etmək icazən yoxdur.",
       "roleMember": "Rol: üzv",
-      "sendError": "Dəvət göndərilmədi.",
       "sendInvite": "Dəvət göndər",
-      "title": "Üzv dəvət et"
+      "title": "Üzv dəvət et",
+      "alreadyInvited": "Bu e-poçt ünvanı artıq dəvət olunub və ya artıq üzvdür.",
+      "sendError": "Dəvət göndərilmədi.",
+      "pendingInvitation": "Bu e-poçt ünvanının artıq gözləyən dəvəti var.",
+      "alreadyMember": "Bu şəxs artıq bu təşkilatın üzvüdür."
     },
     "invoices": {
       "downloadA11y": "{{number}} nömrəli hesab-fakturanı endir",
@@ -3231,8 +3253,13 @@
       "inviteCreated": "Dəvət yaradıldı",
       "pendingInvitations": "Gözləyən dəvətlər",
       "resendInvite": "Dəvəti yenidən göndər",
+      "shareInviteLink": "Dəvət keçidini paylaş",
       "resendInviteError": "Dəvət yenidən göndərilmədi.",
-      "shareInviteLink": "Dəvət keçidini paylaş"
+      "inviteNotResendable": "Bu dəvət artıq yenidən göndərilə bilməz.",
+      "ownerAuthority": "Yalnız təşkilat sahibi sahibləri idarə edə bilər.",
+      "ownRoleChange": "Öz rolunu dəyişə bilməzsən.",
+      "inviteExpired": "Bu dəvətin müddəti bitib.",
+      "inviteAccepted": "Bu dəvət artıq qəbul edilib."
     },
     "usageStats": {
       "inputTokens": "Giriş tokenləri",
@@ -3345,7 +3372,7 @@
     "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün parametrlərdə canlı fəaliyyətləri aktivləşdir.",
     "openSession": "Aç",
     "finished": "Bitdi",
-    "followFailed": "Bu agenti kilid ekranında göstərmək mümkün olmadı.",
+    "followFailed": "Bu sessiyanı izləmək mümkün olmadı.",
     "approveFailed": "Təsdiqləmək mümkün olmadı. Yenidən cəhd etmək üçün $t(common.approve) üzərinə toxun.",
     "checked": "Yoxlanılıb",
     "lastKnown": "Son məlum vəziyyət",
@@ -3377,11 +3404,11 @@
   },
   "transcriptionModel": {
     "title": "Səsin mətnə çevrilməsi modeli",
-    "choose": "Model seçin",
     "noneChosen": "Seçilməyib",
     "emptyTitle": "Səsin mətnə çevrilməsi modeli yoxdur",
     "emptyDescription": "Kilo Gateway hazırda səsin mətnə çevrilməsi modeli təklif etmir.",
-    "loadFailed": "Səsin mətnə çevrilməsi modellərini yükləmək mümkün olmadı."
+    "loadFailed": "Səsin mətnə çevrilməsi modellərini yükləmək mümkün olmadı.",
+    "choose": "Model seçin"
   },
   "voiceLanguage": {
     "title": "Səslə daxiletmə dili",
@@ -3403,7 +3430,6 @@
   },
   "modelChat": {
     "offlineFailure": "Bu model internet bağlantısı tələb edir. Qoşulun və yenidən cəhd edin və ya bu cihazdakı modelə keçin.",
-    "creditsRequired": "Bu mesajı göndərmək üçün kifayət qədər kredit yoxdur. Kredit əlavə edin və yenidən cəhd edin.",
     "empty": {
       "title": "Söhbətə başlayın",
       "description": "Bir modellə danışmaq üçün mesaj göndərin."
@@ -3672,7 +3698,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "Bu model düşünmə səviyyəsini dəstəkləyir"
-    }
+    },
+    "creditsRequired": "Bu mesajı göndərmək üçün kifayət qədər kredit yoxdur. Kredit əlavə edin və yenidən cəhd edin."
   },
   "settingsTools": {
     "confirmTitle": "Bu dəyişiklik təsdiqlənsin?"
@@ -3710,10 +3737,10 @@
     "noSpend": "Hələ heç bir xərc qeydə alınmayıb",
     "spend24h": "Son 24 saatda xərc",
     "multiplierError": "1 və ya daha böyük əmsal daxil et",
-    "multiplierMaxError": "{{max}} və ya daha az əmsal daxil et",
-    "thresholdMaxError": "{{max}} və ya daha az məbləğ daxil et.",
     "permissionDenied": "Xərc bildirişlərini idarə etmək icazən yoxdur.",
-    "pushOffByCategory": "Bildirişlərdə söndürülüb"
+    "pushOffByCategory": "Bildirişlərdə söndürülüb",
+    "multiplierMaxError": "{{max}} və ya daha az əmsal daxil et",
+    "thresholdMaxError": "{{max}} və ya daha az məbləğ daxil et."
   },
   "profiles": {
     "title": "Profillər",
@@ -3772,7 +3799,6 @@
     },
     "variablesEmpty": "Hələ heç bir dəyişən yoxdur",
     "variablesSaveFailed": "Dəyişən yadda saxlamaq mümkün olmadı",
-    "variablesDeleteFailed": "Dəyişəni silmək mümkün olmadı",
     "commandsTitle": "Quraşdırma əmrləri",
     "addCommand": "Komanda əlavə edin",
     "commandLabel": "Əmr",
@@ -3783,7 +3809,6 @@
     "moveDown": "Aşağı hərəkət edin",
     "moveCommandUp": "{{position}} nömrəli əmri yuxarı köçür",
     "moveCommandDown": "{{position}} nömrəli əmri aşağı köçür",
-    "deleteCommand": "{{position}} nömrəli əmri sil",
     "skillsTitle": "Bacarıqlar",
     "addSkill": "Bacarıq əlavə edin",
     "skillNameLabel": "Bacarıq adı",
@@ -3905,7 +3930,9 @@
       "pinFailed": "Repo bağlamaq mümkün olmadı",
       "unboundToast": "Repo bağlanmamışdır",
       "unbindFailed": "Repo bağlamaq mümkün olmadı"
-    }
+    },
+    "variablesDeleteFailed": "Dəyişəni silmək mümkün olmadı",
+    "deleteCommand": "{{position}} nömrəli əmri sil"
   },
   "credits": {
     "title": "Kredit al",
@@ -3932,7 +3959,6 @@
       "newList": "Yeni siyahı",
       "empty": "Hələ siyahı yoxdur",
       "couldNotLoad": "Siyahıları yükləmək mümkün olmadı",
-      "createFailed": "Siyahını yaratmaq mümkün olmadı",
       "noRepository": "Repozitoriya yoxdur",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "{{count}} açıq",
@@ -3942,7 +3968,8 @@
       "archive": "Arxivləşdir",
       "unarchive": "Arxivdən çıxar",
       "deleteTitle": "{{name}} silinsin?",
-      "deleteMessage": "Onun tapşırıqları da silinir. Sessiyaları qalır."
+      "deleteMessage": "Onun tapşırıqları da silinir. Sessiyaları qalır.",
+      "createFailed": "Siyahını yaratmaq mümkün olmadı"
     },
     "listSettings": {
       "title": "Siyahı parametrləri",
@@ -4010,26 +4037,25 @@
     }
   },
   "agentBriefing": {
-    "title": "Səhər brifinqi",
+    "title": "Agent hesabatı",
     "atLeast": "≥{{value}}",
     "coverageHint": "Bəzi keçmiş fəaliyyətlər çatışmaya bilər. ≥ ən azı bu qədər deməkdir; naməlum sıfır demək deyil.",
-    "available": "Mövcud brifinqlər",
-    "history": "Brifinq tarixçəsi",
+    "available": "Mövcud hesabatlar",
+    "history": "Hesabat tarixçəsi",
     "historyHint": "Hesabatlar, o cümlədən bağlanmış hesabatlar, 30 gün saxlanılır.",
-    "settings": "Brifinq ayarları",
-    "saved": "Brifinq ayarları yadda saxlanıldı.",
-    "empty": "Gecə fəaliyyəti yoxdur",
-    "emptyHint": "Aktiv gecədən sonra bulud və CLI kodlaşdırma sessiyalarınız burada görünəcək.",
-    "loadError": "Brifinqləri yükləmək mümkün olmadı",
-    "sessions": "Gecə aktiv",
-    "pullRequests": "Açılmış PRs",
+    "settings": "Hesabat ayarları",
+    "empty": "Bu hesabat pəncərəsində fəaliyyət yoxdur.",
+    "emptyHint": "Bulud və CLI kodlaşdırma sessiyalarınız planlaşdırılmış hesabatda fəaliyyət olduqda burada görünəcək.",
+    "loadError": "Hesabatları yükləmək mümkün olmadı",
+    "sessions": "Hesabat pəncərəsində aktiv",
+    "pullRequests": "Açılmış PR-lər",
     "blockers": "Yeni maneələr",
-    "spend": "Gecə xərci",
-    "view": "Brifinqi oxu",
+    "spend": "Hesabat pəncərəsində xərc",
+    "view": "Hesabatı oxu",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
-    "dismiss": "Brifinqi rədd et",
-    "offline": "Oflayn · saxlanmış brifinq",
+    "dismiss": "Hesabatı rədd et",
+    "offline": "Oflayn · saxlanmış hesabat",
     "cached": "Saxlanmış hesabat · yeniləmə mümkün deyil",
     "revised": "Yenilənib · {{revision}}",
     "window": "{{start}} – {{end}}",
@@ -4044,36 +4070,36 @@
     "generate": "Xülasə yarat",
     "retrySummary": "Ödənişli xülasəni təkrarla",
     "sources": "Sübutlar və artefaktlar",
-    "timezone": "Brifinq saat qurşağı",
-    "deviceTimezone": "Cihazın saat qurşağını istifadə et",
-    "timezoneHint": "IANA saat qurşağı, məsələn Europe/Berlin. Cədvəl dəyişiklikləri gələcək gecələrə tətbiq olunur.",
-    "nightStart": "Gecə başlayır",
-    "morningStart": "Gecə bitir / səhər başlayır",
-    "morningEnd": "Səhər bitir",
-    "timeHint": "Səhər bitəndə Əsas kart, hətta oflayn olsa belə, canlı statusu bərpa edir.",
-    "invalidSchedule": "Etibarlı saat qurşağı və üst-üstə düşməyən, boş olmayan gecə və səhər dövrləri seçin.",
-    "notificationsHint": "İlk hesabatınız hazır olanda hər səhər bir ümumi bildiriş. Ödənişli AI xülasələrindən asılı deyil.",
-    "notificationPermission": "Brifinqi almaq üçün $t(common.notifications) bölməsində cihaz bildirişlərini aktiv edin.",
+    "timezone": "Hesabat saat qurşağı",
+    "deviceTimezone": "Cihazın saat qurşağından istifadə et",
+    "timezoneHint": "IANA saat qurşağı, məsələn Europe/Berlin. Cədvəl dəyişiklikləri gələcək hesabatlara tətbiq olunur.",
+    "nightStart": "Hesabat pəncərəsi başlayır",
+    "morningStart": "Hesabatın hazır olduğu vaxt",
+    "morningEnd": "Hesabatın mövcud olduğu son vaxt",
+    "timeHint": "Hesabat pəncərəsi bitəndə Əsas kart, hətta oflayn olsa belə, canlı statusu bərpa edir.",
+    "invalidSchedule": "Etibarlı saat qurşağı və boş olmayan hesabat pəncərəsi seçin.",
+    "notificationsHint": "Hər planlaşdırılmış hesabat üçün bir ümumi bildiriş. Ödənişli AI xülasələrindən asılı deyil.",
+    "notificationPermission": "Hesabatı almaq üçün $t(common.notifications) bölməsində cihaz bildirişlərini aktiv edin.",
     "aiOptIn": "Ödənişli AI xülasələri",
-    "aiHint": "Yalnız bu kontekst üçün istəyə bağlıdır. Seçilmiş, redaktə olunmuş fraqmentlər və strukturlu faktlar tətbiq dilinizdə modelinizə göndərilir. Ödənişlər bu kontekstin balansından çıxılır.",
-    "defaultModel": "Kilo’nun standart modelini istifadə et",
+    "aiHint": "Yalnız bu kontekst üçün istəyə bağlıdır. Seçilmiş, həssas məlumatları silinmiş fraqmentlər və strukturlu faktlar tətbiq dilinizdə modelinizə göndərilir. Ödənişlər bu kontekstin balansından çıxılır.",
+    "defaultModel": "Kilonun standart modelindən istifadə et",
     "duration": "Vaxt limiti (dəqiqə)",
     "spendLimit": "Xərc limiti (USD)",
     "safeguardHint": "Hər xülasə üçün sonlu limitlər, gündəlik büdcə deyil. Standart: 10 dəqiqə və $2. Hesabat ən çox beş dəqiqədən sonra dərc olunur, yaratma isə bu limitlər daxilində davam edir.",
     "invalidSafeguards": "Müsbət, sonlu vaxt və xərc limitləri daxil edin.",
     "estimate": "Təxmin {{estimate}} · maksimum {{maximum}}",
-    "estimateUnavailable": "Bu parametrlər üçün ödənişli icmal mövcud deyil.",
+    "estimateUnavailable": "Bu parametrlər üçün ödənişli xülasə mövcud deyil.",
     "confirmPaid": "{{context}} üçün ödənişli xülasələr aktiv edilsin?",
     "confirmGeneration": "Ödənişli xülasə yaradılsın?",
     "paidDisclosure": "Təxminən {{estimate}}, maksimum {{maximum}}, {{minutes}} dəqiqəlik limitlə. Yaratma uğursuz olsa belə ödəniş tutulur.",
     "enable": "Ödənişli xülasələri aktiv et",
     "contextSettings": "AI ayarları · {{context}}",
-    "allContexts": "Şəxsi və təşkilat brifinqləri ayrı saxlanılır.",
-    "create": "Brifinq yarat",
-    "oneOff": "Birdəfəlik",
+    "allContexts": "Şəxsi və təşkilat hesabatları ayrı saxlanılır.",
+    "create": "Hesabat yarat",
+    "oneOff": "Tələb əsasında",
     "createdAt": "Yaradılıb: {{time}}",
     "chooseContext": "Bir kontekst seçin",
-    "period": "Brifinq dövrü",
+    "period": "Hesabat dövrü",
     "last24Hours": "Son 24 saat",
     "last7Days": "Son 7 gün",
     "customPeriod": "Fərdi dövr",
@@ -4085,20 +4111,29 @@
     "invalidPeriod": "Bitmə vaxtından əvvəl olan başlanğıc vaxtı seçin.",
     "futurePeriod": "Dövr gələcəkdə bitə bilməz.",
     "periodTooLong": "31 gün və ya daha qısa dövr seçin.",
-    "invalidLocalTime": "Bu yerli vaxt brifinqin saat qurşağında mövcud deyil. Başqa vaxt seçin.",
-    "reviewBriefing": "Brifinqi nəzərdən keçir",
-    "reviewAgain": "Yeni icmal hazırla",
+    "invalidLocalTime": "Bu yerli vaxt hesabatın saat qurşağında mövcud deyil. Başqa vaxt seçin.",
+    "reviewBriefing": "Hesabatı nəzərdən keçir",
+    "reviewAgain": "Yeni önbaxış hazırla",
     "payer": "Ödəniş {{context}} balansından tutulur",
     "emptyPeriod": "Bu dövrdə fəaliyyət tapılmadı. AI xülasəsi yaradılmır və ödəniş tutulmur.",
-    "emptyHistory": "Saxlanılmış brifinq yoxdur",
+    "emptyHistory": "Saxlanılmış hesabat yoxdur",
     "historicalStateHint": "Sessiyanın vəziyyəti cari canlı vəziyyəti deyil, seçilmiş dövrün sonundakı vəziyyəti əks etdirir.",
-    "oneOffHint": "AI tətbiqinizin dilində seçilmiş və həssas məlumatları silinmiş materialları alır. Bu birdəfəlik hesabat səhər cədvəlinizi və ya AI seçimlərinizi dəyişmir.",
-    "createOffline": "Brifinqi nəzərdən keçirmək və ya yaratmaq üçün internetə qoşulun. Ödənişli sorğular internet bağlantısı olmadıqda heç vaxt növbəyə əlavə edilmir.",
+    "oneOffHint": "AI tətbiqinizin dilində seçilmiş və həssas məlumatları silinmiş materialları alır. Tələb əsasında hazırlanan bu hesabat planlaşdırılmış hesabatınızı və ya AI seçimlərinizi dəyişmir.",
+    "createOffline": "Hesabatı nəzərdən keçirmək və ya yaratmaq üçün internetə qoşulun. Ödənişli sorğular internet bağlantısı olmadıqda heç vaxt növbəyə əlavə edilmir.",
     "estimateInputTooLarge": "Bu dövrdə seçilmiş model üçün həddindən artıq çox material var.",
     "estimatePermissionUnavailable": "Bu kontekstin balansından istifadə etmək icazəniz yoxdur.",
-    "estimatePricingUnavailable": "Bu model üçün qiymətləndirmə mövcud deyil.",
-    "estimateBalanceUnavailable": "Ödənişli icmal üçün balans kifayət etmir.",
-    "estimateModelNotAllowed": "Bu model burada icazə verilmir.",
-    "estimateSpendLimitTooLow": "Bu icmalın icazəsi üçün xərcləmə limitini artırın."
+    "createFailed": "Bu hesabatı yaratmaq mümkün olmadı.",
+    "reviewFailed": "Bu hesabatı nəzərdən keçirmək mümkün olmadı.",
+    "estimatePricingUnavailable": "Bu model üçün qiymət məlumatı mövcud deyil.",
+    "estimateBalanceUnavailable": "Ödənişli xülasə üçün balans kifayət etmir.",
+    "estimateModelNotAllowed": "Burada bu modelə icazə verilmir.",
+    "estimateSpendLimitTooLow": "Bu xülasənin yaradılmasına imkan vermək üçün xərcləmə limitini artırın.",
+    "saved": "Hesabat ayarları yadda saxlanıldı.",
+    "preparing": "Hesabatınız hazırlanır…",
+    "preparationHint": "Fəaliyyət məlumatları toplanarkən buradan çıxıb sonra qayıda bilərsiniz. Siz nəzərdən keçirib təxmini məbləği təsdiqləyənədək AI işə başlamır və ödəniş tutulmur.",
+    "resumeReview": "Nəzərdən keçirməyə davam et",
+    "preparationFailed": "Bu hesabat üçün fəaliyyət məlumatlarını toplamaq mümkün olmadı. Yenidən cəhd edin.",
+    "preparationTimedOut": "Fəaliyyət məlumatlarının toplanması çox uzun çəkdi. Yenidən cəhd edin.",
+    "preparationDrafts": "Təsdiqlənməmiş hesabatlar"
   }
 }

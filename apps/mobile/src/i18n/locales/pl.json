@@ -53,6 +53,7 @@
     "connected": "Połączono",
     "couldNotLoadModels": "Nie udało się wczytać modeli.",
     "couldNotLoadRepositories": "Nie udało się wczytać repozytoriów.",
+    "noRepositoriesFound": "Nie znaleziono repozytoriów",
     "critical": "Poziom krytyczny",
     "delete": "Usuń",
     "deleted": "Usunięto",
@@ -87,6 +88,7 @@
     "connect": "Połącz",
     "connectBitbucket": "Połącz konto Bitbucket",
     "connectGitlab": "Połącz konto GitLab",
+    "connectProvider": "Połącz konto dostawcy",
     "contentTruncated": "Skrócono treść",
     "copyLink": "Kopiuj link",
     "couldNotLoadOrganizations": "Nie udało się wczytać organizacji.",
@@ -145,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Zmiany"
+    "changes": "Zmiany",
+    "organizationTrialEnded": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Właściciel organizacji może zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie."
   },
   "language": {
     "restarting": "Ponowne uruchamianie po zmianie języka",
@@ -269,7 +272,6 @@
     "voiceInput": "Wprowadzanie głosu",
     "autoExpandThinking": "Automatycznie rozwijaj tok rozumowania",
     "autoExpandThinkingSubtitle": "Rozwijaj tok rozumowania agenta po jego zakończeniu.",
-    "autoExpandThinkingInactiveSubtitle": "Nie działa, gdy szczegóły rozumowania są ukryte.",
     "hideThinking": "Ukryj szczegóły rozumowania",
     "hideThinkingSubtitle": "Nie pokazuj rozumowania agenta na stronie sesji.",
     "keepScreenOn": "Nie wygaszaj ekranu podczas wyświetlania sesji",
@@ -294,7 +296,8 @@
     "condenseToolCallsSubtitle": "Grupuj kolejne wywołania narzędzi w jednym wierszu, który możesz otworzyć.",
     "toolSummaryTranslation": "Tłumacz podsumowania narzędzi",
     "toolSummaryTranslationSubtitle": "Wyślij każde podsumowanie narzędzia do modelu, aby przetłumaczył je na język Twojej aplikacji. Jeśli tłumaczenie się nie powiedzie, wyświetlany jest oryginał.",
-    "toolSummaryTranslationModelUnavailableNotice": "Ten model nie jest już oferowany. Dotknij $t(common.model), aby wybrać inny."
+    "toolSummaryTranslationModelUnavailableNotice": "Ten model nie jest już oferowany. Dotknij $t(common.model), aby wybrać inny.",
+    "autoExpandThinkingInactiveSubtitle": "Nie działa, gdy szczegóły rozumowania są ukryte."
   },
   "notifications": {
     "liveActivities": "Aktywności na żywo",
@@ -889,7 +892,6 @@
       "gitlabNoRepositoriesDescription": "Może być konieczne przyznanie dostępu do większej liczby grup lub projektów w serwisie GitLab.",
       "installGithubApp": "Zainstaluj aplikację GitHub dla repozytoriów",
       "installGithubAppDescription": "Przyznaj aplikacji Kilo w serwisie GitHub dostęp do repozytoriów, które chcesz poddać przeglądowi.",
-      "noRepositoriesFound": "Nie znaleziono repozytoriów",
       "repositoryAccess": "dostęp do repozytorium"
     },
     "style": {
@@ -913,7 +915,6 @@
     "followReviewMd": "Postępuj zgodnie z REVIEW.md",
     "followReviewMdSubtitle": "Przestrzegaj instrukcji z pliku REVIEW.md w każdym repozytorium",
     "manualReview": {
-      "connectProvider": "Połącz konto dostawcy",
       "connectProviderDescription": "Połącz konto GitHub, aby rozpocząć ręczny przegląd PR.",
       "couldNotCheckProviderStatus": "Nie udało się sprawdzić statusu dostawcy.",
       "couldNotLoadProviders": "Nie udało się wczytać połączonych dostawców. Spróbuj ponownie.",
@@ -922,6 +923,8 @@
       "invalidUrl": "Wpisz prawidłowy adres URL PR.",
       "pullRequestUrl": "Adres URL PR",
       "start": "Rozpocznij przegląd",
+      "starting": "Rozpoczynanie przeglądu…",
+      "title": "Ręczny przegląd",
       "startNotFound": "Nie udało się odczytać tego {{requestNoun}} z {{provider}}. Sprawdź adres URL i czy repozytorium jest dostępne.",
       "startRateLimited": "{{provider}} ogranicza obecnie liczbę żądań. Spróbuj ponownie za kilka minut.",
       "startNotAllowed": "Nie masz uprawnień, aby rozpocząć przegląd tego {{requestNoun}}. Sprawdź swoje uprawnienia oraz plan swojej organizacji.",
@@ -929,9 +932,7 @@
       "startAlreadyRunning": "Przegląd tego {{requestNoun}} jest już uruchomiony.",
       "startRejected": "Nie można przeprowadzić przeglądu tego {{requestNoun}}. Upewnij się, że jest otwarty, nie jest szkicem, oraz że adres URL jest poprawny.",
       "startProviderUnavailable": "Nie udało się połączyć z {{provider}}, aby odczytać ten {{requestNoun}}. Spróbuj ponownie.",
-      "startFailed": "Nie udało się rozpocząć przeglądu. Sprawdź połączenie i spróbuj ponownie.",
-      "starting": "Rozpoczynanie przeglądu…",
-      "title": "Ręczny przegląd"
+      "startFailed": "Nie udało się rozpocząć przeglądu. Sprawdź połączenie i spróbuj ponownie."
     },
     "notConnectedReadOnly": "Brak połączenia z {{platform}}. Tylko właściciele organizacji i administratorzy mogą je skonfigurować.",
     "gitlab": {
@@ -969,12 +970,6 @@
       "findingsUnavailable": "Wyniki są niedostępne, ponieważ ten przegląd się nie powiódł.",
       "serviceUnavailable": "Nie udało się połączyć z usługą przeglądu kodu. Ponów przegląd, gdy usługa będzie dostępna.",
       "reviewFailed": "Przegląd się nie powiódł. Spróbuj ponownie.",
-      "cancelReasonSuperseded": "Wypchnięto nowszy commit, więc ten przegląd został zastąpiony.",
-      "cancelReasonIntegrationDisconnected": "{{platform}} jest rozłączony, więc ten przegląd został anulowany. Połącz go ponownie, a następnie ponów przegląd.",
-      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer został wyłączony dla Bitbucket, więc ten przegląd został anulowany. Włącz go ponownie, a następnie ponów przegląd.",
-      "cancelReasonBitbucketPullRequestChanged": "Pull request w Bitbucket uległ zmianie, więc ten przegląd został zastąpiony.",
-      "cancelReasonCancelled": "Ten przegląd został anulowany.",
-      "cancelReasonInterrupted": "Ten przegląd został przerwany.",
       "retryMessage": "Spowoduje to ponowne uruchomienie przeglądu kodu.",
       "retryReview": "Ponów przegląd",
       "retryNeedsSettings": "Asystent przeglądu kodu jest wyłączony albo jego ustawienia wymagają uwagi. Popraw ustawienia, a następnie ponów ten przegląd.",
@@ -982,6 +977,8 @@
       "retryTitle": "Ponowić przegląd?",
       "showMore": "Pokaż więcej",
       "started": "Rozpoczęto",
+      "reviewEnded": "Zakończono",
+      "severityNitpick": "Drobiazg",
       "threshold": "Próg",
       "title": "Przegląd",
       "tokens": "Liczba tokenów",
@@ -1000,7 +997,13 @@
       "sessionError": "Wystąpił błąd sesji: {{error}}.",
       "statusWithValue": "Stan: {{status}}",
       "toolName": "Narzędzie: {{name}}",
-      "toolNameError": "Wystąpił błąd narzędzia: {{name}}."
+      "toolNameError": "Wystąpił błąd narzędzia: {{name}}.",
+      "cancelReasonSuperseded": "Wypchnięto nowszy commit, więc ten przegląd został zastąpiony.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} jest rozłączony, więc ten przegląd został anulowany. Połącz go ponownie, a następnie ponów przegląd.",
+      "cancelReasonBitbucketReviewerDisabled": "Code Reviewer został wyłączony dla Bitbucket, więc ten przegląd został anulowany. Włącz go ponownie, a następnie ponów przegląd.",
+      "cancelReasonBitbucketPullRequestChanged": "Pull request w Bitbucket uległ zmianie, więc ten przegląd został zastąpiony.",
+      "cancelReasonCancelled": "Ten przegląd został anulowany.",
+      "cancelReasonInterrupted": "Ten przegląd został przerwany."
     },
     "reviewList": {
       "configureProvider": "Skonfiguruj dostawcę",
@@ -1017,6 +1020,22 @@
       "loading": "Ładowanie pamięci przeglądów",
       "loadingProposals": "Ładowanie propozycji",
       "noProposals": "Brak propozycji",
+      "proposalDetails": "Szczegóły propozycji",
+      "proposalTitle": "Tytuł propozycji",
+      "rationale": "Uzasadnienie",
+      "saveFirst": "Zapisz zmiany przed otwarciem pull requesta.",
+      "proposalSaved": "Propozycja zapisana",
+      "proposalDismissed": "Propozycja odrzucona",
+      "dismissProposalTitle": "Odrzucić propozycję?",
+      "dismissProposalMessage": "Ta propozycja zostanie usunięta z listy aktywnych propozycji i nie będzie można jej przywrócić.",
+      "prOpened": "Otwarto pull request do pliku REVIEW.md",
+      "alreadyPresent": "Wytyczne są już w pliku REVIEW.md",
+      "status": {
+        "edited": "Edytowana",
+        "opening_change_request": "Otwieranie PR",
+        "change_request_failed": "Nie udało się otworzyć PR",
+        "superseded": "Już istnieje"
+      },
       "noProposalsDescription": "Propozycje z pamięci przeglądów pojawią się tutaj, gdy Kilo przeanalizuje odpowiedzi opiekunów repozytorium.",
       "off": "Pamięć przeglądów jest wyłączona.",
       "on": "Pamięć przeglądów jest włączona.",
@@ -1097,8 +1116,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Brak dostępnych filtrów",
-      "noFiltersDescription": "Wróć do listy problemów i ponownie otwórz filtry.",
       "title": "Filtrowanie problemów",
       "fixed": "Naprawione",
       "outcome": "Wynik",
@@ -1164,12 +1181,20 @@
       "actorSystem": "System Kilo",
       "couldNotLoad": "Nie udało się wczytać raportu audytu.",
       "events": "Zdarzenia",
+      "eventConfidence": "Pewność: {{confidence}}",
+      "eventReason": "Powód: {{reason}}",
+      "eventsCount_one": "{{displayCount}} zdarzenie",
+      "eventsCount_few": "{{displayCount}} zdarzenia",
+      "eventsCount_many": "{{displayCount}} zdarzeń",
+      "eventsCount_other": "{{displayCount}} zdarzenia",
       "generated": "Wygenerowano {{generatedAt}}.",
       "noActivity": "Brak zarejestrowanej aktywności",
       "noActivityDescription": "W okresie od {{start}} do {{end}} Kilo nie zarejestrowało zdarzeń dotyczących problemów z bezpieczeństwem, które można uwzględnić w raporcie.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "Nie udało się pobrać danych do raportu. Spróbuj ponownie.",
       "repositoryNotRecorded": "Nie zapisano repozytorium",
+      "reasonUnknown": "Nierozpoznany powód",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Podsumowanie raportu",
       "title": "Raport audytu",
       "unavailable": "Raport audytu niedostępny",
@@ -1417,6 +1442,7 @@
       "reauthorizeButton": "Autoryzuj ponownie aplikację GitHub",
       "reauthorizeDescription": "Agent bezpieczeństwa wymaga uprawnienia do odczytu alertów Dependabot. Autoryzuj ponownie aplikację GitHub, aby przyznać to uprawnienie.",
       "reauthorizeTitle": "Wymagane dodatkowe uprawnienia",
+      "retryFailed": "Nadal nie udało się wczytać agenta bezpieczeństwa. Sprawdź połączenie i spróbuj ponownie.",
       "setupFailed": "Nie udało się rozpocząć konfiguracji GitHub. Spróbuj ponownie."
     },
     "settingsOverview": {
@@ -1632,8 +1658,8 @@
       "dollar_many": "dolarów",
       "costSpoken": "koszt {{cost}}",
       "costSpokenWithTime": "koszt {{cost}}, {{time}}",
-      "spokenJoiner": "i",
-      "pullRequest": "PR {{number}}"
+      "pullRequest": "PR {{number}}",
+      "spokenJoiner": "i"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Nie udało się rozpocząć konfiguracji aplikacji GitHub. Spróbuj ponownie.",
@@ -1663,8 +1689,8 @@
       "title": "Sesja",
       "copyErrorDetails": "Kopiuj szczegóły błędu",
       "backToSessions": "Wróć do sesji",
-      "follow": "Obserwuj na ekranie blokady",
-      "unfollow": "Przestań obserwować na ekranie blokady",
+      "follow": "Obserwuj sesję",
+      "unfollow": "Przestań obserwować sesję",
       "couldNotLoad": "Nie udało się wczytać sesji.",
       "failedToLoadDetails": "Nie udało się wczytać szczegółów sesji.",
       "failedToStopExecution": "Nie udało się zatrzymać wykonywania zadania.",
@@ -2073,7 +2099,10 @@
       "allowOnceAccessibility": "Zezwól tylko tym razem",
       "alwaysAllow": "Zawsze zezwalaj",
       "alwaysAllowAccessibility": "Zawsze zezwalaj",
-      "retrying": "Ponawianie…"
+      "retrying": "Ponawianie…",
+      "retryDeny": "Ponów odmowę",
+      "retryAllowOnce": "Ponów zezwolenie tylko tym razem",
+      "retryAlwaysAllow": "Ponów zezwalanie zawsze"
     },
     "questionCard": {
       "title": "Agent czeka na odpowiedź",
@@ -2466,7 +2495,6 @@
     "allow": "Zezwól",
     "onlineMessage": "To urządzenie nie obsługuje transkrypcji bez połączenia z internetem. Nagranie jest wysyłane do {{provider}} w celu zamiany na tekst. Kilo nie przechowuje nagrania.",
     "onlineTitle": "Mowa jest przetwarzana przez internet",
-    "staysOff": "Dyktowanie pozostanie wyłączone, dopóki nie zezwolisz na transkrypcję przez internet.",
     "start": "Rozpocznij dyktowanie",
     "stop": "Zatrzymaj dyktowanie",
     "restricted": "Na tym urządzeniu obowiązują ograniczenia dyktowania.",
@@ -3195,22 +3223,16 @@
     "boundary": {
       "backToProfile": "Wróć do profilu",
       "loadErrorMessage": "Sprawdź połączenie i spróbuj ponownie.",
-
       "chooseAccount": "Wybierz konto",
       "loadErrorTitle": "Nie udało się wczytać twoich organizacji.",
       "membershipLostNotice": "Nie masz już dostępu do tej organizacji. Przełączono na {{target}}.",
       "noOrganization": "Brak organizacji",
-
       "noOrganizationDescription": "To konto nie należy do organizacji. Utwórz organizację lub dołącz do niej w przeglądarce, aby korzystać z funkcji organizacji, takich jak zaproszenia dla członków i alerty o niskim saldzie.",
-
       "openWebOrganizations": "Otwórz organizacje w przeglądarce",
-
       "organizationUnavailable": "Organizacja jest niedostępna.",
       "selectDescriptionWithOrganizations": "Należysz do jednej lub więcej organizacji. Wybierz konto, którego ma używać ten ekran.",
-
       "selectOrganization": "Wybierz organizację",
       "unavailableDescription": "Ta organizacja nie jest już dostępna. Wybierz inną w swoim profilu, aby kontynuować.",
-
       "unavailableSessionsDescription": "Ta organizacja nie jest już dostępna. Nie można wczytać jej sesji.",
       "accessDeniedDescription": "Nie masz dostępu do tej organizacji."
     },
@@ -3240,14 +3262,16 @@
       "renameTitle": "Zmień nazwę organizacji"
     },
     "inviteMember": {
-      "alreadyInvited": "Ten adres e-mail ma już oczekujące zaproszenie lub należy już do członka tej organizacji.",
       "emailError": "Wpisz prawidłowy adres e-mail.",
       "emailPlaceholder": "imie@example.com",
       "permissionDenied": "Nie masz uprawnień do zapraszania członków.",
       "roleMember": "Przypisana rola: członek.",
-      "sendError": "Nie udało się wysłać zaproszenia.",
       "sendInvite": "Wyślij zaproszenie",
-      "title": "Zaproś członka"
+      "title": "Zaproś członka",
+      "alreadyInvited": "Ten adres e-mail ma już oczekujące zaproszenie lub należy już do członka tej organizacji.",
+      "sendError": "Nie udało się wysłać zaproszenia.",
+      "pendingInvitation": "Ten adres e-mail ma już oczekujące zaproszenie.",
+      "alreadyMember": "Ta osoba jest już członkiem tej organizacji."
     },
     "invoices": {
       "downloadA11y": "Pobierz fakturę {{number}}",
@@ -3316,8 +3340,13 @@
       "inviteCreated": "Utworzono zaproszenie",
       "pendingInvitations": "Oczekujące zaproszenia",
       "resendInvite": "Wyślij zaproszenie ponownie",
+      "shareInviteLink": "Udostępnij link do zaproszenia",
       "resendInviteError": "Nie udało się wysłać zaproszenia ponownie.",
-      "shareInviteLink": "Udostępnij link do zaproszenia"
+      "inviteNotResendable": "Tego zaproszenia nie można już wysłać ponownie.",
+      "ownerAuthority": "Tylko właściciel organizacji może zarządzać właścicielami.",
+      "ownRoleChange": "Nie możesz zmienić własnej roli.",
+      "inviteExpired": "To zaproszenie wygasło.",
+      "inviteAccepted": "To zaproszenie zostało już przyjęte."
     },
     "usageStats": {
       "inputTokens": "Tokeny wejściowe",
@@ -3433,7 +3462,7 @@
     "activityKitDisabledBody": "Włącz aktywności na żywo w ustawieniach, aby widzieć aktywnych agentów na ekranie blokady.",
     "openSession": "Otwórz",
     "finished": "Zakończono",
-    "followFailed": "Nie udało się pokazać tego agenta na ekranie blokady.",
+    "followFailed": "Nie udało się obserwować tej sesji.",
     "approveFailed": "Nie udało się zatwierdzić. Dotknij $t(common.approve), aby spróbować ponownie.",
     "checked": "Sprawdzono",
     "lastKnown": "Ostatni znany stan",
@@ -3465,11 +3494,11 @@
   },
   "transcriptionModel": {
     "title": "Model transkrypcji",
-    "choose": "Wybierz model",
     "noneChosen": "Nie wybrano",
     "emptyTitle": "Brak modeli transkrypcji",
     "emptyDescription": "Kilo Gateway nie oferuje teraz żadnych modeli transkrypcji.",
-    "loadFailed": "Nie udało się wczytać modeli transkrypcji."
+    "loadFailed": "Nie udało się wczytać modeli transkrypcji.",
+    "choose": "Wybierz model"
   },
   "voiceLanguage": {
     "title": "Język dyktowania",
@@ -3491,7 +3520,6 @@
   },
   "modelChat": {
     "offlineFailure": "Ten model wymaga połączenia z internetem. Połącz się i spróbuj ponownie lub przełącz się na model na tym urządzeniu.",
-    "creditsRequired": "Brak wystarczającej liczby kredytów, aby wysłać tę wiadomość. Doładuj konto i spróbuj ponownie.",
     "empty": {
       "title": "Rozpocznij czat",
       "description": "Wyślij wiadomość, aby porozmawiać z modelem."
@@ -3762,7 +3790,8 @@
     },
     "reasoningEffort": {
       "modelFlag": "Ten model obsługuje poziom rozumowania"
-    }
+    },
+    "creditsRequired": "Brak wystarczającej liczby kredytów, aby wysłać tę wiadomość. Doładuj konto i spróbuj ponownie."
   },
   "settingsTools": {
     "confirmTitle": "Potwierdzić tę zmianę?"
@@ -3800,10 +3829,10 @@
     "noSpend": "Nie zarejestrowano jeszcze żadnych wydatków",
     "spend24h": "Wydatki z ostatnich 24 godzin",
     "multiplierError": "Podaj mnożnik równy 1 lub większy",
-    "multiplierMaxError": "Podaj mnożnik równy {{max}} lub mniejszy",
-    "thresholdMaxError": "Wpisz kwotę {{max}} lub mniejszą.",
     "permissionDenied": "Nie masz uprawnień do zarządzania alertami o wydatkach.",
-    "pushOffByCategory": "Wyłączone w Powiadomieniach"
+    "pushOffByCategory": "Wyłączone w Powiadomieniach",
+    "multiplierMaxError": "Podaj mnożnik równy {{max}} lub mniejszy",
+    "thresholdMaxError": "Wpisz kwotę {{max}} lub mniejszą."
   },
   "profiles": {
     "title": "Profile",
@@ -3872,7 +3901,6 @@
     },
     "variablesEmpty": "Nie ma jeszcze zmiennych",
     "variablesSaveFailed": "Nie udało się zapisać zmiennej",
-    "variablesDeleteFailed": "Nie udało się usunąć zmiennej",
     "commandsTitle": "Polecenia konfiguracyjne",
     "addCommand": "Dodaj polecenie",
     "commandLabel": "Rozkaz",
@@ -3883,7 +3911,6 @@
     "moveDown": "Opuszczać",
     "moveCommandUp": "Przenieś polecenie {{position}} w górę",
     "moveCommandDown": "Przenieś polecenie {{position}} w dół",
-    "deleteCommand": "Usuń polecenie {{position}}",
     "skillsTitle": "Umiejętności",
     "addSkill": "Dodaj umiejętność",
     "skillNameLabel": "Nazwa umiejętności",
@@ -4005,7 +4032,9 @@
       "pinFailed": "Nie udało się przypiąć repozytorium",
       "unboundToast": "Repo niezwiązane",
       "unbindFailed": "Nie można odłączyć repozytorium"
-    }
+    },
+    "variablesDeleteFailed": "Nie udało się usunąć zmiennej",
+    "deleteCommand": "Usuń polecenie {{position}}"
   },
   "credits": {
     "title": "Kup kredyty",
@@ -4032,7 +4061,6 @@
       "newList": "Nowa lista",
       "empty": "Brak list",
       "couldNotLoad": "Nie udało się wczytać list",
-      "createFailed": "Nie udało się utworzyć listy",
       "noRepository": "Brak repozytorium",
       "rowA11y": "{{name}}, {{openCount}}",
       "openCount_one": "Otwarte: {{count}}",
@@ -4046,7 +4074,8 @@
       "archive": "Zarchiwizuj",
       "unarchive": "Przywróć z archiwum",
       "deleteTitle": "Usunąć {{name}}?",
-      "deleteMessage": "Jej zadania też zostaną usunięte. Sesje pozostaną."
+      "deleteMessage": "Jej zadania też zostaną usunięte. Sesje pozostaną.",
+      "createFailed": "Nie udało się utworzyć listy"
     },
     "listSettings": {
       "title": "Ustawienia listy",
@@ -4118,21 +4147,20 @@
     }
   },
   "agentBriefing": {
-    "title": "Poranny raport",
+    "title": "Raport agenta",
     "atLeast": "≥{{value}}",
     "coverageHint": "Może brakować części historycznej aktywności. ≥ oznacza co najmniej tyle; brak danych to nie zero.",
     "available": "Dostępne raporty",
     "history": "Historia raportów",
     "historyHint": "Raporty są przechowywane przez 30 dni, także odrzucone.",
     "settings": "Ustawienia raportu",
-    "saved": "Zapisano ustawienia raportu",
-    "empty": "Brak aktywności w nocy",
-    "emptyHint": "Twoje sesje kodowania w chmurze i CLI pojawią się tutaj po aktywnej nocy.",
+    "empty": "Brak aktywności w tym oknie raportu",
+    "emptyHint": "Twoje sesje kodowania w chmurze i CLI pojawią się tutaj, gdy zaplanowany raport ma aktywność.",
     "loadError": "Nie udało się wczytać raportów",
-    "sessions": "Aktywne w nocy",
-    "pullRequests": "Otwarte PRs",
+    "sessions": "Aktywne w oknie",
+    "pullRequests": "PR-y otwarte w okresie",
     "blockers": "Nowe blokady",
-    "spend": "Wydatki w nocy",
+    "spend": "Wydatki w oknie",
     "view": "Przeczytaj raport",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}, {{time}}",
@@ -4142,10 +4170,10 @@
     "revised": "Zaktualizowano · {{revision}}",
     "window": "{{start}} – {{end}}",
     "summary": "Podsumowanie AI",
-    "summaryDisabled": "Raport strukturalny · AI wyłączone w tym kontekście",
+    "summaryDisabled": "Raport ustrukturyzowany · AI wyłączone w tym kontekście",
     "summaryPending": "Trwa tworzenie podsumowania AI. Pojawi się tutaj, gdy będzie gotowe.",
     "summaryFailed": "Nie udało się utworzyć podsumowania AI. Ponowna próba może wiązać się z kolejną opłatą.",
-    "summaryUnavailable": "Podsumowanie AI niedostępne. Raport strukturalny jest nadal dostępny.",
+    "summaryUnavailable": "Podsumowanie AI niedostępne. Raport ustrukturyzowany jest nadal dostępny.",
     "summaryOutdated": "To podsumowanie powstało przed najnowszą wersją raportu.",
     "summaryCharge": "Opłata za AI: {{cost}}",
     "summaryChargePending": "Opłata za AI oczekuje na rozliczenie",
@@ -4154,16 +4182,16 @@
     "sources": "Dowody i artefakty",
     "timezone": "Strefa czasowa raportu",
     "deviceTimezone": "Użyj strefy czasowej urządzenia",
-    "timezoneHint": "Strefa czasowa IANA, np. Europe/Berlin. Zmiany harmonogramu dotyczą kolejnych nocy.",
-    "nightStart": "Początek nocy",
-    "morningStart": "Koniec nocy / początek poranka",
-    "morningEnd": "Koniec poranka",
-    "timeHint": "Karta na ekranie głównym wraca do bieżącego stanu po zakończeniu poranka, nawet offline.",
-    "invalidSchedule": "Wybierz prawidłową strefę czasową oraz niepuste, niezachodzące na siebie okresy nocy i poranka.",
-    "notificationsHint": "Jedno ogólne powiadomienie każdego ranka, gdy pierwszy raport jest gotowy. Niezależne od płatnych podsumowań AI.",
+    "timezoneHint": "Strefa czasowa IANA, np. Europe/Berlin. Zmiany harmonogramu dotyczą kolejnych raportów.",
+    "nightStart": "Początek okna raportu",
+    "morningStart": "Raport gotowy o",
+    "morningEnd": "Raport dostępny do",
+    "timeHint": "Karta na ekranie głównym wraca do bieżącego stanu po zakończeniu okna raportu, nawet offline.",
+    "invalidSchedule": "Wybierz prawidłową strefę czasową oraz niepuste okno raportu.",
+    "notificationsHint": "Jedno ogólne powiadomienie na zaplanowany raport. Niezależne od płatnych podsumowań AI.",
     "notificationPermission": "Włącz powiadomienia urządzenia w sekcji $t(common.notifications), aby otrzymywać raport.",
     "aiOptIn": "Płatne podsumowania AI",
-    "aiHint": "Opcjonalne tylko w tym kontekście. Wybrane, zanonimizowane fragmenty i fakty strukturalne są wysyłane do modelu w języku aplikacji. Opłaty pobierane są z salda tego kontekstu.",
+    "aiHint": "Opcjonalne, włączane osobno dla każdego kontekstu. Wybrane fragmenty z usuniętymi danymi wrażliwymi i ustrukturyzowane fakty są wysyłane do modelu w języku aplikacji. Opłaty pobierane są z salda tego kontekstu.",
     "defaultModel": "Użyj domyślnego modelu Kilo",
     "duration": "Limit czasu (minuty)",
     "spendLimit": "Limit wydatków (USD)",
@@ -4176,9 +4204,9 @@
     "paidDisclosure": "Szacunkowo {{estimate}}, maksymalnie {{maximum}}, limit {{minutes}} min. Opłata obowiązuje nawet w razie niepowodzenia.",
     "enable": "Włącz płatne podsumowania",
     "contextSettings": "Ustawienia AI · {{context}}",
-    "allContexts": "Raporty osobiste i organizacji są przechowywane oddzielnie.",
+    "allContexts": "Raporty osobiste i organizacji pozostają oddzielne.",
     "create": "Utwórz raport",
-    "oneOff": "Jednorazowy",
+    "oneOff": "Na żądanie",
     "createdAt": "Utworzono {{time}}",
     "chooseContext": "Wybierz jeden kontekst",
     "period": "Okres raportu",
@@ -4195,18 +4223,27 @@
     "periodTooLong": "Wybierz okres nie dłuższy niż 31 dni.",
     "invalidLocalTime": "Ten czas lokalny nie istnieje w strefie czasowej raportu. Wybierz inny czas.",
     "reviewBriefing": "Przejrzyj raport",
-    "reviewAgain": "Przygotuj nowy przegląd",
+    "reviewAgain": "Przygotuj nowy podgląd",
     "payer": "Opłata obciąża {{context}}",
     "emptyPeriod": "Nie znaleziono aktywności w tym okresie. Podsumowanie AI nie zostanie utworzone, a opłata nie zostanie naliczona.",
     "emptyHistory": "Brak zapisanych raportów",
     "historicalStateHint": "Stan sesji odzwierciedla koniec wybranego okresu, a nie bieżący stan na żywo.",
-    "oneOffHint": "AI otrzymuje wybrane materiały z usuniętymi danymi wrażliwymi w języku aplikacji. Ten jednorazowy raport nie zmienia porannego harmonogramu ani preferencji AI.",
+    "oneOffHint": "AI otrzymuje wybrane materiały z usuniętymi danymi wrażliwymi w języku aplikacji. Ten jednorazowy raport nie zmienia zaplanowanego raportu ani preferencji AI.",
     "createOffline": "Połącz się z internetem, aby przejrzeć lub utworzyć raport. Płatne żądania nigdy nie są kolejkowane w trybie offline.",
     "estimateInputTooLarge": "Ten okres zawiera zbyt dużo materiałów dla wybranego modelu.",
     "estimatePermissionUnavailable": "Nie masz uprawnień do korzystania ze środków w tym kontekście.",
+    "createFailed": "Nie udało się utworzyć tego raportu.",
+    "reviewFailed": "Nie udało się przejrzeć tego raportu.",
     "estimatePricingUnavailable": "Cennik tego modelu jest niedostępny.",
     "estimateBalanceUnavailable": "Brak wystarczających środków na płatne podsumowanie.",
     "estimateModelNotAllowed": "Ten model nie jest tu dozwolony.",
-    "estimateSpendLimitTooLow": "Zwiększ limit wydatków, aby umożliwić to podsumowanie."
+    "estimateSpendLimitTooLow": "Zwiększ limit wydatków, aby umożliwić to podsumowanie.",
+    "saved": "Zapisano ustawienia raportu",
+    "preparing": "Przygotowywanie raportu…",
+    "preparationHint": "Możesz opuścić ten widok i wrócić do niego później, gdy trwa zbieranie danych o aktywności. Praca AI nie rozpocznie się ani nie zostanie naliczona żadna opłata, dopóki nie przejrzysz podglądu i nie zatwierdzisz szacowanych kosztów.",
+    "resumeReview": "Kontynuuj przeglądanie raportu",
+    "preparationFailed": "Nie udało się zebrać danych o aktywności do tego raportu. Spróbuj ponownie.",
+    "preparationTimedOut": "Zbieranie danych o aktywności trwało zbyt długo. Spróbuj ponownie.",
+    "preparationDrafts": "Raporty oczekujące na zatwierdzenie"
   }
 }

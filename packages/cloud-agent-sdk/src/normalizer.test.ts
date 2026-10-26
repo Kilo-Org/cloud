@@ -1,4 +1,11 @@
 import { normalize, normalizeCliEvent, isChatEvent } from './normalizer';
+import { PREPARATION_OUTPUT_MAX_LENGTH, PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
+import {
+  REMOTE_COMMAND_MAX_COMMANDS,
+  REMOTE_COMMAND_MAX_HINTS,
+  SESSION_QUEUE_MAX_IDS,
+  SESSION_QUESTION_MAX_QUESTIONS,
+} from './schemas';
 import type { CloudAgentEvent } from './schemas';
 
 function createRaw(streamEventType: string, data: unknown, sessionId = 'ses-1'): CloudAgentEvent {
@@ -182,6 +189,7 @@ describe('normalize', () => {
         sessionID: 'ses-1',
         messageID: 'msg-1',
         type: 'tool',
+        state: { status: 'running' },
       };
       const result = normalize(
         createRaw('message.part.updated', { part, time: 1_772_214_640_111 })
@@ -205,6 +213,41 @@ describe('normalize', () => {
       // for a null result, so it cannot prove the event was recognized.
       expect(result).toEqual({ type: 'message.part.updated', part });
       expect(Object.hasOwn(result as object, 'time')).toBe(false);
+    });
+
+    it('returns null for a tool part with no readable state', () => {
+      const base = { id: 'p-1', sessionID: 'ses-1', messageID: 'msg-1', type: 'tool' };
+      const states: unknown[] = [
+        undefined,
+        null,
+        [],
+        'running',
+        {},
+        { status: 42 },
+        { status: '' },
+      ];
+
+      for (const state of states) {
+        const part = state === undefined ? base : { ...base, state };
+        expect(normalize(createRaw('message.part.updated', { part }))).toBeNull();
+      }
+    });
+
+    it('keeps a tool part whose state carries a non-empty status string', () => {
+      const part = {
+        id: 'p-1',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'tool',
+        state: { status: 'completed', attachments: 'not-an-array' },
+      };
+
+      // The state's identity is what the boundary checks; its contents are
+      // reduced at the chat-processor seam.
+      expect(normalize(createRaw('message.part.updated', { part }))).toEqual({
+        type: 'message.part.updated',
+        part,
+      });
     });
   });
 
@@ -947,6 +990,19 @@ describe('normalize', () => {
       ).toBeNull();
     });
 
+    it('accepts a snapshot exactly at the ID limit', () => {
+      const queued = Array.from({ length: SESSION_QUEUE_MAX_IDS }, (_, index) => `m${index}`);
+      const result = normalize(createRaw('session.queue.changed', { sessionID: 'ses-1', queued }));
+      expect(result).toEqual({ type: 'queue.changed', sessionId: 'ses-1', queued });
+    });
+
+    it('returns null when the snapshot exceeds the ID limit', () => {
+      const queued = Array.from({ length: SESSION_QUEUE_MAX_IDS + 1 }, (_, index) => `m${index}`);
+      expect(
+        normalize(createRaw('session.queue.changed', { sessionID: 'ses-1', queued }))
+      ).toBeNull();
+    });
+
     it('is classified as a ServiceEvent, not a ChatEvent', () => {
       const result = normalize(
         createRaw('session.queue.changed', { sessionID: 'ses-1', queued: ['m1'] })
@@ -1046,6 +1102,38 @@ describe('normalize', () => {
     it('has questions undefined when not an array', () => {
       const data = { id: 'q-1', questions: 'not-an-array' };
       const result = normalize(createRaw('question.asked', data));
+      expect(result).toEqual({
+        type: 'question.asked',
+        requestId: 'q-1',
+        questions: undefined,
+      });
+    });
+
+    it('keeps every question in a list exactly at the maximum', () => {
+      const questions = Array.from({ length: SESSION_QUESTION_MAX_QUESTIONS }, (_, index) => ({
+        question: `Continue step ${index}?`,
+        header: `Step ${index}`,
+        options: [{ label: 'Yes', description: 'Continue' }],
+      }));
+      const result = normalize(createRaw('question.asked', { id: 'q-1', questions }));
+      expect(result).toEqual({
+        type: 'question.asked',
+        requestId: 'q-1',
+        questions: questions.map(entry => ({
+          question: entry.question,
+          header: entry.header,
+          options: [{ label: 'Yes', description: 'Continue' }],
+        })),
+      });
+    });
+
+    it('drops an over-limit question list but keeps the prompt', () => {
+      const questions = Array.from({ length: SESSION_QUESTION_MAX_QUESTIONS + 1 }, () => ({
+        question: 'Continue?',
+        header: 'Continue',
+        options: [],
+      }));
+      const result = normalize(createRaw('question.asked', { id: 'q-1', questions }));
       expect(result).toEqual({
         type: 'question.asked',
         requestId: 'q-1',
@@ -1457,6 +1545,66 @@ describe('normalize', () => {
 
     it('returns null when step is not a string', () => {
       expect(normalize(createRaw('preparing', { step: 42, message: 'Cloning...' }))).toBeNull();
+    });
+
+    it('returns null when a step_output delta exceeds the wire limit', () => {
+      const result = normalize(
+        createRaw('preparing', {
+          step: 'setup_commands',
+          message: 'Installing dependencies',
+          version: 2,
+          attemptId: 'attempt-1',
+          triggerMessageId: 'msg-1',
+          revision: 6,
+          timestamp: 1000,
+          action: 'step_output',
+          stepId: 'command:install',
+          output: 'x'.repeat(PREPARATION_OUTPUT_MAX_LENGTH + 1),
+        })
+      );
+      expect(result).toBeNull();
+    });
+
+    const snapshotEvent = (outputTail: string) =>
+      createRaw('preparing', {
+        step: 'setup_commands',
+        message: 'Preparation snapshot',
+        version: 2,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'msg-1',
+        revision: 5,
+        timestamp: 2000,
+        action: 'step_snapshot',
+        stepId: 'command:install',
+        stepSnapshot: {
+          id: 'command:install',
+          key: 'setup_commands',
+          kind: 'setup_command',
+          label: 'Install dependencies',
+          status: 'running',
+          startedAt: 1000,
+          revision: 5,
+          outputTail,
+        },
+      });
+
+    it('returns null when a step snapshot tail exceeds the wire limit', () => {
+      expect(normalize(snapshotEvent('x'.repeat(PREPARATION_OUTPUT_MAX_LENGTH + 1)))).toBeNull();
+    });
+
+    it('accepts a step snapshot tail within the byte budget', () => {
+      const outputTail = 'é'.repeat(PREPARATION_OUTPUT_TAIL_MAX_BYTES / 2);
+      expect(normalize(snapshotEvent(outputTail))).toMatchObject({
+        type: 'preparing',
+        action: 'step_snapshot',
+        stepSnapshot: { outputTail },
+      });
+    });
+
+    it('returns null when a step snapshot tail exceeds the byte budget', () => {
+      const outputTail = 'é'.repeat(PREPARATION_OUTPUT_TAIL_MAX_BYTES / 2 + 1);
+      expect(outputTail.length).toBeLessThan(PREPARATION_OUTPUT_TAIL_MAX_BYTES);
+      expect(normalize(snapshotEvent(outputTail))).toBeNull();
     });
 
     it('is classified as a ServiceEvent, not a ChatEvent', () => {
@@ -2000,6 +2148,34 @@ describe('normalize', () => {
       expect(normalize(createRaw('commands.available', {}))).toBeNull();
     });
 
+    it('accepts a catalog exactly at the command and hint limits', () => {
+      const commands = Array.from({ length: REMOTE_COMMAND_MAX_COMMANDS }, (_, index) => ({
+        name: `command-${index}`,
+        hints: Array.from({ length: REMOTE_COMMAND_MAX_HINTS }, (_, hint) => `hint-${hint}`),
+      }));
+      const result = normalize(createRaw('commands.available', { commands }));
+      if (result?.type !== 'commands.available') throw new Error('Expected commands.available');
+      expect(result.commands).toHaveLength(REMOTE_COMMAND_MAX_COMMANDS);
+      expect(result.commands[0]?.hints).toHaveLength(REMOTE_COMMAND_MAX_HINTS);
+    });
+
+    it('returns null when the catalog exceeds the command limit', () => {
+      const commands = Array.from({ length: REMOTE_COMMAND_MAX_COMMANDS + 1 }, (_, index) => ({
+        name: `command-${index}`,
+      }));
+      expect(normalize(createRaw('commands.available', { commands }))).toBeNull();
+    });
+
+    it('returns null when a command exceeds the hint limit', () => {
+      const hints = Array.from(
+        { length: REMOTE_COMMAND_MAX_HINTS + 1 },
+        (_, index) => `hint-${index}`
+      );
+      expect(
+        normalize(createRaw('commands.available', { commands: [{ name: 'review', hints }] }))
+      ).toBeNull();
+    });
+
     it('is not a chat event', () => {
       const result = normalize(createRaw('commands.available', { commands: [] }));
       expect(result).not.toBeNull();
@@ -2350,6 +2526,7 @@ describe('normalizeCliEvent', () => {
         sessionID: 'ses-1',
         messageID: 'msg-1',
         type: 'tool',
+        state: { status: 'running' },
       };
       expect(normalizeCliEvent('message.part.updated', { part, time: 42 })).toEqual({
         type: 'message.part.updated',

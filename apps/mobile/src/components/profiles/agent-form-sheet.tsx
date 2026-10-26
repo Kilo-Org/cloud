@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the agent form keeps its validation, dirty check, and every field group in one sheet, so Save and the fields it saves stay together */
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, View } from 'react-native';
@@ -22,8 +23,19 @@ import { FormField } from '@/components/ui/form-field';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
+import { selectableRowA11y } from '@/lib/a11y/selectable-row';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
+import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 import { cn } from '@/lib/utils';
+
+const ERROR_FIELDS = {
+  'slug-required': 'slug',
+  'slug-invalid': 'slug',
+  'slug-conflict': 'slug',
+  'name-required': 'name',
+  'name-too-long': 'name',
+  'description-too-long': 'description',
+} as const satisfies Record<AgentFormError, string>;
 
 type AgentFormSheetProps = Readonly<{
   agent: AgentSource | null;
@@ -81,6 +93,9 @@ export function AgentFormSheet({
   const [disabledTools, setDisabledTools] = useState<readonly string[]>(initial.disabledTools);
   const [error, setError] = useState<AgentFormError | null>(null);
   const { models } = useAvailableModels(organizationId);
+  const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<
+    'slug' | 'name' | 'description'
+  >();
 
   const variantsFor = (model: string): readonly string[] =>
     models.find(option => option.id === model.trim())?.variants ?? [];
@@ -121,6 +136,7 @@ export function AgentFormSheet({
     const problem = validateAgentForm(state, existingSlugs);
     if (problem !== null) {
       setError(problem);
+      scrollToField(ERROR_FIELDS[problem]);
       return;
     }
     setError(null);
@@ -138,6 +154,7 @@ export function AgentFormSheet({
         topInset="ios-page-sheet"
       />
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
         contentContainerClassName="gap-4 px-6 pt-4 pb-8"
         keyboardShouldPersistTaps="handled"
@@ -153,6 +170,7 @@ export function AgentFormSheet({
           autoCapitalize="none"
           autoCorrect={false}
           placeholder={t('profiles.agents.slugPlaceholder')}
+          containerOnLayout={fieldLayout('slug')}
           onChangeText={value => {
             // Kept exactly as typed: a silent rewrite would save a slug the
             // reader never entered, and an invalid one is refused with the rule.
@@ -171,6 +189,7 @@ export function AgentFormSheet({
           disabled={isSaving}
           required
           placeholder={t('profiles.agents.namePlaceholder')}
+          containerOnLayout={fieldLayout('name')}
           onChangeText={value => {
             nameRef.current = value;
             setError(null);
@@ -182,6 +201,7 @@ export function AgentFormSheet({
           error={error === 'description-too-long' ? agentErrorText(t, error) : undefined}
           disabled={isSaving}
           placeholder={t('profiles.descriptionPlaceholder')}
+          containerOnLayout={fieldLayout('description')}
           onChangeText={value => {
             descriptionRef.current = value;
             setError(null);
@@ -193,7 +213,7 @@ export function AgentFormSheet({
           disabled={isSaving}
           multiline
           textAlignVertical="top"
-          className="min-h-28 leading-5"
+          className="min-h-28 max-h-52 leading-[1.25rem]"
           autoCapitalize="none"
           autoCorrect={false}
           placeholder={t('profiles.agents.promptPlaceholder')}
@@ -271,8 +291,7 @@ export function AgentFormSheet({
                     'min-h-11 flex-row items-center rounded-md px-3 active:opacity-70',
                     selected && 'bg-secondary'
                   )}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: selected }}
+                  {...selectableRowA11y({ multi: false, selected })}
                   accessibilityLabel={t(option.labelKey)}
                   onPress={() => {
                     setVisibility(option.value);

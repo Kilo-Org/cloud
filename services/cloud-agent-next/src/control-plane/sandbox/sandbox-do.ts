@@ -348,8 +348,11 @@ const wrapperSocketAttachmentSchema = z.object({
   heartbeatAck: z.literal(true).optional(),
   redactsNamedSecrets: z.literal(true).optional(),
   runtimeCapability: z.literal('worktree').optional(),
+  billingCheckedAt: z.number().finite().nonnegative().optional(),
 });
 type WrapperSocketAttachment = z.infer<typeof wrapperSocketAttachmentSchema>;
+
+const WRAPPER_BILLING_CHECK_MS = 30_000;
 
 /** Separates an old wrapper from a decrypt/parse failure; both fail the attempt. */
 type PrepareFrameMaterializationStage =
@@ -4806,6 +4809,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
   }
 
+  private async readWrapperBillingBlock(state: AllocationState): Promise<boolean> {
+    if (this.currentProvider() === 'vercel') {
+      return (await this.ensureVercelBillingRuntime())?.lifecycle.isBillingBlocked() ?? false;
+    }
+    return (await this.provider.isBillingBlocked?.(state.providerRef)) ?? false;
+  }
+
   private async handleFrame(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     if (ws.readyState !== WebSocket.OPEN) return;
     const deadline = this.readAttachment(ws)?.helloDeadlineAt;
@@ -4906,8 +4916,33 @@ export class SandboxControlV2 extends DurableObject<Env> {
       return;
     }
 
+    const currentState = await this.readAllocation();
+    const current = connectionMatches(
+      currentState,
+      attachment.allocationId,
+      attachment.connectionId
+    );
+    const now = Date.now();
+    if (current && now - (attachment.billingCheckedAt ?? 0) >= WRAPPER_BILLING_CHECK_MS) {
+      const blocked = await withTimeout(
+        this.readWrapperBillingBlock(currentState),
+        this.billingReadTimeoutMs(),
+        'Sandbox billing state read timed out'
+      ).catch(() => false);
+      if (blocked) {
+        await this.applyEvent({ type: 'stop-requested', at: now, reason: 'billing_blocked' });
+        this.settlePendingForSocket(
+          ws,
+          controlRequestFailure('not_ready', 'Wrapper disconnected', true)
+        );
+        ws.close(4402, 'Container billing blocked');
+        return;
+      }
+      ws.serializeAttachment({ ...attachment, billingCheckedAt: now });
+    }
+
     if (frame.type === 'heartbeat') {
-      const state = await this.readAllocation();
+      const state = currentState;
       if (!connectionMatches(state, attachment.allocationId, attachment.connectionId)) return;
       const at = Date.now();
       await this.applyEvent({
@@ -4944,12 +4979,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // to the session.
     // A superseded socket can stay open (the DO does not close it on
     // `stopping`), so only the current connection may move a route or forward.
-    const currentState = await this.readAllocation();
-    const current = connectionMatches(
-      currentState,
-      attachment.allocationId,
-      attachment.connectionId
-    );
     const ctx = this.routeContext(currentState);
     switch (frame.type) {
       case 'session.progress':
@@ -5480,6 +5509,27 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private sandboxTimers(): SandboxTimers {
     return resolveControlPlaneTimers(this.env as unknown as Record<string, string | undefined>)
       .sandbox;
+  }
+
+  /**
+   * Bounds the stored-policy read inside the wrapper's heartbeat
+   * acknowledgement deadline. The read runs on the serial queue, so a read that
+   * outlived the deadline would hold back the acknowledgement the wrapper
+   * watchdog waits for and reconnect a healthy socket. Half the deadline leaves
+   * room for the queued acknowledgement itself; a timed-out read stays
+   * non-enforcing and is retried on the next cadence.
+   */
+  private billingReadTimeoutMs(): number {
+    const timers = resolveControlPlaneTimers(
+      this.env as unknown as Record<string, string | undefined>
+    );
+    return Math.max(
+      1,
+      Math.min(
+        timers.sandbox.providerStopAttemptMs,
+        Math.floor(timers.wrapper.heartbeatAckTimeoutMs / 2)
+      )
+    );
   }
 
   /**

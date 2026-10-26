@@ -183,12 +183,17 @@ Copy lives in `src/i18n/locales/en.json`. The other 86 catalogs are reviewed
 against the screens their keys render on, so a key's name and its context are
 what a translator has to work from.
 
-- Add and edit copy in `en.json` only. Never hand-edit another catalog. The one
-  exception is a value-level correction of a confirmed mistranslation in an
-  existing non-English entry (a wrong word, not a style preference): fix the
-  value in place, keep the key name, placeholders, and English copy unchanged,
-  verify the corrected string on the screen that renders it, and say so in the
-  pull request. Do not rewrite surrounding entries.
+- Add and edit copy in `en.json` only. Never hand-edit another catalog. The
+  exceptions are value-level edits of an existing non-English entry. For both,
+  keep the key name, the placeholder set, and the surrounding entries as they
+  are, and say so in the pull request:
+  - a confirmed mistranslation, meaning a wrong word rather than a style
+    preference: fix the value in place, leave the English copy unchanged, and
+    verify the corrected string on the screen that renders it;
+  - a change to the meaning of the English copy, or to the surface it names: the
+    existing value in every catalog now describes the old meaning, so update it
+    in each of them, using that catalog's own established wording for the new
+    meaning or surface. `check:i18n` and `check:plurals` still have to pass.
 - Search `en.json` for the string before you add a key. If the copy already
   exists, reuse that key. `pnpm check:i18n` fails when two keys hold the same copy.
 - Put copy used by more than one section under `common.`.
@@ -196,6 +201,10 @@ what a translator has to work from.
   message, or every catalog quotes a button the reader never sees.
 - Keep the `{{placeholder}}` set identical to English. Word order around a
   placeholder is the translator's to change, so never assume English order.
+  One exception: a plural category may interpolate the count its own family
+  already declares, where that language's plural rules select the category for
+  counts other than one. Never drop a placeholder English requires, and never
+  add one the family does not use.
 - Case follows the English copy, and only in a language that has case. Georgian
   Mkhedruli has none, and Greek keeps the tonos on a capital initial and drops
   it only in full capitals.
@@ -223,7 +232,7 @@ The Chat tab runs `@kilocode/harness-sdk` on the device. `src/lib/chat/` holds t
 
 Quick Chat renders streamed text, reasoning and tools through the shared agent message and tool-detail surfaces. Tool results update the matching call rather than adding user-message bubbles; the same pairing is rebuilt from stored turns when a chat reopens.
 
-The header usage pill shows its percentage or token count without a visible Context prefix. Its accessibility label names the context.
+The header usage pill shows its percentage, or a dash while the context window is unknown, without a visible Context prefix. Its accessibility label names the context and the token count.
 Collapsed reasoning uses the tool row's full-width shape, padding and text style, with a dashed border.
 
 A chat is opened with the SDK's `time` tool and no other. A model has no clock, so it answers a dated question from its training date, confidently and wrong. The other three tools the SDK ships stay off: the composer is already how a person is asked something, a subagent costs a second session, and a to-do list is working memory for a run a chat does not have.

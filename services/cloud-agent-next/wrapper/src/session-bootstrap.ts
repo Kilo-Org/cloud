@@ -1,3 +1,4 @@
+import { runSetupScript } from './setup-script.js';
 import { writeRuntimeSkills } from './runtime-skills.js';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
@@ -822,12 +823,16 @@ async function runSetupCommands(
       commandIndex: index,
       commandCount: setupCommands.length,
     });
-    const result = await run('sh', ['-lc', command], {
-      cwd: request.workspace.workspacePath,
-      inactivityTimeoutMs: SETUP_COMMAND_INACTIVITY_TIMEOUT_MS,
-      hardTimeoutMs: LONG_COMMAND_HARD_TIMEOUT_MS,
-      onOutput: outputReporter.onOutput,
-    });
+    const result = await runSetupScript(
+      command,
+      {
+        cwd: request.workspace.workspacePath,
+        inactivityTimeoutMs: SETUP_COMMAND_INACTIVITY_TIMEOUT_MS,
+        hardTimeoutMs: LONG_COMMAND_HARD_TIMEOUT_MS,
+        onOutput: outputReporter.onOutput,
+      },
+      run
+    );
     outputReporter.flush();
     logToFile(
       `bootstrap setup command finished kiloSessionId=${request.kiloSessionId} index=${index + 1} count=${setupCommands.length} elapsedMs=${Date.now() - startedAt} exitCode=${result.exitCode} terminationReason=${result.terminationReason ?? '(none)'}`

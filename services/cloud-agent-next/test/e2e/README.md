@@ -958,6 +958,11 @@ path token. Mint (`POST /__e2e/callbacks`), read/delete (`GET`/`DELETE
 /__e2e/callbacks/:token`) and any extra or trailing path segment stay behind both
 gates.
 
+Callback URLs use the lowercase UUIDv4 format emitted by `crypto.randomUUID()`.
+Delivery records belong to an active minted token, with the sink's one-hour
+lifetime and per-token record cap. Owner-authenticated reads preserve arrival
+order; deletion completes the token's lifecycle.
+
 Security consequence, recorded honestly. Holding the e2e secret with no JWT lets
 a caller replace any sandbox's wrapper credential by id
 (`POST /internal/sandbox-control/seed` is secret-only and unowned) and disrupt

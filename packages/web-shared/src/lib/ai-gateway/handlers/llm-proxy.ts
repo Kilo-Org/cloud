@@ -35,6 +35,7 @@ import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-t
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import {
   hasBestEffortGuessDataCollectionRequirement,
+  isFreeModel,
   isFreeModelExcludingCustomLlms,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {

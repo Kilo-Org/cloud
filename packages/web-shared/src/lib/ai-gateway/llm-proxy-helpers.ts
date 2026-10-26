@@ -15,6 +15,8 @@ import { errorExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/ut
 
 import type { Span } from '@sentry/nextjs';
 import { debugSaveProxyResponseStream } from '@kilocode/web-shared/lib/debugUtils';
+import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
+import { getConfiguredCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/configured-custom-pricing';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type {
   OpenRouterChatCompletionRequest,
@@ -1172,7 +1174,7 @@ export function countAndStoreFimUsage(
           );
 
   after(
-    usageStatsPromise.then(usageStats => {
+    usageStatsPromise.then(async usageStats => {
       if (!usageStats) {
         captureMessage('SUSPICIOUS: No FIM usage information', {
           level: 'error',
@@ -1182,12 +1184,7 @@ export function countAndStoreFimUsage(
         return;
       }
 
-      usageStats.market_cost = usageStats.cost_mUsd;
-
-      if (usageContext.is_free || usageContext.user_byok) {
-        usageStats.cost_mUsd = 0;
-        usageStats.cacheDiscount_mUsd = 0;
-      }
+      applyUsagePricing(usageStats, usageContext, await getConfiguredCustomPricing());
 
       // Persist billing, then report the same request to bouncer's usage ledger.
       return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
@@ -1308,7 +1305,7 @@ export function countAndStoreEditUsage(
         });
 
   after(
-    usageStatsPromise.then(usageStats => {
+    usageStatsPromise.then(async usageStats => {
       requestSpan?.end();
       if (!usageStats) {
         captureMessage('SUSPICIOUS: No edit usage information', {
@@ -1319,12 +1316,7 @@ export function countAndStoreEditUsage(
         return;
       }
 
-      usageStats.market_cost = usageStats.cost_mUsd;
-
-      if (usageContext.is_free || usageContext.user_byok) {
-        usageStats.cost_mUsd = 0;
-        usageStats.cacheDiscount_mUsd = 0;
-      }
+      applyUsagePricing(usageStats, usageContext, await getConfiguredCustomPricing());
 
       return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
     })
@@ -1526,7 +1518,7 @@ export function countAndStoreEmbeddingUsage(
         .catch(() => null);
 
   after(
-    usageStatsPromise.then(usageStats => {
+    usageStatsPromise.then(async usageStats => {
       requestSpan?.end();
       if (!usageStats) {
         captureMessage('SUSPICIOUS: No embedding usage information', {
@@ -1537,12 +1529,7 @@ export function countAndStoreEmbeddingUsage(
         return;
       }
 
-      // Preserve the real upstream cost before free-model or BYOK zeroing.
-      usageStats.market_cost = usageStats.cost_mUsd;
-
-      if (usageContext.is_free || usageContext.user_byok) {
-        usageStats.cost_mUsd = 0;
-      }
+      applyUsagePricing(usageStats, usageContext, await getConfiguredCustomPricing());
 
       return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
     })

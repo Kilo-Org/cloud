@@ -22,6 +22,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => (
 jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/configured-custom-pricing', () => ({
+  getConfiguredCustomPricing: async () => ({}),
+}));
 jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
   resolveOrganizationMemberModelDecision: jest.fn().mockResolvedValue({
     decision: { allowed: true },

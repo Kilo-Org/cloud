@@ -23,6 +23,12 @@ import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/defini
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { logMicrodollarUsageAndReportToBouncer } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
+import type {
+  MicrodollarUsageContext,
+  MicrodollarUsageStats,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
+import { getConfiguredCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/configured-custom-pricing';
 import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { emitGatewayApiMetrics } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
@@ -223,72 +229,71 @@ export async function handleSystemOneRequest(request: NextRequest) {
   const { id, model, provider, usage } = result.data;
   const cost = toMicrodollars(usage.cost);
   after(async () => {
-    await logMicrodollarUsageAndReportToBouncer(
-      {
-        messageId: id,
-        model,
-        responseContent: '',
-        hasError: false,
-        inference_provider: provider ?? null,
-        upstream_id: null,
-        finish_reason: null,
-        latency: ttfbMs,
-        moderation_latency: null,
-        generation_time: null,
-        streamed: false,
-        cancelled: false,
-        status_code: response.status,
-        cost_mUsd: isFree ? 0 : cost,
-        market_cost: cost,
-        inputTokens: usage.input_tokens,
-        outputTokens: usage.output_tokens,
-        cacheWriteTokens: 0,
-        cacheHitTokens: 0,
-        is_byok: false,
+    const usageStats: MicrodollarUsageStats = {
+      messageId: id,
+      model,
+      responseContent: '',
+      hasError: false,
+      inference_provider: provider ?? null,
+      upstream_id: null,
+      finish_reason: null,
+      latency: ttfbMs,
+      moderation_latency: null,
+      generation_time: null,
+      streamed: false,
+      cancelled: false,
+      status_code: response.status,
+      cost_mUsd: cost,
+      inputTokens: usage.input_tokens,
+      outputTokens: usage.output_tokens,
+      cacheWriteTokens: 0,
+      cacheHitTokens: 0,
+      is_byok: false,
+    };
+    const usageContext: MicrodollarUsageContext = {
+      api_kind: 'systemone',
+      kiloUserId: user.id,
+      provider: 'openrouter',
+      requested_model: requestedModel,
+      is_free: isFree,
+      promptInfo: { system_prompt_prefix: '', system_prompt_length: 0, user_prompt_prefix: '' },
+      max_tokens: null,
+      has_middle_out_transform: null,
+      reasoning_setting: null,
+      fraudHeaders,
+      isStreaming: false,
+      organizationId,
+      prior_microdollar_usage: user.microdollars_used,
+      posthog_distinct_id: user.google_user_email,
+      project_id: projectId,
+      status_code: response.status,
+      editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
+      machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
+      user_byok: false,
+      has_tools: false,
+      botId,
+      tokenSource,
+      feature,
+      session_id: extractHeaderAndLimitLength(request, 'X-KiloCode-TaskId'),
+      mode: extractHeaderAndLimitLength(request, 'x-kilocode-mode'),
+      auto_model: null,
+      ttfb_ms: ttfbMs,
+      bouncer: {
+        requestId: bouncerRequestId,
+        occurredAt: new Date(startedAtMs),
+        accountId: bouncerAccountId(user.id, organizationId),
+        clientIp: payerSharingIp(bouncerIp, feature),
+        clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
+        requestedLogprobs: false,
+        samples: null,
+        // System One input is a typed classification payload, not a conversation,
+        // so there is no prompt text to hash (and no raw state leaves the gateway).
+        promptSimHash: null,
+        spendWatch: bouncerVerdict?.spendWatch === true,
       },
-      {
-        api_kind: 'systemone',
-        kiloUserId: user.id,
-        provider: 'openrouter',
-        requested_model: requestedModel,
-        is_free: isFree,
-        promptInfo: { system_prompt_prefix: '', system_prompt_length: 0, user_prompt_prefix: '' },
-        max_tokens: null,
-        has_middle_out_transform: null,
-        reasoning_setting: null,
-        fraudHeaders,
-        isStreaming: false,
-        organizationId,
-        prior_microdollar_usage: user.microdollars_used,
-        posthog_distinct_id: user.google_user_email,
-        project_id: projectId,
-        status_code: response.status,
-        editor_name: extractHeaderAndLimitLength(request, 'x-kilocode-editorname'),
-        machine_id: extractHeaderAndLimitLength(request, 'x-kilocode-machineid'),
-        user_byok: false,
-        has_tools: false,
-        botId,
-        tokenSource,
-        feature,
-        session_id: extractHeaderAndLimitLength(request, 'X-KiloCode-TaskId'),
-        mode: extractHeaderAndLimitLength(request, 'x-kilocode-mode'),
-        auto_model: null,
-        ttfb_ms: ttfbMs,
-        bouncer: {
-          requestId: bouncerRequestId,
-          occurredAt: new Date(startedAtMs),
-          accountId: bouncerAccountId(user.id, organizationId),
-          clientIp: payerSharingIp(bouncerIp, feature),
-          clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
-          requestedLogprobs: false,
-          samples: null,
-          // System One input is a typed classification payload, not a conversation,
-          // so there is no prompt text to hash (and no raw state leaves the gateway).
-          promptSimHash: null,
-          spendWatch: bouncerVerdict?.spendWatch === true,
-        },
-      }
-    );
+    };
+    applyUsagePricing(usageStats, usageContext, await getConfiguredCustomPricing());
+    await logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
   });
   return NextResponse.json(responseBody);
 }

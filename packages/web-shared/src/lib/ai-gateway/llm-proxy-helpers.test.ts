@@ -3,6 +3,7 @@ import { captureMessage } from '@sentry/nextjs';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
 import type { GatewayRequest } from './providers/openrouter/types';
 import { createMockUsageContext } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
+import { getConfiguredCustomPricing } from './configured-custom-pricing';
 
 // `countAndStoreEditUsage` schedules the usage write through `next/server`'s
 // `after()` post-response hook, which only works in a request context. Replace
@@ -28,6 +29,9 @@ jest.mock('./processUsage', () => ({
   ) => mockedLogMicrodollarUsage(stats, ctx),
 }));
 
+jest.mock('@kilocode/web-shared/lib/ai-gateway/configured-custom-pricing', () => ({
+  getConfiguredCustomPricing: jest.fn(async () => ({})),
+}));
 jest.mock('@sentry/nextjs', () => ({
   ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
   captureMessage: jest.fn(),
@@ -601,6 +605,39 @@ describe('countAndStoreFimUsage', () => {
 
     const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
     expect(stats.cost_mUsd).toBe(390);
+    expect(stats.market_cost).toBe(390);
+  });
+
+  it('bills admin-configured custom pricing for the requested model', async () => {
+    jest.mocked(getConfiguredCustomPricing).mockResolvedValueOnce({
+      'mistralai/codestral-2508': {
+        pricing: [
+          {
+            start_context_length: 0,
+            pricing: {
+              prompt_per_million: 1,
+              completion_per_million: 10,
+              input_cache_read_per_million: null,
+              input_cache_write_per_million: null,
+            },
+          },
+        ],
+        fallbackOnly: false,
+      },
+    });
+    countAndStoreFimUsage(
+      makeUpstreamResponse(),
+      makeUsageContext({
+        provider: 'mistral',
+        requested_model: 'mistralai/codestral-2508',
+      }),
+      undefined
+    );
+
+    await new Promise(resolve => setImmediate(resolve));
+
+    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats.cost_mUsd).toBe(2_000);
     expect(stats.market_cost).toBe(390);
   });
 

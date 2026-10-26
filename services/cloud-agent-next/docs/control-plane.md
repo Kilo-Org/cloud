@@ -211,9 +211,10 @@ The mode says where the runtime (Kilo and the supervisor) comes from: the image 
   and the SDK process scan stay unchanged.
 - **Selection.** `startup-selection.ts` reads the mode and the native image from Worker
   configuration once per create attempt. Absent configuration means `preinstalled`. Mode and image
-  are independent, but the runtime-free image requires `downloaded`. `downloaded` is native only:
-  SDK and Vercel pins on a downloaded target use `preinstalled`. Any other pair, a native
-  `downloaded` pin without a descriptor, or a missing descriptor or payload object fails
+  are independent, but the runtime-free image requires `downloaded`. Native and BYOC Vercel pins
+  support `downloaded`; SDK pins keep `preinstalled`. Vercel executes the trusted installer as root
+  against the customer snapshot. Its base digest excludes the downloaded CLI and wrapper release.
+  Any invalid pair, a `downloaded` pin without a descriptor, or a missing descriptor or payload object fails
   `invalid_configuration` before provider work. An R2 read error is a transient create error.
 - **State.** The repository-launch record stores the allocation's mode, and both record writers
   keep it. There is no other new
@@ -839,8 +840,9 @@ On the native Cloudflare Containers runtime the container main process is the st
 after install. PID 1 identity (`/proc/1/cmdline`) is the issuance confirmation when it is either
 argv, bounded by the wrapper readiness deadline. PID 1 identity is not wrapper readiness: the
 wrapper socket and the Sandbox DO `starting` timer stay the readiness owner, and no provider poll or
-wrapper-child probe is added for that path. Sandbox SDK and Vercel run the preinstalled startup
-command against a living PID 1; downloaded startup is native-only.
+wrapper-child probe is added for that path. Sandbox SDK runs the preinstalled startup command
+against a living PID 1. Vercel runs either startup command against a living PID 1; downloaded startup
+installs verified artifacts before it executes the supervisor.
 
 A native attempt that already issued the main process does not start another supervisor when that
 process is gone; the persisted `exec_pending` fence is not reset, and the next allocation may start a

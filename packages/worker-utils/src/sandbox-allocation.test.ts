@@ -8,8 +8,7 @@ import {
   getSandboxAllocationProvider,
   getSandboxAllocationResources,
   getSandboxAllocationRequest,
-  getSandboxAllocationKey,
-  getKiloSandboxAllocation,
+  getSandboxAllocation,
   sandboxAllocationInputSchema,
   sandboxAllocationRequestSchema,
   selectableSandboxAllocationInputSchema,
@@ -55,19 +54,23 @@ describe('sandbox allocation contract', () => {
       const request = getSandboxAllocationRequest(allocation);
       expect(sandboxAllocationInputSchema.parse(allocation)).toEqual(request);
       expect(sandboxAllocationInputSchema.parse(request)).toEqual(request);
-      expect(getKiloSandboxAllocation(request)).toBe(allocation);
+      expect(getSandboxAllocation(request)).toBe(allocation);
     }
   );
 
-  it('keeps BYOC distinct from Kilo compute with the same instance type', () => {
-    const byoc = sandboxAllocationRequestSchema.parse({
-      provider: { id: 'vercel', account: 'byoc' },
-      instanceType: 'small',
-    });
-    const kilo = getSandboxAllocationRequest('vercel-small');
-    expect(getSandboxAllocationKey(byoc)).not.toBe(getSandboxAllocationKey(kilo));
-    expect(getKiloSandboxAllocation(byoc)).toBeUndefined();
-    expect(selectableSandboxAllocationInputSchema.parse(byoc)).toEqual(byoc);
+  it('accepts only BYOC Vercel and maps its selected size to the runtime allocation', () => {
+    const request = { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'small' } as const;
+    expect(sandboxAllocationRequestSchema.parse(request)).toEqual(
+      getSandboxAllocationRequest('vercel-small')
+    );
+    expect(getSandboxAllocation(request)).toBe('vercel-small');
+    expect(
+      sandboxAllocationRequestSchema.safeParse({
+        ...request,
+        provider: { id: 'vercel', account: 'kilo' },
+      }).success
+    ).toBe(false);
+    expect(selectableSandboxAllocationInputSchema.parse(request)).toEqual(request);
   });
 
   it.each([
@@ -106,7 +109,7 @@ describe('sandbox allocation contract', () => {
 
   it('accepts provider-default and devcontainer descriptions without making them selectable', () => {
     for (const defaultDestination of [
-      { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
+      { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'default' },
       { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'devcontainer' },
     ]) {
       const capabilities = sandboxSelectionCapabilitiesSchema.parse({

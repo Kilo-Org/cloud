@@ -122,6 +122,7 @@ type ContractHarness = {
   billingBlock?(blocked: boolean): void;
   /** Container providers: how many backend billing reads the adapter made. */
   billingReads?(): number;
+  launchSudo?(): boolean | undefined;
 };
 
 async function requireRef(adapter: ProviderAdapter): Promise<string> {
@@ -404,6 +405,7 @@ function vercelHarness(): ContractHarness {
     leaseMs: () => [...state.extendedMs],
     grantReads: () => state.grantReads,
     appliedPolicies: () => [...state.policies],
+    launchSudo: () => state.commands.at(-1)?.sudo,
   };
 }
 
@@ -638,6 +640,16 @@ describe('provider-specific contract differences', () => {
     expect(harness.billingReads?.()).toBe(reads);
   });
 
+  it('runs the trusted downloaded installer as root on Vercel', async () => {
+    const harness = vercelHarness();
+    const ref = await harness.create();
+    await harness.adapter.launch(ref, {
+      command: { argv: ['/bin/sh', '-c', 'installer'], user: 'root' },
+      env: {},
+    });
+    expect(harness.launchSudo?.()).toBe(true);
+  });
+
   it('reads Vercel grants on every create and applies a contained-credential policy', async () => {
     const harness = vercelHarness();
     const ref = await harness.create();
@@ -646,6 +658,7 @@ describe('provider-specific contract differences', () => {
 
     await harness.adapter.launch(ref, { command: preinstalledStartup(), env: {} });
     expect(harness.launchSupervisor()).toBe(CONTROL_SUPERVISOR_PATH);
+    expect(harness.launchSudo?.()).toBe(false);
     expect('applyContainedCredentials' in harness.adapter).toBe(true);
     // A foreign ref is refused before any Vercel request.
     const leases = harness.leaseMs().length;

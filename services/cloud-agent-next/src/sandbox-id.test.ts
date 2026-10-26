@@ -522,15 +522,16 @@ describe('generateSandboxId', () => {
 
 describe('selectSandboxForNewSession', () => {
   const completeVercelConfiguration = {
-    VERCEL_SANDBOX_ORG_IDS: 'org-id',
-    VERCEL_TOKEN: 'token',
-    VERCEL_TEAM_ID: 'team-id',
-    VERCEL_PROJECT_ID: 'project-id',
-    VERCEL_SANDBOX_SNAPSHOT_ID: 'snapshot-id',
-    VERCEL_SANDBOX_RUNTIME_BUILD_ID: 'build-id',
-    VERCEL_SANDBOX_RUNTIME: 'node24',
-    VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000',
-    VERCEL_SANDBOX_EXTEND_DURATION_MS: '600000',
+    CREDENTIAL_CONTAINMENT_ENABLED: undefined,
+    ...{ VERCEL_SANDBOX_ORG_IDS: 'org-id' },
+    ...{ VERCEL_TOKEN: 'token' },
+    ...{ VERCEL_TEAM_ID: 'team-id' },
+    ...{ VERCEL_PROJECT_ID: 'project-id' },
+    ...{ VERCEL_SANDBOX_SNAPSHOT_ID: 'snapshot-id' },
+    ...{ VERCEL_SANDBOX_RUNTIME_BUILD_ID: 'build-id' },
+    ...{ VERCEL_SANDBOX_RUNTIME: 'node24' },
+    ...{ VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000' },
+    ...{ VERCEL_SANDBOX_EXTEND_DURATION_MS: '600000' },
   };
   const controlSessionId = 'workspace_12345678-1234-1234-1234-123456789abc';
   const otherSessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -543,7 +544,7 @@ describe('selectSandboxForNewSession', () => {
           env: {
             ...completeVercelConfiguration,
             PER_SESSION_SANDBOX_ORG_IDS: rollout,
-            VERCEL_SANDBOX_ORG_IDS: rollout,
+            ...{ VERCEL_SANDBOX_ORG_IDS: rollout },
           },
           orgId: 'org-id',
           userId: 'user-id',
@@ -614,7 +615,7 @@ describe('selectSandboxForNewSession', () => {
     }
   );
 
-  it('selects Vercel for an enabled, allowlisted, isolated control-plane session', async () => {
+  it('ignores retired Vercel platform enrollment for an isolated control-plane session', async () => {
     const selection = await selectSandboxForNewSession({
       env: completeVercelConfiguration,
       orgId: 'org-id',
@@ -622,7 +623,7 @@ describe('selectSandboxForNewSession', () => {
       sessionId: controlSessionId,
     });
 
-    expect(selection.provider).toBe('vercel');
+    expect(selection.provider).toBe('cloudflare-containers');
     expect(selection.sandboxId).toMatch(/^ses-/);
   });
 
@@ -661,7 +662,7 @@ describe('selectSandboxForNewSession', () => {
       env: {
         PER_SESSION_SANDBOX_ORG_IDS: 'org-id',
         ...completeVercelConfiguration,
-        VERCEL_SANDBOX_ORG_IDS: 'other-org',
+        ...{ VERCEL_SANDBOX_ORG_IDS: 'other-org' },
       },
       orgId: 'org-id',
       userId: 'user-id',
@@ -672,19 +673,19 @@ describe('selectSandboxForNewSession', () => {
     expect(selection.sandboxId).toMatch(/^ses-/);
   });
 
-  it('selects Vercel for any isolated control-plane organization when enrollment is wildcarded', async () => {
+  it('ignores the retired wildcard for isolated organizations', async () => {
     const selection = await selectSandboxForNewSession({
       env: {
         PER_SESSION_SANDBOX_ORG_IDS: '*',
         ...completeVercelConfiguration,
-        VERCEL_SANDBOX_ORG_IDS: '*',
+        ...{ VERCEL_SANDBOX_ORG_IDS: '*' },
       },
       orgId: 'org-id',
       userId: 'user-id',
       sessionId: controlSessionId,
     });
 
-    expect(selection.provider).toBe('vercel');
+    expect(selection.provider).toBe('cloudflare-containers');
     expect(selection.sandboxId).toMatch(/^ses-/);
   });
 
@@ -693,13 +694,13 @@ describe('selectSandboxForNewSession', () => {
       env: {
         PER_SESSION_SANDBOX_ORG_IDS: '*',
         ...completeVercelConfiguration,
-        VERCEL_SANDBOX_ORG_IDS: '*',
+        ...{ VERCEL_SANDBOX_ORG_IDS: '*' },
       },
       userId: 'user-id',
       sessionId: controlSessionId,
     });
 
-    expect(selection.provider).toBe('vercel');
+    expect(selection.provider).toBe('cloudflare-containers');
     expect(selection.sandboxId).toMatch(/^ses-/);
   });
 
@@ -708,7 +709,7 @@ describe('selectSandboxForNewSession', () => {
       env: {
         PER_SESSION_SANDBOX_ORG_IDS: 'org-id',
         ...completeVercelConfiguration,
-        VERCEL_SANDBOX_RUNTIME: 'node22',
+        ...{ VERCEL_SANDBOX_RUNTIME: 'node22' },
       },
       orgId: 'org-id',
       userId: 'user-id',
@@ -773,12 +774,12 @@ describe('selectSandboxForNewSession', () => {
     expect(selection.sandboxId).toMatch(/^org-/);
   });
 
-  it('keeps Vercel precedence when both enrollments are enabled', async () => {
+  it('uses Cloudflare containers when retired Vercel enrollment is also present', async () => {
     const selection = await selectSandboxForNewSession({
       env: {
         PER_SESSION_SANDBOX_ORG_IDS: '*',
         ...completeVercelConfiguration,
-        VERCEL_SANDBOX_ORG_IDS: '*',
+        ...{ VERCEL_SANDBOX_ORG_IDS: '*' },
         CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
       },
       orgId: 'org-id',
@@ -786,7 +787,7 @@ describe('selectSandboxForNewSession', () => {
       sessionId: controlSessionId,
     });
 
-    expect(selection.provider).toBe('vercel');
+    expect(selection.provider).toBe('cloudflare-containers');
     expect(selection.sandboxId).toMatch(/^ses-/);
   });
 
@@ -795,7 +796,7 @@ describe('selectSandboxForNewSession', () => {
       env: {
         PER_SESSION_SANDBOX_ORG_IDS: '*',
         ...completeVercelConfiguration,
-        VERCEL_SANDBOX_ORG_IDS: '*',
+        ...{ VERCEL_SANDBOX_ORG_IDS: '*' },
         CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
         CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
         CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: 'org-id',
@@ -814,7 +815,7 @@ describe('selectSandboxForNewSession', () => {
       env: {
         PER_SESSION_SANDBOX_ORG_IDS: '*',
         ...completeVercelConfiguration,
-        VERCEL_SANDBOX_ORG_IDS: '*',
+        ...{ VERCEL_SANDBOX_ORG_IDS: '*' },
         CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
         CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: 'org-id',
       },
@@ -827,12 +828,12 @@ describe('selectSandboxForNewSession', () => {
     expect(selection.sandboxId).toMatch(/^ses-/);
   });
 
-  it('still selects Vercel for a dual-enrolled organization when enforcement is off', async () => {
+  it('uses Cloudflare containers when enforcement is off', async () => {
     const selection = await selectSandboxForNewSession({
       env: {
         PER_SESSION_SANDBOX_ORG_IDS: '*',
         ...completeVercelConfiguration,
-        VERCEL_SANDBOX_ORG_IDS: '*',
+        ...{ VERCEL_SANDBOX_ORG_IDS: '*' },
         CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
         CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'false',
       },
@@ -841,7 +842,7 @@ describe('selectSandboxForNewSession', () => {
       sessionId: controlSessionId,
     });
 
-    expect(selection.provider).toBe('vercel');
+    expect(selection.provider).toBe('cloudflare-containers');
   });
 
   it('skips Vercel for a personal owner enforced through the user allowlist', async () => {
@@ -849,7 +850,7 @@ describe('selectSandboxForNewSession', () => {
       env: {
         PER_SESSION_SANDBOX_ORG_IDS: '*',
         ...completeVercelConfiguration,
-        VERCEL_SANDBOX_ORG_IDS: '*',
+        ...{ VERCEL_SANDBOX_ORG_IDS: '*' },
         CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
         CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
         CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: 'user-id',
@@ -866,7 +867,7 @@ describe('selectSandboxForNewSession', () => {
       {
         PER_SESSION_SANDBOX_ORG_IDS: '*',
         ...completeVercelConfiguration,
-        VERCEL_SANDBOX_ORG_IDS: '*',
+        ...{ VERCEL_SANDBOX_ORG_IDS: '*' },
         CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
         CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
         CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS: 'org-id',

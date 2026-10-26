@@ -20,7 +20,7 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import {
-  getKiloSandboxAllocation,
+  getSandboxAllocation,
   isSandboxAllocationAvailable,
   sandboxAllocationSchema,
   type SandboxAllocation,
@@ -438,7 +438,7 @@ async function assertSandboxAllocationAvailable(
   if (isSandboxAllocationAvailable(capabilities, sandboxAllocation)) return;
 
   const option = capabilities.options.find(
-    candidate => getKiloSandboxAllocation(candidate.allocation) === sandboxAllocation
+    candidate => getSandboxAllocation(candidate.allocation) === sandboxAllocation
   );
   const unavailableReason = option?.unavailableReason ?? option?.repositoryUnavailableReason;
 

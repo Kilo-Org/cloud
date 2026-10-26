@@ -940,6 +940,10 @@ jobs:
         if: matrix.part == 'unit'
         run: pnpm --filter cloud-agent-next test
 
+      - name: Build runtime artifacts for Worker integration tests
+        if: matrix.part == 'workers'
+        run: pnpm --filter cloud-agent-next build:wrapper
+
       - name: Run cloud-agent-next Workers tests
         if: matrix.part == 'workers'
         run: pnpm --filter cloud-agent-next test:integration

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { captureMessage } from '@sentry/nextjs';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
 import type { GatewayRequest } from './providers/openrouter/types';
 import { createMockUsageContext } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
@@ -25,6 +26,11 @@ jest.mock('./processUsage', () => ({
     stats: MicrodollarUsageStats,
     ctx: MicrodollarUsageContext
   ) => mockedLogMicrodollarUsage(stats, ctx),
+}));
+
+jest.mock('@sentry/nextjs', () => ({
+  ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
+  captureMessage: jest.fn(),
 }));
 
 const mockedErrorExceptInTest = jest.fn();
@@ -409,6 +415,77 @@ describe('parseEditUsageFromResponse', () => {
 describe('countAndStoreEmbeddingUsage', () => {
   beforeEach(() => {
     mockedLogMicrodollarUsage.mockClear();
+    jest.mocked(captureMessage).mockClear();
+  });
+
+  it.each([400, 429])(
+    'records an upstream %i error body as errored usage without reporting it',
+    async status => {
+      const usageContext: MicrodollarUsageContext = {
+        ...createMockUsageContext('user-id', 'embedding@example.com', 0),
+        api_kind: 'embeddings',
+        requested_model: 'test/embedding',
+        status_code: status,
+      };
+      const response = new Response(
+        JSON.stringify({ error: { code: status, message: 'upstream rejected the request' } }),
+        { status }
+      );
+
+      countAndStoreEmbeddingUsage(response, usageContext, undefined);
+      await new Promise(resolve => setImmediate(resolve));
+
+      expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          hasError: true,
+          model: null,
+          inputTokens: 0,
+          cost_mUsd: 0,
+          status_code: status,
+        }),
+        usageContext
+      );
+      expect(captureMessage).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    ['an empty body', ''],
+    ['an HTML error page', '<html><body>502 Bad Gateway</body></html>'],
+  ])('records an upstream error with %s as errored usage without reporting it', async (_, body) => {
+    const usageContext: MicrodollarUsageContext = {
+      ...createMockUsageContext('user-id', 'embedding@example.com', 0),
+      api_kind: 'embeddings',
+      requested_model: 'test/embedding',
+      status_code: 502,
+    };
+
+    countAndStoreEmbeddingUsage(new Response(body, { status: 502 }), usageContext, undefined);
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ hasError: true, inputTokens: 0, cost_mUsd: 0, status_code: 502 }),
+      usageContext
+    );
+    expect(captureMessage).not.toHaveBeenCalled();
+  });
+
+  it('reports a successful response without usage', async () => {
+    const usageContext: MicrodollarUsageContext = {
+      ...createMockUsageContext('user-id', 'embedding@example.com', 0),
+      api_kind: 'embeddings',
+      requested_model: 'test/embedding',
+      status_code: 200,
+    };
+    const response = new Response(JSON.stringify({ id: 'embedding-id', model: 'test/embedding' }));
+
+    countAndStoreEmbeddingUsage(response, usageContext, undefined);
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(captureMessage).toHaveBeenCalledWith(
+      'SUSPICIOUS: No embedding usage information',
+      expect.anything()
+    );
   });
 
   it.each([

@@ -102,6 +102,14 @@ const baseProps: CtaProps = {
   kind: 'review',
 };
 
+/** The GitLab MR every GitLab case below renders, keyed by its project path. */
+const GITLAB_PROPS = { owner: 'group/sub', repo: 'repo', number: 12, commentId: 12 };
+
+const GITLAB_CONVERSATION_PROPS: Partial<CtaProps> = {
+  ...GITLAB_PROPS,
+  kind: 'conversation',
+};
+
 // ── Helpers ──────────────────────────────────────────────────────────
 
 async function renderCta(
@@ -188,14 +196,14 @@ describe('PrCommentFixWithKilo', () => {
   it('empty: a GitLab comment renders nothing until the read names a URL', async () => {
     // No URL published for the loaded MR — with or without an instance hint
     // on the ref — so the control has no link to offer.
-    const withoutHint = await renderCta(
-      { owner: 'group/sub', repo: 'repo', number: 12, commentId: 12 },
-      { ref: GITLAB_REF_WITHOUT_HINT, organizationId: null }
-    );
-    const withHint = await renderCta(
-      { owner: 'group/sub', repo: 'repo', number: 12, commentId: 12 },
-      { ref: GITLAB_REF_WITH_HINT, organizationId: null }
-    );
+    const withoutHint = await renderCta(GITLAB_PROPS, {
+      ref: GITLAB_REF_WITHOUT_HINT,
+      organizationId: null,
+    });
+    const withHint = await renderCta(GITLAB_PROPS, {
+      ref: GITLAB_REF_WITH_HINT,
+      organizationId: null,
+    });
 
     for (const renderer of [withoutHint, withHint]) {
       expect(findPressables(renderer)).toHaveLength(0);
@@ -222,7 +230,7 @@ describe('PrCommentFixWithKilo', () => {
     'happy: a $platform comment with a host stages its anchor and no repo prefill',
     async ({ ref, serverWebUrl, url, href }) => {
       const renderer = await renderCta(
-        { owner: 'group/sub', repo: 'repo', number: 12, commentId: 12, kind: 'conversation' },
+        GITLAB_CONVERSATION_PROPS,
         { ref, organizationId: 'org_1' },
         serverWebUrl
       );
@@ -303,25 +311,13 @@ describe('PrCommentFixWithKilo', () => {
       },
       {
         name: 'a GitLab comment on a hinted instance',
-        props: {
-          owner: 'group/sub',
-          repo: 'repo',
-          number: 12,
-          commentId: 12,
-          kind: 'conversation',
-        },
+        props: GITLAB_CONVERSATION_PROPS,
         scope: { ref: GITLAB_REF_WITH_HINT, organizationId: 'org_1' },
         serverWebUrl: 'https://gitlab.example.com/group/sub/repo/-/merge_requests/12',
       },
       {
         name: 'a GitLab comment with no loaded URL',
-        props: {
-          owner: 'group/sub',
-          repo: 'repo',
-          number: 12,
-          commentId: 12,
-          kind: 'conversation',
-        },
+        props: GITLAB_CONVERSATION_PROPS,
         scope: { ref: GITLAB_REF_WITHOUT_HINT, organizationId: null },
         rendersNothing: true,
       },

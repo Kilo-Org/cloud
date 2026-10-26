@@ -90,14 +90,22 @@ export type ProviderObservation = {
   providerRef?: string;
 };
 
-/** What a physical start used: the image, or a repository snapshot of it. */
+/** What a physical start used: the image, or an environment snapshot of it. */
 export type ProviderStartSource = 'image' | 'repository';
 
+/**
+ * A published environment snapshot the Sandbox DO selected for this allocation.
+ * Only the environment coordinator produces one; no public API accepts it.
+ */
+export type ProviderSnapshotStart = {
+  snapshotId: string;
+  /** The image the snapshot was captured from. */
+  baseImage: string;
+};
+
 export type ProviderLaunchOptions = {
-  /** Keyed hash of the launch's scope, repository and env; a provider may start from its snapshot. */
-  repoKey?: string;
-  /** Start from the image and retain the failed snapshot for debugging. */
-  skipRepository?: true;
+  /** Start from this snapshot; a provider without snapshot support ignores it. */
+  snapshot?: ProviderSnapshotStart;
   deadlineAt?: number;
 };
 
@@ -131,12 +139,8 @@ export type ProviderAdapter = {
   stop(ref: string | null, intent?: ProviderAllocationIntent | null): Promise<StopResult>;
   ensureLeaseAtLeast(ref: string, ms: number): Promise<void>;
   logs(ref: string): Promise<string>;
-  /**
-   * Save the running container as the repository snapshot for `repoKey`. Only a
-   * provider that can start from one implements it; `false` is a failed capture
-   * that the caller ignores.
-   */
-  captureRepository?(ref: string, repoKey: string, commit?: string): Promise<boolean>;
+  /** Present on a provider that can start a session from an environment snapshot. */
+  readonly environmentSnapshots?: true;
   /**
    * Replace the live sandbox's contained-credential network policy with one
    * built from the authoritative grants. Only a provider whose network policy

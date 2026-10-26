@@ -7991,8 +7991,11 @@ export const cloud_agent_environments = pgTable(
 
     // Ordered setup commands run after clone. Array order is the run order.
     commands: text().array().default([]).notNull(),
+    // Monotonic build-input revision. Advances when commands, plaintext
+    // variables or secrets change; a rename or an identical write keeps it.
+    configuration_revision: integer().default(1).notNull(),
     // Saved sandbox allocation key for this repository's sessions; null uses the
-    // owner's default.
+    // owner's default. Not a build input, so it never advances the revision.
     sandbox_allocation: text(),
 
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),

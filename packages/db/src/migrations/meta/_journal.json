@@ -2119,8 +2119,15 @@
     {
       "idx": 302,
       "version": "7",
-      "when": 1792878854955,
-      "tag": "0302_regular_maverick",
+      "when": 1792878599267,
+      "tag": "0302_loud_victor_mancha",
+      "breakpoints": true
+    },
+    {
+      "idx": 303,
+      "version": "7",
+      "when": 1793014244373,
+      "tag": "0303_review_window_index",
       "breakpoints": true
     }
   ]

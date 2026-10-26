@@ -110,10 +110,8 @@ type ContractHarness = {
   leaseCalls(): number;
   /** Lease durations the backend received where it has one (Cloudflare has none). */
   leaseMs(): number[];
-  /** Containers-only repository capture; absent on the other two adapters. */
-  captureRepository?(ref: string, repoKey: string, commit?: string): Promise<boolean>;
-  /** Containers-only observable capture call. */
-  capturedRepository?(): { ref: string; repoKey: string; commit?: string } | undefined;
+  /** Containers-only: the launch inputs the container DO received. */
+  launchInputs?(): ContainersLaunchInput[];
   /** Containers-only: set the outcome the backend reports from `stop`. */
   setStopOutcome?(outcome: 'terminal' | 'retryable'): void;
   /** Vercel-only: authoritative contained-grant reads observed by the adapter. */
@@ -220,7 +218,6 @@ function containersHarness(
     admission: async (): Promise<SandboxBillingAdmissionResult> => ({ success: true }),
     launchInputs: [] as ContainersLaunchInput[],
     leaseMs: [] as number[],
-    captures: [] as { ref: string; repoKey: string; commit?: string }[],
     billingBlocked: false,
     billingReads: 0,
   };
@@ -239,10 +236,6 @@ function containersHarness(
     ensureLeaseAtLeast: async (_ref: string, ms: number) => {
       state.leaseMs.push(ms);
       if (options.failLaunchLease) throw new Error('containers lease failed');
-    },
-    captureRepository: async (ref: string, repoKey: string, commit?: string) => {
-      state.captures.push({ ref, repoKey, ...(commit === undefined ? {} : { commit }) });
-      return true;
     },
     observe: async () => {
       if (state.observeThrows) throw new Error('containers observe failed');
@@ -295,8 +288,7 @@ function containersHarness(
     launchInvocation: () => state.launchInputs.at(-1)?.command.argv,
     leaseCalls: () => state.leaseMs.length,
     leaseMs: () => [...state.leaseMs],
-    captureRepository: (ref, repoKey, commit) => adapter.captureRepository!(ref, repoKey, commit),
-    capturedRepository: () => state.captures.at(-1),
+    launchInputs: () => [...state.launchInputs],
     setStopOutcome: outcome => {
       state.stopResult = outcome;
     },
@@ -580,24 +572,24 @@ describe('provider-specific contract differences', () => {
     const owned = harness.leaseCalls();
     await harness.adapter.ensureLeaseAtLeast(harness.foreignRef(), OWNED_LEASE_MS);
     expect(harness.leaseCalls()).toBe(owned);
-    expect('captureRepository' in harness.adapter).toBe(false);
+    expect('environmentSnapshots' in harness.adapter).toBe(false);
     expect('applyContainedCredentials' in harness.adapter).toBe(false);
   });
 
-  it('maps Containers repository capture and reports a backend stop outcome verbatim', async () => {
+  it('forwards an environment snapshot start and reports a backend stop outcome verbatim', async () => {
     const harness = containersHarness();
     const ref = await harness.create();
 
-    expect(await harness.captureRepository!(ref, 'repo-key', 'commit-1')).toBe(true);
-    expect(harness.capturedRepository!()).toEqual({
-      ref,
-      repoKey: 'repo-key',
-      commit: 'commit-1',
-    });
-    expect(await harness.captureRepository!(harness.foreignRef(), 'repo-key')).toBe(false);
+    expect(harness.adapter.environmentSnapshots).toBe(true);
+    const snapshot = { snapshotId: 'snap-env', baseImage: 'registry.example/app:1' };
+    await harness.adapter.launch(ref, { command: preinstalledStartup(), env: {} }, { snapshot });
+    expect(harness.launchInputs!().at(-1)?.snapshot).toEqual(snapshot);
+    await harness.adapter.launch(ref, { command: preinstalledStartup(), env: {} });
+    expect(harness.launchInputs!().at(-1)).not.toHaveProperty('snapshot');
 
+    const launchLeases = harness.leaseMs().length;
     await harness.adapter.ensureLeaseAtLeast(ref, OWNED_LEASE_MS);
-    expect(harness.leaseMs()).toEqual([OWNED_LEASE_MS]);
+    expect(harness.leaseMs().slice(launchLeases)).toEqual([OWNED_LEASE_MS]);
     expect(await harness.adapter.logs(ref)).toBe('container-log-body');
     // The DO reports an unconfirmed stop outcome, and the adapter returns it verbatim.
     harness.setStopOutcome!('retryable');
@@ -659,7 +651,7 @@ describe('provider-specific contract differences', () => {
     const leases = harness.leaseMs().length;
     await harness.adapter.ensureLeaseAtLeast(harness.foreignRef(), OWNED_LEASE_MS);
     expect(harness.leaseMs()).toHaveLength(leases);
-    expect('captureRepository' in harness.adapter).toBe(false);
+    expect('environmentSnapshots' in harness.adapter).toBe(false);
 
     await expect(
       harness.adapter.applyContainedCredentials!(ref, [] as readonly SessionCredentialGrant[])

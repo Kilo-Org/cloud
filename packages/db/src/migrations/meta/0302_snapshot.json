@@ -1,5 +1,5 @@
 {
-  "id": "e52bfc1f-3ff1-46f2-ab42-5036c59ac38d",
+  "id": "3ef93f9d-c2d8-4ef7-87ce-4876b6dba5de",
   "prevId": "ff5b8190-a865-47ea-9c73-8120c8d9963a",
   "version": "7",
   "dialect": "postgresql",
@@ -5518,22 +5518,6 @@
           "method": "btree",
           "with": {}
         },
-        "idx_cloud_agent_code_reviews_started_at_effective": {
-          "name": "idx_cloud_agent_code_reviews_started_at_effective",
-          "columns": [
-            {
-              "expression": "COALESCE(\"started_at\", \"updated_at\", \"created_at\")",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"cloud_agent_code_reviews\".\"status\" NOT IN ('pending', 'queued') AND COALESCE(\"cloud_agent_code_reviews\".\"terminal_reason\", '') <> 'abandoned'",
-          "concurrently": true,
-          "method": "btree",
-          "with": {}
-        },
         "idx_cloud_agent_code_reviews_terminal_missing_completed_at": {
           "name": "idx_cloud_agent_code_reviews_terminal_missing_completed_at",
           "columns": [
@@ -5772,6 +5756,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'{}'"
+        },
+        "configuration_revision": {
+          "name": "configuration_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
         },
         "sandbox_allocation": {
           "name": "sandbox_allocation",

@@ -76,46 +76,20 @@ export type ControlPlaneTimers = {
 // scaled) because they bound provider and container work.
 const PROVIDER_CREATE_MS = 2 * MINUTE_MS;
 const PROVIDER_CREATE_RETRY_MS = 10_000;
-// A repository-backed container allocation creates its sandbox under the wider
-// repository startup bound (`DEADLINE_MS.repositoryStartup` in
-// `sandbox-control/deadlines.ts`), which is the create path every preparation
-// attempt with a repository takes. It is restated here because this module is
-// bundled into the wrapper without the worker's other sources;
-// `control-plane-timers.test.ts` asserts the attempt budget against that bound.
+// Environment snapshot starts use `DEADLINE_MS.repositoryStartup`; this module
+// also ships in the wrapper without the worker sources.
 const PREPARATION_CREATE_MS = 5 * MINUTE_MS;
 const WRAPPER_FIRST_CONNECT_MS = 5 * MINUTE_MS;
 const WRAPPER_HELLO_MS = 30_000;
 const RESTORE_MS = 2 * MINUTE_MS;
 const CLONE_MS = 6 * MINUTE_MS;
-// The attempt's own last workspace step: the Sandbox DO saves the prepared
-// workspace for a repository-backed route, and preparation waits for it.
 const CAPTURE_MS = 5 * MINUTE_MS + 10_000;
 const KILO_RUNTIME_START_MS = 2 * MINUTE_MS;
 const KILO_SESSION_MS = 2 * MINUTE_MS;
 
-/**
- * One preparation attempt runs these steps in order: sandbox create, wrapper
- * first connect and hello, snapshot restore (falling back to a clone), the
- * workspace save, Kilo runtime start, then the session import. Every step keeps
- * its own bound, so the attempt deadline is their sum. A shorter deadline fails
- * a slow but valid preparation as `preparation_timeout` while each step stayed
- * inside its own budget — the failure names a timeout the plan never allowed to
- * finish.
- *
- * Two steps are retried once inside the same attempt, so each counts twice.
- * A transient create failure pauses and creates again inside the same attempt
- * (`control-plane/sandbox/allocation.ts`), so one retried create is counted
- * too. Further retries stay bounded by this deadline, which is what stops a
- * create that keeps failing.
- *
- * Setup commands have no term here. Each command carries its own inactivity and
- * hard timeout (`wrapper/src/control-plane/prepare.ts`), while how many run and
- * how long each takes are the route's configuration (bounded per command, not in
- * total). This deadline is therefore their aggregate stop by design: a route
- * whose setup work together outlasts the attempt fails as
- * `preparation_timeout`, because a bound that grew with the configured command
- * count would also stretch how long a stuck preparation can hold a session.
- */
+// Fixed preparation work includes one create retry and one retry each for
+// runtime start and session import. Setup retains its per-command bounds;
+// the attempt deadline is its aggregate stop.
 const ROUTE_PREPARATION_MS =
   PREPARATION_CREATE_MS +
   PROVIDER_CREATE_RETRY_MS +
@@ -124,15 +98,13 @@ const ROUTE_PREPARATION_MS =
   WRAPPER_HELLO_MS +
   RESTORE_MS +
   CLONE_MS +
-  CAPTURE_MS +
   2 * KILO_RUNTIME_START_MS +
   2 * KILO_SESSION_MS;
 
 // The divisor shortens only internal deadlines whose partner also scales, so
 // their orderings hold (the 90-s reconnect window stays longer than the 30-s
 // max backoff). Timers that bound external work stay real: provider create and
-// container boot, the prep attempt that must outlast create+connect+restore+
-// clone+save+runtime+session, the pause before a failed create is retried,
+// container boot, the preparation attempt, the pause before a failed create is retried,
 // restore/clone/save/runtime/session bounds, SSE silence (Kilo heartbeats every
 // 10-15 s), health request, the real-SSE reconnect window, credential grants
 // and the provider stop ladder.

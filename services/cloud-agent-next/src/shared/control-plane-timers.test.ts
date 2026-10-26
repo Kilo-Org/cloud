@@ -39,8 +39,7 @@ describe('control-plane idle timers', () => {
 describe('control-plane preparation attempt budget', () => {
   it('outlasts every step of one preparation attempt in sequence', () => {
     const { sandbox, wrapper } = CONTROL_PLANE_TIMERS;
-    // A repository-backed container allocation runs its create under the wider
-    // repository startup bound, so that is the create step this covers.
+    // Environment snapshot starts use the wider repository startup bound.
     const createMs = Math.max(sandbox.providerCreateMs, DEADLINE_MS.repositoryStartup);
     const steps =
       // A transient create failure creates again inside the same attempt.
@@ -51,14 +50,11 @@ describe('control-plane preparation attempt budget', () => {
       sandbox.wrapperHelloMs +
       wrapper.restoreMs +
       wrapper.cloneMs +
-      wrapper.captureMs +
       // Kilo runtime start and the Kilo session each retry once inside the
       // attempt, so each can consume two of its own bounds.
       2 * wrapper.kiloRuntimeStartMs +
       2 * wrapper.kiloSessionMs;
 
-    // A shorter attempt deadline would fail a slow but valid preparation as
-    // `preparation_timeout` while each step stayed inside its own bound.
     expect(sandbox.routePreparationMs).toBeGreaterThanOrEqual(steps);
   });
 

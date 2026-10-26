@@ -313,8 +313,8 @@ so a later report changes nothing.
 
 `preparing` → `ready` → `failed`. Each preparation attempt has a deadline that outlasts its
 own steps in sequence (sandbox create, wrapper first connect and hello, snapshot restore with
-the clone fallback, the workspace save, Kilo runtime start, session import), including the one
-retry each of the last two steps may take. An attempt
+the clone fallback, Kilo runtime start, session import), including one create retry and one
+retry each of the last two steps. Environment snapshot builds run separately. An attempt
 starts when a route enters `preparing`: the first `prepare`, a `prepare` after `failed`, or a
 re-prepare after a wrapper restart. A repeated `prepare`, a reconnect or a new allocation inside the
 attempt keeps its deadline. Setup commands keep their own per-command limits, and how many run is

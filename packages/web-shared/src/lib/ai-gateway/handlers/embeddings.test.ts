@@ -151,6 +151,38 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     }
   });
 
+  it('answers anonymous callers the same for a free model id a custom LLM uses', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: new Response('unauthorized', { status: 401 }),
+      organizationId: undefined,
+    } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
+    mockedFetch.mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ error: { message: 'model not found' } }), {
+          status: 400,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+    // Rows created before free model ids were rejected can still use one.
+    await insertCustomLlmForTest('stealth/legacy-alpha');
+    try {
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const customResponse = await handleEmbeddingsRequest(
+        makeRequest({ model: 'stealth/legacy-alpha' })
+      );
+      const unknownResponse = await handleEmbeddingsRequest(
+        makeRequest({ model: 'stealth/unknown-alpha' })
+      );
+
+      expect(customResponse.status).toBe(unknownResponse.status);
+      expect(await customResponse.json()).toEqual(await unknownResponse.json());
+      expect(mockedFetch).toHaveBeenCalledTimes(2);
+    } finally {
+      await deleteCustomLlmForTest('stealth/legacy-alpha');
+    }
+  });
+
   it('forwards personal request privacy with other provider fields', async () => {
     const provider = { data_collection: 'deny', zdr: true, only: ['openai'], sort: 'latency' };
     const { handleEmbeddingsRequest } = await import('./embeddings');

@@ -195,8 +195,10 @@ export async function handleEmbeddingsRequest(
   }
 
   // Custom LLMs are served only through chat routes; never forward their ids
-  // elsewhere. Checked after auth so anonymous callers cannot probe for them.
-  if (await isCustomLlm(requestedModelLowerCased)) {
+  // elsewhere for signed-in callers. Anonymous callers can only send ids the
+  // built-in free model rules allow, and such an id must be answered the same
+  // whether or not a custom LLM uses it, so they are not checked.
+  if (!isAnonymousContext(user) && (await isCustomLlm(requestedModelLowerCased))) {
     return modelDoesNotExistResponse();
   }
 

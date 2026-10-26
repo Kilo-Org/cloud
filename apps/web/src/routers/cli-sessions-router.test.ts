@@ -6,8 +6,6 @@ import {
   sharedCliSessions,
   organizations,
   organization_memberships,
-  cloud_agent_webhook_triggers,
-  agent_environment_profiles,
 } from '@kilocode/db/schema';
 import { CliSessionSharedState } from '@/types/cli-session-shared-state';
 import { eq, and } from 'drizzle-orm';
@@ -1290,6 +1288,25 @@ describe('cli-sessions-router', () => {
       deleteSessionId = session.session_id;
     });
 
+    afterEach(async () => {
+      const { deleteBlobs } = await import('@/lib/r2/cli-sessions');
+      jest.mocked(deleteBlobs).mockReset().mockResolvedValue(undefined);
+      await db.delete(sharedCliSessions).where(eq(sharedCliSessions.session_id, deleteSessionId));
+      await db.delete(cliSessions).where(eq(cliSessions.session_id, deleteSessionId));
+    });
+
+    async function insertShare(sessionId: string, publisherId: string): Promise<string> {
+      const [share] = await db
+        .insert(sharedCliSessions)
+        .values({
+          session_id: sessionId,
+          kilo_user_id: publisherId,
+          shared_state: CliSessionSharedState.Public,
+        })
+        .returning({ share_id: sharedCliSessions.share_id });
+      return share.share_id;
+    }
+
     it('should delete session and its blobs', async () => {
       const caller = await createCallerForUser(regularUser.id);
       const { deleteBlobs } = await import('@/lib/r2/cli-sessions');
@@ -1357,6 +1374,190 @@ describe('cli-sessions-router', () => {
         .from(cliSessions)
         .where(eq(cliSessions.session_id, deleteSessionId));
       expect(sessions).toHaveLength(1);
+    });
+
+    it('should delete shares linked to the source session, including shares by another publisher', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const { deleteBlobs } = await import('@/lib/r2/cli-sessions');
+      jest.mocked(deleteBlobs).mockClear();
+
+      const ownedShareId = await insertShare(deleteSessionId, regularUser.id);
+      const otherPublisherShareId = await insertShare(deleteSessionId, otherUser.id);
+
+      const [unrelatedSession] = await db
+        .insert(cliSessions)
+        .values({
+          kilo_user_id: regularUser.id,
+          title: 'Unrelated Session',
+          created_on_platform: 'vscode',
+        })
+        .returning({ session_id: cliSessions.session_id });
+      const unrelatedShareId = await insertShare(unrelatedSession.session_id, regularUser.id);
+
+      try {
+        await expect(caller.cliSessions.delete({ session_id: deleteSessionId })).resolves.toEqual({
+          success: true,
+          session_id: deleteSessionId,
+        });
+
+        const remainingShares = await db
+          .select({ share_id: sharedCliSessions.share_id })
+          .from(sharedCliSessions)
+          .where(eq(sharedCliSessions.session_id, deleteSessionId));
+        expect(remainingShares).toHaveLength(0);
+
+        const [unrelatedShare] = await db
+          .select({ share_id: sharedCliSessions.share_id })
+          .from(sharedCliSessions)
+          .where(eq(sharedCliSessions.share_id, unrelatedShareId));
+        expect(unrelatedShare?.share_id).toBe(unrelatedShareId);
+
+        const sharedBlobs = [
+          { folderName: 'shared-sessions', filename: 'api_conversation_history' },
+          { folderName: 'shared-sessions', filename: 'task_metadata' },
+          { folderName: 'shared-sessions', filename: 'ui_messages' },
+          { folderName: 'shared-sessions', filename: 'git_state' },
+        ];
+        expect(deleteBlobs).toHaveBeenCalledWith(ownedShareId, sharedBlobs);
+        expect(deleteBlobs).toHaveBeenCalledWith(otherPublisherShareId, sharedBlobs);
+
+        const otherCaller = await createCallerForUser(otherUser.id);
+        await expect(
+          otherCaller.cliSessions.fork({
+            share_or_session_id: ownedShareId,
+            created_on_platform: 'vscode',
+          })
+        ).rejects.toThrow('Session not found');
+      } finally {
+        await db.delete(sharedCliSessions).where(eq(sharedCliSessions.share_id, unrelatedShareId));
+        await db.delete(cliSessions).where(eq(cliSessions.session_id, unrelatedSession.session_id));
+      }
+    });
+
+    it('should retry share blob deletion before removing share rows', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const { deleteBlobs } = await import('@/lib/r2/cli-sessions');
+      const shareId = await insertShare(deleteSessionId, otherUser.id);
+      let shareDeletionAttempts = 0;
+
+      jest.mocked(deleteBlobs).mockImplementation(async (_id, blobs) => {
+        if (blobs.some(blob => blob.folderName === 'shared-sessions')) {
+          shareDeletionAttempts += 1;
+          if (shareDeletionAttempts < 2) {
+            throw new Error('Transient R2 failure');
+          }
+        }
+      });
+
+      await expect(caller.cliSessions.delete({ session_id: deleteSessionId })).resolves.toEqual({
+        success: true,
+        session_id: deleteSessionId,
+      });
+
+      expect(shareDeletionAttempts).toBe(2);
+      const [share] = await db
+        .select({ share_id: sharedCliSessions.share_id })
+        .from(sharedCliSessions)
+        .where(eq(sharedCliSessions.share_id, shareId));
+      expect(share).toBeUndefined();
+    });
+
+    it('should retain the source session and shares when share blob deletion keeps failing', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const { deleteBlobs } = await import('@/lib/r2/cli-sessions');
+      const shareId = await insertShare(deleteSessionId, otherUser.id);
+      let shareDeletionAttempts = 0;
+
+      jest.mocked(deleteBlobs).mockImplementation(async (_id, blobs) => {
+        if (blobs.some(blob => blob.folderName === 'shared-sessions')) {
+          shareDeletionAttempts += 1;
+          throw new Error('Persistent R2 failure');
+        }
+      });
+
+      await expect(caller.cliSessions.delete({ session_id: deleteSessionId })).rejects.toThrow(
+        'Persistent R2 failure'
+      );
+
+      expect(shareDeletionAttempts).toBe(3);
+      expect(deleteBlobs).not.toHaveBeenCalledWith(deleteSessionId, expect.any(Array));
+
+      const [session] = await db
+        .select({ session_id: cliSessions.session_id })
+        .from(cliSessions)
+        .where(eq(cliSessions.session_id, deleteSessionId));
+      expect(session?.session_id).toBe(deleteSessionId);
+
+      const [share] = await db
+        .select({ share_id: sharedCliSessions.share_id })
+        .from(sharedCliSessions)
+        .where(eq(sharedCliSessions.share_id, shareId));
+      expect(share?.share_id).toBe(shareId);
+    });
+
+    it('should remove already-cleaned shares when a later share cleanup fails', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const { deleteBlobs } = await import('@/lib/r2/cli-sessions');
+      await insertShare(deleteSessionId, regularUser.id);
+      await insertShare(deleteSessionId, otherUser.id);
+      let shareDeletionAttempts = 0;
+
+      jest.mocked(deleteBlobs).mockImplementation(async (_id, blobs) => {
+        if (blobs.some(blob => blob.folderName === 'shared-sessions')) {
+          shareDeletionAttempts += 1;
+          if (shareDeletionAttempts > 1) {
+            throw new Error('Persistent R2 failure');
+          }
+        }
+      });
+
+      await expect(caller.cliSessions.delete({ session_id: deleteSessionId })).rejects.toThrow(
+        'Persistent R2 failure'
+      );
+
+      expect(shareDeletionAttempts).toBe(4);
+      expect(deleteBlobs).not.toHaveBeenCalledWith(deleteSessionId, expect.any(Array));
+
+      const remainingShares = await db
+        .select({ share_id: sharedCliSessions.share_id })
+        .from(sharedCliSessions)
+        .where(eq(sharedCliSessions.session_id, deleteSessionId));
+      expect(remainingShares).toHaveLength(1);
+
+      const [session] = await db
+        .select({ session_id: cliSessions.session_id })
+        .from(cliSessions)
+        .where(eq(cliSessions.session_id, deleteSessionId));
+      expect(session?.session_id).toBe(deleteSessionId);
+    });
+
+    it('should remove share blobs before the source session blobs', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const { deleteBlobs } = await import('@/lib/r2/cli-sessions');
+      const shareId = await insertShare(deleteSessionId, otherUser.id);
+
+      await expect(caller.cliSessions.delete({ session_id: deleteSessionId })).resolves.toEqual({
+        success: true,
+        session_id: deleteSessionId,
+      });
+
+      const calls = jest.mocked(deleteBlobs).mock.calls.map(([id]) => id);
+      expect(calls).toEqual([shareId, deleteSessionId]);
+    });
+
+    it('should keep shares when a non-owner attempts deletion', async () => {
+      const shareId = await insertShare(deleteSessionId, otherUser.id);
+      const caller = await createCallerForUser(otherUser.id);
+
+      await expect(caller.cliSessions.delete({ session_id: deleteSessionId })).rejects.toThrow(
+        'Session not found'
+      );
+
+      const [share] = await db
+        .select({ share_id: sharedCliSessions.share_id })
+        .from(sharedCliSessions)
+        .where(eq(sharedCliSessions.share_id, shareId));
+      expect(share?.share_id).toBe(shareId);
     });
 
     it('should throw NOT_FOUND when deleting other user session', async () => {
@@ -1837,228 +2038,6 @@ describe('cli-sessions-router', () => {
           cloud_agent_session_id: testCloudAgentSessionId,
         })
       ).rejects.toThrow('No kilo session found for this cloud-agent session');
-    });
-  });
-
-  describe('shareForWebhookTrigger', () => {
-    let triggerId: string;
-    let profileId: string;
-    const testTriggerId = 'test-trigger-share';
-
-    beforeAll(async () => {
-      // Create an environment profile (required FK for triggers)
-      const [profile] = await db
-        .insert(agent_environment_profiles)
-        .values({
-          owned_by_user_id: regularUser.id,
-          name: 'share-test-profile',
-        })
-        .returning({ id: agent_environment_profiles.id });
-      profileId = profile.id;
-
-      // Create a personal webhook trigger owned by regularUser
-      const [trigger] = await db
-        .insert(cloud_agent_webhook_triggers)
-        .values({
-          trigger_id: testTriggerId,
-          user_id: regularUser.id,
-          github_repo: 'test/repo',
-          profile_id: profileId,
-        })
-        .returning({ id: cloud_agent_webhook_triggers.id });
-      triggerId = trigger.id;
-    });
-
-    afterAll(async () => {
-      await db
-        .delete(cloud_agent_webhook_triggers)
-        .where(eq(cloud_agent_webhook_triggers.id, triggerId));
-      await db
-        .delete(agent_environment_profiles)
-        .where(eq(agent_environment_profiles.id, profileId));
-    });
-
-    describe('v1 path (UUID sessions)', () => {
-      let v1SessionId: string;
-
-      beforeEach(async () => {
-        const [session] = await db
-          .insert(cliSessions)
-          .values({
-            kilo_user_id: regularUser.id,
-            title: 'V1 Share Test Session',
-            created_on_platform: 'vscode',
-          })
-          .returning({ session_id: cliSessions.session_id });
-        v1SessionId = session.session_id;
-      });
-
-      afterEach(async () => {
-        await db.delete(sharedCliSessions).where(eq(sharedCliSessions.session_id, v1SessionId));
-        await db.delete(cliSessions).where(eq(cliSessions.session_id, v1SessionId));
-      });
-
-      it('should share a v1 session by copying blobs and creating a shared record', async () => {
-        const caller = await createCallerForUser(regularUser.id);
-
-        const result = await caller.cliSessions.shareForWebhookTrigger({
-          kilo_session_id: v1SessionId,
-          trigger_id: testTriggerId,
-        });
-
-        expect(result.session_id).toBe(v1SessionId);
-        expect(result.share_id).toBeDefined();
-
-        // Verify shared session was created in the database
-        const [shared] = await db
-          .select()
-          .from(sharedCliSessions)
-          .where(eq(sharedCliSessions.share_id, result.share_id));
-
-        expect(shared).toBeDefined();
-        expect(shared.session_id).toBe(v1SessionId);
-        expect(shared.shared_state).toBe(CliSessionSharedState.Public);
-      });
-
-      it('should throw NOT_FOUND for non-existent v1 session', async () => {
-        const caller = await createCallerForUser(regularUser.id);
-        const fakeUuid = '00000000-0000-0000-0000-000000000000';
-
-        await expect(
-          caller.cliSessions.shareForWebhookTrigger({
-            kilo_session_id: fakeUuid,
-            trigger_id: testTriggerId,
-          })
-        ).rejects.toThrow('Session not found');
-      });
-
-      it('should throw NOT_FOUND when session belongs to a different user (personal trigger)', async () => {
-        // Session is created by regularUser (via beforeEach), but otherUser tries to share it
-        // otherUser needs their own trigger to pass verifyWebhookTriggerAccess
-        const [otherProfile] = await db
-          .insert(agent_environment_profiles)
-          .values({
-            owned_by_user_id: otherUser.id,
-            name: 'other-user-share-profile',
-          })
-          .returning({ id: agent_environment_profiles.id });
-
-        const otherTriggerId = 'test-trigger-share-other-user';
-        const [otherTrigger] = await db
-          .insert(cloud_agent_webhook_triggers)
-          .values({
-            trigger_id: otherTriggerId,
-            user_id: otherUser.id,
-            github_repo: 'test/other-repo',
-            profile_id: otherProfile.id,
-          })
-          .returning({ id: cloud_agent_webhook_triggers.id });
-
-        try {
-          const caller = await createCallerForUser(otherUser.id);
-          await expect(
-            caller.cliSessions.shareForWebhookTrigger({
-              kilo_session_id: v1SessionId,
-              trigger_id: otherTriggerId,
-            })
-          ).rejects.toThrow('Session not found');
-        } finally {
-          await db
-            .delete(cloud_agent_webhook_triggers)
-            .where(eq(cloud_agent_webhook_triggers.id, otherTrigger.id));
-          await db
-            .delete(agent_environment_profiles)
-            .where(eq(agent_environment_profiles.id, otherProfile.id));
-        }
-      });
-
-      it('should throw NOT_FOUND when session belongs to a different org (org trigger)', async () => {
-        // Create a session belonging to testOrganization
-        const [orgSession] = await db
-          .insert(cliSessions)
-          .values({
-            kilo_user_id: regularUser.id,
-            title: 'Org Session',
-            created_on_platform: 'vscode',
-            organization_id: testOrganization.id,
-          })
-          .returning({ session_id: cliSessions.session_id });
-
-        // Create a second org and an org trigger for it
-        const [otherOrg] = await db
-          .insert(organizations)
-          .values({
-            name: 'Other Org for Share Test',
-            created_by_kilo_user_id: regularUser.id,
-          })
-          .returning();
-
-        await db.insert(organization_memberships).values({
-          organization_id: otherOrg.id,
-          kilo_user_id: regularUser.id,
-          role: 'owner',
-        });
-
-        const [otherProfile] = await db
-          .insert(agent_environment_profiles)
-          .values({
-            name: 'other-org-share-profile',
-            owned_by_organization_id: otherOrg.id,
-          })
-          .returning({ id: agent_environment_profiles.id });
-
-        const otherOrgTriggerId = 'test-trigger-share-other-org';
-        const [otherOrgTrigger] = await db
-          .insert(cloud_agent_webhook_triggers)
-          .values({
-            trigger_id: otherOrgTriggerId,
-            organization_id: otherOrg.id,
-            github_repo: 'test/other-org-repo',
-            profile_id: otherProfile.id,
-          })
-          .returning({ id: cloud_agent_webhook_triggers.id });
-
-        try {
-          const caller = await createCallerForUser(regularUser.id);
-          // Try to share orgSession (belongs to testOrganization) via otherOrg's trigger
-          await expect(
-            caller.cliSessions.shareForWebhookTrigger({
-              kilo_session_id: orgSession.session_id,
-              trigger_id: otherOrgTriggerId,
-              organization_id: otherOrg.id,
-            })
-          ).rejects.toThrow('Session not found');
-        } finally {
-          await db
-            .delete(cloud_agent_webhook_triggers)
-            .where(eq(cloud_agent_webhook_triggers.id, otherOrgTrigger.id));
-          await db
-            .delete(agent_environment_profiles)
-            .where(eq(agent_environment_profiles.id, otherProfile.id));
-          await db
-            .delete(organization_memberships)
-            .where(
-              and(
-                eq(organization_memberships.organization_id, otherOrg.id),
-                eq(organization_memberships.kilo_user_id, regularUser.id)
-              )
-            );
-          await db.delete(cliSessions).where(eq(cliSessions.session_id, orgSession.session_id));
-          await db.delete(organizations).where(eq(organizations.id, otherOrg.id));
-        }
-      });
-    });
-
-    it('should throw NOT_FOUND for non-existent trigger', async () => {
-      const caller = await createCallerForUser(regularUser.id);
-      const fakeUuid = '10000000-0000-1000-8000-000000000001';
-
-      await expect(
-        caller.cliSessions.shareForWebhookTrigger({
-          kilo_session_id: fakeUuid,
-          trigger_id: 'non-existent-trigger',
-        })
-      ).rejects.toThrow('Trigger not found');
     });
   });
 });

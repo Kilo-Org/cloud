@@ -1,4 +1,4 @@
-import { Deferred, Effect, Either, Fiber, Schedule, Stream } from 'effect';
+import { Deferred, Effect, Fiber, Result, Schedule, Stream } from 'effect';
 import { expect, it } from 'vitest';
 import type { AbortLike, FetchLike, HttpResponse } from '../../core/fetch.js';
 import { sampleRequest, sse } from '../gateway/fake.js';
@@ -28,10 +28,10 @@ it('aborts a pending request when a connection-check deadline expires', async ()
   const result = await Effect.runPromise(
     Stream.runDrain(remoteModelClient(configFor(fetch), retry).stream(sampleRequest())).pipe(
       Effect.timeout('10 millis'),
-      Effect.either
+      Effect.result
     )
   );
-  expect(Either.isLeft(result)).toBe(true);
+  expect(Result.isFailure(result)).toBe(true);
   expect(observed.signal?.aborted).toBe(true);
 });
 
@@ -59,7 +59,7 @@ it('owns the abort handle until the consumer stops reading, not only until heade
   };
   await Effect.runPromise(
     Effect.gen(function* () {
-      const reading = yield* Effect.fork(
+      const reading = yield* Effect.forkChild(
         remoteModelClient(configFor(fetch), retry)
           .stream(sampleRequest())
           .pipe(Stream.runForEach(() => Deferred.succeed(ready, true)))

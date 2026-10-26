@@ -13,6 +13,8 @@ import {
   OrganizationSettingsSchema,
 } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
+  cloud_agent_environments,
+  cli_sessions_v2,
   kilocode_users,
   organization_invitations,
   organization_membership_removals,
@@ -38,7 +40,11 @@ import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { captureOrganizationMemberJoined } from '@kilocode/web-shared/lib/organizations/organization-member-analytics';
 import { failureResult, successResult } from '@kilocode/web-shared/lib/maybe-result';
-import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
+import {
+  bumpOrganizationGroupPolicyRevision,
+  lockOrganizationGroupPolicy,
+} from '@kilocode/web-shared/lib/organizations/organization-groups';
+import { enforceOrganizationCreationLimit } from '@kilocode/web-shared/lib/organizations/organization-creation-limit';
 
 export async function getOrganizationById(
   id: Organization['id'],
@@ -170,6 +176,13 @@ export type ProfileOrganization = {
   role: OrganizationRole;
 };
 
+/** One row of the profile query: the org, the caller's membership, and its current seat status. */
+type ProfileOrganizationRow = {
+  organization: Organization;
+  membership: typeof organization_memberships.$inferSelect;
+  latestSeatPurchaseStatus: OrganizationSeatsPurchase['subscription_status'] | null;
+};
+
 export type GetProfileOrganizationsOptions = {
   // When true, omit organizations whose free trial has hard-expired without an
   // active entitlement (the "Access Blocked" state). These orgs are locked to
@@ -198,7 +211,7 @@ export async function getProfileOrganizations(
       )`
     : sql<OrganizationSeatsPurchase['subscription_status'] | null>`NULL`;
 
-  const results = await db
+  const results: ProfileOrganizationRow[] = await db
     .select({
       organization: organizations,
       membership: organization_memberships,
@@ -253,6 +266,9 @@ export async function createOrganization(
   plan?: 'teams' | 'enterprise'
 ): Promise<Organization> {
   const organization = await db.transaction(async tx => {
+    if (userId) {
+      await enforceOrganizationCreationLimit(tx, userId);
+    }
     const now = new Date();
     const trialEndDate = new Date(now.getTime() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000);
 
@@ -678,6 +694,11 @@ export async function acceptOrganizationInvite(
         return failureResult('Invitation is for a different email address');
       }
 
+      // Keep the membership-mutation advisory lock before the policy lock, and
+      // both before the organization row lock, matching SSO joins and settings writes.
+      await lockOrganizationMembershipMutation(tx, invitation.organization_id, userId);
+      await lockOrganizationGroupPolicy(tx, invitation.organization_id);
+
       const [organization] = await tx
         .select()
         .from(organizations)
@@ -714,8 +735,6 @@ export async function acceptOrganizationInvite(
         return failureResult('Invitation requires authentication through organization SSO');
       }
 
-      await lockOrganizationMembershipMutation(tx, invitation.organization_id, userId);
-
       const existingMembership = await tx
         .select()
         .from(organization_memberships)
@@ -744,6 +763,38 @@ export async function acceptOrganizationInvite(
         });
       }
 
+      // The invitation must be newer than the removal record to be accepted.
+      const [removal] = await tx
+        .select({ removedAt: organization_membership_removals.removed_at })
+        .from(organization_membership_removals)
+        .where(
+          and(
+            eq(organization_membership_removals.organization_id, invitation.organization_id),
+            eq(organization_membership_removals.kilo_user_id, userId)
+          )
+        )
+        .limit(1);
+
+      if (removal && new Date(invitation.created_at) <= new Date(removal.removedAt)) {
+        // The invitation is refused, so it must not linger as live in the
+        // invitation list or produce a later invite email: expire it and mark
+        // its outbox row terminal (same shape as the deleteInvite procedure).
+        await tx
+          .update(organization_invitations)
+          .set({ expires_at: sql`NOW()` })
+          .where(eq(organization_invitations.id, invitation.id));
+        await tx
+          .update(external_side_effect_outbox)
+          .set({
+            status: 'failed',
+            claimed_at: null,
+            next_attempt_at: null,
+            last_error: 'revoked',
+          })
+          .where(eq(external_side_effect_outbox.invitation_id, invitation.id));
+        return failureResult('Invitation is no longer valid');
+      }
+
       // Add user to organization
       await tx.insert(organization_memberships).values({
         organization_id: invitation.organization_id,
@@ -751,6 +802,10 @@ export async function acceptOrganizationInvite(
         role: invitation.role,
         invited_by: invitation.invited_by,
       });
+
+      // A real membership insert changes group-policy evaluation, so advance the
+      // same revision signal addUserToOrganization uses for the SSO path.
+      await bumpOrganizationGroupPolicyRevision(tx, invitation.organization_id, userId);
 
       await skipCustomerSourceSurveyForOrgJoin(userId, tx);
 
@@ -794,7 +849,7 @@ export async function acceptOrganizationInvite(
         tx,
       });
 
-      logExceptInTest(`Invitation ${inviteToken} accepted by ${userId}`);
+      logExceptInTest(`Invitation ${invitation.id} accepted by ${userId}`);
       return successResult({
         invitation: updatedInvitation,
         organizationId: invitation.organization_id,
@@ -853,14 +908,15 @@ export async function updateOrganizationSettings(
   settings: OrganizationSettings,
   txn?: DrizzleTransaction
 ): Promise<OrganizationSettings> {
+  const validated = OrganizationSettingsSchema.parse(settings);
   await (txn || db)
     .update(organizations)
     .set({
-      settings,
+      settings: validated,
     })
     .where(eq(organizations.id, organizationId));
 
-  return settings;
+  return validated;
 }
 
 // Atomically update the recommendations-digest flag inside the settings JSONB
@@ -889,24 +945,39 @@ export async function setOrganizationRecommendationsDigestEnabled(
 export async function markOrganizationAsDeleted(
   organizationId: Organization['id'],
   txn?: DrizzleTransaction
-): Promise<void> {
-  const execute = async (tx: DrizzleTransaction) => {
+): Promise<Organization['id'][]> {
+  const execute = async (tx: DrizzleTransaction): Promise<Organization['id'][]> => {
     const [organization] = await tx
       .select({ id: organizations.id })
       .from(organizations)
       .where(eq(organizations.id, organizationId))
       .for('update');
-    if (!organization) return;
+    if (!organization) return [];
+
+    const members = await tx
+      .select({ id: organization_memberships.kilo_user_id })
+      .from(organization_memberships)
+      .where(eq(organization_memberships.organization_id, organizationId));
+
+    await tx
+      .update(cli_sessions_v2)
+      .set({ public_id: null })
+      .where(eq(cli_sessions_v2.organization_id, organizationId));
     await tx
       .delete(provider_oauth_attempts)
       .where(eq(provider_oauth_attempts.owned_by_organization_id, organizationId));
     await tx
+      .delete(cloud_agent_environments)
+      .where(eq(cloud_agent_environments.owned_by_organization_id, organizationId));
+    await tx
       .update(organizations)
       .set({ ...auto_deleted_at })
       .where(eq(organizations.id, organizationId));
+
+    return members.map(member => member.id);
   };
-  if (txn) await execute(txn);
-  else await db.transaction(execute);
+  if (txn) return execute(txn);
+  return db.transaction(execute);
 }
 
 export async function getOrganizationMemberByEmail(

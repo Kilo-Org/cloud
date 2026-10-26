@@ -1,8 +1,10 @@
 import {
   isVirtualAutoModelId,
+  type AutoRouter,
   type AutoRoutingDeniedModelsRequest,
 } from '@kilocode/auto-routing-contracts';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { hasBestEffortGuessDataCollectionRequirement } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
@@ -51,12 +53,13 @@ export function deniedModelIdsForCandidates(
 }
 
 export async function collectDeniedAutoRoutingModelIds(
-  policy: EffectiveOrganizationModelPolicy
+  policy: EffectiveOrganizationModelPolicy,
+  router: AutoRouter
 ): Promise<string[]> {
   if (!policyNeedsCandidateEvaluation(policy)) return [];
   return deniedAutoRoutingCandidates(
     policy,
-    candidateModelIdsFromTable(await getCachedRoutingTable())
+    candidateModelIdsFromTable(await getCachedRoutingTable(router))
   );
 }
 
@@ -80,26 +83,34 @@ export async function deniedAutoRoutingCandidates(
   return deniedModelIdsForCandidates(policy, uniqueCandidates, modelId => allowed.has(modelId));
 }
 
-function dataCollectionRequiredCandidates(
+async function dataCollectionRequiredCandidates(
   candidateIds: ReadonlyArray<string>,
   dataCollectionRequiredModelIds: ReadonlySet<string>
-): string[] {
-  return candidateIds.filter(
-    modelId =>
-      hasBestEffortGuessDataCollectionRequirement(modelId) ||
-      dataCollectionRequiredModelIds.has(modelId)
+): Promise<string[]> {
+  const requiresDataCollection = await Promise.all(
+    candidateIds.map(
+      async modelId =>
+        dataCollectionRequiredModelIds.has(modelId) ||
+        (await hasBestEffortGuessDataCollectionRequirement(modelId))
+    )
   );
+  return candidateIds.filter((_modelId, index) => requiresDataCollection[index]);
 }
 
 export async function dataCollectionRequiredAutoRoutingCandidates(
   candidateIds: ReadonlyArray<string>
 ): Promise<string[]> {
-  return dataCollectionRequiredCandidates(candidateIds, await getDataCollectionRequiredModelIds());
+  return await dataCollectionRequiredCandidates(
+    candidateIds,
+    await getDataCollectionRequiredModelIds()
+  );
 }
 
-export async function collectDataCollectionRequiredAutoRoutingModelIds(): Promise<string[]> {
+export async function collectDataCollectionRequiredAutoRoutingModelIds(
+  router: AutoRouter
+): Promise<string[]> {
   const [table, dataCollectionRequiredModelIds] = await Promise.all([
-    getCachedRoutingTable(),
+    getCachedRoutingTable(router),
     getDataCollectionRequiredModelIds(),
   ]);
   return dataCollectionRequiredCandidates(
@@ -117,6 +128,7 @@ export async function deniedAutoRoutingModelIdsForMember(
   const policy = await resolveOrganizationMemberModelPolicy({
     organizationId: request.organizationId,
     kiloUserId: request.userId,
+    fromDb: readDb,
   });
   const candidateIds = [...new Set(request.modelIds.filter(id => !isVirtualAutoModelId(id)))];
   const [deniedByPolicy, deniedByPrivacy] = await Promise.all([

@@ -1,6 +1,8 @@
-import { describe, it, expect, beforeEach } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
+import { captureMessage } from '@sentry/nextjs';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
 import type { GatewayRequest } from './providers/openrouter/types';
+import { createMockUsageContext } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
 
 // `countAndStoreEditUsage` schedules the usage write through `next/server`'s
 // `after()` post-response hook, which only works in a request context. Replace
@@ -26,6 +28,11 @@ jest.mock('./processUsage', () => ({
   ) => mockedLogMicrodollarUsage(stats, ctx),
 }));
 
+jest.mock('@sentry/nextjs', () => ({
+  ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
+  captureMessage: jest.fn(),
+}));
+
 const mockedErrorExceptInTest = jest.fn();
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   ...(jest.requireActual('@kilocode/web-shared/lib/utils.server') as Record<string, unknown>),
@@ -33,14 +40,24 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
 }));
 
 import {
+  gemma_4_26b_a4b_it_free_model,
+  glyph_cluster_stealth_free_model,
+  kiloExclusiveModels,
+  reflection_beam_free_model,
+} from './kilo-exclusive-models';
+import type { KiloExclusiveModel } from './providers/kilo-exclusive-model';
+import {
   captureProxyError,
+  checkExclusiveModelProviderAllowed,
   countAndStoreEditUsage,
   countAndStoreFimUsage,
+  countAndStoreEmbeddingUsage,
   extractEditPromptInfo,
   extractEmbeddingPromptInfo,
   extractHeaderAndLimitLength,
   extractReasoningSetting,
   getOrganizationProviderPrivacy,
+  getOutputHeaders,
   lastUserPromptText,
   makeErrorReadable,
   parseEmbeddingUsageFromResponse,
@@ -49,6 +66,36 @@ import {
   requestedLogprobs,
   requestedSamples,
 } from './llm-proxy-helpers';
+
+describe('getOutputHeaders', () => {
+  it.each(['text/event-stream', 'text/event-stream; charset=utf-8', 'Text/Event-Stream'])(
+    'prevents intermediary compression and caching of %s responses',
+    contentType => {
+      const response = new Response(null, {
+        headers: { 'content-type': contentType, 'cache-control': 'public, max-age=3600' },
+      });
+
+      const headers = getOutputHeaders(response);
+
+      expect(headers.get('content-type')).toBe(contentType);
+      expect(headers.get('content-encoding')).toBe('identity');
+      expect(headers.get('cache-control')).toBe('no-cache, no-transform');
+      expect(response.headers.get('cache-control')).toBe('public, max-age=3600');
+    }
+  );
+
+  it.each(['application/json', 'text/plain', 'text/event-stream-other'])(
+    'prevents intermediary caching and compression of %s responses',
+    contentType => {
+      const headers = getOutputHeaders(
+        new Response(null, { headers: { 'content-type': contentType } })
+      );
+
+      expect(headers.get('content-encoding')).toBe('identity');
+      expect(headers.get('cache-control')).toBe('no-cache, no-transform');
+    }
+  );
+});
 
 describe('extractReasoningSetting', () => {
   it.each<{ name: string; body: unknown; expected: string | null }>([
@@ -365,6 +412,112 @@ describe('parseEditUsageFromResponse', () => {
   });
 });
 
+describe('countAndStoreEmbeddingUsage', () => {
+  beforeEach(() => {
+    mockedLogMicrodollarUsage.mockClear();
+    jest.mocked(captureMessage).mockClear();
+  });
+
+  it.each([400, 429])(
+    'records an upstream %i error body as errored usage without reporting it',
+    async status => {
+      const usageContext: MicrodollarUsageContext = {
+        ...createMockUsageContext('user-id', 'embedding@example.com', 0),
+        api_kind: 'embeddings',
+        requested_model: 'test/embedding',
+        status_code: status,
+      };
+      const response = new Response(
+        JSON.stringify({ error: { code: status, message: 'upstream rejected the request' } }),
+        { status }
+      );
+
+      countAndStoreEmbeddingUsage(response, usageContext, undefined);
+      await new Promise(resolve => setImmediate(resolve));
+
+      expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          hasError: true,
+          model: null,
+          inputTokens: 0,
+          cost_mUsd: 0,
+          status_code: status,
+        }),
+        usageContext
+      );
+      expect(captureMessage).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    ['an empty body', ''],
+    ['an HTML error page', '<html><body>502 Bad Gateway</body></html>'],
+  ])('records an upstream error with %s as errored usage without reporting it', async (_, body) => {
+    const usageContext: MicrodollarUsageContext = {
+      ...createMockUsageContext('user-id', 'embedding@example.com', 0),
+      api_kind: 'embeddings',
+      requested_model: 'test/embedding',
+      status_code: 502,
+    };
+
+    countAndStoreEmbeddingUsage(new Response(body, { status: 502 }), usageContext, undefined);
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ hasError: true, inputTokens: 0, cost_mUsd: 0, status_code: 502 }),
+      usageContext
+    );
+    expect(captureMessage).not.toHaveBeenCalled();
+  });
+
+  it('reports a successful response without usage', async () => {
+    const usageContext: MicrodollarUsageContext = {
+      ...createMockUsageContext('user-id', 'embedding@example.com', 0),
+      api_kind: 'embeddings',
+      requested_model: 'test/embedding',
+      status_code: 200,
+    };
+    const response = new Response(JSON.stringify({ id: 'embedding-id', model: 'test/embedding' }));
+
+    countAndStoreEmbeddingUsage(response, usageContext, undefined);
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(captureMessage).toHaveBeenCalledWith(
+      'SUSPICIOUS: No embedding usage information',
+      expect.anything()
+    );
+  });
+
+  it.each([
+    { is_free: false, user_byok: false, expectedCost: 1000 },
+    { is_free: true, user_byok: false, expectedCost: 0 },
+    { is_free: false, user_byok: true, expectedCost: 0 },
+  ])('uses the free/BYOK snapshots for embedding cost: %j', async testCase => {
+    const usageContext: MicrodollarUsageContext = {
+      ...createMockUsageContext('user-id', 'embedding@example.com', 0),
+      api_kind: 'embeddings',
+      requested_model: 'test/embedding',
+      is_free: testCase.is_free,
+      user_byok: testCase.user_byok,
+    };
+    const response = new Response(
+      JSON.stringify({
+        id: 'embedding-id',
+        model: 'test/embedding',
+        usage: { prompt_tokens: 10, cost: 0.001 },
+      })
+    );
+
+    countAndStoreEmbeddingUsage(response, usageContext, undefined);
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(mockedLogMicrodollarUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ cost_mUsd: testCase.expectedCost, market_cost: 1000 }),
+      usageContext
+    );
+  });
+});
+
 describe('countAndStoreFimUsage', () => {
   function makeUsageContext(
     overrides: Partial<MicrodollarUsageContext> = {}
@@ -391,6 +544,7 @@ describe('countAndStoreFimUsage', () => {
       editor_name: null,
       machine_id: null,
       user_byok: false,
+      is_free: false,
       has_tools: false,
       feature: null,
       session_id: null,
@@ -450,8 +604,11 @@ describe('countAndStoreFimUsage', () => {
     expect(stats.market_cost).toBe(390);
   });
 
-  it('does not bill BYOK requests', async () => {
-    countAndStoreFimUsage(makeUpstreamResponse(), makeUsageContext({ user_byok: true }), undefined);
+  it.each([
+    { user_byok: true, is_free: false },
+    { user_byok: false, is_free: true },
+  ])('does not bill BYOK or free requests: %j', async overrides => {
+    countAndStoreFimUsage(makeUpstreamResponse(), makeUsageContext(overrides), undefined);
 
     await new Promise(resolve => setImmediate(resolve));
 
@@ -488,6 +645,7 @@ describe('countAndStoreEditUsage', () => {
       editor_name: null,
       machine_id: null,
       user_byok: false,
+      is_free: false,
       has_tools: false,
       feature: null,
       session_id: null,
@@ -511,7 +669,10 @@ describe('countAndStoreEditUsage', () => {
     mockedLogMicrodollarUsage.mockResolvedValue(null);
   });
 
-  it('zeros both cost_mUsd and cacheDiscount_mUsd for BYOK requests', async () => {
+  it.each([
+    { user_byok: true, is_free: false },
+    { user_byok: false, is_free: true },
+  ])('zeros costs for BYOK or free requests: %j', async overrides => {
     const response = makeUpstreamResponse({
       id: 'edit-byok',
       model: 'mercury-edit-2',
@@ -524,7 +685,7 @@ describe('countAndStoreEditUsage', () => {
       choices: [],
     });
 
-    countAndStoreEditUsage(response, makeUsageContext({ user_byok: true }), undefined);
+    countAndStoreEditUsage(response, makeUsageContext(overrides), undefined);
 
     // Allow the async usage parse + after() callback to settle.
     await new Promise(resolve => setImmediate(resolve));
@@ -589,7 +750,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
       usage: { prompt_tokens: 100, total_tokens: 100, cost: 0.00005 },
     });
 
-    const result = parseEmbeddingUsageFromResponse(response, 200);
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
 
     expect(result.cost_mUsd).toBe(50);
   });
@@ -599,7 +760,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
       usage: { prompt_tokens: 1000, total_tokens: 1000 },
     });
 
-    const result = parseEmbeddingUsageFromResponse(response, 200);
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
 
     expect(result.cost_mUsd).toBe(0);
   });
@@ -607,7 +768,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
   it('should extract id as messageId', () => {
     const response = makeResponse({ id: 'embd-abc' });
 
-    const result = parseEmbeddingUsageFromResponse(response, 200);
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
 
     expect(result.messageId).toBe('embd-abc');
   });
@@ -617,7 +778,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
     const parsed = JSON.parse(response);
     delete parsed.id;
 
-    const result = parseEmbeddingUsageFromResponse(JSON.stringify(parsed), 200);
+    const result = parseEmbeddingUsageFromResponse(JSON.stringify(parsed), 200, 'openrouter');
 
     expect(result.messageId).toBeNull();
   });
@@ -625,7 +786,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
   it('should set hasError to true when model is empty', () => {
     const response = makeResponse({ model: '' });
 
-    const result = parseEmbeddingUsageFromResponse(response, 200);
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
 
     expect(result.hasError).toBe(true);
   });
@@ -633,7 +794,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
   it('should set hasError to false when model is present', () => {
     const response = makeResponse({ model: 'text-embedding-3-small' });
 
-    const result = parseEmbeddingUsageFromResponse(response, 200);
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
 
     expect(result.hasError).toBe(false);
   });
@@ -641,7 +802,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
   it('should always set outputTokens to 0 and streamed/cancelled to false', () => {
     const response = makeResponse();
 
-    const result = parseEmbeddingUsageFromResponse(response, 200);
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
 
     expect(result.outputTokens).toBe(0);
     expect(result.streamed).toBe(false);
@@ -653,9 +814,59 @@ describe('parseEmbeddingUsageFromResponse', () => {
       usage: { prompt_tokens: 42, total_tokens: 42 },
     });
 
-    const result = parseEmbeddingUsageFromResponse(response, 200);
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
 
     expect(result.inputTokens).toBe(42);
+  });
+});
+
+describe('parseEmbeddingUsageFromResponse upstream cost shapes', () => {
+  it('bills the upstream inference cost of a BYOK-served OpenRouter embedding', () => {
+    const response = JSON.stringify({
+      id: 'gen-emb-123',
+      object: 'list',
+      model: 'codestral-embed-2505',
+      usage: {
+        prompt_tokens: 3000,
+        total_tokens: 3000,
+        cost: 0.0000225,
+        is_byok: true,
+        cost_details: { upstream_inference_cost: 0.00045 },
+      },
+      provider: 'Mistral',
+    });
+
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
+
+    expect(result.cost_mUsd).toBe(450);
+    expect(result.is_byok).toBe(true);
+  });
+
+  it('reads Vercel AI Gateway cost and credential type from providerMetadata', () => {
+    const response = JSON.stringify({
+      object: 'list',
+      model: 'mistral/codestral-embed',
+      usage: { prompt_tokens: 3000, total_tokens: 3000 },
+      providerMetadata: {
+        gateway: {
+          routing: {
+            modelAttempts: [
+              {
+                success: true,
+                providerAttempts: [{ provider: 'mistral', credentialType: 'byok', success: true }],
+              },
+            ],
+          },
+          cost: '0',
+          marketCost: '0.00045',
+        },
+      },
+    });
+
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'vercel');
+
+    expect(result.cost_mUsd).toBe(450);
+    expect(result.is_byok).toBe(true);
   });
 });
 
@@ -681,7 +892,9 @@ describe('parseTranscriptionUsageFromResponse', () => {
     const result = parseTranscriptionUsageFromResponse(
       makeResponse(),
       200,
-      'openai/gpt-4o-mini-transcribe'
+      'openai/gpt-4o-mini-transcribe',
+      'openrouter',
+      null
     );
 
     expect(result.cost_mUsd).toBe(20);
@@ -703,7 +916,9 @@ describe('parseTranscriptionUsageFromResponse', () => {
         },
       }),
       200,
-      'openai/gpt-4o-mini-transcribe'
+      'openai/gpt-4o-mini-transcribe',
+      'openrouter',
+      null
     );
 
     expect(result.cost_mUsd).toBe(40);
@@ -714,7 +929,9 @@ describe('parseTranscriptionUsageFromResponse', () => {
     const result = parseTranscriptionUsageFromResponse(
       makeResponse(),
       200,
-      'openai/gpt-4o-mini-transcribe'
+      'openai/gpt-4o-mini-transcribe',
+      'openrouter',
+      null
     );
 
     expect(result.generation_time).toBe(2.5);
@@ -727,7 +944,9 @@ describe('parseTranscriptionUsageFromResponse', () => {
     const result = parseTranscriptionUsageFromResponse(
       JSON.stringify(parsed),
       200,
-      'openai/whisper-1'
+      'openai/whisper-1',
+      'openrouter',
+      null
     );
 
     expect(result.model).toBe('openai/whisper-1');
@@ -740,10 +959,54 @@ describe('parseTranscriptionUsageFromResponse', () => {
     const result = parseTranscriptionUsageFromResponse(
       JSON.stringify(parsed),
       200,
-      'openai/gpt-4o-mini-transcribe'
+      'openai/gpt-4o-mini-transcribe',
+      'openrouter',
+      null
     );
 
     expect(result.hasError).toBe(true);
+  });
+
+  describe('OpenRouter response without BYOK status', () => {
+    // Shape OpenRouter returns for a BYOK-served whisper-1 transcription: `cost`
+    // is only the 5% BYOK fee, and neither is_byok nor cost_details is present.
+    const openRouterWhisperResponse = JSON.stringify({
+      text: 'This is a short transcription test.',
+      usage: { seconds: 2, cost: 0.00001 },
+    });
+
+    beforeEach(() => {
+      jest.mocked(captureMessage).mockClear();
+    });
+
+    it('uses the x-generation-id header so the generation lookup can resolve the cost', () => {
+      const result = parseTranscriptionUsageFromResponse(
+        openRouterWhisperResponse,
+        200,
+        'openai/whisper-1',
+        'openrouter',
+        'gen-stt-123'
+      );
+
+      expect(result.messageId).toBe('gen-stt-123');
+      expect(captureMessage).not.toHaveBeenCalled();
+    });
+
+    it('reports the unresolvable cost when there is no generation id', () => {
+      const result = parseTranscriptionUsageFromResponse(
+        openRouterWhisperResponse,
+        200,
+        'openai/whisper-1',
+        'openrouter',
+        null
+      );
+
+      expect(result.messageId).toBeNull();
+      expect(captureMessage).toHaveBeenCalledWith(
+        "SUSPICIOUS: openrouters cost accounting doesn't make sense",
+        expect.anything()
+      );
+    });
   });
 });
 
@@ -999,10 +1262,81 @@ describe('makeErrorReadable', () => {
 
       expect(result?.status).toBe(status);
       const body = await result?.json();
+      const baselineBody = await baseline?.json();
       expect(body).toMatchObject({ error_type: 'byok_error' });
-      expect(body).toEqual(await baseline?.json());
+      expect(body.message.startsWith(baselineBody.message)).toBe(true);
     }
   );
+
+  it('appends the provider explanation to a specific BYOK 401 message', async () => {
+    const result = await makeErrorReadable({
+      providerId: 'direct-byok',
+      requestedModel: 'opencode-go/glm-5.3-flash',
+      request,
+      response: Response.json(
+        {
+          error: {
+            type: 'authentication_error',
+            code: 'api_key_expired',
+            message:
+              'This API key has expired. Create a new API key in OpenCode Console and replace it in your client or secret store.',
+          },
+        },
+        { status: 401 }
+      ),
+      userByokProviderIds: ['opencode-go'],
+    });
+
+    const expected =
+      '[BYOK] Your API key is invalid or has been revoked. Please check your API key configuration. Provider message: This API key has expired. Create a new API key in OpenCode Console and replace it in your client or secret store.';
+    expect(result?.status).toBe(401);
+    await expect(result?.json()).resolves.toEqual({
+      error: expected,
+      error_type: 'byok_error',
+      message: expected,
+    });
+  });
+
+  it('appends the provider explanation to the OpenCode Go BYOK permission message', async () => {
+    const result = await makeErrorReadable({
+      providerId: 'direct-byok',
+      requestedModel: 'opencode-go/mimo-v2.5',
+      request,
+      response: Response.json(
+        { message: 'Synthetic data collection opt-in required.' },
+        { status: 403 }
+      ),
+      userByokProviderIds: ['opencode-go'],
+    });
+
+    const expected =
+      '[BYOK] Your API key does not have permission to access this model. Some OpenCode Go models require opting in to data collection or region-specific inference in OpenCode Go. Provider message: Synthetic data collection opt-in required.';
+    await expect(result?.json()).resolves.toEqual({
+      error: expected,
+      error_type: 'byok_error',
+      message: expected,
+    });
+  });
+
+  it('removes control characters and bounds provider text appended to a specific BYOK message', async () => {
+    const result = await makeErrorReadable({
+      providerId: 'vercel',
+      requestedModel: 'synthetic-model',
+      request,
+      response: Response.json(
+        { error: { message: `  Synthetic\u0000\n${'x'.repeat(400)}  ` } },
+        { status: 429 }
+      ),
+      userByokProviderIds: ['anthropic'],
+    });
+
+    const expected = `[BYOK] Your API key has hit its rate limit. Please try again later or check your rate limit settings with your API provider. Provider message: ${`Synthetic  ${'x'.repeat(400)}`.slice(0, 300)}`;
+    await expect(result?.json()).resolves.toEqual({
+      error: expected,
+      error_type: 'byok_error',
+      message: expected,
+    });
+  });
 
   it.each([400, 500, 502, 503])(
     'leaves non-BYOK errors and BYOK outages unchanged for status %i',
@@ -1398,5 +1732,64 @@ describe('requestedSamples', () => {
     expect(requestedSamples({ n: 3 })).toBe(3);
     expect(requestedSamples({})).toBeNull();
     expect(requestedSamples({ n: null })).toBeNull();
+  });
+});
+
+describe('checkExclusiveModelProviderAllowed', () => {
+  const multiProviderModel: KiloExclusiveModel = {
+    ...reflection_beam_free_model,
+    public_id: 'test/multi-provider-exclusive',
+    inference_providers: ['anthropic', 'amazon-bedrock'],
+  };
+
+  beforeEach(() => {
+    kiloExclusiveModels.push(multiProviderModel);
+  });
+
+  afterEach(() => {
+    kiloExclusiveModels.splice(kiloExclusiveModels.indexOf(multiProviderModel), 1);
+  });
+
+  it('allows non-exclusive models, missing provider config, and unrestricted exclusives', () => {
+    expect(checkExclusiveModelProviderAllowed('vendor/model', { only: ['openai'] })).toBeNull();
+    expect(
+      checkExclusiveModelProviderAllowed(reflection_beam_free_model.public_id, undefined)
+    ).toBeNull();
+    expect(
+      checkExclusiveModelProviderAllowed(gemma_4_26b_a4b_it_free_model.public_id, {
+        only: ['openai'],
+      })
+    ).toBeNull();
+  });
+
+  it('allows a model when any of its inference providers is eligible', () => {
+    expect(
+      checkExclusiveModelProviderAllowed(multiProviderModel.public_id, {
+        only: ['amazon-bedrock'],
+      })
+    ).toBeNull();
+    expect(
+      checkExclusiveModelProviderAllowed(multiProviderModel.public_id, { ignore: ['anthropic'] })
+    ).toBeNull();
+  });
+
+  it('rejects a model when none of its inference providers is eligible', async () => {
+    const onlyResult = checkExclusiveModelProviderAllowed(multiProviderModel.public_id, {
+      only: ['openai'],
+    });
+    expect(onlyResult?.status).toBe(403);
+    expect(await onlyResult?.json()).toMatchObject({
+      error_type: 'provider_not_allowed',
+      error:
+        'No eligible provider can serve the selected model. Please enable provider: anthropic, amazon-bedrock',
+    });
+
+    const ignoreResult = checkExclusiveModelProviderAllowed(
+      glyph_cluster_stealth_free_model.public_id,
+      {
+        ignore: ['stealth'],
+      }
+    );
+    expect(ignoreResult?.status).toBe(403);
   });
 });

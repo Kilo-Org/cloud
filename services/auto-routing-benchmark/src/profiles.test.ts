@@ -22,10 +22,11 @@ type EventRow = {
 type PendingStmt =
   | { kind: 'event'; values: Omit<EventRow, 'id'>; guarded: boolean }
   | { kind: 'claim_user_requested'; entries: string[] }
+  | { kind: 'quota_guard' }
   | {
       kind: 'profile';
       values: ProfileRow;
-      onConflict: 'update_if_failed' | 'do_nothing' | 'replace';
+      onConflict: 'update_if_failed' | 'do_nothing';
     };
 
 const store = vi.hoisted(() => {
@@ -128,6 +129,7 @@ vi.mock('drizzle-orm/d1', () => {
       status: row.status as ProfileRow['status'],
       run_id: (row.run_id as string | null) ?? null,
       failure_reason: (row.failure_reason as string | null) ?? null,
+      invalidated_at: (row.invalidated_at as string | null) ?? null,
       requested_at: String(row.requested_at),
       updated_at: String(row.updated_at),
       completed_at: (row.completed_at as string | null) ?? null,
@@ -210,16 +212,11 @@ vi.mock('drizzle-orm/d1', () => {
             }
             const profileValues = profileValuesFromRow(row);
             return {
-              onConflictDoUpdate(config?: { where?: { type?: string; value?: string } }) {
-                // Register path: WHERE status = 'failed'
-                const whereFailed =
-                  !!config?.where &&
-                  (config.where as { type?: string; value?: string }).type === 'eq' &&
-                  (config.where as { value?: string }).value === 'failed';
+              onConflictDoUpdate() {
                 const stmt: PendingStmt = {
                   kind: 'profile',
                   values: profileValues,
-                  onConflict: whereFailed ? 'update_if_failed' : 'replace',
+                  onConflict: 'update_if_failed',
                 };
                 return wrapStmt(stmt);
               },
@@ -275,6 +272,11 @@ vi.mock('drizzle-orm/d1', () => {
       // Not simulated: this mock does not read the claim's WHERE tree, so it
       // cannot know which rows to touch. What the claim updates is verified
       // against real SQLite in profiles-sql.test.ts.
+      return;
+    }
+    if (stmt.kind === 'quota_guard') {
+      // Not simulated: the in-batch quota check runs against real SQLite in
+      // profile-quota-sql.test.ts.
       return;
     }
     if (stmt.kind === 'event') {
@@ -363,7 +365,10 @@ import {
   classifyProfileAdmission,
   computeQuotaRetryAt,
   isCurrentBenchmarkProfile,
+  lookupProfileStatuses,
+  MISSING_PROFILE_FAILURE_REASON,
   pendingRegisterUpsertStatement,
+  pendingStatusInsertStatement,
   PROFILE_ADMISSION_LIMIT,
   PROFILE_ADMISSION_WINDOW_MS,
   ProfileQuotaExceededError,
@@ -391,6 +396,7 @@ function profileRow(
     repetitions: REPS,
     run_id: null,
     failure_reason: null,
+    invalidated_at: null,
     requested_at: '2026-07-27T00:00:00.000Z',
     updated_at: '2026-07-27T00:00:00.000Z',
     completed_at: null,
@@ -403,7 +409,7 @@ function profileRow(
 /**
  * Build production admission statements (real builders) and apply them through
  * the mock batch path. Exercises chargedEventInsertStatement /
- * pendingRegisterUpsertStatement so a missing
+ * pendingRegisterUpsertStatement / pendingStatusInsertStatement so a missing
  * __stmt tag or broken builder wiring fails these race tests.
  */
 async function applyProductionAdmissionBatch(opts: {
@@ -413,6 +419,7 @@ async function applyProductionAdmissionBatch(opts: {
     entry: BenchmarkPair;
   }>;
   registerUpserts?: BenchmarkPair[];
+  statusInserts?: BenchmarkPair[];
   nowIso?: string;
 }): Promise<void> {
   const { drizzle } = await import('drizzle-orm/d1');
@@ -438,6 +445,13 @@ async function applyProductionAdmissionBatch(opts: {
   for (const entry of opts.registerUpserts ?? []) {
     stmts.push(
       pendingRegisterUpsertStatement(orm, buildPendingUpsertValues(entry, current, nowIso)) as {
+        __stmt?: PendingStmt;
+      }
+    );
+  }
+  for (const entry of opts.statusInserts ?? []) {
+    stmts.push(
+      pendingStatusInsertStatement(orm, buildPendingUpsertValues(entry, current, nowIso)) as {
         __stmt?: PendingStmt;
       }
     );
@@ -996,6 +1010,12 @@ describe('registerProfiles', () => {
         now: NOW,
       })
     ).rejects.toThrow('Duplicate benchmark pair');
+    await expect(
+      lookupProfileStatuses({} as D1Database, config, {
+        pairs: [entry('dup/m'), entry('dup/m')],
+        now: NOW,
+      })
+    ).rejects.toBeInstanceOf(ProfileValidationError);
     expect(store.profiles.size).toBe(0);
 
     const result = await registerProfiles({} as D1Database, config, {
@@ -1025,5 +1045,107 @@ describe('registerProfiles', () => {
         store.profilePk(profileRow({ model: 'retry/m', variant: 'high', status: 'failed' }))
       )?.status
     ).toBe('failed');
+  });
+});
+
+describe('lookupProfileStatuses', () => {
+  it('returns current statuses without charging', async () => {
+    store.seedProfile(profileRow({ model: 'a/ready', status: 'ready' }));
+    store.seedProfile(profileRow({ model: 'a/fail', status: 'failed', failure_reason: 'nope' }));
+
+    const result = await lookupProfileStatuses({} as D1Database, config, {
+      pairs: [entry('a/ready'), entry('a/fail')],
+      now: NOW,
+    });
+
+    expect(result.statuses).toEqual([
+      { entry: entry('a/ready'), status: 'ready', failureReason: null },
+      { entry: entry('a/fail'), status: 'failed', failureReason: 'nope' },
+    ]);
+    expect(store.events).toHaveLength(0);
+  });
+
+  it('inserts a free pending row for stale profiles and reports pending', async () => {
+    const stale = profileRow({
+      model: 'stale/m',
+      status: 'ready',
+      engine_identity: 'v-old:engine',
+    });
+    store.seedProfile(stale);
+
+    const result = await lookupProfileStatuses({} as D1Database, config, {
+      pairs: [entry('stale/m')],
+      now: NOW,
+    });
+
+    expect(result.statuses[0]).toEqual({
+      entry: entry('stale/m'),
+      status: 'pending',
+      failureReason: null,
+    });
+    expect(store.events).toHaveLength(0);
+    expect(store.profiles.get(store.profilePk(stale))?.status).toBe('ready');
+    const current = [...store.profiles.values()].find(
+      r => r.model === 'stale/m' && r.engine_identity === ENGINE
+    );
+    expect(current?.status).toBe('pending');
+  });
+
+  it('preserves a concurrent current row on stale status-lookup insert race', async () => {
+    const stale = profileRow({
+      model: 'race/stale',
+      status: 'ready',
+      engine_identity: 'v-old:engine',
+    });
+    store.seedProfile(stale);
+    // Concurrent writer already created the current ready row.
+    store.seedProfile(
+      profileRow({
+        model: 'race/stale',
+        status: 'ready',
+        run_id: 'winner-run',
+        completed_at: '2026-07-28T08:00:00.000Z',
+      })
+    );
+
+    // Lookup sees current ready → reports it, no charge.
+    const withCurrent = await lookupProfileStatuses({} as D1Database, config, {
+      pairs: [entry('race/stale')],
+      now: NOW,
+    });
+    expect(withCurrent.statuses[0]?.status).toBe('ready');
+    expect(
+      store.profiles.get(
+        store.profilePk(profileRow({ model: 'race/stale', status: 'ready', run_id: 'winner-run' }))
+      )?.run_id
+    ).toBe('winner-run');
+
+    // Explicit do_nothing race via real status builder: must not clobber ready.
+    await applyProductionAdmissionBatch({
+      statusInserts: [entry('race/stale')],
+    });
+    const current = store.profiles.get(
+      store.profilePk(profileRow({ model: 'race/stale', status: 'ready' }))
+    );
+    expect(current?.status).toBe('ready');
+    expect(current?.run_id).toBe('winner-run');
+    expect(store.events).toHaveLength(0);
+  });
+
+  it('reports missing as failed without admitting', async () => {
+    const result = await lookupProfileStatuses({} as D1Database, config, {
+      pairs: [entry('never/seen')],
+      now: NOW,
+    });
+
+    expect(result.statuses).toEqual([
+      {
+        entry: entry('never/seen'),
+        status: 'failed',
+        failureReason: MISSING_PROFILE_FAILURE_REASON,
+      },
+    ]);
+    expect(store.profiles.size).toBe(0);
+    expect(store.events).toHaveLength(0);
   });
 });

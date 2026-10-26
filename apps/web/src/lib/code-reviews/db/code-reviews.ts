@@ -24,16 +24,20 @@ import {
   ne,
   inArray,
   sql,
-  sum,
   gte,
   lte,
   isNull,
   getTableColumns,
+  type SQL,
 } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { sanitizePostgresString } from '@kilocode/web-shared/lib/sanitize-jsonb';
-import { CreateReviewParamsSchema } from '../core';
+import {
+  CreateReviewParamsSchema,
+  CodeReviewStatusSchema,
+  CodeReviewTerminalReasonSchema,
+} from '../core';
 import { assertCouncilCreationAllowed } from '../core/council-entitlement';
 import { codeReviewLedgerIntent, settleCodeReviewLedgerRow } from '../code-review-ledger';
 import type {
@@ -51,9 +55,12 @@ import {
   activeCodeReviewWorkCondition,
   reconsiderableCodeReviewWorkCondition,
   FUNDED_CODE_REVIEW_BALANCE_THRESHOLD_MICRODOLLARS,
+  isTerminalCodeReviewStatus,
   MAX_CONCURRENT_CODE_REVIEWS_PER_DEFAULT_USER,
   MAX_CONCURRENT_CODE_REVIEWS_PER_FUNDED_USER,
   MAX_CONCURRENT_CODE_REVIEWS_PER_ORG,
+  NON_TERMINAL_CODE_REVIEW_STATUSES,
+  nonTerminalCodeReviewStatusListSql,
   staleQueuedCodeReviewCutoffSql,
   staleRunningCodeReviewCutoffSql,
   type PendingCodeReviewCreatedAtWindow,
@@ -129,10 +136,6 @@ function reviewScopeConditions(scope: ReviewScope) {
 
 export function providerPublishingCondition() {
   return sql`(${cloud_agent_code_reviews.manual_config} IS NULL OR ${cloud_agent_code_reviews.manual_config}->>'outputMode' = 'provider')`;
-}
-
-function isTerminalCodeReviewStatus(status: string): boolean {
-  return status === 'completed' || status === 'failed' || status === 'cancelled';
 }
 
 function buildAttemptUpdateData(
@@ -854,7 +857,9 @@ export async function updateCodeReviewAttemptForCallback(
         .limit(1);
     }
 
-    const latestAttempt = await getLatestCodeReviewAttempt(params.codeReviewId);
+    const latestAttempt = matchingAttempt
+      ? undefined
+      : await getLatestCodeReviewAttempt(params.codeReviewId);
     if (
       !matchingAttempt &&
       params.sessionId &&
@@ -934,6 +939,38 @@ export async function hasInfraRetryAttempt(codeReviewId: string): Promise<boolea
   }
 }
 
+/**
+ * Narrows a persisted review row to the fields its attempt mirrors. `status` and
+ * `terminal_reason` are plain text columns, so the shared schemas validate them
+ * here; an assertion would let an unexpected value through into attempt rows.
+ */
+function persistedCodeReviewAttemptFields(
+  review: CloudAgentCodeReview
+): Omit<AttemptCallbackFields, 'codeReviewId' | 'attemptId'> {
+  const status = CodeReviewStatusSchema.safeParse(review.status);
+  if (!status.success) {
+    throw new Error(
+      `Code review ${review.id} has an unexpected persisted status '${review.status}'`
+    );
+  }
+  const terminalReason = CodeReviewTerminalReasonSchema.safeParse(review.terminal_reason);
+  if (review.terminal_reason !== null && !terminalReason.success) {
+    throw new Error(
+      `Code review ${review.id} has an unexpected persisted terminal reason '${review.terminal_reason}'`
+    );
+  }
+
+  return {
+    status: status.data,
+    sessionId: review.session_id ?? undefined,
+    cliSessionId: review.cli_session_id ?? undefined,
+    errorMessage: review.error_message ?? undefined,
+    terminalReason: terminalReason.success ? terminalReason.data : undefined,
+    startedAt: review.started_at ? new Date(review.started_at) : undefined,
+    completedAt: review.completed_at ? new Date(review.completed_at) : undefined,
+  };
+}
+
 export async function ensureCurrentCodeReviewAttemptFromReview(
   review: CloudAgentCodeReview,
   analyticsEnabledAtDispatch?: boolean
@@ -946,17 +983,7 @@ export async function ensureCurrentCodeReviewAttemptFromReview(
     ) {
       const [updated] = await db
         .update(cloud_agent_code_review_attempts)
-        .set(
-          buildAttemptUpdateData({
-            status: review.status as CodeReviewAttemptStatus,
-            sessionId: review.session_id ?? undefined,
-            cliSessionId: review.cli_session_id ?? undefined,
-            errorMessage: review.error_message ?? undefined,
-            terminalReason: review.terminal_reason as CodeReviewTerminalReason | undefined,
-            startedAt: review.started_at ? new Date(review.started_at) : undefined,
-            completedAt: review.completed_at ? new Date(review.completed_at) : undefined,
-          })
-        )
+        .set(buildAttemptUpdateData(persistedCodeReviewAttemptFields(review)))
         .where(eq(cloud_agent_code_review_attempts.id, attempt.id))
         .returning();
 
@@ -965,13 +992,7 @@ export async function ensureCurrentCodeReviewAttemptFromReview(
   } else {
     attempt = await createCodeReviewAttempt({
       codeReviewId: review.id,
-      status: review.status as CodeReviewAttemptStatus,
-      sessionId: review.session_id ?? undefined,
-      cliSessionId: review.cli_session_id ?? undefined,
-      errorMessage: review.error_message ?? undefined,
-      terminalReason: review.terminal_reason as CodeReviewTerminalReason | undefined,
-      startedAt: review.started_at ? new Date(review.started_at) : undefined,
-      completedAt: review.completed_at ? new Date(review.completed_at) : undefined,
+      ...persistedCodeReviewAttemptFields(review),
       analyticsEnabledAtDispatch,
     });
   }
@@ -1110,10 +1131,6 @@ export async function recordCodeReviewAttemptPublicationStatus(
 }
 
 /**
- * Updates code review status
- * Can optionally update session_id, cli_session_id, error_message, started_at, completed_at
- */
-/**
  * Persists the captured council outcome (decision + per-specialist votes/findings) on the
  * review so the cloud UI job-runs screen can render it. Council runs only.
  */
@@ -1130,74 +1147,71 @@ export async function setCodeReviewCouncilResult(
     .where(eq(cloud_agent_code_reviews.id, reviewId));
 }
 
+/**
+ * Optional column updates accepted by both status writers. Every field is
+ * mapped to its snake_case column and stamped for timestamps in
+ * {@link buildCodeReviewStatusUpdateData}, so the two writers cannot drift.
+ */
+export type CodeReviewStatusUpdates = {
+  sessionId?: string;
+  cliSessionId?: string;
+  errorMessage?: string;
+  terminalReason?: CodeReviewTerminalReason;
+  startedAt?: Date;
+  completedAt?: Date;
+  agentVersion?: string;
+  model?: string;
+  totalTokensIn?: number;
+  totalTokensOut?: number;
+  totalCostMusd?: number;
+};
+
+/**
+ * Builds the column values common to every status write: the status itself,
+ * `updated_at`, the optional mapped fields, and the status-driven timestamp
+ * defaults. A caller-supplied `startedAt`/`completedAt` always wins.
+ */
+function buildCodeReviewStatusUpdateData(
+  status: CodeReviewStatus,
+  updates: CodeReviewStatusUpdates
+): Partial<typeof cloud_agent_code_reviews.$inferInsert> {
+  const updateData: Partial<typeof cloud_agent_code_reviews.$inferInsert> = {
+    status,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (updates.sessionId !== undefined) updateData.session_id = updates.sessionId;
+  if (updates.cliSessionId !== undefined) updateData.cli_session_id = updates.cliSessionId;
+  if (updates.errorMessage !== undefined) updateData.error_message = updates.errorMessage;
+  if (updates.terminalReason !== undefined) updateData.terminal_reason = updates.terminalReason;
+  if (updates.startedAt !== undefined) updateData.started_at = updates.startedAt.toISOString();
+  if (updates.completedAt !== undefined) {
+    updateData.completed_at = updates.completedAt.toISOString();
+  }
+  if (updates.agentVersion !== undefined) updateData.agent_version = updates.agentVersion;
+  if (updates.model !== undefined) updateData.model = updates.model;
+  if (updates.totalTokensIn !== undefined) updateData.total_tokens_in = updates.totalTokensIn;
+  if (updates.totalTokensOut !== undefined) updateData.total_tokens_out = updates.totalTokensOut;
+  if (updates.totalCostMusd !== undefined) updateData.total_cost_musd = updates.totalCostMusd;
+
+  // Auto-set timestamps based on status
+  if (status === 'running' && !updates.startedAt) {
+    updateData.started_at = new Date().toISOString();
+  }
+  if (isTerminalCodeReviewStatus(status) && !updates.completedAt) {
+    updateData.completed_at = new Date().toISOString();
+  }
+
+  return updateData;
+}
+
 export async function updateCodeReviewStatus(
   reviewId: string,
   status: CodeReviewStatus,
-  updates: {
-    sessionId?: string;
-    cliSessionId?: string;
-    errorMessage?: string;
-    terminalReason?: CodeReviewTerminalReason;
-    startedAt?: Date;
-    completedAt?: Date;
-    agentVersion?: string;
-    model?: string;
-    totalTokensIn?: number;
-    totalTokensOut?: number;
-    totalCostMusd?: number;
-  } = {}
+  updates: CodeReviewStatusUpdates = {}
 ): Promise<void> {
   try {
-    const updateData: Partial<typeof cloud_agent_code_reviews.$inferInsert> = {
-      status,
-      updated_at: new Date().toISOString(),
-    };
-
-    // Add optional updates
-    if (updates.sessionId !== undefined) {
-      updateData.session_id = updates.sessionId;
-    }
-    if (updates.cliSessionId !== undefined) {
-      updateData.cli_session_id = updates.cliSessionId;
-    }
-    if (updates.errorMessage !== undefined) {
-      updateData.error_message = updates.errorMessage;
-    }
-    if (updates.terminalReason !== undefined) {
-      updateData.terminal_reason = updates.terminalReason;
-    }
-    if (updates.startedAt !== undefined) {
-      updateData.started_at = updates.startedAt.toISOString();
-    }
-    if (updates.completedAt !== undefined) {
-      updateData.completed_at = updates.completedAt.toISOString();
-    }
-    if (updates.agentVersion !== undefined) {
-      updateData.agent_version = updates.agentVersion;
-    }
-    if (updates.model !== undefined) {
-      updateData.model = updates.model;
-    }
-    if (updates.totalTokensIn !== undefined) {
-      updateData.total_tokens_in = updates.totalTokensIn;
-    }
-    if (updates.totalTokensOut !== undefined) {
-      updateData.total_tokens_out = updates.totalTokensOut;
-    }
-    if (updates.totalCostMusd !== undefined) {
-      updateData.total_cost_musd = updates.totalCostMusd;
-    }
-
-    // Auto-set timestamps based on status
-    if (status === 'running' && !updates.startedAt) {
-      updateData.started_at = new Date().toISOString();
-    }
-    if (
-      (status === 'completed' || status === 'failed' || status === 'cancelled') &&
-      !updates.completedAt
-    ) {
-      updateData.completed_at = new Date().toISOString();
-    }
+    const updateData = buildCodeReviewStatusUpdateData(status, updates);
 
     await db
       .update(cloud_agent_code_reviews)
@@ -1215,50 +1229,11 @@ export async function updateCodeReviewStatus(
 export async function updateCodeReviewStatusIfNonTerminal(
   reviewId: string,
   status: CodeReviewStatus,
-  updates: {
-    sessionId?: string;
-    cliSessionId?: string;
-    errorMessage?: string;
-    terminalReason?: CodeReviewTerminalReason;
-    startedAt?: Date;
-    completedAt?: Date;
-    agentVersion?: string;
-    model?: string;
-    totalTokensIn?: number;
-    totalTokensOut?: number;
-    totalCostMusd?: number;
-  } = {},
+  updates: CodeReviewStatusUpdates = {},
   dispatchReservationId?: string
 ): Promise<boolean> {
   try {
-    const updateData: Partial<typeof cloud_agent_code_reviews.$inferInsert> = {
-      status,
-      updated_at: new Date().toISOString(),
-    };
-
-    if (updates.sessionId !== undefined) updateData.session_id = updates.sessionId;
-    if (updates.cliSessionId !== undefined) updateData.cli_session_id = updates.cliSessionId;
-    if (updates.errorMessage !== undefined) updateData.error_message = updates.errorMessage;
-    if (updates.terminalReason !== undefined) updateData.terminal_reason = updates.terminalReason;
-    if (updates.startedAt !== undefined) updateData.started_at = updates.startedAt.toISOString();
-    if (updates.completedAt !== undefined) {
-      updateData.completed_at = updates.completedAt.toISOString();
-    }
-    if (updates.agentVersion !== undefined) updateData.agent_version = updates.agentVersion;
-    if (updates.model !== undefined) updateData.model = updates.model;
-    if (updates.totalTokensIn !== undefined) updateData.total_tokens_in = updates.totalTokensIn;
-    if (updates.totalTokensOut !== undefined) updateData.total_tokens_out = updates.totalTokensOut;
-    if (updates.totalCostMusd !== undefined) updateData.total_cost_musd = updates.totalCostMusd;
-
-    if (status === 'running' && !updates.startedAt) {
-      updateData.started_at = new Date().toISOString();
-    }
-    if (
-      (status === 'completed' || status === 'failed' || status === 'cancelled') &&
-      !updates.completedAt
-    ) {
-      updateData.completed_at = new Date().toISOString();
-    }
+    const updateData = buildCodeReviewStatusUpdateData(status, updates);
 
     const updated = await db
       .update(cloud_agent_code_reviews)
@@ -1266,7 +1241,7 @@ export async function updateCodeReviewStatusIfNonTerminal(
       .where(
         and(
           eq(cloud_agent_code_reviews.id, reviewId),
-          inArray(cloud_agent_code_reviews.status, ['pending', 'queued', 'running']),
+          inArray(cloud_agent_code_reviews.status, [...NON_TERMINAL_CODE_REVIEW_STATUSES]),
           dispatchReservationId
             ? eq(cloud_agent_code_reviews.dispatch_reservation_id, dispatchReservationId)
             : undefined
@@ -1662,15 +1637,34 @@ async function findExistingReviewWithDatabase(
   return review || null;
 }
 
-async function findReviewByLegacyUniqueKeyWithDatabase(
+/**
+ * Resolves the row that blocked an idempotent insert after the scope-exact lookup missed.
+ *
+ * Every unique index on `cloud_agent_code_reviews` is keyed by `platform_integration_id`, so the
+ * row an insert conflicts with always shares the caller's integration, repo, PR and head SHA.
+ * Unlike the scope-exact lookup this ignores `manual_config`: a manual review already publishing
+ * through the provider for the same head SHA wins the active publisher index, and returning it
+ * keeps the insert idempotent. The owner and platform predicates keep the winner inside the
+ * caller's review scope.
+ */
+async function findConflictWinnerWithDatabase(
   database: CodeReviewDatabase,
-  params: Pick<CreateReviewParams, 'repoFullName' | 'prNumber' | 'headSha'>
+  scope: ReviewScope,
+  params: Pick<CreateReviewParams, 'repoFullName' | 'prNumber' | 'headSha'> & {
+    platformIntegrationId: string;
+  }
 ): Promise<CloudAgentCodeReview | null> {
   const [review] = await database
     .select()
     .from(cloud_agent_code_reviews)
     .where(
       and(
+        // Same owner predicate as reviewScopeConditions: the winner must belong to the caller.
+        scope.owner.type === 'org'
+          ? eq(cloud_agent_code_reviews.owned_by_organization_id, scope.owner.id)
+          : eq(cloud_agent_code_reviews.owned_by_user_id, scope.owner.id),
+        eq(cloud_agent_code_reviews.platform, scope.platform),
+        eq(cloud_agent_code_reviews.platform_integration_id, params.platformIntegrationId),
         eq(cloud_agent_code_reviews.repo_full_name, params.repoFullName),
         eq(cloud_agent_code_reviews.pr_number, params.prNumber),
         eq(cloud_agent_code_reviews.head_sha, params.headSha)
@@ -1729,7 +1723,14 @@ export async function createCodeReviewIfAbsentInTransaction(
 
   const existing =
     (await findExistingReviewWithDatabase(tx, scope, params.headSha)) ??
-    (await findReviewByLegacyUniqueKeyWithDatabase(tx, params));
+    (params.platformIntegrationId
+      ? await findConflictWinnerWithDatabase(tx, scope, {
+          platformIntegrationId: params.platformIntegrationId,
+          repoFullName: params.repoFullName,
+          prNumber: params.prNumber,
+          headSha: params.headSha,
+        })
+      : null);
   if (!existing) throw new Error('Code review conflict winner not found');
   return { reviewId: existing.id, created: false };
 }
@@ -1816,7 +1817,7 @@ export async function findActiveReviewsForPR(
         and(
           ...reviewScopeConditions(scope),
           ne(cloud_agent_code_reviews.head_sha, excludeSha),
-          inArray(cloud_agent_code_reviews.status, ['pending', 'queued', 'running'])
+          inArray(cloud_agent_code_reviews.status, [...NON_TERMINAL_CODE_REVIEW_STATUSES])
         )
       )
       .orderBy(
@@ -1850,7 +1851,7 @@ export async function findActiveProviderPublishingReview(input: {
           eq(cloud_agent_code_reviews.repo_full_name, input.repoFullName),
           eq(cloud_agent_code_reviews.pr_number, input.prNumber),
           providerPublishingCondition(),
-          inArray(cloud_agent_code_reviews.status, ['pending', 'queued', 'running'])
+          inArray(cloud_agent_code_reviews.status, [...NON_TERMINAL_CODE_REVIEW_STATUSES])
         )
       )
       .limit(1);
@@ -1874,7 +1875,7 @@ type CancelledReviewDatabaseRow = {
   prev_status: 'pending' | 'queued' | 'running';
   session_id: string | null;
   latest_active_attempt_id: string | null;
-  check_run_id: number | null;
+  check_run_id: string | null;
   head_sha: string;
   platform: CodeReviewPlatform;
   platform_project_id: number | null;
@@ -1888,13 +1889,95 @@ function mapCancelledReviewRow(row: CancelledReviewDatabaseRow): CancelledReview
     prevStatus: row.prev_status,
     sessionId: row.session_id,
     latestActiveAttemptId: row.latest_active_attempt_id,
-    checkRunId: row.check_run_id,
+    checkRunId: row.check_run_id === null ? null : Number(row.check_run_id),
     headSha: row.head_sha,
     platform: row.platform,
     platformProjectId: row.platform_project_id,
     platformIntegrationId: row.platform_integration_id,
     triggerSource: row.trigger_source,
   };
+}
+
+/**
+ * Cancels the non-terminal reviews matched by `targetPredicate`, plus their
+ * non-terminal attempts, in one statement. The cancellation policy differs per
+ * caller and is explicit here: a new push or a duplicate continuation is
+ * `superseded` and keeps any dispatch reservation, while an integration
+ * disconnect is `user_cancelled` and clears the dangling reservation.
+ */
+async function cancelCodeReviewsWithDatabase(
+  database: CodeReviewDatabase,
+  {
+    targetPredicate,
+    terminalReason,
+    errorMessage,
+    clearDispatchReservation,
+  }: {
+    targetPredicate: SQL;
+    terminalReason: 'superseded' | 'user_cancelled';
+    errorMessage: string;
+    clearDispatchReservation: boolean;
+  }
+): Promise<CancelledReviewRow[]> {
+  const result = await database.execute<CancelledReviewDatabaseRow>(sql`
+    WITH targets AS (
+      SELECT
+        id,
+        status AS prev_status,
+        session_id,
+        (
+          SELECT attempts.id
+          FROM ${cloud_agent_code_review_attempts} AS attempts
+          WHERE attempts.code_review_id = ${cloud_agent_code_reviews}.id
+            AND attempts.status IN (${nonTerminalCodeReviewStatusListSql()})
+          ORDER BY attempts.attempt_number DESC
+          LIMIT 1
+        ) AS latest_active_attempt_id,
+        check_run_id,
+        head_sha,
+        platform,
+        platform_project_id,
+        platform_integration_id,
+        trigger_source
+      FROM ${cloud_agent_code_reviews}
+      WHERE ${targetPredicate}
+        AND ${cloud_agent_code_reviews.status} IN (${nonTerminalCodeReviewStatusListSql()})
+    ), cancelled_attempts AS (
+      UPDATE ${cloud_agent_code_review_attempts} AS attempts
+      SET
+        status = 'cancelled',
+        terminal_reason = ${terminalReason},
+        error_message = ${errorMessage},
+        completed_at = now(),
+        updated_at = now()
+      FROM targets
+      WHERE attempts.code_review_id = targets.id
+        AND attempts.status IN (${nonTerminalCodeReviewStatusListSql()})
+    )
+    UPDATE ${cloud_agent_code_reviews} AS reviews
+    SET
+      status = 'cancelled',
+      terminal_reason = ${terminalReason},
+      error_message = ${errorMessage},
+      ${clearDispatchReservation ? sql`dispatch_reservation_id = NULL,` : sql``}
+      completed_at = now(),
+      updated_at = now()
+    FROM targets
+    WHERE reviews.id = targets.id
+    RETURNING
+      reviews.id,
+      targets.prev_status,
+      targets.session_id,
+      targets.latest_active_attempt_id,
+      targets.check_run_id,
+      targets.head_sha,
+      targets.platform,
+      targets.platform_project_id,
+      targets.platform_integration_id,
+      targets.trigger_source
+  `);
+
+  return result.rows.map(mapCancelledReviewRow);
 }
 
 async function cancelReviewsForPR(
@@ -1915,69 +1998,17 @@ async function cancelReviewsForPR(
       ? sql``
       : sql`AND ${cloud_agent_code_reviews.platform_integration_id} = ${scope.platformIntegrationId}
             AND ${cloud_agent_code_reviews.manual_config} IS NULL`;
-  const result = await database.execute<CancelledReviewDatabaseRow>(sql`
-    WITH targets AS (
-      SELECT
-        id,
-        status AS prev_status,
-        session_id,
-        (
-          SELECT attempts.id
-          FROM ${cloud_agent_code_review_attempts} AS attempts
-          WHERE attempts.code_review_id = ${cloud_agent_code_reviews}.id
-            AND attempts.status IN ('pending', 'queued', 'running')
-          ORDER BY attempts.attempt_number DESC
-          LIMIT 1
-        ) AS latest_active_attempt_id,
-        check_run_id,
-        head_sha,
-        platform,
-        platform_project_id,
-        platform_integration_id,
-        trigger_source
-      FROM ${cloud_agent_code_reviews}
-      WHERE ${ownerCondition}
-        AND ${cloud_agent_code_reviews.platform} = ${scope.platform}
-        AND ${cloud_agent_code_reviews.repo_full_name} = ${scope.repoFullName}
-        AND ${cloud_agent_code_reviews.pr_number} = ${scope.prNumber}
-        ${excludedHeadCondition}
-        ${platformIntegrationCondition}
-        AND ${cloud_agent_code_reviews.status} IN ('pending', 'queued', 'running')
-    ), cancelled_attempts AS (
-      UPDATE ${cloud_agent_code_review_attempts} AS attempts
-      SET
-        status = 'cancelled',
-        terminal_reason = 'superseded',
-        error_message = 'Superseded by new push',
-        completed_at = now(),
-        updated_at = now()
-      FROM targets
-      WHERE attempts.code_review_id = targets.id
-        AND attempts.status IN ('pending', 'queued', 'running')
-    )
-    UPDATE ${cloud_agent_code_reviews} AS reviews
-    SET
-      status = 'cancelled',
-      terminal_reason = 'superseded',
-      error_message = 'Superseded by new push',
-      completed_at = now(),
-      updated_at = now()
-    FROM targets
-    WHERE reviews.id = targets.id
-    RETURNING
-      reviews.id,
-      targets.prev_status,
-      targets.session_id,
-      targets.latest_active_attempt_id,
-      targets.check_run_id,
-      targets.head_sha,
-      targets.platform,
-      targets.platform_project_id,
-      targets.platform_integration_id,
-      targets.trigger_source
-  `);
-
-  return result.rows.map(mapCancelledReviewRow);
+  return cancelCodeReviewsWithDatabase(database, {
+    targetPredicate: sql`${ownerCondition}
+      AND ${cloud_agent_code_reviews.platform} = ${scope.platform}
+      AND ${cloud_agent_code_reviews.repo_full_name} = ${scope.repoFullName}
+      AND ${cloud_agent_code_reviews.pr_number} = ${scope.prNumber}
+      ${excludedHeadCondition}
+      ${platformIntegrationCondition}`,
+    terminalReason: 'superseded',
+    errorMessage: 'Superseded by new push',
+    clearDispatchReservation: false,
+  });
 }
 
 async function cancelActiveCodeReviewsByIdWithDatabase(
@@ -1987,64 +2018,12 @@ async function cancelActiveCodeReviewsByIdWithDatabase(
 ): Promise<CancelledReviewRow[]> {
   if (reviewIds.length === 0) return [];
 
-  const result = await database.execute<CancelledReviewDatabaseRow>(sql`
-    WITH targets AS (
-      SELECT
-        id,
-        status AS prev_status,
-        session_id,
-        (
-          SELECT attempts.id
-          FROM ${cloud_agent_code_review_attempts} AS attempts
-          WHERE attempts.code_review_id = ${cloud_agent_code_reviews}.id
-            AND attempts.status IN ('pending', 'queued', 'running')
-          ORDER BY attempts.attempt_number DESC
-          LIMIT 1
-        ) AS latest_active_attempt_id,
-        check_run_id,
-        head_sha,
-        platform,
-        platform_project_id,
-        platform_integration_id,
-        trigger_source
-      FROM ${cloud_agent_code_reviews}
-      WHERE ${inArray(cloud_agent_code_reviews.id, reviewIds)}
-        AND ${cloud_agent_code_reviews.status} IN ('pending', 'queued', 'running')
-    ), cancelled_attempts AS (
-      UPDATE ${cloud_agent_code_review_attempts} AS attempts
-      SET
-        status = 'cancelled',
-        terminal_reason = 'superseded',
-        error_message = ${errorMessage},
-        completed_at = now(),
-        updated_at = now()
-      FROM targets
-      WHERE attempts.code_review_id = targets.id
-        AND attempts.status IN ('pending', 'queued', 'running')
-    )
-    UPDATE ${cloud_agent_code_reviews} AS reviews
-    SET
-      status = 'cancelled',
-      terminal_reason = 'superseded',
-      error_message = ${errorMessage},
-      completed_at = now(),
-      updated_at = now()
-    FROM targets
-    WHERE reviews.id = targets.id
-    RETURNING
-      reviews.id,
-      targets.prev_status,
-      targets.session_id,
-      targets.latest_active_attempt_id,
-      targets.check_run_id,
-      targets.head_sha,
-      targets.platform,
-      targets.platform_project_id,
-      targets.platform_integration_id,
-      targets.trigger_source
-  `);
-
-  return result.rows.map(mapCancelledReviewRow);
+  return cancelCodeReviewsWithDatabase(database, {
+    targetPredicate: inArray(cloud_agent_code_reviews.id, reviewIds),
+    terminalReason: 'superseded',
+    errorMessage,
+    clearDispatchReservation: false,
+  });
 }
 
 /**
@@ -2073,67 +2052,14 @@ async function cancelActiveCodeReviewsForIntegrationWithDatabase(
     input.owner.type === 'org'
       ? sql`${cloud_agent_code_reviews.owned_by_organization_id} = ${input.owner.id}`
       : sql`${cloud_agent_code_reviews.owned_by_user_id} = ${input.owner.id}`;
-  const result = await database.execute<CancelledReviewDatabaseRow>(sql`
-    WITH targets AS (
-      SELECT
-        id,
-        status AS prev_status,
-        session_id,
-        (
-          SELECT attempts.id
-          FROM ${cloud_agent_code_review_attempts} AS attempts
-          WHERE attempts.code_review_id = ${cloud_agent_code_reviews}.id
-            AND attempts.status IN ('pending', 'queued', 'running')
-          ORDER BY attempts.attempt_number DESC
-          LIMIT 1
-        ) AS latest_active_attempt_id,
-        check_run_id,
-        head_sha,
-        platform,
-        platform_project_id,
-        platform_integration_id,
-        trigger_source
-      FROM ${cloud_agent_code_reviews}
-      WHERE ${ownerCondition}
-        AND ${cloud_agent_code_reviews.platform} = ${input.platform}
-        AND ${cloud_agent_code_reviews.platform_integration_id} = ${input.integrationId}
-        AND ${cloud_agent_code_reviews.status} IN ('pending', 'queued', 'running')
-    ), cancelled_attempts AS (
-      UPDATE ${cloud_agent_code_review_attempts} AS attempts
-      SET
-        status = 'cancelled',
-        terminal_reason = 'user_cancelled',
-        error_message = ${errorMessage},
-        completed_at = now(),
-        updated_at = now()
-      FROM targets
-      WHERE attempts.code_review_id = targets.id
-        AND attempts.status IN ('pending', 'queued', 'running')
-    )
-    UPDATE ${cloud_agent_code_reviews} AS reviews
-    SET
-      status = 'cancelled',
-      terminal_reason = 'user_cancelled',
-      error_message = ${errorMessage},
-      dispatch_reservation_id = NULL,
-      completed_at = now(),
-      updated_at = now()
-    FROM targets
-    WHERE reviews.id = targets.id
-    RETURNING
-      reviews.id,
-      targets.prev_status,
-      targets.session_id,
-      targets.latest_active_attempt_id,
-      targets.check_run_id,
-      targets.head_sha,
-      targets.platform,
-      targets.platform_project_id,
-      targets.platform_integration_id,
-      targets.trigger_source
-  `);
-
-  return result.rows.map(mapCancelledReviewRow);
+  return cancelCodeReviewsWithDatabase(database, {
+    targetPredicate: sql`${ownerCondition}
+      AND ${cloud_agent_code_reviews.platform} = ${input.platform}
+      AND ${cloud_agent_code_reviews.platform_integration_id} = ${input.integrationId}`,
+    terminalReason: 'user_cancelled',
+    errorMessage,
+    clearDispatchReservation: true,
+  });
 }
 
 /**
@@ -2374,15 +2300,19 @@ export async function updateReviewHeadShaAndCheckRun(
 }
 
 /**
- * Verifies that a user owns (or is a member of the org that owns) a code review
- * Returns true if the user has access, false otherwise
+ * Verifies that a user directly owns a code review, i.e. the review's
+ * `owned_by_user_id` matches `userId`.
+ *
+ * Organization-owned reviews return false: membership of the owning
+ * organization is deliberately not checked here. tRPC procedures authorize org
+ * access, and a caller that needs membership semantics must do that check
+ * explicitly rather than rely on this helper.
  */
-export async function userOwnsReview(reviewId: string, userId: string): Promise<boolean> {
+export async function userDirectlyOwnsReview(reviewId: string, userId: string): Promise<boolean> {
   try {
     const [review] = await db
       .select({
         owned_by_user_id: cloud_agent_code_reviews.owned_by_user_id,
-        owned_by_organization_id: cloud_agent_code_reviews.owned_by_organization_id,
       })
       .from(cloud_agent_code_reviews)
       .where(eq(cloud_agent_code_reviews.id, reviewId))
@@ -2392,19 +2322,10 @@ export async function userOwnsReview(reviewId: string, userId: string): Promise<
       return false;
     }
 
-    // Check direct user ownership
-    if (review.owned_by_user_id === userId) {
-      return true;
-    }
-
-    // For org ownership, we'd need to check org membership
-    // This would require joining with organization_members table
-    // For now, we'll rely on tRPC procedures to handle org authorization
-    // and only check direct user ownership here
-    return false;
+    return review.owned_by_user_id === userId;
   } catch (error) {
     captureException(error, {
-      tags: { operation: 'userOwnsReview' },
+      tags: { operation: 'userDirectlyOwnsReview' },
       extra: { reviewId, userId },
     });
     throw error;
@@ -2450,45 +2371,46 @@ export async function getSessionUsageFromBilling(
       reviewCompletedAt ? lte(microdollar_usage_metadata.created_at, reviewCompletedAt) : undefined
     );
 
-    // 1. Session-wide totals (all models combined)
-    const [totals] = await db
+    // Group once per model so the top model and the session totals come from the same
+    // scan; the window sums regroup the per-model sums into the session totals.
+    const [usage] = await db
       .select({
-        totalTokensIn: sum(microdollar_usage.input_tokens).mapWith(Number),
-        totalTokensOut: sum(microdollar_usage.output_tokens).mapWith(Number),
-        totalCacheHitTokens: sum(microdollar_usage.cache_hit_tokens).mapWith(Number),
-        totalCacheWriteTokens: sum(microdollar_usage.cache_write_tokens).mapWith(Number),
-        totalCostMusd: sum(microdollar_usage.cost).mapWith(Number),
+        model: microdollar_usage.model,
+        totalTokensIn: sql<number>`sum(sum(${microdollar_usage.input_tokens})) over ()`.mapWith(
+          Number
+        ),
+        totalTokensOut: sql<number>`sum(sum(${microdollar_usage.output_tokens})) over ()`.mapWith(
+          Number
+        ),
+        totalCacheHitTokens:
+          sql<number>`sum(sum(${microdollar_usage.cache_hit_tokens})) over ()`.mapWith(Number),
+        totalCacheWriteTokens:
+          sql<number>`sum(sum(${microdollar_usage.cache_write_tokens})) over ()`.mapWith(Number),
+        totalCostMusd: sql<number>`sum(sum(${microdollar_usage.cost})) over ()`.mapWith(Number),
       })
-      .from(microdollar_usage)
-      .innerJoin(microdollar_usage_metadata, joinCondition)
-      .where(sessionFilter);
-
-    if (totals?.totalTokensIn == null) return null;
-
-    // 2. Pick the model with the most tokens (the primary review model)
-    const [topModel] = await db
-      .select({ model: microdollar_usage.model })
       .from(microdollar_usage)
       .innerJoin(microdollar_usage_metadata, joinCondition)
       .where(sessionFilter)
       .groupBy(microdollar_usage.model)
       .orderBy(
-        sql`sum(${microdollar_usage.input_tokens} + ${microdollar_usage.output_tokens}) desc`
+        sql`sum(${microdollar_usage.input_tokens} + ${microdollar_usage.output_tokens}) desc`,
+        asc(microdollar_usage.model)
       )
       .limit(1);
 
-    if (!topModel?.model) return null;
+    if (usage?.totalTokensIn == null) return null;
+    if (!usage.model) return null;
 
-    const cachedTokens = (totals.totalCacheHitTokens ?? 0) + (totals.totalCacheWriteTokens ?? 0);
+    const cachedTokens = (usage.totalCacheHitTokens ?? 0) + (usage.totalCacheWriteTokens ?? 0);
 
     return {
-      model: topModel.model,
-      totalTokensIn: totals.totalTokensIn,
-      totalTokensOut: totals.totalTokensOut ?? 0,
-      tokensIn: Math.max(0, totals.totalTokensIn - cachedTokens),
-      tokensOut: totals.totalTokensOut ?? 0,
+      model: usage.model,
+      totalTokensIn: usage.totalTokensIn,
+      totalTokensOut: usage.totalTokensOut ?? 0,
+      tokensIn: Math.max(0, usage.totalTokensIn - cachedTokens),
+      tokensOut: usage.totalTokensOut ?? 0,
       cachedTokens,
-      totalCostMusd: totals.totalCostMusd ?? 0,
+      totalCostMusd: usage.totalCostMusd ?? 0,
     };
   } catch (error) {
     captureException(error, {

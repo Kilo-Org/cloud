@@ -526,7 +526,7 @@ describe('ChatInput finalize failure', () => {
       });
       mockedUseCloudAgentAttachmentUpload.mockReturnValue(upload);
       const onSend = jest.fn(async () => true);
-      const onNewChat = jest.fn(async () => true);
+      const onNewChat = jest.fn(() => true);
       const dom = installLinkedomDom();
       let root: Root | undefined;
       try {
@@ -821,7 +821,7 @@ describe('ChatInput finalize failure', () => {
     const onSend = jest.fn<
       (message: string, attachments?: CloudAgentAttachments) => Promise<boolean>
     >(() => new Promise<boolean>(() => {}));
-    const onNewChat = jest.fn(async () => true);
+    const onNewChat = jest.fn(() => true);
 
     const dom = installLinkedomDom();
     let root!: Root;

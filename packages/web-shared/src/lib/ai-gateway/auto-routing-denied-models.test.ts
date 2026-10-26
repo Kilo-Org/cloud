@@ -1,6 +1,10 @@
-import { describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
-import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import {
+  getDataCollectionRequiredModelIds,
+  getProviderSlugsForModel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
   resolveOrganizationMemberModelPolicy,
   type EffectiveOrganizationModelPolicy,
@@ -21,6 +25,7 @@ jest.mock(
   '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server',
   () => ({
     getDataCollectionRequiredModelIds: jest.fn(),
+    getProviderSlugsForModel: jest.fn(),
   })
 );
 jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
@@ -38,6 +43,7 @@ function policy(
     organizationModelDenyList: [],
     memberGrant: { mode: 'unrestricted' },
     policyRevision: 1,
+    customLlmGrantee: { organizationId: 'org-1', groupIds: [] },
     ...overrides,
   };
 }
@@ -85,7 +91,7 @@ describe('policyNeedsCandidateEvaluation', () => {
 
 describe('collectDeniedAutoRoutingModelIds', () => {
   it('returns no denials without loading when the policy cannot deny anything', async () => {
-    await expect(collectDeniedAutoRoutingModelIds(policy())).resolves.toEqual([]);
+    await expect(collectDeniedAutoRoutingModelIds(policy(), 'efficient')).resolves.toEqual([]);
     expect(getCachedRoutingTable).not.toHaveBeenCalled();
   });
 
@@ -109,7 +115,8 @@ describe('collectDeniedAutoRoutingModelIds', () => {
             modelAllowList: ['anthropic/claude-sonnet-4.6'],
             providerAllowList: [],
           },
-        })
+        }),
+        'efficient'
       )
     ).resolves.toEqual(['openai/gpt-5']);
   });
@@ -117,9 +124,51 @@ describe('collectDeniedAutoRoutingModelIds', () => {
   it('ignores the organization deny list for an unrestricted grant without loading candidates', async () => {
     jest.mocked(getCachedRoutingTable).mockClear();
     await expect(
-      collectDeniedAutoRoutingModelIds(policy({ organizationModelDenyList: ['openai/gpt-4o'] }))
+      collectDeniedAutoRoutingModelIds(
+        policy({ organizationModelDenyList: ['openai/gpt-4o'] }),
+        'efficient'
+      )
     ).resolves.toEqual([]);
     expect(getCachedRoutingTable).not.toHaveBeenCalled();
+  });
+
+  describe('with an organization provider allowlist', () => {
+    const providerCeilingPolicy = policy({
+      memberGrant: { mode: 'organization_baseline' },
+      organizationProviderCeiling: ['anthropic'],
+    });
+
+    beforeEach(() => {
+      jest.mocked(getCachedRoutingTable).mockReset();
+      jest.mocked(getCachedRoutingTable).mockImplementation(
+        async router =>
+          (router === 'frontier'
+            ? { routes: { 'implementation/code_generation': [{ model: 'openai/gpt-5' }] } }
+            : {
+                routes: { 'implementation/code_generation': [{ model: 'anthropic/claude' }] },
+              }) as never
+      );
+      jest
+        .mocked(getProviderSlugsForModel)
+        .mockImplementation(async modelId =>
+          modelId.startsWith('openai/') ? new Set(['openai']) : new Set(['anthropic'])
+        );
+    });
+
+    it('denies a frontier table model blocked by the provider allowlist and absent from the efficient table', async () => {
+      await expect(
+        collectDeniedAutoRoutingModelIds(providerCeilingPolicy, 'frontier')
+      ).resolves.toEqual(['openai/gpt-5']);
+      expect(getCachedRoutingTable).toHaveBeenCalledWith('frontier');
+      expect(getCachedRoutingTable).not.toHaveBeenCalledWith('efficient');
+    });
+
+    it('uses the efficient platform table instead of the frontier table', async () => {
+      await expect(
+        collectDeniedAutoRoutingModelIds(providerCeilingPolicy, 'efficient')
+      ).resolves.toEqual([]);
+      expect(getCachedRoutingTable).toHaveBeenCalledWith('efficient');
+    });
   });
 });
 
@@ -139,10 +188,38 @@ describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
       .mocked(getDataCollectionRequiredModelIds)
       .mockResolvedValue(new Set(['meta/muse-spark-1.3-contributor', 'unrelated/model']));
 
-    await expect(collectDataCollectionRequiredAutoRoutingModelIds()).resolves.toEqual([
+    await expect(collectDataCollectionRequiredAutoRoutingModelIds('efficient')).resolves.toEqual([
       'meta/muse-spark-1.3-contributor',
       'provider/free-model:free',
     ]);
+  });
+
+  it('uses frontier candidates for privacy denials rather than the efficient table', async () => {
+    jest.mocked(getCachedRoutingTable).mockReset();
+    jest.mocked(getCachedRoutingTable).mockImplementation(
+      async router =>
+        (router === 'frontier'
+          ? {
+              routes: {
+                'implementation/code_generation': [
+                  { model: 'frontier/private-model' },
+                  { model: 'frontier/ordinary-model' },
+                ],
+              },
+            }
+          : {
+              routes: { 'implementation/code_generation': [{ model: 'efficient/private-model' }] },
+            }) as never
+    );
+    jest
+      .mocked(getDataCollectionRequiredModelIds)
+      .mockResolvedValue(new Set(['frontier/private-model', 'efficient/private-model']));
+
+    await expect(collectDataCollectionRequiredAutoRoutingModelIds('frontier')).resolves.toEqual([
+      'frontier/private-model',
+    ]);
+    expect(getCachedRoutingTable).toHaveBeenCalledWith('frontier');
+    expect(getCachedRoutingTable).not.toHaveBeenCalledWith('efficient');
   });
 });
 
@@ -181,10 +258,13 @@ describe('deniedAutoRoutingModelIdsForMember', () => {
         modelIds: ['anthropic/claude-sonnet-4.6', 'openai/gpt-5', 'kilo-auto/frontier'],
       })
     ).resolves.toEqual(['openai/gpt-5']);
-    expect(resolveOrganizationMemberModelPolicy).toHaveBeenCalledWith({
+    const { fromDb, ...policyParams } =
+      jest.mocked(resolveOrganizationMemberModelPolicy).mock.lastCall?.[0] ?? {};
+    expect(policyParams).toEqual({
       organizationId: member.organizationId,
       kiloUserId: member.userId,
     });
+    expect(fromDb).toBe(readDb);
   });
 
   it('denies data-collection-required candidates when the organization denies data collection', async () => {

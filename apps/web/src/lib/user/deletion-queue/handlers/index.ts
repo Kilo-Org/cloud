@@ -7,7 +7,6 @@ import { handleCompletionEmail } from '@/lib/user/deletion-queue/handlers/comple
 import { handleCustomerio } from '@/lib/user/deletion-queue/handlers/customerio';
 import { handleKiloclawDestroy } from '@/lib/user/deletion-queue/handlers/kiloclaw';
 import { handlePosthog } from '@/lib/user/deletion-queue/handlers/posthog';
-import { handleCsaSupportDb } from '@/lib/user/deletion-queue/handlers/csa-support-db';
 import { handlePylonContact } from '@/lib/user/deletion-queue/handlers/pylon-contact';
 import { handlePylonFinalize } from '@/lib/user/deletion-queue/handlers/pylon-finalize';
 import { handlePylonReply } from '@/lib/user/deletion-queue/handlers/pylon-reply';
@@ -29,7 +28,7 @@ const handlers = {
   [UserDeletionStepKey.PylonFinalize]: handlePylonFinalize,
   [UserDeletionStepKey.CompletionEmail]: handleCompletionEmail,
   [UserDeletionStepKey.PylonContact]: handlePylonContact,
-  [UserDeletionStepKey.CsaSupportDb]: handleCsaSupportDb,
+  [UserDeletionStepKey.CsaSupportDb]: async () => ({ kind: 'not_applicable' }),
 } as const satisfies Record<UserDeletionStepKey, DeletionHandler>;
 
 export function getDeletionHandler(stepKey: UserDeletionStepKey): DeletionHandler {

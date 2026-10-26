@@ -178,6 +178,51 @@ describe('SessionItemSchema session_pr_link validation', () => {
 });
 
 describe('SessionItemSchema session_status validation', () => {
+  it('preserves the original transition tuple without dropping its causal identity', () => {
+    const item = {
+      type: 'session_status',
+      data: {
+        status: 'question',
+        previousStatus: 'busy',
+        occurredAt: '2026-07-24T07:59:00.000Z',
+        transitionId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+      },
+    };
+    expect(SessionItemSchema.parse(item)).toEqual(item);
+  });
+
+  it.each(['not-an-id', 'Z1ARZ3NDEKTSV4RRFFQ69G5FAV', '01arz3ndektsv4rrffq69g5fav'])(
+    'rejects noncanonical or overflowing transition identity %s',
+    transitionId => {
+      expect(
+        SessionItemSchema.safeParse({
+          type: 'session_status',
+          data: { status: 'question', transitionId },
+        }).success
+      ).toBe(false);
+    }
+  );
+
+  it('preserves an originating historical transition timestamp independently from scheduledAt', () => {
+    const item = {
+      type: 'session_status',
+      data: {
+        status: 'question',
+        occurredAt: '2026-07-24T07:59:00.000Z',
+      },
+    };
+    expect(SessionItemSchema.parse(item)).toEqual(item);
+  });
+
+  it('rejects malformed originating timestamps instead of treating them as history', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'session_status',
+        data: { status: 'question', occurredAt: 'yesterday' },
+      }).success
+    ).toBe(false);
+  });
+
   it.each(['idle', 'busy', 'question', 'permission', 'retry'])(
     'parses the known %s status',
     status => {
@@ -281,5 +326,52 @@ describe('SessionItemSchema storage key identity', () => {
         data: { id: 'prt_parent\u0000child', messageID: 'msg_parent' },
       }).success
     ).toBe(false);
+  });
+});
+
+describe('SessionItemSchema identity segments', () => {
+  it.each(['message', 'part', 'agent_notification'])(
+    'refuses a part whose message id equals the %s root',
+    reserved => {
+      expect(
+        SessionItemSchema.safeParse({
+          type: 'part',
+          data: { id: 'prt_child', messageID: reserved },
+        }).success
+      ).toBe(false);
+    }
+  );
+
+  it.each(['message', 'part', 'agent_notification'])(
+    'refuses a message whose id equals the %s root',
+    reserved => {
+      expect(SessionItemSchema.safeParse({ type: 'message', data: { id: reserved } }).success).toBe(
+        false
+      );
+    }
+  );
+
+  it('accepts ordinary message and part identities', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'message',
+        data: { id: 'msg_42', role: 'assistant' },
+      }).success
+    ).toBe(true);
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: 'prt_1', messageID: 'msg_42' },
+      }).success
+    ).toBe(true);
+  });
+
+  it('accepts a part id equal to an item-type root', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: 'message', messageID: 'msg_42' },
+      }).success
+    ).toBe(true);
   });
 });

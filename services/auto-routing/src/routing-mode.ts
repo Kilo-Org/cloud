@@ -2,14 +2,14 @@ import {
   AutoRoutingModeSchema,
   DEFAULT_AUTO_ROUTING_MODE,
   type AutoRoutingMode,
-  type AutoRoutingModeOwnerType,
+  type OwnerType,
 } from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
 import { DurableObject } from 'cloudflare:workers';
 
 type AutoRoutingModeEnv = Pick<Env, 'AUTO_ROUTING_MODE_CONFIG'>;
 
-function modeKey(ownerType: AutoRoutingModeOwnerType, ownerId: string): string {
+function modeKey(ownerType: OwnerType, ownerId: string): string {
   return `${ownerType}:${ownerId}`;
 }
 
@@ -31,21 +31,21 @@ export class AutoRoutingModeConfigDO extends DurableObject<Env> {
   }
 }
 
-function modeStub(env: AutoRoutingModeEnv, ownerType: AutoRoutingModeOwnerType, ownerId: string) {
+function modeStub(env: AutoRoutingModeEnv, ownerType: OwnerType, ownerId: string) {
   const namespace = env.AUTO_ROUTING_MODE_CONFIG;
   return namespace.get(namespace.idFromName(modeKey(ownerType, ownerId)));
 }
 
 export function readConfiguredAutoRoutingMode(
   env: AutoRoutingModeEnv,
-  owner: { ownerType: AutoRoutingModeOwnerType; ownerId: string }
+  owner: { ownerType: OwnerType; ownerId: string }
 ): Promise<AutoRoutingMode | null> {
   return modeStub(env, owner.ownerType, owner.ownerId).getMode();
 }
 
 export async function getConfiguredAutoRoutingMode(
   env: AutoRoutingModeEnv,
-  owner: { ownerType: AutoRoutingModeOwnerType; ownerId: string }
+  owner: { ownerType: OwnerType; ownerId: string }
 ): Promise<AutoRoutingMode | null> {
   return readConfiguredAutoRoutingMode(env, owner).catch((error: unknown) => {
     console.warn(
@@ -63,20 +63,18 @@ export async function getAutoRoutingMode(
   env: AutoRoutingModeEnv,
   owner: { userId: string; organizationId: string | null }
 ): Promise<AutoRoutingMode> {
-  const userMode = getConfiguredAutoRoutingMode(env, {
-    ownerType: 'user',
-    ownerId: owner.userId,
-  });
-  const orgMode = owner.organizationId
-    ? getConfiguredAutoRoutingMode(env, { ownerType: 'org', ownerId: owner.organizationId })
-    : null;
-  const [configuredOrgMode, configuredUserMode] = await Promise.all([orgMode, userMode]);
-  return configuredOrgMode ?? configuredUserMode ?? DEFAULT_AUTO_ROUTING_MODE;
+  const [orgMode, userMode] = await Promise.all([
+    owner.organizationId
+      ? getConfiguredAutoRoutingMode(env, { ownerType: 'org', ownerId: owner.organizationId })
+      : null,
+    getConfiguredAutoRoutingMode(env, { ownerType: 'user', ownerId: owner.userId }),
+  ]);
+  return orgMode ?? userMode ?? DEFAULT_AUTO_ROUTING_MODE;
 }
 
 export async function setAutoRoutingMode(
   env: AutoRoutingModeEnv,
-  owner: { ownerType: AutoRoutingModeOwnerType; ownerId: string },
+  owner: { ownerType: OwnerType; ownerId: string },
   mode: AutoRoutingMode | null
 ): Promise<void> {
   await modeStub(env, owner.ownerType, owner.ownerId).setMode(mode);

@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
-import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { buildEligibleCatalog } from './auto-routing-pool-validation';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
@@ -12,13 +11,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
 jest.mock('@kilocode/web-shared/lib/organizations/organization-models', () => ({
   getAvailableModelsForOrganization: jest.fn(),
 }));
-jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => ({
-  kiloExclusiveModels: [
-    { public_id: 'kilo/hidden-model', status: 'hidden' },
-    { public_id: 'kilo/public-model', status: 'public' },
-  ],
-}));
-
 const { getEnhancedOpenRouterModels } = jest.requireMock(
   '@kilocode/web-shared/lib/ai-gateway/providers/openrouter'
 );
@@ -45,14 +37,13 @@ describe('buildEligibleCatalog', () => {
     mockedGetByokOrg.mockResolvedValue([]);
   });
 
-  test('excludes virtual, direct BYOK-only, custom LLM, and hidden exclusive models', async () => {
+  test('excludes virtual, direct BYOK-only, and custom LLM models', async () => {
     mockedGetEnhanced.mockResolvedValue({
       data: [
         model('anthropic/claude-sonnet-4'),
         model('kilo-auto/efficient'),
         model('openai-codex/gpt-5'),
-        model(`${CUSTOM_LLM_PREFIX}custom`),
-        model('kilo/hidden-model'),
+        { ...model('acme/custom'), isCustomLlm: true },
         model('kilo/public-model'),
       ],
     });

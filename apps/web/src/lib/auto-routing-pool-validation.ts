@@ -1,8 +1,6 @@
 import 'server-only';
 
 import { isVirtualAutoModelId } from '@kilocode/auto-routing-contracts';
-import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
-import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   getDirectByokModelsForOrganization,
   getDirectByokModelsForUser,
@@ -24,11 +22,6 @@ export type EligibleCatalog = {
   ownerCatalogIds: ReadonlySet<string>;
   organizationId: string | null;
 };
-
-function isHiddenExclusiveModel(modelId: string): boolean {
-  const exclusive = kiloExclusiveModels.find(model => model.public_id === modelId);
-  return exclusive !== undefined && exclusive.status !== 'public';
-}
 
 /**
  * Build the eligible managed catalog for pool membership.
@@ -72,8 +65,7 @@ export async function buildEligibleCatalog(params: {
     const id = model.id;
     if (isVirtualAutoModelId(id)) continue;
     if (byokOnlyIds.has(id)) continue;
-    if (id.startsWith(CUSTOM_LLM_PREFIX)) continue;
-    if (isHiddenExclusiveModel(id)) continue;
+    if (model.isCustomLlm) continue;
 
     byId.set(id, { id });
   }

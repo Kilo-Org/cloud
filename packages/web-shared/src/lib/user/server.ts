@@ -18,7 +18,9 @@ import type { NextAuthOptions, JWT, LoggerInstance } from 'next-auth';
 import { getServerSession } from 'next-auth';
 import { IS_DEVELOPMENT, ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { redirect } from 'next/navigation';
-import type { Organization, User } from '@kilocode/db/schema';
+import { device_sessions, type Organization, type User } from '@kilocode/db/schema';
+import { and, eq, isNull } from 'drizzle-orm';
+import { isDeviceSessionActive } from '@kilocode/web-shared/lib/auth/device-session-cache';
 import {
   isApiTokenPepperCurrent,
   isEmailBlacklistedByDomain,
@@ -40,6 +42,10 @@ import { z } from 'zod';
 import { v5 as uuidv5 } from 'uuid';
 import { isWebSessionCurrent } from '@kilocode/web-shared/lib/web-session-revocation';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
+import {
+  isCloudAgentAuthorityHttpPathAllowed,
+  type CloudAgentAuthority,
+} from '@kilocode/worker-utils/cloud-agent-authority';
 import { KILO_API_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   isKiloCredentialExchangeEligible,
@@ -108,6 +114,9 @@ export type RequiredPermissions = {
   adminOnly: boolean;
   DANGEROUS_allowBlockedUsers?: boolean;
   expectedAudience?: string;
+  // Derive from an actual Request URL or fixed route path, never a request header.
+  requestPathname?: string;
+  requestHeaders?: Headers;
 };
 
 type GetAuthResponse =
@@ -130,6 +139,7 @@ type GetAuthResponse =
       botId?: undefined;
       tokenSource?: undefined;
       deviceSessionId?: undefined;
+      cloudAgentAuthority?: undefined;
     }
   | {
       user: User;
@@ -141,10 +151,11 @@ type GetAuthResponse =
       botId?: string;
       tokenSource?: string;
       deviceSessionId?: string;
+      cloudAgentAuthority?: CloudAgentAuthority;
     };
 
 export async function getUserFromAuth(opts: RequiredPermissions): Promise<GetAuthResponse> {
-  const headersList = await headers();
+  const headersList = opts.requestHeaders ?? (await headers());
   const result = await resolveUserFromAuth(opts, headersList);
 
   // Admin audit trail: emit exactly one identity-attributed event per authorized
@@ -233,7 +244,10 @@ export async function getUserFromBearerForCredentialExchange(
     false,
     undefined,
     undefined,
-    db
+    db,
+    undefined,
+    undefined,
+    auth.claims.deviceSessionId
   );
   if (!result.user) return result;
   if (!isKiloCredentialExchangeEligible(auth, policy)) {
@@ -249,7 +263,7 @@ async function resolveUserFromAuth(
   // This path is executed for non-next-auth requests
   // all calls from the extension including the openrouter proxy call use this auth method
   // also val.town and other blessed API users who are given their own custom JWTs use this path
-  if (headersList.get('Authorization')) {
+  if (authViaTokenFromHeaders(headersList)) {
     const rawAuthorization = headersList.get('Authorization');
     const bearer = rawAuthorization?.match(/^Bearer (.+)$/i)?.[1];
     let decoded: ReturnType<typeof jwt.decode>;
@@ -259,7 +273,7 @@ async function resolveUserFromAuth(
       return authError(401, 'Invalid API token', '?', { credentialsRejected: true });
     }
     const decodedPayload = decoded !== null && typeof decoded !== 'string' ? decoded : null;
-    const decodedRuntimeAuthorization = decodedPayload?.runtimeAuthorization;
+    const decodedRuntimeAuthorization: unknown = decodedPayload?.runtimeAuthorization;
     const runtimeAuthorization = CloudAgentNextRuntimeAuthorizationClaimSchema.safeParse(
       decodedRuntimeAuthorization
     );
@@ -284,6 +298,7 @@ async function resolveUserFromAuth(
     const authorizationValidationResult = validateAuthorizationHeader(headersList, {
       expectedAudience: opts.expectedAudience,
       runtimeProxyAttestationVerified,
+      requestPathname: opts.requestPathname,
     });
     if (authorizationValidationResult.error != undefined) {
       return authError(401, authorizationValidationResult.error, '?', {
@@ -291,35 +306,60 @@ async function resolveUserFromAuth(
       });
     }
 
-    const user = await findUserById(authorizationValidationResult.kiloUserId, readDb);
+    const scope = authorizationValidationResult.cloudAgentAuthority;
+    if (scope && opts.adminOnly) {
+      return authError(403, 'Scoped credentials cannot access admin APIs', scope.ownerId, {
+        credentialsRejected: true,
+      });
+    }
+    const fromDb = scope ? db : readDb;
+    const user = await findUserById(authorizationValidationResult.kiloUserId, fromDb);
 
     if (
       user &&
-      !isApiTokenPepperCurrent(user.api_token_pepper, authorizationValidationResult.apiTokenPepper)
+      (scope
+        ? user.api_token_pepper !== authorizationValidationResult.apiTokenPepper
+        : !isApiTokenPepperCurrent(
+            user.api_token_pepper,
+            authorizationValidationResult.apiTokenPepper
+          ))
     ) {
       return authError(401, 'Invalid API token', user.id, { credentialsRejected: true });
     }
-    const organizationId = requestOrganizationId(
-      authorizationValidationResult.organizationId,
-      headersList.get(ORGANIZATION_ID_HEADER)
-    );
+    // A token-bound organization is signed; the request header is mutable.
+    // Legacy and personal tokens intentionally continue to use the header.
+    const headerOrganizationId = headersList.get(ORGANIZATION_ID_HEADER);
+    if (scope && headerOrganizationId !== null && headerOrganizationId !== scope.organizationId) {
+      return authError(403, 'Scoped organization mismatch', scope.ownerId, {
+        credentialsRejected: true,
+      });
+    }
+    const organizationId = scope
+      ? (scope.organizationId ?? undefined)
+      : requestOrganizationId(authorizationValidationResult.organizationId, headerOrganizationId);
     const internalApiUse = authorizationValidationResult.internalApiUse;
     const botId = authorizationValidationResult.botId;
     const tokenSource = authorizationValidationResult.tokenSource;
     const deviceSessionId = authorizationValidationResult.deviceSessionId;
 
-    return await validateUserAuthorization(
+    const result = await validateUserAuthorization(
       authorizationValidationResult.kiloUserId,
       user,
       opts,
       false,
       organizationId,
       internalApiUse,
-      readDb,
+      fromDb,
       botId,
       tokenSource,
       deviceSessionId
     );
+    if (scope && !isCloudAgentAuthorityHttpPathAllowed(scope, opts.requestPathname)) {
+      return authError(401, 'Cloud Agent authority has expired', scope.ownerId, {
+        credentialsRejected: true,
+      });
+    }
+    return result.user ? { ...result, cloudAgentAuthority: scope } : result;
   }
 
   return resolveUserFromSession(opts, readDb);
@@ -420,6 +460,26 @@ async function validateUserAuthorization(
     return authError(403, 'Access denied (nonadmin)', kiloUserId);
   }
 
+  // A credential bound to a device session is only valid while that session is
+  // active. The answer is cached per instance for
+  // `DEVICE_SESSION_CACHE_TTL_MS`, which is the window in which a revocation
+  // written by another instance takes effect here; a revocation on this
+  // instance invalidates its entry. See `lib/auth/device-session-cache`.
+  if (deviceSessionId !== undefined) {
+    const active = uuid.safeParse(deviceSessionId).success
+      ? await isDeviceSessionActive(deviceSessionId, kiloUserId, () =>
+          readActiveDeviceSession(deviceSessionId, kiloUserId)
+        )
+      : false;
+    if (!active) {
+      // The caller presented a credential that no longer works, so this must
+      // not degrade into an anonymous request.
+      return authError(401, 'Device session is no longer active', kiloUserId, {
+        credentialsRejected: true,
+      });
+    }
+  }
+
   if (organizationId) {
     const uuidResult = uuid.safeParse(organizationId);
     if (!uuidResult.success) {
@@ -441,6 +501,25 @@ async function validateUserAuthorization(
     tokenSource,
     deviceSessionId,
   };
+}
+
+/**
+ * Read a session from the primary: a session created moments ago must
+ * authenticate its first request, which a lagging replica would refuse.
+ */
+async function readActiveDeviceSession(
+  deviceSessionId: string,
+  kiloUserId: string
+): Promise<boolean> {
+  const session = await db.query.device_sessions.findFirst({
+    where: and(
+      eq(device_sessions.id, deviceSessionId),
+      eq(device_sessions.kilo_user_id, kiloUserId),
+      isNull(device_sessions.revoked_at)
+    ),
+    columns: { id: true },
+  });
+  return session !== undefined;
 }
 
 export async function isUserBlacklistedByDomain(

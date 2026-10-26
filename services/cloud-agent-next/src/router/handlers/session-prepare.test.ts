@@ -9,6 +9,7 @@
  * covered by `src/session/session-prepare.test.ts`.
  */
 import { TRPCError } from '@trpc/server';
+import jwt from 'jsonwebtoken';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as CloudAgentProfile from '@kilocode/cloud-agent-profile';
 
@@ -19,17 +20,26 @@ import {
   createSessionPrepareHandlers,
   prepareInputToSessionCreateRequest,
 } from './session-prepare.js';
+import { createSessionStartHandlers } from './session-start.js';
+
+function environmentLoad(layer: Record<string, unknown>, sandboxAllocation: string | null = null) {
+  return { layer, sandboxAllocation };
+}
 
 const {
   mergeProfileConfigurationMock,
+  loadEnvironmentForSessionMock,
   assertKiloModelAvailableMock,
   assertBitbucketRepositoryAccessMock,
   assertOrganizationMembershipMock,
   registerNewSessionMock,
   startNewSessionMock,
   createSessionWithLedgerMock,
+  parentRuntimeTokenMock,
 } = vi.hoisted(() => ({
   mergeProfileConfigurationMock: vi.fn().mockResolvedValue({}),
+  loadEnvironmentForSessionMock: vi.fn().mockResolvedValue(null),
+  parentRuntimeTokenMock: vi.fn().mockResolvedValue('trusted-parent-model-token'),
   assertKiloModelAvailableMock: vi.fn().mockResolvedValue(undefined),
   assertBitbucketRepositoryAccessMock: vi.fn().mockResolvedValue(undefined),
   assertOrganizationMembershipMock: vi.fn().mockResolvedValue(undefined),
@@ -67,6 +77,7 @@ vi.mock('@kilocode/cloud-agent-profile', async importActual => {
   return {
     ...actual,
     mergeProfileConfiguration: mergeProfileConfigurationMock,
+    loadEnvironmentForSession: loadEnvironmentForSessionMock,
   };
 });
 
@@ -92,10 +103,18 @@ vi.mock('../../session/session-registration.js', () => ({
   createSessionWithLedger: createSessionWithLedgerMock,
 }));
 
+vi.mock('../../sandbox-session/session-stub.js', () => ({
+  getSandboxSessionStub: () => ({ getCloudAgentSpawnRuntimeToken: parentRuntimeTokenMock }),
+}));
+vi.mock('../../balance-validation.js', () => ({
+  validateBalanceOnly: vi.fn(async () => ({ success: true })),
+}));
+
 const handlers = createSessionPrepareHandlers();
 const router = t.router({
   prepareSession: handlers.prepareSession,
   updateSession: handlers.updateSession,
+  start: createSessionStartHandlers().start,
 });
 
 function createContext(overrides?: {
@@ -128,6 +147,7 @@ describe('prepareSession operation-ledger admission gate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mergeProfileConfigurationMock.mockResolvedValue({});
+    loadEnvironmentForSessionMock.mockResolvedValue(null);
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
     assertBitbucketRepositoryAccessMock.mockResolvedValue(undefined);
     assertOrganizationMembershipMock.mockResolvedValue(undefined);
@@ -193,6 +213,177 @@ describe('prepareSession operation-ledger admission gate', () => {
     expect(startNewSessionMock).not.toHaveBeenCalled();
     expect(registerNewSessionMock).not.toHaveBeenCalled();
   });
+
+  it('keeps opt-in outside the profile and defaults ordinary sessions to disabled', async () => {
+    const caller = router.createCaller(createContext());
+    await caller.prepareSession({
+      prompt: 'parent',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+      allowSubagentSessions: true,
+    });
+    expect(startNewSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({ allowSubagentSessions: true }),
+      expect.anything(),
+      expect.anything()
+    );
+    const optedIn = startNewSessionMock.mock.calls[0][0];
+    expect(optedIn.profile).not.toHaveProperty('allowSubagentSessions');
+    await caller.prepareSession({
+      prompt: 'ordinary',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+    });
+    expect(startNewSessionMock.mock.calls[1][0].allowSubagentSessions).toBe(false);
+  });
+
+  it('derives child lineage from authority and defaults child opt-in to false', async () => {
+    const context = createContext();
+    context.authToken = jwt.sign({ aud: 'cloud-agent-next' }, 'fixture');
+    const authority = {
+      version: 1,
+      ownerId: context.userId ?? 'user-123',
+      parentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
+      organizationId: null,
+      authorizationId: '12345678-1234-4234-8234-123456789abc',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+    } satisfies NonNullable<TRPCContext['cloudAgentAuthority']>;
+    context.cloudAgentAuthority = authority;
+    const caller = router.createCaller(context);
+    await caller.prepareSession({
+      prompt: 'child',
+      callbackTarget: { url: 'session:parent' },
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+      createdOnPlatform: 'cloud-agent-web',
+    });
+    const [request, registration] = startNewSessionMock.mock.calls[0];
+    expect(request.parentCloudAgentSessionId).toBe(authority.parentSessionId);
+    expect(request.allowSubagentSessions).toBe(false);
+    expect(request.options.createdOnPlatform).toBe('cloud-agent');
+    expect(request.options.callbackTarget).toEqual({ url: 'session:parent' });
+    expect(registration.cloudAgentAuthority).toEqual(context.cloudAgentAuthority);
+    await caller.prepareSession({
+      prompt: 'grandchild-enabled child',
+      mode: 'code',
+      model: 'other/model',
+      githubRepo: 'other/repo',
+      autoInitiate: true,
+      allowSubagentSessions: true,
+    });
+    expect(startNewSessionMock.mock.calls[1][0]).toMatchObject({
+      allowSubagentSessions: true,
+      parentCloudAgentSessionId: authority.parentSessionId,
+    });
+  });
+
+  it('permits normal parent preparation inputs without requiring auto-initiation or GitHub', async () => {
+    const caller = router.createCaller(createContext());
+    await caller.prepareSession({
+      prompt: 'parent',
+      mode: 'code',
+      model: 'kilo/test-model',
+      gitUrl: 'https://example.test/repo.git',
+      autoInitiate: false,
+      allowSubagentSessions: true,
+      envVars: { CUSTOM: 'value' },
+      setupCommands: ['pnpm install'],
+      mcpServers: {},
+    });
+    expect(registerNewSessionMock.mock.calls[0][0]).toMatchObject({
+      allowSubagentSessions: true,
+      repository: { type: 'git', url: 'https://example.test/repo.git' },
+      profile: { overrides: { envVars: { CUSTOM: 'value' }, setupCommands: ['pnpm install'] } },
+    });
+    expect(startNewSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a parent callback without authenticated spawn authority before creating a session', async () => {
+    await expect(
+      router.createCaller(createContext()).prepareSession({
+        prompt: 'ordinary session',
+        mode: 'code',
+        model: 'kilo/test-model',
+        githubRepo: 'acme/repo',
+        autoInitiate: true,
+        callbackTarget: { url: 'session:parent' },
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(startNewSessionMock).not.toHaveBeenCalled();
+    expect(registerNewSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('does not accept caller lineage on ordinary preparation', async () => {
+    const caller = router.createCaller(createContext());
+    const input = {
+      prompt: 'parent',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+      parentCloudAgentSessionId: 'workspace_forged',
+    };
+    await caller.prepareSession(input);
+    expect(startNewSessionMock.mock.calls[0][0].parentCloudAgentSessionId).toBeUndefined();
+  });
+
+  it('rejects setting a parent callback through updateSession before accessing the session', async () => {
+    await expect(
+      router.createCaller(createContext()).updateSession({
+        cloudAgentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
+        callbackTarget: { url: 'session:parent' },
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'A parent callback can only be set when a Cloud Agent parent launches a session',
+    });
+  });
+
+  it('retains normal repository and model access checks for opted-in parents', async () => {
+    const input = {
+      prompt: 'parent',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'new-owner/new-repo',
+      autoInitiate: true,
+      allowSubagentSessions: true,
+    };
+    assertBitbucketRepositoryAccessMock.mockRejectedValueOnce(
+      new TRPCError({ code: 'FORBIDDEN', message: 'Repository access denied' })
+    );
+    await expect(router.createCaller(createContext()).prepareSession(input)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    assertKiloModelAvailableMock.mockRejectedValueOnce(
+      new TRPCError({ code: 'BAD_REQUEST', message: 'Model unavailable' })
+    );
+    await expect(router.createCaller(createContext()).prepareSession(input)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(startNewSessionMock).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, false, true])(
+    'propagates grouped start opt-in %s and otherwise retains normal start inputs',
+    async allowSubagentSessions => {
+      await router.createCaller(createContext()).start({
+        message: { prompt: 'start' },
+        agent: { mode: 'code', model: 'kilo/test-model' },
+        repository: { type: 'git', url: 'https://example.test/repo.git' },
+        allowSubagentSessions,
+      });
+      expect(startNewSessionMock.mock.calls[0][0]).toMatchObject({
+        allowSubagentSessions: allowSubagentSessions ?? false,
+      });
+      expect(startNewSessionMock.mock.calls[0][0].parentCloudAgentSessionId).toBeUndefined();
+    }
+  );
 
   it('adapts the legacy GitHub integration id into grouped repository identity', async () => {
     const caller = router.createCaller(createContext());
@@ -657,5 +848,38 @@ describe('prepareSession operation-ledger admission gate', () => {
     expect(mergeProfileConfigurationMock).toHaveBeenCalledTimes(2);
     expect(assertKiloModelAvailableMock).toHaveBeenCalledTimes(2);
     expect(createSessionWithLedgerMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('carries the repository environment and its merged configuration in the registration-only create request', async () => {
+    const caller = router.createCaller(createContext());
+    const layer = { envVars: { ENV_ONLY: 'from-environment' }, setupCommands: ['env-setup'] };
+    loadEnvironmentForSessionMock.mockResolvedValueOnce(environmentLoad(layer));
+    mergeProfileConfigurationMock.mockResolvedValueOnce(layer);
+
+    await caller.prepareSession({
+      prompt: 'Use environment',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      autoInitiate: false,
+      createdOnPlatform: 'cloud-agent-web',
+    });
+
+    expect(mergeProfileConfigurationMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ environment: layer })
+    );
+    expect(registerNewSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profile: expect.objectContaining({
+          resolved: expect.objectContaining({
+            envVars: { ENV_ONLY: 'from-environment' },
+            setupCommands: ['env-setup'],
+          }),
+        }),
+      }),
+      expect.objectContaining({ userId: 'test-user-123' }),
+      { billingOrigin: 'cloud-agent-web' }
+    );
   });
 });

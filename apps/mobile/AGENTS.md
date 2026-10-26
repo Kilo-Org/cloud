@@ -9,7 +9,7 @@ Expo Router app for iOS and Android only. Use dev builds, never Expo Go. No web-
 
 ## Stack
 
-- Expo SDK 57, React Native 0.86, React 19, strict TypeScript (`tsgo`)
+- Expo SDK 58, React Native 0.88, React 19.3, strict TypeScript (`tsgo`)
 - NativeWind v5 / Tailwind CSS v4; React Native Reusables in `src/components/ui/`
 - Expo Router routes in `src/app/`
 - oxlint and oxfmt
@@ -38,6 +38,16 @@ git diff --check
 
 - Install with `npx expo install <package>` (or `--dev`), never `pnpm add`.
 - After dependency changes, run `pnpx expo-doctor` and fix every issue.
+- `jotai` stays on 2.x for now, and the four pins move together: `apps/mobile`,
+  `apps/web`, `apps/extension` and `packages/cloud-agent-sdk`. The SDK creates
+  the session atoms and each app reads them through its own jotai hooks, so a
+  partial bump fails `typecheck`: a 2.x `Atom` is not assignable to the 3.x
+  type because its `read` options still require `setSelf`, which 3.x removed
+  (mobile alone reports 153 such errors). `apps/web` cannot move first while
+  `jotai-minidb@0.0.8` (the latest release) imports `atomFamily` from
+  `jotai/vanilla/utils` and calls `setSelf`; both are gone in 3.x. Revisit as
+  soon as `jotai-minidb` ships a release that supports `jotai` 3; 3.0.1 already
+  clears `minimumReleaseAge`.
 - `@kilocode/kilo-chat-hooks` is copied, not symlinked. After editing it:
 
   ```bash
@@ -52,10 +62,10 @@ git diff --check
 Before you build a UI element, find the library that already does it.
 
 1. Check the element map below. If the concern has an entry, use that element.
-2. Check `@expo/ui` (`node_modules/@expo/ui/build/`), which ships native modules for `57.x`: universal
+2. Check `@expo/ui` (`node_modules/@expo/ui/build/`), which ships native modules for `58.x`: universal
    `BottomSheet`, `Picker`, `Switch`, `TextInput`, `List`, `Host`, plus
    `community/{segmented-control, picker, datetime-picker, masked-view, menu, pager-view, slider}`.
-3. Check the Expo SDK 57 docs for the concern.
+3. Check the Expo SDK 58 docs for the concern.
 4. Check npm for a maintained package. A release in the last six months is the bar.
 
 A hand-built element is correct only when steps 1–4 fail. Record the decision in the PR body: the library
@@ -136,9 +146,10 @@ Direct full-screen entry clears the status bar; presented sheets do not add a se
 - Default exports only where Expo Router requires them, in `src/app/`.
 - Import React Native primitives from `react-native`; NativeWind adds `className`.
 - Import `Image` from `@/components/ui/image` and other UI primitives from `@/components/ui/<component>`.
+- Import `Switch` from `@/components/ui/switch`. It mirrors `disabled` into `accessibilityState`, which iOS needs to report the control as disabled to assistive technology.
 - Add reusables with `pnpm dlx @react-native-reusables/cli@latest add <component> --styling-library nativewind -y`.
 - Style with Tailwind `className`. No inline styles, no `StyleSheet.create`. Merge classes with `cn()` from `@/lib/utils`.
-- Opacity modifiers do not work on theme colors (CSS variables): `bg-destructive/10` fails. Use a concrete Tailwind color with a dark variant. Non-variable colors like `bg-black/5` are fine.
+- Opacity modifiers do not work on theme colors (CSS variables): `bg-destructive/10` is dropped. Where a `*-tile-bg` / `*-tile-border` pair exists — `danger` for `destructive`, plus `good`, `warn`, `info`, the agent colors and the row hues — use it; otherwise use a concrete color with a dark variant. `<utility>-black/<alpha>` compiles to an unparseable `#NaN` color and paints nothing either; use a concrete value, for example `bg-[#0000000d]` for 5%. `pnpm check:classes` enforces both.
 - Type dynamic Expo Router paths as `Href`. Never silence route types with `as never`.
 - Use Lucide icons, never emoji. Color icons with `color={colors.<token>}` from `useThemeColors()`; `className` colors do not work on them.
 
@@ -164,6 +175,7 @@ Direct full-screen entry clears the status bar; presented sheets do not add a se
 - Use `ActivityIndicator` only for inline waits. Where layout would jump, use the existing Reanimated `FadeIn`/`FadeOut`/`LinearTransition` patterns.
 - Set `freezeOnBlur: true` on tabs. Use haptics for commits and outcomes only, never passive interaction.
 - Set `transition={0}` on small or header `expo-image` images to avoid flicker.
+- A scroll view takes a horizontal inset through `contentContainerClassName`, never `className`: the scroller's own style does not narrow the scroll content, so an inset there leaves the end side flush in right-to-left layouts. `CenteredState` applies that class to its content box instead, because a `contentContainerStyle` of its own drops the caller's class.
 
 ## Translations
 
@@ -171,7 +183,17 @@ Copy lives in `src/i18n/locales/en.json`. The other 86 catalogs are reviewed
 against the screens their keys render on, so a key's name and its context are
 what a translator has to work from.
 
-- Add and edit copy in `en.json` only. Never hand-edit another catalog.
+- Add and edit copy in `en.json` only. Never hand-edit another catalog. The
+  exceptions are value-level edits of an existing non-English entry. For both,
+  keep the key name, the placeholder set, and the surrounding entries as they
+  are, and say so in the pull request:
+  - a confirmed mistranslation, meaning a wrong word rather than a style
+    preference: fix the value in place, leave the English copy unchanged, and
+    verify the corrected string on the screen that renders it;
+  - a change to the meaning of the English copy, or to the surface it names: the
+    existing value in every catalog now describes the old meaning, so update it
+    in each of them, using that catalog's own established wording for the new
+    meaning or surface. `check:i18n` and `check:plurals` still have to pass.
 - Search `en.json` for the string before you add a key. If the copy already
   exists, reuse that key. `pnpm check:i18n` fails when two keys hold the same copy.
 - Put copy used by more than one section under `common.`.
@@ -179,6 +201,10 @@ what a translator has to work from.
   message, or every catalog quotes a button the reader never sees.
 - Keep the `{{placeholder}}` set identical to English. Word order around a
   placeholder is the translator's to change, so never assume English order.
+  One exception: a plural category may interpolate the count its own family
+  already declares, where that language's plural rules select the category for
+  counts other than one. Never drop a placeholder English requires, and never
+  add one the family does not use.
 - Case follows the English copy, and only in a language that has case. Georgian
   Mkhedruli has none, and Greek keeps the tonos on a capital initial and drops
   it only in full capitals.
@@ -206,7 +232,7 @@ The Chat tab runs `@kilocode/harness-sdk` on the device. `src/lib/chat/` holds t
 
 Quick Chat renders streamed text, reasoning and tools through the shared agent message and tool-detail surfaces. Tool results update the matching call rather than adding user-message bubbles; the same pairing is rebuilt from stored turns when a chat reopens.
 
-The header usage pill shows its percentage or token count without a visible Context prefix. Its accessibility label names the context.
+The header usage pill shows its percentage, or a dash while the context window is unknown, without a visible Context prefix. Its accessibility label names the context and the token count.
 Collapsed reasoning uses the tool row's full-width shape, padding and text style, with a dashed border.
 
 A chat is opened with the SDK's `time` tool and no other. A model has no clock, so it answers a dated question from its training date, confidently and wrong. The other three tools the SDK ships stay off: the composer is already how a person is asked something, a subagent costs a second session, and a to-do list is working memory for a run a chat does not have.

@@ -9,6 +9,21 @@ const storageKeySegmentSchema = z
     message: 'storage key segments must not contain / or U+0000',
   });
 
+/**
+ * Item-type roots that start an item id (`message/<id>`, `part/<messageId>/<id>`,
+ * `agent_notification/<id>`). An identity segment equal to one of these roots is refused.
+ */
+const RESERVED_IDENTITY_SEGMENTS: Record<string, true> = {
+  message: true,
+  part: true,
+  agent_notification: true,
+};
+
+const identitySegmentSchema = storageKeySegmentSchema.refine(
+  segment => !Object.hasOwn(RESERVED_IDENTITY_SEGMENTS, segment),
+  { message: 'storage key segments must not repeat an item-type root' }
+);
+
 export const SessionItemSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('kilo_meta'),
@@ -26,14 +41,14 @@ export const SessionItemSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('message'),
     data: z.looseObject({
-      id: storageKeySegmentSchema,
+      id: identitySegmentSchema,
     }),
   }),
   z.object({
     type: z.literal('part'),
     data: z.looseObject({
       id: storageKeySegmentSchema,
-      messageID: storageKeySegmentSchema,
+      messageID: identitySegmentSchema,
     }),
   }),
   z.object({
@@ -72,6 +87,12 @@ export const SessionItemSchema = z.discriminatedUnion('type', [
       // status and when the producer omits it; null is tolerated like the stored
       // row schema, because a missing time must never drop the item.
       scheduledAt: z.string().nullable().optional(),
+      occurredAt: z.string().datetime().optional(),
+      previousStatus: z.string().nullable().optional(),
+      transitionId: z
+        .string()
+        .regex(/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/)
+        .optional(),
     }),
   }),
   z.object({

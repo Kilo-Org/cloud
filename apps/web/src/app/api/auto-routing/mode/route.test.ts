@@ -83,6 +83,23 @@ describe('/api/auto-routing/mode', () => {
     expect(mockedUpdateMode).not.toHaveBeenCalled();
   });
 
+  test.each(['not-a-uuid', '', '00000000-0000-0000-0000-00000000000g'])(
+    'rejects malformed organization IDs before resolving organization access: %j',
+    async organizationId => {
+      const query = `?organizationId=${encodeURIComponent(organizationId)}`;
+      for (const response of [
+        await GET(request(query)),
+        await PUT(request(query, { mode: 'best_accuracy' })),
+      ]) {
+        expect(response.status).toBe(400);
+        await expect(response.json()).resolves.toEqual({ error: 'Invalid organization ID' });
+      }
+      expect(mockedGetMode).not.toHaveBeenCalled();
+      expect(mockedUpdateMode).not.toHaveBeenCalled();
+      expect(mockedRequireActiveSubscription).not.toHaveBeenCalled();
+    }
+  );
+
   test('reads the authenticated personal mode, ignoring caller-supplied owner fields', async () => {
     const body: AutoRoutingModeResponse = {
       ownerType: 'user',

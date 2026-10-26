@@ -49,7 +49,9 @@ Split auto routing into platform routers and custom routers.
 - A member can use a personal router in an organization context. The organization pays, and the
   organization model policy removes denied gateway candidates.
 - `kilo-auto/org` route targets can name an organization custom router of the same organization.
-  The gateway resolves the target with gateway candidates only.
+  The organization model catalog lists that organization's routers for both the fallback and
+  custom-mode pickers, excluding personal routers. The gateway resolves the target with gateway
+  candidates only.
 
 ## Router definition
 
@@ -78,6 +80,13 @@ The entry key is `gateway:<model>` or `client:<provider>/<model>`. The CLI regis
 entries from its own configuration (`kilo auto router add`). The web editor manages gateway
 entries and can remove client entries.
 
+Write requests carry an explicit entry budget: model IDs up to 200 characters, provider IDs up to
+100, at most 20 variants of up to 100 characters, at most 10 input modalities of up to 50
+characters, context lengths up to 10,000,000, per-million-token prices that are finite and at most
+1,000,000, and default entry keys up to 320 characters. The budget applies to create, update, and
+client-entry registration; stored definitions and responses still parse rows written before it, so
+the worker keeps serving them.
+
 The serving worker reads definitions through its existing Hyperdrive binding with an isolate
 cache. The web app owns create, update, and delete.
 
@@ -93,6 +102,18 @@ The benchmark worker stays the only writer of measurements and routing tables.
 - Platform-paid admission is limited to 20 new models per base router per owner per rolling 24
   hours. Ready and pending models do not count. A save over the limit gets `quota_exceeded`
   (HTTP 429) with `retryAt`, and every other validation runs before admission.
+  Web saves fetch the catalog and admit benchmarks before locking, and the owner's PostgreSQL
+  advisory lock covers the final validation and the write, so queued saves do not hold a pooled
+  connection across an outbound benchmark request. Admission runs at most one in-flight request per
+  owner. Updates admit the merged definition computed from a pre-lock read; if a concurrent save
+  changes the base router or pool before the lock is taken, the locked definition is admitted again
+  while that lock is held, before the write. Deletes and client-entry edits use the same lock without
+  admission. All registration batches share a ten-second HTTP deadline, including response-body
+  reads. A batch that fails in transit or gets a worker 5xx before the deadline is retried once.
+  PostgreSQL and worker D1 do not share a transaction: an ambiguous HTTP failure, a later batch
+  rejection, a database commit failure, or a save that loses a concurrent race can leave
+  already-admitted profiles and quota charges. There is no refund API. Re-registering current
+  pending, running, or ready profiles is idempotent, but cannot undo those charges.
 - The frontier base gets an owner queue, as the efficient base has today.
 - Client profiles are keyed by (owner, base router, entry key, variant, engine identity,
   repetitions). They are never shared with another owner or promoted to the platform.
@@ -175,7 +196,9 @@ Older CLIs, OpenClaw, and API clients send the custom model ID to the gateway. T
 the internal `/decide` with the custom router reference. The worker considers gateway entries
 only. The gateway passes `router_not_found` and `custom_router_unavailable` to the caller; any
 other worker failure is a retryable `auto_routing_unavailable`. The gateway does not fall back to
-a model outside the pool.
+a model outside the pool. Organization deny-list IDs are normalized and expanded to the exact
+gateway candidate IDs, including suffixed variants, before calling the worker; the gateway also
+rejects a worker pick that matches any denied candidate.
 
 The `kilo-auto-frontier-routing` flag gates only the platform frontier table. A custom router with
 a frontier base serves its own pool and does not read that table, so the flag does not apply.
@@ -189,7 +212,8 @@ with `custom_router_unavailable`. A custom router never routes outside its pool.
 ## Rollout and cutover
 
 1. Deploy contracts, benchmark support, web, serving, and gateway integration behind the
-   `kilo-auto-custom-routers` flag. Publish the CLI after cloud verification.
+   `kilo-auto-custom-routers` flag. Publish the CLI after cloud verification. The flag was
+   rolled out to everyone and removed before the cutover; custom routers no longer have a gate.
 2. Deploy the overlap migration separately from graduation. Keep legacy serving, settings,
    and storage. Run the silent conversion before sending the advance notice.
    - Each saved pool becomes an owner-scoped `efficient` custom router.
@@ -198,8 +222,7 @@ with `custom_router_unavailable`. A custom router never routes outside its pool.
      Custom modes are independent of platform mode settings and organization mode inheritance.
      Platform mode settings remain stored and editable throughout the transition.
    - Keep the migrated slug stable and reject deletion until graduation; benchmark difficulty remains editable.
-   - Migrated owners and authorized organization editors can use their router without the flag.
-     This does not enable unrelated router creation.
+   - Migrated owners and authorized organization editors keep using their router.
    - New legacy pool saves also convert before acknowledging success, including owners missed
      by an earlier scan.
 3. Resolve every conversion exception and verify both model IDs before the blast.
@@ -219,7 +242,7 @@ with `custom_router_unavailable`. A custom router never routes outside its pool.
    - The custom model ID retains its own pool and independently selected mode and benchmark difficulty.
    - Remove legacy pool settings/UI, custom-mode inheritance compatibility, and temporary pool edit guards.
      Keep the platform mode endpoint, mode-only UI, and persisted mode storage.
-   - Remove the rollout flag. Do not reconvert pools or resend the advance notice.
+   - Do not reconvert pools or resend the advance notice.
 7. Retire one-time pool conversion tooling after verification. Preserve the existing mode Durable
    Object, its binding, namespace, and saved modes. Do not apply a `deleted_classes` migration.
 
@@ -233,7 +256,7 @@ to keep selecting a platform routing mode.
 
 The conversion script and its worker endpoint are removed at this revision. The commands below
 document the pre-retirement procedure and require the #7808 cutover revision
-(`2ee9ff579d6cc50bad07b4c0de0491f38386cba7`), not this checkout. Do not deploy the retired
+(`cdc4ca4c0273207dd56b671e71857ca951fd4d04`), not this checkout. Do not deploy the retired
 conversion endpoint again after cutover.
 
 From that revision, run from the repository root with approved production credentials.
@@ -249,6 +272,10 @@ The historical scanner requires `CLOUDFLARE_API_TOKEN` and `INTERNAL_API_SECRET`
 Retain every report. Resolve unreadable, invalid, unmatched, missing-owner, collision, and
 router-cap findings before declaring the cohort complete. Interrupted writes retain a recovery
 fence; retry the conversion on the pre-retirement deployment rather than clearing the fence manually.
+If a scan response is lost, recover owner keys from the structured
+`auto_routing_owner_pool_conversion_scan` event's `readFailedOwners`, `invalidPoolOwners`,
+`invalidModeOwners`, `needsAttentionOwners`, and `notPostedOwners` arrays before declaring the
+run clean; a retry can skip owners already marked converted.
 `--limit` controls the page size, not the total number of owners.
 
 #### Advance notice (before graduation)
@@ -267,13 +294,20 @@ pnpm --filter web script src/scripts/notify-auto-routing-pool-users.ts --cutover
 ```
 
 The dry run writes a private hashed plan, but sends nothing.
-Personal owners and direct or inherited organization billing contacts receive one grouped notice
-per address. Missing contacts block sending rather than silently omitting an owner.
+Live personal owners and direct or inherited organization billing contacts receive one grouped
+notice per address. Soft-deleted users are never owners or contacts. An owner with no live, valid
+contact is not sent. The plan saves its private hash, and the output reports the unreachable count.
 Reuse the same timestamp and directory. `--refresh-plan` reviews cohort changes without resending
 successful targets. Resolve unknown delivery outcomes against provider records with
 `--reconcile-target` and `--reconcile-outcome`; use `--help` for the exact recovery procedure.
 Do not discard a used plan or remove its lock until the prior sender has stopped.
 A changed cutover date requires a separately reviewed update campaign, not an ordinary retry.
+If cutover passes during sending, the script stops before the next recipient and returns the
+saved partial summary with a nonzero exit status. Pending recipients stay pending; sent and
+unknown outcomes retain their history. Do not send an expired advance notice. Preserve the
+original campaign for reconciliation, and review a future campaign containing only pending or
+provider-confirmed `not_sent` recipients. Explicitly exclude sent and unknown targets; copying
+the entire original cohort into a new directory would notify successful recipients again.
 
 ## Invariants
 

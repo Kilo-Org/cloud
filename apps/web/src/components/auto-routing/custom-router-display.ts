@@ -9,7 +9,7 @@ import {
   type CustomRouterEntryRef,
   type CustomRouterListEntry,
   type CustomRouterListResponse,
-  type CustomRouterScope,
+  type OwnerType,
   type CustomRouterSummary,
 } from '@kilocode/auto-routing-contracts';
 
@@ -34,7 +34,7 @@ export function customRoutersEndpoint(organizationId: string | undefined): strin
 }
 
 export function customRouterItemEndpoint(
-  scope: CustomRouterScope,
+  scope: OwnerType,
   slug: string,
   organizationId: string | undefined
 ): string {

@@ -25,6 +25,7 @@
     "error": "алдаа: {{error}}",
     "back": "Буцах",
     "somethingWentWrong": "Алдаа гарлаа.",
+    "actionNotRecorded": "Энэ үйлдлийг бүртгэж чадсангүй. Дараа дахин оролдоно уу.",
     "couldNotOpen": "{{label}} нээж чадсангүй.",
     "link": "холбоос",
     "takingLonger": "Энэ үйлдэл хүлээгдэж байснаас удаж байна. Та энэ цонхыг хаагаад дахин шалгаж болно.",
@@ -35,6 +36,8 @@
     "connectGithub": "GitHub холбох",
     "cost": "Зардал",
     "discard": "Хаях",
+    "discardChangesMessage": "Таны өөрчлөлтүүд алдагдах болно.",
+    "discardChangesTitle": "Өөрчлөлтүүдийг хаях уу?",
     "findings": "Илэрсэн асуудлууд",
     "mergeRequest": "нэгтгэх хүсэлт",
     "notConnected": "Холбогдоогүй",
@@ -50,6 +53,7 @@
     "connected": "Холбогдсон",
     "couldNotLoadModels": "Загваруудыг ачаалж чадсангүй.",
     "couldNotLoadRepositories": "Кодын сангуудыг ачаалж чадсангүй.",
+    "noRepositoriesFound": "Репозитори олдсонгүй",
     "critical": "Ноцтой",
     "delete": "Устгах",
     "deleted": "Устгасан",
@@ -84,6 +88,7 @@
     "connect": "Холбох",
     "connectBitbucket": "Bitbucket холбох",
     "connectGitlab": "GitLab холбох",
+    "connectProvider": "Үйлчилгээ үзүүлэгчийг холбох",
     "contentTruncated": "Агуулгыг хэсэгчлэн харуулж байна",
     "copyLink": "Холбоосыг хуулах",
     "couldNotLoadOrganizations": "Байгууллагуудыг ачаалж чадсангүй.",
@@ -109,7 +114,9 @@
     "online": "Онлайн",
     "open": "{{name}}-г нээх",
     "openPullRequest": "Нэгтгэх хүсэлт нээх",
+    "completed": "Дууссан",
     "pending": "Хүлээгдэж байна",
+    "running": "Ажиллаж байна",
     "performance": "Гүйцэтгэл",
     "preferences": "Тохиргоо",
     "privacyPolicy": "Нууцлалын бодлого",
@@ -140,7 +147,8 @@
     "agent": "Агент",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Өөрчлөлтүүд"
+    "changes": "Өөрчлөлтүүд",
+    "organizationTrialEnded": "Байгууллагын туршилтын хугацаа дууссан бөгөөд идэвхтэй төлөвлөгөө байхгүй байна. Байгууллагын эзэн kilo.ai дээр төлбөрийн мэдээллээ шинэчлээд, дараа нь дахин оролдоно уу."
   },
   "language": {
     "restarting": "Сонгосон хэлийг хэрэглэхийн тулд дахин ачаалж байна",
@@ -177,7 +185,7 @@
     "codeArrivalHint": "Энэ хаяг шаардлага хангасан бол код нэг минутын дотор ирнэ.",
     "verifyCode": "Кодыг баталгаажуулах",
     "resendCode": "Кодыг дахин илгээх",
-    "termsPrefix": "Үргэлжлүүлснээр та манай дараах баримт бичгийг зөвшөөрнө:",
+    "termsPrefix": "Үргэлжлүүлснээр та манай дараах баримт бичгийг зөвшөөрнө: ",
     "terms": "Үйлчилгээний нөхцөл",
     "termsConnector": " болон ",
     "termsSuffix": ".",
@@ -219,7 +227,7 @@
     "hideBalance": "Үлдэгдэл нуух",
     "showBalance": "Үлдэгдэл харуулах",
     "balanceHidden": "Үлдэгдэл нуугдсан",
-    "bonusCreditsExpiring": "{{amount}} урамшууллын кредитийн хугацаа {{date}} өдөр дуусна.",
+    "bonusCreditsExpiring": "{{amount}} кредитийн хугацаа {{date}} өдөр дуусна.",
     "signOutTitle": "Гарах уу?",
     "signOutMessage": "Ажлын орчиндоо хандахын тулд дахин нэвтрэх шаардлагатай.",
     "deleteAccountTitle": "Бүртгэлийг устгах уу?",
@@ -288,7 +296,8 @@
     "condenseToolCallsSubtitle": "Дараалсан хэрэгслийн дуудлагыг нээж болох нэг мөрөнд бүлэглэнэ.",
     "toolSummaryTranslation": "Хэрэгслийн хураангуйг орчуулах",
     "toolSummaryTranslationSubtitle": "Хэрэгсэл бүрийн хураангуйг аппынхаа хэл рүү орчуулахын тулд загвар руу илгээ. Орчуулга бүтэлгүйтвэл эх хувийг харуулна.",
-    "toolSummaryTranslationModelUnavailableNotice": "Энэ загварыг цаашид санал болгохгүй. Өөр загвар сонгохын тулд $t(common.model)-г товшино уу."
+    "toolSummaryTranslationModelUnavailableNotice": "Энэ загварыг цаашид санал болгохгүй. Өөр загвар сонгохын тулд $t(common.model)-г товшино уу.",
+    "autoExpandThinkingInactiveSubtitle": "Бодлын дэлгэрэнгүйг нуух үед нөлөө үзүүлэхгүй."
   },
   "prReview": {
     "pullRequestUnavailable": "Нэгтгэх хүсэлтийг нээх боломжгүй",
@@ -586,6 +595,8 @@
     "installKiloGitHubApp": "Kilo GitHub аппыг суулгах",
     "checkConnection": "Холболтыг шалгах",
     "couldNotLoadPullRequest": "Нэгтгэх хүсэлтийг ачаалж чадсангүй.",
+    "reviewServiceUnavailable": "Үйлчилгээ ашиглах боломжгүй",
+    "reviewServiceUnavailableDescription": "Үйлчилгээ түр зуур ашиглах боломжгүй. Удахгүй дахин оролдоно уу.",
     "description": "Тайлбар",
     "noDescriptionProvided": "Тайлбар оруулаагүй.",
     "review": "Шалгалт",
@@ -615,9 +626,15 @@
       "viewOnGitHub": "PR-ыг GitHub дээр үзэх",
       "noChecksReported": "Шалгалтын мэдээлэл алга",
       "passed": "{{displayCount}} амжилттай",
+      "passed_one": "{{displayCount}} амжилттай",
+      "passed_other": "{{displayCount}} амжилттай",
       "failed": "{{displayCount}} амжилтгүй",
+      "failed_one": "{{displayCount}} амжилтгүй",
+      "failed_other": "{{displayCount}} амжилтгүй",
       "pending": "{{displayCount}} хүлээгдэж байна",
       "skipped": "{{displayCount}} алгассан",
+      "skipped_one": "{{displayCount}} алгассан",
+      "skipped_other": "{{displayCount}} алгассан",
       "checksCount": "{{displayCount}} шалгалт",
       "checksCount_one": "{{displayCount}} шалгалт",
       "checksCount_other": "{{displayCount}} шалгалт",
@@ -661,7 +678,9 @@
       "description": "Гар утаснаасаа нэгтгэх хүсэлтүүдийг хянахын тулд GitHub бүртгэлээ холбоно уу.",
       "gitlabDescription": "Гар утаснаас нэгтгэх хүсэлтүүдийг шалгахын тулд GitLab бүртгэлээ холбоно уу.",
       "bitbucketDescription": "Гар утаснаас татах хүсэлтүүдийг шалгахын тулд Bitbucket-ийг энэ байгууллагад холбоно уу.",
-      "bitbucketOrgOnlyDescription": "Тухайн байгууллагын Bitbucket татах хүсэлтүүдийг шалгахын тулд профайлаасаа байгууллага сонгоно уу."
+      "bitbucketOrgOnlyDescription": "Түүний Bitbucket татах хүсэлтүүдийг шалгахын тулд дээрх бүртгэлийг байгууллагад шилжүүлнэ үү.",
+      "contextLine": "{{organization}}-ийн хувьд",
+      "contextLinePersonal": "Хувийн дансны хувьд"
     },
     "screen": {
       "title": "#{{number}}",
@@ -756,6 +775,7 @@
       "truncationBanner_other": "GitHub API-ийн хязгаараас шалтгаалан өөрчлөгдсөн {{total}} файлаас эхний {{limit}} файлыг харуулж байна."
     },
     "linkPasteClipboardEmpty": "Хуулах санах ой хоосон байна.",
+    "linkPasteDenied": "Оруулах эрхээс татгалзсан. Оруулахыг зөвшөөрөөд дахин оролдоно уу.",
     "linkPasteNotAPullRequest": "Энэ татах эсвэл нэгтгэх хүсэлтийн холбоос биш байна.",
     "announce": {
       "commentPosted": "Сэтгэгдэл нийтлэгдсэн",
@@ -769,7 +789,9 @@
       "reviewNotSubmitted": "Энэ хяналтыг одоогийн байдлаар нь илгээх боломжгүй. PR өөрчлөгдсөн байж болзошгүй, эсвэл та өөрийн нэгтгэх хүсэлтийг хянах гэж оролдсон байна.",
       "reviewNotSubmittedTerm": "Энэ шалгалтыг хэвээр нь илгээх боломжгүй. {{term}} өөрчлөгдсөн байж болзошгүй, эсвэл та өөрийн {{term}}-г шалгах боломжгүй.",
       "couldNotPostComment": "Сэтгэгдлийг нийтэлж чадсангүй.",
-      "couldNotSubmitReview": "Хяналтыг илгээж чадсангүй. Холболтоо шалгаад дахин оролдоно уу."
+      "couldNotSubmitReview": "Хяналтыг илгээж чадсангүй. Холболтоо шалгаад дахин оролдоно уу.",
+      "rateLimited": "Хэт олон хүсэлт илгээгдлээ. Дараа дахин оролдоно уу.",
+      "conflict": "Та ажиллаж байх үед энэ өөрчлөгдсөн байна. Дахин ачаалаад дахин оролдоно уу."
     },
     "operation": {
       "couldNotReply": "Хариу илгээж чадсангүй.",
@@ -777,7 +799,6 @@
       "mergeResultDefaultError": "GitHub нэгтгэх үйлдлийг дуусгаагүй.",
       "mergeResultNotCompleted": "{{term}} нэгтгэгдсэнгүй. Төлөвийг шалгаад дахин оролдоно уу.",
       "ambiguous": "Баталгаажуулж чадсангүй. Дахин оролдохын өмнө PR-ыг шалгана уу.",
-      "persistenceFailed": "Энэ үйлдлийг бүртгэж чадсангүй. Дараа дахин оролдоно уу.",
       "forbidden": "Энэ үйлдлийг хийх эрх байхгүй."
     },
     "capabilities": {
@@ -1389,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "GitLab дээр илүү олон бүлэг эсвэл төсөлд хандах эрх өгөх шаардлагатай байж болно.",
       "installGithubApp": "Репозиториудад GitHub апп суулгах",
       "installGithubAppDescription": "Kilo GitHub аппад шалгуулах репозиториуддаа хандах эрх олгоно уу.",
-      "noRepositoriesFound": "Репозитори олдсонгүй",
       "repositoryAccess": "репозиторийн хандах эрх"
     },
     "style": {
@@ -1413,9 +1433,14 @@
       "couldNotGetLatest": "Сүүлийн мэдээллийг авч чадсангүй.",
       "byline": "{{repo}} #{{number}} · Зохиогч: {{author}}",
       "noFindings": "Асуудал илрээгүй.",
+      "findingsUnavailable": "Энэ шалгалт амжилтгүй болсон тул үр дүнг харах боломжгүй.",
+      "serviceUnavailable": "Код шалгах үйлчилгээнд холбогдож чадсангүй. Үйлчилгээ ашиглах боломжтой болсон үед дахин шалгана уу.",
+      "reviewFailed": "Шалгалт амжилтгүй боллоо. Дахин оролдоно уу.",
       "showMore": "Илүүг харуулах",
       "created": "Үүсгэсэн",
       "started": "Эхэлсэн",
+      "reviewEnded": "Дуусгасан",
+      "severityNitpick": "Жижиг алдаа",
       "tokens": "Токен",
       "tokensInOut": "{{input}} оролт / {{output}} гаралт",
       "council": "Зөвлөл",
@@ -1439,19 +1464,42 @@
       "sessionError": "Сессийн алдаа: {{error}}",
       "statusWithValue": "Төлөв: {{status}}",
       "toolName": "Хэрэгсэл: {{name}}",
-      "toolNameError": "{{name}} хэрэгсэлд алдаа гарлаа."
+      "toolNameError": "{{name}} хэрэгсэлд алдаа гарлаа.",
+      "cancelReasonSuperseded": "Шинэ commit оруулсан тул энэ шалгалтыг орлууллаа.",
+      "cancelReasonIntegrationDisconnected": "{{platform}} холболтоос салсан тул энэ шалгалтыг цуцаллаа. Дахин холбож, шалгалтыг дахин гүйцэтгэнэ үү.",
+      "cancelReasonBitbucketReviewerDisabled": "Bitbucket дээр Code Reviewer-ийг унтраасан тул энэ шалгалтыг цуцаллаа. Дахин идэвхжүүлээд шалгалтыг дахин гүйцэтгэнэ үү.",
+      "cancelReasonBitbucketPullRequestChanged": "Bitbucket-ийн pull request өөрчлөгдсөн тул энэ шалгалтыг орлууллаа.",
+      "cancelReasonCancelled": "Энэ шалгалтыг цуцаллаа.",
+      "cancelReasonInterrupted": "Энэ шалгалт тасалдав."
     },
     "reviewMemory": {
       "title": "Шалгалтын санах ой",
       "loading": "Шалгалтын санах ойг ачаалж байна",
       "couldNotLoad": "Шалгалтын санах ойг ачаалж чадсангүй.",
       "off": "Шалгалтын санах ой идэвхгүй байна.",
+      "on": "Шалгалтын санах ой идэвхтэй байна.",
       "offDescription": "Kilo төслийн хариуцагчдын хариултаас суралцаж, REVIEW.md файлд нэмэх заавар санал болгохын тулд санах ойг идэвхжүүлнэ үү.",
-      "readOnlyDescription": "Зөвхөн байгууллагын эзэмшигч болон төлбөрийн менежер шалгалтын санах ойг идэвхжүүлэх эрхтэй.",
+      "readOnlyDescription": "Зөвхөн байгууллагын эзэмшигч, админ болон төлбөрийн менежер шалгалтын санах ойг өөрчлөх эрхтэй.",
       "enable": "Шалгалтын санах ойг идэвхжүүлэх",
       "loadingProposals": "Саналуудыг ачаалж байна",
       "couldNotLoadProposals": "Саналуудыг ачаалж чадсангүй.",
       "noProposals": "Санал байхгүй",
+      "proposalDetails": "Саналын дэлгэрэнгүй",
+      "proposalTitle": "Саналын гарчиг",
+      "rationale": "Үндэслэл",
+      "saveFirst": "Pull request нээхээсээ өмнө өөрчлөлтөө хадгална уу.",
+      "proposalSaved": "Саналыг хадгаллаа",
+      "proposalDismissed": "Саналыг хэрэгсэхгүй болголоо",
+      "dismissProposalTitle": "Саналыг хэрэгсэхгүй болгох уу?",
+      "dismissProposalMessage": "Энэ санал идэвхтэй жагсаалтаас хасагдах бөгөөд сэргээх боломжгүй болно.",
+      "prOpened": "REVIEW.md файлын pull request нээгдлээ",
+      "alreadyPresent": "Заавар REVIEW.md файлд аль хэдийн байна",
+      "status": {
+        "edited": "Засварласан",
+        "opening_change_request": "PR нээж байна",
+        "change_request_failed": "PR амжилтгүй болсон",
+        "superseded": "Аль хэдийн байна"
+      },
       "noProposalsDescription": "Kilo төслийн хариуцагчдын хариултыг шинжилсний дараа шалгалтын санах ойн саналууд энд харагдана."
     },
     "manualReview": {
@@ -1459,15 +1507,25 @@
       "invalidUrl": "Нэгтгэх хүсэлтийн хүчинтэй URL оруулна уу.",
       "couldNotCheckProviderStatus": "Үйлчилгээ үзүүлэгчийн төлөвийг шалгаж чадсангүй.",
       "couldNotLoadProviders": "Холбосон үйлчилгээ үзүүлэгчдийн мэдээллийг ачаалж чадсангүй. Дахин оролдоно уу.",
-      "connectProvider": "Үйлчилгээ үзүүлэгчийг холбох",
       "connectProviderDescription": "Нэгтгэх хүсэлтийн шалгалтыг гараар эхлүүлэхийн тулд GitHub-ыг холбоно уу.",
       "pullRequestUrl": "Нэгтгэх хүсэлтийн URL",
       "instructions": "Заавар (заавал биш)",
       "instructionsPlaceholder": "Шалгагчийн онцлон анхаарах зүйл…",
       "starting": "Шалгалтыг эхлүүлж байна…",
-      "start": "Шалгалтыг эхлүүлэх"
+      "start": "Шалгалтыг эхлүүлэх",
+      "startNotFound": "Энэ {{requestNoun}} нь {{provider}} дээр олдсонгүй. URL болон репозиторигийн хүртээмжтэй байгаа эсэхийг шалгана уу.",
+      "startRateLimited": "{{provider}} одоо түр хязгаарлалт хийж байна. Хэдэн минутын дараа дахин оролдоно уу.",
+      "startNotAllowed": "Танд энэ {{requestNoun}} дээр шалгалт эхлүүлэх эрх байхгүй байна. Өөрийн эрх болон байгууллагынхаа төлөвлөгөөг шалгана уу.",
+      "startProviderNeedsAttention": "Гараар хийх шалгалтад {{provider}}-ийн стандарт холболт шаардлагатай. Холбоод дахин оролдоно уу.",
+      "startAlreadyRunning": "Тэр {{requestNoun}}-ийн шалгалт аль хэдийн явагдаж байна.",
+      "startRejected": "Тэр {{requestNoun}}-ийг шалгах боломжгүй. Нээлттэй, ноорог биш байгааг болон URL зөв эсэхийг шалгана уу.",
+      "startProviderUnavailable": "Тэр {{requestNoun}}-ийг уншихын тулд {{provider}}-д холбогдож чадсангүй. Дахин оролдоно уу.",
+      "startFailed": "Шалгалтыг эхлүүлж чадсангүй. Холболтоо шалгаад дахин оролдоно уу."
     },
-    "notConnectedReadOnly": "{{platform}} холбогдоогүй байна. Зөвхөн байгууллагын эзэмшигч болон төлбөрийн менежер үүнийг холбох эрхтэй.",
+    "notConnectedReadOnly": "{{platform}} холбогдоогүй байна. Зөвхөн байгууллагын эзэмшигч болон админ үүнийг холбох эрхтэй.",
+    "gitlab": {
+      "notConnectedReadOnly": "{{platform}} холбогдоогүй байна. Үүнийг холбуулахын тулд байгууллагын Эзэмшигч, Админ эсвэл Төлбөрийн менежерт хандана уу."
+    },
     "webhookSetup": "Вэбхүүкийн тохиргоо дутуу байна.",
     "webhookSetupDescription": "Зарим репозиторид автомат шалгалт хийгдэхгүй байж болзошгүй.",
     "autoReviews": "Автомат шалгалтууд",
@@ -1475,7 +1533,7 @@
     "followReviewMd": "REVIEW.md зааврыг дагах",
     "followReviewMdSubtitle": "Репозитори бүрийн REVIEW.md файл дахь зааврыг дагах",
     "bitbucket": {
-      "notConnectedReadOnly": "Bitbucket холбогдоогүй байна. Зөвхөн байгууллагын эзэмшигч болон төлбөрийн менежер үүнийг холбох эрхтэй.",
+      "notConnectedReadOnly": "Bitbucket холбогдоогүй байна. Зөвхөн байгууллагын эзэмшигч, админ болон төлбөрийн менежер үүнийг холбох эрхтэй.",
       "setupIncomplete": "Тохиргоо дутуу байна. kilo.ai дээр тохиргоог дуусгана уу.",
       "setup": "Bitbucket-ийн тохиргоо"
     },
@@ -1528,8 +1586,6 @@
     "updateFailed": "Шалгагчийг шинэчилж чадсангүй.",
     "configSaveFailed": "Шалгалтын тохиргоог хадгалж чадсангүй.",
     "status": {
-      "running": "Ажиллаж байна",
-      "completed": "Дууссан",
       "interrupted": "Тасарсан"
     },
     "reviewStyle": {
@@ -1542,7 +1598,8 @@
       "bugs": "Алдаанууд",
       "style": "Бичлэгийн хэв маяг",
       "testing": "Туршилт",
-      "documentation": "Баримтжуулалт"
+      "documentation": "Баримтжуулалт",
+      "unknown": "Бусад ({{area}})"
     },
     "gateThreshold": {
       "warning": "Анхааруулга"
@@ -1577,8 +1634,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Шүүлтүүр байхгүй байна",
-      "noFiltersDescription": "Буцаж очоод илэрсэн асуудлын жагсаалтаас шүүлтүүрийг дахин нээнэ үү.",
       "title": "Илэрсэн асуудлыг шүүх",
       "reset": "Анхны төлөвт оруулах",
       "severity": "Ноцтой байдлын зэрэг",
@@ -1654,7 +1709,14 @@
       "whereFound": "Илэрсэн байршлууд ({{displayCount}})",
       "fullReport": "Боловсруулсан бүрэн тайлан",
       "yes": "Тийм",
-      "no": "Үгүй"
+      "no": "Үгүй",
+      "action": {
+        "analyzeCodebase": "Кодын баазыг шинжлэх",
+        "dismiss": "Үгүйсгэх",
+        "manualReview": "Гараар хянан шалгах",
+        "monitor": "Ажиглах",
+        "openPr": "PR нээх"
+      }
     },
     "dashboard": {
       "findingsCount": "{{displayCount}} илэрсэн асуудал",
@@ -1708,7 +1770,7 @@
       "deadlinePassed": "Хугацаа дууссан",
       "deadlinePassedDetail": "{{critical}} ноцтой, {{high}} өндөр",
       "dueThisWeek": "Эцсийн хугацаа энэ долоо хоногт",
-      "dueThisWeekDetail": "{{exploitable}} асуудлыг халдлагад ашиглах боломжтой нь батлагдсан",
+      "dueThisWeekDetail": "Тэдгээрээс {{exploitable}} асуудлыг халдлагад ашиглах боломжтой нь батлагдсан",
       "noDeadline": "Хугацаагүй",
       "reviewSlaAssignment": "Тогтоосон SLA хугацааг шалгах",
       "allOpenFindingsTracked": "Бүх шийдээгүй асуудлыг хянаж байна"
@@ -1729,7 +1791,7 @@
       "couldNotLoad": "Энэ асуудлын мэдээллийг ачаалж чадсангүй.",
       "couldNotCheckPermissions": "Хасах эрхийг шалгаж чадсангүй.",
       "cannotDismissTitle": "Энэ асуудлыг хасах боломжгүй",
-      "cannotDismissDescription": "Зөвхөн байгууллагын эзэмшигч болон төлбөрийн менежер илэрсэн асуудлыг хасах эрхтэй.",
+      "cannotDismissDescription": "Зөвхөн байгууллагын эзэмшигч, админ болон төлбөрийн менежер илэрсэн асуудлыг хасах эрхтэй.",
       "alreadyResolvedDescription": "Энэ асуудлыг аль хэдийн шийдсэн тул хасах боломжгүй."
     },
     "findingDetails": {
@@ -1771,7 +1833,7 @@
       "automationAllOff": "Бүгд идэвхгүй",
       "automationCount": "3-аас {{displayCount}} нь идэвхтэй",
       "notificationsCount": "2-оос {{displayCount}} нь идэвхтэй",
-      "disabledNoManage": "Аюулгүй байдлын агент идэвхгүй байна. Зөвхөн байгууллагын эзэмшигч болон төлбөрийн менежер үүнийг идэвхжүүлэх эрхтэй.",
+      "disabledNoManage": "Аюулгүй байдлын агент идэвхгүй байна. Зөвхөн байгууллагын эзэмшигч, админ болон төлбөрийн менежер үүнийг идэвхжүүлэх эрхтэй.",
       "disabledNoRepo": "Аюулгүй байдлын агентыг идэвхжүүлэхээс өмнө дор хаяж нэг репозитори сонгоно уу.",
       "disabledPrompt": "Dependabot мэдэгдлийг синхрончлох, репозитори сонгох, автоматжуулалтыг тохируулахын тулд Аюулгүй байдлын агентыг идэвхжүүлнэ үү."
     },
@@ -1820,7 +1882,7 @@
       "invalidDayCount": "хоногийн тоог 1–365 хүртэлх бүхэл тоогоор оруулна уу.",
       "remediationDeadlineA11y": "{{label}} зэргийн асуудлыг засах хугацаа, хоногоор",
       "enterWholeNumber": "1-Ээс 365 хүртэлх бүхэл тоог оруулна уу",
-      "permissionNote": "Зөвхөн байгууллагын эзэмшигч болон төлбөрийн менежер эдгээр тохиргоог өөрчлөх эрхтэй.",
+      "permissionNote": "Зөвхөн байгууллагын эзэмшигч, админ болон төлбөрийн менежер эдгээр тохиргоог өөрчлөх эрхтэй.",
       "enableTracking": "SLA хяналтыг идэвхжүүлэх",
       "enableTrackingSubtitle": "Илэрсэн асуудлын ноцтой байдлын зэрэгт үндэслэн засварын эцсийн хугацааг тогтооно.",
       "deadlinesHeading": "Засварын эцсийн хугацаа (хоног)"
@@ -1856,24 +1918,51 @@
     "settingsSave": {
       "saveChanges": "Өөрчлөлтүүдийг хадгалах",
       "unsavedTitle": "Хадгалаагүй өөрчлөлтүүд",
-      "unsavedMessage": "Энэ дэлгэцээс гарахаас өмнө өөрчлөлтүүдээ хадгалах уу?"
+      "unsavedMessage": "Энэ дэлгэцээс гарахаас өмнө өөрчлөлтүүдээ хадгалах уу?",
+      "unsavedInvalidMessage": "Эдгээр өөрчлөлтийг одоохондоо хадгалах боломжгүй. Хадгалахын тулд засаарай, эсвэл гарахын тулд хаяарай."
     },
     "auditReportButton": {
       "viewA11y": "Аудитын тайланг үзэх"
     },
     "auditReport": {
+      "actorMaskedKiloAdmin": "Kilo админ",
+      "actorMaskedUser": "Нууцлагдсан хэрэглэгч",
+      "actorSystem": "Kilo систем",
       "couldNotLoad": "Аудитын тайланг ачаалж чадсангүй.",
       "events": "Үйл явдлууд",
+      "eventConfidence": "Итгэл: {{confidence}}",
+      "eventReason": "Шалтгаан: {{reason}}",
+      "eventsCount_one": "{{displayCount}} үйл явдал",
+      "eventsCount_other": "{{displayCount}} үйл явдал",
       "generated": "{{generatedAt}} үед үүсгэсэн.",
       "noActivity": "Бүртгэсэн үйл ажиллагаа байхгүй",
       "noActivityDescription": "{{start}} – {{end}} хугацаанд Kilo-д илэрсэн аюулгүй байдлын асуудалтай холбоотой тайлагнах үйл ажиллагаа бүртгэгдээгүй.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Репозиторийг бүртгээгүй",
+      "reasonUnknown": "Танигдаагүй шалтгаан",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Тайлангийн хураангуй",
       "title": "Аудитын тайлан",
       "unavailable": "Аудитын тайланг үзэх боломжгүй",
-      "unavailableDescription": "Зөвхөн байгууллагын эзэмшигч болон төлбөрийн менежер аудитын тайланг үзэх эрхтэй. Тэднээс хандах эрх хүснэ үү.",
-      "queryFailed": "Тайлангийн асуулга дуусаагүй. Дахин оролдоно уу."
+      "unavailableDescription": "Зөвхөн байгууллагын эзэмшигч, админ болон төлбөрийн менежер аудитын тайланг үзэх эрхтэй. Эзэмшигч, админ эсвэл төлбөрийн менежерээс хандах эрх хүснэ үү.",
+      "queryFailed": "Тайлангийн асуулга дуусаагүй. Дахин оролдоно уу.",
+      "eventActions": {
+        "findingAnalysisCompleted": "Шинжилгээ дууссан",
+        "findingAnalysisFailed": "Шинжилгээ амжилтгүй боллоо",
+        "findingAutoDismissed": "Автомат үгүйсгэсэн",
+        "findingCreated": "Импортолсон",
+        "findingDeleted": "Устгасан",
+        "findingDismissed": "Үгүйсгэсэн",
+        "findingSeverityChanged": "Ноцтой байдал өөрчлөгдсөн",
+        "findingStatusChange": "Төлөв өөрчлөгдсөн",
+        "findingSuperseded": "Солигдсон",
+        "remediationBlocked": "Засвар хаагдсан",
+        "remediationCancelled": "Цуцлагдсан",
+        "remediationFailed": "Засвар амжилтгүй боллоо",
+        "remediationNoChangesNeeded": "Өөрчлөлт шаардлагагүй",
+        "remediationPrOpened": "PR нээгдсэн",
+        "remediationQueued": "Засвар хийх хүсэлт илгээсэн"
+      }
     },
     "notifications": {
       "couldNotLoad": "Мэдэгдлийн тохиргоог ачаалж чадсангүй.",
@@ -1904,9 +1993,9 @@
       "couldNotLoad": "Аюулгүй байдлын агентыг ачаалж чадсангүй.",
       "installApp": "GitHub апп суулгах",
       "reauthorizeButton": "GitHub аппад дахин эрх олгох",
-      "reauthorizeDescription": "Аюулгүй байдлын агент Dependabot мэдэгдэлд хандахын тулд vulnerability_alerts эрх шаарддаг. Энэ эрхийг олгохын тулд GitHub аппад дахин эрх олгоно уу.",
-      "reauthorizeFailed": "Дахин эрх олгох үйлдлийг эхлүүлж чадсангүй. Дахин оролдоно уу.",
+      "reauthorizeDescription": "Аюулгүй байдлын агент Dependabot мэдэгдлийг уншихад эрх шаарддаг. Энэ эрхийг олгохын тулд GitHub аппад дахин эрх олгоно уу.",
       "reauthorizeTitle": "Нэмэлт эрх шаардлагатай",
+      "retryFailed": "Аюулгүй байдлын агентыг одоо ч ачаалж чадсангүй. Холболтоо шалгаад дахин оролдоно уу.",
       "setupFailed": "GitHub-ыг тохируулах үйлдлийг эхлүүлж чадсангүй. Дахин оролдоно уу."
     },
     "queuedActionUntracked": "Дараалалд орсон үйлдлийг цаашид хянах боломжгүй болсон. Хамгийн сүүлийн төлөвийг харахын тулд сэргээнэ үү.",
@@ -1924,7 +2013,12 @@
       "syncMayNotHaveCompleted": "Синхрончлол дуусаагүй байж болзошгүй. Төлөвийг нийцүүлэхийн тулд дахин оролдох эсвэл хүсэлтийг хэрэгсэхгүй болгоно уу.",
       "syncInProgress": "Аюулгүй байдлын өгөгдлийг синхрончилж байна. Дахин оролдоно уу.",
       "dismissalInProgress": "Энэ асуудлыг хасах үйлдэл явагдаж байна. Дахин оролдоно уу.",
-      "couldNotReadPendingSyncs": "Хүлээгдэж буй синхрончлолын мэдээллийг уншиж чадсангүй. Дахин оролдоно уу."
+      "couldNotReadPendingSyncs": "Хүлээгдэж буй синхрончлолын мэдээллийг уншиж чадсангүй. Дахин оролдоно уу.",
+      "ambiguous": "Баталгаажуулж чадсангүй. Дахин оролдохын өмнө аюулгүй байдлын хяналтыг шалгана уу.",
+      "settleFailed": "Үйлдэл бүрэн дууслаа, гэхдээ бид үр дүнг бүртгэж чадсангүй. Дахин оролдоно уу.",
+      "replayFailed": "Энэ үйлдэл дууссангүй. Дахин оролдоно уу.",
+      "actionFailed": "Энэ үйлдлийг дуусгаж чадсангүй. Дахин оролдоно уу.",
+      "actionBlocked": "Энэ үйлдлийг дуусгаж чадсангүй. Асуудлыг эхэлж шийдвэрлэх шаардлагатай."
     },
     "analysisState": {
       "queued": "Шинжилгээ дараалалд",
@@ -2064,7 +2158,8 @@
       "dollar_other": "доллар",
       "costSpoken": "зардал {{cost}}",
       "costSpokenWithTime": "зардал {{cost}}, {{time}}",
-      "pullRequest": "{{number}} дугаартай нэгтгэх хүсэлт"
+      "pullRequest": "{{number}} дугаартай нэгтгэх хүсэлт",
+      "spokenJoiner": ","
     },
     "githubInstall": {
       "couldNotOpenTitle": "GitHub-ыг нээж чадсангүй",
@@ -2092,8 +2187,8 @@
       "title": "Сесс",
       "copyErrorDetails": "Алдааны мэдээллийг хуулах",
       "backToSessions": "Сессүүд рүү буцах",
-      "follow": "Түгжээний дэлгэцэд дагах",
-      "unfollow": "Түгжээний дэлгэцэд дагахаа болих",
+      "follow": "Сессийг дагах",
+      "unfollow": "Сессийг дагахаа болих",
       "couldNotLoad": "Сессийг ачаалж чадсангүй.",
       "failedToLoadDetails": "Сессийн дэлгэрэнгүй мэдээллийг ачаалж чадсангүй.",
       "failedToStopExecution": "Гүйцэтгэлийг зогсоож чадсангүй.",
@@ -2183,6 +2278,9 @@
       "noRepositoriesVisibleGitlab": "Кодын сан харагдахгүй байна. GitLab-ийн кодын санд хандах эрхийг шалгаад жагсаалтыг шинэчилнэ үү.",
       "noRepositoriesVisibleBitbucket": "Кодын сан харагдахгүй байна. Bitbucket-ийн кодын санд хандах эрхийг шалгаад жагсаалтыг шинэчилнэ үү.",
       "bitbucketOrganizationsOnly": "Bitbucket зөвхөн байгууллагуудад боломжтой.",
+      "githubNeedsAttention": "GitHub-ыг дахин холбох шаардлагатай",
+      "githubNeedsAttentionDescription": "Kilo GitHub аппыг дахин холбоод жагсаалтыг шинэчилж кодын сангуудыг нь ачаална уу.",
+      "partialRepositories": "Зарим GitHub кодын сангууд ачаалагдсангүй.",
       "branchPickerTitle": "Салбар сонгох",
       "branchDefault": "Өгөгдмөл",
       "branchAccessibility": "Салбар: {{label}}",
@@ -2190,17 +2288,19 @@
       "branchLoadError": "Салбаруудыг ачаалж чадсангүй",
       "branchUnavailable": "Энэ кодны санд салбарууд боломжгүй. Провайдераас хандах эрхээ шалгаад, өөр кодны сан сонгоно уу.",
       "branchEmpty": "Салбар боломжгүй",
+      "branchListIncomplete": "Зөвхөн зарим салбарыг харуулж байна. Кодны санд энэ жагсаалтад багтаахаас илүү олон салбар байна.",
       "branchPlaceholder": "Салбар сонгоно уу",
       "runOnWithTarget": "{{target}} дээр ажиллуулах",
       "environment": "Орчин",
       "couldNotLoadEnvironment": "Таны орчныг ачаалж чадсангүй.",
       "retryLoadingEnvironment": "Орчныг дахин ачаалах",
       "defaultEnvironment": "Үндсэн орчин",
-      "environmentSummary": "{{commands}} команд · {{mcp}} MCP · {{skills}} чадвар · {{agents}} агент",
       "leaveChanges": "Өөрчлөлтүүдийг үлдээх",
       "commitAndPush": "Коммит хийж илгээх",
       "startSession": "Сессийг эхлүүлэх",
       "selectRepositoryToStart": "Эхлэхийн тулд кодын сангаа сонгоно уу.",
+      "enterPromptToStart": "Эхлэхийн тулд заавар нэмнэ үү.",
+      "enterPromptOrFileToStart": "Эхлэхийн тулд заавар эсвэл файл нэмнэ үү.",
       "connectProviderToStart": "Эхлэхийн тулд үйлчилгээ үзүүлэгчийг холбоно уу.",
       "promptPlaceholder": "Юун дээр ажиллах вэ?",
       "couldNotLoadModels": "Загваруудыг ачаалж чадсангүй.",
@@ -2209,6 +2309,7 @@
       "prefillModelUnavailable": "{{model}} загварыг ашиглах боломжгүй болсон. Таны үндсэн загварыг ашиглаж байна.",
       "couldNotReadPendingSessions": "Хүлээгдэж буй сессүүдийг уншиж чадсангүй. Дахин оролдоно уу.",
       "failedToCreate": "Сесс үүсгэж чадсангүй.",
+      "checkOrganizationAccess": "Энэ байгууллагад хандах эрхээ шалгаад дахин оролдоно уу.",
       "couldNotRefreshRepositories": "Кодын сангийн жагсаалтыг шинэчилж чадсангүй. Дахин оролдоно уу.",
       "discardDraftTitle": "Нооргийг устгах уу?",
       "discardDraftMessage": "Таны бичсэн заавар устах болно.",
@@ -2278,7 +2379,8 @@
       "linesBadge_other": "{{displayCount}} мөр",
       "matchesBadge_one": "{{displayCount}} илэрц",
       "matchesBadge_other": "{{displayCount}} илэрц",
-      "noOutput": "Гаралт байхгүй."
+      "noOutput": "Гаралт байхгүй.",
+      "translationFailed": "Орчуулга амжилтгүй боллоо"
     },
     "readToolMarkdown": {
       "linesTruncated": "{{start}}–{{end}} мөр (товчилсон)",
@@ -2411,7 +2513,71 @@
       "preparationComplete": "Бэлтгэл дууссан",
       "preparationFailed": "Бэлтгэл амжилтгүй болсон",
       "setupCommand": "Бэлтгэх команд {{index}}",
-      "setupCommandOf": "Бэлтгэх команд {{index}} / {{displayCount}}"
+      "setupCommandOf": "Бэлтгэх команд {{index}} / {{displayCount}}",
+      "stepWorkspaceSetup": "Ажлын талбарын тохируулга",
+      "stepDiskCheck": "Диск шалгалт",
+      "stepCloning": "Репозиторийг клонлож байна",
+      "stepBranch": "Салбарыг тохируулж байна",
+      "stepDevcontainerSetup": "Dev контейнерын тохируулга",
+      "stepWorkspaceRestore": "Ажлын талбарыг сэргээж байна",
+      "stepWorkspaceBackup": "Ажлын талбарыг хадгалж байна",
+      "stepSandboxProvision": "Sandbox бэлдэж байна",
+      "stepSandboxBoot": "Sandbox эхлүүлж байна",
+      "stepSnapshotFallback": "Snapshot-гүйгээр дахин оролдож байна",
+      "stepKiloServer": "Kilo эхлүүлж байна",
+      "stepKiloSession": "Session бэлдэж байна",
+      "stepRestoreIncomplete": "Session сэргээлт бүрэн дуусаагүй",
+      "stepReady": "Орчин бэлэн боллоо",
+      "stepFailed": "Орчны тохируулга амжилтгүй боллоо",
+      "stepUnknown": "Орчны тохируулга",
+      "detailCreatingSandbox": "Sandbox үүсгэж байна",
+      "detailUpdatingRepository": "Репозиторийг шинэчилж байна",
+      "detailCheckingOutBranch": "Салбар шилжүүлж байна",
+      "detailRunningSetupCommands": "Бэлтгэх командуудыг ажиллуулж байна",
+      "detailSavingRepository": "Репозиторийг хурдан эхлэлд зориулж хадгалж байна",
+      "detailStartingKiloRuntime": "Kilo Runtime эхлүүлж байна",
+      "detailPreparingKiloSession": "Kilo Session бэлдэж байна",
+      "detailWaitingForPreviousSandbox": "Өмнөх Sandbox зогсохыг хүлээж байна",
+      "detailRetryingSandboxCreation": "Sandbox үүсгэхийг дахин оролдож байна",
+      "detailPreviousSnapshotFailed": "Өмнөх Snapshot эхлэл амжилтгүй боллоо. Snapshot-гүйгээр дахин оролдож байна.",
+      "detailSnapshotStartupFailed": "Snapshot эхлэл амжилтгүй боллоо. Snapshot-гүйгээр дахин оролдож байна.",
+      "detailStartingSandboxWithoutSnapshot": "Snapshot-гүй Sandbox эхлүүлж байна",
+      "detailSettingUpWorkspace": "Ажлын талбарыг тохируулж байна",
+      "detailRestoringSession": "Session сэргээж байна",
+      "detailWarmWorkspaceReused": "Бэлэн ажлын талбарыг дахин ашиглаа",
+      "detailRetryingClone": "Клонлож дахин оролдож байна ({{total}} оролдлогын {{attempt}})",
+      "detailSetupCommandFailed": "Бэлтгэх команд {{index}} амжилтгүй боллоо",
+      "detailSetupCommandTimedOut": "Бэлтгэх команд {{index}} хугацаанаас хэтэрлээ",
+      "detailColdRestore": "Хүйтэн сэргээлт, Snapshot ашиглагдлаа, {{total}} файлаас {{applied}} нь сэргээгдлээ",
+      "detailProgressPercent": "{{percent}}% дууссан",
+      "detailRestoreIncompleteReport": "Session сэргээлт бүрэн дуусаагүй: {{total}} файлаас {{skipped}} нь сэргээгдээгүй ({{reasons}}).",
+      "detailRestoreIncompleteMissing": "Байхгүй: {{paths}}",
+      "detailRestoreIncompleteMore": "{{listed}} болон {{omitted}} нэмэлт",
+      "detailReasonPatchFailed": "патч оруулагдсангүй",
+      "detailReasonOutsideWorkspace": "зам нь ажлын талбарын гадна байна",
+      "detailReasonMissingContent": "Snapshot нь файлын агуулгыг агуулаагүй",
+      "detailReasonIndexResetFailed": "амжилтгүй apply-ийн дараа индексийг дахин тохируулж чадсангүй",
+      "detailReasonUnlinkFailed": "файлыг устгаж чадсангүй",
+      "detailReasonWriteFailed": "файлыг бичиж чадсангүй",
+      "detailReasonUnknown": "үл мэдэгдэх шалтгаан",
+      "detailUnknown": "Хэвээр бэлдэж байна",
+      "errorPreparationTimeout": "Орчны бэлтгэл хугацаанаас хэтэрлээ",
+      "errorWorkspaceSetupFailed": "Ажлын талбарын тохируулга амжилтгүй боллоо",
+      "errorCredentialUpgradeRequired": "Энэ Session-д шаардлагатай итгэмжлэлийн шинэчлэл байхгүй байна. Үргэлжлүүлэхийн тулд шинэ Session эхлүүлнэ үү.",
+      "errorAgentUnavailable": "Агент боломжгүй боллоо",
+      "errorBillingBlocked": "Sandbox-ийн төлбөрт нэмэлт кредит шаардлагатай",
+      "errorBillingUnavailable": "Sandbox-ийн төлбөр буюу хүчин чадлын шалгалт боломжгүй байна. Тун удалгүй дахин оролдоно уу.",
+      "errorContainerLimitReached": "Контейнерын хязгаарт хүрлээ. Шинэ контейнер эхлүүлэхийн өмнө байгаа контейнерыг зогсооно уу.",
+      "errorInvalidConfiguration": "Sandbox-ийн тохиргоо буруу эсвэл дэмжигдээгүй байна",
+      "errorRuntimeArtifactUnauthorized": "Runtime татаж авах зөвшөөрөлгүй байна",
+      "errorRuntimeArtifactInvalid": "Runtime файлын баталгаажуулалт амжилтгүй боллоо",
+      "errorRuntimeCliProbeFailed": "Runtime CLI баталгаажуулалт амжилтгүй боллоо",
+      "errorRuntimeSupervisorMissing": "Runtime Supervisor байхгүй байна",
+      "errorConnectionLost": "Sandbox-ийн холболт тасарлаа",
+      "errorSandboxLost": "Sandbox алдагдлаа",
+      "errorAgentRestarted": "Агент дахин эхэллээ",
+      "errorSandboxOutOfMemory": "Sandbox-ийн санах ой дууслаа",
+      "errorPreparationDidNotComplete": "Бэлтгэл дуусаагүй"
     },
     "permissionCard": {
       "title": "Зөвшөөрөл шаардлагатай",
@@ -2423,7 +2589,10 @@
       "allowOnceAccessibility": "Нэг удаа зөвшөөрөх",
       "alwaysAllow": "Үргэлж зөвшөөрөх",
       "alwaysAllowAccessibility": "Үргэлж зөвшөөрөх",
-      "retrying": "Дахин оролдож байна…"
+      "retrying": "Дахин оролдож байна…",
+      "retryDeny": "Татгалзахыг дахин оролдох",
+      "retryAllowOnce": "Нэг удаа зөвшөөрөхийг дахин оролдох",
+      "retryAlwaysAllow": "Үргэлж зөвшөөрөхийг дахин оролдох"
     },
     "questionCard": {
       "title": "Агент хариулт хүлээж байна",
@@ -2729,6 +2898,7 @@
   "deviceSessions": {
     "couldNotLoadDescription": "Энэ мэдээллийг ачаалж дуустал таны идэвхтэй нэвтрэлтүүдийг харах боломжгүй.",
     "currentDeviceUnidentified": "Одоогийн төхөөрөмжийг тодорхойлж чадсангүй.",
+    "kiloApp": "Kilo апп",
     "noSessions": "Идэвхтэй нэвтрэлт алга",
     "noSessionsDescription": "Өөр төхөөрөмж дээр Kilo аппаар нэвтэрвэл тэр төхөөрөмж энд харагдана.",
     "onlyKiloAppSignIns": "Энд зөвхөн Kilo аппын нэвтрэлтүүд харагдана. Код засварлагч болон CLI-ийн нэвтрэлтүүд орохгүй.",
@@ -2737,7 +2907,7 @@
     "viewProfile": "Профайл үзэх",
     "webBrowser": "Вэб хөтөч",
     "signOutThisDevice": "Энэ төхөөрөмжөөс гарах",
-    "signOutThisSession": "Энэ нэвтрэлтийг дуусгах",
+    "signOutSessionLabel": "{{device}} төхөөрөмжөөс гарах, нэвтэрсэн: {{signedIn}}",
     "sessionSignedOut": "Нэвтрэлтийг дуусгалаа.",
     "signOutThisDeviceTitle": "Энэ төхөөрөмжөөс гарах уу?",
     "signOutThisSessionTitle": "Энэ нэвтрэлтийг дуусгах уу?",
@@ -2798,7 +2968,6 @@
   },
   "voiceInput": {
     "listening": "Сонсож байна...",
-    "staysOff": "Яриаг онлайнаар бичвэр болгохыг зөвшөөрөх хүртэл дуугаар оруулах боломж идэвхгүй байна.",
     "onlineTitle": "Яриаг онлайнаар боловсруулна",
     "onlineMessage": "Энэ төхөөрөмж интернетгүй үед яриаг бичвэр болгож чадахгүй. Таны бичлэгийг бичвэр болгохын тулд {{provider}} руу илгээнэ. Kilo дууны бичлэгийг хадгалахгүй.",
     "allow": "Зөвшөөрөх",
@@ -2881,6 +3050,7 @@
   "consent": {
     "kilo": "Kilo",
     "beforeWeGetStarted": "Эхлэхээс өмнө",
+    "summaryTitle": "Өгөгдөл хуваалцах тохиргоо",
     "introDescription": "Kilo хариулт үүсгэхийн тулд таны мессежийг AI үйлчилгээ үзүүлэгчдэд илгээдэг. Ямар өгөгдлийг хэнтэй хуваалцдагийг доор тайлбарлав.",
     "required": "Kilo ашиглахад шаардлагатай",
     "promptsTitle": "Таны заавар болон харилцан яриа",
@@ -2889,7 +3059,6 @@
     "accountDescription": "Таныг баталгаажуулж, хэрэглээг тооцоход ашиглах Kilo бүртгэлийн ID болон хүсэлтийн мета өгөгдөл.",
     "diagnosticsTitle": "Аппын оношилгоо",
     "diagnosticsDescription": "Аппын тогтвортой ажиллагааг хангахад ашиглах гацалт, алдааны тайлан. Эдгээрээс аппын агуулгыг арилгасан байна.",
-    "optional": "Заавал биш",
     "helpImprove": "Kilo-г сайжруулахад туслах",
     "helpImproveDescription": "Хэрэглэгчийг таних мэдээлэлгүй хэрэглээний статистик болон суулгасан эх үүсвэрийн мэдээллийг хуваалцана уу. Үүнийг тохиргооноос хүссэн үедээ өөрчилж болно.",
     "seeFullDetails": "Дэлгэрэнгүйг үзэх",
@@ -2974,11 +3143,17 @@
     "boundary": {
       "backToProfile": "Профайл руу буцах",
       "loadErrorMessage": "Холболтоо шалгаад дахин оролдоно уу.",
+      "chooseAccount": "Бүртгэл сонгох",
       "loadErrorTitle": "Таны байгууллагуудыг ачаалж чадсангүй.",
+      "membershipLostNotice": "Та энэ байгууллагад хандах эрхгүй боллоо. {{target}} руу шилжлээ.",
+      "noOrganization": "Байгууллага байхгүй",
+      "noOrganizationDescription": "Энэ бүртгэл нь байгууллагын гишүүн биш. Гишүүдийн урилга, бага үлдэгдлийн мэдэгдэл зэрэг байгууллагын функцуудыг ашиглахын тулд вэб сайтад байгууллага үүсгэх эсвэл нэгдээрэй.",
+      "openWebOrganizations": "Байгууллагуудыг вэб сайтад нээх",
       "organizationUnavailable": "Байгууллагад хандах боломжгүй.",
-      "selectDescription": "Үргэлжлүүлэхийн тулд профайлаасаа байгууллага сонгоно уу.",
+      "selectDescriptionWithOrganizations": "Та нэг буюу хэд хэдэн байгууллагын гишүүн байна. Энэ дэлгэц ашиглах ёстой бүртгэлийг сонгоно уу.",
       "selectOrganization": "Байгууллага сонгох",
       "unavailableDescription": "Энэ байгууллагад хандах боломжгүй болсон. Үргэлжлүүлэхийн тулд профайлаасаа өөр байгууллага сонгоно уу.",
+      "unavailableSessionsDescription": "Энэ байгууллагад хандах боломжгүй болсон. Түүний сессүүдийг ачаалах боломжгүй.",
       "accessDeniedDescription": "Танд энэ байгууллагад хандах эрх байхгүй."
     },
     "creditActivity": {
@@ -3005,7 +3180,11 @@
       "permissionDenied": "Танд гишүүн урих эрх байхгүй.",
       "roleMember": "Эрхийн түвшин: гишүүн.",
       "sendInvite": "Урилга илгээх",
-      "title": "Гишүүн урих"
+      "title": "Гишүүн урих",
+      "alreadyInvited": "Уг хаяг дээр аль хэдийн урилга илгээгдсэн эсвэл аль хэдийн гишүүн байна.",
+      "sendError": "Урилгыг илгээж чадсангүй.",
+      "pendingInvitation": "Энэ имэйл хаягт хүлээгдэж буй урилга аль хэдийн байна.",
+      "alreadyMember": "Энэ хүн аль хэдийн энэ байгууллагын гишүүн байна."
     },
     "invoices": {
       "downloadA11y": "{{number}} нэхэмжлэхийг татах",
@@ -3030,7 +3209,11 @@
       "separateEmailsHint": "Олон имэйл хаягийг таслалаар тусгаарлана уу.",
       "thresholdLabel": "Энэ дүнгээс доош бол анхааруулах (USD)",
       "title": "Үлдэгдэл багасах анхааруулга",
-      "emailsError": "Дор хаяж нэг зөв имэйл хаяг оруулна уу. Олон хаягийг таслалаар тусгаарлана уу.",
+      "emailsInvalid": "Нэг буюу хэд хэдэн имэйл хаяг зөв бус байна.",
+      "emailsRequired": "Дор хаяж нэг имэйл хаяг оруулна уу.",
+      "saveEmailsError": "Зарим имэйл хаягийг хүлээн аваагүй. Шалгаад дахин оролдоно уу.",
+      "saveError": "Үлдэгдэл багасах анхааруулгыг хадгалж чадсангүй.",
+      "thresholdPlaceholder": "Дүн оруулна уу.",
       "thresholdError": "0-Ээс их дүн оруулна уу."
     },
     "memberLimit": {
@@ -3041,12 +3224,13 @@
       "removeLimit": "Хязгаарыг арилгах",
       "title": "Өдрийн хэрэглээний хязгаар",
       "blankError": "Дүн оруулна уу. Эсвэл доорх «Хязгаарыг арилгах» товчийг товшино уу.",
+      "blankWithoutLimitError": "0-Ээс {{max}} хүртэлх өдрийн хязгаар оруулна уу.",
       "rangeError": "0-Ээс {{max}} хүртэлх дүн оруулна уу."
     },
     "members": {
       "changeRole": "Эрхийн түвшнийг өөрчлөх",
       "emptyDescriptionCanInvite": "Энэ байгууллагад хамтран ажиллахын тулд багийн гишүүдээ урина уу.",
-      "emptyDescriptionCannotInvite": "Багийн гишүүдийг урихыг эзэмшигч эсвэл төлбөрийн менежерээс хүснэ үү.",
+      "emptyDescriptionCannotInvite": "Багийн гишүүдийг урихыг эзэмшигч, админ эсвэл төлбөрийн менежерээс хүснэ үү.",
       "emptyTitle": "Гишүүд хараахан алга",
       "invitedDate": "Урьсан огноо: {{date}}",
       "limitPerDay": "{{amount}}/өдөр",
@@ -3069,7 +3253,13 @@
       "inviteCreated": "Урилга үүсгэгдлээ",
       "pendingInvitations": "Хүлээгдэж буй урилгууд",
       "resendInvite": "Урилгыг дахин илгээх",
-      "shareInviteLink": "Урилгын холбоос хуваалцах"
+      "shareInviteLink": "Урилгын холбоос хуваалцах",
+      "resendInviteError": "Урилгыг дахин илгээж чадсангүй.",
+      "inviteNotResendable": "Энэ урилгыг дахин илгээх боломжгүй болсон.",
+      "ownerAuthority": "Зөвхөн байгууллагын эзэмшигч эзэмшигчдийг удирдах боломжтой.",
+      "ownRoleChange": "Та өөрийн эрхийн түвшнийг өөрчлөх боломжгүй.",
+      "inviteExpired": "Энэ урилгын хугацаа дууссан.",
+      "inviteAccepted": "Энэ урилгыг аль хэдийн хүлээн авсан."
     },
     "usageStats": {
       "inputTokens": "Оролтын токенууд",
@@ -3182,7 +3372,7 @@
     "activityKitDisabledBody": "Түгжээтэй дэлгэц дээр идэвхтэй агентуудыг харахын тулд тохиргооноос шууд үйл ажиллагааг идэвхжүүлнэ үү.",
     "openSession": "Нээх",
     "finished": "Дууссан",
-    "followFailed": "Энэ агентыг түгжээний дэлгэцэд харуулж чадсангүй.",
+    "followFailed": "Энэ сессийг дагаж чадсангүй.",
     "approveFailed": "Зөвшөөрч чадсангүй. Дахин оролдохын тулд $t(common.approve)-г товшино уу.",
     "checked": "Шалгасан",
     "lastKnown": "Сүүлд мэдэгдсэн",
@@ -3217,7 +3407,8 @@
     "noneChosen": "Сонгоогүй",
     "emptyTitle": "Яриаг бичвэр болгох загвар байхгүй",
     "emptyDescription": "Kilo Gateway одоогоор яриаг бичвэр болгох загвар санал болгохгүй байна.",
-    "loadFailed": "Яриаг бичвэр болгох загваруудыг ачаалж чадсангүй."
+    "loadFailed": "Яриаг бичвэр болгох загваруудыг ачаалж чадсангүй.",
+    "choose": "Загвар сонгоно уу"
   },
   "voiceLanguage": {
     "title": "Дуугаар оруулах хэл",
@@ -3310,9 +3501,15 @@
       "settingsToolsOn": "Асаалттай — тохиргооны хэрэгслүүд загварт илгээгдэнэ",
       "settingsToolsOff": "Унтраалттай — загварт ямар ч тохиргооны хэрэгсэл илгээгдэхгүй",
       "serverChecking": "Энэ серверийг шалгаж байна…",
-      "serverToolCount": "{{count}} хэрэгсэл",
+      "serverToolCount_one": "{{count}} хэрэгсэл",
+      "serverToolCount_other": "{{count}} хэрэгсэл",
       "serverUnreachable": "Энэ серверт хүрч чадсангүй",
-      "serverOff": "Энэ сервер унтарсан"
+      "serverOff": "Энэ сервер унтарсан",
+      "app": {
+        "label": "Хэрэгслийн интерфейс",
+        "failed": "Энэ хэрэгслийн интерфейсийг ачаалж чадсангүй.",
+        "empty": "Энэ хэрэгслийн интерфейсэд үзүүлэх зүйл байхгүй."
+      }
     },
     "mcpOAuth": {
       "authMethod": "Баталгаажуулалт",
@@ -3426,6 +3623,7 @@
       "fromHuggingFace": "Hugging Face-ээс",
       "loading": "Загваруудыг ачаалж байна",
       "noResults": "Загвар олдсонгүй",
+      "noResultsForQuery": "\"{{query}}\"-д тохирох загвар олдсонгүй",
       "noFits": "Энэ төхөөрөмжид тохирох загвар алга",
       "noFitsDescription": "Том загварууд \"$t(common.all)\" табд байна.",
       "fit": {
@@ -3456,7 +3654,7 @@
       "quantizations": "Квантчлалууд",
       "quantizationsHelp": "Жижиг файл бага санах ой, сан ашиглана. Том файл ихэвчлэн илүү сайн хариулт өгдөг.",
       "quantDetail": "{{size}} татна · ойролцоогоор {{memory}} санах ой",
-      "downloadQuant": "{{quant}} татах",
+      "detailsA11y": "Дэлгэрэнгүй: {{name}}",
       "loadingModel": "Загварын дэлгэрэнгүйг ачаалж байна",
       "couldNotLoadModel": "Энэ загварыг ачаалж чадсангүй",
       "noFiles": "Энэ аппад ажиллах файл алга",
@@ -3468,6 +3666,9 @@
     "localModels": {
       "title": "Төхөөрөмж дээрх загварууд",
       "help": "Төхөөрөмж дээрх загварууд энэ утсан дээр ажиллана. Таны асуулт, хариултууд төхөөрөмж дээрээ үлдэнэ.",
+      "switchTitle": "Төхөөрөмж дээрх загвар руу шилжих үү?",
+      "switchMessage": "{{name}} рүү шилжихэд энэ харилцан ярианы сануулга болон контекстийг алсын сервер дээр биш, энэ утсан дээр боловсруулна.",
+      "switchConfirm": "Загварыг солих",
       "systemPurpose": "Энэ төхөөрөмжийн системд суулгасан загвар. Төхөөрөмж дээр ажиллана.",
       "apple": "Apple Intelligence (төхөөрөмж дээр)",
       "checking": "Боломжтой эсэхийг шалгаж байна…",
@@ -3497,14 +3698,19 @@
     },
     "reasoningEffort": {
       "modelFlag": "Энэ загвар бодох түвшинг дэмждэг"
-    }
+    },
+    "creditsRequired": "Энэ мессежийг илгээхэд хангалттай кредит байхгүй. Кредит нэмээд дахин оролдоно уу."
   },
   "settingsTools": {
     "confirmTitle": "Энэ өөрчлөлтийг баталгаажуулах уу?"
   },
   "appActions": {
     "start": {
+      "confirmMostRecentRepository": "таны хамгийн сүүлийн кодын сан",
+      "confirmMessage": "Кодын сан: {{repository}}. Хүсэлт: {{prompt}}",
+      "confirmTitle": "Энэ агентийг эхлүүлэх үү?",
       "promptRequired": "Агент эхлүүлэхэд заавар шаардлагатай. Заавар нэмээд дахин ажиллуулна уу.",
+      "repositoryRequired": "Агент эхлүүлэхэд кодын сан шаардлагатай. Kilo-г нээгээд нэгийг сонгоод дахин ажиллуулна уу.",
       "repositoryUnknown": "Kilo {{repository}}-г GitHub эсвэл GitLab кодын сан гэж хүлээн зөвшөөрөхгүй. Kilo дотор өөр кодын сан сонгоно уу.",
       "repositoryUnsupported": "{{repository}} нь Bitbucket кодын сан — Агент эхлүүлэх үүнийг одоохондоо ашиглаж чадахгүй. Kilo дотор өөр кодын сан сонгоно уу."
     }
@@ -3532,7 +3738,9 @@
     "spend24h": "Сүүлийн 24 цагийн зарцуулалт",
     "multiplierError": "1 буюу түүнээс их үржүүлэгч оруул",
     "permissionDenied": "Зарцуулалтын анхааруулгыг удирдах эрх танд байхгүй.",
-    "pushOffByCategory": "Мэдэгдэлд унтарсан"
+    "pushOffByCategory": "Мэдэгдэлд унтарсан",
+    "multiplierMaxError": "{{max}} буюу түүнээс бага үржүүлэгч оруул",
+    "thresholdMaxError": "{{max}} буюу түүнээс бага дүн оруулна уу."
   },
   "profiles": {
     "title": "Профайлууд",
@@ -3542,13 +3750,17 @@
     "emptyDescription": "Хүрээлэн буй орчны хувьсагч, тохируулах команд, ур чадварыг сешнүүдэд дахин ашиглахын тулд профайл үүсгээрэй.",
     "loadFailed": "Профайлуудыг ачаалж чадсангүй",
     "counts": {
-      "vars": "{{count}} хувьсагч",
+      "vars_one": "{{count}} хувьсагч",
+      "vars_other": "{{count}} хувьсагч",
       "mcp": "{{count}} MCP",
-      "skills": "{{count}} ур чадвар",
-      "commands": "{{count}} команд",
-      "varsShort": "{{count}}х",
-      "skillsShort": "{{count}}у",
-      "commandsShort": "{{count}}к"
+      "skills_one": "{{count}} ур чадвар",
+      "skills_other": "{{count}} ур чадвар",
+      "commands_one": "{{count}} команд",
+      "commands_other": "{{count}} команд",
+      "setupCommands_one": "{{count}} тохируулах команд",
+      "setupCommands_other": "{{count}} тохируулах команд",
+      "agents_one": "{{count}} агент",
+      "agents_other": "{{count}} агент"
     },
     "nameLabel": "Профайлын нэр",
     "namePlaceholder": "жишээ нь Ар талд дибаг хийх",
@@ -3564,7 +3776,6 @@
     "personalDefaultDescription": "Хадгалах газарт бэхлэгдсэн профайл байхгүй үед автоматаар ачаалагдана.",
     "organizationDefaultDescription": "Хувийн өгөгдмөлгүй гишүүдэд автоматаар ачаалагдсан.",
     "setAsDefault": "Өгөгдмөл болгож тохируулах",
-    "removeDefault": "Өгөгдмөл байдлаар устгана уу",
     "saveFailed": "Профайлыг хадгалж чадсангүй",
     "deleteTitle": "Профайлыг устгах",
     "deleteMessage": "Энэ нь профайл болон түүний тохиргоог бүрмөсөн устгана. Үүнийг буцаах боломжгүй.",
@@ -3577,7 +3788,8 @@
     "keyTooLong": "Түлхүүр нь 256 тэмдэгт эсвэл түүнээс бага байх ёстой",
     "keyDuplicate": "Энэ түлхүүр профайлд аль хэдийн байна",
     "valueLabel": "Үнэ цэнэ",
-    "secretLabel": "Нууц",
+    "valueRequired": "Үнэ цэнэ оруулна уу",
+    "tooLong": "Хамгийн ихдээ {{max}} тэмдэгт ашиглана уу",
     "secrets": {
       "markSecret": "Нууц гэж тэмдэглэ",
       "masked": "Нуугдсан үнэ цэнэ",
@@ -3590,11 +3802,13 @@
     "commandsTitle": "Тохируулах командууд",
     "addCommand": "Команд нэмэх",
     "commandLabel": "Тушаал",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "жишээ нь pnpm install",
     "commandsEmpty": "Одоогоор тохируулах команд алга",
     "commandsSaveFailed": "Тохируулгын командуудыг хадгалж чадсангүй",
     "moveUp": "Дээш хөдөл",
     "moveDown": "Доош хөдөл",
+    "moveCommandUp": "{{position}} дугаар командыг дээш зөөх",
+    "moveCommandDown": "{{position}} дугаар командыг доош зөөх",
     "skillsTitle": "Ур чадвар",
     "addSkill": "Ур чадвар нэмэх",
     "skillNameLabel": "Ур чадварын нэр",
@@ -3604,6 +3818,8 @@
     "skillNameInvalid": "Ур чадварын нэр нь үсэг эсвэл цифрээр эхэлж, зөвхөн жижиг үсэг, цифр, зураас ашиглана.",
     "skillContentRequired": "Ур чадварын агуулга шаардлагатай",
     "skillSaveFailed": "Ур чадвараа хадгалж чадсангүй",
+    "skillSourceCustom": "Өөрийн",
+    "skillSourceMarketplace": "Маркет",
     "skillsHint": "SKILL.md-г буулгаж, нэрийг нь бөглөнө; Чирэх, буулгахгүйгээр утаснаасаа ур чадвар нэмнэ үү.",
     "skillEditTitle": "Ур чадварыг засах",
     "mcp": {
@@ -3619,12 +3835,12 @@
       "environment": "Байгаль орчин (JSON)",
       "headers": "Толгой хэсэг (JSON)",
       "timeout": "Хугацаа хэтэрсэн",
-      "secretCount": "Нууц тоо",
+      "secretCount": "Нууц тоо: {{count}}",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
       "nameRequired": "Серверийн нэрийг оруулна уу",
-      "nameInvalid": "Нэр нь зөвхөн үсэг, тоо, доогуур зураас, зураас ашиглаж болно",
+      "nameInvalid": "Нэр нь зөвхөн ASCII үсэг, тоо, доогуур зураас, зураас ашиглаж, хамгийн ихдээ 100 тэмдэгт байна",
       "commandRequired": "Команд оруулна уу",
       "commandTooLong": "Хамгийн ихдээ 50 аргумент ашиглана уу, тус бүр 500 тэмдэгт",
       "urlRequired": "URL оруулна уу",
@@ -3634,7 +3850,9 @@
       "jsonTooLarge": "Хамгийн ихдээ 50 оруулга ашиглана уу, түлхүүр 128 хүртэл, утга 4096 тэмдэгт хүртэл",
       "timeoutInvalid": "Хугацаа нь бүхэл бүтэн миллисекунд байх ёстой",
       "edit": "MCP серверийг засах",
-      "saveFailed": "MCP серверийг хадгалж чадсангүй"
+      "saveFailed": "MCP серверийг хадгалж чадсангүй",
+      "deleteFailed": "MCP серверийг устгаж чадсангүй",
+      "updateFailed": "MCP серверийг шинэчилж чадсангүй"
     },
     "agents": {
       "title": "Профайл агентууд",
@@ -3650,21 +3868,25 @@
       "stepsPlaceholder": "жишээ нь 50",
       "temperature": "Температур",
       "temperaturePlaceholder": "жишээ нь 0.2",
-      "topP": "top_p",
+      "topP": "Top P",
       "topPPlaceholder": "жишээ нь 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Миний агент",
       "promptPlaceholder": "Та бол ...",
       "tools": "Багаж хэрэгсэл",
       "visibility": "Харагдах байдал",
-      "visibilityPrimary": "Үндсэн - сонгогч дээр харуулав",
-      "visibilitySubagent": "Дэд агент - зөвхөн бусдаас дуудах боломжтой",
-      "visibilityAll": "Бүгд - хоёулаа",
+      "visibilityPrimary": "Үндсэн — сонгогч дээр харуулав",
+      "visibilitySubagent": "Дэд агент — зөвхөн бусдаас дуудах боломжтой",
+      "visibilityAll": "Бүгд — хоёулаа",
+      "modePrimary": "Зөвхөн үндсэн",
+      "modeSubagent": "Зөвхөн дэд агент",
+      "modeAll": "Бүх горим",
       "saveFailed": "Агентийг хадгалж чадсангүй",
+      "deleteFailed": "Агентийг устгаж чадсангүй",
       "nameRequired": "Агентын нэрийг оруулна уу",
       "slugRequired": "Агент slug оруулна уу",
-      "slugInvalid": "Slug үсгээр эхэлж, зөвхөн жижиг үсэг, цифр, зураас ашиглана",
-      "slugConflict": "Тэр slug-г суулгасан агент нөөцөлсөн",
+      "slugInvalid": "Slug нь ASCII жижиг үсгээр эхэлж, зөвхөн ASCII жижиг үсэг, цифр, зураас ашиглаж, хамгийн ихдээ 50 тэмдэгт байна",
+      "slugConflict": "Түүний slug-ийг аль хэдийн суурин агент эсвэл энэ профайл дахь өөр агент ашиглаж байна",
       "edit": "Агентийг засах"
     },
     "slashCommands": {
@@ -3675,10 +3897,12 @@
       "description": "Тушаалын тайлбар",
       "template": "Загвар",
       "namePlaceholder": "explain",
+      "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS-г тайлбарла",
       "subtask": "Дэд даалгавар болгон ажиллуул",
       "edit": "Талуу зураасыг засах команд",
       "saveFailed": "Командыг хадгалж чадсангүй",
+      "deleteFailed": "Командыг устгаж чадсангүй",
       "nameRequired": "Тушаалын нэрийг оруулна уу",
       "nameInvalid": "Нэр нь жижиг үсгээр эхэлж, зөвхөн жижиг үсэг, цифр, зураас ашиглана",
       "templateRequired": "Тушаалын загварыг оруулна уу",
@@ -3706,7 +3930,9 @@
       "pinFailed": "Репо-г тогтоож чадсангүй",
       "unboundToast": "Репо хязгааргүй",
       "unbindFailed": "Репо-г салгаж чадсангүй"
-    }
+    },
+    "variablesDeleteFailed": "Хувьсагчийг устгаж чадсангүй",
+    "deleteCommand": "{{position}} дугаар командыг устгах"
   },
   "credits": {
     "title": "Кредит худалдан авах",
@@ -3717,6 +3943,8 @@
     "empty": "Кредит багцууд одоогоор боломжгүй байна.",
     "noMatchingProducts": "App Store тохирох кредит багц буцаагаагүй.",
     "noMatchingProductsPlay": "Google Play тохирох кредит багц буцаагаагүй.",
+    "storeTimedOut": "App Store хугацаандаа хариу өгөөгүй. Дахин оролдох",
+    "storeTimedOutPlay": "Google Play хугацаандаа хариу өгөөгүй. Дахин оролдох",
     "purchaseOwnedByAnotherAccount": "Энэ Apple Account дээрх кредит нь өөр Kilo бүртгэлд харьяалагдана. Ашиглахын тулд тухайн Kilo бүртгэлдээ нэвтэрнэ үү.",
     "purchaseOwnedByAnotherAccountPlay": "Энэ Google Play бүртгэл дээрх кредит нь өөр Kilo бүртгэлд харьяалагдана. Ашиглахын тулд тухайн Kilo бүртгэлдээ нэвтэрнэ үү."
   },
@@ -3740,7 +3968,8 @@
       "archive": "Архивлах",
       "unarchive": "Архиваас гаргах",
       "deleteTitle": "{{name}}-г устгах уу?",
-      "deleteMessage": "Түүний хийх ажлууд ч бас устгагдана. Сессүүд нь үлдэнэ."
+      "deleteMessage": "Түүний хийх ажлууд ч бас устгагдана. Сессүүд нь үлдэнэ.",
+      "createFailed": "Жагсаалтыг үүсгэж чадсангүй"
     },
     "listSettings": {
       "title": "Жагсаалтын тохиргоо",
@@ -3806,5 +4035,105 @@
       "title": "Жагсаалтад хадгалах",
       "saved": "{{list}}-д хадгалсан"
     }
+  },
+  "agentBriefing": {
+    "title": "Агентын тойм",
+    "atLeast": "≥{{value}}",
+    "coverageHint": "Өмнөх зарим үйл ажиллагаа дутуу байж магадгүй. ≥ нь хамгийн багадаа гэсэн утгатай; тодорхойгүй нь тэг гэсэн үг биш.",
+    "available": "Боломжтой тоймууд",
+    "history": "Тоймын түүх",
+    "historyHint": "Хаасан тоймуудыг оруулаад бүх тойм 30 хоног хадгалагдана.",
+    "settings": "Тоймын тохиргоо",
+    "empty": "Энэ тоймын хугацаанд үйл ажиллагаа алга",
+    "emptyHint": "Товлосон тоймд үйл ажиллагаа байгаа үед таны үүлэн болон CLI кодчиллын сешнүүд энд харагдана.",
+    "loadError": "Тоймуудыг ачаалж чадсангүй",
+    "sessions": "Тоймын хугацаанд идэвхтэй",
+    "pullRequests": "Нээгдсэн PRs",
+    "blockers": "Шинэ саад",
+    "spend": "Тоймын хугацааны зарцуулалт",
+    "view": "Тойм унших",
+    "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
+    "scheduleTimeLabel": "{{label}}, {{time}}",
+    "dismiss": "Тоймыг хасах",
+    "offline": "Офлайн · хадгалсан тойм",
+    "cached": "Хадгалсан тайлан · шинэчлэх боломжгүй",
+    "revised": "Засварласан · {{revision}}",
+    "window": "{{start}} – {{end}}",
+    "summary": "AI хураангуй",
+    "summaryDisabled": "Бүтэцтэй тайлан · Энэ орчинд AI унтраалттай",
+    "summaryPending": "AI хураангуй бэлтгэгдэж байна. Бэлэн болмогц энд хавсаргагдана.",
+    "summaryFailed": "AI хураангуй амжилтгүй боллоо. Дахин оролдоход дахин төлбөр гарч болзошгүй.",
+    "summaryUnavailable": "AI хураангуй боломжгүй. Бүтэцтэй тайлан тань хэвээр байна.",
+    "summaryOutdated": "Энэ хураангуй тайлангийн сүүлийн засвараас өмнөх хувилбар юм.",
+    "summaryCharge": "AI төлбөр {{cost}}",
+    "summaryChargePending": "AI төлбөр тооцоо нийлүүлэлтийг хүлээж байна",
+    "generate": "Хураангуй үүсгэх",
+    "retrySummary": "Төлбөртэй хураангуйг дахин оролдох",
+    "sources": "Нотолгоо ба артефактууд",
+    "timezone": "Тоймын цагийн бүс",
+    "deviceTimezone": "Төхөөрөмжийн цагийн бүсийг ашиглах",
+    "timezoneHint": "IANA цагийн бүс, жишээ нь Europe/Berlin. Хуваарийн өөрчлөлт дараагийн тоймуудад хэрэгжинэ.",
+    "nightStart": "Тоймын хугацаа эхлэх",
+    "morningStart": "Тойм бэлэн болох цаг",
+    "morningEnd": "Тойм авах боломжтой эцсийн цаг",
+    "timeHint": "Тоймын хугацаа дуусахад Нүүр картанд шууд төлөв офлайн байсан ч сэргэнэ.",
+    "invalidSchedule": "Зөв цагийн бүс болон хоосон бус тоймын хугацааг сонгоно уу.",
+    "notificationsHint": "Товлосон тойм бүрт нэг ерөнхий мэдэгдэл ирнэ. Төлбөртэй AI хураангуйгаас хамаарахгүй.",
+    "notificationPermission": "Тоймоо авахын тулд $t(common.notifications) хэсэгт төхөөрөмжийн мэдэгдлийг идэвхжүүлнэ үү.",
+    "aiOptIn": "Төлбөртэй AI хураангуй",
+    "aiHint": "Зөвхөн энэ орчинд сонголтоор. Сонгосон, нууцалсан хэсгүүд болон бүтэцтэй баримтуудыг таны апп-ын хэлээр загвар руу илгээнэ. Төлбөрийг энэ орчны үлдэгдлээс хасна.",
+    "defaultModel": "Kilo-гийн үндсэн загварыг ашиглах",
+    "duration": "Цагийн хязгаар (минут)",
+    "spendLimit": "Зарцуулалтын хязгаар (USD)",
+    "safeguardHint": "Хураангуй тус бүрийн хугацаа, зарцуулалт хязгаартай; энэ нь өдрийн төсөв биш. Үндсэн: 10 минут ба $2. Үүсгэлт эдгээр хязгаарт үргэлжилж байхад тайлан дээд тал нь таван минутын дараа нийтлэгдэнэ.",
+    "invalidSafeguards": "Эерэг, хязгаартай цаг болон зарцуулалтын хязгаар оруулна уу.",
+    "estimate": "Тооцоо {{estimate}} · дээд хязгаар {{maximum}}",
+    "estimateUnavailable": "Эдгээр тохиргоонд төлбөрт хураангуй боломжгүй.",
+    "confirmPaid": "{{context}}-д төлбөртэй хураангуйг идэвхжүүлэх үү?",
+    "confirmGeneration": "Төлбөртэй хураангуй үүсгэх үү?",
+    "paidDisclosure": "Тооцоолсноор {{estimate}}, дээд тал нь {{maximum}}, {{minutes}} минутын хязгаартай. Үүсгэлт амжилтгүй болсон ч төлбөр гарна.",
+    "enable": "Төлбөртэй хураангуйг идэвхжүүлэх",
+    "contextSettings": "AI тохиргоо · {{context}}",
+    "allContexts": "Хувийн болон байгууллагын тоймууд тусдаа хадгалагдана.",
+    "create": "Тойм үүсгэх",
+    "oneOff": "Хүсэлтээр",
+    "createdAt": "{{time}} үүсгэсэн",
+    "chooseContext": "Нэг контекст сонгоно уу",
+    "period": "Тоймын хугацаа",
+    "last24Hours": "Сүүлийн 24 цаг",
+    "last7Days": "Сүүлийн 7 хоног",
+    "customPeriod": "Хугацааг өөрөө сонгох",
+    "periodStart": "Хугацааны эхлэл",
+    "periodEnd": "Хугацааны төгсгөл",
+    "periodHint": "31 хүртэлх хоног сонгоно уу. Өнгөрсөн үеийн мэдээлэл бүрэн бус байж болно.",
+    "periodSessions": "Тухайн хугацаанд идэвхтэй",
+    "periodSpend": "Тухайн хугацааны зарцуулалт",
+    "invalidPeriod": "Төгсгөлөөс өмнөх эхлэх цагийг сонгоно уу.",
+    "futurePeriod": "Хугацааны төгсгөл ирээдүйд байж болохгүй.",
+    "periodTooLong": "31 хоног буюу түүнээс богино хугацаа сонгоно уу.",
+    "invalidLocalTime": "Энэ орон нутгийн цаг тоймын цагийн бүсэд байхгүй. Өөр цаг сонгоно уу.",
+    "reviewBriefing": "Тоймыг урьдчилан харах",
+    "reviewAgain": "Дахин урьдчилан харахаар бэлтгэх",
+    "payer": "Төлбөрийг {{context}}-оос суутгана",
+    "emptyPeriod": "Энэ хугацаанд үйл ажиллагаа олдсонгүй. AI хураангуй үүсгэхгүй, төлбөр авахгүй.",
+    "emptyHistory": "Хадгалсан тойм алга",
+    "historicalStateHint": "Сессийн төлөв нь одоогийн бодит төлөвийг бус, сонгосон хугацааны төгсгөлийн төлөвийг харуулна.",
+    "oneOffHint": "AI нь сонгосон, нууц мэдээллийг нь халхалсан баримтыг таны аппын хэлээр хүлээн авна. Энэ хүсэлтээр гаргасан тойм таны товлосон тойм болон AI тохиргоог өөрчлөхгүй.",
+    "createOffline": "Тоймыг урьдчилан харах эсвэл үүсгэхийн тулд интернэтэд холбогдоно уу. Офлайн үед төлбөртэй хүсэлтийг хэзээ ч дараалалд оруулахгүй.",
+    "estimateInputTooLarge": "Энэ хугацааны баримтын хэмжээ сонгосон загварт хэт их байна.",
+    "estimatePermissionUnavailable": "Та энэ контекстийн үлдэгдлийг ашиглах эрхгүй.",
+    "createFailed": "Энэ тоймыг үүсгэж чадсангүй.",
+    "reviewFailed": "Энэ тоймыг урьдчилан харж чадсангүй.",
+    "estimatePricingUnavailable": "Энэ загварын үнийн мэдээлэл байхгүй.",
+    "estimateBalanceUnavailable": "Төлбөрт хураангуй авахад үлдэгдэл хүрэлцэхгүй байна.",
+    "estimateModelNotAllowed": "Энэ загварыг энд ашиглах боломжгүй.",
+    "estimateSpendLimitTooLow": "Энэ хураангуйг зөвшөөрөхийн тулд зарцуулалтын хязгаарыг нэмэгдүүлнэ үү.",
+    "saved": "Тоймын тохиргоог хадгаллаа",
+    "preparing": "Таны тоймыг бэлтгэж байна…",
+    "preparationHint": "Үйл ажиллагааны мэдээллийг цуглуулж байх хооронд та энэ хэсгээс гараад буцаж ирж болно. Та тоймыг урьдчилан харж, төлбөрийн тооцоог баталгаажуулах хүртэл AI ажиллаж эхлэхгүй, төлбөр гарахгүй.",
+    "resumeReview": "Урьдчилан харахыг үргэлжлүүлэх",
+    "preparationFailed": "Энэ тоймд зориулсан үйл ажиллагааны мэдээллийг цуглуулж чадсангүй. Дахин оролдоно уу.",
+    "preparationTimedOut": "Үйл ажиллагааны мэдээллийг цуглуулахад хэт удаан хугацаа зарцууллаа. Дахин оролдоно уу.",
+    "preparationDrafts": "Баталгаажуулаагүй тоймууд"
   }
 }

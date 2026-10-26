@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import {
   ensureOrganizationAccess,
   ensureOrganizationAccessAndFetchOrg,
+  ensureOrganizationsAccess,
   getOrganizationsAccessRoles,
 } from './utils';
 import {
@@ -13,6 +14,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { organization_memberships, organizations, type User } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 
 /**
  * `is_admin` on these helpers is the escape hatch that lets a Kilo employee read
@@ -51,6 +53,79 @@ describe('organization access kilo_admin_elevation telemetry', () => {
     const owner = await insertTestUser({ is_admin: false });
     return createTestOrganization(`elevation-test-${crypto.randomUUID()}`, owner.id, 0);
   }
+
+  async function softDeleteOrganization(organizationId: string) {
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, organizationId));
+  }
+
+  describe('admin access to organizations marked deleted', () => {
+    test('an admin elevation never applies to a deleted organization', async () => {
+      const admin = await insertTestUser({ is_admin: true });
+      const organization = await orgOwnedByAnotherUser();
+      await softDeleteOrganization(organization.id);
+
+      await expect(ensureOrganizationAccess(ctxFor(admin), organization.id)).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+      });
+      await expect(
+        ensureOrganizationAccessAndFetchOrg(ctxFor(admin), organization.id)
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+
+      // The fetch helper attributes the attempt before resolving it; the
+      // access helper records nothing because no elevation was granted.
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({ reason: 'organization_fetch' });
+    });
+
+    test('a batched admin resolution elevates only live organizations', async () => {
+      const admin = await insertTestUser({ is_admin: true });
+      const active = await orgOwnedByAnotherUser();
+      const alsoActive = await orgOwnedByAnotherUser();
+      const deleted = await orgOwnedByAnotherUser();
+      await softDeleteOrganization(deleted.id);
+
+      const roles = await getOrganizationsAccessRoles(ctxFor(admin), [
+        active.id,
+        alsoActive.id,
+        deleted.id,
+      ]);
+
+      expect(roles.get(active.id)).toBe('owner');
+      expect(roles.get(alsoActive.id)).toBe('owner');
+      expect(roles.has(deleted.id)).toBe(false);
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        reason: 'organization_access_batch',
+        target: 'organizations:2',
+      });
+    });
+
+    test('a batched admin resolution records no elevation when every organization is deleted', async () => {
+      const admin = await insertTestUser({ is_admin: true });
+      const deleted = await orgOwnedByAnotherUser();
+      await softDeleteOrganization(deleted.id);
+
+      const roles = await getOrganizationsAccessRoles(ctxFor(admin), [deleted.id]);
+
+      expect(roles.size).toBe(0);
+      expect(events).toHaveLength(0);
+    });
+
+    test('the batched guard rejects a request that names a deleted organization', async () => {
+      const admin = await insertTestUser({ is_admin: true });
+      const active = await orgOwnedByAnotherUser();
+      const deleted = await orgOwnedByAnotherUser();
+      await softDeleteOrganization(deleted.id);
+
+      await expect(
+        ensureOrganizationsAccess(ctxFor(admin), [active.id, deleted.id])
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+      await expect(ensureOrganizationsAccess(ctxFor(admin), [active.id])).resolves.toBeUndefined();
+    });
+  });
 
   test('ensureOrganizationAccess records the org an admin reached without membership', async () => {
     const admin = await insertTestUser({ is_admin: true, is_super_admin: true });
@@ -158,6 +233,94 @@ describe('organization access kilo_admin_elevation telemetry', () => {
     expect(events[0]).toMatchObject({
       reason: 'organization_fetch',
       target: `organization:${missingId}`,
+    });
+  });
+
+  test('denies direct membership in a soft-deleted organization', async () => {
+    const member = await insertTestUser();
+    const organization = await createTestOrganization(
+      `deleted-direct-${crypto.randomUUID()}`,
+      member.id,
+      0
+    );
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, organization.id));
+
+    await expect(ensureOrganizationAccess(ctxFor(member), organization.id)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+    const roles = await getOrganizationsAccessRoles(ctxFor(member), [organization.id]);
+    expect(roles.has(organization.id)).toBe(false);
+    await expect(
+      ensureOrganizationAccessAndFetchOrg(ctxFor(member), organization.id)
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  test('keeps parent-inherited access while the target and parent are live', async () => {
+    const parentOwner = await insertTestUser();
+    const childOwner = await insertTestUser();
+    const parent = await createTestOrganization(
+      `live-parent-${crypto.randomUUID()}`,
+      parentOwner.id,
+      0
+    );
+    const child = await createTestOrganization(
+      `live-child-${crypto.randomUUID()}`,
+      childOwner.id,
+      0
+    );
+    await db
+      .update(organizations)
+      .set({ parent_organization_id: parent.id })
+      .where(eq(organizations.id, child.id));
+
+    await expect(ensureOrganizationAccess(ctxFor(parentOwner), child.id)).resolves.toBe('owner');
+    await expect(getOrganizationsAccessRoles(ctxFor(parentOwner), [child.id])).resolves.toEqual(
+      new Map([[child.id, 'owner']])
+    );
+  });
+
+  test('denies inherited access when the target organization is soft-deleted', async () => {
+    const parentOwner = await insertTestUser();
+    const childOwner = await insertTestUser();
+    const parent = await createTestOrganization(`parent-${crypto.randomUUID()}`, parentOwner.id, 0);
+    const child = await createTestOrganization(
+      `deleted-child-${crypto.randomUUID()}`,
+      childOwner.id,
+      0
+    );
+    await db
+      .update(organizations)
+      .set({ parent_organization_id: parent.id, deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, child.id));
+
+    await expect(ensureOrganizationAccess(ctxFor(parentOwner), child.id)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+  });
+
+  test('denies inherited access when the parent organization is soft-deleted', async () => {
+    const parentOwner = await insertTestUser();
+    const childOwner = await insertTestUser();
+    const parent = await createTestOrganization(
+      `deleted-parent-${crypto.randomUUID()}`,
+      parentOwner.id,
+      0
+    );
+    const child = await createTestOrganization(`child-${crypto.randomUUID()}`, childOwner.id, 0);
+    await db
+      .update(organizations)
+      .set({ parent_organization_id: parent.id })
+      .where(eq(organizations.id, child.id));
+    await db
+      .update(organizations)
+      .set({ deleted_at: new Date().toISOString() })
+      .where(eq(organizations.id, parent.id));
+
+    await expect(ensureOrganizationAccess(ctxFor(parentOwner), child.id)).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
     });
   });
 });

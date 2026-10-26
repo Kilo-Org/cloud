@@ -4,7 +4,8 @@ import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { EmptyFilesView, HunkHeaderRow, PaginationRow, TabStateMessage } from './pr-diff-hunk-rows';
+import { EmptyFilesView, HunkHeaderRow, PaginationRow } from './pr-diff-hunk-rows';
+import { TabStateMessage } from './pr-diff-tab-state-message';
 
 vi.mock('react-native', () => ({
   View: 'View',

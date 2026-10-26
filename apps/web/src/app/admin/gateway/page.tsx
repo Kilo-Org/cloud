@@ -10,6 +10,8 @@ import { CustomLlmsContent } from '@/app/admin/custom-llms/CustomLlmsContent';
 import { RoutingContent } from '@/app/admin/gateway/RoutingContent';
 import { AutoFreeContent } from '@/app/admin/gateway/AutoFreeContent';
 import { GatewayModelListContent } from '@/app/admin/gateway/GatewayModelListContent';
+import { VercelModelIdOverridesContent } from '@/app/admin/gateway/VercelModelIdOverridesContent';
+import { PreferredProviderOrderContent } from '@/app/admin/gateway/PreferredProviderOrderContent';
 import ApiRequestLogPage from '@/app/admin/api-request-log/page';
 import RequestLoggingOptInsContent from '@/app/admin/request-logging-opt-ins/RequestLoggingOptInsContent';
 
@@ -20,6 +22,7 @@ const VALID_TABS: readonly string[] = [
   'auto-free',
   'preferred-models',
   'unavailable-models',
+  'provider-order',
   'api-request-log',
 ];
 type Tab =
@@ -29,6 +32,7 @@ type Tab =
   | 'auto-free'
   | 'preferred-models'
   | 'unavailable-models'
+  | 'provider-order'
   | 'api-request-log';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
@@ -77,7 +81,7 @@ export default function AdminGatewayPage() {
               Custom LLMs
             </TabsTrigger>
             <TabsTrigger value="routing" className={tabTriggerClass}>
-              Routing
+              Vercel Routing
             </TabsTrigger>
             <TabsTrigger value="auto-free" className={tabTriggerClass}>
               Auto Free
@@ -87,6 +91,9 @@ export default function AdminGatewayPage() {
             </TabsTrigger>
             <TabsTrigger value="unavailable-models" className={tabTriggerClass}>
               Unavailable Models
+            </TabsTrigger>
+            <TabsTrigger value="provider-order" className={tabTriggerClass}>
+              Provider Order
             </TabsTrigger>
             <TabsTrigger value="api-request-log" className={tabTriggerClass}>
               API Request Log
@@ -98,8 +105,9 @@ export default function AdminGatewayPage() {
           <TabsContent value="custom-llms" className="mt-4">
             <CustomLlmsContent />
           </TabsContent>
-          <TabsContent value="routing" className="mt-4">
+          <TabsContent value="routing" className="mt-4 flex flex-col gap-y-6">
             <RoutingContent />
+            <VercelModelIdOverridesContent />
           </TabsContent>
           <TabsContent value="auto-free" className="mt-4">
             <AutoFreeContent />
@@ -134,6 +142,9 @@ export default function AdminGatewayPage() {
                 </>
               }
             />
+          </TabsContent>
+          <TabsContent value="provider-order" className="mt-4">
+            <PreferredProviderOrderContent />
           </TabsContent>
           <TabsContent
             value="api-request-log"

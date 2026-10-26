@@ -3,15 +3,16 @@ import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { describe, it, expect, vi } from 'vitest';
 import { requests, triggerConfig } from '../../src/db/sqlite-schema';
 import type { TriggerDO } from '../../src/dos/TriggerDO';
+import type { SandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
 
 async function expectSandboxAllocation(
   stub: DurableObjectStub<TriggerDO>,
-  sandboxAllocation: 'isolated-standard' | undefined
+  sandboxAllocation: SandboxAllocation | undefined
 ): Promise<void> {
   expect((await stub.getConfig())?.sandboxAllocation).toBe(sandboxAllocation);
   expect((await stub.getConfigForResponse())?.sandboxAllocation).toBe(sandboxAllocation);
   await runInDurableObject(stub, async (_instance, state) => {
-    const config = await state.storage.get<{ sandboxAllocation?: 'isolated-standard' }>('config');
+    const config = await state.storage.get<{ sandboxAllocation?: SandboxAllocation }>('config');
     expect(config?.sandboxAllocation).toBe(sandboxAllocation);
     const row = drizzle(state.storage)
       .select({ sandboxAllocation: triggerConfig.sandbox_allocation })
@@ -29,6 +30,142 @@ describe('TriggerDO', () => {
   const testOrgNamespace = `org/${testOrgId}`;
 
   describe('configure', () => {
+    it.each(['webhook', 'scheduled'] as const)(
+      'persists immutable creator identity in SQLite, responses and KV for %s triggers',
+      async activationMode => {
+        const triggerId = `creator-${activationMode}`;
+        const stub = env.TRIGGER_DO.get(
+          env.TRIGGER_DO.idFromName(`${testOrgNamespace}/${triggerId}`)
+        );
+        const input = {
+          executionUserId: 'oauth/creator',
+          githubRepo: 'owner/repo',
+          mode: 'code',
+          model: 'model-1',
+          promptTemplate: 'Process {{body}}',
+          activationMode,
+          ...(activationMode === 'webhook'
+            ? { webhookAuth: { header: 'x-secret', secret: 'creator-secret-0123456789' } }
+            : { cronExpression: '* * * * *' }),
+        };
+        await stub.configure(testOrgNamespace, triggerId, input);
+        await stub.updateConfig({ promptTemplate: 'Updated {{body}}' });
+        expect((await stub.getConfigForResponse())?.executionUserId).toBe('oauth/creator');
+        await runInDurableObject(stub, async (instance, state) => {
+          const cached = await state.storage.get<{ executionUserId?: string }>('config');
+          expect(cached?.executionUserId).toBe('oauth/creator');
+          expect(
+            drizzle(state.storage)
+              .select({ executionUserId: triggerConfig.execution_user_id })
+              .from(triggerConfig)
+              .get()?.executionUserId
+          ).toBe('oauth/creator');
+          await state.storage.delete('config');
+          expect((await instance.getConfig())?.executionUserId).toBe('oauth/creator');
+          await expect(
+            instance.configure(testOrgNamespace, triggerId, {
+              ...input,
+              executionUserId: 'other-user',
+            })
+          ).rejects.toThrow('immutable');
+          await expect(
+            instance.configure(testOrgNamespace, triggerId, {
+              ...input,
+              executionUserId: undefined,
+            })
+          ).rejects.toThrow('immutable');
+          if (activationMode === 'webhook') {
+            await expect(instance.updateConfig({ webhookAuth: { secret: null } })).rejects.toThrow(
+              'Webhook auth is required'
+            );
+          }
+        });
+        expect((await stub.getConfig())?.executionUserId).toBe('oauth/creator');
+      }
+    );
+
+    it('defaults legacy identities to null and prevents opting into creator mode after creation', async () => {
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testOrgNamespace}/legacy-execution`)
+      );
+      const input = {
+        githubRepo: 'owner/repo',
+        promptTemplate: 'test',
+        webhookAuth: { header: 'x-secret', secret: 'creator-secret-0123456789' },
+      };
+      await stub.configure(testOrgNamespace, 'legacy-execution', input);
+      expect((await stub.getConfig())?.executionUserId).toBeNull();
+      await runInDurableObject(stub, async instance => {
+        await expect(
+          instance.configure(testOrgNamespace, 'legacy-execution', {
+            ...input,
+            executionUserId: 'creator',
+          })
+        ).rejects.toThrow('immutable');
+      });
+    });
+
+    it('rejects personal, KiloClaw and unauthenticated creator configs without writes', async () => {
+      const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('invalid-creator'));
+      await runInDurableObject(stub, async (instance, state) => {
+        const input = {
+          executionUserId: 'creator',
+          promptTemplate: 'test',
+          webhookAuth: { header: 'x-secret', secret: 'secret' },
+        };
+        await expect(
+          instance.configure(testUserNamespace, 'invalid-creator', input)
+        ).rejects.toThrow('only supported for organization');
+        await expect(
+          instance.configure(testOrgNamespace, 'invalid-creator', {
+            ...input,
+            targetType: 'kiloclaw_chat',
+          })
+        ).rejects.toThrow('only supported for organization');
+        await expect(
+          instance.configure(testOrgNamespace, 'invalid-creator', {
+            ...input,
+            webhookAuth: undefined,
+          })
+        ).rejects.toThrow('Webhook auth is required');
+        expect(await instance.getConfig()).toBeNull();
+        expect(await state.storage.get('config')).toBeUndefined();
+      });
+    });
+
+    it('requires a strong secret for creator webhooks on create and rotation only', async () => {
+      const triggerId = 'creator-secret-strength';
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testOrgNamespace}/${triggerId}`)
+      );
+      const input = {
+        executionUserId: 'oauth/creator',
+        githubRepo: 'owner/repo',
+        promptTemplate: 'test',
+      };
+      await runInDurableObject(stub, async instance => {
+        await expect(
+          instance.configure(testOrgNamespace, triggerId, {
+            ...input,
+            webhookAuth: { header: 'x-secret', secret: ` ${'a'.repeat(15)} ` },
+          })
+        ).rejects.toThrow('at least 16 characters');
+        expect(await instance.getConfig()).toBeNull();
+
+        await instance.configure(testOrgNamespace, triggerId, {
+          ...input,
+          webhookAuth: { header: 'x-secret', secret: 'a'.repeat(16) },
+        });
+        const before = await instance.getConfig();
+        await expect(instance.updateConfig({ webhookAuth: { secret: 'short' } })).rejects.toThrow(
+          'at least 16 characters'
+        );
+        expect(await instance.getConfig()).toEqual(before);
+        await instance.updateConfig({ webhookAuth: { header: 'x-other' } });
+        expect((await instance.getConfig())?.webhookAuthHeader).toBe('x-other');
+      });
+    });
+
     it.each([
       ['webhook', undefined],
       ['scheduled', '* * * * *'],
@@ -50,7 +187,7 @@ describe('TriggerDO', () => {
         });
 
         await runInDurableObject(stub, async (_instance, state) => {
-          const config = await state.storage.get<{ sandboxAllocation?: 'isolated-standard' }>(
+          const config = await state.storage.get<{ sandboxAllocation?: SandboxAllocation }>(
             'config'
           );
           expect(config?.sandboxAllocation).toBe('isolated-standard');
@@ -92,6 +229,37 @@ describe('TriggerDO', () => {
 
         await stub.updateConfig({ sandboxAllocation: undefined });
         await expectSandboxAllocation(stub, 'isolated-standard');
+
+        await stub.updateConfig({ sandboxAllocation: null });
+        await expectSandboxAllocation(stub, undefined);
+      }
+    );
+
+    it.each([
+      'cloudflare-containers-standard-3',
+      'cloudflare-containers-standard-4',
+      'vercel-large',
+    ] as const)(
+      'persists the %s allocation, preserves it on unrelated updates, and clears it on null',
+      async sandboxAllocation => {
+        const triggerId = `sandbox-allocation-${sandboxAllocation}`;
+        const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${triggerId}`);
+        const stub = env.TRIGGER_DO.get(id);
+
+        await stub.configure(testUserNamespace, triggerId, {
+          githubRepo: 'owner/repo',
+          mode: 'code',
+          model: 'openai/gpt-4.1',
+          promptTemplate: 'Process {{body}}',
+          sandboxAllocation,
+        });
+        await expectSandboxAllocation(stub, sandboxAllocation);
+
+        await stub.updateConfig({ promptTemplate: 'Updated {{body}}' });
+        await expectSandboxAllocation(stub, sandboxAllocation);
+
+        await stub.updateConfig({ sandboxAllocation: undefined });
+        await expectSandboxAllocation(stub, sandboxAllocation);
 
         await stub.updateConfig({ sandboxAllocation: null });
         await expectSandboxAllocation(stub, undefined);
@@ -383,6 +551,46 @@ describe('TriggerDO', () => {
     });
   });
 
+  describe('exists', () => {
+    it('should return false for unconfigured trigger', async () => {
+      const id = env.TRIGGER_DO.idFromName('unconfigured/trigger');
+      const stub = env.TRIGGER_DO.get(id);
+
+      expect(await stub.exists()).toBe(false);
+    });
+
+    it('should distinguish a paused trigger from a missing one', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${testTriggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+
+      await stub.configure(testUserNamespace, testTriggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process this webhook:\n\n{{body}}',
+      });
+      await stub.updateConfig({ isActive: false });
+
+      expect(await stub.isActive()).toBe(false);
+      expect(await stub.exists()).toBe(true);
+    });
+
+    it('should return false after deletion', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${testTriggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+
+      await stub.configure(testUserNamespace, testTriggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process this webhook:\n\n{{body}}',
+      });
+      await stub.deleteTrigger();
+
+      expect(await stub.exists()).toBe(false);
+    });
+  });
+
   describe('captureRequest', () => {
     it('should fail for unconfigured trigger', async () => {
       const id = env.TRIGGER_DO.idFromName('unconfigured/trigger');
@@ -440,6 +648,76 @@ describe('TriggerDO', () => {
       expect(request.path).toBe('/webhook');
       expect(request.body).toBe('{"test": true}');
       expect(request.processStatus).toBe('captured');
+    });
+
+    it.each([
+      ['personal', testUserNamespace, {}],
+      ['creator-run organization', testOrgNamespace, { executionUserId: 'oauth/creator' }],
+    ] as const)(
+      'rejects public capture for %s scheduled triggers without writing a request',
+      async (_name, namespace, identity) => {
+        const triggerId = 'public-scheduled';
+        const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName(`${namespace}/${triggerId}`));
+        await stub.configure(namespace, triggerId, {
+          githubRepo: 'owner/repo',
+          mode: 'code',
+          model: 'openai/gpt-4.1',
+          promptTemplate: 'Process {{body}}',
+          activationMode: 'scheduled',
+          cronExpression: '* * * * *',
+          ...identity,
+        });
+
+        const result = await stub.captureRequest({
+          method: 'POST',
+          path: `/inbound/${namespace}/${triggerId}`,
+          queryString: null,
+          headers: {},
+          body: 'attacker controlled',
+          contentType: 'text/plain',
+          sourceIp: '203.0.113.1',
+        });
+
+        expect(result).toEqual({ success: false, error: 'Trigger not configured or inactive' });
+        expect((await stub.listRequests()).requests).toEqual([]);
+      }
+    );
+
+    it('requires the configured secret before capturing for creator-run webhook triggers', async () => {
+      const triggerId = 'creator-webhook-capture';
+      const stub = env.TRIGGER_DO.get(
+        env.TRIGGER_DO.idFromName(`${testOrgNamespace}/${triggerId}`)
+      );
+      const secret = 'creator-secret-0123456789';
+      await stub.configure(testOrgNamespace, triggerId, {
+        executionUserId: 'oauth/creator',
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process {{body}}',
+        webhookAuth: { header: 'X-Secret', secret },
+      });
+      const capture = (headers: Record<string, string>) =>
+        stub.captureRequest({
+          method: 'POST',
+          path: '/',
+          queryString: null,
+          headers,
+          body: '{}',
+          contentType: 'application/json',
+          sourceIp: null,
+        });
+
+      await expect(capture({})).resolves.toEqual({ success: false, error: 'Unauthorized' });
+      await expect(capture({ 'x-secret': 'wrong' })).resolves.toEqual({
+        success: false,
+        error: 'Unauthorized',
+      });
+      expect((await stub.listRequests()).requests).toEqual([]);
+
+      const accepted = await capture({ 'x-secret': secret });
+      expect(accepted.success).toBe(true);
+      expect((await stub.listRequests()).requests[0]?.headers['x-secret']).toBe('[REDACTED]');
     });
 
     it('should reject payload exceeding 256KB', async () => {
@@ -620,15 +898,7 @@ describe('TriggerDO', () => {
         cronExpression: '* * * * *',
       });
       for (let index = 0; index < 19; index++) {
-        const captured = await stub.captureRequest({
-          method: 'POST',
-          path: `/${index}`,
-          queryString: null,
-          headers: {},
-          body: '{}',
-          contentType: null,
-          sourceIp: null,
-        });
+        const captured = await stub.invokeScheduled();
         if (!captured.success) throw new Error('Expected request to be captured');
         if (index % 2 === 0)
           await stub.updateRequest(captured.requestId, { process_status: 'inprogress' });
@@ -775,15 +1045,7 @@ describe('TriggerDO', () => {
         cronExpression: '* * * * *',
       });
       for (let index = 0; index < 20; index++) {
-        const captured = await stub.captureRequest({
-          method: 'POST',
-          path: `/${index}`,
-          queryString: null,
-          headers: {},
-          body: '{}',
-          contentType: null,
-          sourceIp: null,
-        });
+        const captured = await stub.invokeScheduled();
         if (!captured.success) throw new Error('Expected request to be captured');
         if (index % 2 === 0)
           await stub.updateRequest(captured.requestId, { process_status: 'inprogress' });
@@ -803,6 +1065,37 @@ describe('TriggerDO', () => {
   });
 
   describe('listRequests', () => {
+    it('should return captured requests for a paused trigger', async () => {
+      const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${testTriggerId}`);
+      const stub = env.TRIGGER_DO.get(id);
+
+      await stub.configure(testUserNamespace, testTriggerId, {
+        githubRepo: 'owner/repo',
+        mode: 'code',
+        model: 'openai/gpt-4.1',
+        promptTemplate: 'Process this webhook:\n\n{{body}}',
+      });
+
+      const captured = await stub.captureRequest({
+        method: 'POST',
+        path: '/while-active',
+        queryString: null,
+        headers: {},
+        body: 'body',
+        contentType: null,
+        sourceIp: null,
+      });
+      expect(captured.success).toBe(true);
+
+      await stub.updateConfig({ isActive: false });
+
+      const result = await stub.listRequests();
+      expect(result.requests).toHaveLength(1);
+      expect(result.requests[0].path).toBe('/while-active');
+      if (!captured.success) throw new Error('capture failed');
+      expect(await stub.getRequest(captured.requestId)).toMatchObject({ path: '/while-active' });
+    });
+
     it('should return empty array for new trigger', async () => {
       const id = env.TRIGGER_DO.idFromName(`${testUserNamespace}/${testTriggerId}`);
       const stub = env.TRIGGER_DO.get(id);
@@ -994,5 +1287,235 @@ describe('TriggerDO', () => {
       const isActive = await stub.isActive();
       expect(isActive).toBe(false);
     });
+  });
+});
+
+describe('webhook body validation', () => {
+  const bodySchema = {
+    type: 'object' as const,
+    properties: { event: { type: 'string' as const, enum: ['issue.opened', 'issue.closed'] } },
+    required: ['event'],
+    additionalProperties: false,
+  };
+  const captured = (body: string, headers: Record<string, string> = {}) => ({
+    method: 'POST',
+    path: '/',
+    queryString: null,
+    headers,
+    body,
+    contentType: 'application/json',
+    sourceIp: null,
+  });
+
+  it('rejects invalid input before request persistence and queue dispatch, then captures exact valid bytes', async () => {
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/schema/capture'));
+    await stub.configure('user/schema', 'capture', { promptTemplate: '{{body}}', bodySchema });
+    for (const body of [
+      '{',
+      '{}',
+      '{"event":"private-value"}',
+      '{"event":"issue.opened","extra":true}',
+    ]) {
+      const result = await stub.captureRequest(captured(body));
+      expect(result).toMatchObject({ success: false, error: 'Body validation failed' });
+      expect(JSON.stringify(result)).not.toContain('private-value');
+      expect((await stub.listRequests()).requests).toEqual([]);
+    }
+    // A failing queue proves that invalid payloads never reach enqueue.
+    await runInDurableObject(stub, async instance => {
+      const queue = (instance as unknown as { env: Env }).env.WEBHOOK_DELIVERY_QUEUE;
+      const send = vi.spyOn(queue, 'send').mockRejectedValue(new Error('queue unavailable'));
+      const rejected = await instance.captureRequest(captured('{}'));
+      expect(rejected.success).toBe(false);
+      expect(send).not.toHaveBeenCalled();
+      send.mockRestore();
+    });
+    const raw = ' { "event" : "issue.opened" }\n';
+    const accepted = await stub.captureRequest(captured(raw));
+    expect(accepted.success).toBe(true);
+    if (accepted.success) expect((await stub.getRequest(accepted.requestId))?.body).toBe(raw);
+    expect((await stub.listRequests()).requests).toHaveLength(1);
+  });
+
+  it('authenticates before schema validation', async () => {
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/schema/auth'));
+    await stub.configure('user/schema', 'auth', {
+      promptTemplate: '{{body}}',
+      bodySchema,
+      webhookAuth: { header: 'x-secret', secret: 'test-secret' },
+    });
+    expect(await stub.captureRequest(captured('{'))).toEqual({
+      success: false,
+      error: 'Unauthorized',
+    });
+    expect(await stub.captureRequest(captured('{', { 'x-secret': 'test-secret' }))).toMatchObject({
+      success: false,
+      error: 'Body validation failed',
+    });
+    expect((await stub.listRequests()).requests).toEqual([]);
+  });
+
+  it('persists schema/profile updates in SQLite and KV, preserves omission and clears null', async () => {
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/schema/persistence'));
+    await stub.configure('user/schema', 'persistence', {
+      promptTemplate: '{{body}}',
+      profileId: 'saved-profile',
+      bodySchema,
+    });
+    await stub.updateConfig({ promptTemplate: 'Changed' });
+    expect(await stub.getConfig()).toMatchObject({ bodySchema, profileId: 'saved-profile' });
+    await runInDurableObject(stub, async (instance, state) => {
+      expect(await state.storage.get('config')).toMatchObject({
+        bodySchema,
+        profileId: 'saved-profile',
+      });
+      await state.storage.delete('config');
+      expect(await instance.getConfig()).toMatchObject({ bodySchema, profileId: 'saved-profile' });
+      expect(drizzle(state.storage).select().from(triggerConfig).get()).toMatchObject({
+        body_schema: bodySchema,
+        profile_id: 'saved-profile',
+      });
+    });
+    await stub.updateConfig({ bodySchema: null, profileId: null });
+    expect(await stub.getConfigForResponse()).toMatchObject({ bodySchema: null, profileId: null });
+    await runInDurableObject(stub, async (_instance, state) => {
+      expect(await state.storage.get('config')).toMatchObject({
+        bodySchema: null,
+        profileId: null,
+      });
+      expect(drizzle(state.storage).select().from(triggerConfig).get()).toMatchObject({
+        body_schema: null,
+        profile_id: null,
+      });
+    });
+    expect((await stub.captureRequest(captured('plain text'))).success).toBe(true);
+    await stub.updateConfig({ bodySchema });
+    expect((await stub.captureRequest(captured('plain text'))).success).toBe(false);
+  });
+
+  it('rejects body schemas for scheduled and KiloClaw targets on direct RPC', async () => {
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/schema/unsupported'));
+    for (const options of [
+      { activationMode: 'scheduled' as const, cronExpression: '* * * * *' },
+      { targetType: 'kiloclaw_chat' as const },
+    ]) {
+      await runInDurableObject(stub, async instance => {
+        await expect(
+          instance.configure('user/schema', 'unsupported', {
+            promptTemplate: 'test',
+            bodySchema,
+            ...options,
+          })
+        ).rejects.toThrow('only available');
+      });
+      await stub.configure('user/schema', 'unsupported', { promptTemplate: 'test', ...options });
+      await runInDurableObject(stub, async instance => {
+        await expect(instance.updateConfig({ bodySchema })).rejects.toThrow('only available');
+      });
+    }
+  });
+});
+
+describe('JSON own-property capture', () => {
+  it.each(['constructor', 'toString', '__proto__'])(
+    'validates %s without changing accepted raw bodies',
+    async key => {
+      for (const nested of [false, true]) {
+        const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName(`user/special/${key}-${nested}`));
+        const objectSchema = {
+          type: 'object',
+          properties: { [key]: { type: 'string' } },
+          additionalProperties: false,
+        };
+        const wrapSchema = (schema: object) =>
+          nested
+            ? {
+                type: 'object',
+                properties: { outer: schema },
+                required: ['outer'],
+                additionalProperties: false,
+              }
+            : schema;
+        const wrapBody = (value: object) => JSON.stringify(nested ? { outer: value } : value);
+        const capture = (body: string) =>
+          stub.captureRequest({
+            method: 'POST',
+            path: '/',
+            queryString: null,
+            headers: {},
+            body,
+            contentType: 'application/json',
+            sourceIp: null,
+          });
+        await stub.configure('user/special', `${key}-${nested}`, {
+          promptTemplate: '{{body}}',
+          bodySchema: wrapSchema(objectSchema),
+        });
+        expect((await capture(wrapBody({}))).success).toBe(true);
+        const raw = ` \n${wrapBody({ [key]: 'value' })} \n`;
+        const accepted = await capture(raw);
+        expect(accepted.success).toBe(true);
+        if (accepted.success) expect((await stub.getRequest(accepted.requestId))?.body).toBe(raw);
+        await stub.updateConfig({ bodySchema: wrapSchema({ ...objectSchema, required: [key] }) });
+        expect(await capture(wrapBody({}))).toMatchObject({
+          success: false,
+          error: 'Body validation failed',
+        });
+        expect(await capture(wrapBody({ [key]: 42 }))).toMatchObject({
+          success: false,
+          error: 'Body validation failed',
+        });
+        expect((await stub.listRequests()).requests).toHaveLength(2);
+        expect((await capture(raw)).success).toBe(true);
+        expect((await stub.listRequests()).requests).toHaveLength(3);
+      }
+    }
+  );
+});
+
+describe('standard JSON Schema patterns', () => {
+  it('persists a grouped unanchored pattern and captures matching raw bytes', async () => {
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/pattern/standard'));
+    const bodySchema = {
+      type: 'object',
+      properties: { event: { type: 'string', pattern: 'issue\\.(opened|closed)' } },
+      required: ['event'],
+      additionalProperties: false,
+    };
+    await stub.configure('user/pattern', 'standard', { promptTemplate: '{{body}}', bodySchema });
+    expect((await stub.getConfig())?.bodySchema).toEqual(bodySchema);
+    const capture = (body: string) =>
+      stub.captureRequest({
+        method: 'POST',
+        path: '/',
+        queryString: null,
+        headers: {},
+        body,
+        contentType: 'application/json',
+        sourceIp: null,
+      });
+    const raw = ' {"event":"prefix issue.opened suffix"}\n';
+    const result = await capture(raw);
+    expect(result.success).toBe(true);
+    if (result.success) expect((await stub.getRequest(result.requestId))?.body).toBe(raw);
+    expect(await capture('{"event":"issue.changed"}')).toMatchObject({
+      success: false,
+      error: 'Body validation failed',
+    });
+    expect((await stub.listRequests()).requests).toHaveLength(1);
+  });
+
+  it('rejects malformed patterns before configuration persistence', async () => {
+    const stub = env.TRIGGER_DO.get(env.TRIGGER_DO.idFromName('user/pattern/malformed'));
+    await runInDurableObject(stub, async instance => {
+      await expect(
+        instance.configure('user/pattern', 'malformed', {
+          promptTemplate: '{{body}}',
+          bodySchema: { type: 'string', pattern: '[' },
+        })
+      ).rejects.toThrow('Pattern must be a valid regular expression');
+    });
+    expect(await stub.getConfig()).toBeNull();
+    expect((await stub.listRequests()).requests).toEqual([]);
   });
 });

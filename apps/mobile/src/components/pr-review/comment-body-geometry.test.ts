@@ -45,8 +45,8 @@ describe('resolveCommentBodyFade', () => {
     expect(resolveCommentBodyFade({ contentHeight: 400, frameHeight: null })).toBe(false);
   });
 
-  it('shows no fade while the content fits the frame', () => {
-    expect(resolveCommentBodyFade({ contentHeight: 200, frameHeight: 212 })).toBe(false);
+  it('hides the fade when the content height exactly fits the frame', () => {
+    expect(resolveCommentBodyFade({ contentHeight: 212, frameHeight: 212 })).toBe(false);
   });
 
   it('shows the fade when the content is taller than the frame', () => {

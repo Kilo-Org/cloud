@@ -8056,6 +8056,11 @@ export const cloud_agent_environments = pgTable(
     // Saved sandbox allocation key for this repository's sessions; null uses the
     // owner's default. Not a build input, so it never advances the revision.
     sandbox_allocation: text(),
+    // Saved network egress policy. Both null keeps the legacy unrestricted
+    // behavior. `unrestricted` also has no list. `allowlist` always has a list,
+    // where an empty list permits only the server-owned Kilo/Git baseline.
+    egress_mode: text({ enum: ['unrestricted', 'allowlist'] }),
+    egress_allowlist: text().array(),
 
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -8130,6 +8135,17 @@ export const cloud_agent_environments = pgTable(
           ${table.bitbucket_repository_uuid} IS NOT NULL AND
           ${table.gitlab_clone_url} IS NULL
         )
+      )`
+    ),
+    check(
+      'cloud_agent_environments_egress_policy_check',
+      sql`(
+        (
+          (${table.egress_mode} IS NULL AND ${table.egress_allowlist} IS NULL) OR
+          (${table.egress_mode} IS NOT NULL AND ${table.egress_mode} IN ('unrestricted', 'allowlist'))
+        ) AND
+        (${table.egress_mode} IS DISTINCT FROM 'unrestricted' OR ${table.egress_allowlist} IS NULL) AND
+        (${table.egress_mode} IS DISTINCT FROM 'allowlist' OR ${table.egress_allowlist} IS NOT NULL)
       )`
     ),
   ]

@@ -5,6 +5,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { AGENT_ENV_VARS_PUBLIC_KEY } from '@kilocode/web-shared/lib/config.server';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { SELECTABLE_SANDBOX_ALLOCATIONS } from '@kilocode/worker-utils/sandbox-allocation';
+import { egressModeSchema, egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { canonicalGitLabCloneUrl } from '@kilocode/worker-utils/git-url';
 import { isUniqueViolation } from '@/lib/db-errors';
 import { TRPCError } from '@trpc/server';
@@ -131,6 +132,8 @@ const environmentResponseSchema = z.object({
   secretKeys: z.array(z.string()),
   configurationRevision: z.number(),
   sandboxAllocation: z.string().nullable(),
+  egressMode: egressModeSchema.nullable(),
+  egressAllowlist: z.array(z.string()).nullable(),
 });
 
 const publicKey = AGENT_ENV_VARS_PUBLIC_KEY ?? '';
@@ -309,15 +312,17 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
 
   create: baseProcedure
     .input(
-      z.object({
-        organizationId: z.uuid().optional(),
-        name: environmentNameSchema,
-        repository: createRepositorySchema,
-        plainVars: environmentPlainVarsSchema.optional(),
-        secrets: environmentSecretsSchema.optional(),
-        commands: environmentCommandsSchema.optional(),
-        sandboxAllocation: environmentSandboxAllocationSchema.optional(),
-      })
+      z
+        .object({
+          organizationId: z.uuid().optional(),
+          name: environmentNameSchema,
+          repository: createRepositorySchema,
+          plainVars: environmentPlainVarsSchema.optional(),
+          secrets: environmentSecretsSchema.optional(),
+          commands: environmentCommandsSchema.optional(),
+          sandboxAllocation: environmentSandboxAllocationSchema.optional(),
+        })
+        .and(egressPolicySchema)
     )
     .output(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
@@ -350,6 +355,8 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
             secrets: input.secrets,
             commands: input.commands,
             sandboxAllocation: input.sandboxAllocation,
+            egressMode: input.egressMode,
+            egressAllowlist: input.egressAllowlist,
           })
         )
         .catch(error => {
@@ -362,15 +369,17 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
 
   update: baseProcedure
     .input(
-      z.object({
-        organizationId: z.uuid().optional(),
-        environmentId: z.uuid(),
-        name: environmentNameSchema.optional(),
-        plainVars: environmentPlainVarsSchema.optional(),
-        secrets: environmentSecretChangesSchema.optional(),
-        commands: environmentCommandsSchema.optional(),
-        sandboxAllocation: environmentSandboxAllocationSchema.optional(),
-      })
+      z
+        .object({
+          organizationId: z.uuid().optional(),
+          environmentId: z.uuid(),
+          name: environmentNameSchema.optional(),
+          plainVars: environmentPlainVarsSchema.optional(),
+          secrets: environmentSecretChangesSchema.optional(),
+          commands: environmentCommandsSchema.optional(),
+          sandboxAllocation: environmentSandboxAllocationSchema.optional(),
+        })
+        .and(egressPolicySchema)
     )
     .output(z.object({ success: z.boolean(), configurationRevision: z.number() }))
     .mutation(async ({ ctx, input }) => {
@@ -399,6 +408,8 @@ export const cloudEnvironmentsRouter = createTRPCRouter({
           secrets: input.secrets,
           commands: input.commands,
           sandboxAllocation: input.sandboxAllocation,
+          egressMode: input.egressMode,
+          egressAllowlist: input.egressAllowlist,
         })
       );
       return { success: true, configurationRevision };

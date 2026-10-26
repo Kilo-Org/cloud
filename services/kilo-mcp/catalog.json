@@ -8300,6 +8300,24 @@
               "type": "null"
             }
           ]
+        },
+        "egressMode": {
+          "description": "Defaults to unrestricted when omitted. The allowlist mode permits the Kilo/Git baseline plus optional egressAllowlist domains.",
+          "type": "string",
+          "enum": [
+            "unrestricted",
+            "allowlist"
+          ]
+        },
+        "egressAllowlist": {
+          "description": "Additional exact DNS hostnames; requires explicit allowlist mode.",
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 254,
+            "pattern": "^[A-Za-z0-9.-]+$"
+          }
         }
       },
       "required": [
@@ -8316,9 +8334,11 @@
       "plainvars",
       "secrets",
       "commands",
-      "sandboxallocation"
+      "sandboxallocation",
+      "egressmode",
+      "egressallowlist"
     ],
-    "searchBlob": "cloudEnvironments.create Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can have only one. cloudenvironments create organizationid name repository plainvars secrets commands sandboxallocation organizationId name repository plainVars secrets commands sandboxAllocation"
+    "searchBlob": "cloudEnvironments.create Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can have only one. cloudenvironments create organizationid name repository plainvars secrets commands sandboxallocation egressmode egressallowlist organizationId name repository plainVars secrets commands sandboxAllocation egressMode egressAllowlist"
   },
   "cloudEnvironments.delete": {
     "path": "cloudEnvironments.delete",
@@ -8598,6 +8618,24 @@
               "type": "null"
             }
           ]
+        },
+        "egressMode": {
+          "description": "Defaults to unrestricted when omitted. The allowlist mode permits the Kilo/Git baseline plus optional egressAllowlist domains.",
+          "type": "string",
+          "enum": [
+            "unrestricted",
+            "allowlist"
+          ]
+        },
+        "egressAllowlist": {
+          "description": "Additional exact DNS hostnames; requires explicit allowlist mode.",
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 254,
+            "pattern": "^[A-Za-z0-9.-]+$"
+          }
         }
       },
       "required": [
@@ -8613,9 +8651,11 @@
       "plainvars",
       "secrets",
       "commands",
-      "sandboxallocation"
+      "sandboxallocation",
+      "egressmode",
+      "egressallowlist"
     ],
-    "searchBlob": "cloudEnvironments.update Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size. cloudenvironments update organizationid environmentid name plainvars secrets commands sandboxallocation organizationId environmentId name plainVars secrets commands sandboxAllocation"
+    "searchBlob": "cloudEnvironments.update Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size. cloudenvironments update organizationid environmentid name plainvars secrets commands sandboxallocation egressmode egressallowlist organizationId environmentId name plainVars secrets commands sandboxAllocation egressMode egressAllowlist"
   },
   "codeIndexing.delete": {
     "path": "codeIndexing.delete",

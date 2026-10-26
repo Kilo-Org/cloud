@@ -28,9 +28,12 @@ import {
 import { useEnvironmentProfiles } from '@/hooks/useEnvironmentProfiles';
 import {
   hasEnvironmentFormChanges,
+  buildEgressPolicy,
   toEnvironmentCommands,
   toEnvironmentScript,
+  toNetworkAccessDraft,
 } from './environment-form';
+import { EnvironmentNetworkField } from './EnvironmentNetworkField';
 import { EnvironmentBuildPanel } from './EnvironmentBuildPanel';
 import {
   buildEnvironmentVariableChanges,
@@ -124,6 +127,12 @@ function EnvironmentForm({
     toSelectableAllocation(existing?.sandboxAllocation ?? null)
   );
   const [sandboxAllocation, setSandboxAllocation] = useState(initialSandboxAllocation);
+  // Retain the baseline shown when editing starts, even if queries refresh in the background.
+  const [initialNetworkAccess] = useState(() =>
+    toNetworkAccessDraft(existing?.egressMode ?? null, existing?.egressAllowlist ?? null)
+  );
+  const [networkAccess, setNetworkAccess] = useState(initialNetworkAccess);
+  const [networkAccessError, setNetworkAccessError] = useState<string | null>(null);
   const sandboxRepository = existing
     ? { platform: existing.platform, fullName }
     : repository
@@ -152,8 +161,9 @@ function EnvironmentForm({
       script: initialScript,
       variablesText: initialVariablesText,
       sandboxAllocation: initialSandboxAllocation,
+      networkAccess: initialNetworkAccess,
     },
-    { script, variablesText, sandboxAllocation }
+    { script, variablesText, sandboxAllocation, networkAccess }
   );
   const [error, setError] = useState<string | null>(null);
   let variables: ReturnType<typeof buildEnvironmentVariableChanges> | undefined;
@@ -180,6 +190,13 @@ function EnvironmentForm({
       setPage('variables');
       return;
     }
+    const egress = buildEgressPolicy(networkAccess, initialNetworkAccess);
+    if (egress.error) {
+      setNetworkAccessError(egress.error);
+      setPage('overview');
+      return;
+    }
+    setNetworkAccessError(null);
     setError(null);
     try {
       validateEnvironmentName(name);
@@ -192,6 +209,7 @@ function EnvironmentForm({
           secrets: variables.secrets,
           commands,
           sandboxAllocation,
+          ...egress.policy,
         });
         onSaved(existing.id);
       } else {
@@ -212,6 +230,7 @@ function EnvironmentForm({
           secrets,
           commands,
           sandboxAllocation,
+          ...egress.policy,
         });
         onSaved(created.id);
       }
@@ -272,6 +291,16 @@ function EnvironmentForm({
                   onChange={setSandboxAllocation}
                 />
               )}
+              <EnvironmentNetworkField
+                value={networkAccess}
+                sandboxAllocation={sandboxAllocation}
+                error={networkAccessError}
+                disabled={isSaving}
+                onChange={next => {
+                  setNetworkAccessError(null);
+                  setNetworkAccess(next);
+                }}
+              />
               <div className="space-y-3">
                 <EditorRow
                   icon={<Terminal className="size-4" />}

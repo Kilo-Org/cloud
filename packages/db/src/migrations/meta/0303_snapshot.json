@@ -1,4 +1,5 @@
 {
+<<<<<<< f2ef0ed3340f7820e5a2f72f93705e32b190aaaf
   "id": "53a48f7f-7f1f-47c1-9607-259103016378",
   "prevId": "3ef93f9d-c2d8-4ef7-87ce-4876b6dba5de",
   "version": "7",
@@ -6227,6 +6228,6038 @@
         "cloud_agent_environments_bitbucket_identity_check": {
           "name": "cloud_agent_environments_bitbucket_identity_check",
           "value": "(\n        (\"cloud_agent_environments\".\"platform\" = 'bitbucket') = (\n          \"cloud_agent_environments\".\"bitbucket_workspace_uuid\" IS NOT NULL AND\n          \"cloud_agent_environments\".\"bitbucket_repository_uuid\" IS NOT NULL AND\n          \"cloud_agent_environments\".\"gitlab_clone_url\" IS NULL\n        )\n      )"
+||||||| 0193c81970e48a3312b6f0f5f2b2e6014ad23a1a
+=======
+  "id": "26a0653e-6f6a-4c07-a494-81080bc59b40",
+  "prevId": "3ef93f9d-c2d8-4ef7-87ce-4876b6dba5de",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.admin_action_audit_logs": {
+      "name": "admin_action_audit_logs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actor_email": {
+          "name": "actor_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actor_name": {
+          "name": "actor_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "target_type": {
+          "name": "target_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "target_id": {
+          "name": "target_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "message": {
+          "name": "message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_admin_action_audit_logs_created_at": {
+          "name": "IDX_admin_action_audit_logs_created_at",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_admin_action_audit_logs_action_created_at": {
+          "name": "IDX_admin_action_audit_logs_action_created_at",
+          "columns": [
+            {
+              "expression": "action",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_admin_action_audit_logs_actor_id_created_at": {
+          "name": "IDX_admin_action_audit_logs_actor_id_created_at",
+          "columns": [
+            {
+              "expression": "actor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_admin_action_audit_logs_target_created_at": {
+          "name": "IDX_admin_action_audit_logs_target_created_at",
+          "columns": [
+            {
+              "expression": "target_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "target_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.agent_briefing_context_preferences": {
+      "name": "agent_briefing_context_preferences",
+      "schema": "",
+      "columns": {
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "context_key": {
+          "name": "context_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ai_enabled": {
+          "name": "ai_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "max_duration_seconds": {
+          "name": "max_duration_seconds",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 600
+        },
+        "max_spend_microdollars": {
+          "name": "max_spend_microdollars",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 2000000
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "agent_briefing_context_preferences_kilo_user_id_kilocode_users_id_fk": {
+          "name": "agent_briefing_context_preferences_kilo_user_id_kilocode_users_id_fk",
+          "tableFrom": "agent_briefing_context_preferences",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "agent_briefing_context_preferences_organization_id_organizations_id_fk": {
+          "name": "agent_briefing_context_preferences_organization_id_organizations_id_fk",
+          "tableFrom": "agent_briefing_context_preferences",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "agent_briefing_context_preferences_kilo_user_id_context_key_pk": {
+          "name": "agent_briefing_context_preferences_kilo_user_id_context_key_pk",
+          "columns": [
+            "kilo_user_id",
+            "context_key"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "agent_briefing_context_limits": {
+          "name": "agent_briefing_context_limits",
+          "value": "\"agent_briefing_context_preferences\".\"max_duration_seconds\" BETWEEN 1 AND 600 AND \"agent_briefing_context_preferences\".\"max_spend_microdollars\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.agent_briefing_events": {
+      "name": "agent_briefing_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "session_id": {
+          "name": "session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recorded_at": {
+          "name": "recorded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "url": {
+          "name": "url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "agent_briefing_events_user_window": {
+          "name": "agent_briefing_events_user_window",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "agent_briefing_events_session_window": {
+          "name": "agent_briefing_events_session_window",
+          "columns": [
+            {
+              "expression": "session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agent_briefing_events_session_fk": {
+          "name": "agent_briefing_events_session_fk",
+          "tableFrom": "agent_briefing_events",
+          "tableTo": "cli_sessions_v2",
+          "columnsFrom": [
+            "session_id",
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "session_id",
+            "kilo_user_id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.agent_briefing_preferences": {
+      "name": "agent_briefing_preferences",
+      "schema": "",
+      "columns": {
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "timezone": {
+          "name": "timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "night_start": {
+          "name": "night_start",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'22:00'"
+        },
+        "morning_start": {
+          "name": "morning_start",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'08:00'"
+        },
+        "morning_end": {
+          "name": "morning_end",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'12:00'"
+        },
+        "language": {
+          "name": "language",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'en'"
+        },
+        "notifications_enabled": {
+          "name": "notifications_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "next_run_at": {
+          "name": "next_run_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "agent_briefing_preferences_due": {
+          "name": "agent_briefing_preferences_due",
+          "columns": [
+            {
+              "expression": "next_run_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agent_briefing_preferences_kilo_user_id_kilocode_users_id_fk": {
+          "name": "agent_briefing_preferences_kilo_user_id_kilocode_users_id_fk",
+          "tableFrom": "agent_briefing_preferences",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.agent_briefing_reports": {
+      "name": "agent_briefing_reports",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "context_key": {
+          "name": "context_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'scheduled'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "timezone": {
+          "name": "timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "language": {
+          "name": "language",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "evidence_recorded_before": {
+          "name": "evidence_recorded_before",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "local_date": {
+          "name": "local_date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "night_start_at": {
+          "name": "night_start_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cutoff_at": {
+          "name": "cutoff_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "morning_end_at": {
+          "name": "morning_end_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "published_at": {
+          "name": "published_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "next_refresh_at": {
+          "name": "next_refresh_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "now()"
+        },
+        "next_charge_check_at": {
+          "name": "next_charge_check_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "read_at": {
+          "name": "read_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "dismissed_at": {
+          "name": "dismissed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "evidence_hash": {
+          "name": "evidence_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "facts": {
+          "name": "facts",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "summary": {
+          "name": "summary",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "generation_id": {
+          "name": "generation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "generation_started_at": {
+          "name": "generation_started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "generation_finished_at": {
+          "name": "generation_finished_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "generation_deadline_at": {
+          "name": "generation_deadline_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "generation_revision": {
+          "name": "generation_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "generation_max_cost": {
+          "name": "generation_max_cost",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notification_sent_at": {
+          "name": "notification_sent_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "agent_briefing_reports_window": {
+          "name": "agent_briefing_reports_window",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "context_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "local_date",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "agent_briefing_reports_user_history": {
+          "name": "agent_briefing_reports_user_history",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "cutoff_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "agent_briefing_reports_active": {
+          "name": "agent_briefing_reports_active",
+          "columns": [
+            {
+              "expression": "morning_end_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "agent_briefing_reports_refresh_due": {
+          "name": "agent_briefing_reports_refresh_due",
+          "columns": [
+            {
+              "expression": "next_refresh_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "agent_briefing_reports_charge_due": {
+          "name": "agent_briefing_reports_charge_due",
+          "columns": [
+            {
+              "expression": "next_charge_check_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agent_briefing_reports_kilo_user_id_kilocode_users_id_fk": {
+          "name": "agent_briefing_reports_kilo_user_id_kilocode_users_id_fk",
+          "tableFrom": "agent_briefing_reports",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "agent_briefing_reports_organization_id_organizations_id_fk": {
+          "name": "agent_briefing_reports_organization_id_organizations_id_fk",
+          "tableFrom": "agent_briefing_reports",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.agent_configs": {
+      "name": "agent_configs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "owned_by_organization_id": {
+          "name": "owned_by_organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "owned_by_user_id": {
+          "name": "owned_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "agent_type": {
+          "name": "agent_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "config": {
+          "name": "config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "is_enabled": {
+          "name": "is_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "runtime_state": {
+          "name": "runtime_state",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'{}'::jsonb"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "config_revision": {
+          "name": "config_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        }
+      },
+      "indexes": {
+        "IDX_agent_configs_org_id": {
+          "name": "IDX_agent_configs_org_id",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_agent_configs_owned_by_user_id": {
+          "name": "IDX_agent_configs_owned_by_user_id",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_agent_configs_agent_type": {
+          "name": "IDX_agent_configs_agent_type",
+          "columns": [
+            {
+              "expression": "agent_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_agent_configs_platform": {
+          "name": "IDX_agent_configs_platform",
+          "columns": [
+            {
+              "expression": "platform",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agent_configs_owned_by_organization_id_organizations_id_fk": {
+          "name": "agent_configs_owned_by_organization_id_organizations_id_fk",
+          "tableFrom": "agent_configs",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "owned_by_organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "agent_configs_owned_by_user_id_kilocode_users_id_fk": {
+          "name": "agent_configs_owned_by_user_id_kilocode_users_id_fk",
+          "tableFrom": "agent_configs",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "owned_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_agent_configs_org_agent_platform": {
+          "name": "UQ_agent_configs_org_agent_platform",
+          "nullsNotDistinct": false,
+          "columns": [
+            "owned_by_organization_id",
+            "agent_type",
+            "platform"
+          ]
+        },
+        "UQ_agent_configs_user_agent_platform": {
+          "name": "UQ_agent_configs_user_agent_platform",
+          "nullsNotDistinct": false,
+          "columns": [
+            "owned_by_user_id",
+            "agent_type",
+            "platform"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "agent_configs_owner_check": {
+          "name": "agent_configs_owner_check",
+          "value": "(\n        (\"agent_configs\".\"owned_by_user_id\" IS NOT NULL AND \"agent_configs\".\"owned_by_organization_id\" IS NULL) OR\n        (\"agent_configs\".\"owned_by_user_id\" IS NULL AND \"agent_configs\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
+        },
+        "agent_configs_agent_type_check": {
+          "name": "agent_configs_agent_type_check",
+          "value": "\"agent_configs\".\"agent_type\" IN ('code_review', 'auto_triage', 'auto_fix', 'security_scan')"
+        },
+        "agent_configs_config_revision_check": {
+          "name": "agent_configs_config_revision_check",
+          "value": "\"agent_configs\".\"config_revision\" >= 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.agent_environment_profile_agents": {
+      "name": "agent_environment_profile_agents",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "profile_id": {
+          "name": "profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "config": {
+          "name": "config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_agent_env_profile_agents_profile_id": {
+          "name": "IDX_agent_env_profile_agents_profile_id",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agent_environment_profile_agents_profile_id_agent_environment_profiles_id_fk": {
+          "name": "agent_environment_profile_agents_profile_id_agent_environment_profiles_id_fk",
+          "tableFrom": "agent_environment_profile_agents",
+          "tableTo": "agent_environment_profiles",
+          "columnsFrom": [
+            "profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_agent_env_profile_agents_profile_slug": {
+          "name": "UQ_agent_env_profile_agents_profile_slug",
+          "nullsNotDistinct": false,
+          "columns": [
+            "profile_id",
+            "slug"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.agent_environment_profile_commands": {
+      "name": "agent_environment_profile_commands",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "profile_id": {
+          "name": "profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sequence": {
+          "name": "sequence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "command": {
+          "name": "command",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_agent_env_profile_commands_profile_id": {
+          "name": "IDX_agent_env_profile_commands_profile_id",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agent_environment_profile_commands_profile_id_agent_environment_profiles_id_fk": {
+          "name": "agent_environment_profile_commands_profile_id_agent_environment_profiles_id_fk",
+          "tableFrom": "agent_environment_profile_commands",
+          "tableTo": "agent_environment_profiles",
+          "columnsFrom": [
+            "profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_agent_env_profile_commands_profile_sequence": {
+          "name": "UQ_agent_env_profile_commands_profile_sequence",
+          "nullsNotDistinct": false,
+          "columns": [
+            "profile_id",
+            "sequence"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.agent_environment_profile_instructions": {
+      "name": "agent_environment_profile_instructions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "profile_id": {
+          "name": "profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_agent_env_profile_instructions_profile_id": {
+          "name": "IDX_agent_env_profile_instructions_profile_id",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agent_environment_profile_instructions_profile_id_agent_environment_profiles_id_fk": {
+          "name": "agent_environment_profile_instructions_profile_id_agent_environment_profiles_id_fk",
+          "tableFrom": "agent_environment_profile_instructions",
+          "tableTo": "agent_environment_profiles",
+          "columnsFrom": [
+            "profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_agent_env_profile_instructions_profile_name": {
+          "name": "UQ_agent_env_profile_instructions_profile_name",
+          "nullsNotDistinct": false,
+          "columns": [
+            "profile_id",
+            "name"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.agent_environment_profile_kilo_commands": {
+      "name": "agent_environment_profile_kilo_commands",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "profile_id": {
+          "name": "profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "template": {
+          "name": "template",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "agent": {
+          "name": "agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "subtask": {
+          "name": "subtask",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_agent_env_profile_kilo_cmds_profile_id": {
+          "name": "IDX_agent_env_profile_kilo_cmds_profile_id",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agent_environment_profile_kilo_commands_profile_id_agent_environment_profiles_id_fk": {
+          "name": "agent_environment_profile_kilo_commands_profile_id_agent_environment_profiles_id_fk",
+          "tableFrom": "agent_environment_profile_kilo_commands",
+          "tableTo": "agent_environment_profiles",
+          "columnsFrom": [
+            "profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_agent_env_profile_kilo_cmds_profile_name": {
+          "name": "UQ_agent_env_profile_kilo_cmds_profile_name",
+          "nullsNotDistinct": false,
+          "columns": [
+            "profile_id",
+            "name"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.agent_environment_profile_mcp_servers": {
+      "name": "agent_environment_profile_mcp_servers",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "profile_id": {
+          "name": "profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "timeout": {
+          "name": "timeout",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "config": {
+          "name": "config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_agent_env_profile_mcp_servers_profile_id": {
+          "name": "IDX_agent_env_profile_mcp_servers_profile_id",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agent_environment_profile_mcp_servers_profile_id_agent_environment_profiles_id_fk": {
+          "name": "agent_environment_profile_mcp_servers_profile_id_agent_environment_profiles_id_fk",
+          "tableFrom": "agent_environment_profile_mcp_servers",
+          "tableTo": "agent_environment_profiles",
+          "columnsFrom": [
+            "profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_agent_env_profile_mcp_servers_profile_name": {
+          "name": "UQ_agent_env_profile_mcp_servers_profile_name",
+          "nullsNotDistinct": false,
+          "columns": [
+            "profile_id",
+            "name"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.agent_environment_profile_repo_bindings": {
+      "name": "agent_environment_profile_repo_bindings",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "repo_full_name": {
+          "name": "repo_full_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'github'"
+        },
+        "profile_id": {
+          "name": "profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "owned_by_organization_id": {
+          "name": "owned_by_organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "owned_by_user_id": {
+          "name": "owned_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_agent_env_profile_repo_bindings_user": {
+          "name": "UQ_agent_env_profile_repo_bindings_user",
+          "columns": [
+            {
+              "expression": "repo_full_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"agent_environment_profile_repo_bindings\".\"owned_by_user_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_agent_env_profile_repo_bindings_org": {
+          "name": "UQ_agent_env_profile_repo_bindings_org",
+          "columns": [
+            {
+              "expression": "repo_full_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "platform",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"agent_environment_profile_repo_bindings\".\"owned_by_organization_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agent_environment_profile_repo_bindings_profile_id_agent_environment_profiles_id_fk": {
+          "name": "agent_environment_profile_repo_bindings_profile_id_agent_environment_profiles_id_fk",
+          "tableFrom": "agent_environment_profile_repo_bindings",
+          "tableTo": "agent_environment_profiles",
+          "columnsFrom": [
+            "profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "agent_environment_profile_repo_bindings_owned_by_organization_id_organizations_id_fk": {
+          "name": "agent_environment_profile_repo_bindings_owned_by_organization_id_organizations_id_fk",
+          "tableFrom": "agent_environment_profile_repo_bindings",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "owned_by_organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "agent_environment_profile_repo_bindings_owned_by_user_id_kilocode_users_id_fk": {
+          "name": "agent_environment_profile_repo_bindings_owned_by_user_id_kilocode_users_id_fk",
+          "tableFrom": "agent_environment_profile_repo_bindings",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "owned_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "agent_env_profile_repo_bindings_owner_check": {
+          "name": "agent_env_profile_repo_bindings_owner_check",
+          "value": "(\n        (\"agent_environment_profile_repo_bindings\".\"owned_by_user_id\" IS NOT NULL AND \"agent_environment_profile_repo_bindings\".\"owned_by_organization_id\" IS NULL) OR\n        (\"agent_environment_profile_repo_bindings\".\"owned_by_user_id\" IS NULL AND \"agent_environment_profile_repo_bindings\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.agent_environment_profile_skills": {
+      "name": "agent_environment_profile_skills",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "profile_id": {
+          "name": "profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_type": {
+          "name": "source_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_url": {
+          "name": "source_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "raw_markdown": {
+          "name": "raw_markdown",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "files": {
+          "name": "files",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_agent_env_profile_skills_profile_id": {
+          "name": "IDX_agent_env_profile_skills_profile_id",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agent_environment_profile_skills_profile_id_agent_environment_profiles_id_fk": {
+          "name": "agent_environment_profile_skills_profile_id_agent_environment_profiles_id_fk",
+          "tableFrom": "agent_environment_profile_skills",
+          "tableTo": "agent_environment_profiles",
+          "columnsFrom": [
+            "profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_agent_env_profile_skills_profile_name": {
+          "name": "UQ_agent_env_profile_skills_profile_name",
+          "nullsNotDistinct": false,
+          "columns": [
+            "profile_id",
+            "name"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.agent_environment_profile_vars": {
+      "name": "agent_environment_profile_vars",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "profile_id": {
+          "name": "profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_secret": {
+          "name": "is_secret",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_agent_env_profile_vars_profile_id": {
+          "name": "IDX_agent_env_profile_vars_profile_id",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agent_environment_profile_vars_profile_id_agent_environment_profiles_id_fk": {
+          "name": "agent_environment_profile_vars_profile_id_agent_environment_profiles_id_fk",
+          "tableFrom": "agent_environment_profile_vars",
+          "tableTo": "agent_environment_profiles",
+          "columnsFrom": [
+            "profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_agent_env_profile_vars_profile_key": {
+          "name": "UQ_agent_env_profile_vars_profile_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "profile_id",
+            "key"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.agent_environment_profiles": {
+      "name": "agent_environment_profiles",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "owned_by_organization_id": {
+          "name": "owned_by_organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "owned_by_user_id": {
+          "name": "owned_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "is_default": {
+          "name": "is_default",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_agent_env_profiles_org_name": {
+          "name": "UQ_agent_env_profiles_org_name",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"agent_environment_profiles\".\"owned_by_organization_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_agent_env_profiles_user_name": {
+          "name": "UQ_agent_env_profiles_user_name",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"agent_environment_profiles\".\"owned_by_user_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_agent_env_profiles_org_default": {
+          "name": "UQ_agent_env_profiles_org_default",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"agent_environment_profiles\".\"is_default\" = true AND \"agent_environment_profiles\".\"owned_by_organization_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_agent_env_profiles_user_default": {
+          "name": "UQ_agent_env_profiles_user_default",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"agent_environment_profiles\".\"is_default\" = true AND \"agent_environment_profiles\".\"owned_by_user_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_agent_env_profiles_org_id": {
+          "name": "IDX_agent_env_profiles_org_id",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_agent_env_profiles_user_id": {
+          "name": "IDX_agent_env_profiles_user_id",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_agent_env_profiles_created_by_user_id": {
+          "name": "IDX_agent_env_profiles_created_by_user_id",
+          "columns": [
+            {
+              "expression": "created_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "agent_environment_profiles_owned_by_organization_id_organizations_id_fk": {
+          "name": "agent_environment_profiles_owned_by_organization_id_organizations_id_fk",
+          "tableFrom": "agent_environment_profiles",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "owned_by_organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "agent_environment_profiles_owned_by_user_id_kilocode_users_id_fk": {
+          "name": "agent_environment_profiles_owned_by_user_id_kilocode_users_id_fk",
+          "tableFrom": "agent_environment_profiles",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "owned_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "agent_env_profiles_owner_check": {
+          "name": "agent_env_profiles_owner_check",
+          "value": "(\n        (\"agent_environment_profiles\".\"owned_by_user_id\" IS NOT NULL AND \"agent_environment_profiles\".\"owned_by_organization_id\" IS NULL) OR\n        (\"agent_environment_profiles\".\"owned_by_user_id\" IS NULL AND \"agent_environment_profiles\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.ai_gateway_config": {
+      "name": "ai_gateway_config",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "default": 1
+        },
+        "config": {
+          "name": "config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "auto_free": {
+          "name": "auto_free",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "preferred_models": {
+          "name": "preferred_models",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "unavailable_models": {
+          "name": "unavailable_models",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vercel_model_id_overrides": {
+          "name": "vercel_model_id_overrides",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "preferred_provider_order": {
+          "name": "preferred_provider_order",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ai_gateway_config_singleton": {
+          "name": "ai_gateway_config_singleton",
+          "value": "\"ai_gateway_config\".\"id\" = 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.ai_gateway_request_logging_opt_ins": {
+      "name": "ai_gateway_request_logging_opt_ins",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "default": 1
+        },
+        "opt_ins": {
+          "name": "opt_ins",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ai_gateway_request_logging_opt_ins_singleton": {
+          "name": "ai_gateway_request_logging_opt_ins_singleton",
+          "value": "\"ai_gateway_request_logging_opt_ins\".\"id\" = 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.ai_gateway_sync_providers_state": {
+      "name": "ai_gateway_sync_providers_state",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "default": 1
+        },
+        "last_completed_at": {
+          "name": "last_completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stale_alert_last_posted_at": {
+          "name": "stale_alert_last_posted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "direct_byok_last_completed_at": {
+          "name": "direct_byok_last_completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "direct_byok_stale_alert_last_posted_at": {
+          "name": "direct_byok_stale_alert_last_posted_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "ai_gateway_sync_providers_state_singleton": {
+          "name": "ai_gateway_sync_providers_state_singleton",
+          "value": "\"ai_gateway_sync_providers_state\".\"id\" = 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.analytics_event_outbox": {
+      "name": "analytics_event_outbox",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "event_uuid": {
+          "name": "event_uuid",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event_name": {
+          "name": "event_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "distinct_id": {
+          "name": "distinct_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "properties": {
+          "name": "properties",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "next_attempt_at": {
+          "name": "next_attempt_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "claimed_at": {
+          "name": "claimed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "delivered_at": {
+          "name": "delivered_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_error": {
+          "name": "last_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "UQ_analytics_event_outbox_event_uuid": {
+          "name": "UQ_analytics_event_outbox_event_uuid",
+          "columns": [
+            {
+              "expression": "event_uuid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_analytics_event_outbox_status_next_attempt_at": {
+          "name": "IDX_analytics_event_outbox_status_next_attempt_at",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "next_attempt_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.api_kind": {
+      "name": "api_kind",
+      "schema": "",
+      "columns": {
+        "api_kind_id": {
+          "name": "api_kind_id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "api_kind": {
+          "name": "api_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "UQ_api_kind": {
+          "name": "UQ_api_kind",
+          "columns": [
+            {
+              "expression": "api_kind",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.api_request_log": {
+      "name": "api_request_log",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "session_id": {
+          "name": "session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vercel_request_id": {
+          "name": "vercel_request_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_code": {
+          "name": "status_code",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "request": {
+          "name": "request",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response": {
+          "name": "response",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error": {
+          "name": "error",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "request_r2_key": {
+          "name": "request_r2_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response_r2_key": {
+          "name": "response_r2_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_api_request_log_created_at": {
+          "name": "idx_api_request_log_created_at",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.app_min_versions": {
+      "name": "app_min_versions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "ios_min_version": {
+          "name": "ios_min_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'1.0.0'"
+        },
+        "android_min_version": {
+          "name": "android_min_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'1.0.0'"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.app_reported_messages": {
+      "name": "app_reported_messages",
+      "schema": "",
+      "columns": {
+        "report_id": {
+          "name": "report_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "report_type": {
+          "name": "report_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "signature": {
+          "name": "signature",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "message": {
+          "name": "message",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "cli_session_id": {
+          "name": "cli_session_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mode": {
+          "name": "mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "app_reported_messages_cli_session_id_cli_sessions_session_id_fk": {
+          "name": "app_reported_messages_cli_session_id_cli_sessions_session_id_fk",
+          "tableFrom": "app_reported_messages",
+          "tableTo": "cli_sessions",
+          "columnsFrom": [
+            "cli_session_id"
+          ],
+          "columnsTo": [
+            "session_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.auto_model": {
+      "name": "auto_model",
+      "schema": "",
+      "columns": {
+        "auto_model_id": {
+          "name": "auto_model_id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "auto_model": {
+          "name": "auto_model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "UQ_auto_model": {
+          "name": "UQ_auto_model",
+          "columns": [
+            {
+              "expression": "auto_model",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.auto_routing_custom_routers": {
+      "name": "auto_routing_custom_routers",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "owned_by_organization_id": {
+          "name": "owned_by_organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "owned_by_user_id": {
+          "name": "owned_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "slug": {
+          "name": "slug",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "base_router": {
+          "name": "base_router",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mode": {
+          "name": "mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entries": {
+          "name": "entries",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "default_entry_key": {
+          "name": "default_entry_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "legacy_pool": {
+          "name": "legacy_pool",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "legacy_mode_inherited": {
+          "name": "legacy_mode_inherited",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_auto_routing_custom_routers_org_slug": {
+          "name": "UQ_auto_routing_custom_routers_org_slug",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "slug",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"auto_routing_custom_routers\".\"owned_by_organization_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_auto_routing_custom_routers_user_slug": {
+          "name": "UQ_auto_routing_custom_routers_user_slug",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "slug",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"auto_routing_custom_routers\".\"owned_by_user_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_auto_routing_custom_routers_org_id": {
+          "name": "IDX_auto_routing_custom_routers_org_id",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_auto_routing_custom_routers_user_id": {
+          "name": "IDX_auto_routing_custom_routers_user_id",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "auto_routing_custom_routers_owned_by_organization_id_organizations_id_fk": {
+          "name": "auto_routing_custom_routers_owned_by_organization_id_organizations_id_fk",
+          "tableFrom": "auto_routing_custom_routers",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "owned_by_organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "auto_routing_custom_routers_owned_by_user_id_kilocode_users_id_fk": {
+          "name": "auto_routing_custom_routers_owned_by_user_id_kilocode_users_id_fk",
+          "tableFrom": "auto_routing_custom_routers",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "owned_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "auto_routing_custom_routers_owner_check": {
+          "name": "auto_routing_custom_routers_owner_check",
+          "value": "(\n        (\"auto_routing_custom_routers\".\"owned_by_user_id\" IS NOT NULL AND \"auto_routing_custom_routers\".\"owned_by_organization_id\" IS NULL) OR\n        (\"auto_routing_custom_routers\".\"owned_by_user_id\" IS NULL AND \"auto_routing_custom_routers\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
+        },
+        "auto_routing_custom_routers_base_router_check": {
+          "name": "auto_routing_custom_routers_base_router_check",
+          "value": "\"auto_routing_custom_routers\".\"base_router\" IN ('efficient', 'frontier')"
+        },
+        "auto_routing_custom_routers_mode_check": {
+          "name": "auto_routing_custom_routers_mode_check",
+          "value": "\"auto_routing_custom_routers\".\"mode\" IN ('cost_per_accuracy', 'best_accuracy')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.auto_top_up_configs": {
+      "name": "auto_top_up_configs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "owned_by_user_id": {
+          "name": "owned_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "owned_by_organization_id": {
+          "name": "owned_by_organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "stripe_payment_method_id": {
+          "name": "stripe_payment_method_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "amount_cents": {
+          "name": "amount_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 5000
+        },
+        "threshold_cents": {
+          "name": "threshold_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_auto_top_up_at": {
+          "name": "last_auto_top_up_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attempt_started_at": {
+          "name": "attempt_started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "disabled_reason": {
+          "name": "disabled_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_auto_top_up_configs_owned_by_user_id": {
+          "name": "UQ_auto_top_up_configs_owned_by_user_id",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"auto_top_up_configs\".\"owned_by_user_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_auto_top_up_configs_owned_by_organization_id": {
+          "name": "UQ_auto_top_up_configs_owned_by_organization_id",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"auto_top_up_configs\".\"owned_by_organization_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "auto_top_up_configs_owned_by_user_id_kilocode_users_id_fk": {
+          "name": "auto_top_up_configs_owned_by_user_id_kilocode_users_id_fk",
+          "tableFrom": "auto_top_up_configs",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "owned_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        },
+        "auto_top_up_configs_owned_by_organization_id_organizations_id_fk": {
+          "name": "auto_top_up_configs_owned_by_organization_id_organizations_id_fk",
+          "tableFrom": "auto_top_up_configs",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "owned_by_organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "auto_top_up_configs_exactly_one_owner": {
+          "name": "auto_top_up_configs_exactly_one_owner",
+          "value": "(\"auto_top_up_configs\".\"owned_by_user_id\" IS NOT NULL AND \"auto_top_up_configs\".\"owned_by_organization_id\" IS NULL) OR (\"auto_top_up_configs\".\"owned_by_user_id\" IS NULL AND \"auto_top_up_configs\".\"owned_by_organization_id\" IS NOT NULL)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.bot_request_cloud_agent_sessions": {
+      "name": "bot_request_cloud_agent_sessions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "bot_request_id": {
+          "name": "bot_request_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "spawn_group_id": {
+          "name": "spawn_group_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cloud_agent_session_id": {
+          "name": "cloud_agent_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kilo_session_id": {
+          "name": "kilo_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "execution_id": {
+          "name": "execution_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'running'"
+        },
+        "mode": {
+          "name": "mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "github_repo": {
+          "name": "github_repo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "gitlab_project": {
+          "name": "gitlab_project",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "callback_step": {
+          "name": "callback_step",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "error_message": {
+          "name": "error_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "final_message": {
+          "name": "final_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "final_message_fetched_at": {
+          "name": "final_message_fetched_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "final_message_error": {
+          "name": "final_message_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "terminal_at": {
+          "name": "terminal_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "continuation_started_at": {
+          "name": "continuation_started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_bot_request_cas_cloud_agent_session_id": {
+          "name": "UQ_bot_request_cas_cloud_agent_session_id",
+          "columns": [
+            {
+              "expression": "cloud_agent_session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_bot_request_cas_bot_request_id": {
+          "name": "IDX_bot_request_cas_bot_request_id",
+          "columns": [
+            {
+              "expression": "bot_request_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_bot_request_cas_bot_request_id_spawn_group_id": {
+          "name": "IDX_bot_request_cas_bot_request_id_spawn_group_id",
+          "columns": [
+            {
+              "expression": "bot_request_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "spawn_group_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_bot_request_cas_bot_request_id_spawn_group_id_status": {
+          "name": "IDX_bot_request_cas_bot_request_id_spawn_group_id_status",
+          "columns": [
+            {
+              "expression": "bot_request_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "spawn_group_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "bot_request_cloud_agent_sessions_bot_request_id_bot_requests_id_fk": {
+          "name": "bot_request_cloud_agent_sessions_bot_request_id_bot_requests_id_fk",
+          "tableFrom": "bot_request_cloud_agent_sessions",
+          "tableTo": "bot_requests",
+          "columnsFrom": [
+            "bot_request_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.bot_requests": {
+      "name": "bot_requests",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "platform_integration_id": {
+          "name": "platform_integration_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_thread_id": {
+          "name": "platform_thread_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform_message_id": {
+          "name": "platform_message_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_message": {
+          "name": "user_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "error_message": {
+          "name": "error_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "model_used": {
+          "name": "model_used",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "steps": {
+          "name": "steps",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cloud_agent_session_id": {
+          "name": "cloud_agent_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "response_time_ms": {
+          "name": "response_time_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_bot_requests_created_at": {
+          "name": "IDX_bot_requests_created_at",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_bot_requests_created_by": {
+          "name": "IDX_bot_requests_created_by",
+          "columns": [
+            {
+              "expression": "created_by",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_bot_requests_organization_id": {
+          "name": "IDX_bot_requests_organization_id",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_bot_requests_platform_integration_id": {
+          "name": "IDX_bot_requests_platform_integration_id",
+          "columns": [
+            {
+              "expression": "platform_integration_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_bot_requests_status": {
+          "name": "IDX_bot_requests_status",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "bot_requests_created_by_kilocode_users_id_fk": {
+          "name": "bot_requests_created_by_kilocode_users_id_fk",
+          "tableFrom": "bot_requests",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "created_by"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "bot_requests_organization_id_organizations_id_fk": {
+          "name": "bot_requests_organization_id_organizations_id_fk",
+          "tableFrom": "bot_requests",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "bot_requests_platform_integration_id_platform_integrations_id_fk": {
+          "name": "bot_requests_platform_integration_id_platform_integrations_id_fk",
+          "tableFrom": "bot_requests",
+          "tableTo": "platform_integrations",
+          "columnsFrom": [
+            "platform_integration_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.bouncer_credit_event_outbox": {
+      "name": "bouncer_credit_event_outbox",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "event_id": {
+          "name": "event_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event_type": {
+          "name": "event_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "next_attempt_at": {
+          "name": "next_attempt_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "claimed_at": {
+          "name": "claimed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "delivered_at": {
+          "name": "delivered_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_error": {
+          "name": "last_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "UQ_bouncer_credit_event_outbox_event_id_type": {
+          "name": "UQ_bouncer_credit_event_outbox_event_id_type",
+          "columns": [
+            {
+              "expression": "event_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "event_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_bouncer_credit_event_outbox_status_next_attempt_at": {
+          "name": "IDX_bouncer_credit_event_outbox_status_next_attempt_at",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "next_attempt_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_bouncer_credit_event_outbox_user_id": {
+          "name": "IDX_bouncer_credit_event_outbox_user_id",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.bouncer_usage_event_outbox": {
+      "name": "bouncer_usage_event_outbox",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "request_id": {
+          "name": "request_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload": {
+          "name": "payload",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "next_attempt_at": {
+          "name": "next_attempt_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "claimed_at": {
+          "name": "claimed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "delivered_at": {
+          "name": "delivered_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_error": {
+          "name": "last_error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "UQ_bouncer_usage_event_outbox_request_id": {
+          "name": "UQ_bouncer_usage_event_outbox_request_id",
+          "columns": [
+            {
+              "expression": "request_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_bouncer_usage_event_outbox_status_next_attempt_at": {
+          "name": "IDX_bouncer_usage_event_outbox_status_next_attempt_at",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "next_attempt_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_bouncer_usage_event_outbox_user_id": {
+          "name": "IDX_bouncer_usage_event_outbox_user_id",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.byok_api_keys": {
+      "name": "byok_api_keys",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provider_id": {
+          "name": "provider_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "encrypted_api_key": {
+          "name": "encrypted_api_key",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "management_source": {
+          "name": "management_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'user'"
+        },
+        "is_enabled": {
+          "name": "is_enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "IDX_byok_api_keys_organization_id": {
+          "name": "IDX_byok_api_keys_organization_id",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_byok_api_keys_kilo_user_id": {
+          "name": "IDX_byok_api_keys_kilo_user_id",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_byok_api_keys_provider_id": {
+          "name": "IDX_byok_api_keys_provider_id",
+          "columns": [
+            {
+              "expression": "provider_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "byok_api_keys_organization_id_organizations_id_fk": {
+          "name": "byok_api_keys_organization_id_organizations_id_fk",
+          "tableFrom": "byok_api_keys",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "byok_api_keys_kilo_user_id_kilocode_users_id_fk": {
+          "name": "byok_api_keys_kilo_user_id_kilocode_users_id_fk",
+          "tableFrom": "byok_api_keys",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_byok_api_keys_org_provider": {
+          "name": "UQ_byok_api_keys_org_provider",
+          "nullsNotDistinct": false,
+          "columns": [
+            "organization_id",
+            "provider_id"
+          ]
+        },
+        "UQ_byok_api_keys_user_provider": {
+          "name": "UQ_byok_api_keys_user_provider",
+          "nullsNotDistinct": false,
+          "columns": [
+            "kilo_user_id",
+            "provider_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "byok_api_keys_management_source_check": {
+          "name": "byok_api_keys_management_source_check",
+          "value": "\"byok_api_keys\".\"management_source\" IN ('user', 'coding_plan')"
+        },
+        "byok_api_keys_owner_check": {
+          "name": "byok_api_keys_owner_check",
+          "value": "(\n        (\"byok_api_keys\".\"kilo_user_id\" IS NOT NULL AND \"byok_api_keys\".\"organization_id\" IS NULL) OR\n        (\"byok_api_keys\".\"kilo_user_id\" IS NULL AND \"byok_api_keys\".\"organization_id\" IS NOT NULL)\n      )"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.cli_sessions": {
+      "name": "cli_sessions",
+      "schema": "",
+      "columns": {
+        "session_id": {
+          "name": "session_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_on_platform": {
+          "name": "created_on_platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'unknown'"
+        },
+        "api_conversation_history_blob_url": {
+          "name": "api_conversation_history_blob_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "task_metadata_blob_url": {
+          "name": "task_metadata_blob_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ui_messages_blob_url": {
+          "name": "ui_messages_blob_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "git_state_blob_url": {
+          "name": "git_state_blob_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "git_url": {
+          "name": "git_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "forked_from": {
+          "name": "forked_from",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parent_session_id": {
+          "name": "parent_session_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cloud_agent_session_id": {
+          "name": "cloud_agent_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_mode": {
+          "name": "last_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_model": {
+          "name": "last_model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_cli_sessions_kilo_user_id": {
+          "name": "IDX_cli_sessions_kilo_user_id",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_cli_sessions_created_at": {
+          "name": "IDX_cli_sessions_created_at",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_cli_sessions_updated_at": {
+          "name": "IDX_cli_sessions_updated_at",
+          "columns": [
+            {
+              "expression": "updated_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_cli_sessions_organization_id": {
+          "name": "IDX_cli_sessions_organization_id",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_cli_sessions_user_updated": {
+          "name": "IDX_cli_sessions_user_updated",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "updated_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "cli_sessions_kilo_user_id_kilocode_users_id_fk": {
+          "name": "cli_sessions_kilo_user_id_kilocode_users_id_fk",
+          "tableFrom": "cli_sessions",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "cli_sessions_forked_from_cli_sessions_session_id_fk": {
+          "name": "cli_sessions_forked_from_cli_sessions_session_id_fk",
+          "tableFrom": "cli_sessions",
+          "tableTo": "cli_sessions",
+          "columnsFrom": [
+            "forked_from"
+          ],
+          "columnsTo": [
+            "session_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "cli_sessions_parent_session_id_cli_sessions_session_id_fk": {
+          "name": "cli_sessions_parent_session_id_cli_sessions_session_id_fk",
+          "tableFrom": "cli_sessions",
+          "tableTo": "cli_sessions",
+          "columnsFrom": [
+            "parent_session_id"
+          ],
+          "columnsTo": [
+            "session_id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "cli_sessions_organization_id_organizations_id_fk": {
+          "name": "cli_sessions_organization_id_organizations_id_fk",
+          "tableFrom": "cli_sessions",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "cli_sessions_cloud_agent_session_id_unique": {
+          "name": "cli_sessions_cloud_agent_session_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "cloud_agent_session_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.cli_sessions_v2": {
+      "name": "cli_sessions_v2",
+      "schema": "",
+      "columns": {
+        "session_id": {
+          "name": "session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kilo_user_id": {
+          "name": "kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "public_id": {
+          "name": "public_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "parent_session_id": {
+          "name": "parent_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "profile_id": {
+          "name": "profile_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cloud_agent_session_id": {
+          "name": "cloud_agent_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cloud_agent_session_scope_id": {
+          "name": "cloud_agent_session_scope_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cloud_agent_worktree_id": {
+          "name": "cloud_agent_worktree_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_on_platform": {
+          "name": "created_on_platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'unknown'"
+        },
+        "git_url": {
+          "name": "git_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "git_branch": {
+          "name": "git_branch",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pr_url": {
+          "name": "pr_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pr_number": {
+          "name": "pr_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pr_head_ref": {
+          "name": "pr_head_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pr_head_sha": {
+          "name": "pr_head_sha",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pr_link_verified_at": {
+          "name": "pr_link_verified_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_updated_at": {
+          "name": "status_updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_transition_id": {
+          "name": "status_transition_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_activity_at": {
+          "name": "last_activity_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_cost_microdollars": {
+          "name": "total_cost_microdollars",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "live_summary": {
+          "name": "live_summary",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_cli_sessions_v2_parent_session_id_kilo_user_id": {
+          "name": "IDX_cli_sessions_v2_parent_session_id_kilo_user_id",
+          "columns": [
+            {
+              "expression": "parent_session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_cli_sessions_v2_profile_id": {
+          "name": "IDX_cli_sessions_v2_profile_id",
+          "columns": [
+            {
+              "expression": "profile_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_cli_sessions_v2_public_id": {
+          "name": "UQ_cli_sessions_v2_public_id",
+          "columns": [
+            {
+              "expression": "public_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"cli_sessions_v2\".\"public_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_cli_sessions_v2_cloud_agent_session_id": {
+          "name": "UQ_cli_sessions_v2_cloud_agent_session_id",
+          "columns": [
+            {
+              "expression": "cloud_agent_session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"cli_sessions_v2\".\"cloud_agent_session_id\" is not null",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_cli_sessions_v2_organization_id": {
+          "name": "IDX_cli_sessions_v2_organization_id",
+          "columns": [
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_cli_sessions_v2_user_updated": {
+          "name": "IDX_cli_sessions_v2_user_updated",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "updated_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_cli_sessions_v2_user_created": {
+          "name": "IDX_cli_sessions_v2_user_created",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_cli_sessions_v2_user_worktree_updated": {
+          "name": "IDX_cli_sessions_v2_user_worktree_updated",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "cloud_agent_worktree_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "updated_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"cli_sessions_v2\".\"cloud_agent_worktree_id\" is not null",
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
+        },
+        "cli_sessions_v2_git_url_branch_idx": {
+          "name": "cli_sessions_v2_git_url_branch_idx",
+          "columns": [
+            {
+              "expression": "git_url",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "git_branch",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_cli_sessions_v2_git_url_pr_number": {
+          "name": "IDX_cli_sessions_v2_git_url_pr_number",
+          "columns": [
+            {
+              "expression": "git_url",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "pr_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "cli_sessions_v2_kilo_user_id_kilocode_users_id_fk": {
+          "name": "cli_sessions_v2_kilo_user_id_kilocode_users_id_fk",
+          "tableFrom": "cli_sessions_v2",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "cli_sessions_v2_organization_id_organizations_id_fk": {
+          "name": "cli_sessions_v2_organization_id_organizations_id_fk",
+          "tableFrom": "cli_sessions_v2",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "cli_sessions_v2_profile_id_agent_environment_profiles_id_fk": {
+          "name": "cli_sessions_v2_profile_id_agent_environment_profiles_id_fk",
+          "tableFrom": "cli_sessions_v2",
+          "tableTo": "agent_environment_profiles",
+          "columnsFrom": [
+            "profile_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "cli_sessions_v2_parent_session_id_kilo_user_id_fk": {
+          "name": "cli_sessions_v2_parent_session_id_kilo_user_id_fk",
+          "tableFrom": "cli_sessions_v2",
+          "tableTo": "cli_sessions_v2",
+          "columnsFrom": [
+            "parent_session_id",
+            "kilo_user_id"
+          ],
+          "columnsTo": [
+            "session_id",
+            "kilo_user_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "cli_sessions_v2_session_id_kilo_user_id_pk": {
+          "name": "cli_sessions_v2_session_id_kilo_user_id_pk",
+          "columns": [
+            "session_id",
+            "kilo_user_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.cloud_agent_code_review_attempts": {
+      "name": "cloud_agent_code_review_attempts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "code_review_id": {
+          "name": "code_review_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attempt_number": {
+          "name": "attempt_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "retry_of_attempt_id": {
+          "name": "retry_of_attempt_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "retry_reason": {
+          "name": "retry_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "session_id": {
+          "name": "session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cli_session_id": {
+          "name": "cli_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "execution_id": {
+          "name": "execution_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "analytics_enabled_at_dispatch": {
+          "name": "analytics_enabled_at_dispatch",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "error_message": {
+          "name": "error_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "terminal_reason": {
+          "name": "terminal_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "publication_status": {
+          "name": "publication_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_cloud_agent_code_review_attempts_review_attempt_number": {
+          "name": "UQ_cloud_agent_code_review_attempts_review_attempt_number",
+          "columns": [
+            {
+              "expression": "code_review_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "attempt_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_cloud_agent_code_review_attempts_code_review_id": {
+          "name": "idx_cloud_agent_code_review_attempts_code_review_id",
+          "columns": [
+            {
+              "expression": "code_review_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_cloud_agent_code_review_attempts_retry_of_attempt_id": {
+          "name": "idx_cloud_agent_code_review_attempts_retry_of_attempt_id",
+          "columns": [
+            {
+              "expression": "retry_of_attempt_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_cloud_agent_code_review_attempts_session_id": {
+          "name": "idx_cloud_agent_code_review_attempts_session_id",
+          "columns": [
+            {
+              "expression": "session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_cloud_agent_code_review_attempts_cli_session_id": {
+          "name": "idx_cloud_agent_code_review_attempts_cli_session_id",
+          "columns": [
+            {
+              "expression": "cli_session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_cloud_agent_code_review_attempts_status": {
+          "name": "idx_cloud_agent_code_review_attempts_status",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_cloud_agent_code_review_attempts_retry_reason": {
+          "name": "idx_cloud_agent_code_review_attempts_retry_reason",
+          "columns": [
+            {
+              "expression": "retry_reason",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "cloud_agent_code_review_attempts_code_review_id_cloud_agent_code_reviews_id_fk": {
+          "name": "cloud_agent_code_review_attempts_code_review_id_cloud_agent_code_reviews_id_fk",
+          "tableFrom": "cloud_agent_code_review_attempts",
+          "tableTo": "cloud_agent_code_reviews",
+          "columnsFrom": [
+            "code_review_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "cloud_agent_code_review_attempts_retry_of_attempt_id_cloud_agent_code_review_attempts_id_fk": {
+          "name": "cloud_agent_code_review_attempts_retry_of_attempt_id_cloud_agent_code_review_attempts_id_fk",
+          "tableFrom": "cloud_agent_code_review_attempts",
+          "tableTo": "cloud_agent_code_review_attempts",
+          "columnsFrom": [
+            "retry_of_attempt_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "cloud_agent_code_review_attempts_attempt_number_check": {
+          "name": "cloud_agent_code_review_attempts_attempt_number_check",
+          "value": "\"cloud_agent_code_review_attempts\".\"attempt_number\" >= 1"
+        },
+        "cloud_agent_code_review_attempts_publication_status_check": {
+          "name": "cloud_agent_code_review_attempts_publication_status_check",
+          "value": "\"cloud_agent_code_review_attempts\".\"publication_status\" IN ('published', 'unchanged', 'missing', 'unknown', 'not_applicable')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.cloud_agent_code_reviews": {
+      "name": "cloud_agent_code_reviews",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "owned_by_organization_id": {
+          "name": "owned_by_organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "owned_by_user_id": {
+          "name": "owned_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "platform_integration_id": {
+          "name": "platform_integration_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "manual_config": {
+          "name": "manual_config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "review_type": {
+          "name": "review_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'standard'"
+        },
+        "trigger_source": {
+          "name": "trigger_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "council_result": {
+          "name": "council_result",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "repo_full_name": {
+          "name": "repo_full_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pr_number": {
+          "name": "pr_number",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pr_url": {
+          "name": "pr_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pr_title": {
+          "name": "pr_title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pr_author": {
+          "name": "pr_author",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pr_author_github_id": {
+          "name": "pr_author_github_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "base_ref": {
+          "name": "base_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "head_ref": {
+          "name": "head_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "head_sha": {
+          "name": "head_sha",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'github'"
+        },
+        "platform_project_id": {
+          "name": "platform_project_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "session_id": {
+          "name": "session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cli_session_id": {
+          "name": "cli_session_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "dispatch_reservation_id": {
+          "name": "dispatch_reservation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error_message": {
+          "name": "error_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "terminal_reason": {
+          "name": "terminal_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "agent_version": {
+          "name": "agent_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'v1'"
+        },
+        "check_run_id": {
+          "name": "check_run_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "repository_review_instructions_used": {
+          "name": "repository_review_instructions_used",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "repository_review_instructions_ref": {
+          "name": "repository_review_instructions_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "repository_review_instructions_truncated": {
+          "name": "repository_review_instructions_truncated",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "previous_summary_body": {
+          "name": "previous_summary_body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "previous_summary_head_sha": {
+          "name": "previous_summary_head_sha",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "previous_summary_observed": {
+          "name": "previous_summary_observed",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "model": {
+          "name": "model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_tokens_in": {
+          "name": "total_tokens_in",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_tokens_out": {
+          "name": "total_tokens_out",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total_cost_musd": {
+          "name": "total_cost_musd",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_cloud_agent_code_reviews_webhook_integration_repo_pr_sha": {
+          "name": "UQ_cloud_agent_code_reviews_webhook_integration_repo_pr_sha",
+          "columns": [
+            {
+              "expression": "platform_integration_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "repo_full_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "pr_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "head_sha",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"cloud_agent_code_reviews\".\"manual_config\" IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_cloud_agent_code_reviews_active_provider_publisher": {
+          "name": "UQ_cloud_agent_code_reviews_active_provider_publisher",
+          "columns": [
+            {
+              "expression": "platform_integration_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "repo_full_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "pr_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"cloud_agent_code_reviews\".\"platform_integration_id\" IS NOT NULL\n        AND \"cloud_agent_code_reviews\".\"status\" IN ('pending', 'queued', 'running')\n        AND (\"cloud_agent_code_reviews\".\"manual_config\" IS NULL OR \"cloud_agent_code_reviews\".\"manual_config\"->>'outputMode' = 'provider')",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_cloud_agent_code_reviews_owned_by_org_id": {
+          "name": "idx_cloud_agent_code_reviews_owned_by_org_id",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_cloud_agent_code_reviews_owned_by_user_id": {
+          "name": "idx_cloud_agent_code_reviews_owned_by_user_id",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_cloud_agent_code_reviews_session_id": {
+          "name": "idx_cloud_agent_code_reviews_session_id",
+          "columns": [
+            {
+              "expression": "session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_cloud_agent_code_reviews_cli_session_id": {
+          "name": "idx_cloud_agent_code_reviews_cli_session_id",
+          "columns": [
+            {
+              "expression": "cli_session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_cloud_agent_code_reviews_status": {
+          "name": "idx_cloud_agent_code_reviews_status",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_cloud_agent_code_reviews_repo": {
+          "name": "idx_cloud_agent_code_reviews_repo",
+          "columns": [
+            {
+              "expression": "repo_full_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_cloud_agent_code_reviews_pr_number": {
+          "name": "idx_cloud_agent_code_reviews_pr_number",
+          "columns": [
+            {
+              "expression": "repo_full_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "pr_number",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_cloud_agent_code_reviews_created_at": {
+          "name": "idx_cloud_agent_code_reviews_created_at",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_cloud_agent_code_reviews_pr_author_github_id": {
+          "name": "idx_cloud_agent_code_reviews_pr_author_github_id",
+          "columns": [
+            {
+              "expression": "pr_author_github_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_cloud_agent_code_reviews_completed_at": {
+          "name": "idx_cloud_agent_code_reviews_completed_at",
+          "columns": [
+            {
+              "expression": "completed_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"cloud_agent_code_reviews\".\"completed_at\" is not null",
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_cloud_agent_code_reviews_started_at": {
+          "name": "idx_cloud_agent_code_reviews_started_at",
+          "columns": [
+            {
+              "expression": "started_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"cloud_agent_code_reviews\".\"started_at\" is not null",
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_cloud_agent_code_reviews_terminal_missing_completed_at": {
+          "name": "idx_cloud_agent_code_reviews_terminal_missing_completed_at",
+          "columns": [
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"cloud_agent_code_reviews\".\"status\" IN ('completed', 'failed', 'cancelled', 'interrupted') AND \"cloud_agent_code_reviews\".\"completed_at\" IS NULL",
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "cloud_agent_code_reviews_owned_by_organization_id_organizations_id_fk": {
+          "name": "cloud_agent_code_reviews_owned_by_organization_id_organizations_id_fk",
+          "tableFrom": "cloud_agent_code_reviews",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "owned_by_organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "cloud_agent_code_reviews_owned_by_user_id_kilocode_users_id_fk": {
+          "name": "cloud_agent_code_reviews_owned_by_user_id_kilocode_users_id_fk",
+          "tableFrom": "cloud_agent_code_reviews",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "owned_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "cloud_agent_code_reviews_platform_integration_id_platform_integrations_id_fk": {
+          "name": "cloud_agent_code_reviews_platform_integration_id_platform_integrations_id_fk",
+          "tableFrom": "cloud_agent_code_reviews",
+          "tableTo": "platform_integrations",
+          "columnsFrom": [
+            "platform_integration_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "cloud_agent_code_reviews_owner_check": {
+          "name": "cloud_agent_code_reviews_owner_check",
+          "value": "(\n        (\"cloud_agent_code_reviews\".\"owned_by_user_id\" IS NOT NULL AND \"cloud_agent_code_reviews\".\"owned_by_organization_id\" IS NULL) OR\n        (\"cloud_agent_code_reviews\".\"owned_by_user_id\" IS NULL AND \"cloud_agent_code_reviews\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.cloud_agent_environment_vars": {
+      "name": "cloud_agent_environment_vars",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "environment_id": {
+          "name": "environment_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "value": {
+          "name": "value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_secret": {
+          "name": "is_secret",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "IDX_cloud_agent_environment_vars_environment_id": {
+          "name": "IDX_cloud_agent_environment_vars_environment_id",
+          "columns": [
+            {
+              "expression": "environment_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "cloud_agent_environment_vars_environment_id_cloud_agent_environments_id_fk": {
+          "name": "cloud_agent_environment_vars_environment_id_cloud_agent_environments_id_fk",
+          "tableFrom": "cloud_agent_environment_vars",
+          "tableTo": "cloud_agent_environments",
+          "columnsFrom": [
+            "environment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_cloud_agent_environment_vars_environment_key": {
+          "name": "UQ_cloud_agent_environment_vars_environment_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "environment_id",
+            "key"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.cloud_agent_environments": {
+      "name": "cloud_agent_environments",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "owned_by_organization_id": {
+          "name": "owned_by_organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "owned_by_user_id": {
+          "name": "owned_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "platform": {
+          "name": "platform",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "repo_full_name": {
+          "name": "repo_full_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "gitlab_clone_url": {
+          "name": "gitlab_clone_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bitbucket_workspace_uuid": {
+          "name": "bitbucket_workspace_uuid",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bitbucket_repository_uuid": {
+          "name": "bitbucket_repository_uuid",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "commands": {
+          "name": "commands",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'"
+        },
+        "configuration_revision": {
+          "name": "configuration_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "sandbox_allocation": {
+          "name": "sandbox_allocation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "egress_mode": {
+          "name": "egress_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "egress_allowlist": {
+          "name": "egress_allowlist",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "UQ_cloud_agent_environments_github_user": {
+          "name": "UQ_cloud_agent_environments_github_user",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "repo_full_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"cloud_agent_environments\".\"platform\" = 'github' AND \"cloud_agent_environments\".\"owned_by_user_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_cloud_agent_environments_github_org": {
+          "name": "UQ_cloud_agent_environments_github_org",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "repo_full_name",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"cloud_agent_environments\".\"platform\" = 'github' AND \"cloud_agent_environments\".\"owned_by_organization_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_cloud_agent_environments_gitlab_user": {
+          "name": "UQ_cloud_agent_environments_gitlab_user",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "gitlab_clone_url",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"cloud_agent_environments\".\"platform\" = 'gitlab' AND \"cloud_agent_environments\".\"owned_by_user_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_cloud_agent_environments_gitlab_org": {
+          "name": "UQ_cloud_agent_environments_gitlab_org",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "gitlab_clone_url",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"cloud_agent_environments\".\"platform\" = 'gitlab' AND \"cloud_agent_environments\".\"owned_by_organization_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_cloud_agent_environments_bitbucket_user": {
+          "name": "UQ_cloud_agent_environments_bitbucket_user",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "bitbucket_workspace_uuid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "bitbucket_repository_uuid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"cloud_agent_environments\".\"platform\" = 'bitbucket' AND \"cloud_agent_environments\".\"owned_by_user_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "UQ_cloud_agent_environments_bitbucket_org": {
+          "name": "UQ_cloud_agent_environments_bitbucket_org",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "bitbucket_workspace_uuid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "bitbucket_repository_uuid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"cloud_agent_environments\".\"platform\" = 'bitbucket' AND \"cloud_agent_environments\".\"owned_by_organization_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_cloud_agent_environments_user_id": {
+          "name": "IDX_cloud_agent_environments_user_id",
+          "columns": [
+            {
+              "expression": "owned_by_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_cloud_agent_environments_org_id": {
+          "name": "IDX_cloud_agent_environments_org_id",
+          "columns": [
+            {
+              "expression": "owned_by_organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "cloud_agent_environments_owned_by_organization_id_organizations_id_fk": {
+          "name": "cloud_agent_environments_owned_by_organization_id_organizations_id_fk",
+          "tableFrom": "cloud_agent_environments",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "owned_by_organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "cloud_agent_environments_owned_by_user_id_kilocode_users_id_fk": {
+          "name": "cloud_agent_environments_owned_by_user_id_kilocode_users_id_fk",
+          "tableFrom": "cloud_agent_environments",
+          "tableTo": "kilocode_users",
+          "columnsFrom": [
+            "owned_by_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "cloud_agent_environments_owner_check": {
+          "name": "cloud_agent_environments_owner_check",
+          "value": "(\n        (\"cloud_agent_environments\".\"owned_by_user_id\" IS NOT NULL AND \"cloud_agent_environments\".\"owned_by_organization_id\" IS NULL) OR\n        (\"cloud_agent_environments\".\"owned_by_user_id\" IS NULL AND \"cloud_agent_environments\".\"owned_by_organization_id\" IS NOT NULL)\n      )"
+        },
+        "cloud_agent_environments_platform_check": {
+          "name": "cloud_agent_environments_platform_check",
+          "value": "\"cloud_agent_environments\".\"platform\" IN ('github', 'gitlab', 'bitbucket')"
+        },
+        "cloud_agent_environments_github_identity_check": {
+          "name": "cloud_agent_environments_github_identity_check",
+          "value": "(\n        (\"cloud_agent_environments\".\"platform\" = 'github') = (\n          \"cloud_agent_environments\".\"gitlab_clone_url\" IS NULL AND\n          \"cloud_agent_environments\".\"bitbucket_workspace_uuid\" IS NULL AND\n          \"cloud_agent_environments\".\"bitbucket_repository_uuid\" IS NULL\n        )\n      )"
+        },
+        "cloud_agent_environments_gitlab_identity_check": {
+          "name": "cloud_agent_environments_gitlab_identity_check",
+          "value": "(\n        (\"cloud_agent_environments\".\"platform\" = 'gitlab') = (\n          \"cloud_agent_environments\".\"gitlab_clone_url\" IS NOT NULL AND\n          \"cloud_agent_environments\".\"bitbucket_workspace_uuid\" IS NULL AND\n          \"cloud_agent_environments\".\"bitbucket_repository_uuid\" IS NULL\n        )\n      )"
+        },
+        "cloud_agent_environments_bitbucket_identity_check": {
+          "name": "cloud_agent_environments_bitbucket_identity_check",
+          "value": "(\n        (\"cloud_agent_environments\".\"platform\" = 'bitbucket') = (\n          \"cloud_agent_environments\".\"bitbucket_workspace_uuid\" IS NOT NULL AND\n          \"cloud_agent_environments\".\"bitbucket_repository_uuid\" IS NOT NULL AND\n          \"cloud_agent_environments\".\"gitlab_clone_url\" IS NULL\n        )\n      )"
+        },
+        "cloud_agent_environments_egress_policy_check": {
+          "name": "cloud_agent_environments_egress_policy_check",
+          "value": "(\n        (\n          (\"cloud_agent_environments\".\"egress_mode\" IS NULL AND \"cloud_agent_environments\".\"egress_allowlist\" IS NULL) OR\n          (\"cloud_agent_environments\".\"egress_mode\" IS NOT NULL AND \"cloud_agent_environments\".\"egress_mode\" IN ('unrestricted', 'allowlist'))\n        ) AND\n        (\"cloud_agent_environments\".\"egress_mode\" IS DISTINCT FROM 'unrestricted' OR \"cloud_agent_environments\".\"egress_allowlist\" IS NULL) AND\n        (\"cloud_agent_environments\".\"egress_mode\" IS DISTINCT FROM 'allowlist' OR \"cloud_agent_environments\".\"egress_allowlist\" IS NOT NULL)\n      )"
+>>>>>>> 21f4cc1d1d49f7f9f0ff231295dcefa713bcc5ac
         }
       },
       "isRLSEnabled": false

@@ -893,7 +893,8 @@ describe('parseTranscriptionUsageFromResponse', () => {
       makeResponse(),
       200,
       'openai/gpt-4o-mini-transcribe',
-      'openrouter'
+      'openrouter',
+      null
     );
 
     expect(result.cost_mUsd).toBe(20);
@@ -916,7 +917,8 @@ describe('parseTranscriptionUsageFromResponse', () => {
       }),
       200,
       'openai/gpt-4o-mini-transcribe',
-      'openrouter'
+      'openrouter',
+      null
     );
 
     expect(result.cost_mUsd).toBe(40);
@@ -928,7 +930,8 @@ describe('parseTranscriptionUsageFromResponse', () => {
       makeResponse(),
       200,
       'openai/gpt-4o-mini-transcribe',
-      'openrouter'
+      'openrouter',
+      null
     );
 
     expect(result.generation_time).toBe(2.5);
@@ -942,7 +945,8 @@ describe('parseTranscriptionUsageFromResponse', () => {
       JSON.stringify(parsed),
       200,
       'openai/whisper-1',
-      'openrouter'
+      'openrouter',
+      null
     );
 
     expect(result.model).toBe('openai/whisper-1');
@@ -956,10 +960,53 @@ describe('parseTranscriptionUsageFromResponse', () => {
       JSON.stringify(parsed),
       200,
       'openai/gpt-4o-mini-transcribe',
-      'openrouter'
+      'openrouter',
+      null
     );
 
     expect(result.hasError).toBe(true);
+  });
+
+  describe('OpenRouter response without BYOK status', () => {
+    // Shape OpenRouter returns for a BYOK-served whisper-1 transcription: `cost`
+    // is only the 5% BYOK fee, and neither is_byok nor cost_details is present.
+    const openRouterWhisperResponse = JSON.stringify({
+      text: 'This is a short transcription test.',
+      usage: { seconds: 2, cost: 0.00001 },
+    });
+
+    beforeEach(() => {
+      jest.mocked(captureMessage).mockClear();
+    });
+
+    it('uses the x-generation-id header so the generation lookup can resolve the cost', () => {
+      const result = parseTranscriptionUsageFromResponse(
+        openRouterWhisperResponse,
+        200,
+        'openai/whisper-1',
+        'openrouter',
+        'gen-stt-123'
+      );
+
+      expect(result.messageId).toBe('gen-stt-123');
+      expect(captureMessage).not.toHaveBeenCalled();
+    });
+
+    it('reports the unresolvable cost when there is no generation id', () => {
+      const result = parseTranscriptionUsageFromResponse(
+        openRouterWhisperResponse,
+        200,
+        'openai/whisper-1',
+        'openrouter',
+        null
+      );
+
+      expect(result.messageId).toBeNull();
+      expect(captureMessage).toHaveBeenCalledWith(
+        "SUSPICIOUS: openrouters cost accounting doesn't make sense",
+        expect.anything()
+      );
+    });
   });
 });
 

@@ -1668,7 +1668,7 @@ export const mapToUsageStats = (
     inference_provider: data.provider_name ?? null,
     upstream_id: data.upstream_id ?? null,
     finish_reason: data.finish_reason ?? null,
-    // The gateway measures latency and generation_time itself; see timeResponseBody.
+    // The gateway measures latency and generation_time itself; see drainSseStream and readResponseText.
     latency: null,
     moderation_latency: data.moderation_latency ?? null,
     generation_time: null,

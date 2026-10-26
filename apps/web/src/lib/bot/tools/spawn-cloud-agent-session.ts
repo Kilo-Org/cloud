@@ -78,7 +78,7 @@ export const spawnCloudAgentInputSchema = z.object({
     ),
 });
 
-type SpawnCloudAgentInput = z.infer<typeof spawnCloudAgentInputSchema>;
+export type SpawnCloudAgentInput = z.infer<typeof spawnCloudAgentInputSchema>;
 
 /**
  * Spawn a Cloud Agent session and collect the results.

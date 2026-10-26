@@ -142,7 +142,7 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
             draft.entries.some(
               (entry, index) => customRouterEntryKey(entry) !== router.entries[index]?.key
             )
-              ? { entries: draft.entries }
+              ? { entries: draft.entries, defaultEntryKey: draft.defaultEntryKey }
               : {}),
             ...(draft.defaultEntryKey !== router.defaultEntryKey
               ? { defaultEntryKey: draft.defaultEntryKey }

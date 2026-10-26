@@ -162,7 +162,7 @@ const STORED_OUTPUT_MAX_LENGTH = 200_000;
  * client profile. The graded case is stored before judged grading is billed to the
  * paying owner, and removed again when billing fails, so a retry never bills twice for
  * one stored case. A case that already ran returns its stored score; one that did not
- * (nonzero exit or timeout) is replaced by the new upload.
+ * (nonzero exit, timeout, or empty output) is replaced by the new upload.
  */
 export async function gradeClientEvalResult(
   db: D1Database,

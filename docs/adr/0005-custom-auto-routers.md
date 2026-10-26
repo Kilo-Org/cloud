@@ -265,6 +265,10 @@ The scanner requires `CLOUDFLARE_API_TOKEN` and `INTERNAL_API_SECRET`.
 Retain every report. Resolve unreadable, invalid, unmatched, missing-owner, collision, and
 router-cap findings before declaring the cohort complete. Interrupted writes retain a recovery
 fence; retry the conversion rather than clearing the fence manually.
+If a scan response is lost, recover owner keys from the structured
+`auto_routing_owner_pool_conversion_scan` event's `readFailedOwners`, `invalidPoolOwners`,
+`invalidModeOwners`, `needsAttentionOwners`, and `notPostedOwners` arrays before declaring the
+run clean; a retry can skip owners already marked converted.
 `--limit` controls the page size, not the total number of owners.
 
 Set `CUTOVER_AT` to a future timestamp with an explicit timezone.
@@ -286,6 +290,12 @@ successful targets. Resolve unknown delivery outcomes against provider records w
 `--reconcile-target` and `--reconcile-outcome`; use `--help` for the exact recovery procedure.
 Do not discard a used plan or remove its lock until the prior sender has stopped.
 A changed cutover date requires a separately reviewed update campaign, not an ordinary retry.
+If cutover passes during sending, the script stops before the next recipient and returns the
+saved partial summary with a nonzero exit status. Pending recipients stay pending; sent and
+unknown outcomes retain their history. Do not send an expired advance notice. Preserve the
+original campaign for reconciliation, and review a future campaign containing only pending or
+provider-confirmed `not_sent` recipients. Explicitly exclude sent and unknown targets; copying
+the entire original cohort into a new directory would notify successful recipients again.
 
 ## Invariants
 

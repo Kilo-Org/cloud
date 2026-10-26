@@ -136,10 +136,7 @@ export async function ensureClientProfile(
   return row;
 }
 
-// A case ran when the CLI exited 0 without a timeout, the platform's reuse rule. Other
-// stored cases are re-planned and an upload replaces them, so an endpoint that was down
-// once does not keep its pair failed until the next engine version.
-const ranSuccessfully = sql`(${clientCaseResults.exit_code} IS NOT NULL AND ${clientCaseResults.exit_code} = 0 AND ${clientCaseResults.timed_out} = 0)`;
+const ranSuccessfully = sql`(${clientCaseResults.exit_code} IS NOT NULL AND ${clientCaseResults.exit_code} = 0 AND ${clientCaseResults.timed_out} = 0 AND ${clientCaseResults.output} <> '')`;
 
 export async function getClientCase(
   db: D1Database,
@@ -153,8 +150,7 @@ export async function getClientCase(
   const [row] = await drizzle(db)
     .select({
       score: clientCaseResults.score,
-      exitCode: clientCaseResults.exit_code,
-      timedOut: clientCaseResults.timed_out,
+      ran: sql`${ranSuccessfully}`.mapWith(Boolean),
       revision: clientCaseResults.revision,
       pendingGraderUsage: clientCaseResults.pending_grader_usage,
     })
@@ -169,7 +165,7 @@ export async function getClientCase(
   return row
     ? {
         score: row.score,
-        ran: row.exitCode === 0 && !row.timedOut,
+        ran: row.ran,
         revision: row.revision,
         pendingGraderUsage: row.pendingGraderUsage,
       }

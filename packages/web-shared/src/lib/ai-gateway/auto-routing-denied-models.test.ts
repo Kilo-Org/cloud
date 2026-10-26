@@ -188,9 +188,10 @@ describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
       .mocked(getDataCollectionRequiredModelIds)
       .mockResolvedValue(new Set(['meta/muse-spark-1.3-contributor', 'unrelated/model']));
 
-    await expect(
-      collectDataCollectionRequiredAutoRoutingModelIds('efficient')
-    ).resolves.toEqual(['meta/muse-spark-1.3-contributor', 'provider/free-model:free']);
+    await expect(collectDataCollectionRequiredAutoRoutingModelIds('efficient')).resolves.toEqual([
+      'meta/muse-spark-1.3-contributor',
+      'provider/free-model:free',
+    ]);
   });
 
   it('uses frontier candidates for privacy denials rather than the efficient table', async () => {
@@ -214,9 +215,9 @@ describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
       .mocked(getDataCollectionRequiredModelIds)
       .mockResolvedValue(new Set(['frontier/private-model', 'efficient/private-model']));
 
-    await expect(
-      collectDataCollectionRequiredAutoRoutingModelIds('frontier')
-    ).resolves.toEqual(['frontier/private-model']);
+    await expect(collectDataCollectionRequiredAutoRoutingModelIds('frontier')).resolves.toEqual([
+      'frontier/private-model',
+    ]);
     expect(getCachedRoutingTable).toHaveBeenCalledWith('frontier');
     expect(getCachedRoutingTable).not.toHaveBeenCalledWith('efficient');
   });

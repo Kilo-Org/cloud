@@ -292,10 +292,11 @@ describe('client eval (real SQLite)', () => {
     expect(response.status).toBe(401);
   });
 
-  it('re-plans a case that did not run and lets a new upload replace it', async () => {
-    expect(
-      await gradeClientEvalResult(db, CONFIG, upload({ exitCode: 1, output: 'down' }), deps)
-    ).toEqual({ score: 0 });
+  it.each([
+    { exitCode: 1, output: 'down' },
+    { exitCode: 0, output: '' },
+  ])('re-plans an unsuccessful case and lets a new upload replace it: %j', async failedRun => {
+    expect(await gradeClientEvalResult(db, CONFIG, upload(failedRun), deps)).toEqual({ score: 0 });
     const plan = await planClientEval(db, CONFIG, context, deps.source);
     expect(plan.items).toContainEqual(
       expect.objectContaining({ variant: 'low', caseId: exactCase.id, rep: 0 })

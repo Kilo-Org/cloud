@@ -16,7 +16,6 @@
     "worker-configuration.d.ts",
     "src/**/*.ts",
     "src/**/*.d.ts",
-    "scripts/convert-owner-pools.ts",
     "vitest.config.ts"
   ]
 }

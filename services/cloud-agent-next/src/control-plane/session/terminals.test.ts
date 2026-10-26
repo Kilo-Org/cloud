@@ -152,6 +152,7 @@ function fixture(
     ok: true,
     result: { pty: pty('pty_new') },
   }));
+  const checkAccess = vi.fn(async (): Promise<'allowed' | 'denied'> => 'allowed');
   const terminals = createControlPlaneTerminals({
     state: fakeState(values, overrides.sockets ?? []),
     sessionId: SESSION_ID,
@@ -160,9 +161,11 @@ function fixture(
     getWrapperId: async () => CURRENT_WRAPPER,
     isRouteReady: () => overrides.isRouteReady ?? true,
     getSandboxStatus: overrides.getSandboxStatus ?? (async () => sandboxStatus('active')),
+    checkAccess,
+    scheduleAuthorization: async () => undefined,
     request,
   });
-  return { terminals, values, request };
+  return { terminals, values, request, checkAccess };
 }
 
 describe('V2 control-plane terminals projection', () => {
@@ -205,6 +208,41 @@ describe('V2 control-plane terminals projection', () => {
     ).resolves.toEqual({ success: false, error: 'PTY allocation failed' });
   });
 
+  it('checks existing terminal records that have no authorization lease', async () => {
+    const { terminals, values, request, checkAccess } = fixture();
+    values.set('control_terminal:pty_existing', record(CURRENT_WRAPPER, 'pty_existing'));
+    checkAccess.mockResolvedValue('denied');
+    request.mockResolvedValue({ ok: true, result: { success: true } });
+    expect(await terminals.nextAuthorizationCheckAt()).not.toBeNull();
+    await terminals.maintainAuthorization();
+    expect(values.get('control_terminal:pty_existing')).toMatchObject({ state: 'ended' });
+    expect(await terminals.nextAuthorizationCheckAt()).toBeNull();
+    expect(request).toHaveBeenCalledWith(
+      SANDBOX_ID,
+      expect.objectContaining({ operation: 'close' })
+    );
+  });
+  it('closes a PTY whose creation finishes after revocation', async () => {
+    const { terminals, values, request, checkAccess } = fixture();
+    const response = Promise.withResolvers<ControlPlaneControlResult>();
+    request
+      .mockImplementationOnce(() => response.promise)
+      .mockResolvedValue({ ok: true, result: { success: true } });
+    const creation = terminals.create({ operationId: crypto.randomUUID() });
+    await vi.waitFor(() => expect(request).toHaveBeenCalledOnce());
+    checkAccess.mockResolvedValue('denied');
+    await terminals.revoke();
+    response.resolve({ ok: true, result: { pty: pty('pty_late') } });
+    expect(await creation).toMatchObject({ success: false });
+    expect(values.get('control_terminal:pty_late')).toBeUndefined();
+    expect(request).toHaveBeenLastCalledWith(
+      SANDBOX_ID,
+      expect.objectContaining({
+        operation: 'close',
+        payload: { ptyId: 'pty_late' },
+      })
+    );
+  });
   it('ends running records and clears completions for a replaced wrapper', async () => {
     const { terminals, values, request } = fixture();
     const operationId = '44444444-4444-4444-8444-444444444444';

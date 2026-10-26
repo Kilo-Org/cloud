@@ -365,6 +365,9 @@ async function startTerminalSession(): Promise<{
   const provider = createFakeProvider();
   await injectProvider(sandboxId, provider);
   const sessionStub = sessions.getByName(sessionDoName(USER_ID, sessionId));
+  await runInDurableObject(sessionStub, instance => {
+    Object.assign(instance, { checkTerminalAccess: async () => 'allowed' });
+  });
   await sessionStub.createSessionWithInitialAdmission({
     metadata: metadata({ sessionId, kiloSessionId: kiloSessionId(), sandboxId }),
     message: promptPayload(messageId()),
@@ -463,6 +466,107 @@ describe('control-plane terminals on the Session DO (B10)', () => {
 });
 
 describe('control-plane terminal bridge routing on the Session DO (B10)', () => {
+  async function connectedTerminal() {
+    const fixture = await startTerminalSession();
+    const { sessionStub, wrapper } = fixture;
+    const created = sessionStub.terminalCreate({ operationId: crypto.randomUUID() });
+    const creation = await awaitFrame(wrapper, 'terminal.create');
+    wrapper.send({
+      type: 'terminal.result',
+      requestId: creation.requestId,
+      ok: true,
+      result: { pty: pty('pty_1', creation.session.directory) },
+    });
+    await created;
+    const connecting = sessionStub.fetch(
+      new Request('https://control.test/terminal/browser?ptyId=pty_1', {
+        headers: { Upgrade: 'websocket' },
+      })
+    );
+    const connect = await awaitFrame(wrapper, 'terminal.connect');
+    const reverse = await sessionStub.fetch(
+      new Request('https://control.test/terminal/wrapper?ptyId=pty_1', {
+        headers: { Upgrade: 'websocket', Authorization: `Bearer ${connect.payload.capability}` },
+      })
+    );
+    const terminalSocket = reverse.webSocket;
+    if (!terminalSocket) throw new Error('Terminal wrapper socket missing');
+    terminalSocket.accept();
+    wrapper.send({
+      type: 'terminal.result',
+      requestId: connect.requestId,
+      ok: true,
+      result: { connected: true },
+    });
+    const connected = await connecting;
+    const browserSocket = connected.webSocket;
+    if (!browserSocket) throw new Error('Terminal browser socket missing');
+    browserSocket.accept();
+    return { ...fixture, browserSocket, terminalSocket };
+  }
+
+  it('closes established terminal sockets and their PTY on organization revocation', async () => {
+    const { sessionStub, wrapper, browserSocket, terminalSocket } = await connectedTerminal();
+    const messages: unknown[] = [];
+    terminalSocket.addEventListener('message', event => {
+      messages.push(event.data);
+    });
+    browserSocket.send('authorized command');
+    await waitFor(() => expect(messages).toEqual(['authorized command']));
+    expect(await sessionStub.closeOrgStreams('another_org')).toBe(0);
+    browserSocket.send('still authorized');
+    await waitFor(() => expect(messages).toHaveLength(2));
+    await runInDurableObject(sessionStub, instance => {
+      Object.assign(instance, { checkTerminalAccess: async () => 'denied' });
+    });
+    const revoked = sessionStub.closeOrgStreams(ORG_ID);
+    const close = await awaitFrame(wrapper, 'terminal.close');
+    expect(close.payload.ptyId).toBe('pty_1');
+    wrapper.send({
+      type: 'terminal.result',
+      requestId: close.requestId,
+      ok: true,
+      result: { success: true },
+    });
+    await revoked;
+    await waitFor(() => expect(browserSocket.readyState).not.toBe(WebSocket.OPEN));
+    expect(messages).toEqual(['authorized command', 'still authorized']);
+    const record = await runInDurableObject(sessionStub, (_instance, state) =>
+      state.storage.get<{ state: string }>('control_terminal:pty_1')
+    );
+    expect(record?.state).toBe('ended');
+    browserSocket.close();
+    terminalSocket.close();
+    wrapper.close();
+  });
+
+  it('revokes an established terminal through the alarm when removal notification is lost', async () => {
+    const { sessionStub, wrapper, browserSocket, terminalSocket } = await connectedTerminal();
+    await runInDurableObject(sessionStub, async (instance, state) => {
+      Object.assign(instance, { checkTerminalAccess: async () => 'denied' });
+      const lease = await state.storage.get<{ identity: string }>('terminal_authorization');
+      if (!lease) throw new Error('Terminal authorization lease missing');
+      await state.storage.put('terminal_authorization', {
+        ...lease,
+        authorizedUntil: Date.now() - 1,
+        checkAt: Date.now() - 1,
+      });
+    });
+    const alarm = runInDurableObject(sessionStub, instance => instance.alarm());
+    const close = await awaitFrame(wrapper, 'terminal.close');
+    wrapper.send({
+      type: 'terminal.result',
+      requestId: close.requestId,
+      ok: true,
+      result: { success: true },
+    });
+    await alarm;
+    await waitFor(() => expect(browserSocket.readyState).not.toBe(WebSocket.OPEN));
+    browserSocket.close();
+    terminalSocket.close();
+    wrapper.close();
+  });
+
   it('answers the V2 terminal fetch paths and rejects non-terminal paths', async () => {
     const { sessionStub } = await startTerminalSession();
 
@@ -603,7 +707,16 @@ describe('control-plane session organization close on the Session DO', () => {
     const terminal = await openBrowserTerminal(sessionStub, wrapper);
     const stream = await openStreamSocket(sessionStub);
 
-    await expect(sessionStub.closeOrgStreams(ORG_ID)).resolves.toBe(2);
+    const revoked = sessionStub.closeOrgStreams(ORG_ID);
+    const close = await awaitFrame(wrapper, 'terminal.close');
+    expect(close.payload.ptyId).toBe('pty_1');
+    wrapper.send({
+      type: 'terminal.result',
+      requestId: close.requestId,
+      ok: true,
+      result: { success: true },
+    });
+    await expect(revoked).resolves.toBe(2);
 
     await expect(terminal.closed).resolves.toEqual({
       code: 1000,
@@ -613,17 +726,16 @@ describe('control-plane session organization close on the Session DO', () => {
       code: 1000,
       reason: 'session access revoked',
     });
-    // The bridge ends the wrapper side through the browser-disconnect path.
+    // Organization revocation also closes the wrapper peer and ends the PTY.
     await expect(terminal.peerClosed).resolves.toEqual({
-      code: 1000,
-      reason: 'Browser disconnected',
+      code: 1008,
+      reason: 'Terminal access revoked',
     });
 
-    // The terminal record stays running.
     const record = await runInDurableObject(sessionStub, (_instance, state) =>
       state.storage.get<{ state: string }>('control_terminal:pty_1')
     );
-    expect(record).toMatchObject({ state: 'running' });
+    expect(record).toMatchObject({ state: 'ended' });
     wrapper.close();
   });
 
@@ -636,7 +748,20 @@ describe('control-plane session organization close on the Session DO', () => {
     expect(terminal.socket.readyState).toBe(WebSocket.OPEN);
     expect(stream.socket.readyState).toBe(WebSocket.OPEN);
 
-    await expect(sessionStub.closeOrgStreams(ORG_ID)).resolves.toBe(2);
+    const record = await runInDurableObject(sessionStub, (_instance, state) =>
+      state.storage.get<{ state: string }>('control_terminal:pty_1')
+    );
+    expect(record).toMatchObject({ state: 'running' });
+
+    const revoked = sessionStub.closeOrgStreams(ORG_ID);
+    const close = await awaitFrame(wrapper, 'terminal.close');
+    wrapper.send({
+      type: 'terminal.result',
+      requestId: close.requestId,
+      ok: true,
+      result: { success: true },
+    });
+    await expect(revoked).resolves.toBe(2);
     await expect(terminal.closed).resolves.toEqual({
       code: 1000,
       reason: 'session access revoked',
@@ -646,8 +771,8 @@ describe('control-plane session organization close on the Session DO', () => {
       reason: 'session access revoked',
     });
     await expect(terminal.peerClosed).resolves.toEqual({
-      code: 1000,
-      reason: 'Browser disconnected',
+      code: 1008,
+      reason: 'Terminal access revoked',
     });
     wrapper.close();
   });

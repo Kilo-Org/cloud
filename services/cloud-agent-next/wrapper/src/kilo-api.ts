@@ -383,6 +383,7 @@ export type WrapperKiloClient = {
     title: string;
     env: Record<string, string>;
   }) => Promise<WrapperPty>;
+  listPtys: (directory?: string) => Promise<WrapperPty[]>;
   resizePty: (ptyId: string, size: WrapperPtySize, directory?: string) => Promise<WrapperPty>;
   deletePty: (ptyId: string, directory?: string) => Promise<boolean>;
 
@@ -815,6 +816,11 @@ export function createWrapperKiloClient(
         { signal: opts.signal }
       );
       return requireSdkData(result, 'Commit message generation');
+    },
+
+    listPtys: async (directory = workspacePath) => {
+      const result = await v2Client.pty.list({ directory });
+      return requireSdkData(result, 'PTY list');
     },
 
     createPty: async opts => {

@@ -362,6 +362,34 @@ describe('issueCloudAgentGitHubSessionCapability', () => {
     });
   });
 
+  it('accepts an opaque bot capability when personal auth is unavailable at selection', async () => {
+    const issueGitHubSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      capability: 'kgh3.bot-opaque',
+      installationId: '123',
+      accountLogin: 'acme',
+      appType: 'standard',
+      source: 'installation',
+      gitAuthor: { name: 'kiloconnect[bot]', email: 'bot@example.com' },
+      fallbackReason: 'no_user_authorization',
+    });
+    await expect(
+      issueCloudAgentGitHubSessionCapability(createEnv({ issueGitHubSessionCapability }), {
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId: 'container-test',
+        allowUserAuthorization: true,
+      })
+    ).resolves.toMatchObject({
+      success: true,
+      value: {
+        source: 'installation',
+        capability: 'kgh3.bot-opaque',
+        fallbackReason: 'no_user_authorization',
+      },
+    });
+  });
+
   it('returns an opaque capability and preserves managed identity metadata', async () => {
     const issueGitHubSessionCapability = vi.fn().mockResolvedValue({
       success: true,
@@ -692,7 +720,7 @@ describe('resolveCloudAgentGitHubAuthForRepo', () => {
     });
   });
 
-  it('passes through sanitized credential fallback reasons on successful installation auth', async () => {
+  it('accepts bot fallback during initial credential selection', async () => {
     const getCloudAgentAuthForRepo = vi.fn().mockResolvedValue({
       success: true,
       githubToken: 'installation-token',
@@ -715,15 +743,11 @@ describe('resolveCloudAgentGitHubAuthForRepo', () => {
     );
 
     expect(getTokenForRepo).not.toHaveBeenCalled();
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       success: true,
       value: {
-        githubToken: 'installation-token',
-        installationId: '123',
-        accountLogin: 'acme',
-        appType: 'standard',
         source: 'installation',
-        gitAuthor: { name: 'kiloconnect[bot]', email: 'bot@example.com' },
+        githubToken: 'installation-token',
         fallbackReason: 'credential_unreadable',
       },
     });

@@ -1,4 +1,6 @@
+import { LogUploadReadError, readLogUploadBody } from '../log-upload-policy.js';
 import type { Hono, Context } from 'hono';
+import { DEFAULT_DO_RETRY_CONFIG } from '@kilocode/worker-utils';
 import type { HonoContext } from '../hono-context.js';
 import { resolveSecret } from '../auth.js';
 import { logger } from '../logger.js';
@@ -15,6 +17,43 @@ import {
   type ControlLogIdentity,
 } from '../shared/control-diagnostics.js';
 import { validateControlLogUploadGrant } from './log-upload-grant.js';
+import { getSandboxControlStub } from './stub.js';
+import { withDORetry } from '../utils/do-retry.js';
+
+async function requireActiveAllocation(
+  c: Context<HonoContext>,
+  identity: ControlLogIdentity
+): Promise<Response | undefined> {
+  try {
+    const allowed = await withDORetry(
+      () => getSandboxControlStub(c.env, identity.sandboxId),
+      stub => stub.isLogUploadAuthorized(identity),
+      'authorizeControlLogUpload',
+      { ...DEFAULT_DO_RETRY_CONFIG, scope: { deadlineAt: Date.now() + 5_000 } }
+    );
+    if (!allowed) return c.text('Log allocation inactive', 403);
+  } catch {
+    return c.text('Log authorization unavailable', 503);
+  }
+}
+
+async function reserveUpload(
+  c: Context<HonoContext>,
+  identity: ControlLogIdentity,
+  bytes: number
+): Promise<Response | undefined> {
+  try {
+    const allowed = await withDORetry(
+      () => getSandboxControlStub(c.env, identity.sandboxId),
+      stub => stub.reserveLogUpload(identity, bytes),
+      'reserveControlLogUpload',
+      { ...DEFAULT_DO_RETRY_CONFIG, scope: { deadlineAt: Date.now() + 5_000 } }
+    );
+    if (!allowed) return c.text('Log upload budget exhausted or allocation inactive', 429);
+  } catch {
+    return c.text('Log quota unavailable', 503);
+  }
+}
 
 function reportUnreapedOwnedProcessCleanup(
   identity: ControlLogIdentity,
@@ -40,35 +79,6 @@ function archivePrefix(identity: ControlLogIdentity): string {
 
 function mediaType(header: string | undefined): string | undefined {
   return header?.split(';')[0].trim();
-}
-
-async function readBoundedBytes(
-  request: Request,
-  maxBytes: number
-): Promise<Uint8Array | undefined> {
-  const stream: ReadableStream<Uint8Array> | null = request.body;
-  if (!stream) return new Uint8Array();
-  const reader = stream.getReader();
-  const chunks: Uint8Array[] = [];
-  let length = 0;
-  try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      length += value.byteLength;
-      if (length > maxBytes) return undefined;
-      chunks.push(value);
-    }
-  } finally {
-    void reader.cancel().catch(() => undefined);
-  }
-  const bytes = new Uint8Array(length);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return bytes;
 }
 
 function declaredLength(header: string | undefined): number | undefined | 'invalid' {
@@ -101,6 +111,8 @@ async function authorizeIdentity(
     grant.wrapperInstanceId !== identity.data.wrapperInstanceId
   )
     return c.text('Log scope mismatch', 403);
+  const denied = await requireActiveAllocation(c, identity.data);
+  if (denied) return denied;
   return { identity: identity.data };
 }
 
@@ -120,9 +132,19 @@ export function registerControlLogRoutes(app: Hono<HonoContext>): void {
       if (length !== undefined && length > CONTROL_LOG_MAX_ARCHIVE_BYTES) {
         return c.text('Body too large', 413);
       }
-      const body = await readBoundedBytes(c.req.raw, CONTROL_LOG_MAX_ARCHIVE_BYTES);
-      if (body === undefined) return c.text('Body too large', 413);
+      let body: Uint8Array;
+      try {
+        body = await readLogUploadBody(c.req.raw, CONTROL_LOG_MAX_ARCHIVE_BYTES);
+      } catch (error) {
+        return error instanceof LogUploadReadError
+          ? c.text(error.message, error.status)
+          : c.text('Invalid request body', 400);
+      }
       if (body.byteLength === 0) return c.text('Missing request body', 400);
+      const denied = await requireActiveAllocation(c, authorized.identity);
+      if (denied) return denied;
+      const quota = await reserveUpload(c, authorized.identity, body.byteLength);
+      if (quota) return quota;
       try {
         await c.env.R2_BUCKET.put(
           `${archivePrefix(authorized.identity)}${CONTROL_LOG_ARCHIVE_NAME}`,
@@ -155,16 +177,24 @@ export function registerControlLogRoutes(app: Hono<HonoContext>): void {
 
     let parsed: unknown;
     try {
-      const bytes = await readBoundedBytes(c.req.raw, CONTROL_LOG_MAX_BATCH_BYTES);
-      if (bytes === undefined) return c.text('Body too large', 413);
+      const bytes = await readLogUploadBody(c.req.raw, CONTROL_LOG_MAX_BATCH_BYTES);
       parsed = JSON.parse(
         new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes)
       );
-    } catch {
+    } catch (error) {
+      if (error instanceof LogUploadReadError) return c.text(error.message, error.status);
       return c.text('Invalid log batch', 400);
     }
     const batch = controlLogBatchSchema.safeParse(parsed);
     if (!batch.success) return c.text('Invalid log batch', 400);
+    const denied = await requireActiveAllocation(c, authorized.identity);
+    if (denied) return denied;
+    const quota = await reserveUpload(
+      c,
+      authorized.identity,
+      new TextEncoder().encode(JSON.stringify(batch.data)).byteLength
+    );
+    if (quota) return quota;
     let stored: unknown;
     try {
       stored = await c.env.R2_BUCKET.put(

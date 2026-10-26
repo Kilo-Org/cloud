@@ -169,3 +169,33 @@ describe('GitHubSessionCapabilityCodec', () => {
     );
   });
 });
+
+describe('task-bound GitHub capability', () => {
+  const taskGrant = {
+    revision: 1 as const,
+    scopeId: 'fixture-scope',
+    taskRef: 'refs/heads/kilo/task',
+    repository: { id: 101, nodeId: 'R_fixture_a', owner: claims.owner, name: claims.repo },
+  };
+  it('seals stable repository identity, task ref, scope, and revision under the v3 marker', () => {
+    const codec = new GitHubSessionCapabilityCodec(encryptionKey);
+    const capability = codec.issue({ ...claims, taskGrant });
+    expect(capability).toMatch(/^kgh3\./);
+    expect(codec.decode(capability)).toMatchObject({
+      version: 3,
+      outboundContainerId: claims.outboundContainerId,
+      taskGrant,
+    });
+  });
+  it('requires an allocation and matching repository identity', () => {
+    const codec = new GitHubSessionCapabilityCodec(encryptionKey);
+    const { outboundContainerId: _container, ...unbound } = claims;
+    expect(() => codec.issue({ ...unbound, taskGrant })).toThrow(GitHubSessionCapabilityError);
+    expect(() =>
+      codec.issue({
+        ...claims,
+        taskGrant: { ...taskGrant, repository: { ...taskGrant.repository, name: 'replacement' } },
+      })
+    ).toThrow(GitHubSessionCapabilityError);
+  });
+});

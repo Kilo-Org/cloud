@@ -13,6 +13,10 @@ const SECRET_PATTERNS: { pattern: RegExp; replacement: string }[] = [
     replacement: `$1=${REDACTED}`,
   },
   {
+    pattern: /("(?:KILO_AUTH|KILO_CONFIG|OPENCODE_CONFIG)_CONTENT"\s*:\s*)"(?:\\.|[^"\\])*"/gi,
+    replacement: `$1"${REDACTED}"`,
+  },
+  {
     pattern: /(Authorization\s*:\s*Bearer\s+)(\S+)/gi,
     replacement: `$1${REDACTED}`,
   },
@@ -56,27 +60,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Builds a redactor that remembers the values of every environment whose name
- * matches `SECRET_NAME`, plus the values of `secretEnvKeys` regardless of name.
- * Later environments override earlier ones for a named key, mirroring how the
- * caller layers them.
+ * Collects named secrets and credentials inside known configuration JSON.
+ * Explicit secretEnvKeys retain opaque values; malformed configurations do too.
  */
-export function createSecretRedactor(
+export function collectSecretValues(
   environment: Record<string, string | undefined>,
   additionalEnvironments: readonly Record<string, string | undefined>[] = [],
   secretEnvKeys: readonly string[] = []
-): (text: string) => string {
+): string[] {
   const sources = [environment, ...additionalEnvironments];
   const secrets = new Set<string>();
   const remember = (value: string): void => {
     if (!value) return;
     secrets.add(value);
-    secrets.add(JSON.stringify(value).slice(1, -1));
-    for (const line of value.split(/\r?\n/)) {
-      if (line.trim()) secrets.add(line.trim());
-    }
-    const authorization = /^(?:Bearer|Basic)\s+(.+)$/i.exec(value);
-    if (authorization?.[1]) secrets.add(authorization[1]);
   };
   const collect = (value: unknown, inMcp = false, mcpCredentialValues = false): void => {
     if (Array.isArray(value)) {
@@ -99,11 +95,10 @@ export function createSecretRedactor(
     for (const [name, value] of Object.entries(source)) {
       if (!value) continue;
       if (CONFIG_ENV_NAME.test(name)) {
-        secrets.add(value);
-        secrets.add(JSON.stringify(value).slice(1, -1));
         try {
           const parsed: unknown = JSON.parse(value);
-          collect(parsed);
+          if (isRecord(parsed) || Array.isArray(parsed)) collect(parsed);
+          else remember(value);
         } catch {
           remember(value);
         }
@@ -121,8 +116,44 @@ export function createSecretRedactor(
       }
     }
   }
+  return [...secrets];
+}
+
+export function createSecretValueRedactor(values: Iterable<string>): (text: string) => string {
+  const secrets = new Set<string>();
+  for (const value of values) {
+    if (!value) continue;
+    secrets.add(value);
+    secrets.add(JSON.stringify(value).slice(1, -1));
+    if (value.length >= 8) {
+      if (value.isWellFormed()) secrets.add(encodeURIComponent(value));
+      secrets.add(Buffer.from(value).toString('base64'));
+      secrets.add(Buffer.from(value).toString('base64url'));
+      secrets.add(Buffer.from(value).toString('hex'));
+    }
+    for (const line of value.split(/\r?\n/)) {
+      if (line.trim()) secrets.add(line.trim());
+    }
+    const authorization = /^(?:Bearer|Basic)\s+(.+)$/i.exec(value);
+    if (authorization?.[1]) secrets.add(authorization[1]);
+  }
   const known = [...secrets].sort((left, right) => right.length - left.length);
   return text => redactSecrets(text, known);
+}
+
+export function createSecretRedactor(
+  environment: Record<string, string | undefined>,
+  additionalEnvironments: readonly Record<string, string | undefined>[] = [],
+  secretEnvKeys: readonly string[] = []
+): (text: string) => string {
+  const values = collectSecretValues(environment, additionalEnvironments, secretEnvKeys);
+  // Setup output can mask whole configurations without retaining every historical copy.
+  for (const source of [environment, ...additionalEnvironments]) {
+    for (const [name, value] of Object.entries(source)) {
+      if (value && CONFIG_ENV_NAME.test(name)) values.push(value);
+    }
+  }
+  return createSecretValueRedactor(values);
 }
 
 export function createOutputRedactor(

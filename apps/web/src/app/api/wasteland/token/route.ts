@@ -24,7 +24,9 @@ const ONE_HOUR_SECONDS = 60 * 60;
  * worker can enforce access and check org membership without DB round-trips.
  */
 export async function POST() {
-  const { user, authFailedResponse, tokenSource } = await getUserFromAuth({ adminOnly: false });
+  const { user, authFailedResponse, tokenSource, deviceSessionId } = await getUserFromAuth({
+    adminOnly: false,
+  });
   if (authFailedResponse) return authFailedResponse;
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -44,7 +46,7 @@ export async function POST() {
 
   const token = generateApiToken(
     user,
-    { isAdmin: user.is_admin, orgMemberships },
+    { isAdmin: user.is_admin, orgMemberships, deviceSessionId },
     { expiresIn: ONE_HOUR_SECONDS }
   );
   const expiresAt = new Date(Date.now() + 55 * 60 * 1000).toISOString();

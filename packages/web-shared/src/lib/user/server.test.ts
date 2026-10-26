@@ -751,6 +751,44 @@ describe('getUserFromAuth', () => {
     expect(afterWindow.credentialsRejected).toBe(true);
   });
 
+  test('rejects a bearer token whose device session does not exist', async () => {
+    const user = await insertTestUser({
+      google_user_email: `api-token-device-missing-${crypto.randomUUID()}@example.com`,
+      api_token_pepper: 'device-missing-pepper',
+    });
+    const token = generateApiToken(user, { deviceSessionId: crypto.randomUUID() });
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(true);
+  });
+
+  test('rejects a bearer token whose device session belongs to another user', async () => {
+    const owner = await insertTestUser({
+      google_user_email: `api-token-device-owner-${crypto.randomUUID()}@example.com`,
+      api_token_pepper: 'device-owner-pepper',
+    });
+    const caller = await insertTestUser({
+      google_user_email: `api-token-device-caller-${crypto.randomUUID()}@example.com`,
+      api_token_pepper: 'device-caller-pepper',
+    });
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: owner.id })
+      .returning({ id: device_sessions.id });
+    const token = generateApiToken(caller, { deviceSessionId: session!.id });
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(true);
+  });
+
   test('web-session branch leaves deviceSessionId undefined', async () => {
     const user = await insertTestUser({
       google_user_email: `web-session-claim-${crypto.randomUUID()}@example.com`,

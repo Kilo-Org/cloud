@@ -37,4 +37,16 @@ describe('kiloChat router - getToken', () => {
     expect(expiresAtMs).toBeGreaterThanOrEqual(before + oneHourMs - 5_000);
     expect(expiresAtMs).toBeLessThanOrEqual(after + oneHourMs + 5_000);
   });
+
+  it('binds the token to the caller device session', async () => {
+    const deviceSessionId = crypto.randomUUID();
+    const caller = await createCallerForUser(testUser.id, { deviceSessionId });
+    const result = await caller.kiloChat.getToken();
+
+    const payload = jwt.verify(result.token, NEXTAUTH_SECRET, {
+      algorithms: ['HS256'],
+    }) as jwt.JwtPayload & { deviceSessionId?: string };
+
+    expect(payload.deviceSessionId).toBe(deviceSessionId);
+  });
 });

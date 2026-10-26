@@ -150,7 +150,7 @@ describe('authMiddleware', () => {
           extra: {
             tokenSource: 'kilo-chat',
             botId: 'bot-123',
-            deviceSessionId: 'device-123',
+            deviceSessionId: '11111111-1111-4111-8111-111111111111',
           },
         }),
     ],

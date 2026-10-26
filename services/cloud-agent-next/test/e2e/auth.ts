@@ -192,11 +192,7 @@ export type MintedTokens = {
   apiToken: string;
 };
 
-/**
- * Mint a Kilo user JWT for tRPC authentication. Mirrors
- * `packages/web-shared/src/lib/tokens.ts:generateApiToken` but with a short expiry
- * since the driver is ephemeral.
- */
+/** Mint the Cloud Agent control token that authorizes local E2E runtime creation. */
 export function mintApiToken(
   user: { id: string; api_token_pepper?: string },
   nextAuthSecret: string | undefined,
@@ -205,12 +201,21 @@ export function mintApiToken(
   if (!nextAuthSecret) {
     throw new Error('mintApiToken requires NEXTAUTH_SECRET for local JWT minting');
   }
+  const pepper = user.api_token_pepper ?? null;
   return jwt.sign(
     {
       env: 'development',
       kiloUserId: user.id,
-      ...(user.api_token_pepper ? { apiTokenPepper: user.api_token_pepper } : {}),
+      apiTokenPepper: pepper,
       version: JWT_TOKEN_VERSION,
+      aud: 'cloud-agent-next',
+      tokenPurpose: 'human-api',
+      credentialExchange: false,
+      runtimeAdmission: {
+        source: 'user',
+        authorizationUserId: user.id,
+        authorizationPepper: pepper,
+      },
       tokenSource: 'cloud-agent',
     },
     nextAuthSecret,

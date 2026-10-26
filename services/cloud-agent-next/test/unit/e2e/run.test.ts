@@ -288,6 +288,12 @@ describe('buildDeployedConfig', () => {
     expect(config.user).toEqual({ id: 'usr_deployed', email: 'deployed@example.test' });
   });
 
+  it('forwards a control-token provider when supplied', () => {
+    const getBearerToken = async () => 'control-token';
+    const config = buildDeployedConfig(env, auth, { getBearerToken });
+    expect(config.getBearerToken).toBe(getBearerToken);
+  });
+
   it('carries the resolved e2e internal secret for prepare and the surface', () => {
     const config = buildDeployedConfig(env, auth);
     expect(config.internalApiSecret).toBe('e2e-internal-secret-0123456789');

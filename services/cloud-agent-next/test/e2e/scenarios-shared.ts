@@ -852,15 +852,23 @@ async function runAuthReject(
     durationMs: Date.now() - startedAt,
   });
 
-  if (!config.bearerToken) {
-    return fail('auth-reject requires config.bearerToken (deployed profile only)');
+  let modelToken: string;
+  try {
+    modelToken = config.getBearerToken ? await config.getBearerToken() : (config.bearerToken ?? '');
+  } catch (error) {
+    return fail(`threw: ${errorMessage(error)}`);
+  }
+  if (modelToken.length === 0) {
+    return fail(
+      'auth-reject requires config.getBearerToken or config.bearerToken (deployed profile only)'
+    );
   }
 
   try {
     const probes = buildAuthRejectProbes({
       fakeLlmRootUrl: config.fakeLlmUrl,
       adminToken: resolveFakeAdminToken(),
-      modelToken: config.bearerToken,
+      modelToken,
       badSignatureToken: jwt.sign(
         {
           env: 'test',

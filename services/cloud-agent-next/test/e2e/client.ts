@@ -57,10 +57,16 @@ export type DriverConfig = {
   /** Local profile only: mints JWTs. Deployed profile uses `bearerToken`. */
   nextAuthSecret?: string;
   /**
-   * Deployed profile: a real ordinary personal API token presented verbatim as
-   * the tRPC bearer. Takes precedence over `nextAuthSecret` minting.
+   * Deployed profile: the source personal API token. Used verbatim only when
+   * `getBearerToken` is absent. Takes precedence over `nextAuthSecret` minting.
    */
   bearerToken?: string;
+  /**
+   * Deployed profile: resolves the bearer for each tRPC call. The control token
+   * is short-lived, so the provider refreshes it. Takes precedence over
+   * `bearerToken`.
+   */
+  getBearerToken?: () => Promise<string>;
   /** Deployed profile: fetches a fresh stream ticket for a session. */
   fetchStreamTicket?: (sessionId: string) => Promise<string>;
   /**
@@ -178,9 +184,12 @@ export async function trpcCall<T>(
 ): Promise<T> {
   const method = opts?.method ?? 'POST';
   const url = new URL(`/trpc/${procedure}`, config.workerUrl);
+  const bearer = config.getBearerToken
+    ? await config.getBearerToken()
+    : (config.bearerToken ?? mintApiToken(config.user, config.nextAuthSecret));
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${config.bearerToken ?? mintApiToken(config.user, config.nextAuthSecret)}`,
+    Authorization: `Bearer ${bearer}`,
   };
   if (config.skipBalanceCheck !== false) {
     // cloud-agent-client.ts sends this for skipped-balance callers; it cleanly

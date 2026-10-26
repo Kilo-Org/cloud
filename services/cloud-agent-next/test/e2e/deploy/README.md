@@ -83,6 +83,10 @@ The commands below run from `services/cloud-agent-next` (or use the full path fr
    authenticated Kilo user can start control-plane sessions and create worktrees
    on it.
 
+   The renderer points `E2E_MODEL_VALIDATION_BASE_URL` at the fake Worker origin,
+   so model validation with a runtime-authorized token uses the fake catalogue.
+   Production never sets that variable.
+
    `deploy` uploads `E2E_INTERNAL_API_SECRET` as the Worker's
    `INTERNAL_API_SECRET` secret when a source supplies it. `wrangler deploy` never
    clears an existing secret, so a redeploy without one keeps the deployed value and

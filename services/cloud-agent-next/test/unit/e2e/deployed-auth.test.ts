@@ -17,7 +17,9 @@ vi.mock('node:fs', async importOriginal => {
 import {
   assertDeployedProfileEnv,
   bootstrapDeployedProfile,
+  createControlTokenProvider,
   decodeOrdinaryPersonalToken,
+  exchangeControlToken,
   fetchStreamTicket,
   loadDeployedAuthFile,
 } from '../../e2e/deployed-auth.js';
@@ -704,5 +706,140 @@ describe('fetchStreamTicket', () => {
     );
 
     await expect(fetchStreamTicket({ ...input, timeoutMs: 1_000 })).resolves.toBe('fresh-ticket');
+  });
+});
+
+describe('exchangeControlToken', () => {
+  const backendUrl = 'https://api.example.test';
+  const later = () => new Date(Date.now() + 10 * 60_000).toISOString();
+
+  it('exchanges the source bearer for a control token', async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({ token: 'control-token', expiresAt: later() })
+    );
+
+    const result = await exchangeControlToken({
+      backendUrl,
+      sourceToken: 'source-token',
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    });
+
+    expect(result.token).toBe('control-token');
+    expect(result.expiresAtMs).toBeGreaterThan(Date.now());
+    const [url, init] = fetchMock.mock.calls[0] ?? [];
+    expect(url).toBe('https://api.example.test/api/cloud-agent-next/token');
+    expect((init as RequestInit).method).toBe('POST');
+    expect((init as RequestInit).body).toBe('{}');
+    expect((init as RequestInit).headers).toMatchObject({
+      Authorization: 'Bearer source-token',
+      'Content-Type': 'application/json',
+    });
+  });
+
+  it('reports the status without leaking the source token', async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({ error: 'nope' }, { status: 401, statusText: 'Unauthorized' })
+    );
+
+    await expect(
+      exchangeControlToken({
+        backendUrl,
+        sourceToken: 'super-secret-source',
+        fetchImpl: fetchMock as unknown as typeof fetch,
+      })
+    ).rejects.toThrow('Control token exchange failed: 401 Unauthorized');
+  });
+
+  it('rejects a response without a usable token or expiry', async () => {
+    for (const body of [
+      {},
+      { token: '', expiresAt: later() },
+      { token: 'control-token' },
+      { token: 'control-token', expiresAt: 'not-a-date' },
+      { token: 'control-token', expiresAt: new Date(Date.now() - 1000).toISOString() },
+    ]) {
+      const fetchMock = vi.fn(async () => Response.json(body));
+      await expect(
+        exchangeControlToken({
+          backendUrl,
+          sourceToken: 'source-token',
+          fetchImpl: fetchMock as unknown as typeof fetch,
+        })
+      ).rejects.toThrow(/Control token exchange/);
+    }
+  });
+});
+
+describe('createControlTokenProvider', () => {
+  const backendUrl = 'https://api.example.test';
+  const sourceToken = 'source-token';
+
+  it('caches a token until its refresh margin', async () => {
+    let now = Date.now();
+    let exchangeCount = 0;
+    const fetchMock = vi.fn(async () => {
+      exchangeCount += 1;
+      return Response.json({
+        token: `control-${exchangeCount}`,
+        expiresAt: new Date(now + 10 * 60_000).toISOString(),
+      });
+    });
+    const provider = createControlTokenProvider({
+      backendUrl,
+      sourceToken,
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      nowMs: () => now,
+      refreshMarginMs: 60_000,
+    });
+
+    expect(await provider.getToken()).toBe('control-1');
+    now += 60_000;
+    expect(await provider.getToken()).toBe('control-1');
+    now += 8 * 60_000;
+    expect(await provider.getToken()).toBe('control-2');
+    expect(exchangeCount).toBe(2);
+  });
+
+  it('shares one exchange between concurrent callers', async () => {
+    let resolveExchange: ((response: Response) => void) | undefined;
+    const fetchMock = vi.fn(
+      async () =>
+        new Promise<Response>(resolve => {
+          resolveExchange = resolve;
+        })
+    );
+    const provider = createControlTokenProvider({
+      backendUrl,
+      sourceToken,
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    });
+
+    const first = provider.getToken();
+    const second = provider.getToken();
+    await Promise.resolve();
+    resolveExchange?.(
+      Response.json({
+        token: 'control-token',
+        expiresAt: new Date(Date.now() + 600_000).toISOString(),
+      })
+    );
+
+    await expect(Promise.all([first, second])).resolves.toEqual(['control-token', 'control-token']);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('propagates an exchange failure', async () => {
+    const fetchMock = vi.fn(
+      async () => new Response('nope', { status: 503, statusText: 'Unavailable' })
+    );
+    const provider = createControlTokenProvider({
+      backendUrl,
+      sourceToken,
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    });
+
+    await expect(provider.getToken()).rejects.toThrow(
+      'Control token exchange failed: 503 Unavailable'
+    );
   });
 });

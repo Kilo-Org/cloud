@@ -156,6 +156,9 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     ...config.vars,
     WORKER_URL: workerUrl,
     KILOCODE_BACKEND_BASE_URL: 'https://api.kilo.ai',
+    // The e2e stack validates its models against the fake Worker, which serves
+    // the same route shape as the official backend. Production never sets this.
+    E2E_MODEL_VALIDATION_BASE_URL: new URL(kiloOpenRouterBase).origin,
     KILO_OPENROUTER_BASE: kiloOpenRouterBase,
     WS_ALLOWED_ORIGINS: 'https://app.kilo.ai,https://api.kilo.ai,http://localhost:3000',
     PER_SESSION_SANDBOX_ORG_IDS: '*',

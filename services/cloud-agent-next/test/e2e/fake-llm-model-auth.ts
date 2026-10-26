@@ -7,11 +7,17 @@
  * them with the static `local-fake-llm` credential
  * (`packages/web-shared/src/lib/ai-gateway/local-fake-llm.ts`).
  *
+ * Both credential classes are accepted: an ordinary personal token (no
+ * audience) and a modern policy-bearing token. Modern tokens carry an audience
+ * that the Worker's model validation and runtime proxy mint, so verification
+ * tries the audiences the Cloud Agent stack issues instead of requiring the
+ * no-audience legacy shape.
+ *
  * `kiloTokenPayload` omits `tokenPurpose`/`credentialExchange` and a non-strict
- * Zod parse strips unknown keys, so a policy-bearing token can never be
- * detected from `verifyKiloToken`'s return value. The signature is therefore
- * verified with `verifyKiloToken` and the *raw* decoded payload is checked
- * separately for the claims an ordinary personal token must not carry.
+ * Zod parse strips unknown keys, so forbidden claims can never be detected from
+ * `verifyKiloToken`'s return value. The signature is therefore verified with
+ * `verifyKiloToken` and the *raw* decoded payload is checked separately for the
+ * organization claims this personal-only fake must not accept.
  *
  * The pepper check mirrors the first half of production's API-token rule
  * (`packages/web-shared/src/lib/user/server.ts`): an absent `apiTokenPepper` claim is
@@ -25,19 +31,13 @@
 import { extractBearerToken, verifyKiloToken, type KiloTokenPayload } from '@kilocode/worker-utils';
 
 /**
- * Claims that only a non-ordinary (session, organization, delegated-workload,
- * runtime-authorized or audience-bound) token carries. Their presence rejects
- * the token on the model routes.
+ * Organization claims stay rejected: the deployed e2e suite runs as one
+ * personal account, so a session token must not widen into an organization.
  */
-export const FORBIDDEN_MODEL_TOKEN_CLAIMS = [
-  'aud',
-  'tokenPurpose',
-  'credentialExchange',
-  'runtimeAdmission',
-  'runtimeAuthorization',
-  'organizationId',
-  'organizationRole',
-] as const;
+export const FORBIDDEN_MODEL_TOKEN_CLAIMS = ['organizationId', 'organizationRole'] as const;
+
+/** Audiences the Cloud Agent stack issues for control and runtime tokens. */
+export const MODEL_TOKEN_AUDIENCES = ['cloud-agent-next', 'kilo-api', 'kilo-gateway'] as const;
 
 /** A Cloudflare Secrets Store binding (production) or a plain string (tests/local). */
 export type NextAuthSecretBinding = { get(): Promise<string | null> } | string | undefined;
@@ -75,6 +75,18 @@ export function decodeTrustedPayload(token: string): Record<string, unknown> {
 export type ModelRouteAuthResult =
   | { ok: true; payload: KiloTokenPayload }
   | { ok: false; status: number; message: string };
+
+async function verifyModernAudience(token: string, secret: string): Promise<KiloTokenPayload> {
+  let lastError: unknown;
+  for (const audience of MODEL_TOKEN_AUDIENCES) {
+    try {
+      return await verifyKiloToken(token, secret, { audience });
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('No accepted model token audience');
+}
 
 /**
  * Verify a bearer for the Worker's model routes.
@@ -114,16 +126,19 @@ export async function verifyModelRouteBearer(
     };
   }
 
-  let payload: KiloTokenPayload;
+  let decoded: Record<string, unknown>;
   try {
-    payload = await verifyKiloToken(token, secret);
+    decoded = decodeTrustedPayload(token);
   } catch {
     return { ok: false, status: 401, message: 'invalid model token' };
   }
 
-  let decoded: Record<string, unknown>;
+  let payload: KiloTokenPayload;
   try {
-    decoded = decodeTrustedPayload(token);
+    payload =
+      decoded.aud === undefined
+        ? await verifyKiloToken(token, secret)
+        : await verifyModernAudience(token, secret);
   } catch {
     return { ok: false, status: 401, message: 'invalid model token' };
   }

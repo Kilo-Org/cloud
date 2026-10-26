@@ -495,6 +495,27 @@ describe('trpcCall auth headers', () => {
     });
   });
 
+  it('prefers getBearerToken over bearerToken without minting', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okEnvelope({}));
+    vi.stubGlobal('fetch', fetchMock);
+    const getBearerToken = vi.fn(async () => 'control-token');
+
+    await trpcCall(
+      {
+        ...baseConfig,
+        bearerToken: 'source-token',
+        getBearerToken,
+        nextAuthSecret: undefined,
+      },
+      'start',
+      {}
+    );
+
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(request.headers).toMatchObject({ Authorization: 'Bearer control-token' });
+    expect(getBearerToken).toHaveBeenCalledTimes(1);
+  });
+
   it('omits x-skip-balance-check only when skipBalanceCheck is false', async () => {
     const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(okEnvelope({})));
     vi.stubGlobal('fetch', fetchMock);

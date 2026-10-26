@@ -441,8 +441,9 @@ run, so `releaseGate`, `fetchFakeWaiters`, `fetchFakeRequests`,
 configuration; precedence is env then auth file. The deployed profile reads the
 auth file at most once and only when a source needs it: never when `E2E_USER_TOKEN`
 and `FAKE_LLM_ADMIN_TOKEN` are both set. The
-deployed profile never reads `.dev.vars`, root env files, or Postgres, and never
-mints valid authentication credentials or stream tickets.
+deployed profile never reads `.dev.vars`, root env files, or Postgres. It never
+mints JWTs itself: it exchanges the source token for short-lived control tokens
+and fetches stream tickets from the live backend.
 The `auth-reject` negative probe deliberately signs one **invalid** JWT
 (wrong secret); it is used only for that bad-signature probe and is never
 presented as a valid credential.
@@ -455,11 +456,13 @@ The auth file, named by the optional `E2E_AUTH_FILE`, is JSON
 identity and the fake-llm admin bearer as one alternative to `E2E_USER_TOKEN` and
 `FAKE_LLM_ADMIN_TOKEN`. The token must be an **ordinary
 personal Kilo API token** (the `generateApiToken` family), obtained from the
-user's personal API key or CLI token flow.
+user's personal API key or CLI token flow. The driver exchanges it for
+short-lived Cloud Agent control tokens (`POST /api/cloud-agent-next/token`) and
+presents those to the Worker; stream-ticket requests still use the source token.
 Session/control tokens, organization tokens, and delegated/runtime tokens are
-refused with a diagnostic: they take the runtime-authorization path, and
-admission then fails with `Model catalog authentication unavailable`. The token
-is never printed.
+refused as the **source** with a diagnostic. Neither token is printed. A
+`503 Service Unavailable` from the exchange means Cloud Agent token issuance is
+disabled on the backend (`CLOUD_AGENT_RESOURCE_TOKENS_ENABLED`).
 
 Exact run command, from `services/cloud-agent-next`:
 
@@ -582,6 +585,12 @@ E2E_PARALLEL=all pnpm --filter cloud-agent-next run e2e:parallel
 pnpm --filter cloud-agent-next exec tsx test/e2e/matrix.ts --profile local-http --parallel 2
 pnpm --filter cloud-agent-next exec tsx test/e2e/matrix.ts --profile local --only cold,worktree-chat
 ```
+
+The local Docker profile mints a modern control token with a runtime admission.
+The `local-http` and `deployed` profiles exchange their source token for a
+short-lived control token; `local-http` therefore needs
+`SHARED_RESOURCE_TOKENS_ENABLED=true` and
+`CLOUD_AGENT_RESOURCE_TOKENS_ENABLED=true` on the local web app.
 
 `matrix.ts` runs every entry in `SHARED_SCENARIOS` under one concurrency pool,
 one scenario per child process (`run.ts`), passing each scenario's

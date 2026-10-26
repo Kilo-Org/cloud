@@ -103,23 +103,17 @@ export function computeExpiration(
 }
 
 export async function fetchExpiringTransactions(userId: string, fromDb: DbOrTx = db) {
-  // DISTINCT preserves a query-planning boundary for the owner-scoped closure lookup.
+  const closures = alias(creditTransactionsTable, 'closures');
+  // LIMIT keeps owner and category filters outside the unique-link lookup.
   const expiredCredits = fromDb
-    .selectDistinct({
-      original_transaction_id: creditTransactionsTable.original_transaction_id,
+    .select({
+      original_transaction_id: closures.original_transaction_id,
+      kilo_user_id: closures.kilo_user_id,
+      credit_category: closures.credit_category,
     })
-    .from(creditTransactionsTable)
-    .where(
-      and(
-        eq(creditTransactionsTable.kilo_user_id, userId),
-        isNotNull(creditTransactionsTable.original_transaction_id),
-        inArray(creditTransactionsTable.credit_category, [
-          'credits_expired',
-          'orb_credit_expired',
-          'orb_credit_voided',
-        ])
-      )
-    )
+    .from(closures)
+    .where(eq(closures.original_transaction_id, creditTransactionsTable.id))
+    .limit(1)
     .as('expired_credits');
   return await fromDb
     .select({
@@ -132,9 +126,16 @@ export async function fetchExpiringTransactions(userId: string, fromDb: DbOrTx =
       is_free: creditTransactionsTable.is_free,
     })
     .from(creditTransactionsTable)
-    .leftJoin(
+    .leftJoinLateral(
       expiredCredits,
-      eq(expiredCredits.original_transaction_id, creditTransactionsTable.id)
+      and(
+        eq(expiredCredits.kilo_user_id, userId),
+        inArray(expiredCredits.credit_category, [
+          'credits_expired',
+          'orb_credit_expired',
+          'orb_credit_voided',
+        ])
+      )
     )
     .where(
       and(
@@ -267,18 +268,16 @@ export async function fetchExpiringTransactionsForOrganization(
   organizationId: string,
   fromDb: DbOrTx = db
 ) {
+  const closures = alias(creditTransactionsTable, 'closures');
   const expiredCredits = fromDb
-    .selectDistinct({
-      original_transaction_id: creditTransactionsTable.original_transaction_id,
+    .select({
+      original_transaction_id: closures.original_transaction_id,
+      organization_id: closures.organization_id,
+      credit_category: closures.credit_category,
     })
-    .from(creditTransactionsTable)
-    .where(
-      and(
-        eq(creditTransactionsTable.organization_id, organizationId),
-        isNotNull(creditTransactionsTable.original_transaction_id),
-        eq(creditTransactionsTable.credit_category, 'credits_expired')
-      )
-    )
+    .from(closures)
+    .where(eq(closures.original_transaction_id, creditTransactionsTable.id))
+    .limit(1)
     .as('expired_credits');
 
   return await fromDb
@@ -293,9 +292,12 @@ export async function fetchExpiringTransactionsForOrganization(
       kilo_user_id: creditTransactionsTable.kilo_user_id,
     })
     .from(creditTransactionsTable)
-    .leftJoin(
+    .leftJoinLateral(
       expiredCredits,
-      eq(expiredCredits.original_transaction_id, creditTransactionsTable.id)
+      and(
+        eq(expiredCredits.organization_id, organizationId),
+        eq(expiredCredits.credit_category, 'credits_expired')
+      )
     )
     .where(
       and(

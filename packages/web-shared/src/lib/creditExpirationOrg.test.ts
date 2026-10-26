@@ -63,35 +63,53 @@ describe('fetchExpiringTransactionsForOrganization', () => {
     expect(new Date(result[0].expiry_date!).toISOString()).toBe('2024-02-01T00:00:00.000Z');
   });
 
-  it('excludes already-expired transactions', async () => {
-    const originalId = randomUUID();
-    await db.insert(creditTransactionsTable).values([
-      {
-        id: originalId,
-        kilo_user_id: ownerId,
-        organization_id: orgId,
-        amount_microdollars: 5_000_000,
-        is_free: true,
-        expiry_date: '2024-01-10T00:00:00Z',
-        expiration_baseline_microdollars_used: 0,
-        original_baseline_microdollars_used: 0,
-        description: 'Already expired',
-      },
-      {
-        kilo_user_id: ownerId,
-        organization_id: orgId,
-        amount_microdollars: -5_000_000,
-        is_free: true,
-        credit_category: 'credits_expired',
-        original_transaction_id: originalId,
-        original_baseline_microdollars_used: 0,
-        description: 'Expiration record',
-      },
-    ]);
-
-    const result = await fetchExpiringTransactionsForOrganization(orgId);
-    expect(result).toHaveLength(0);
-  });
+  it.each([
+    { category: 'credits_expired', matchesOrganization: true, closed: true },
+    { category: 'accounting_adjustment', matchesOrganization: true, closed: false },
+    { category: 'orb_credit_expired', matchesOrganization: true, closed: false },
+    { category: 'orb_credit_voided', matchesOrganization: true, closed: false },
+    { category: null, matchesOrganization: true, closed: false },
+    { category: 'credits_expired', matchesOrganization: false, closed: false },
+  ])(
+    'matches expiration organization and category ($category, organization match: $matchesOrganization)',
+    async ({ category, matchesOrganization, closed }) => {
+      const otherOrg = matchesOrganization ? null : await createTestOrg(ownerId);
+      if (!matchesOrganization && !otherOrg) throw new Error('Expected another organization');
+      const originalId = randomUUID();
+      try {
+        await db.insert(creditTransactionsTable).values([
+          {
+            id: originalId,
+            kilo_user_id: ownerId,
+            organization_id: orgId,
+            amount_microdollars: 5_000_000,
+            is_free: true,
+            expiry_date: '2024-01-10T00:00:00Z',
+            expiration_baseline_microdollars_used: 0,
+            original_baseline_microdollars_used: 0,
+          },
+          {
+            kilo_user_id: ownerId,
+            organization_id: otherOrg?.id ?? orgId,
+            amount_microdollars: -5_000_000,
+            is_free: true,
+            credit_category: category,
+            original_transaction_id: originalId,
+            original_baseline_microdollars_used: 0,
+          },
+        ]);
+        const result = await fetchExpiringTransactionsForOrganization(orgId);
+        expect(result.map(transaction => transaction.id)).toEqual(closed ? [] : [originalId]);
+      } finally {
+        if (otherOrg) {
+          await db
+            .delete(creditTransactionsTable)
+            .where(eq(creditTransactionsTable.organization_id, otherOrg.id));
+          await db.delete(organizations).where(eq(organizations.id, otherOrg.id));
+        }
+      }
+    }
+  );
 
   it('does not return transactions without expiry dates', async () => {
     await db.insert(creditTransactionsTable).values({

@@ -250,6 +250,8 @@ should pass against the local PostgreSQL database.
 Single-account expiration locks the primary account before reading its credit transactions.
 It returns current usage, acquired credits, and the next expiration.
 Balance callers use these fields together.
+Closure checks follow the unique original-transaction link.
+Account and category filters determine whether the linked record closes the credit.
 Forced checks pass `{ force: true }`, including checks with no expiration hint.
 
 Use synthetic accounts and a local PostgreSQL database for expiration checks.
@@ -262,6 +264,7 @@ pnpm --filter web exec env NODE_ENV=test jest --runInBand \
   ../../packages/web-shared/src/lib/creditExpiration.concurrent.test.ts \
   ../../packages/web-shared/src/lib/organizations/organization-usage.test.ts \
   src/tests/profile-balance.test.ts \
+  src/lib/recomputeNextCreditExpiration.test.ts \
   src/routers/organizations/organization-router.test.ts
 ```
 

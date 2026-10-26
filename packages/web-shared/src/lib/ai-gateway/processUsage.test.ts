@@ -104,7 +104,7 @@ describe('processOpenRouterUsage', () => {
       total_tokens: 150,
     };
 
-    const result = processOpenRouterUsage(usage, coreProps);
+    const result = processOpenRouterUsage(usage, coreProps, 'openrouter');
 
     expect(result.cost_mUsd).toBe(1000);
     expect(result.is_byok).toBe(false);
@@ -122,10 +122,45 @@ describe('processOpenRouterUsage', () => {
       total_tokens: 150,
     };
 
-    const result = processOpenRouterUsage(usage, coreProps);
+    const result = processOpenRouterUsage(usage, coreProps, 'openrouter');
 
     expect(result.cost_mUsd).toBe(20000);
     expect(result.is_byok).toBe(true);
+  });
+
+  describe('missing BYOK status', () => {
+    const usage = {
+      cost: 0.075966,
+      completion_tokens: 100,
+      completion_tokens_details: { reasoning_tokens: 0 },
+      prompt_tokens: 50,
+      prompt_tokens_details: { cached_tokens: 0 },
+      total_tokens: 150,
+    };
+
+    beforeEach(() => {
+      jest.mocked(captureMessage).mockClear();
+    });
+
+    test.each(['openrouter', 'vercel'] as const)(
+      'reports %s usage with cost but without is_byok',
+      provider => {
+        processOpenRouterUsage(usage, coreProps, provider);
+
+        expect(captureMessage).toHaveBeenCalledWith(
+          "SUSPICIOUS: openrouters cost accounting doesn't make sense",
+          expect.anything()
+        );
+      }
+    );
+
+    test('bills the reported cost from providers that never report is_byok', () => {
+      const result = processOpenRouterUsage(usage, coreProps, 'martian');
+
+      expect(result.cost_mUsd).toBe(75966);
+      expect(result.is_byok).toBeNull();
+      expect(captureMessage).not.toHaveBeenCalled();
+    });
   });
 });
 
@@ -199,7 +234,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
   test(nonStreaming, async () => {
     const inputFile = join(sampleDir, nonStreaming);
     const jsonString = await readFile(inputFile, 'utf-8');
-    const result = parseMicrodollarUsageFromString(jsonString, 'fake-user-id', 200);
+    const result = parseMicrodollarUsageFromString(jsonString, 'fake-user-id', 200, 'openrouter');
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);
@@ -570,7 +605,7 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
       usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
     });
 
-    const result = parseMicrodollarUsageFromString(response, 'fake-user-id', 200);
+    const result = parseMicrodollarUsageFromString(response, 'fake-user-id', 200, 'openrouter');
 
     expect(result.upstream_id).toBe('chatcmpl-non-streamed');
     expect(result.inference_provider).toBe('fireworks');

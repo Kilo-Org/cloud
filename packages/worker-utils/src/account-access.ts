@@ -32,6 +32,8 @@ export function isApiTokenPepperCurrent(
   return !accountPepper || accountPepper === tokenPepper;
 }
 
+// A membership resolves only for a live organization: the join excludes a soft-deleted
+// organization, so the caller sees no role (and therefore no membership).
 export async function findOrganizationMemberRole(
   db: AccountDb,
   organizationId: string,
@@ -128,6 +130,7 @@ export async function findOrganizationMemberBalanceRow(
       and(
         eq(organizations.id, organizationId),
         eq(organization_memberships.kilo_user_id, userId),
+        isNull(organizations.deleted_at),
         not(eq(organization_memberships.role, 'billing_manager'))
       )
     )

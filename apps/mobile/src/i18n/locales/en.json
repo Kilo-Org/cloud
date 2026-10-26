@@ -58,7 +58,7 @@
     "estimateSpendLimitTooLow": "Raise the spend safeguard to allow this summary.",
     "confirmPaid": "Enable paid summaries for {{context}}?",
     "confirmGeneration": "Generate a paid summary?",
-    "paidDisclosure": "{{estimate}} estimated, up to {{maximum}}, with a {{minutes}} minute limit. Charges apply even if generation fails.",
+    "paidDisclosure": "{{estimate}} estimated, up to {{maximum}}, with a {{minutes}}-minute limit. Charges apply even if generation fails.",
     "enable": "Enable paid summaries",
     "contextSettings": "AI settings · {{context}}",
     "allContexts": "Personal and organization briefs stay separate.",
@@ -91,7 +91,13 @@
     "estimatePermissionUnavailable": "You do not have permission to use this context’s balance.",
     "createFailed": "Could not create this brief.",
     "reviewFailed": "Could not review this brief.",
-    "saved": "Briefing settings saved"
+    "saved": "Brief settings saved",
+    "preparing": "Preparing your brief…",
+    "preparationHint": "You can leave and return while activity is collected. No AI work or charge starts until you review and confirm the estimate.",
+    "resumeReview": "Continue review",
+    "preparationFailed": "Could not collect activity for this brief. Try again.",
+    "preparationTimedOut": "Collecting activity took too long. Try again.",
+    "preparationDrafts": "Unconfirmed briefs"
   },
   "common": {
     "cancel": "Cancel",
@@ -147,6 +153,7 @@
     "connected": "Connected",
     "couldNotLoadModels": "Could not load models",
     "couldNotLoadRepositories": "Could not load repositories",
+    "noRepositoriesFound": "No repositories found",
     "critical": "Critical",
     "delete": "Delete",
     "deleted": "Deleted",
@@ -181,6 +188,7 @@
     "connect": "Connect",
     "connectBitbucket": "Connect Bitbucket",
     "connectGitlab": "Connect GitLab",
+    "connectProvider": "Connect a provider",
     "contentTruncated": "Content truncated",
     "copyLink": "Copy link",
     "couldNotLoadOrganizations": "Could not load organizations",
@@ -239,7 +247,8 @@
     "dismissed": "Dismissed",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Changes"
+    "changes": "Changes",
+    "organizationTrialEnded": "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again."
   },
   "language": {
     "restarting": "Restarting to apply language",
@@ -1500,7 +1509,6 @@
       "gitlabNoRepositoriesDescription": "You may need to grant access to more groups or projects on GitLab.",
       "installGithubApp": "Install the GitHub app on repositories",
       "installGithubAppDescription": "Grant the Kilo GitHub App access to the repositories you want reviewed.",
-      "noRepositoriesFound": "No repositories found",
       "repositoryAccess": "repository access"
     },
     "style": {
@@ -1582,7 +1590,6 @@
       "invalidUrl": "Enter a valid pull request URL",
       "couldNotCheckProviderStatus": "Couldn't check provider status",
       "couldNotLoadProviders": "We couldn't load your connected providers. Please try again.",
-      "connectProvider": "Connect a provider",
       "connectProviderDescription": "Connect GitHub to start a manual review of a pull request.",
       "pullRequestUrl": "Pull request URL",
       "instructions": "Instructions (optional)",
@@ -1710,8 +1717,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "No filters available",
-      "noFiltersDescription": "Go back and reopen filters from the findings list.",
       "title": "Filter findings",
       "reset": "Reset",
       "severity": "Severity",
@@ -2265,8 +2270,8 @@
       "title": "Session",
       "copyErrorDetails": "Copy error details",
       "backToSessions": "Back to sessions",
-      "follow": "Follow on Lock Screen",
-      "unfollow": "Stop following on Lock Screen",
+      "follow": "Follow session",
+      "unfollow": "Unfollow session",
       "couldNotLoad": "Could not load session",
       "failedToLoadDetails": "Failed to load session details",
       "failedToStopExecution": "Failed to stop execution",
@@ -3060,7 +3065,6 @@
   "voiceInput": {
     "listening": "Listening...",
     "listeningStopped": "Listening stopped.",
-    "staysOff": "Speech stays off until you allow online transcription.",
     "onlineTitle": "Speech is processed online",
     "onlineMessage": "This device cannot transcribe offline. Your recording is sent to {{provider}} to turn it into text. Kilo does not store the audio.",
     "allow": "Allow",
@@ -3274,7 +3278,9 @@
       "sendInvite": "Send invite",
       "title": "Invite member",
       "alreadyInvited": "They're already invited or already a member.",
-      "sendError": "Couldn't send the invite."
+      "sendError": "Couldn't send the invite.",
+      "pendingInvitation": "This email already has a pending invitation.",
+      "alreadyMember": "This person is already a member of this organization."
     },
     "invoices": {
       "downloadA11y": "Download invoice {{number}}",
@@ -3344,7 +3350,12 @@
       "pendingInvitations": "Pending invitations",
       "resendInvite": "Resend invite",
       "shareInviteLink": "Share invite link",
-      "resendInviteError": "Couldn't resend the invite."
+      "resendInviteError": "Couldn't resend the invite.",
+      "inviteNotResendable": "This invitation can no longer be resent.",
+      "ownerAuthority": "Only an organization owner can manage owners.",
+      "ownRoleChange": "You cannot change your own role.",
+      "inviteExpired": "This invitation has expired.",
+      "inviteAccepted": "This invitation has already been accepted."
     },
     "usageStats": {
       "inputTokens": "Input Tokens",
@@ -3444,7 +3455,7 @@
     "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen.",
     "openSession": "Open",
     "finished": "Finished",
-    "followFailed": "Couldn't show this agent on the Lock Screen.",
+    "followFailed": "Couldn't follow this session.",
     "approveFailed": "Couldn't approve. Tap $t(common.approve) to try again.",
     "checked": "Checked",
     "lastKnown": "Last known",

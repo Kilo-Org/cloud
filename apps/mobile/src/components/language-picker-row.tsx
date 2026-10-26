@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -13,7 +14,8 @@ type LanguagePickerRowProps = Readonly<{
   first: boolean;
   /** A group title never carries the divider of the row above it. */
   showDivider: boolean;
-  selected: LanguagePreference;
+  /** True only for the row the sheet holds as its selection. */
+  selected: boolean;
   disabled: boolean;
   /** The device's own language, shown under the device option. */
   deviceEndonym: string;
@@ -22,7 +24,10 @@ type LanguagePickerRowProps = Readonly<{
   onSelect: (preference: LanguagePreference) => void;
 }>;
 
-export function LanguagePickerRow({
+// FlashList re-renders the mounted cells when `extraData` changes, and the
+// list's item objects keep their identity across a selection. Memoizing the
+// row narrows that repaint to the two rows whose own `selected` flag flipped.
+export const LanguagePickerRow = memo(function LanguagePickerRow({
   item,
   first,
   showDivider,
@@ -60,7 +65,7 @@ export function LanguagePickerRow({
     return (
       <ChoiceRow
         className={dividerClass}
-        selected={selected === 'device'}
+        selected={selected}
         disabled={disabled}
         onPress={() => {
           onSelect('device');
@@ -81,7 +86,7 @@ export function LanguagePickerRow({
   return (
     <ChoiceRow
       className={dividerClass}
-      selected={selected === item.row.tag}
+      selected={selected}
       disabled={disabled}
       onPress={() => {
         onSelect(item.row.tag);
@@ -101,4 +106,4 @@ export function LanguagePickerRow({
       </View>
     </ChoiceRow>
   );
-}
+});

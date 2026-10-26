@@ -31,6 +31,15 @@ const validDefinition: CustomLlmDefinition = {
   group_ids: ['00000000-0000-4000-8000-000000000123'],
 };
 
+const publicDefinition: CustomLlmDefinition = {
+  internal_id: 'upstream-model',
+  display_name: 'Public model',
+  context_length: 128000,
+  max_completion_tokens: 4096,
+  base_url: 'https://upstream.example.com/v1',
+  public: { inference_providers: ['acme'], description: 'A public custom model' },
+};
+
 beforeEach(async () => {
   jest
     .mocked(getOpenRouterModelsMetadataFromDatabase)
@@ -551,6 +560,73 @@ describe('adminCustomLlmRouter', () => {
           source_public_id: 'acme/copy-source',
           public_id: 'kilo/copy',
           display_name: 'Copy',
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+  });
+
+  describe('public definitions', () => {
+    const credentials = { type: 'api_key', api_key: 'sk-secret' } as const;
+
+    it('creates a public custom LLM', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      const result = await caller.admin.customLlm.upsert({
+        public_id: 'acme/public-model',
+        definition: publicDefinition,
+        credentials,
+      });
+
+      expect(result.definition.public).toEqual({
+        inference_providers: ['acme'],
+        description: 'A public custom model',
+      });
+    });
+
+    it.each([
+      ['organization_ids', { organization_ids: [] }],
+      ['group_ids', { group_ids: ['00000000-0000-4000-8000-000000000123'] }],
+      ['description', { public: { inference_providers: ['acme'], description: ' ' } }],
+    ])('rejects a public definition with an invalid %s', async (_field, overrides) => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: 'acme/invalid-public-model',
+          definition: { ...publicDefinition, ...overrides },
+          credentials,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
+    it('stores a private definition that nobody is granted yet', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const {
+        organization_ids: _organizationIds,
+        group_ids: _groupIds,
+        ...definition
+      } = validDefinition;
+
+      const result = await caller.admin.customLlm.upsert({
+        public_id: 'acme/unassigned-model',
+        definition,
+        credentials,
+      });
+
+      expect(result.definition.organization_ids).toBeUndefined();
+    });
+
+    it('rejects an inference provider that is not a lowercase slug', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: 'acme/public-model',
+          definition: {
+            ...publicDefinition,
+            public: { inference_providers: ['Acme AI'], description: 'A public custom model' },
+          },
+          credentials,
         })
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     });

@@ -18,7 +18,9 @@ import type { NextAuthOptions, JWT, LoggerInstance } from 'next-auth';
 import { getServerSession } from 'next-auth';
 import { IS_DEVELOPMENT, ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { redirect } from 'next/navigation';
-import type { Organization, User } from '@kilocode/db/schema';
+import { device_sessions, type Organization, type User } from '@kilocode/db/schema';
+import { and, eq, isNull } from 'drizzle-orm';
+import { isDeviceSessionActive } from '@kilocode/web-shared/lib/auth/device-session-cache';
 import {
   isApiTokenPepperCurrent,
   isEmailBlacklistedByDomain,
@@ -242,7 +244,10 @@ export async function getUserFromBearerForCredentialExchange(
     false,
     undefined,
     undefined,
-    db
+    db,
+    undefined,
+    undefined,
+    auth.claims.deviceSessionId
   );
   if (!result.user) return result;
   if (!isKiloCredentialExchangeEligible(auth, policy)) {
@@ -455,6 +460,26 @@ async function validateUserAuthorization(
     return authError(403, 'Access denied (nonadmin)', kiloUserId);
   }
 
+  // A credential bound to a device session is only valid while that session is
+  // active. The answer is cached per instance for
+  // `DEVICE_SESSION_CACHE_TTL_MS`, which is the window in which a revocation
+  // written by another instance takes effect here; a revocation on this
+  // instance invalidates its entry. See `lib/auth/device-session-cache`.
+  if (deviceSessionId !== undefined) {
+    const active = uuid.safeParse(deviceSessionId).success
+      ? await isDeviceSessionActive(deviceSessionId, kiloUserId, () =>
+          readActiveDeviceSession(deviceSessionId, kiloUserId)
+        )
+      : false;
+    if (!active) {
+      // The caller presented a credential that no longer works, so this must
+      // not degrade into an anonymous request.
+      return authError(401, 'Device session is no longer active', kiloUserId, {
+        credentialsRejected: true,
+      });
+    }
+  }
+
   if (organizationId) {
     const uuidResult = uuid.safeParse(organizationId);
     if (!uuidResult.success) {
@@ -476,6 +501,25 @@ async function validateUserAuthorization(
     tokenSource,
     deviceSessionId,
   };
+}
+
+/**
+ * Read a session from the primary: a session created moments ago must
+ * authenticate its first request, which a lagging replica would refuse.
+ */
+async function readActiveDeviceSession(
+  deviceSessionId: string,
+  kiloUserId: string
+): Promise<boolean> {
+  const session = await db.query.device_sessions.findFirst({
+    where: and(
+      eq(device_sessions.id, deviceSessionId),
+      eq(device_sessions.kilo_user_id, kiloUserId),
+      isNull(device_sessions.revoked_at)
+    ),
+    columns: { id: true },
+  });
+  return session !== undefined;
 }
 
 export async function isUserBlacklistedByDomain(

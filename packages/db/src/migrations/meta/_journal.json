@@ -2119,8 +2119,15 @@
     {
       "idx": 302,
       "version": "7",
-      "when": 1792878912751,
-      "tag": "0302_flippant_jackpot",
+      "when": 1792878599267,
+      "tag": "0302_loud_victor_mancha",
+      "breakpoints": true
+    },
+    {
+      "idx": 303,
+      "version": "7",
+      "when": 1793014203416,
+      "tag": "0303_cli_session_publication",
       "breakpoints": true
     }
   ]

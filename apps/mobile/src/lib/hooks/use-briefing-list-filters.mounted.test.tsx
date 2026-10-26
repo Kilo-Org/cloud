@@ -6,11 +6,18 @@ import { type BriefingListFilters, useBriefingListFilters } from './use-briefing
 
 const navigation = vi.hoisted(() => {
   const params: { via?: string } = {};
+  const state = { clearsParam: true };
   return {
     params,
+    state,
     router: {
       setParams: vi.fn((next: { via?: string }) => {
-        params.via = next.via;
+        // The real call goes through the navigation container, which merges the
+        // params of the route that handles the action. `state.clearsParam`
+        // models the case where this screen's own route never receives it.
+        if (state.clearsParam) {
+          params.via = next.via;
+        }
       }),
     },
   };
@@ -47,6 +54,7 @@ function mount() {
 describe('briefing notification entry', () => {
   beforeEach(() => {
     navigation.params.via = undefined;
+    navigation.state.clearsParam = true;
     navigation.router.setParams.mockClear();
     published.current = undefined;
   });
@@ -85,6 +93,53 @@ describe('briefing notification entry', () => {
       expect(navigation.params.via).toBeUndefined();
     }
     expect(navigation.router.setParams).toHaveBeenCalledTimes(2);
+    renderer.unmount();
+  });
+
+  it('keeps the chips live when the marker never clears from this route', () => {
+    navigation.state.clearsParam = false;
+    const renderer = mount();
+    navigation.params.via = 'push';
+    act(() => {
+      renderer.update(createElement(Harness));
+    });
+    // The entry still opens on the whole current window...
+    expect(filters().organizationId).toBeUndefined();
+    expect(filters().history).toBe(false);
+    // ...and the controls stay effective afterwards, even though the route
+    // still carries the marker.
+    expect(navigation.params.via).toBe('push');
+    act(() => {
+      filters().setOrganizationId('org-1');
+      filters().setHistory(true);
+    });
+    expect(filters().organizationId).toBe('org-1');
+    expect(filters().history).toBe(true);
+    act(() => {
+      filters().setOrganizationId(null);
+    });
+    expect(filters().organizationId).toBeNull();
+    act(() => {
+      filters().setOrganizationId(undefined);
+    });
+    expect(filters().organizationId).toBeUndefined();
+    renderer.unmount();
+  });
+
+  it('dispatches the marker clear once while the marker stays set', () => {
+    navigation.state.clearsParam = false;
+    const renderer = mount();
+    navigation.params.via = 'push';
+    act(() => {
+      renderer.update(createElement(Harness));
+    });
+    act(() => {
+      filters().setOrganizationId('org-1');
+    });
+    act(() => {
+      renderer.update(createElement(Harness));
+    });
+    expect(navigation.router.setParams).toHaveBeenCalledTimes(1);
     renderer.unmount();
   });
 });

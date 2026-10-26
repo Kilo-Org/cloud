@@ -320,6 +320,7 @@ re-prepare after a wrapper restart. A repeated `prepare`, a reconnect or a new a
 attempt keeps its deadline. Setup commands keep their own per-command limits, and how many run is
 configuration, so the attempt deadline is their aggregate stop: a preparation whose setup work
 together outlasts the attempt fails as `preparation_timeout`.
+Environment-build status reports this same timer as `sessionPreparationBudgetMs` for setup warnings.
 
 `prepare` returns the route view that the Sandbox DO would notify: `ready` only when the route is
 ready and the wrapper is connected, `reconnecting` when the route is ready but the socket is down,

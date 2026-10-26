@@ -4132,6 +4132,7 @@
       "startNewSessionHint": "Нажмите и удерживайте, чтобы начать новый сеанс.",
       "linkSession": "Привязать сеанс",
       "linkFailed": "Не удалось привязать сеанс к задаче",
+      "moveToAnotherTodo": "Переместить в другую задачу",
       "startRefreshFailed": "Сеанс запущен, но этот список не обновился."
     },
     "linkSession": {
@@ -4141,6 +4142,7 @@
     },
     "upNext": "Далее",
     "sessionTodo": "Задача: {{title}}",
+    "openTodoHint": "Открывает задачу.",
     "linkToTodo": "Привязать к задаче",
     "candidates": {
       "empty": "Нет открытых задач"

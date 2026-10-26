@@ -4022,6 +4022,7 @@
       "startNewSessionHint": "ନୂଆ ସେସନ୍ ଆରମ୍ଭ କରିବାକୁ ଦୀର୍ଘ ସମୟ ଦବାନ୍ତୁ।",
       "linkSession": "ସେସନ୍ ଲିଙ୍କ୍ କରନ୍ତୁ",
       "linkFailed": "ସେସନ୍କୁ କାମ ସହିତ ଲିଙ୍କ୍ କରାଯାଇପାରିଲା ନାହିଁ",
+      "moveToAnotherTodo": "ଅନ୍ୟ ଏକ କାମକୁ ଘୁଞ୍ଚାନ୍ତୁ",
       "startRefreshFailed": "ସେସନ୍ ଆରମ୍ଭ ହେଲା, କିନ୍ତୁ ଏହି ତାଲିକା ଅପଡେଟ୍ ହେଲା ନାହିଁ।"
     },
     "linkSession": {
@@ -4031,6 +4032,7 @@
     },
     "upNext": "ପରବର୍ତ୍ତୀ",
     "sessionTodo": "କାମ: {{title}}",
+    "openTodoHint": "କାମ ଖୋଲେ।",
     "linkToTodo": "କାମ ସହିତ ଲିଙ୍କ୍ କରନ୍ତୁ",
     "candidates": {
       "empty": "କୌଣସି ଖୋଲା କାମ ନାହିଁ"

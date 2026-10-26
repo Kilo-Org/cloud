@@ -4022,6 +4022,7 @@
       "startNewSessionHint": "برای شروع نشست جدید طولانی فشار دهید.",
       "linkSession": "پیوند نشست",
       "linkFailed": "پیوند دادن نشست به کار ممکن نشد.",
+      "moveToAnotherTodo": "انتقال به کار دیگر",
       "startRefreshFailed": "نشست آغاز شد، اما این فهرست به‌روز نشد."
     },
     "linkSession": {
@@ -4031,6 +4032,7 @@
     },
     "upNext": "بعدی",
     "sessionTodo": "کار: {{title}}",
+    "openTodoHint": "کار را باز می‌کند.",
     "linkToTodo": "پیوند به کار",
     "candidates": {
       "empty": "هیچ کار بازی نیست"

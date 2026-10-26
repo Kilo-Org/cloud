@@ -4022,6 +4022,7 @@
       "startNewSessionHint": "Yeni sessiya başlatmaq üçün uzun bas.",
       "linkSession": "Sessiyanı əlaqələndir",
       "linkFailed": "Sessiyanı tapşırıqla əlaqələndirmək mümkün olmadı",
+      "moveToAnotherTodo": "Başqa tapşırığa köçür",
       "startRefreshFailed": "Sessiya başladı, lakin bu siyahı yenilənmədi."
     },
     "linkSession": {
@@ -4031,6 +4032,7 @@
     },
     "upNext": "Sıradakı",
     "sessionTodo": "Tapşırıq: {{title}}",
+    "openTodoHint": "Tapşırığı açır.",
     "linkToTodo": "Tapşırığa əlaqələndir",
     "candidates": {
       "empty": "Açıq tapşırıq yoxdur"

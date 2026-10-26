@@ -4132,6 +4132,7 @@
       "startNewSessionHint": "Przytrzymaj, aby rozpocząć nową sesję.",
       "linkSession": "Powiąż sesję",
       "linkFailed": "Nie udało się powiązać sesji z zadaniem",
+      "moveToAnotherTodo": "Przenieś do innego zadania",
       "startRefreshFailed": "Sesja została rozpoczęta, ale nie udało się zaktualizować tej listy."
     },
     "linkSession": {
@@ -4141,6 +4142,7 @@
     },
     "upNext": "Następne",
     "sessionTodo": "Zadanie: {{title}}",
+    "openTodoHint": "Otwiera zadanie.",
     "linkToTodo": "Powiąż z zadaniem",
     "candidates": {
       "empty": "Brak otwartych zadań"

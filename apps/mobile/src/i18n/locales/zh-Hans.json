@@ -4022,6 +4022,7 @@
       "startNewSessionHint": "长按以开始新会话。",
       "linkSession": "关联会话",
       "linkFailed": "无法将会话关联到该待办事项",
+      "moveToAnotherTodo": "移至其他待办事项",
       "startRefreshFailed": "会话已启动，但此列表未更新。"
     },
     "linkSession": {
@@ -4031,6 +4032,7 @@
     },
     "upNext": "接下来",
     "sessionTodo": "待办事项：{{title}}",
+    "openTodoHint": "打开该待办事项。",
     "linkToTodo": "关联到待办事项",
     "candidates": {
       "empty": "暂无未完成的待办事项"

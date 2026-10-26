@@ -4022,6 +4022,7 @@
       "startNewSessionHint": "Peze lontan pou kòmanse yon nouvo sesyon.",
       "linkSession": "Lye sesyon",
       "linkFailed": "Nou pa t ka lye sesyon an ak travay la",
+      "moveToAnotherTodo": "Deplase nan yon lòt travay",
       "startRefreshFailed": "Sesyon an te kòmanse, men lis sa a pa t’ mete ajou."
     },
     "linkSession": {
@@ -4031,6 +4032,7 @@
     },
     "upNext": "Pwochen",
     "sessionTodo": "Travay: {{title}}",
+    "openTodoHint": "Louvri travay la.",
     "linkToTodo": "Lye ak travay",
     "candidates": {
       "empty": "Pa gen travay ouvè"

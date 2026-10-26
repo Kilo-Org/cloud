@@ -4022,6 +4022,7 @@
       "startNewSessionHint": "Riƙe dogon lokaci don fara sabon zama.",
       "linkSession": "Haɗa zama",
       "linkFailed": "An kasa haɗa zaman da aikin",
+      "moveToAnotherTodo": "Kai zuwa wani aiki",
       "startRefreshFailed": "Zaman ya fara, amma wannan jerin bai sabunta ba."
     },
     "linkSession": {
@@ -4031,6 +4032,7 @@
     },
     "upNext": "Na gaba",
     "sessionTodo": "Aiki: {{title}}",
+    "openTodoHint": "Yana buɗe aiki.",
     "linkToTodo": "Haɗa da aiki",
     "candidates": {
       "empty": "Babu buɗaɗɗen ayyuka"

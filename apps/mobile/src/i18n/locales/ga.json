@@ -4187,6 +4187,7 @@
       "startNewSessionHint": "Brúigh go fada chun seisiún nua a thosú.",
       "linkSession": "Nasc seisiún",
       "linkFailed": "Níorbh fhéidir an seisiún a nascadh leis an tasc",
+      "moveToAnotherTodo": "Bog go tasc eile",
       "startRefreshFailed": "Thosaigh an seisiún, ach níor nuashonraíodh an liosta seo."
     },
     "linkSession": {
@@ -4196,6 +4197,7 @@
     },
     "upNext": "An chéad rud eile",
     "sessionTodo": "Tasc: {{title}}",
+    "openTodoHint": "Osclaíonn sé an tasc.",
     "linkToTodo": "Nasc le tasc",
     "candidates": {
       "empty": "Gan aon tasc oscailte"

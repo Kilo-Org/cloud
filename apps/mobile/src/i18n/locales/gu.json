@@ -4022,6 +4022,7 @@
       "startNewSessionHint": "નવું સેશન શરૂ કરવા લાંબુ દબાવો.",
       "linkSession": "સત્ર જોડો",
       "linkFailed": "સત્રને કાર્ય સાથે જોડી શકાયું નહીં",
+      "moveToAnotherTodo": "અન્ય કાર્ય પર ખસેડો",
       "startRefreshFailed": "સત્ર શરૂ થયું, પરંતુ આ યાદી અપડેટ થઈ નહીં."
     },
     "linkSession": {
@@ -4031,6 +4032,7 @@
     },
     "upNext": "આગળ",
     "sessionTodo": "કાર્ય: {{title}}",
+    "openTodoHint": "કાર્ય ખોલે છે.",
     "linkToTodo": "કાર્ય સાથે જોડો",
     "candidates": {
       "empty": "કોઈ ખુલ્લું કાર્ય નથી"

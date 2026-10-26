@@ -4022,6 +4022,7 @@
       "startNewSessionHint": "نیا سیشن شروع کرنے کے لیے دیر تک دبائیں.",
       "linkSession": "سیشن لنک کریں",
       "linkFailed": "سیشن کو کام سے لنک نہیں کیا جا سکا",
+      "moveToAnotherTodo": "کسی اور کام میں منتقل کریں",
       "startRefreshFailed": "سیشن شروع ہو گیا، لیکن یہ فہرست اپ ڈیٹ نہیں ہوئی۔"
     },
     "linkSession": {
@@ -4031,6 +4032,7 @@
     },
     "upNext": "اگلا",
     "sessionTodo": "کام: {{title}}",
+    "openTodoHint": "کام کھولتا ہے.",
     "linkToTodo": "کام سے لنک کریں",
     "candidates": {
       "empty": "کوئی کھلا کام نہیں"

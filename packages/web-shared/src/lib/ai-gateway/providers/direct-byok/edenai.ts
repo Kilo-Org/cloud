@@ -2,6 +2,7 @@ import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/p
 import { replaceReasoningObjectWithReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import {
+  apiKeyUpstream,
   faviconIcon,
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
@@ -9,10 +10,12 @@ import {
 export default {
   id: 'edenai',
   models_dev_id: 'edenai',
-  base_url: 'https://api.edenai.run/v3',
-  base_url_overrides: { messages: 'https://api.edenai.run/v3/v1' },
-  supported_chat_apis: ['chat_completions', 'messages', 'responses'],
-  reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
+  resolveUpstream: apiKeyUpstream({
+    apiUrl: 'https://api.edenai.run/v3',
+    apiUrlOverrides: { messages: 'https://api.edenai.run/v3/v1' },
+    supportedChatApis: ['chat_completions', 'messages', 'responses'],
+    responseTransforms: ReasoningDetailsTransform.ReasoningContent,
+  }),
   transformRequest(context) {
     replaceReasoningObjectWithReasoningEffort(context.request, { disableWithNoneEffort: true });
   },

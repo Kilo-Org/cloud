@@ -422,6 +422,7 @@ function buildRegistrationInput(
     agent: source.metadata.agent,
     repository,
     ...(source.metadata.profile ? { profile: source.metadata.profile } : {}),
+    ...(source.metadata.environment ? { environment: source.metadata.environment } : {}),
     ...(source.metadata.finalization ? { finalization: source.metadata.finalization } : {}),
     workspace,
     lifecycle: { version: now, timestamp: now },

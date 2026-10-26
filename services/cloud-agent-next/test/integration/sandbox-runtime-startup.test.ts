@@ -95,7 +95,6 @@ function fakeProvider(
     options?: ProviderLaunchOptions;
   }[] = [];
   const releases: (() => void)[] = [];
-  const captures: string[] = [];
   const calls = { create: 0, stop: 0, observe: 0, lease: 0 };
   const adapter: ProviderAdapter = {
     async ensureBillingAdmission() {},
@@ -128,12 +127,8 @@ function fakeProvider(
     async logs() {
       return '';
     },
-    async captureRepository(_ref, key) {
-      captures.push(key);
-      return true;
-    },
   };
-  return { adapter, launches, calls, captures, releases };
+  return { adapter, launches, calls, releases };
 }
 
 function configureHarness(
@@ -144,7 +139,6 @@ function configureHarness(
   installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
     NEXTAUTH_SECRET: workerSecret,
     WORKER_URL: 'https://worker.test',
-    CONTAINER_REPO_SNAPSHOT_IDS: '*',
     SANDBOX_CONTAINERS: FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
     RUNTIME_STARTUP_MODE: 'downloaded',
     NATIVE_RUNTIME_IMAGE: 'all-in-one',
@@ -225,13 +219,13 @@ afterEach(async () => {
 });
 
 describe('downloaded startup in the allocation owner', () => {
-  it('retains the mode through recordLaunch and uses that mode for capture', async () => {
+  it('retains the downloaded mode through recordLaunch and refuses session capture', async () => {
     const h = await setup('sbx__runtime_mode');
     await prepare(h);
     await waitFor(async () => expect((await h.stub.getAllocationState()).kind).toBe('starting'));
     expect((await record(h))?.startupMode).toBe('downloaded');
     const startup = h.provider.launches[0]!;
-    expect(startup.options?.repoKey?.startsWith('downloaded:')).toBe(true);
+    expect(startup.options?.snapshot).toBeUndefined();
     const wrapper = await FakeWrapper.connect({
       sandboxId: h.id,
       credential: startup.env.SANDBOX_CONTROL_CREDENTIAL,
@@ -241,9 +235,13 @@ describe('downloaded startup in the allocation owner', () => {
       allocationId: startup.env.CONTROL_PLANE_ALLOCATION_ID,
     });
     await waitFor(async () => expect((await h.stub.getAllocationState()).kind).toBe('connected'));
+    expect((await wrapper.next())?.type).toBe('session.prepare');
     wrapper.send({ type: 'workspace.capture', sessionId: SESSION });
-    await waitFor(() => expect(h.provider.captures.length).toBe(1));
-    expect(h.provider.captures[0]).toBe(startup.options?.repoKey);
+    expect(await wrapper.next()).toEqual({
+      type: 'workspace.captured',
+      sessionId: SESSION,
+      ok: false,
+    });
     expect(await report(h, 0, 'artifact_invalid')).toBe(false);
   });
   it('stops immediately without image fallback when a permanent report wins', async () => {
@@ -269,7 +267,7 @@ describe('downloaded startup in the allocation owner', () => {
     });
     await prepare(h);
     await waitFor(() => expect(h.provider.launches.length).toBe(2));
-    expect(h.provider.launches[1]?.options?.skipRepository).toBe(true);
+    expect(h.provider.launches[1]?.options?.snapshot).toBeUndefined();
     expect(h.provider.launches[0]?.command === h.provider.launches[1]?.command).toBe(true);
     expect(await report(h, 0, 'artifact_invalid')).toBe(false);
     expect(await report(h, 1, 'artifact_invalid')).toBe(true);
@@ -294,7 +292,7 @@ describe('downloaded startup in the allocation owner', () => {
       expect(await report(h, 0, 'base_incompatible')).toBe(true);
       if (holdFirst) await release(h, 0);
       await waitFor(() => expect(h.provider.launches.length).toBe(2));
-      expect(h.provider.launches[1]?.options?.skipRepository).toBe(true);
+      expect(h.provider.launches[1]?.options?.snapshot).toBeUndefined();
       expect(h.peer.routeUpdatesFor(SESSION).some(x => x.state === 'failed')).toBe(false);
     }
   );

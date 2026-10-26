@@ -93,6 +93,7 @@ export type PendingAuthorization = {
   /** The parsed library authorization request, stored as JSON. */
   authRequest: AuthRequest;
   deviceAuthCode: string;
+  userCode: string | null;
   status: PendingAuthorizationStatus;
   kiloUserId: string | null;
   organizationId: string | null;
@@ -112,6 +113,7 @@ export type NewPendingAuthorization = {
   id: string;
   authRequest: AuthRequest;
   deviceAuthCode: string;
+  userCode: string;
   /** The flow-cookie token bound to the starting browser. */
   flowToken: string;
   createdAt: string;
@@ -175,6 +177,7 @@ function rowToPendingAuthorization(
     id: row.id,
     authRequest: JSON.parse(row.auth_request) as AuthRequest,
     deviceAuthCode: row.device_auth_code,
+    userCode: row.user_code,
     status: row.status,
     kiloUserId: row.kilo_user_id,
     organizationId: row.organization_id,
@@ -233,6 +236,7 @@ export class KiloMcpOAuthStore
         id: input.id,
         auth_request: JSON.stringify(input.authRequest),
         device_auth_code: input.deviceAuthCode,
+        user_code: input.userCode,
         status: 'pending',
         flow_token: input.flowToken,
         created_at: input.createdAt,

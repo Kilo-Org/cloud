@@ -1254,6 +1254,7 @@ describe('createExtensionAgentSessionManager', () => {
       const trpc = setup();
       await capturedConfig!.api.send({
         attachments: { files: [], path: '/f', type: 'file' } as never,
+        messageId: 'msg_123456789abc123456789ABC04',
         payload: { mode: 'code', model: 'gpt', prompt: 'hi', type: 'prompt' },
         sessionId: CLOUD_AGENT_ID as never,
       });
@@ -1325,6 +1326,7 @@ describe('createExtensionAgentSessionManager', () => {
     it('send calls org cloudAgentNext.sendMessage including organizationId', async () => {
       const trpc = setup();
       await capturedConfig!.api.send({
+        messageId: 'msg_123456789abc123456789ABC03',
         payload: { mode: 'code', model: 'gpt', prompt: 'hi', type: 'prompt' },
         sessionId: CLOUD_AGENT_ID as never,
       });

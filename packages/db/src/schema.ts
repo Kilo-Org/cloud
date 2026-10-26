@@ -5496,6 +5496,7 @@ export const contributor_champion_memberships = pgTable(
     enrolled_at: timestamp({ withTimezone: true, mode: 'string' }),
     credit_amount_microdollars: bigint({ mode: 'number' }).default(0).notNull(),
     credits_last_granted_at: timestamp({ withTimezone: true, mode: 'string' }),
+    credits_window_granted_microdollars: bigint({ mode: 'number' }).default(0).notNull(),
     linked_kilo_user_id: text().references(() => kilocode_users.id, { onDelete: 'set null' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -6751,6 +6752,14 @@ export const device_auth_requests = pgTable(
     device_code_hash: text(),
     user_agent: text(),
     ip_address: text(),
+    /** The OAuth client the request asks to connect, when the requester names one. */
+    requesting_client_id: text(),
+    /** Display name of that client, as it is shown on the approval page. */
+    requesting_client_name: text(),
+    /** Origin (or app scheme) the approved code is delivered to, as shown to the approver. */
+    requesting_redirect_origin: text(),
+    /** When the approver confirmed that exact client; null until then. */
+    client_confirmed_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -7976,8 +7985,11 @@ export const cloud_agent_environments = pgTable(
 
     // Ordered setup commands run after clone. Array order is the run order.
     commands: text().array().default([]).notNull(),
+    // Monotonic build-input revision. Advances when commands, plaintext
+    // variables or secrets change; a rename or an identical write keeps it.
+    configuration_revision: integer().default(1).notNull(),
     // Saved sandbox allocation key for this repository's sessions; null uses the
-    // owner's default.
+    // owner's default. Not a build input, so it never advances the revision.
     sandbox_allocation: text(),
 
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),

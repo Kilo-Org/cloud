@@ -25,8 +25,8 @@ function failure(
  *    authenticates through the platform's credential helper, never the remote URL;
  * 2. fetch, pruning refs the remote dropped, and refresh the remote default;
  * 3. detach at the remote default branch, so a new branch starts from its tip;
- * 4. drop every local branch. The captured session's branch, or this session's own
- *    from an earlier capture, would otherwise shadow a newer `origin/<branch>`.
+ * 4. drop every local branch. The builder's default branch would otherwise shadow
+ *    a newer `origin/<branch>`.
  *
  * Any failure throws and the caller falls back to a clone.
  */
@@ -55,10 +55,10 @@ export async function refreshAdoptedRepository(input: {
 }
 
 /**
- * Leave no credential in `.git` before a snapshot: `origin` is set to the bare URL
- * and the reflogs and `FETCH_HEAD`, which can record the URL a command ran with,
- * are cleared. Returns false when any of that fails, in which case the workspace
- * must not be captured.
+ * Leave no credential in `.git` before an environment build captures it:
+ * `origin` is set to the bare URL and the reflogs and `FETCH_HEAD`, which can
+ * record the URL a command ran with, are cleared. Returns false when any of that
+ * fails, in which case the workspace must not be captured.
  */
 export async function stripGitCredentials(input: {
   git: WorkspaceGit;
@@ -79,23 +79,7 @@ export async function stripGitCredentials(input: {
 }
 
 /**
- * A restored container still holds the session homes of the allocation that took
- * the snapshot. Setup re-runs and recreates what it needs under this route's own
- * home, so every other entry is stale and only risks being read as current state
- * (the log uploader archives each one).
- */
-export async function removeStaleHomes(homeRoot: string, keep: string): Promise<void> {
-  const entries = await fs.readdir(homeRoot).catch(() => [] as string[]);
-  const keepName = path.basename(keep);
-  await Promise.all(
-    entries
-      .filter(name => name !== keepName)
-      .map(name => fs.rm(path.join(homeRoot, name), { recursive: true, force: true }))
-  );
-}
-
-/**
- * Empty the wrapper log so a snapshot does not carry this allocation's lines into a
+ * Empty a log so a snapshot does not carry this allocation's lines into a
  * restored container, where they would be uploaded with the next session's logs.
  * The log is appended to per line, so truncating in place is safe.
  */

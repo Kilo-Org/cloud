@@ -49,8 +49,9 @@ import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
 import { ProfilePickerPopover } from '@/components/cloud-agent/ProfilePickerPopover';
-import { RepositoryEnvironmentChip } from '@/components/cloud-agent-next/RepositoryEnvironmentChip';
 import { EnvironmentProfileSetupNotice } from '@/components/cloud-agent-next/EnvironmentProfileSetupNotice';
+import { EnvironmentSnapshotNotice } from '@/components/cloud-agent-next/EnvironmentSnapshotNotice';
+import { RepositoryEnvironmentChip } from '@/components/cloud-agent-next/RepositoryEnvironmentChip';
 import {
   useRepositoryEnvironment,
   type EnvironmentRepository,
@@ -1011,6 +1012,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
     organizationId,
     repository: environmentRepository,
   });
+  const showSnapshotNotice = !!repositoryEnvironment;
 
   const creationInput = useMemo(() => {
     const trimmed = prompt.trim();
@@ -1807,6 +1809,7 @@ export function NewSessionPanel({ organizationId }: NewSessionPanelProps) {
             ))}
           </div>
         )}
+        {showSnapshotNotice && <EnvironmentSnapshotNotice />}
 
         {githubIdentityHint && (
           <ContextualTip {...githubIdentityHint} onDismiss={handleDismissGitHubIdentityHint} />

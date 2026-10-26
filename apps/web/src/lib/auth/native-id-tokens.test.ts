@@ -588,6 +588,25 @@ describe('verifyNativeGoogleIdToken', () => {
     );
   });
 
+  it('accepts only one overlapping verification of the same Google token', async () => {
+    mockVerifySignedJwtWithCertsAsync.mockResolvedValue({
+      getPayload: () => ({
+        sub: 'google-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+      }),
+    });
+    jest.mocked(redisClient.set).mockResolvedValueOnce('OK').mockResolvedValueOnce(null);
+
+    const results = await Promise.allSettled([
+      verifyNativeGoogleIdToken('g-token'),
+      verifyNativeGoogleIdToken('g-token'),
+    ]);
+
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(1);
+  });
+
   it('caps the record TTL at the longest Google token lifetime', async () => {
     mockVerifySignedJwtWithCertsAsync.mockResolvedValue({
       getPayload: () => ({

@@ -279,7 +279,8 @@ are removed from `containers`, `durable_objects.bindings` and `migrations`, so
 those bindings do not exist on `cloud-agent-e2e-test`. The migration list keeps
 each surviving SQLite Durable Object class on its original production tag
 (`Sandbox` `v1`, `CloudAgentSession` `v2`, `UserKiloFacade` `v5`,
-`StreamTicketNonceDO` `v8`, `SandboxControl` `v9`, `SandboxSession` `v10`);
+`StreamTicketNonceDO` `v8`, `SandboxControl` `v9`, `SandboxSession` `v10`,
+`EnvironmentBuild` `v12`);
 entries whose classes are all removed (`v3`, `v4`, `v6`, `v7`, `v11`) are dropped, and
 no surviving tag is renumbered or reordered. The e2e Worker's Durable Object
 migration history is **append-only**: once a Worker has been deployed, existing
@@ -320,10 +321,11 @@ documented limitations, not supported behaviour:
   this path.
 
 `getSandboxNamespace` returns the undefined binding, so the call that performs
-`idFromName` raises instead of silently using another class. The
-`CloudAgentSession` checks `!env.Sandbox && !env.SandboxSmall` and
-`env.Sandbox || env.SandboxSmall` only test presence; both stay satisfied by the
-kept `Sandbox` binding.
+`idFromName` raises instead of silently using another class.
+
+`CloudAgentSession` is a no-op class retained for migration history, with no
+request binding. The e2e entrypoint exports it along with every other class
+named by the rendered migrations so Wrangler can initialize the local runtime.
 
 ## Token requirement
 

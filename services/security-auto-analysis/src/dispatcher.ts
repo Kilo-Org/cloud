@@ -8,7 +8,10 @@ import { getWorkerDb } from '@kilocode/db/client';
 import { discoverDueOwners, reconcileStaleAnalysisQueueRows } from './db/queries.js';
 import { logger, sanitizedExceptionName, type DispatcherStage } from './logger.js';
 import { getSecurityAgentCommandLifecycleConfig } from './command-lifecycle-config.js';
-import { discoverQueuedRemediationAttempts } from './remediation.js';
+import {
+  discoverQueuedRemediationAttempts,
+  recoverStaleRemediationLaunchAttempts,
+} from './remediation.js';
 
 const DISPATCH_OWNER_LIMIT = 100;
 const DISPATCH_REMEDIATION_ATTEMPT_LIMIT = 100;
@@ -137,6 +140,22 @@ export async function dispatchDueOwners(
 
   logStalledCommands(commandReconciliation);
 
+  const remediationReconciliation = await runDispatcherStage({
+    stage: 'stale_remediation_launch_reconciliation',
+    dispatchId,
+    env,
+    operation: () =>
+      recoverStaleRemediationLaunchAttempts(db, {
+        env,
+        claimedBefore: new Date(now - commandLifecycleConfig.acceptedCommandTimeoutMs),
+      }),
+    successTags: result => ({
+      requeued_stale_remediation_launch_count: result.requeuedCount,
+      failed_stale_remediation_launch_count: result.failedCount,
+      cancelled_stale_remediation_launch_count: result.cancelledCount,
+    }),
+  });
+
   const deletedCommandCount = await runDispatcherStage({
     stage: 'retained_command_deletion',
     dispatchId,
@@ -220,6 +239,9 @@ export async function dispatchDueOwners(
       failed_running_count: reconciliation.failedRunningCount,
       stale_accepted_command_count: commandReconciliation.staleAccepted.length,
       stale_running_command_count: commandReconciliation.staleRunning.length,
+      requeued_stale_remediation_launch_count: remediationReconciliation.requeuedCount,
+      failed_stale_remediation_launch_count: remediationReconciliation.failedCount,
+      cancelled_stale_remediation_launch_count: remediationReconciliation.cancelledCount,
       deleted_terminal_command_count: deletedCommandCount,
       discovered_owner_count: owners.length,
       enqueued_owner_message_count: messages.length,

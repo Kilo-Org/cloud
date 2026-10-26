@@ -5,7 +5,10 @@ import {
 } from '@kilocode/db';
 import { getWorkerDb } from '@kilocode/db/client';
 import { discoverDueOwners, reconcileStaleAnalysisQueueRows } from './db/queries.js';
-import { discoverQueuedRemediationAttempts } from './remediation.js';
+import {
+  discoverQueuedRemediationAttempts,
+  recoverStaleRemediationLaunchAttempts,
+} from './remediation.js';
 import { dispatchDueOwners } from './dispatcher.js';
 
 const loggerMock = vi.hoisted(() => {
@@ -27,7 +30,10 @@ vi.mock('./db/queries.js', () => ({
   discoverDueOwners: vi.fn(),
   reconcileStaleAnalysisQueueRows: vi.fn(),
 }));
-vi.mock('./remediation.js', () => ({ discoverQueuedRemediationAttempts: vi.fn() }));
+vi.mock('./remediation.js', () => ({
+  discoverQueuedRemediationAttempts: vi.fn(),
+  recoverStaleRemediationLaunchAttempts: vi.fn(),
+}));
 vi.mock('./logger.js', () => ({
   logger: loggerMock,
   sanitizedExceptionName: (error: unknown) =>
@@ -61,6 +67,11 @@ beforeEach(() => {
   } as never);
   vi.mocked(deleteRetainedSecurityAgentCommands).mockResolvedValue(3);
   vi.mocked(discoverDueOwners).mockResolvedValue([{ type: 'user', id: 'sensitive-owner-id' }]);
+  vi.mocked(recoverStaleRemediationLaunchAttempts).mockResolvedValue({
+    requeuedCount: 2,
+    failedCount: 1,
+    cancelledCount: 1,
+  });
   vi.mocked(discoverQueuedRemediationAttempts).mockResolvedValue(['sensitive-attempt-id']);
   ownerQueueSend.mockResolvedValue(undefined);
   remediationQueueSend.mockResolvedValue(undefined);
@@ -83,6 +94,7 @@ describe('dispatchDueOwners telemetry', () => {
     expect(stageTags.map(tags => tags.dispatcher_stage)).toEqual([
       'stale_analysis_queue_reconciliation',
       'stale_command_reconciliation',
+      'stale_remediation_launch_reconciliation',
       'retained_command_deletion',
       'due_owner_discovery',
       'owner_queue_sends',
@@ -95,6 +107,11 @@ describe('dispatchDueOwners telemetry', () => {
       worker_version: 'version-123',
       requeued_pending_count: 1,
       failed_running_count: 2,
+    });
+    expect(stageTags[2]).toMatchObject({
+      requeued_stale_remediation_launch_count: 2,
+      failed_stale_remediation_launch_count: 1,
+      cancelled_stale_remediation_launch_count: 1,
     });
     const serializedStageLogs = JSON.stringify(
       loggerMock.withTags.mock.calls.filter(
@@ -194,6 +211,11 @@ describe('dispatchDueOwners telemetry', () => {
       stage: 'stale_command_reconciliation',
       fail: () =>
         vi.mocked(reconcileStaleSecurityAgentCommands).mockRejectedValueOnce(stageError()),
+    },
+    {
+      stage: 'stale_remediation_launch_reconciliation',
+      fail: () =>
+        vi.mocked(recoverStaleRemediationLaunchAttempts).mockRejectedValueOnce(stageError()),
     },
     {
       stage: 'retained_command_deletion',

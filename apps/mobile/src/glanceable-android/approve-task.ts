@@ -137,7 +137,7 @@ async function showApproving(ask: WaitingAsk): Promise<void> {
  * process cannot exit with the update still in flight.
  */
 export async function handleApproveTask(input?: unknown): Promise<void> {
-  // A swiped session notification is an Unfollow (spec "Android: actions" 3):
+  // A swiped session notification is an Unfollow (spec "Android: actions" 4):
   // the receiver already cancelled the card; this stops following the session
   // and deletes its server row. Never throws: the worker completes from the
   // task's finish, and a rejection would leave the row behind with no retry.

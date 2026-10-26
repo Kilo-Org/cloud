@@ -1095,6 +1095,21 @@ describe('provider failure content', () => {
     });
   });
 
+  it('keeps a provider message at the excerpt limit unchanged', async () => {
+    const providerBody = 'x'.repeat(200);
+    mockFailureResponse(500, providerBody);
+
+    await expect(
+      createProjectWebhook('test-token', 123, 'https://example.com/webhook', 'webhook-secret')
+    ).rejects.toThrow(/^GitLab create webhook failed: 500$/);
+
+    expect(mockLogExceptInTest).toHaveBeenCalledWith('GitLab create webhook failed:', {
+      status: 500,
+      bodyExcerpt: providerBody,
+      projectId: 123,
+    });
+  });
+
   it('returns a fixed message when a token check fails', async () => {
     mockFailureResponse(500, 'message: token check unavailable');
 

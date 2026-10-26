@@ -325,6 +325,13 @@ describe.each(['initial', 'continuation'] as const)('GitHub %s execution', execu
       expect.objectContaining({ githubRepo: threadRepository, mode: 'ask' })
     );
     expect(getGitLabTokenForOrganization).not.toHaveBeenCalled();
+    expect(computeCloudAgentNextBalanceCheckEligibility).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user: { id: 'user-1' },
+        organizationId: 'org-1',
+      })
+    );
+    expect(createCloudAgentNextClientForModel).toHaveBeenCalledTimes(1);
   });
 
   it('cannot select another accessible GitHub repository in code mode', async () => {

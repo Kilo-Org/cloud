@@ -60,8 +60,21 @@ import {
   profileResolutionPolicyForSessionCreateOrigin,
 } from './session-creation-preflight.js';
 
-function environmentLoad(layer: Record<string, unknown>, sandboxAllocation: string | null = null) {
-  return { layer, sandboxAllocation };
+function environmentLoad(
+  layer: Record<string, unknown>,
+  environmentId: string,
+  sandboxAllocation: string | null = null
+) {
+  return {
+    layer,
+    sandboxAllocation,
+    reference: {
+      environmentId,
+      owner: { type: 'user' as const, id: 'user-123' },
+      configurationRevision: 3,
+      repository: { platform: 'github' as const, repoFullName: 'acme/repo' },
+    },
+  };
 }
 
 const context = {
@@ -423,13 +436,14 @@ describe('session creation preflight', () => {
   });
 
   describe('repository environment resolution', () => {
+    const environmentId = '123e4567-e89b-12d3-a456-426614174099';
     const githubRepository = { type: 'github' as const, repo: 'acme/repo' };
     const webOptions = { createdOnPlatform: 'cloud-agent-web' };
 
     it('resolves the repository environment on an approved origin and merges it under the profile layers', async () => {
       const layer = { envVars: { FROM_ENV: 'env' }, setupCommands: ['env-command'] };
       loadEnvironmentForSessionMock.mockResolvedValueOnce(
-        environmentLoad(layer, 'cloudflare-containers-standard-4')
+        environmentLoad(layer, environmentId, 'cloudflare-containers-standard-4')
       );
       mergeProfileConfigurationMock.mockResolvedValueOnce({
         envVars: { FROM_ENV: 'env' },
@@ -451,11 +465,12 @@ describe('session creation preflight', () => {
         expect.objectContaining({ environment: layer })
       );
       expect(resolved.profile?.resolved?.setupCommands).toEqual(['env-command']);
+      expect(resolved.environment).toEqual(environmentLoad({}, environmentId).reference);
       expect(resolved.environmentSandboxAllocation).toBe('cloudflare-containers-standard-4');
     });
 
     it('omits the allocation when the environment has none', async () => {
-      loadEnvironmentForSessionMock.mockResolvedValueOnce(environmentLoad({}));
+      loadEnvironmentForSessionMock.mockResolvedValueOnce(environmentLoad({}, environmentId));
 
       const resolved = await preflightSessionCreation(
         request({ repository: githubRepository, options: webOptions }),
@@ -464,6 +479,7 @@ describe('session creation preflight', () => {
       );
 
       expect(loadEnvironmentForSessionMock).toHaveBeenCalledOnce();
+      expect(resolved.environment?.environmentId).toBe(environmentId);
       expect(resolved).not.toHaveProperty('environmentSandboxAllocation');
     });
 
@@ -489,21 +505,23 @@ describe('session creation preflight', () => {
           db,
           expect.objectContaining({ environment: undefined })
         );
-        expect(resolved).not.toHaveProperty('environmentSandboxAllocation');
+        expect(resolved.environment).toBeUndefined();
       }
     );
 
-    it('drops a client-supplied allocation', async () => {
+    it('drops a client-supplied environment reference and allocation', async () => {
       const resolved = await preflightSessionCreation(
         request({
           repository: githubRepository,
           options: webOptions,
+          environment: environmentLoad({}, environmentId).reference,
           environmentSandboxAllocation: 'vercel-large',
         }),
         context,
         'prepareSession'
       );
 
+      expect(resolved.environment).toBeUndefined();
       expect(resolved.environmentSandboxAllocation).toBeUndefined();
     });
 
@@ -519,7 +537,7 @@ describe('session creation preflight', () => {
         db,
         expect.objectContaining({ environment: undefined })
       );
-      expect(resolved).not.toHaveProperty('environmentSandboxAllocation');
+      expect(resolved.environment).toBeUndefined();
     });
 
     it('looks up an organization launch under the organization owner', async () => {
@@ -608,12 +626,13 @@ describe('session creation preflight', () => {
 
       expect(loadEnvironmentForSessionMock).not.toHaveBeenCalled();
       expect(resolved).not.toHaveProperty('environmentSandboxAllocation');
+      expect(resolved.environment).toBeUndefined();
     });
 
     it('rejects an over-limit merged plaintext value with a fixed message and no value', async () => {
       const longValue = 'x'.repeat(300);
       loadEnvironmentForSessionMock.mockResolvedValueOnce(
-        environmentLoad({ envVars: { LONG_PLAINTEXT: longValue } })
+        environmentLoad({ envVars: { LONG_PLAINTEXT: longValue } }, environmentId)
       );
       mergeProfileConfigurationMock.mockResolvedValueOnce({
         envVars: { LONG_PLAINTEXT: longValue },
@@ -634,7 +653,9 @@ describe('session creation preflight', () => {
 
     it('rejects more than 20 concatenated setup commands', async () => {
       const setupCommands = Array.from({ length: 21 }, (_, index) => `command ${index}`);
-      loadEnvironmentForSessionMock.mockResolvedValueOnce(environmentLoad({ setupCommands }));
+      loadEnvironmentForSessionMock.mockResolvedValueOnce(
+        environmentLoad({ setupCommands }, environmentId)
+      );
       mergeProfileConfigurationMock.mockResolvedValueOnce({ setupCommands });
 
       await expect(

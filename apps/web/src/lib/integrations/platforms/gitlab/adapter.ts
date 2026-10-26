@@ -169,7 +169,8 @@ function buildRedirectRequestInit(
 
 export function fetchGitLabBoundToAddress(
   { url, address, family }: GitLabResolvedUrl & { address: string },
-  init?: RequestInit
+  init?: RequestInit,
+  maxResponseBytes = MAX_GITLAB_RESPONSE_BYTES
 ): Promise<Response> {
   const request = url.protocol === 'https:' ? https.request : http.request;
   const headers = headersInitToRecord(init?.headers);
@@ -198,7 +199,7 @@ export function fetchGitLabBoundToAddress(
         response.on('data', chunk => {
           const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
           responseBytes += buffer.byteLength;
-          if (responseBytes > MAX_GITLAB_RESPONSE_BYTES) {
+          if (responseBytes > maxResponseBytes) {
             const error = new Error('GitLab response exceeded size limit');
             response.destroy(error);
             req.destroy(error);

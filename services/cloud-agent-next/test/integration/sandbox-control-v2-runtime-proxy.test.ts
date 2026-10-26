@@ -50,7 +50,7 @@ const sandboxes = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace 
 const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDBOX_SESSION;
 
 const USER_ID = 'user_123';
-const ORG_ID = 'org_123';
+const ORG_ID = '11111111-1111-4111-8111-111111111111';
 const WORKER_URL = 'https://control.test';
 const SECRET = env.NEXTAUTH_SECRET as string;
 const FACADE_BASE = runtimeCredentialProxyFacadeBaseUrl(WORKER_URL);
@@ -259,6 +259,14 @@ async function createVercelSession(input: {
     message: promptPayload(messageId()),
     sandboxSelection: {
       provider: input.provider ?? 'vercel',
+      ...((input.provider ?? 'vercel') === 'vercel'
+        ? {
+            byoc: {
+              organizationId: ORG_ID,
+              credentialId: '22222222-2222-4222-8222-222222222222',
+            },
+          }
+        : {}),
       ...(input.contained === undefined
         ? {}
         : {

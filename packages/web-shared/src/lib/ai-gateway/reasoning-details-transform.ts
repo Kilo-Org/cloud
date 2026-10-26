@@ -38,6 +38,31 @@ function deleteGoogleExtraContentProperty(value: Record<string, unknown>, proper
   }
 }
 
+/** The tag Gemini wraps thoughts in; the request asks for it as `thought_tag_marker`. */
+export const GEMINI_THOUGHT_TAG_MARKER = 'think';
+
+/**
+ * Without streaming, Gemini's OpenAI-compatible endpoint returns the thoughts
+ * and the answer in one content string flagged as a thought, with only the
+ * thoughts wrapped in `<think>` tags. Splits them, or returns null when the
+ * content has no tagged thoughts.
+ */
+function splitTaggedGeminiThought(content: string) {
+  const openTag = `<${GEMINI_THOUGHT_TAG_MARKER}>`;
+  const closeTag = `</${GEMINI_THOUGHT_TAG_MARKER}>`;
+  if (!content.startsWith(openTag)) {
+    return null;
+  }
+  const closeIndex = content.indexOf(closeTag, openTag.length);
+  if (closeIndex === -1) {
+    return null;
+  }
+  return {
+    thought: content.slice(openTag.length, closeIndex).trim(),
+    answer: content.slice(closeIndex + closeTag.length).trimStart(),
+  };
+}
+
 function mapGeminiThoughtToReasoningDetails(value: unknown) {
   if (!isRecord(value)) {
     return;
@@ -48,13 +73,18 @@ function mapGeminiThoughtToReasoningDetails(value: unknown) {
   const details: Array<ReasoningDetailText | ReasoningDetailEncrypted> = [];
   const google = getGoogleExtraContent(value);
   if (typeof value.content === 'string' && google?.thought === true) {
+    const tagged = splitTaggedGeminiThought(value.content);
     details.push({
       type: ReasoningDetailType.Text,
-      text: value.content,
+      text: tagged ? tagged.thought : value.content,
       index: 0,
       format: ReasoningFormat.GoogleGeminiV1,
     });
-    delete value.content;
+    if (tagged) {
+      value.content = tagged.answer;
+    } else {
+      delete value.content;
+    }
     deleteGoogleExtraContentProperty(value, 'thought');
   }
 

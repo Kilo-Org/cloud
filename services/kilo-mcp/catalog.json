@@ -6167,10 +6167,7 @@
                             },
                             "account": {
                               "type": "string",
-                              "enum": [
-                                "kilo",
-                                "byoc"
-                              ]
+                              "const": "byoc"
                             }
                           },
                           "required": [
@@ -6861,10 +6858,7 @@
                             },
                             "account": {
                               "type": "string",
-                              "enum": [
-                                "kilo",
-                                "byoc"
-                              ]
+                              "const": "byoc"
                             }
                           },
                           "required": [
@@ -17134,10 +17128,7 @@
                                 },
                                 "account": {
                                   "type": "string",
-                                  "enum": [
-                                    "kilo",
-                                    "byoc"
-                                  ]
+                                  "const": "byoc"
                                 }
                               },
                               "required": [
@@ -17834,10 +17825,7 @@
                                 },
                                 "account": {
                                   "type": "string",
-                                  "enum": [
-                                    "kilo",
-                                    "byoc"
-                                  ]
+                                  "const": "byoc"
                                 }
                               },
                               "required": [
@@ -27654,6 +27642,58 @@
     ],
     "searchBlob": "organizations.usageStats Get an organization's usage totals (cost, requests, tokens) over the last 30 days. organizations usagestats organizationid organizationId"
   },
+  "organizations.vercelCompute.getEnrollment": {
+    "path": "organizations.vercelCompute.getEnrollment",
+    "kind": "query",
+    "summary": "Get the organization's BYOC Vercel compute enrollment state, including whether the organization is enrolled.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "vercelcompute",
+      "getenrollment",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.vercelCompute.getEnrollment Get the organization's BYOC Vercel compute enrollment state, including whether the organization is enrolled. organizations vercelcompute getenrollment organizationid organizationId"
+  },
+  "organizations.vercelCompute.getStatus": {
+    "path": "organizations.vercelCompute.getStatus",
+    "kind": "query",
+    "summary": "Get the organization's BYOC Vercel compute status: setup progress, setup and upgrade errors, runtime build and snapshot identity, and whether a newer runtime is available.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "vercelcompute",
+      "getstatus",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.vercelCompute.getStatus Get the organization's BYOC Vercel compute status: setup progress, setup and upgrade errors, runtime build and snapshot identity, and whether a newer runtime is available. organizations vercelcompute getstatus organizationid organizationId"
+  },
   "organizations.withMembers": {
     "path": "organizations.withMembers",
     "kind": "query",
@@ -34799,6 +34839,28 @@
       "context_json"
     ],
     "searchBlob": "userFeedback.create Submit user feedback or a bug report to the Kilo team along with context about the app area and source it came from. userfeedback create feedback_text feedback_for feedback_batch source context_json feedback_text feedback_for feedback_batch source context_json"
+  },
+  "vercelCompute.getEnrollment": {
+    "path": "vercelCompute.getEnrollment",
+    "kind": "query",
+    "summary": "Check whether an organization is enrolled in customer-paid Vercel compute (bring your own Vercel account) and can use the integration.",
+    "inputSchema": {},
+    "tags": [
+      "vercelcompute",
+      "getenrollment"
+    ],
+    "searchBlob": "vercelCompute.getEnrollment Check whether an organization is enrolled in customer-paid Vercel compute (bring your own Vercel account) and can use the integration. vercelcompute getenrollment"
+  },
+  "vercelCompute.getStatus": {
+    "path": "vercelCompute.getStatus",
+    "kind": "query",
+    "summary": "Get the current Vercel compute setup status for an organization, including setup progress, errors, connected team and project, runtime version, and whether a runtime upgrade is available.",
+    "inputSchema": {},
+    "tags": [
+      "vercelcompute",
+      "getstatus"
+    ],
+    "searchBlob": "vercelCompute.getStatus Get the current Vercel compute setup status for an organization, including setup progress, errors, connected team and project, runtime version, and whether a runtime upgrade is available. vercelcompute getstatus"
   },
   "webhookTriggers.capabilities": {
     "path": "webhookTriggers.capabilities",

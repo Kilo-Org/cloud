@@ -61,14 +61,25 @@ describe('startup selection and preflight', () => {
   ] as const)('rejects unsupported configuration before provider work: %s', (env, provider) => {
     expect(() => selectStartup(env, provider)).toThrow('configuration');
   });
-  it('keeps preinstalled startup for SDK and Vercel pins on a downloaded target', () => {
-    for (const provider of ['cloudflare', 'vercel'] as const)
+  it('keeps preinstalled startup for SDK pins on a downloaded target', () => {
+    for (const provider of ['cloudflare'] as const)
       expect(
         selectStartup(
           { RUNTIME_STARTUP_MODE: 'downloaded', RUNTIME_RELEASE_DESCRIPTOR: text },
           provider
         ).mode
       ).toBe('preinstalled');
+  });
+  it('selects downloaded startup for Vercel and requires its release descriptor', () => {
+    expect(
+      selectStartup(
+        { RUNTIME_STARTUP_MODE: 'downloaded', RUNTIME_RELEASE_DESCRIPTOR: text },
+        'vercel'
+      )
+    ).toMatchObject({ mode: 'downloaded', descriptor: text });
+    expect(() => selectStartup({ RUNTIME_STARTUP_MODE: 'downloaded' }, 'vercel')).toThrow(
+      'configuration'
+    );
   });
   it('keeps image and mode independent and isolates downloaded snapshot keys', () => {
     for (const image of ['all-in-one', 'runtime-free'])
@@ -148,6 +159,7 @@ describe('startup selection and preflight', () => {
         )
       ).toBe(true);
       expect(command.argv[0]).toBe('/bin/sh');
+      expect(command.user).toBe('root');
       expect(command.argv.every(arg => new TextEncoder().encode(arg).byteLength < 128 * 1024)).toBe(
         true
       );

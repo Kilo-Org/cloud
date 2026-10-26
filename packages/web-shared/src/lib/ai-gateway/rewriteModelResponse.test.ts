@@ -620,6 +620,138 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect(await result.text()).toBe('not-json{');
     });
 
+    test('splits tagged Gemini thoughts from the answer in a message flagged as a thought', async () => {
+      const upstream = jsonResponse({
+        model: 'google/gemini-3.1-pro-preview',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: '<think>\n**Multiplying**\n\n23 * 47 is 1081.\n\n \n</think>\n\n1081',
+              extra_content: { google: { thought: true, thought_signature: 'opaque-signature' } },
+            },
+            finish_reason: 'stop',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: ReasoningDetailsTransform.GeminiThought,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message).toEqual({
+        role: 'assistant',
+        content: '1081',
+        reasoning_details: [
+          {
+            type: 'reasoning.text',
+            text: '**Multiplying**\n\n23 * 47 is 1081.',
+            index: 0,
+            format: 'google-gemini-v1',
+          },
+          {
+            type: 'reasoning.encrypted',
+            data: 'opaque-signature',
+            index: 0,
+            format: 'google-gemini-v1',
+          },
+        ],
+      });
+    });
+
+    test('splits tagged Gemini thoughts that precede tool calls', async () => {
+      const upstream = jsonResponse({
+        model: 'google/gemini-3.5-flash',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: '<think>\nI should read the file.\n\n\n</think>\n\n',
+              extra_content: { google: { thought: true } },
+              tool_calls: [
+                {
+                  id: 'call-1',
+                  type: 'function',
+                  function: { name: 'read', arguments: '{}' },
+                  extra_content: { google: { thought_signature: 'tool-signature' } },
+                },
+              ],
+            },
+            finish_reason: 'tool_calls',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: ReasoningDetailsTransform.GeminiThought,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message.content).toBe('');
+      expect(json.choices[0].message.reasoning_details).toEqual([
+        {
+          type: 'reasoning.text',
+          text: 'I should read the file.',
+          index: 0,
+          format: 'google-gemini-v1',
+        },
+        {
+          type: 'reasoning.encrypted',
+          data: 'tool-signature',
+          id: 'call-1',
+          index: 0,
+          format: 'google-gemini-v1',
+        },
+      ]);
+    });
+
+    test('treats untagged content flagged as a Gemini thought as reasoning only', async () => {
+      const upstream = jsonResponse({
+        model: 'google/gemini-3.5-flash',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              content: 'only a thought',
+              extra_content: { google: { thought: true } },
+            },
+            finish_reason: 'stop',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: ReasoningDetailsTransform.GeminiThought,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message).toEqual({
+        role: 'assistant',
+        reasoning_details: [
+          { type: 'reasoning.text', text: 'only a thought', index: 0, format: 'google-gemini-v1' },
+        ],
+      });
+    });
+
     test('maps message reasoning_content to reasoning_details', async () => {
       const upstream = jsonResponse({
         model: 'upstream-model',

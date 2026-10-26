@@ -3909,6 +3909,17 @@
     ],
     "searchBlob": "byok.list List all saved bring-your-own-key (BYOK) API keys for the current user or a specified organization, including provider, enabled status, and management source. byok list organizationid organizationId"
   },
+  "byok.listCatalogModeDefaultProviders": {
+    "path": "byok.listCatalogModeDefaultProviders",
+    "kind": "query",
+    "summary": "List BYOK providers whose keys default to routing Kilo catalog model IDs, so you can tell which providers start with catalog mode enabled.",
+    "inputSchema": {},
+    "tags": [
+      "byok",
+      "listcatalogmodedefaultproviders"
+    ],
+    "searchBlob": "byok.listCatalogModeDefaultProviders List BYOK providers whose keys default to routing Kilo catalog model IDs, so you can tell which providers start with catalog mode enabled. byok listcatalogmodedefaultproviders"
+  },
   "byok.listSupportedModels": {
     "path": "byok.listSupportedModels",
     "kind": "query",
@@ -3919,6 +3930,42 @@
       "listsupportedmodels"
     ],
     "searchBlob": "byok.listSupportedModels Get the list of supported models per provider for bring-your-own-key (BYOK) usage, showing which model IDs each provider offers. byok listsupportedmodels"
+  },
+  "byok.setCatalogMode": {
+    "path": "byok.setCatalogMode",
+    "kind": "mutation",
+    "summary": "Enable or disable Kilo catalog model ID routing for an existing BYOK API key, for a user or organization key, and return the updated key details.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "serve_catalog_models": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "serve_catalog_models"
+      ]
+    },
+    "tags": [
+      "byok",
+      "setcatalogmode",
+      "organizationid",
+      "id",
+      "serve_catalog_models"
+    ],
+    "searchBlob": "byok.setCatalogMode Enable or disable Kilo catalog model ID routing for an existing BYOK API key, for a user or organization key, and return the updated key details. byok setcatalogmode organizationid id serve_catalog_models organizationId id serve_catalog_models"
   },
   "byok.setEnabled": {
     "path": "byok.setEnabled",
@@ -14895,6 +14942,10 @@
         "model": {
           "type": "string",
           "minLength": 1
+        },
+        "organizationId": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
@@ -14904,9 +14955,10 @@
     "tags": [
       "modelpreferences",
       "removefavorite",
-      "model"
+      "model",
+      "organizationid"
     ],
-    "searchBlob": "modelPreferences.removeFavorite Remove a model from the current user's list of favorite models. modelpreferences removefavorite model model"
+    "searchBlob": "modelPreferences.removeFavorite Remove a model from the current user's list of favorite models. modelpreferences removefavorite model organizationid model organizationId"
   },
   "modelPreferences.setFavorites": {
     "path": "modelPreferences.setFavorites",
@@ -14916,6 +14968,10 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
+        "organizationId": {
+          "type": "string",
+          "minLength": 1
+        },
         "models": {
           "maxItems": 500,
           "type": "array",
@@ -14932,9 +14988,10 @@
     "tags": [
       "modelpreferences",
       "setfavorites",
+      "organizationid",
       "models"
     ],
-    "searchBlob": "modelPreferences.setFavorites Replace the current user's favorite models with the given list, removing duplicates. modelpreferences setfavorites models models"
+    "searchBlob": "modelPreferences.setFavorites Replace the current user's favorite models with the given list, removing duplicates. modelpreferences setfavorites organizationid models organizationId models"
   },
   "modelPreferences.setLastSelected": {
     "path": "modelPreferences.setLastSelected",

@@ -361,7 +361,7 @@ describe('parseMicrodollarUsageFromString approval tests', () => {
   test(vercelResponsesJson, async () => {
     const inputFile = join(sampleDir, vercelResponsesJson);
     const jsonString = await readFile(inputFile, 'utf-8');
-    const result = parseResponsesMicrodollarUsageFromString(jsonString, 200, 'openrouter');
+    const result = parseResponsesMicrodollarUsageFromString(jsonString, 200, 'vercel');
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);

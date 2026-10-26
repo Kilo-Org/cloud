@@ -298,16 +298,6 @@ describe('adminCustomLlmRouter', () => {
       expect(item!.public_id).toBe(publicId);
       expect((item as Record<string, unknown>).encrypted_api_key).toBeUndefined();
     });
-
-    it('lists the Kilo-exclusive model ids a new custom LLM would replace', async () => {
-      const caller = await createCallerForUser(admin.id);
-
-      const listResult = await caller.admin.customLlm.list();
-
-      expect(listResult.kiloExclusiveModelIds).toEqual(
-        kiloExclusiveModels.map(model => model.public_id)
-      );
-    });
   });
 
   describe('copy', () => {
@@ -505,23 +495,23 @@ describe('adminCustomLlmRouter', () => {
       ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: expect.stringContaining(message) });
     });
 
-    it('accepts a Kilo-exclusive model id even when OpenRouter lists it', async () => {
+    it('rejects a Kilo-exclusive model id', async () => {
       const exclusiveModelId = kiloExclusiveModels.find(
         model => !model.public_id.includes(':')
       )?.public_id;
       if (!exclusiveModelId) throw new Error('Expected a Kilo-exclusive id without a variant');
-      jest
-        .mocked(getOpenRouterModelsMetadataFromDatabase)
-        .mockResolvedValue({ [exclusiveModelId]: {} as StoredModel });
       const caller = await createCallerForUser(admin.id);
 
-      const result = await caller.admin.customLlm.upsert({
-        public_id: exclusiveModelId,
-        definition: validDefinition,
-        credentials,
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: exclusiveModelId,
+          definition: validDefinition,
+          credentials,
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('Kilo-exclusive'),
       });
-
-      expect(result.public_id).toBe(exclusiveModelId);
     });
 
     it('rejects an id that differs only in case from an existing custom LLM', async () => {

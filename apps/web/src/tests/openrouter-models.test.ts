@@ -488,9 +488,8 @@ describe('GET /api/v1/models', () => {
     expect(responseData.data.some(item => item.id === 'byok/openai/model')).toBe(false);
   });
 
-  test('lists public custom LLMs as free and lets them replace a Kilo-exclusive model', async () => {
+  test('lists public custom LLMs as free and hides OpenRouter models with the same id', async () => {
     mockAuth = { user: null, organizationId: null };
-    const exclusiveModel = kiloExclusiveModels[0];
     const customLlm = (public_id: string, isPublic: boolean): CustomLlm => ({
       public_id,
       encrypted_api_key: null,
@@ -509,7 +508,7 @@ describe('GET /api/v1/models', () => {
         ['acme/public-model', customLlm('acme/public-model', true)],
         ['acme/private-model', customLlm('acme/private-model', false)],
         ['acme/claude-review', customLlm('acme/claude-review', true)],
-        [exclusiveModel.public_id, customLlm(exclusiveModel.public_id, true)],
+        ['some-other-model', customLlm('some-other-model', true)],
       ])
     );
     global.fetch = jest
@@ -532,9 +531,9 @@ describe('GET /api/v1/models', () => {
     const claudeReviewModel = responseData.data.find(item => item.id === 'acme/claude-review');
     expect(claudeReviewModel).toBeDefined();
     expect(claudeReviewModel).not.toHaveProperty('opencode');
-    const sameIdModels = responseData.data.filter(item => item.id === exclusiveModel.public_id);
+    const sameIdModels = responseData.data.filter(item => item.id === 'some-other-model');
     expect(sameIdModels).toHaveLength(1);
-    expect(sameIdModels[0].name).toBe(`Custom ${exclusiveModel.public_id}`);
+    expect(sameIdModels[0].name).toBe('Custom some-other-model');
   });
 
   test('omits the Enkrypt field when no score is available', async () => {

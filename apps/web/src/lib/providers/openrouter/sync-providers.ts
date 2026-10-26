@@ -202,13 +202,7 @@ async function syncProviders(params: {
   injectExtraProviderModels(vercelModels, providerModelData, vercelModelIdOverrides);
   injectVercelOnlyProviders(vercelModels, providerModelData, vercelModelIdOverrides);
 
-  // A custom LLM takes precedence over a Kilo-exclusive model with the same id.
-  const customLlmIds = new Set(customLlms.map(customLlm => customLlm.public_id.toLowerCase()));
-  const unshadowedKiloExclusiveModels = kiloExclusiveModels.filter(
-    kfm => !customLlmIds.has(kfm.public_id.toLowerCase())
-  );
-
-  const mappedKiloExclusiveModels: SnapshotExtraModel[] = unshadowedKiloExclusiveModels
+  const mappedKiloExclusiveModels: SnapshotExtraModel[] = kiloExclusiveModels
     .flatMap(kfm =>
       unavailableModelIds.has(kfm.public_id)
         ? []
@@ -264,7 +258,7 @@ async function syncProviders(params: {
   applyFreeEndpointDataPolicy({
     providerModelData,
     openRouterFreeEndpoints,
-    kiloExclusiveModels: unshadowedKiloExclusiveModels,
+    kiloExclusiveModels,
     unavailableModelIds,
   });
 

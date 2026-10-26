@@ -6,7 +6,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
   findCustomLlm,
-  getCustomLlmInferenceProviders,
+  getPublicCustomLlmInferenceProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { hasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
@@ -56,15 +56,16 @@ export async function isModelRestrictionExempt(
 }
 
 /**
- * Providers a model is pinned to regardless of the snapshot: those of a custom
- * LLM, which shadows any built-in model with the same id, or those of a
- * Kilo-exclusive model. Undefined when the snapshot decides.
+ * Providers a model is pinned to regardless of the snapshot: those a public
+ * custom LLM or a Kilo-exclusive model declares. Undefined when the snapshot
+ * decides.
  */
 export async function getModelInferenceProviders(
   modelId: string
 ): Promise<ReadonlySet<string> | undefined> {
   return (
-    (await getCustomLlmInferenceProviders(modelId)) ?? getKiloExclusiveInferenceProviders(modelId)
+    (await getPublicCustomLlmInferenceProviders(modelId)) ??
+    getKiloExclusiveInferenceProviders(modelId)
   );
 }
 

@@ -5,10 +5,6 @@ import { AutoFreeConfigSchema, type AutoFreeConfig } from '@kilocode/db/schema-t
 import { AUTO_FREE_FALLBACK_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
-import {
-  deleteCustomLlmForTest,
-  insertCustomLlmForTest,
-} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 
 let admin: User;
 let nonAdmin: User;
@@ -152,19 +148,4 @@ describe('adminAutoFreeConfigRouter', () => {
       expect(await db.select().from(ai_gateway_config)).toEqual([]);
     }
   );
-
-  it('rejects a free model id that a custom LLM now owns', async () => {
-    const [{ model }] = config.models;
-    await insertCustomLlmForTest(model);
-    try {
-      const caller = await createCallerForUser(admin.id);
-
-      await expect(caller.admin.autoFreeConfig.set({ config })).rejects.toMatchObject({
-        code: 'BAD_REQUEST',
-        message: expect.stringContaining(model),
-      });
-    } finally {
-      await deleteCustomLlmForTest(model);
-    }
-  });
 });

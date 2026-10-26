@@ -182,8 +182,6 @@ async function enhancedModelList(models: OpenRouterModel[]) {
     getPreferredProviderOrderConfig(),
     getCustomLlmsById(),
   ]);
-  // A custom LLM takes precedence over any built-in model with the same id.
-  const isShadowedByCustomLlm = (modelId: string) => customLlmsById.has(modelId.toLowerCase());
   const publicCustomLlms = [...customLlmsById.values()].flatMap(customLlm =>
     isPublicCustomLlm(customLlm.definition)
       ? [{ ...customLlm, definition: customLlm.definition }]
@@ -204,7 +202,9 @@ async function enhancedModelList(models: OpenRouterModel[]) {
     .filter(
       model =>
         (!hasEndpointsMetadata || endpointsMetadata[model.id] !== undefined) &&
-        !isShadowedByCustomLlm(model.id) &&
+        // OpenRouter may add a model after a custom LLM claimed its id, and
+        // routing serves the custom LLM.
+        !customLlmsById.has(model.id.toLowerCase()) &&
         !kiloExclusiveModels.some(m => m.public_id === model.id) &&
         !unavailableModelIds.has(model.id) &&
         !model.id.endsWith(':batch')
@@ -224,7 +224,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
     })
     .concat(
       kiloExclusiveModels
-        .filter(m => !unavailableModelIds.has(m.public_id) && !isShadowedByCustomLlm(m.public_id))
+        .filter(m => !unavailableModelIds.has(m.public_id))
         .map(model => convertFromKiloExclusiveModel(model))
     )
     .concat(autoModels)
@@ -232,11 +232,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
     // Public custom LLMs are complete as defined; id-based pricing, PDF, and
     // protocol guesses below would describe a model routing does not serve.
     .concat(publicCustomLlmModels);
-  const exclusiveById = new Map(
-    kiloExclusiveModels
-      .filter(entry => !isShadowedByCustomLlm(entry.public_id))
-      .map(entry => [entry.public_id, entry])
-  );
+  const exclusiveById = new Map(kiloExclusiveModels.map(entry => [entry.public_id, entry]));
   const providerLookupId = (model: OpenRouterModel) =>
     exclusiveById.get(model.id)?.internal_id ?? model.alias_target ?? model.id;
   const indexedProviders = await getProviderSlugsForModels(catalogModels.map(providerLookupId));

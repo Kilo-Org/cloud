@@ -3,9 +3,7 @@ import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-p
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { createAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
-import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { resetCustomLlmCacheForTest } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { User } from '@kilocode/db/schema';
 import {
@@ -22,8 +20,6 @@ const encryptedApiKey = encryptApiKey(
   JSON.stringify({ type: 'api_key', api_key: 'sk-upstream' }),
   BYOK_ENCRYPTION_KEY
 );
-const shadowedExclusiveId =
-  kiloExclusiveModels.find(model => !model.public_id.includes(':'))?.public_id ?? '';
 
 function providerInput(
   requestedModel: string,
@@ -49,7 +45,7 @@ describe('getProvider with public custom LLMs', () => {
       encryptedApiKey
     );
     await insertCustomLlmForTest(
-      shadowedExclusiveId,
+      'acme/private-model',
       customLlmDefinition({ organization_ids: [ORG_ID] }),
       encryptedApiKey
     );
@@ -57,11 +53,10 @@ describe('getProvider with public custom LLMs', () => {
 
   afterAll(async () => {
     await deleteCustomLlmForTest('acme/public-model');
-    await deleteCustomLlmForTest(shadowedExclusiveId);
+    await deleteCustomLlmForTest('acme/private-model');
   });
 
   afterEach(() => {
-    jest.restoreAllMocks();
     resetCustomLlmCacheForTest();
   });
 
@@ -77,24 +72,16 @@ describe('getProvider with public custom LLMs', () => {
     });
   });
 
-  test('takes precedence over a Kilo-exclusive model with the same id', async () => {
+  test('keeps a private custom LLM to its grantees, exempt from policy checks', async () => {
     await expect(
-      getProvider(providerInput(shadowedExclusiveId, user, ORG_ID))
-    ).resolves.toMatchObject({ kind: 'provider', provider: { id: 'custom' } });
+      getProvider(providerInput('acme/private-model', user, ORG_ID))
+    ).resolves.toMatchObject({
+      kind: 'provider',
+      provider: { id: 'custom' },
+      bypassAccessCheck: true,
+    });
     await expect(
-      getProvider(providerInput(shadowedExclusiveId, user, OTHER_ORG_ID))
+      getProvider(providerInput('acme/private-model', user, OTHER_ORG_ID))
     ).resolves.toEqual({ kind: 'custom-llm-unavailable' });
-  });
-
-  test('refuses a Kilo-exclusive id while the custom LLM catalog cannot be read', async () => {
-    resetCustomLlmCacheForTest();
-    jest.spyOn(console, 'error').mockImplementation(() => {});
-    jest.spyOn(readDb, 'select').mockImplementationOnce(() => {
-      throw new Error('database unavailable');
-    });
-
-    await expect(getProvider(providerInput(shadowedExclusiveId, user, ORG_ID))).resolves.toEqual({
-      kind: 'custom-llm-temporarily-unavailable',
-    });
   });
 });

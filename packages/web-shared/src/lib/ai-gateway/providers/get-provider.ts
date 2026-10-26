@@ -23,7 +23,7 @@ import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/provider
 import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import { CustomLlmCredentialsSchema, type CustomLlmCredentials } from '@kilocode/db/schema-types';
 import {
-  lookupCustomLlm,
+  findCustomLlm,
   isPublicCustomLlm,
   type CustomLlm,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
@@ -62,9 +62,7 @@ export type GetProviderResult =
   | GetProviderProviderResult
   | { kind: 'chatgpt-reconnect'; message: string }
   /** The id is a custom LLM the caller may not use, or its stored credentials are unusable. */
-  | { kind: 'custom-llm-unavailable' }
-  /** The custom LLM catalog cannot be read and the id may belong to a custom LLM. */
-  | { kind: 'custom-llm-temporarily-unavailable' };
+  | { kind: 'custom-llm-unavailable' };
 
 async function checkDirectBYOK(
   user: User | AnonymousUserContext,
@@ -148,8 +146,8 @@ async function resolveCustomLlmAuth(
 }
 
 /**
- * A custom LLM owns its id: an ineligible user or a broken definition must not
- * fall back to OpenRouter or a Kilo-exclusive model with the same id.
+ * A custom LLM owns its id: a caller without access, or a definition with
+ * unusable credentials, must not fall back to another upstream for the same id.
  */
 async function resolveCustomLlmProvider(
   customLlm: CustomLlm,
@@ -245,12 +243,9 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     }
   }
 
-  const customLlmLookup = await lookupCustomLlm(requestedModel);
-  if (customLlmLookup.kind === 'unknown') {
-    return { kind: 'custom-llm-temporarily-unavailable' };
-  }
-  if (customLlmLookup.kind === 'custom-llm') {
-    return await resolveCustomLlmProvider(customLlmLookup.customLlm, user, organizationId);
+  const customLlm = await findCustomLlm(requestedModel);
+  if (customLlm) {
+    return await resolveCustomLlmProvider(customLlm, user, organizationId);
   }
 
   const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);

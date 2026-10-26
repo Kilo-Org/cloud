@@ -27,6 +27,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
         : actual.getKiloExclusiveInferenceProviders(modelId),
   };
 });
+
 function lookup(map: Record<string, string[]>): ProviderLookup {
   return async modelId => new Set(map[modelId] ?? []);
 }
@@ -291,26 +292,6 @@ describe('model access predicates', () => {
     );
 
     await expect(isAllowed('test/restricted-exclusive')).resolves.toBe(true);
-  });
-
-  test('pins a private custom LLM that reuses an exclusive id to no providers', async () => {
-    await insertCustomLlmForTest(
-      'test/restricted-exclusive',
-      customLlmDefinition({ organization_ids: ['00000000-0000-4000-8000-0000000000a1'] })
-    );
-    try {
-      const isAllowed = createAllowPredicateFromProviderAllowList(
-        undefined,
-        ['stepfun'],
-        lookup({}),
-        true,
-        { organizationId: '00000000-0000-4000-8000-0000000000a2', groupIds: [] }
-      );
-
-      await expect(isAllowed('test/restricted-exclusive')).resolves.toBe(false);
-    } finally {
-      await deleteCustomLlmForTest('test/restricted-exclusive');
-    }
   });
 
   test('provider allow list still evaluates restricted exclusive models missing from the snapshot', async () => {

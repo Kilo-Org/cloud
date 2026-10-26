@@ -74,8 +74,8 @@ import {
   type DecideResponse,
 } from '@kilocode/web-shared/lib/bouncer/client';
 import {
+  findCustomLlm,
   isCustomLlm,
-  lookupCustomLlm,
   type CustomLlm,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { after, NextRequest, NextResponse } from 'next/server';
@@ -115,7 +115,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', (
   ...(jest.requireActual(
     '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog'
   ) as Record<string, unknown>),
-  lookupCustomLlm: jest.fn(async () => ({ kind: 'none' })),
   findCustomLlm: jest.fn(async () => null),
   isCustomLlm: jest.fn(async () => false),
 }));
@@ -259,9 +258,9 @@ const mockedIsCustomLlm = jest.mocked(isCustomLlm);
 const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
 const mockedDecide = jest.mocked(decide);
 const mockedIsNonTrialEnterpriseOrganization = jest.mocked(isNonTrialEnterpriseOrganization);
-const mockedLookupCustomLlm = jest.mocked(lookupCustomLlm);
+const mockedFindCustomLlm = jest.mocked(findCustomLlm);
 function mockCustomLlm(customLlm: CustomLlm) {
-  mockedLookupCustomLlm.mockResolvedValue({ kind: 'custom-llm', customLlm });
+  mockedFindCustomLlm.mockResolvedValue(customLlm);
   jest.mocked(isCustomLlm).mockResolvedValue(true);
 }
 
@@ -1534,10 +1533,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     'does not apply free-model rate limiting to the private custom LLM %s',
     async customModelId => {
       mockedIsCustomLlm.mockImplementation(async modelId => modelId === customModelId);
-      mockedLookupCustomLlm.mockResolvedValue({
-        kind: 'custom-llm',
-        customLlm: rateLimitTestCustomLlm(customModelId, false),
-      });
+      mockedFindCustomLlm.mockResolvedValue(rateLimitTestCustomLlm(customModelId, false));
       mockedIsFreeModelRateLimited.mockResolvedValue(true);
 
       try {
@@ -1549,17 +1545,14 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
         expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
       } finally {
         mockedIsCustomLlm.mockImplementation(async () => false);
-        mockedLookupCustomLlm.mockResolvedValue({ kind: 'none' });
+        mockedFindCustomLlm.mockResolvedValue(null);
       }
     }
   );
 
   it('applies free-model rate limiting to a public custom LLM', async () => {
     mockedIsCustomLlm.mockResolvedValue(true);
-    mockedLookupCustomLlm.mockResolvedValue({
-      kind: 'custom-llm',
-      customLlm: rateLimitTestCustomLlm('acme/public-model', true),
-    });
+    mockedFindCustomLlm.mockResolvedValue(rateLimitTestCustomLlm('acme/public-model', true));
     mockedIsFreeModelRateLimited.mockResolvedValue(true);
 
     try {
@@ -1572,7 +1565,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       expect(mockedUpstreamRequest).not.toHaveBeenCalled();
     } finally {
       mockedIsCustomLlm.mockResolvedValue(false);
-      mockedLookupCustomLlm.mockResolvedValue({ kind: 'none' });
+      mockedFindCustomLlm.mockResolvedValue(null);
     }
   });
 
@@ -2988,7 +2981,7 @@ describe('custom LLM requests', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     setUserAuth();
-    mockedLookupCustomLlm.mockResolvedValue({ kind: 'none' });
+    mockedFindCustomLlm.mockResolvedValue(null);
     jest.mocked(isCustomLlm).mockResolvedValue(false);
     mockedGetProvider.mockResolvedValue({
       kind: 'provider',
@@ -3055,17 +3048,6 @@ describe('custom LLM requests', () => {
 
     expect(response.status).toBe(404);
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-  });
-
-  it('returns service unavailable when the custom LLM catalog cannot be read for an exclusive id', async () => {
-    mockedLookupCustomLlm.mockResolvedValue({ kind: 'unknown' });
-
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(gemma_4_26b_a4b_it_free_model.public_id)) as never
-    );
-
-    expect(response.status).toBe(503);
-    expect(mockedGetProvider).not.toHaveBeenCalled();
   });
 
   it('rejects a public custom LLM when the request excludes its inference providers', async () => {

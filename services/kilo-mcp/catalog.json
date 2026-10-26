@@ -240,6 +240,35 @@
     ],
     "searchBlob": "agentBriefing.list List existing agent briefing reports for the user, optionally filtered by personal or organization scope with pagination. agentbriefing list scope organizationid cursor limit currentonly scope organizationId cursor limit currentOnly"
   },
+  "agentBriefing.oneOffDrafts": {
+    "path": "agentBriefing.oneOffDrafts",
+    "kind": "query",
+    "summary": "List resumable, unconfirmed agent briefs, including preparation progress and failures. Use the cursor to retrieve older drafts.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cursor": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "limit": {
+          "default": 20,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    },
+    "tags": [
+      "agentbriefing",
+      "oneoffdrafts",
+      "cursor",
+      "limit"
+    ],
+    "searchBlob": "agentBriefing.oneOffDrafts List resumable, unconfirmed agent briefs, including preparation progress and failures. Use the cursor to retrieve older drafts. agentbriefing oneoffdrafts cursor limit cursor limit"
+  },
   "agentBriefing.oneOffPreferences": {
     "path": "agentBriefing.oneOffPreferences",
     "kind": "query",
@@ -267,6 +296,31 @@
       "language"
     ],
     "searchBlob": "agentBriefing.oneOffPreferences Get the saved timezone and language preferences used when generating a one-off agent activity briefing for a custom date range. agentbriefing oneoffpreferences timezone language timezone language"
+  },
+  "agentBriefing.oneOffPreparation": {
+    "path": "agentBriefing.oneOffPreparation",
+    "kind": "query",
+    "summary": "Check background brief preparation and retrieve its report and cost estimate when ready. Paid generation still requires confirmation in the app.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reportId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "reportId"
+      ]
+    },
+    "tags": [
+      "agentbriefing",
+      "oneoffpreparation",
+      "reportid"
+    ],
+    "searchBlob": "agentBriefing.oneOffPreparation Check background brief preparation and retrieve its report and cost estimate when ready. Paid generation still requires confirmation in the app. agentbriefing oneoffpreparation reportid reportId"
   },
   "agentBriefing.preferences": {
     "path": "agentBriefing.preferences",
@@ -379,6 +433,65 @@
       "reportid"
     ],
     "searchBlob": "agentBriefing.read Mark an agent briefing report as read for the current user. agentbriefing read reportid reportId"
+  },
+  "agentBriefing.startOneOffPreparation": {
+    "path": "agentBriefing.startOneOffPreparation",
+    "kind": "mutation",
+    "summary": "Prepare a historical agent brief in the background for a selected period and context. Preparation does not publish a report or authorize a paid summary.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "startAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "endAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 35
+        }
+      },
+      "required": [
+        "requestId",
+        "startAt",
+        "endAt",
+        "timezone",
+        "language"
+      ]
+    },
+    "tags": [
+      "agentbriefing",
+      "startoneoffpreparation",
+      "requestid",
+      "organizationid",
+      "startat",
+      "endat",
+      "timezone",
+      "language"
+    ],
+    "searchBlob": "agentBriefing.startOneOffPreparation Prepare a historical agent brief in the background for a selected period and context. Preparation does not publish a report or authorize a paid summary. agentbriefing startoneoffpreparation requestid organizationid startat endat timezone language requestId organizationId startAt endAt timezone language"
   },
   "agentBriefing.updatePreferences": {
     "path": "agentBriefing.updatePreferences",
@@ -5937,43 +6050,6 @@
     ],
     "searchBlob": "cloudAgentNext.interruptSession Stop a running cloud agent session and cancel its active work. cloudagentnext interruptsession sessionid sessionId"
   },
-  "cloudAgentNext.linkPendingUploads": {
-    "path": "cloudAgentNext.linkPendingUploads",
-    "kind": "mutation",
-    "summary": "Mark uploaded files as attached so they are kept and sent with the message.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "messageUuid": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "objectKeys": {
-          "minItems": 1,
-          "maxItems": 5,
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 1024
-          }
-        }
-      },
-      "required": [
-        "messageUuid",
-        "objectKeys"
-      ]
-    },
-    "tags": [
-      "cloudagentnext",
-      "linkpendinguploads",
-      "messageuuid",
-      "objectkeys"
-    ],
-    "searchBlob": "cloudAgentNext.linkPendingUploads Mark uploaded files as attached so they are kept and sent with the message. cloudagentnext linkpendinguploads messageuuid objectkeys messageUuid objectKeys"
-  },
   "cloudAgentNext.listGitHubRepositories": {
     "path": "cloudAgentNext.listGitHubRepositories",
     "kind": "query",
@@ -6396,7 +6472,7 @@
               "type": "array",
               "items": {
                 "type": "string",
-                "maxLength": 500
+                "maxLength": 16000
               }
             },
             "mcpServers": {
@@ -7052,7 +7128,7 @@
               "type": "array",
               "items": {
                 "type": "string",
-                "maxLength": 500
+                "maxLength": 16000
               }
             },
             "mcpServers": {
@@ -7690,15 +7766,8 @@
           "type": "boolean"
         },
         "messageId": {
-          "anyOf": [
-            {
-              "type": "string",
-              "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string",
+          "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
         },
         "attachments": {
           "type": "object",
@@ -7748,7 +7817,8 @@
       },
       "required": [
         "cloudAgentSessionId",
-        "payload"
+        "payload",
+        "messageId"
       ]
     },
     "tags": [
@@ -8058,6 +8128,461 @@
       "allocation"
     ],
     "searchBlob": "cloudAgentSettings.setRepositorySettings Save Cloud Agent sandbox settings for a specific repository, setting or clearing its assigned profile and allocation. cloudagentsettings setrepositorysettings organizationid repofullname platform profileid allocation organizationId repoFullName platform profileId allocation"
+  },
+  "cloudEnvironments.create": {
+    "path": "cloudEnvironments.create",
+    "kind": "mutation",
+    "summary": "Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can have only one.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "repository": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string",
+                  "const": "github"
+                },
+                "fullName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "platform",
+                "fullName"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string",
+                  "const": "gitlab"
+                },
+                "projectPath": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "platform",
+                "projectPath"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string",
+                  "const": "bitbucket"
+                },
+                "fullName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "workspaceUuid": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "repositoryUuid": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "platform",
+                "fullName",
+                "workspaceUuid",
+                "repositoryUuid"
+              ]
+            }
+          ]
+        },
+        "plainVars": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 128,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "secrets": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 128,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 8192
+          }
+        },
+        "commands": {
+          "maxItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000
+          }
+        },
+        "sandboxAllocation": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "cloudflare-single",
+                "cloudflare-shared",
+                "cloudflare-containers-standard-3",
+                "cloudflare-containers-standard-4",
+                "vercel-small",
+                "vercel-large"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "repository"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "create",
+      "organizationid",
+      "name",
+      "repository",
+      "plainvars",
+      "secrets",
+      "commands",
+      "sandboxallocation"
+    ],
+    "searchBlob": "cloudEnvironments.create Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can have only one. cloudenvironments create organizationid name repository plainvars secrets commands sandboxallocation organizationId name repository plainVars secrets commands sandboxAllocation"
+  },
+  "cloudEnvironments.delete": {
+    "path": "cloudEnvironments.delete",
+    "kind": "mutation",
+    "summary": "Delete a Cloud Agent repository environment. New sessions in the repository then start without it.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "environmentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "environmentId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "delete",
+      "organizationid",
+      "environmentid"
+    ],
+    "searchBlob": "cloudEnvironments.delete Delete a Cloud Agent repository environment. New sessions in the repository then start without it. cloudenvironments delete organizationid environmentid organizationId environmentId"
+  },
+  "cloudEnvironments.get": {
+    "path": "cloudEnvironments.get",
+    "kind": "query",
+    "summary": "Get one Cloud Agent repository environment with its setup commands, plain variables, secret names, and sandbox size.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "environmentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "environmentId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "get",
+      "organizationid",
+      "environmentid"
+    ],
+    "searchBlob": "cloudEnvironments.get Get one Cloud Agent repository environment with its setup commands, plain variables, secret names, and sandbox size. cloudenvironments get organizationid environmentid organizationId environmentId"
+  },
+  "cloudEnvironments.list": {
+    "path": "cloudEnvironments.list",
+    "kind": "query",
+    "summary": "List the Cloud Agent repository environment for one repository, with setup command, variable, secret, and sandbox size details.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "repository": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string",
+                  "const": "github"
+                },
+                "fullName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "platform",
+                "fullName"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string",
+                  "const": "gitlab"
+                },
+                "projectPath": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "platform",
+                "projectPath"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string",
+                  "const": "bitbucket"
+                },
+                "workspaceUuid": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "repositoryUuid": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "platform",
+                "workspaceUuid",
+                "repositoryUuid"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "repository"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "list",
+      "organizationid",
+      "repository"
+    ],
+    "searchBlob": "cloudEnvironments.list List the Cloud Agent repository environment for one repository, with setup command, variable, secret, and sandbox size details. cloudenvironments list organizationid repository organizationId repository"
+  },
+  "cloudEnvironments.listAll": {
+    "path": "cloudEnvironments.listAll",
+    "kind": "query",
+    "summary": "List every Cloud Agent repository environment for the user or organization, across all repositories.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "cloudenvironments",
+      "listall",
+      "organizationid"
+    ],
+    "searchBlob": "cloudEnvironments.listAll List every Cloud Agent repository environment for the user or organization, across all repositories. cloudenvironments listall organizationid organizationId"
+  },
+  "cloudEnvironments.update": {
+    "path": "cloudEnvironments.update",
+    "kind": "mutation",
+    "summary": "Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "environmentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "plainVars": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 128,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "secrets": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "value": {
+                    "type": "string",
+                    "maxLength": 8192
+                  }
+                },
+                "required": [
+                  "key",
+                  "value"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "delete": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "key",
+                  "delete"
+                ]
+              }
+            ]
+          }
+        },
+        "commands": {
+          "maxItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000
+          }
+        },
+        "sandboxAllocation": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "cloudflare-single",
+                "cloudflare-shared",
+                "cloudflare-containers-standard-3",
+                "cloudflare-containers-standard-4",
+                "vercel-small",
+                "vercel-large"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "environmentId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "update",
+      "organizationid",
+      "environmentid",
+      "name",
+      "plainvars",
+      "secrets",
+      "commands",
+      "sandboxallocation"
+    ],
+    "searchBlob": "cloudEnvironments.update Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size. cloudenvironments update organizationid environmentid name plainvars secrets commands sandboxallocation organizationId environmentId name plainVars secrets commands sandboxAllocation"
   },
   "codeIndexing.delete": {
     "path": "codeIndexing.delete",
@@ -14860,6 +15385,7 @@
               "organization.mode.create",
               "organization.mode.update",
               "organization.mode.delete",
+              "organization.webhook_trigger.update",
               "organization.group.create",
               "organization.group.update",
               "organization.group.delete",
@@ -16365,51 +16891,6 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.interruptSession Stop a running cloud agent session. Use to cancel the agent's current work. organizations cloudagentnext interruptsession organizationid sessionid organizationId sessionId"
   },
-  "organizations.cloudAgentNext.linkPendingUploads": {
-    "path": "organizations.cloudAgentNext.linkPendingUploads",
-    "kind": "mutation",
-    "summary": "Link previously uploaded files to a cloud agent message so they are kept. Use to attach uploaded files.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "messageUuid": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "objectKeys": {
-          "minItems": 1,
-          "maxItems": 5,
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 1024
-          }
-        }
-      },
-      "required": [
-        "organizationId",
-        "messageUuid",
-        "objectKeys"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "cloudagentnext",
-      "linkpendinguploads",
-      "organizationid",
-      "messageuuid",
-      "objectkeys"
-    ],
-    "searchBlob": "organizations.cloudAgentNext.linkPendingUploads Link previously uploaded files to a cloud agent message so they are kept. Use to attach uploaded files. organizations cloudagentnext linkpendinguploads organizationid messageuuid objectkeys organizationId messageUuid objectKeys"
-  },
   "organizations.cloudAgentNext.listBitbucketRepositories": {
     "path": "organizations.cloudAgentNext.listBitbucketRepositories",
     "kind": "query",
@@ -16928,7 +17409,7 @@
                   "type": "array",
                   "items": {
                     "type": "string",
-                    "maxLength": 500
+                    "maxLength": 16000
                   }
                 },
                 "mcpServers": {
@@ -17590,7 +18071,7 @@
                   "type": "array",
                   "items": {
                     "type": "string",
-                    "maxLength": 500
+                    "maxLength": 16000
                   }
                 },
                 "mcpServers": {
@@ -18295,15 +18776,8 @@
           "type": "boolean"
         },
         "messageId": {
-          "anyOf": [
-            {
-              "type": "string",
-              "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string",
+          "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
         },
         "attachments": {
           "type": "object",
@@ -18354,7 +18828,8 @@
       "required": [
         "organizationId",
         "cloudAgentSessionId",
-        "payload"
+        "payload",
+        "messageId"
       ]
     },
     "tags": [

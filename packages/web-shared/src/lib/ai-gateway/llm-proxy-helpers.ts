@@ -50,6 +50,7 @@ import {
   computeOpenRouterCostFields,
   computeVercelCostMicrodollars,
   extractVercelIsByok,
+  providerReportsIsByok,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -668,7 +669,9 @@ export function accountForMicrodollarUsage(
 ) {
   const logFileExtension = usageContext.isStreaming ? '.log.resp.sse' : '.log.resp.json';
   debugSaveProxyResponseStream(clonedReponse, logFileExtension);
-  after(countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan));
+  const accounting = countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan);
+  after(accounting);
+  return accounting;
 }
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
@@ -1360,7 +1363,8 @@ function parseEmbeddingResponse(responseText: string, statusCode: number): Embed
 
 export function parseEmbeddingUsageFromResponse(
   responseText: string,
-  statusCode: number
+  statusCode: number,
+  provider: ProviderId
 ): MicrodollarUsageStats {
   const json = parseEmbeddingResponse(responseText, statusCode);
   const usage = json.usage;
@@ -1394,7 +1398,12 @@ export function parseEmbeddingUsageFromResponse(
   const vercelGateway = json.providerMetadata?.gateway;
   const cost =
     usage?.cost != null || usage?.is_byok != null
-      ? computeOpenRouterCostFields(usage, base, 'embedding_usage_processing')
+      ? computeOpenRouterCostFields(
+          usage,
+          base,
+          'embedding_usage_processing',
+          providerReportsIsByok(provider)
+        )
       : vercelGateway
         ? {
             cost_mUsd: computeVercelCostMicrodollars(vercelGateway),
@@ -1416,7 +1425,8 @@ export function parseEmbeddingUsageFromResponse(
 export function parseTranscriptionUsageFromResponse(
   responseText: string,
   statusCode: number,
-  requestedModel: string
+  requestedModel: string,
+  provider: ProviderId
 ): MicrodollarUsageStats {
   const json = JSON.parse(responseText) as TranscriptionResponse;
   const base = {
@@ -1437,7 +1447,8 @@ export function parseTranscriptionUsageFromResponse(
   const cost = computeOpenRouterCostFields(
     json.usage ?? {},
     base,
-    'transcription_usage_processing'
+    'transcription_usage_processing',
+    providerReportsIsByok(provider)
   );
 
   return {
@@ -1479,7 +1490,7 @@ export function countAndStoreEmbeddingUsage(
     ? Promise.resolve(null)
     : clonedResponse
         .text()
-        .then(text => parseEmbeddingUsageFromResponse(text, statusCode))
+        .then(text => parseEmbeddingUsageFromResponse(text, statusCode, usageContext.provider))
         .catch(() => null);
 
   after(
@@ -1519,7 +1530,12 @@ export function countAndStoreTranscriptionUsage(
     : clonedResponse
         .text()
         .then(text =>
-          parseTranscriptionUsageFromResponse(text, statusCode, usageContext.requested_model)
+          parseTranscriptionUsageFromResponse(
+            text,
+            statusCode,
+            usageContext.requested_model,
+            usageContext.provider
+          )
         )
         .catch(() => null);
 

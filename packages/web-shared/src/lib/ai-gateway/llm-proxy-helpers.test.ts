@@ -750,7 +750,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
       usage: { prompt_tokens: 100, total_tokens: 100, cost: 0.00005 },
     });
 
-    const result = parseEmbeddingUsageFromResponse(response, 200);
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
 
     expect(result.cost_mUsd).toBe(50);
   });
@@ -760,7 +760,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
       usage: { prompt_tokens: 1000, total_tokens: 1000 },
     });
 
-    const result = parseEmbeddingUsageFromResponse(response, 200);
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
 
     expect(result.cost_mUsd).toBe(0);
   });
@@ -768,7 +768,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
   it('should extract id as messageId', () => {
     const response = makeResponse({ id: 'embd-abc' });
 
-    const result = parseEmbeddingUsageFromResponse(response, 200);
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
 
     expect(result.messageId).toBe('embd-abc');
   });
@@ -778,7 +778,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
     const parsed = JSON.parse(response);
     delete parsed.id;
 
-    const result = parseEmbeddingUsageFromResponse(JSON.stringify(parsed), 200);
+    const result = parseEmbeddingUsageFromResponse(JSON.stringify(parsed), 200, 'openrouter');
 
     expect(result.messageId).toBeNull();
   });
@@ -786,7 +786,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
   it('should set hasError to true when model is empty', () => {
     const response = makeResponse({ model: '' });
 
-    const result = parseEmbeddingUsageFromResponse(response, 200);
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
 
     expect(result.hasError).toBe(true);
   });
@@ -794,7 +794,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
   it('should set hasError to false when model is present', () => {
     const response = makeResponse({ model: 'text-embedding-3-small' });
 
-    const result = parseEmbeddingUsageFromResponse(response, 200);
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
 
     expect(result.hasError).toBe(false);
   });
@@ -802,7 +802,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
   it('should always set outputTokens to 0 and streamed/cancelled to false', () => {
     const response = makeResponse();
 
-    const result = parseEmbeddingUsageFromResponse(response, 200);
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
 
     expect(result.outputTokens).toBe(0);
     expect(result.streamed).toBe(false);
@@ -814,7 +814,7 @@ describe('parseEmbeddingUsageFromResponse', () => {
       usage: { prompt_tokens: 42, total_tokens: 42 },
     });
 
-    const result = parseEmbeddingUsageFromResponse(response, 200);
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
 
     expect(result.inputTokens).toBe(42);
   });
@@ -836,7 +836,7 @@ describe('parseEmbeddingUsageFromResponse upstream cost shapes', () => {
       provider: 'Mistral',
     });
 
-    const result = parseEmbeddingUsageFromResponse(response, 200);
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'openrouter');
 
     expect(result.cost_mUsd).toBe(450);
     expect(result.is_byok).toBe(true);
@@ -863,7 +863,7 @@ describe('parseEmbeddingUsageFromResponse upstream cost shapes', () => {
       },
     });
 
-    const result = parseEmbeddingUsageFromResponse(response, 200);
+    const result = parseEmbeddingUsageFromResponse(response, 200, 'vercel');
 
     expect(result.cost_mUsd).toBe(450);
     expect(result.is_byok).toBe(true);
@@ -892,7 +892,8 @@ describe('parseTranscriptionUsageFromResponse', () => {
     const result = parseTranscriptionUsageFromResponse(
       makeResponse(),
       200,
-      'openai/gpt-4o-mini-transcribe'
+      'openai/gpt-4o-mini-transcribe',
+      'openrouter'
     );
 
     expect(result.cost_mUsd).toBe(20);
@@ -914,7 +915,8 @@ describe('parseTranscriptionUsageFromResponse', () => {
         },
       }),
       200,
-      'openai/gpt-4o-mini-transcribe'
+      'openai/gpt-4o-mini-transcribe',
+      'openrouter'
     );
 
     expect(result.cost_mUsd).toBe(40);
@@ -925,7 +927,8 @@ describe('parseTranscriptionUsageFromResponse', () => {
     const result = parseTranscriptionUsageFromResponse(
       makeResponse(),
       200,
-      'openai/gpt-4o-mini-transcribe'
+      'openai/gpt-4o-mini-transcribe',
+      'openrouter'
     );
 
     expect(result.generation_time).toBe(2.5);
@@ -938,7 +941,8 @@ describe('parseTranscriptionUsageFromResponse', () => {
     const result = parseTranscriptionUsageFromResponse(
       JSON.stringify(parsed),
       200,
-      'openai/whisper-1'
+      'openai/whisper-1',
+      'openrouter'
     );
 
     expect(result.model).toBe('openai/whisper-1');
@@ -951,7 +955,8 @@ describe('parseTranscriptionUsageFromResponse', () => {
     const result = parseTranscriptionUsageFromResponse(
       JSON.stringify(parsed),
       200,
-      'openai/gpt-4o-mini-transcribe'
+      'openai/gpt-4o-mini-transcribe',
+      'openrouter'
     );
 
     expect(result.hasError).toBe(true);

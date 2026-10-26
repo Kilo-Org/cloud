@@ -31,7 +31,10 @@ Unrelated paths return 404; other methods on `/usage` return 405.
 | Environment | Worker | Producer and consumer queue | DLQ (no consumer) |
 |---|---|---|---|
 | Production (top-level config) | `usage-ingest` | `usage-ingest-processing` | `usage-ingest-processing-dlq` |
-| Staging (`env.staging`) | `usage-ingest-staging` | `usage-ingest-processing-staging` | `usage-ingest-processing-dlq-staging` |
+| Staging (`env.staging`) | `usage-ingest-staging` | `usage-ingest-processing-staging-eu` | `usage-ingest-processing-dlq-staging-eu` |
+
+Staging connects only this EU pair and one consumer capped at200, batch size1.
+The old global pair remains disconnected. See the [one-time EU setup](eu-queues.md).
 
 ## Processing mode
 
@@ -190,18 +193,26 @@ production and staging deployments. To deploy it individually, dispatch that
 workflow with `worker: services/usage-ingest` and `target_environment: production`
 or `staging`.
 
-Wrangler automatically provisions missing configured producer queues and reuses
-existing queues. `USAGE_INGEST_QUEUE` binds the source queue; `USAGE_INGEST_DLQ` is
-an unused producer binding so Wrangler also provisions the DLQ. The consumer's
-`dead_letter_queue` routes exhausted failures to it. No consumer is attached to
-either DLQ.
+Normal staging CI has one queue preparation step before any Worker upload.
+It reads queue names from `wrangler.jsonc`, creates missing resources with
+explicit `jurisdiction: "eu"`, and verifies/reuses existing EU resources.
+Unknown jurisdiction or lookup/API errors stop deployment. Then the existing
+Frankfurt relay and consumer deploy in order; both consumer upload attempts disable Wrangler's
+global auto-provisioning for EU selections. The preparation step also detaches the obsolete
+staging consumer before Wrangler attaches the selected source; it preserves both queue pairs.
+See [deployment-driven cutover and routing rollback](eu-queues.md).
+Production keeps automatic provisioning and its original names/policy.
+`USAGE_INGEST_QUEUE` binds the source and `USAGE_INGEST_DLQ` binds its matching DLQ;
+only the source has a consumer. Exhausted failures route to that DLQ.
 
 To deploy directly from the repository root with Wrangler authenticated to the
 account in `wrangler.jsonc`:
 
 ```bash
-# Staging
-pnpm --filter cloudflare-usage-ingest exec wrangler deploy --env staging
+# Staging: use the same preparation entrypoint as CI, then existing deploy commands.
+pnpm --filter cloudflare-usage-ingest queues:prepare
+pnpm --filter cloudflare-usage-ingest exec wrangler deploy --config wrangler.writer-relay.jsonc
+pnpm --filter cloudflare-usage-ingest exec wrangler deploy --env staging --experimental-provision=false
 
 # Production
 pnpm --filter cloudflare-usage-ingest exec wrangler deploy
@@ -236,9 +247,10 @@ pnpm install --frozen-lockfile
 pnpm --filter cloudflare-usage-ingest types
 pnpm --filter cloudflare-usage-ingest typecheck
 pnpm --filter cloudflare-usage-ingest lint
+pnpm --filter cloudflare-usage-ingest test:queues
 pnpm --filter cloudflare-usage-ingest test
 pnpm --filter cloudflare-usage-ingest exec wrangler deploy --dry-run
-pnpm --filter cloudflare-usage-ingest exec wrangler deploy --dry-run --env staging
+pnpm --filter cloudflare-usage-ingest exec wrangler deploy --dry-run --env staging --experimental-provision=false
 ```
 
 The dry runs build and show bindings without creating queues or deploying a Worker.
@@ -294,6 +306,6 @@ excludes return/ACK; the full consumer HTTP duration includes the return leg.
 Local runtime tests prove the service-binding path and ACK/retry behavior, not
 geographical placement or speedup.
 
-Rollback by reverting the relay change and deploying the reviewed direct-path
-revision through staging CI. The consumer retains the same queue and usage IDs;
-no data migration or writer rollback is needed. The unused relay can remain private.
+For relay-only rollback, deploy a reviewed direct-path change preserving the EU
+queue pair and single consumer. Queue routing rollback retains the deployment helper and changes only staging queue
+selection as described in the [EU setup](eu-queues.md); a full PR revert cannot detach EU automatically. The unused relay can remain private.

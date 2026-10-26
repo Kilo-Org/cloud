@@ -15,6 +15,7 @@ async function settle() {
 
 async function waitFor(predicate: () => boolean): Promise<void> {
   for (let index = 0; index < 200 && !predicate(); index++) await settle();
+  if (!predicate()) throw new Error('waitFor timed out');
 }
 
 async function hostFixture(

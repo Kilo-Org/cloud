@@ -712,7 +712,8 @@ the key names the setup commands too: a snapshot is reused only by a route with 
   also runs when healthy observations show no live execution anywhere in the root's tree. Waiting
   descendants count as live; unknown observations do not mean an empty tree. Reappearing work or
   unknown observations cancel only that pre-half grace. The first half never extends an armed
-  deadline. Three transient attempts, with 1-second and 2-second backoff, exhaust as `no_outcome`
+  deadline. Feed gaps also preserve that deadline and the publication cleanup transport bound.
+  Three transient attempts, with 1-second and 2-second backoff, exhaust as `no_outcome`
   with an unconfirmed-completion warning. Native work retains the supervisor's execution bounds.
 - The wrapper names the last received Cloud `messageId` in its outcome. It does not reconstruct
   successful outcomes from idle snapshots. Compact's own close reconciliation only releases its

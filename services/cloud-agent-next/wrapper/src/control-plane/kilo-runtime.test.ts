@@ -1039,28 +1039,43 @@ describe('createKiloRuntime', () => {
     await runtime.shutdown();
   });
 
-  it('restarts a crashed Kilo for its exit when refused reopens spend the budget first', async () => {
-    const spawner = createSpawner();
-    const feed = createFeedFactory();
-    const { runtime, logs } = createRuntime({
-      spawner,
-      feed,
-      probe: createProbe(true),
-      scheduler: createScheduler(),
-      timers: timers({ sseSilenceMs: 60_000, healthRequestMs: 1_000 }),
-    });
-    const limit = CONTROL_PLANE_TIMERS.wrapper.sseReconnectLimit;
-    await runtime.ensure();
-    feed.failOpens(limit);
-    feed.feeds[0]!.callbacks.onFailure();
-    // The listener died first; the spawned process reports its exit a little later.
-    await waitFor(() => feed.feeds.length >= 1 + limit);
-    await Bun.sleep(20);
-    spawner.processes[0]!.exit();
-    await waitFor(() => logs.some(line => line.includes('kilo restarting')));
-    expect(logs.find(line => line.includes('kilo restarting'))).toContain('reason=exit');
-    await runtime.shutdown();
-  });
+  it.each([0, 1])(
+    'restarts a crashed Kilo for its exit after %i earlier successful reconnects',
+    async earlierReconnects => {
+      const spawner = createSpawner();
+      const feed = createFeedFactory();
+      const scheduler = createScheduler();
+      const { runtime, logs } = createRuntime({
+        spawner,
+        feed,
+        probe: createProbe(true),
+        scheduler,
+        timers: timers({ sseSilenceMs: 60_000, healthRequestMs: 1_000 }),
+      });
+      const limit = CONTROL_PLANE_TIMERS.wrapper.sseReconnectLimit;
+      await runtime.ensure();
+      if (earlierReconnects > 0) {
+        feed.feeds[0]!.callbacks.onFailure();
+        await waitFor(() => feed.feeds.length === 2);
+        feed.feeds[1]!.callbacks.onEvent({
+          type: 'server.heartbeat',
+          properties: {},
+          nativeRuntimeId: 'r',
+        });
+        await Bun.sleep(1);
+        scheduler.advance(10_000);
+      }
+      feed.failOpens(limit - earlierReconnects);
+      feed.feeds.at(-1)!.callbacks.onFailure();
+      // The listener died first; the spawned process reports its exit a little later.
+      await waitFor(() => feed.feeds.length >= 1 + limit);
+      await Bun.sleep(20);
+      spawner.processes[0]!.exit();
+      await waitFor(() => logs.some(line => line.includes('kilo restarting')));
+      expect(logs.find(line => line.includes('kilo restarting'))).toContain('reason=exit');
+      await runtime.shutdown();
+    }
+  );
 
   it('restarts a live Kilo as hung when its refused reopens spend the budget', async () => {
     const spawner = createSpawner();

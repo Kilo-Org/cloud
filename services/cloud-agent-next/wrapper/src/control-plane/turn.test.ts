@@ -3313,7 +3313,7 @@ describe('GitHub review publication recovery', () => {
     expect(outcomeFrames(h.frames)).toMatchObject([{ status: 'completed', lastMessageId: 'm2' }]);
   });
 
-  it.each(['false', 'hang', 'confirmation', 'restart'] as const)(
+  it.each(['false', 'hang', 'confirmation', 'feed gap', 'restart'] as const)(
     'bounds unsuccessful publication cleanup: %s',
     async failure => {
       const h = createHarness();
@@ -3334,8 +3334,13 @@ describe('GitHub review publication recovery', () => {
       h.client(spec).setDrainImpl(() => new Promise(() => {}));
       h.fireTimeout(15_000);
       await settle();
+      if (failure === 'feed gap') {
+        h.manager.onFeedInterrupted('rt', runtimeKey(spec));
+        h.setExecutionTree(KILO_SESSION, undefined);
+        h.manager.refreshActivity(runtimeKey(spec));
+      }
       if (failure === 'hang') h.fireTimeout(10_000);
-      if (failure === 'confirmation') {
+      if (failure === 'confirmation' || failure === 'feed gap') {
         for (let attempt = 0; attempt < 3; attempt++) {
           h.fireTimeout(10_000);
           await settle();
@@ -4116,6 +4121,46 @@ describe('completion ownership and transport bounds', () => {
     expect(next?.cancelled).toBe(true);
   });
 
+  it.each(['http', 'marker'] as const)(
+    'keeps the %s half deadline through a feed gap',
+    async half => {
+      const h = createHarness();
+      h.registerRoute(routeSpec());
+      const client = h.client(routeSpec());
+      const http = Promise.withResolvers<boolean>();
+      client.setAutomaticDrainMarker(false);
+      client.setDrainImpl(() => http.promise);
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      await settle();
+      h.manager.observeKiloEvent(completedKiloTurn());
+      await settle();
+      if (half === 'http') http.resolve(true);
+      else
+        h.manager.observeKiloEvent(
+          kiloEvent('session.drained', {
+            sessionID: KILO_SESSION,
+            token: client.drains[0].token,
+          })
+        );
+      await settle();
+      const deadline = h.timeouts.find(timer => timer.ms === 10_000 && !timer.cancelled);
+      expect(deadline).toBeDefined();
+      h.manager.onFeedInterrupted('rt', DIRECTORY);
+      h.setExecutionTree(KILO_SESSION, undefined);
+      h.manager.refreshActivity(DIRECTORY);
+      expect(deadline?.cancelled).toBe(false);
+      h.fireTimeout(10_000);
+      await settle();
+      expect(client.drains[0].signal?.aborted).toBe(true);
+      expect(outcomeFrames(h.frames)).toEqual([]);
+      h.fireTimeout(1_000);
+      await settle();
+      expect(client.drains).toHaveLength(2);
+      h.manager.abort(SESSION_ID);
+      http.resolve(true);
+    }
+  );
+
   it('rejects stale tokens, other sessions and other process identities', async () => {
     const h = createHarness();
     h.registerRoute(routeSpec());
@@ -4498,7 +4543,7 @@ describe('native feed gaps', () => {
       await settle();
       h.manager.refreshActivity(DIRECTORY);
       expect(outcomeFrames(h.frames)).toEqual([]);
-      expect(h.timeouts.filter(timer => timer.ms === 10_000 && !timer.cancelled)).toEqual([]);
+      expect(h.timeouts.filter(timer => timer.ms === 10_000 && !timer.cancelled)).toHaveLength(1);
       h.setExecutionTree(KILO_SESSION, [...after]);
       h.manager.refreshActivity(DIRECTORY);
       await settle();

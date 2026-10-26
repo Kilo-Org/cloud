@@ -165,13 +165,13 @@ export function createTurnCompletion(input: CompletionInput) {
           cancel();
           return;
         }
-        // The pair cannot prove work the gap may have hidden, and its marker cannot arrive
-        // without a feed; the reconcile that settles the gap refreshes the pair again.
-        if (turn.gap !== undefined) {
+        // A gap pauses only the pre-half grace. Missing halves and publication cleanup
+        // stay bounded while reconciliation determines whether history was lost.
+        if (turn.gap !== undefined && !http && !marker && transportBudget === undefined) {
           clearTimer();
           return;
         }
-        if (http && marker) {
+        if (http && marker && turn.gap === undefined) {
           finish();
           return;
         }

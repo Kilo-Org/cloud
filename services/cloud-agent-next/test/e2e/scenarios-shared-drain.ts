@@ -1,12 +1,13 @@
 /**
- * Control-plane drain scenarios for work that outlives the model's first reply.
+ * Control-plane child lifecycle and drain scenarios.
  *
  * Callback completion is the observation point: the Worker emits it only after
  * the control-plane operation finishes the turn, and that operation now waits
- * for kilo's drain. A linked child or background task must keep that callback
- * from arriving while the child is still held. A cron or wakeup must not hold
- * the scheduling turn, and the scheduled resume must still run after that turn
- * completes.
+ * for kilo's drain. The foreground child checks the complete task lifecycle.
+ * The background child proves drain holds completion after the parent replies.
+ * Both must keep the callback from arriving while the child is held. A cron or
+ * wakeup must not hold the scheduling turn. The scheduled resume must still run
+ * after that turn completes.
  *
  * These drive the unified `start` surface (the control plane) via
  * `defaultApi: 'unified'`. `start` does not accept `callbackTarget`, so the sink
@@ -118,7 +119,7 @@ async function openDrainSession(
   await deadline.within('callback target', signal =>
     registerSessionCallback(config, session.cloudAgentSessionId, { url: sink.callbackUrl }, signal)
   );
-  const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
+  const stream = openStream(config, session.cloudAgentSessionId, { replay: true });
   try {
     const sandbox = sessionSandboxObservation(args.env);
     const container = await deadline.within('container', signal =>
@@ -174,6 +175,17 @@ async function runHeldChild(
         ok: false,
         message: `child gate ${childTag} did not engage`,
         events: [...stream.events],
+      });
+    }
+    const backgroundParent = directive.match(/^background-task:([A-Za-z0-9_-]+):/);
+    if (backgroundParent) {
+      const replied = () =>
+        assistantTexts(opened.stream.events).some(text =>
+          textEndsWith(text, `done-${backgroundParent[1]}`)
+        );
+      await deadline.within('parent reply while child held', async () => {
+        if (!replied()) await opened.stream.waitFor(replied, deadline.remaining('parent reply'));
+        if (!replied()) throw new Error('parent did not reply while the background child was held');
       });
     }
     const holdMs = Math.min(CHILD_HOLD_MS, deadline.remaining('held child'));

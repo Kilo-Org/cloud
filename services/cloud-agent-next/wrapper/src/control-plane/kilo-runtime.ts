@@ -749,6 +749,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
   }
 
   async function runRecovery(): Promise<void> {
+    let refusedSince: number | undefined;
     while (phase === 'running' || phase === 'suspected') {
       const now = scheduler.now();
       pruneReconnects(now);
@@ -756,7 +757,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
         // Refused reopens spend the budget within milliseconds of a crash, before the
         // process exit arrives. That exit then restarts Kilo for its real reason.
         const refused = kiloProcess;
-        if (refused && now - reconnects[0] < timers.healthRequestMs) {
+        if (refused && refusedSince !== undefined && now - refusedSince < timers.healthRequestMs) {
           if (await exitsWithin(refused, timers.healthRequestMs)) return;
           if (refused !== kiloProcess) return;
         }
@@ -774,6 +775,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       if (previous) options.onFeedInterrupted?.(nativeRuntimeId);
       previous?.close();
       if (await openAttempt(current)) return;
+      refusedSince ??= now;
     }
   }
 

@@ -11,6 +11,7 @@ import {
   pressDelete,
   pressSave,
   rerenderScreen,
+  resetOverviewState,
   testProfile,
   type TestProfileDetail,
 } from '@/components/profiles/profile-overview-screen.test-helpers';
@@ -38,6 +39,10 @@ const h = vi.hoisted(() => ({
     setAsDefault: { mutate: vi.fn(), isPending: false },
     clearDefault: { mutate: vi.fn(), isPending: false },
   },
+}));
+
+vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
+  useCanManageOrganizationProfiles: () => true,
 }));
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
@@ -118,14 +123,7 @@ describe('ProfileOverviewScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     h.connectivity = 'online';
-    Object.assign(h.query, {
-      data: undefined,
-      isError: false,
-      isPending: true,
-      isRefetching: false,
-    });
-    Object.assign(h.mutations.update, { isPending: false });
-    Object.assign(h.mutations.deleteProfile, { isPending: false });
+    resetOverviewState(h);
   });
 
   it('loading: renders skeleton rows and no content rows', async () => {

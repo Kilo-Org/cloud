@@ -53,6 +53,7 @@
     "connected": "Ühendatud",
     "couldNotLoadModels": "Mudeleid ei õnnestunud laadida.",
     "couldNotLoadRepositories": "Hoidlaid ei õnnestunud laadida.",
+    "noRepositoriesFound": "Hoidlaid ei leitud",
     "critical": "Kriitiline",
     "delete": "Kustuta",
     "deleted": "Kustutatud",
@@ -87,6 +88,7 @@
     "connect": "Ühenda",
     "connectBitbucket": "Ühenda Bitbucket",
     "connectGitlab": "Ühenda GitLab",
+    "connectProvider": "Teenusepakkuja ühendamine",
     "contentTruncated": "Sisu kärbitud",
     "copyLink": "Kopeeri link",
     "couldNotLoadOrganizations": "Organisatsioone ei õnnestunud laadida.",
@@ -145,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Muudatused"
+    "changes": "Muudatused",
+    "organizationTrialEnded": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Organisatsiooni omanik saab arveldust kilo.ai keskkonnas uuendada ja seejärel uuesti proovida."
   },
   "language": {
     "restarting": "Keele vahetamiseks taaskäivitatakse rakendus",
@@ -1407,7 +1410,6 @@
       "gitlabNoRepositoriesDescription": "Võimalik, et pead GitLabis andma juurdepääsu veel mõnele rühmale või projektile.",
       "installGithubApp": "GitHubi rakenduse paigaldamine hoidlatele",
       "installGithubAppDescription": "Anna Kilo GitHubi rakendusele juurdepääs hoidlatele, mille koodi soovid üle vaadata.",
-      "noRepositoriesFound": "Hoidlaid ei leitud",
       "repositoryAccess": "juurdepääs hoidlatele"
     },
     "style": {
@@ -1482,6 +1484,22 @@
       "loadingProposals": "Ettepanekute laadimine",
       "couldNotLoadProposals": "Ettepanekuid ei õnnestunud laadida.",
       "noProposals": "Ettepanekuid pole",
+      "proposalDetails": "Ettepaneku üksikasjad",
+      "proposalTitle": "Ettepaneku pealkiri",
+      "rationale": "Põhjendus",
+      "saveFirst": "Salvesta muudatused enne tõmbetaotluse avamist.",
+      "proposalSaved": "Ettepanek salvestatud",
+      "proposalDismissed": "Ettepanek tagasi lükatud",
+      "dismissProposalTitle": "Kas lükata ettepanek tagasi?",
+      "dismissProposalMessage": "See ettepanek eemaldatakse aktiivsete ettepanekute loendist ja seda ei saa taastada.",
+      "prOpened": "Faili REVIEW.md tõmbetaotlus avatud",
+      "alreadyPresent": "Juhised on failis REVIEW.md juba olemas",
+      "status": {
+        "edited": "Muudetud",
+        "opening_change_request": "PR-i avamine",
+        "change_request_failed": "PR ebaõnnestus",
+        "superseded": "Juba olemas"
+      },
       "noProposalsDescription": "Ülevaatuste mälu ettepanekud ilmuvad siia pärast seda, kui Kilo on hooldajate vastuseid analüüsinud."
     },
     "manualReview": {
@@ -1489,7 +1507,6 @@
       "invalidUrl": "Sisesta kehtiv tõmbetaotluse URL.",
       "couldNotCheckProviderStatus": "Teenusepakkuja olekut ei õnnestunud kontrollida.",
       "couldNotLoadProviders": "Ühendatud teenusepakkujaid ei õnnestunud laadida. Proovi uuesti.",
-      "connectProvider": "Teenusepakkuja ühendamine",
       "connectProviderDescription": "Ühenda GitHub, et käivitada tõmbetaotluse ülevaatus käsitsi.",
       "pullRequestUrl": "Tõmbetaotluse URL",
       "instructions": "Juhised (valikulised)",
@@ -1617,8 +1634,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Filtreid pole saadaval",
-      "noFiltersDescription": "Mine tagasi ja ava filtrid leidude loendist uuesti.",
       "title": "Leidude filtreerimine",
       "reset": "Lähtesta",
       "severity": "Raskusaste",
@@ -2172,8 +2187,8 @@
       "title": "Seanss",
       "copyErrorDetails": "Kopeeri vea üksikasjad",
       "backToSessions": "Tagasi seansside juurde",
-      "follow": "Jälgi lukustuskuval",
-      "unfollow": "Lõpeta lukustuskuval jälgimine",
+      "follow": "Jälgi seanssi",
+      "unfollow": "Lõpeta seansi jälgimine",
       "couldNotLoad": "Seansi laadimine ebaõnnestus.",
       "failedToLoadDetails": "Seansi üksikasjade laadimine ebaõnnestus.",
       "failedToStopExecution": "Täitmise peatamine ebaõnnestus.",
@@ -2953,7 +2968,6 @@
   },
   "voiceInput": {
     "listening": "Kuulamine...",
-    "staysOff": "Häälsisestus jääb välja lülitatuks, kuni lubad kõne veebis tekstiks teisendada.",
     "onlineTitle": "Kõnet töödeldakse veebis",
     "onlineMessage": "See seade ei saa kõnet ilma võrguühenduseta tekstiks teisendada. Sinu salvestus saadetakse teenusepakkujale {{provider}}, kes teisendab selle tekstiks. Kilo ei säilita helisalvestist.",
     "allow": "Luba",
@@ -3168,7 +3182,9 @@
       "sendInvite": "Saada kutse",
       "title": "Kutsu liige",
       "alreadyInvited": "Ta on juba kutsutud või juba liige.",
-      "sendError": "Kutset ei õnnestunud saata."
+      "sendError": "Kutset ei õnnestunud saata.",
+      "pendingInvitation": "Sellele e-posti aadressile on juba saadetud kutse, mis on ootel.",
+      "alreadyMember": "See isik on juba selle organisatsiooni liige."
     },
     "invoices": {
       "downloadA11y": "Laadi alla arve {{number}}",
@@ -3238,7 +3254,12 @@
       "pendingInvitations": "Ootel kutsed",
       "resendInvite": "Saada kutse uuesti",
       "shareInviteLink": "Jaga kutselinki",
-      "resendInviteError": "Kutset ei õnnestunud uuesti saata."
+      "resendInviteError": "Kutset ei õnnestunud uuesti saata.",
+      "inviteNotResendable": "Seda kutset ei saa enam uuesti saata.",
+      "ownerAuthority": "Ainult organisatsiooni omanik saab omanikke hallata.",
+      "ownRoleChange": "Sa ei saa oma rolli muuta.",
+      "inviteExpired": "See kutse on aegunud.",
+      "inviteAccepted": "See kutse on juba vastu võetud."
     },
     "usageStats": {
       "inputTokens": "Sisendtokenid",
@@ -3351,7 +3372,7 @@
     "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente.",
     "openSession": "Ava",
     "finished": "Lõpetatud",
-    "followFailed": "Seda agenti ei õnnestunud lukustuskuval kuvada.",
+    "followFailed": "Seda seanssi ei õnnestunud jälgida.",
     "approveFailed": "Kinnitamine ebaõnnestus. Uuesti proovimiseks puuduta $t(common.approve).",
     "checked": "Kontrollitud",
     "lastKnown": "Viimane teadaolev",
@@ -3725,6 +3746,7 @@
     "title": "Profiilid",
     "entrySubtitle": "Keskkonnaseadete taaskasutamine seansside jooksul",
     "newProfile": "Uus profiil",
+    "openHint": "Avab profiili",
     "emptyTitle": "Profiilid veel puuduvad",
     "emptyDescription": "Looge profiil keskkonnamuutujate, häälestuskäskude ja oskuste taaskasutamiseks seansside jooksul.",
     "loadFailed": "Profiilide laadimine nurjus",
@@ -3956,11 +3978,13 @@
       "namePlaceholder": "Vead, Ideed, Väljalase…",
       "emoji": "Emotikon",
       "mode": "Režiim",
-      "defaultsHint": "Sellest loendist alustatud seansid kasutavad neid vaikeseadeid."
+      "defaultsHint": "Sellest loendist alustatud seansid kasutavad neid vaikeseadeid.",
+      "saveFailed": "Loendi salvestamine ei õnnestunud. Kontrolli oma ühendust ja proovi uuesti."
     },
     "list": {
       "addPlaceholder": "Uus ülesanne",
       "add": "Lisa ülesanne",
+      "addFailed": "Ülesande lisamine ei õnnestunud. Kontrolli oma ühendust ja proovi uuesti.",
       "empty": "Ülesandeid veel pole",
       "setDefaults": "Määra hoidla, režiim ja mudel",
       "completed_one": "Lõpetatud ({{count}})",
@@ -3997,7 +4021,8 @@
       "startNewSession": "Alusta uut seanssi",
       "startNewSessionHint": "Uue seansi alustamiseks vajuta pikalt.",
       "linkSession": "Seo seanss",
-      "linkFailed": "Seanssi ei õnnestunud ülesandega siduda"
+      "linkFailed": "Seanssi ei õnnestunud ülesandega siduda",
+      "startRefreshFailed": "Seanss algas, kuid seda loendit ei värskendatud."
     },
     "linkSession": {
       "title": "Seansside linkimine",
@@ -4027,7 +4052,7 @@
     "emptyHint": "Sinu pilve- ja CLI-koodimisseansid ilmuvad siia, kui ajastatud ülevaates on tegevust.",
     "loadError": "Ülevaateid ei õnnestunud laadida",
     "sessions": "Aktiivsed ülevaatevahemikus",
-    "pullRequests": "Avatud PRs",
+    "pullRequests": "Ülevaatevahemikus avatud PR-id",
     "blockers": "Uued takistused",
     "spend": "Ülevaatevahemiku kulud",
     "view": "Loe ülevaadet",
@@ -4035,17 +4060,17 @@
     "scheduleTimeLabel": "{{label}}, {{time}}",
     "dismiss": "Jäta ülevaade kõrvale",
     "offline": "Võrguühenduseta · salvestatud ülevaade",
-    "cached": "Salvestatud aruanne · värskendamine pole saadaval",
+    "cached": "Salvestatud ülevaade · värskendamine pole saadaval",
     "revised": "Muudetud · {{revision}}",
     "window": "{{start}} – {{end}}",
     "summary": "AI kokkuvõte",
-    "summaryDisabled": "Struktureeritud aruanne · AI on selles kontekstis välja lülitatud",
+    "summaryDisabled": "Struktureeritud ülevaade · AI on selles kontekstis välja lülitatud",
     "summaryPending": "AI kokkuvõtet koostatakse. See lisatakse siia, kui on valmis.",
     "summaryFailed": "AI kokkuvõte ebaõnnestus. Uuesti proovimine võib kaasa tuua uue tasu.",
-    "summaryUnavailable": "AI kokkuvõte pole saadaval. Struktureeritud aruanne on endiselt saadaval.",
-    "summaryOutdated": "See kokkuvõte on vanem kui aruande viimane versioon.",
+    "summaryUnavailable": "AI kokkuvõte pole saadaval. Struktureeritud ülevaade on endiselt saadaval.",
+    "summaryOutdated": "See kokkuvõte on vanem kui ülevaate viimane versioon.",
     "summaryCharge": "AI tasu {{cost}}",
-    "summaryChargePending": "AI tasu ootab kinnitamist",
+    "summaryChargePending": "AI tasu ootab arveldusandmete kooskõlastamist",
     "generate": "Koosta kokkuvõte",
     "retrySummary": "Proovi tasulist kokkuvõtet uuesti",
     "sources": "Tõendid ja artefaktid",
@@ -4060,11 +4085,11 @@
     "notificationsHint": "Üks üldine teavitus iga ajastatud ülevaate kohta. Ei sõltu tasulistest AI kokkuvõtetest.",
     "notificationPermission": "Ülevaate saamiseks luba seadme teavitused jaotises $t(common.notifications).",
     "aiOptIn": "Tasulised AI kokkuvõtted",
-    "aiHint": "Valikuline ainult selles kontekstis. Valitud, redigeeritud väljavõtted ja struktureeritud faktid saadetakse sinu mudelile rakenduse keeles. Tasud arvestatakse selle konteksti saldost.",
+    "aiHint": "Tasulised AI kokkuvõtted on valikulised ja neid saab iga konteksti jaoks eraldi sisse lülitada. Valitud, tundlikest andmetest puhastatud väljavõtted ja struktureeritud faktid saadetakse sinu mudelile rakenduse keeles. Tasud arvestatakse selle konteksti saldost.",
     "defaultModel": "Kasuta Kilo vaikemudelit",
     "duration": "Ajapiirang (minutid)",
     "spendLimit": "Kulupiirang (USD)",
-    "safeguardHint": "Lõplikud piirangud kokkuvõtte kohta, mitte päevaeelarve. Vaikimisi: 10 minutit ja $2. Aruanne avaldatakse hiljemalt viie minuti pärast, samal ajal kui koostamine jätkub nende piirides.",
+    "safeguardHint": "Lõplikud piirangud kokkuvõtte kohta, mitte päevaeelarve. Vaikimisi: 10 minutit ja $2. Ülevaade avaldatakse hiljemalt viie minuti pärast, samal ajal kui koostamine jätkub nende piirides.",
     "invalidSafeguards": "Sisesta positiivsed ja lõplikud aja- ja kulupiirangud.",
     "estimate": "Hinnang {{estimate}} · maksimaalselt {{maximum}}",
     "estimateUnavailable": "Nende seadetega pole tasuline kokkuvõte saadaval.",
@@ -4096,17 +4121,23 @@
     "periodTooLong": "Vali kuni 31-päevane periood.",
     "invalidLocalTime": "Seda kohalikku kellaaega ülevaate ajavööndis ei eksisteeri. Vali teine aeg.",
     "reviewBriefing": "Vaata ülevaade üle",
-    "reviewAgain": "Valmista ette uus ülevaatus",
+    "reviewAgain": "Valmista ette uus eelvaade",
     "payer": "Tasu võetakse kontekstilt {{context}}",
     "emptyPeriod": "Sellel perioodil tegevust ei leitud. AI kokkuvõtet ei looda ja tasu ei võeta.",
     "emptyHistory": "Salvestatud ülevaateid pole",
     "historicalStateHint": "Seansi olek kajastab valitud perioodi lõpu seisu, mitte praegust reaalajas olekut.",
     "oneOffHint": "AI saab valitud alusandmed sinu rakenduse keeles, tundlikud andmed on eemaldatud. See nõudmisel loodav ülevaade ei muuda sinu ajastatud ülevaadet ega AI eelistusi.",
-    "createOffline": "Ülevaate kontrollimiseks või loomiseks loo internetiühendus. Tasulisi päringuid ei panda kunagi võrguühenduseta järjekorda.",
+    "createOffline": "Ülevaate eelvaate avamiseks või ülevaate loomiseks loo internetiühendus. Tasulisi päringuid ei panda kunagi võrguühenduseta järjekorda.",
     "estimateInputTooLarge": "Selle perioodi kohta on valitud mudeli jaoks liiga palju alusandmeid.",
     "estimatePermissionUnavailable": "Sul pole õigust selle konteksti saldot kasutada.",
     "createFailed": "Seda ülevaadet ei õnnestunud luua.",
     "reviewFailed": "Seda ülevaadet ei õnnestunud üle vaadata.",
-    "saved": "Ülevaate seaded salvestatud"
+    "saved": "Ülevaate seaded salvestatud",
+    "preparing": "Valmistame sinu ülevaadet ette…",
+    "preparationHint": "Tegevusandmete kogumise ajal võid lahkuda ja hiljem tagasi tulla. AI ei alusta tööd ja tasu ei võeta enne, kui oled hinnangu üle vaadanud ja kinnitanud.",
+    "resumeReview": "Jätka ülevaatamist",
+    "preparationFailed": "Selle ülevaate jaoks ei õnnestunud tegevusandmeid koguda. Proovi uuesti.",
+    "preparationTimedOut": "Tegevusandmete kogumine võttis liiga kaua aega. Proovi uuesti.",
+    "preparationDrafts": "Kinnitamata ülevaated"
   }
 }

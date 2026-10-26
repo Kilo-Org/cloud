@@ -1,11 +1,19 @@
 import 'server-only';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { device_sessions, device_refresh_tokens, kilocode_users } from '@kilocode/db/schema';
+import {
+  device_sessions,
+  device_refresh_tokens,
+  kilocode_users,
+  user_auth_provider,
+} from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
 import { eq, and, isNull, gt, sql, getTableColumns } from 'drizzle-orm';
 import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
+import { invalidateDeviceSession } from '@kilocode/web-shared/lib/auth/device-session-cache';
+import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
 import { createHash, randomBytes } from 'node:crypto';
 import { persistAttestedKey, type VerifyAdmissionOk } from './native-admission';
+import { checkDomainSignInEligibility } from './email-signin-eligibility';
 
 const REFRESH_TOKEN_BYTES = 32;
 
@@ -27,6 +35,7 @@ async function revokeForReuse(deviceSessionId: string, revokedAt: string): Promi
     .update(device_sessions)
     .set({ revoked_at: revokedAt, revoked_reason: 'refresh_reuse_detected' })
     .where(eq(device_sessions.id, deviceSessionId));
+  invalidateDeviceSession(deviceSessionId);
   console.warn('[native-refresh] refresh token reuse detected; session revoked', {
     deviceSessionId,
   });
@@ -34,6 +43,52 @@ async function revokeForReuse(deviceSessionId: string, revokedAt: string): Promi
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
+}
+
+type RenewalDomainPolicy = 'allow' | 'revoke' | 'unavailable';
+
+/**
+ * Decides whether a session may renew against the domain policy of the
+ * account's current email. `revoke` means the domain is refused; `unavailable`
+ * means the policy could not be evaluated and the caller must not treat it as
+ * a refusal.
+ *
+ * A domain that requires SSO allows renewal when the account is linked to that
+ * domain's SSO authority, since such an account signs in through SSO.
+ */
+async function evaluateRenewalDomainPolicy(user: {
+  id: string;
+  google_user_email: string;
+}): Promise<RenewalDomainPolicy> {
+  const eligibility = await checkDomainSignInEligibility(user.google_user_email);
+  if (eligibility.ok) {
+    return 'allow';
+  }
+
+  if (eligibility.status >= 500) {
+    return 'unavailable';
+  }
+
+  if (eligibility.errorCode === 'BLOCKED') {
+    return 'revoke';
+  }
+
+  const domain = getLowerDomainFromEmail(user.google_user_email);
+  if (domain) {
+    const ssoLink = await db.query.user_auth_provider.findFirst({
+      where: and(
+        eq(user_auth_provider.kilo_user_id, user.id),
+        eq(user_auth_provider.provider, 'workos'),
+        eq(user_auth_provider.hosted_domain, domain)
+      ),
+      columns: { kilo_user_id: true },
+    });
+    if (ssoLink) {
+      return 'allow';
+    }
+  }
+
+  return 'revoke';
 }
 
 function generateRefreshToken(): string {
@@ -100,9 +155,12 @@ export async function issueSessionCredentials(
  * Rotate a refresh token. On success, returns a new token pair.
  * On failure, returns null with an error code.
  *
- * Precondition checks (session validity, user blocked_reason) happen BEFORE
- * the atomic consume, so a blocked refusal does not consume the token.
- * An unknown or expired token is refused without revocation.
+ * Precondition checks (session validity, user blocked_reason, and the domain
+ * policy of the account's current email) happen BEFORE the atomic consume, so a
+ * refusal does not consume the token. A domain that requires SSO keeps renewing
+ * for an account linked to that domain's SSO authority; a refused domain
+ * revokes the session. A policy that cannot be evaluated throws without
+ * revoking. An unknown or expired token is refused without revocation.
  *
  * Reuse detection: a consumed token is a replay, and the session is revoked,
  * when the session chain has advanced past it (a later token was consumed) or
@@ -184,6 +242,21 @@ export async function rotateRefreshToken(
 
   // User blocked_reason BEFORE consuming.
   if (user.blocked_reason) {
+    return { ok: false, error: 'USER_BLOCKED' };
+  }
+
+  // Step 3b: Apply the domain policy that governs renewal, before the consume,
+  // so a refusal leaves the token untouched. A verdict that could not be
+  // evaluated throws: renewal stops instead of proceeding unverified.
+  const renewalPolicy = await evaluateRenewalDomainPolicy(user);
+  if (renewalPolicy === 'unavailable') {
+    throw new Error('Domain sign-in policy could not be evaluated for refresh rotation');
+  }
+  if (renewalPolicy === 'revoke') {
+    await revokeDeviceSession(session.id, 'domain_ineligible');
+    console.warn('[native-refresh] domain not eligible; session revoked', {
+      deviceSessionId: session.id,
+    });
     return { ok: false, error: 'USER_BLOCKED' };
   }
 
@@ -406,4 +479,5 @@ export async function revokeDeviceSession(sessionId: string, reason: string): Pr
       revoked_reason: reason,
     })
     .where(eq(device_sessions.id, sessionId));
+  invalidateDeviceSession(sessionId);
 }

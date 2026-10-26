@@ -376,6 +376,12 @@ export const REMOTE_COMMAND_MAX_STRING_LENGTH = 2_000;
 export const REMOTE_COMMAND_MAX_HINTS = 32;
 export const REMOTE_COMMAND_CATALOG_MAX_SERIALIZED_BYTES = 512 * 1024;
 
+export const PREPARATION_MAX_MESSAGE_LENGTH = 16_384;
+export const PREPARATION_MAX_DETAIL_LENGTH = 16_384;
+export const PREPARATION_MAX_SETUP_LOG_ENTRIES = 100;
+export const PREPARATION_MAX_ATTEMPTS = 10;
+export const PREPARATION_MAX_STEPS = 100;
+
 /** Most message IDs a `session.queue.changed` snapshot may carry. */
 export const SESSION_QUEUE_MAX_IDS = 1_000;
 /** Most questions a `question.asked` event may carry. */
@@ -704,8 +710,37 @@ export const messageUpdatedDataSchema = z.object({
 });
 export type MessageUpdatedData = z.infer<typeof messageUpdatedDataSchema>;
 
+/**
+ * The shape of a part as it arrives from the wire or a replay, before the SDK
+ * reads anything off it. Validates the part's identity for every type, and for
+ * a `tool` part additionally requires a `state` object carrying a non-empty
+ * string `status` — the one field every reader of a tool part needs
+ * (`part-utils.ts` ranks `state.status`, the transcript renders the completed
+ * output). A part without a usable state has nothing to show, so it is rejected
+ * at this boundary.
+ *
+ * The state is validated for its identity only, not its contents: attachments
+ * stay unchecked here (`part-utils.ts` filters the non-conforming entries at the
+ * chat-processor seam) because dropping the whole part over one bad attachment
+ * entry would lose a tool call the transcript can still render.
+ *
+ * Mirrored for the history/replay shape in `sessionSnapshotSchema`.
+ */
+const wireMessagePartSchema = z
+  .object({ id: z.string(), sessionID: z.string(), messageID: z.string() })
+  .passthrough()
+  .refine(
+    part =>
+      part['type'] !== 'tool' ||
+      z
+        .object({ status: z.string().min(1) })
+        .passthrough()
+        .safeParse(part['state']).success,
+    { message: 'a tool part requires a state with a non-empty string status', path: ['state'] }
+  );
+
 export const messagePartUpdatedDataSchema = z.object({
-  part: z.object({ id: z.string(), sessionID: z.string(), messageID: z.string() }).passthrough(),
+  part: wireMessagePartSchema,
   time: z.number().optional(),
 });
 export type MessagePartUpdatedData = z.infer<typeof messagePartUpdatedDataSchema>;
@@ -935,7 +970,7 @@ const preparationStepSchema = z.object({
   parentStepId: z.string().optional(),
   completedAt: z.number().optional(),
   revision: z.number(),
-  latestDetail: z.string().optional(),
+  latestDetail: z.string().max(PREPARATION_MAX_DETAIL_LENGTH).optional(),
   safeError: z.string().optional(),
   command: z.string().optional(),
   commandIndex: z.number().optional(),
@@ -958,7 +993,7 @@ const preparationAttemptSchema = z.object({
 export const preparingDataSchema = z
   .object({
     step: z.string(),
-    message: z.string(),
+    message: z.string().max(PREPARATION_MAX_MESSAGE_LENGTH),
     branch: z.string().optional(),
     version: z.literal(2).optional(),
     attemptId: z.string().optional(),
@@ -986,7 +1021,7 @@ export const preparingDataSchema = z
     command: z.string().optional(),
     commandIndex: z.number().optional(),
     commandCount: z.number().optional(),
-    detail: z.string().optional(),
+    detail: z.string().max(PREPARATION_MAX_DETAIL_LENGTH).optional(),
     output: z.string().max(PREPARATION_OUTPUT_MAX_LENGTH).optional(),
     safeError: z.string().optional(),
     exitCode: z.number().optional(),
@@ -1129,7 +1164,7 @@ export const sessionSnapshotSchema = z.object({
   messages: z.array(
     z.object({
       info: z.object({ id: z.string() }).passthrough(),
-      parts: z.array(z.object({ id: z.string() }).passthrough()),
+      parts: z.array(wireMessagePartSchema),
     })
   ),
 });

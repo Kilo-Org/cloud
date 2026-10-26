@@ -54,10 +54,8 @@ export function AddMemberDialog({
   const { data: organizationData } = useOrganizationWithMembers(organizationId);
   const currentMembers = organizationData?.members || [];
 
-  // Search users query - only enabled when there's a search term
   const searchUsersQuery = useSearchUsers(debouncedSearchTerm);
 
-  // Filter search results to exclude current members
   const filteredSearchResults = searchUsersQuery.data?.users
     ? (() => {
         const currentMemberEmails = new Set(currentMembers.map(member => member.email));

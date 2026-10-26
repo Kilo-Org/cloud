@@ -1,5 +1,4 @@
 import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
-import type { Images } from '@kilocode/app-shared/images-schema';
 import {
   errorShapeSchema,
   parseCustomerBillingFailure,
@@ -158,6 +157,13 @@ const RESOLVED_DELIVERY_MEMORY_MAX_SESSIONS = 20;
  * failed a send.
  */
 const FAILED_PROMPT_MEMORY_MAX_SESSIONS = 20;
+
+/**
+ * Maximum number of session ids the manager tracks as not available. An entry
+ * is dropped when a `fetchSession` for the id succeeds, so the cap bounds how
+ * many ids one manager tracks.
+ */
+const DENIED_SESSION_MEMORY_MAX_SESSIONS = 20;
 
 /**
  * Maximum number of retained messages. Once the loaded transcript exceeds this,
@@ -353,6 +359,15 @@ type SessionManagerConfig = {
     kiloSessionId: KiloSessionId
   ) => CachedSessionSnapshotPage | null | Promise<CachedSessionSnapshotPage | null>;
   writeCachedSnapshotPage?: (page: CachedSessionSnapshotPage) => void;
+  /**
+   * Optional request to remove the caller-persisted page for a session.
+   * `switchSession` calls it when an open is answered as not available. The
+   * consumer deletes the page for the id and must not re-queue a write it
+   * already holds for it. The call never delays or replaces the open's
+   * terminal error: a returned promise is not awaited and its rejection is
+   * dropped, like a cache write.
+   */
+  invalidateCachedSnapshotPage?: (kiloSessionId: KiloSessionId) => void | Promise<void>;
   /**
    * Optional classifier for a `fetchSession` failure that means "the request
    * never answered" — a client-side deadline abort — as opposed to the server
@@ -589,7 +604,6 @@ type SessionManager = {
   send(input: {
     payload: SessionManagerSendPayload;
     attachments?: CloudAgentAttachments;
-    images?: Images;
     /**
      * Ready file parts to forward to a remote CLI session. Distinct from the
      * cloud-only `attachments` field: cloud sessions use `attachments`, remote
@@ -1349,6 +1363,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * accepts.
    */
   const failedPromptBySession = new Map<KiloSessionId, string>();
+  /**
+   * Session ids the server answered as not available. Insertion order is the
+   * eviction order (`rememberDeniedSession`).
+   */
+  const deniedSessionIds = new Set<KiloSessionId>();
   let activeSessionType: ActiveSessionType | null = null;
   /**
    * Latest per-session capabilities reported by the live CLI transport's
@@ -2373,6 +2392,43 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   }
 
   /**
+   * Record a session the server answered as not available. Recently touched
+   * ids survive eviction; the active session is never evicted.
+   */
+  function rememberDeniedSession(kiloSessionId: KiloSessionId): void {
+    deniedSessionIds.delete(kiloSessionId);
+    deniedSessionIds.add(kiloSessionId);
+    if (deniedSessionIds.size <= DENIED_SESSION_MEMORY_MAX_SESSIONS) return;
+    for (const key of deniedSessionIds) {
+      if (key !== kiloSessionId && key !== activeSessionId) {
+        deniedSessionIds.delete(key);
+        return;
+      }
+    }
+  }
+
+  /**
+   * Ask the consumer to delete the page it persisted for a session. The open
+   * already has its terminal error, so the request never delays or fails it: a
+   * synchronous throw and a rejected promise are both dropped, like a cache
+   * write.
+   */
+  function invalidateCachedPageForSession(kiloSessionId: KiloSessionId): void {
+    const invalidate = config.invalidateCachedSnapshotPage;
+    if (!invalidate) return;
+    try {
+      const result = invalidate(kiloSessionId);
+      if (result) {
+        void result.catch(() => {
+          // A cache failure must not change the open's outcome.
+        });
+      }
+    } catch {
+      // A cache failure must not change the open's outcome.
+    }
+  }
+
+  /**
    * A switch away caches the outgoing session's page, and that cache write can
    * already hold the optimistic row a send inserted before it settled. Drop the
    * row from that session's cached first page so returning to it does not paint
@@ -2500,8 +2556,11 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * A real session switch (or a caller without caching) still starts clean.
    */
   function preserveTranscriptOnOpen(kiloSessionId: KiloSessionId): boolean {
+    // A session recorded as not available does not use the caller's page.
+    const cacheDenied = deniedSessionIds.has(kiloSessionId);
     return Boolean(
       config.readCachedSnapshotPage &&
+      !cacheDenied &&
       activeSessionId === kiloSessionId &&
       currentSession === null &&
       store.get(messagesListAtom).length > 0
@@ -2606,7 +2665,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       initialPageGeneration: loadOlderGeneration,
       storage: jotaiStorage,
       resolvedFailures,
-      acceptCachedPage: true,
+      // A session the server already refused does not use the caller's page
+      // until it confirms access again.
+      acceptCachedPage: !deniedSessionIds.has(kiloSessionId),
       cacheReadPending: false,
       surfaceDeferredOpenFailure: null,
     };
@@ -2636,7 +2697,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     };
     const { readCachedSnapshotPage } = config;
     const pendingCacheRead =
-      readCachedSnapshotPage && !open.preserveTranscript
+      readCachedSnapshotPage && !open.preserveTranscript && open.acceptCachedPage
         ? readCachedPage(() => readCachedSnapshotPage(open.kiloSessionId), applyCachedPage)
         : null;
     if (!pendingCacheRead) return;
@@ -2670,6 +2731,9 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         // An authoritative denial is terminal and must retire any cached
         // rows the moment it lands — never deferred behind the cache read.
         open.acceptCachedPage = false;
+        // Ask for the caller-persisted page of this id to be deleted.
+        rememberDeniedSession(open.kiloSessionId);
+        invalidateCachedPageForSession(open.kiloSessionId);
         clearAllAtoms();
         store.set(isLoadingAtom, false);
         if (code === 'NOT_FOUND') {
@@ -2727,7 +2791,10 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       }
       return null;
     }
-    return open.expectedGeneration === switchGeneration ? data : null;
+    if (open.expectedGeneration !== switchGeneration) return null;
+    // The server confirmed this id, so its page may be used again.
+    deniedSessionIds.delete(open.kiloSessionId);
+    return data;
   }
 
   /**
@@ -3132,7 +3199,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
   async function send(input: {
     payload: SessionManagerSendPayload;
     attachments?: CloudAgentAttachments;
-    images?: Images;
     attachmentParts?: RemoteAttachmentPart[];
     onOptimisticSend?: () => void;
   }): Promise<boolean> {
@@ -3273,7 +3339,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
         payload: transportPayload,
         messageId,
         ...(input.attachments ? { attachments: input.attachments } : {}),
-        images: input.images,
         ...(sessionType === 'remote' && remoteModelOverride ? { remoteModelOverride } : {}),
         ...(input.attachmentParts && input.attachmentParts.length > 0
           ? { attachmentParts: input.attachmentParts }
@@ -3472,8 +3537,15 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
 
   function clearTranscript(): void {
     if (!currentSession) return;
+    // Preparation attempts and commits are transcript rows: reset their
+    // restoration state, empty both row sets, and clear them from the live
+    // service state.
+    transcriptRows.reset();
     currentSession.storage.clear();
     currentSession.state.clearCommits();
+    currentSession.state.clearPreparationAttempts();
+    store.set(preparationAttemptsAtom, []);
+    store.set(commitsAtom, []);
     olderMessagesCursor = null;
     store.set(hasOlderMessagesAtom, false);
     // The cleared view holds nothing, so the omitted-history accounting starts
@@ -3683,6 +3755,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     resolvedDeliveryFailuresBySession.clear();
     supersededInFlightBySession.clear();
     failedPromptBySession.clear();
+    deniedSessionIds.clear();
     activeSessionId = null;
     activeSessionType = null;
     store.set(

@@ -67,10 +67,11 @@ vi.mock('@/lib/hooks/use-available-models', async importOriginal => {
   };
 });
 vi.mock('@/lib/hooks/use-todos', () => ({
+  reportNothing: () => undefined,
   useTodoLists: () => ({ data: state.list ? [state.list] : [], isSuccess: true }),
   useTodoListMutations: () => ({
-    update: { mutate: state.update, isPending: false },
-    create: { mutate: state.create, isPending: false },
+    update: { mutateAsync: state.update, isPending: false },
+    create: { mutateAsync: state.create, isPending: false },
   }),
 }));
 vi.mock('@/lib/use-new-session-repos', () => ({
@@ -99,6 +100,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: 'AccessibleStatus' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
@@ -211,7 +213,7 @@ describe('To-do list settings model picker return', () => {
     ['organization', 'test-organization'],
   ] as const)(
     'Done keeps the edited %s list settings open and saves the selected defaults',
-    (_scope, organizationId) => {
+    async (_scope, organizationId) => {
       const list: TodoList = {
         id: 'test-list',
         organizationId,
@@ -285,6 +287,10 @@ describe('To-do list settings model picker return', () => {
       expect(modelPickerSlot.get(UNFENCED_ROUTE_KEY)).toBeUndefined();
 
       press(button(settings, i18n.t('common.save')));
+      // The sheet now pops only once the update settles.
+      await act(async () => {
+        await Promise.resolve();
+      });
 
       expect(state.update).toHaveBeenCalledExactlyOnceWith({
         id: 'test-list',

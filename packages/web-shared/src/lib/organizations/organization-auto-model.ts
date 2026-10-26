@@ -157,10 +157,14 @@ export async function validateOrganizationAutoTarget(
         message: `Organization Auto route target '${targetModelId}' is unavailable because this organization does not have an enabled BYOK credential for ${directByokTarget.provider.id}.`,
       };
     }
-    if (
-      options.apiKind &&
-      !directByokTarget.provider.supported_chat_apis.includes(options.apiKind)
-    ) {
+    const upstream = options.apiKind
+      ? await directByokTarget.provider.resolveUpstream({
+          credential: byok[0].decryptedAPIKey,
+          model: directByokTarget.model,
+          stream: false,
+        })
+      : null;
+    if (options.apiKind && !upstream?.supportedChatApis.includes(options.apiKind)) {
       return {
         kind: 'error',
         message: `Organization Auto route target '${targetModelId}' does not support the ${options.apiKind} API.`,

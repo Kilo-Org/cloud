@@ -1,10 +1,10 @@
 import {
   DEFAULT_SECURITY_FINDING_FILTERS,
-  getSecurityRepositoriesInScope,
   hasActiveSecurityFindingFilters,
   isPersonalSecurityScope,
   parseSecurityFindingFilters,
   type SecurityFindingRouteParams,
+  toSecurityFindingParams,
   toSecurityFindingQuery,
 } from '@kilocode/app-shared/security-agent';
 import { FlashList } from '@shopify/flash-list';
@@ -35,14 +35,8 @@ import {
 } from '@/lib/hooks/use-security-agent';
 import { useSecurityFindings } from '@/lib/hooks/use-security-findings';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
-import {
-  getSecurityAgentPath,
-  isSecurityFindingAnalyzable,
-  type SecurityFinding,
-} from '@/lib/security-agent';
-import { setSecurityFindingFilterBridge } from '@/lib/security-finding-filter-bridge';
+import { isSecurityFindingAnalyzable, type SecurityFinding } from '@/lib/security-agent';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { cn } from '@/lib/utils';
 
 type FindingListScreenProps = {
   scope: string;
@@ -92,7 +86,10 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   const colors = useThemeColors();
   const paddingBottom = useTabBarBottomPadding();
   const { t } = useTranslation();
-  const [filters, setFilters] = useState(() => parseSecurityFindingFilters(routeParams));
+  // Filters live in this route's params: the sheet is pushed with them and
+  // writes them back on apply, so the URL, the visible list and the sheet's
+  // draft can never disagree.
+  const filters = useMemo(() => parseSecurityFindingFilters(routeParams), [routeParams]);
   const [refreshing, setRefreshing] = useState(false);
 
   const config = useSecurityAgentConfig(scope);
@@ -141,22 +138,14 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
     () => ({ scope, slaEnabled, capacityState: capacity.state }),
     [scope, slaEnabled, capacity.state]
   );
-  const scopedRepositories = getSecurityRepositoriesInScope(repositories.data ?? [], config.data);
-  // Repos aren't known yet (still loading or the fetch failed) — the filter
-  // stays disabled instead of silently offering a shrunken repository list.
-  // A failed fetch is recoverable: the inline retry above, pull-to-refresh,
-  // and the route-focus refresh all refetch the repositories query.
-  const filterUnavailable = repositories.isLoading || repositories.isError;
-
   const handleRefresh = () => {
     void (async () => {
       setRefreshing(true);
       try {
-        // Refresh only — never triggers a new sync. The repositories fetch
-        // failure disables the filter control until a refetch succeeds, so
-        // every list refresh also retries it. The capacity counters are on
-        // screen, so a pull refreshes them too instead of leaving the notice
-        // and the actions on an older read.
+        // Refresh only — never triggers a new sync. The list shows the
+        // repository fetch failure inline, so every list refresh retries it,
+        // and the capacity counters are on screen, so a pull refreshes them
+        // too instead of leaving the notice and the actions on an older read.
         const [findingsResult] = await Promise.all([
           findings.refetch(),
           repositories.refetch(),
@@ -177,26 +166,18 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
       <ScreenHeader
         className="px-6"
         title={t('common.findings')}
-        // One size-11 (44dp) filter icon; declaring it keeps the one-line
-        // title's readable minimum when the row is narrow.
-        headerRightWidth={44}
+        // One 48dp icon target from IconButton; declaring its width keeps the
+        // one-line title's readable minimum when the row is narrow.
+        headerRightWidth={48}
         headerRight={
           <IconButton
             onPress={() => {
-              if (filterUnavailable) {
-                return;
-              }
-              setSecurityFindingFilterBridge({
-                filters,
-                repositories: scopedRepositories,
-                onApply: setFilters,
+              router.push({
+                pathname: '/(app)/security-agent/[scope]/filter',
+                params: { scope, ...toSecurityFindingParams(filters) },
               });
-              router.push(getSecurityAgentPath(scope, 'filter'));
             }}
-            disabled={filterUnavailable}
             accessibilityLabel={t('securityAgent.filter.title')}
-            accessibilityState={{ disabled: filterUnavailable }}
-            className={cn(filterUnavailable && 'opacity-50')}
           >
             <SlidersHorizontal
               size={20}
@@ -251,7 +232,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
                 className={STATE_ACTION_CLASS}
                 variant="outline"
                 onPress={() => {
-                  setFilters(DEFAULT_SECURITY_FINDING_FILTERS);
+                  router.setParams(toSecurityFindingParams(DEFAULT_SECURITY_FINDING_FILTERS));
                 }}
               >
                 <Text>{t('common.clearFilters')}</Text>

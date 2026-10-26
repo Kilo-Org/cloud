@@ -1,3 +1,4 @@
+import { environmentReferenceSchema } from '../environment-build/reference.js';
 import * as z from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import {
@@ -439,6 +440,8 @@ export const CurrentSessionMetadataSchema = z
     agent: MetadataAgentSchema.optional(),
     finalization: MetadataFinalizationSchema.optional(),
     profile: SessionProfileBundleSchema.optional(),
+    /** The repository environment this session admitted, for snapshot selection. */
+    environment: environmentReferenceSchema.optional(),
     callback: MetadataCallbackSchema.optional(),
     workspace: MetadataWorkspaceSchema.optional(),
     devcontainer: MetadataDevContainerSchema.optional(),

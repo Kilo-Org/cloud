@@ -97,23 +97,23 @@ function mapGeminiThoughtToReasoningDetails(value: unknown) {
   }
 }
 
-function mapReasoningContentToDetails(value: unknown) {
+function mapReasoningStringToDetails(value: unknown, field: 'reasoning_content' | 'reasoning') {
   if (
     !isRecord(value) ||
-    typeof value.reasoning_content !== 'string' ||
-    typeof value.reasoning_details !== 'undefined'
+    typeof value[field] !== 'string' ||
+    value.reasoning_details !== undefined
   ) {
     return;
   }
 
   const detail = {
     type: ReasoningDetailType.Text,
-    text: value.reasoning_content,
+    text: value[field],
     index: 0,
     format: ReasoningFormat.Unknown,
   } satisfies ReasoningDetailText;
   value.reasoning_details = [detail];
-  delete value.reasoning_content;
+  delete value[field];
 }
 
 export function applyReasoningDetailsResponseTransform(
@@ -125,7 +125,10 @@ export function applyReasoningDetailsResponseTransform(
       mapGeminiThoughtToReasoningDetails(value);
       break;
     case ReasoningDetailsTransform.ReasoningContent:
-      mapReasoningContentToDetails(value);
+      mapReasoningStringToDetails(value, 'reasoning_content');
+      break;
+    case ReasoningDetailsTransform.Reasoning:
+      mapReasoningStringToDetails(value, 'reasoning');
       break;
     case null:
       break;

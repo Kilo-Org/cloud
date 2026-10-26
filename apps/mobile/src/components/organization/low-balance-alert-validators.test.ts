@@ -6,6 +6,7 @@ import {
   saveErrorCopy,
 } from '@/components/organization/low-balance-alert-validators';
 import { i18n } from '@/i18n';
+import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 
 describe('emailsError', () => {
   const invalidCopy = i18n.t('organization.lowBalanceAlert.emailsInvalid');
@@ -65,6 +66,16 @@ describe('saveErrorCopy', () => {
     ).toEqual({
       field: 'form',
       message: i18n.t('organization.lowBalanceAlert.saveError'),
+    });
+  });
+
+  it('names a lapsed organization plan on the form line', () => {
+    const error = Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+      data: { code: 'FORBIDDEN', message: ORGANIZATION_TRIAL_EXPIRED_MESSAGE },
+    });
+    expect(saveErrorCopy(error)).toEqual({
+      field: 'form',
+      message: i18n.t('common.organizationTrialEnded'),
     });
   });
 });

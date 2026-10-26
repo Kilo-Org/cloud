@@ -53,6 +53,7 @@
     "connected": "Collegato",
     "couldNotLoadModels": "Impossibile caricare i modelli.",
     "couldNotLoadRepositories": "Impossibile caricare i repository.",
+    "noRepositoriesFound": "Nessun repository trovato",
     "critical": "Livello critico",
     "delete": "Elimina",
     "deleted": "Eliminato",
@@ -87,6 +88,7 @@
     "connect": "Collega",
     "connectBitbucket": "Collega Bitbucket",
     "connectGitlab": "Collega GitLab",
+    "connectProvider": "Connetti una piattaforma",
     "contentTruncated": "Contenuto troncato",
     "copyLink": "Copia link",
     "couldNotLoadOrganizations": "Impossibile caricare le organizzazioni.",
@@ -145,7 +147,8 @@
     "agent": "Agente",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Modifiche"
+    "changes": "Modifiche",
+    "organizationTrialEnded": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Il proprietario dell'organizzazione può aggiornare la fatturazione su kilo.ai, poi riprova."
   },
   "language": {
     "restarting": "Riavvio per applicare la lingua selezionata",
@@ -854,7 +857,6 @@
       "gitlabNoRepositoriesDescription": "Potresti dover concedere l'accesso a più gruppi o progetti su GitLab.",
       "installGithubApp": "Installa l'app GitHub sui repository",
       "installGithubAppDescription": "Concedi all'app GitHub di Kilo l'accesso ai repository che vuoi far esaminare.",
-      "noRepositoriesFound": "Nessun repository trovato",
       "repositoryAccess": "accesso al repository"
     },
     "style": {
@@ -878,7 +880,6 @@
     "followReviewMd": "Segui REVIEW.md",
     "followReviewMdSubtitle": "Rispetta le istruzioni nel file REVIEW.md di ogni repository",
     "manualReview": {
-      "connectProvider": "Connetti una piattaforma",
       "connectProviderDescription": "Connetti GitHub per avviare una revisione manuale di una pull request.",
       "couldNotCheckProviderStatus": "Impossibile verificare lo stato della piattaforma.",
       "couldNotLoadProviders": "Impossibile caricare le piattaforme connesse. Riprova.",
@@ -984,6 +985,22 @@
       "loading": "Caricamento della memoria di revisione",
       "loadingProposals": "Caricamento delle proposte",
       "noProposals": "Nessuna proposta",
+      "proposalDetails": "Dettagli della proposta",
+      "proposalTitle": "Titolo della proposta",
+      "rationale": "Motivazione",
+      "saveFirst": "Salva le modifiche prima di aprire una pull request.",
+      "proposalSaved": "Proposta salvata",
+      "proposalDismissed": "Proposta scartata",
+      "dismissProposalTitle": "Scartare la proposta?",
+      "dismissProposalMessage": "Questa proposta verrà rimossa dall'elenco attivo e non potrà essere ripristinata.",
+      "prOpened": "Pull request per REVIEW.md aperta",
+      "alreadyPresent": "Le indicazioni sono già presenti in REVIEW.md",
+      "status": {
+        "edited": "Modificata",
+        "opening_change_request": "Apertura della PR",
+        "change_request_failed": "Apertura della PR non riuscita",
+        "superseded": "Già presente"
+      },
       "noProposalsDescription": "Le proposte della memoria di revisione compaiono qui dopo che Kilo ha analizzato le risposte dei responsabili del progetto.",
       "off": "La memoria di revisione è disattivata.",
       "on": "La memoria di revisione è attivata.",
@@ -1064,8 +1081,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Nessun filtro disponibile",
-      "noFiltersDescription": "Torna indietro e riapri i filtri dall'elenco delle segnalazioni.",
       "title": "Filtri delle segnalazioni",
       "fixed": "Risolto",
       "outcome": "Esito",
@@ -1629,8 +1644,8 @@
       "title": "Sessione",
       "copyErrorDetails": "Copia i dettagli dell'errore",
       "backToSessions": "Torna alle sessioni",
-      "follow": "Segui nella schermata di blocco",
-      "unfollow": "Smetti di seguire nella schermata di blocco",
+      "follow": "Segui la sessione",
+      "unfollow": "Smetti di seguire la sessione",
       "couldNotLoad": "Impossibile caricare la sessione.",
       "failedToLoadDetails": "Impossibile caricare i dettagli della sessione.",
       "failedToStopExecution": "Impossibile interrompere l'esecuzione.",
@@ -2456,7 +2471,6 @@
     "allow": "Consenti",
     "onlineMessage": "Questo dispositivo non può trascrivere offline. La tua registrazione viene inviata a {{provider}} per convertirla in testo. Kilo non archivia l'audio.",
     "onlineTitle": "La voce viene elaborata online",
-    "staysOff": "La dettatura resta disattivata finché non consenti la trascrizione online.",
     "start": "Avvia la dettatura",
     "stop": "Interrompi la dettatura",
     "restricted": "La dettatura è soggetta a restrizioni su questo dispositivo.",
@@ -3211,7 +3225,9 @@
       "sendInvite": "Invia l'invito",
       "title": "Invita un membro",
       "alreadyInvited": "Questo indirizzo ha già un invito in sospeso o appartiene già a un membro.",
-      "sendError": "Impossibile inviare l'invito."
+      "sendError": "Impossibile inviare l'invito.",
+      "pendingInvitation": "Questo indirizzo email ha già un invito in sospeso.",
+      "alreadyMember": "Questa persona è già un membro di questa organizzazione."
     },
     "invoices": {
       "downloadA11y": "Scarica la fattura {{number}}",
@@ -3281,7 +3297,12 @@
       "pendingInvitations": "Inviti in sospeso",
       "resendInvite": "Invia di nuovo l'invito",
       "shareInviteLink": "Condividi il link di invito",
-      "resendInviteError": "Impossibile inviare di nuovo l'invito."
+      "resendInviteError": "Impossibile inviare di nuovo l'invito.",
+      "inviteNotResendable": "Questo invito non può più essere inviato di nuovo.",
+      "ownerAuthority": "Solo un proprietario dell'organizzazione può gestire i proprietari.",
+      "ownRoleChange": "Non puoi modificare il tuo ruolo.",
+      "inviteExpired": "Questo invito è scaduto.",
+      "inviteAccepted": "Questo invito è già stato accettato."
     },
     "usageStats": {
       "inputTokens": "Token in ingresso",
@@ -3396,7 +3417,7 @@
     "activityKitDisabledBody": "Attiva le attività in tempo reale nelle impostazioni per vedere gli agenti attivi nella schermata di blocco.",
     "openSession": "Apri",
     "finished": "Completato",
-    "followFailed": "Impossibile mostrare questo agente nella schermata di blocco.",
+    "followFailed": "Impossibile seguire questa sessione.",
     "approveFailed": "Impossibile approvare. Tocca $t(common.approve) per riprovare.",
     "checked": "Verificato",
     "lastKnown": "Ultimo stato noto",
@@ -3771,6 +3792,7 @@
     "title": "Profili",
     "entrySubtitle": "Riutilizza le impostazioni dell'ambiente tra le sessioni",
     "newProfile": "Nuovo profilo",
+    "openHint": "Apre il profilo",
     "emptyTitle": "Nessun profilo ancora",
     "emptyDescription": "Crea un profilo per riutilizzare variabili di ambiente, comandi di configurazione e competenze tra le sessioni.",
     "loadFailed": "Impossibile caricare i profili",
@@ -4009,11 +4031,13 @@
       "namePlaceholder": "Bug, Idee, Release…",
       "emoji": "Emoji",
       "mode": "Modalità",
-      "defaultsHint": "Le sessioni avviate da questo elenco usano questi valori predefiniti."
+      "defaultsHint": "Le sessioni avviate da questo elenco usano questi valori predefiniti.",
+      "saveFailed": "Impossibile salvare l’elenco. Controlla la connessione e riprova."
     },
     "list": {
       "addPlaceholder": "Aggiungi un'attività",
       "add": "Aggiungi attività",
+      "addFailed": "Impossibile aggiungere l’attività. Controlla la connessione e riprova.",
       "empty": "Ancora nessuna attività",
       "setDefaults": "Imposta repository, modalità e modello",
       "completed_one": "Completate ({{count}})",
@@ -4052,7 +4076,8 @@
       "startNewSession": "Avvia nuova sessione",
       "startNewSessionHint": "Tieni premuto per avviare una nuova sessione.",
       "linkSession": "Collega sessione",
-      "linkFailed": "Impossibile collegare la sessione all'attività"
+      "linkFailed": "Impossibile collegare la sessione all'attività",
+      "startRefreshFailed": "La sessione è stata avviata, ma questo elenco non è stato aggiornato."
     },
     "linkSession": {
       "title": "Collega una sessione",
@@ -4082,7 +4107,7 @@
     "emptyHint": "Le tue sessioni di coding cloud e CLI appaiono qui quando un briefing programmato ha attività.",
     "loadError": "Impossibile caricare i briefing",
     "sessions": "Attive nella finestra",
-    "pullRequests": "PRs aperte",
+    "pullRequests": "PR aperte nella finestra",
     "blockers": "Nuovi blocchi",
     "spend": "Spesa nella finestra",
     "view": "Leggi briefing",
@@ -4147,7 +4172,7 @@
     "periodTooLong": "Scegli un periodo di 31 giorni o meno.",
     "invalidLocalTime": "Questa ora locale non esiste nel fuso orario del briefing. Scegli un'altra ora.",
     "reviewBriefing": "Rivedi briefing",
-    "reviewAgain": "Prepara una nuova revisione",
+    "reviewAgain": "Prepara una nuova anteprima",
     "payer": "Addebitato a {{context}}",
     "emptyPeriod": "Nessuna attività trovata in questo periodo. Nessun riepilogo AI né addebito.",
     "emptyHistory": "Nessun briefing salvato",
@@ -4161,7 +4186,13 @@
     "estimatePricingUnavailable": "Prezzi non disponibili per questo modello.",
     "estimateBalanceUnavailable": "Saldo insufficiente per un riepilogo a pagamento.",
     "estimateModelNotAllowed": "Questo modello non è consentito qui.",
-    "estimateSpendLimitTooLow": "Aumenta la tutela di spesa per consentire questo riepilogo.",
-    "saved": "Impostazioni briefing salvate"
+    "estimateSpendLimitTooLow": "Aumenta il limite di spesa per consentire questo riepilogo.",
+    "saved": "Impostazioni briefing salvate",
+    "preparing": "Preparazione del briefing in corso…",
+    "preparationHint": "Puoi uscire e tornare mentre vengono raccolte le attività. Non viene avviata alcuna attività AI né applicato alcun addebito finché non rivedi il briefing e confermi la stima.",
+    "resumeReview": "Riprendi la lettura del briefing",
+    "preparationFailed": "Impossibile raccogliere le attività per questo briefing. Riprova.",
+    "preparationTimedOut": "La raccolta delle attività ha richiesto troppo tempo. Riprova.",
+    "preparationDrafts": "Briefing non confermati"
   }
 }

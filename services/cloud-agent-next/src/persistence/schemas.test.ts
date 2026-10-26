@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   AttachmentsSchema,
-  ImagesSchema,
   MCPServerConfigSchema,
   MetadataSchema,
   modelIdSchema,
@@ -103,70 +102,6 @@ describe('AttachmentsSchema', () => {
       AttachmentsSchema.safeParse({
         path: '123e4567-e89b-12d3-a456-426614174000',
         files: ['123e4567-e89b-12d3-a456-426614174001.TAR'],
-      }).success
-    ).toBe(false);
-  });
-});
-
-describe('ImagesSchema', () => {
-  it('retains legacy image descriptor acceptance without accepting document suffixes', () => {
-    const images = {
-      path: '123e4567-e89b-12d3-a456-426614174000',
-      files: [
-        '123e4567-e89b-12d3-a456-426614174001.png',
-        '123e4567-e89b-12d3-a456-426614174002.jpg',
-        '123e4567-e89b-12d3-a456-426614174003.webp',
-        '123e4567-e89b-12d3-a456-426614174004.gif',
-        '123e4567-e89b-12d3-a456-426614174005.jpeg',
-      ],
-    };
-
-    expect(ImagesSchema.parse(images)).toEqual(images);
-    expect(
-      ImagesSchema.safeParse({
-        path: images.path,
-        files: ['123e4567-e89b-12d3-a456-426614174006.pdf'],
-      }).success
-    ).toBe(false);
-  });
-
-  it('rejects client-provided R2 service prefixes', () => {
-    const result = ImagesSchema.safeParse({
-      path: 'images/123e4567-e89b-12d3-a456-426614174000',
-      files: ['123e4567-e89b-12d3-a456-426614174001.png'],
-    });
-
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects hyphen-only image filenames without UUID segments', () => {
-    const result = ImagesSchema.safeParse({
-      path: '123e4567-e89b-12d3-a456-426614174000',
-      files: ['------------------------------------.png'],
-    });
-
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects more than five files and unsafe filenames', () => {
-    expect(
-      ImagesSchema.safeParse({
-        path: '123e4567-e89b-12d3-a456-426614174000',
-        files: [
-          '123e4567-e89b-12d3-a456-426614174001.png',
-          '123e4567-e89b-12d3-a456-426614174002.png',
-          '123e4567-e89b-12d3-a456-426614174003.png',
-          '123e4567-e89b-12d3-a456-426614174004.png',
-          '123e4567-e89b-12d3-a456-426614174005.png',
-          '123e4567-e89b-12d3-a456-426614174006.png',
-        ],
-      }).success
-    ).toBe(false);
-
-    expect(
-      ImagesSchema.safeParse({
-        path: '123e4567-e89b-12d3-a456-426614174000',
-        files: ['../123e4567-e89b-12d3-a456-426614174001.svg'],
       }).success
     ).toBe(false);
   });
@@ -449,7 +384,7 @@ describe('MetadataSchema', () => {
         },
       },
     ],
-    ['setupCommands', ['pnpm install'], ['x'.repeat(501)]],
+    ['setupCommands', ['pnpm install'], ['x'.repeat(16_001)]],
     [
       'mcpServers',
       { docs: { type: 'remote', url: 'https://example.com/mcp' } },
@@ -653,7 +588,7 @@ describe('MetadataSchema', () => {
     });
 
     it('should accept commands at maximum length', () => {
-      const longCommand = 'A'.repeat(500);
+      const longCommand = 'A'.repeat(16_000);
 
       const metadata = {
         version: 1,
@@ -691,8 +626,8 @@ describe('MetadataSchema', () => {
   });
 
   describe('command too long', () => {
-    it('should reject commands exceeding 500 characters', () => {
-      const longCommand = 'A'.repeat(501);
+    it('should reject commands exceeding 16,000 characters', () => {
+      const longCommand = 'A'.repeat(16_001);
 
       const metadata = {
         version: 1,

@@ -109,9 +109,9 @@ function pressButton(root: ReactTestInstance, label: string): void {
 }
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
-function mountSection(organizationId?: string) {
+function mountSection(organizationId?: string, canManage = true) {
   return renderWithProviders(
-    createElement(ProfileRepoPinsSection, { profileId: 'profile-1', organizationId })
+    createElement(ProfileRepoPinsSection, { profileId: 'profile-1', organizationId, canManage })
   );
 }
 
@@ -218,6 +218,30 @@ describe('ProfileRepoPinsSection', () => {
       repoFullName: 'acme/infra',
       platform: 'gitlab',
     });
+
+    unmount();
+  });
+  it('read-only: keeps existing repository bindings without change controls', async () => {
+    Object.assign(h.bindingsQuery, {
+      isLoading: false,
+      bindings: [
+        {
+          repoFullName: 'acme/api',
+          platform: 'github',
+          profileId: 'profile-1',
+          profileName: 'Mine',
+        },
+      ],
+    });
+
+    const { renderer, unmount } = await mountSection('org-1', false);
+
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain('acme/api');
+    expect(findAll(renderer.root, 'Button')).toHaveLength(0);
+    expect(
+      findAll(renderer.root, 'Pressable').some(node => node.props.accessibilityLabel === 'Unbind')
+    ).toBe(false);
+    expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(0);
 
     unmount();
   });

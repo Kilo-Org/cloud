@@ -26,7 +26,6 @@ import {
   CallbackTargetSchema,
   AttachmentsSchema,
   CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS,
-  ImagesSchema,
   RuntimeSkillSchema,
   RuntimeSkillsSchema,
   RuntimeAgentSchema,
@@ -52,7 +51,6 @@ export {
   CallbackTargetSchema,
   AttachmentsSchema,
   CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS,
-  ImagesSchema,
   RuntimeSkillSchema,
   RuntimeSkillsSchema,
   RuntimeAgentSchema,
@@ -95,49 +93,29 @@ export function isBuiltinMode(slug: string): boolean {
 }
 
 export type Attachments = z.infer<typeof AttachmentsSchema>;
-export type Images = z.infer<typeof ImagesSchema>;
 
 const AttachmentFieldsSchema = {
   attachments: AttachmentsSchema.optional().describe(
     'Optional file attachments to download from R2 to the sandbox'
   ),
-  images: ImagesSchema.optional().describe(
-    'Legacy optional image attachments to download from R2 to the sandbox'
-  ),
 };
-
-function rejectAmbiguousAttachments(
-  data: { attachments?: unknown; images?: unknown },
-  ctx: z.RefinementCtx
-): void {
-  if (data.attachments !== undefined && data.images !== undefined) {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['attachments'],
-      message: 'Provide attachments or legacy images, not both',
-    });
-  }
-}
 
 /**
  * Reject a prompt that is empty or whitespace-only when there are no
- * `attachments.files` and no `images.files`. Command turns have no prompt and
- * must skip this rule at the call site.
+ * `attachments.files`. Command turns have no prompt and must skip this rule at
+ * the call site.
  */
 function rejectEmptyPromptWithoutAttachments(
   data: {
     prompt?: unknown;
     attachments?: { files?: unknown[] } | undefined;
-    images?: { files?: unknown[] } | undefined;
   },
   ctx: z.RefinementCtx,
   path: (string | number)[] = ['prompt']
 ): void {
   const prompt = typeof data.prompt === 'string' ? data.prompt : '';
   if (prompt.trim().length > 0) return;
-  const hasFiles =
-    (data.attachments?.files?.length ?? 0) > 0 || (data.images?.files?.length ?? 0) > 0;
-  if (hasFiles) return;
+  if ((data.attachments?.files?.length ?? 0) > 0) return;
   ctx.addIssue({ code: 'custom', path, message: 'Prompt is required' });
 }
 
@@ -337,10 +315,9 @@ export const SendMessageV2Input = z
     SendMessageV2CommandPayloadInput,
   ])
   .superRefine((input, ctx) => {
-    rejectAmbiguousAttachments(input, ctx);
     if ('payload' in input) {
       if (input.payload.type === 'command') {
-        if (input.attachments !== undefined || input.images !== undefined) {
+        if (input.attachments !== undefined) {
           ctx.addIssue({
             code: 'custom',
             path: ['attachments'],
@@ -350,14 +327,14 @@ export const SendMessageV2Input = z
         return;
       }
       rejectEmptyPromptWithoutAttachments(
-        { prompt: input.payload.prompt, attachments: input.attachments, images: input.images },
+        { prompt: input.payload.prompt, attachments: input.attachments },
         ctx,
         ['payload', 'prompt']
       );
       return;
     }
     rejectEmptyPromptWithoutAttachments(
-      { prompt: input.prompt, attachments: input.attachments, images: input.images },
+      { prompt: input.prompt, attachments: input.attachments },
       ctx,
       ['prompt']
     );
@@ -573,7 +550,6 @@ const PrepareSessionSharedFields = {
     .uuid()
     .optional()
     .describe('Profile ID to resolve (repo binding + default still apply on top)'),
-
   ...AttachmentFieldsSchema,
   createdOnPlatform: z
     .string()
@@ -787,7 +763,6 @@ export const PrepareSessionInput = z
       });
     }
   })
-  .superRefine(rejectAmbiguousAttachments)
   .refine(requiresAppendSystemPrompt, {
     message: 'appendSystemPrompt is required when mode is custom',
     path: ['appendSystemPrompt'],
@@ -913,13 +888,11 @@ export const StartSessionInput = z
   .object({
     operationKey: z.string().uuid().optional(),
     allowSubagentSessions: z.boolean().optional(),
-    message: z
-      .object({
-        prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH),
-        ...AttachmentFieldsSchema,
-        id: MessageIdSchema.optional(),
-      })
-      .superRefine(rejectAmbiguousAttachments),
+    message: z.object({
+      prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH),
+      ...AttachmentFieldsSchema,
+      id: MessageIdSchema.optional(),
+    }),
     agent: z.object({
       mode: ModeSlugSchema,
       model: modelIdSchema,
@@ -984,10 +957,9 @@ export const SendMessageInput = z
         ...AttachmentFieldsSchema,
         id: MessageIdSchema.nullish(),
       })
-      .superRefine(rejectAmbiguousAttachments)
       .superRefine((message, ctx) =>
         rejectEmptyPromptWithoutAttachments(
-          { prompt: message.prompt, attachments: message.attachments, images: message.images },
+          { prompt: message.prompt, attachments: message.attachments },
           ctx
         )
       ),

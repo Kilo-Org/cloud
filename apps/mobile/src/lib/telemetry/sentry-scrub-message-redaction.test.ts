@@ -1,0 +1,163 @@
+import { describe, expect, it } from 'vitest';
+
+import { scrubBreadcrumb, scrubEvent } from './sentry-scrub';
+
+// Assembled from parts so the fixture reads as a plain URL value.
+const USERINFO = ['user', 'abcdefghijklmnopqrst'].join(':');
+const OPAQUE_RUN = 'abcdefghijklmnopqrst';
+const FRAGMENT_URL = `https://example.com/oauth/callback#${OPAQUE_RUN}`;
+
+/**
+ * Message and URL coverage for {@link scrubEvent}: an exception message,
+ * `event.message`, the `network` context, and a captured URL all take the same
+ * scrubbed form.
+ */
+describe('scrubEvent message redaction', () => {
+  it('redacts a long opaque run in an exception value and keeps the text readable', () => {
+    const event = {
+      exception: {
+        values: [
+          { type: 'Error', value: 'upload failed for token abcdefghijklmnopqrst' },
+          { type: 'Error', value: 'caused by key abcdefghijklmnopqrst' },
+        ],
+      },
+    };
+
+    const result = scrubEvent(event);
+    const [first, second] = result.exception.values;
+
+    expect(first?.value).toBe('upload failed for token [redacted]');
+    expect(second?.value).toBe('caused by key [redacted]');
+  });
+
+  it('redacts a long opaque run in event.message', () => {
+    const event = { message: 'sync failed for abcdefghijklmnopqrst' };
+
+    const result = scrubEvent(event);
+
+    expect(result.message).toBe('sync failed for [redacted]');
+  });
+
+  it('redacts free text in the network context and keeps the app-set names', () => {
+    const event = {
+      exception: { values: [{ type: 'TypeError' }] },
+      contexts: {
+        network: {
+          url: 'https://api.example.com/api/trpc/cliSessionsV2.getSessionMessagesPage',
+          procedure: 'cliSessionsV2.getSessionMessagesPage',
+          trpcCode: 'INTERNAL_SERVER_ERROR',
+          outcome: 'http_error',
+          statusText: 'Upstream rejected my-super-secret-prod-token',
+        },
+      },
+    };
+
+    const result = scrubEvent(event);
+
+    expect(result.contexts.network.url).toBe(
+      'https://api.example.com/api/trpc/cliSessionsV2.getSessionMessagesPage'
+    );
+    expect(result.contexts.network.procedure).toBe('cliSessionsV2.getSessionMessagesPage');
+    expect(result.contexts.network.trpcCode).toBe('INTERNAL_SERVER_ERROR');
+    expect(result.contexts.network.outcome).toBe('http_error');
+    expect(result.contexts.network.statusText).toBe('Upstream rejected [redacted]');
+  });
+
+  it('applies the declared context policies together', () => {
+    const event = {
+      exception: {
+        values: [{ type: 'NetworkError', value: `request failed ${OPAQUE_RUN}` }],
+      },
+      contexts: {
+        network: {
+          url: FRAGMENT_URL,
+          statusText: `busy ${OPAQUE_RUN}`,
+          procedure: 'session.list',
+        },
+        'network.body': {
+          code: 'INTERNAL_SERVER_ERROR',
+          httpStatus: 500,
+          path: 'session.list',
+          message: 'request details',
+        },
+        NetworkError: { detail: `retry ${OPAQUE_RUN}` },
+      },
+    };
+
+    const result = scrubEvent(event);
+
+    expect(result.contexts).toEqual({
+      network: {
+        url: 'https://example.com/oauth/callback',
+        statusText: 'busy [redacted]',
+        procedure: 'session.list',
+      },
+      'network.body': {
+        code: 'INTERNAL_SERVER_ERROR',
+        httpStatus: 500,
+        path: 'session.list',
+      },
+      NetworkError: { detail: 'retry [redacted]' },
+    });
+    expect(result.exception.values[0]?.value).toBe('request failed [redacted]');
+  });
+});
+
+describe('scrubEvent URL reduction', () => {
+  it('reduces the network context URL to origin and path', () => {
+    const withQuery = scrubEvent({
+      contexts: {
+        network: {
+          url: 'https://api.example.com/api/trpc/session.list?input=abcdefghijklmnopqrst',
+        },
+      },
+    });
+    const withFragment = scrubEvent({
+      contexts: {
+        network: {
+          url: 'https://api.example.com/oauth/callback#abcdefghijklmnopqrst',
+        },
+      },
+    });
+
+    expect(withQuery.contexts.network.url).toBe('https://api.example.com/api/trpc/session.list');
+    expect(withFragment.contexts.network.url).toBe('https://api.example.com/oauth/callback');
+  });
+
+  it('redacts a long opaque path segment in the network context URL', () => {
+    const event = {
+      contexts: {
+        network: { url: 'https://cdn.example.com/files/abcdefghijklmnopqrst/download' },
+      },
+    };
+
+    const result = scrubEvent(event);
+
+    expect(result.contexts.network.url).toBe('https://cdn.example.com/files/[redacted]/download');
+  });
+
+  it('reduces request.url to its origin and path', () => {
+    const fragment = scrubEvent({
+      request: { url: FRAGMENT_URL },
+    });
+    const userinfo = scrubEvent({
+      request: { url: `https://${USERINFO}@api.example.com/v1/latency` },
+    });
+
+    expect(fragment.request.url).toBe('https://example.com/oauth/callback');
+    expect(userinfo.request.url).toBe('https://api.example.com/v1/latency');
+  });
+});
+
+describe('scrubBreadcrumb URL reduction', () => {
+  it('strips a fragment from breadcrumb data.url', () => {
+    const breadcrumb = {
+      category: 'navigation',
+      data: { url: FRAGMENT_URL },
+    };
+
+    const result = scrubBreadcrumb(breadcrumb);
+
+    expect(result?.data.url).toBe('https://example.com/oauth/callback');
+  });
+});

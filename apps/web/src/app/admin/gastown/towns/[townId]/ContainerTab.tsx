@@ -80,7 +80,6 @@ export function ContainerTab({ townId }: { townId: string }) {
   const containerEvents = eventsQuery.data ?? [];
   const envVars = configQuery.data?.env_vars ?? {};
 
-  // Derive container health status from the alarm status snapshot
   let containerStatus: 'running' | 'stopped' | 'unknown' = 'unknown';
   if (health) {
     const hasDeadAgents = health.agents.dead > 0;

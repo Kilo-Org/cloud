@@ -864,12 +864,80 @@ describe('merge request reads', () => {
     });
   });
 
+  it.each([
+    undefined,
+    null,
+    { ...mergeRequest.diff_refs, base_sha: undefined },
+    { ...mergeRequest.diff_refs, head_sha: null },
+    { ...mergeRequest.diff_refs, start_sha: '' },
+  ])('rejects unavailable diff positions (%j)', async diffRefs => {
+    mockSelfHostedGitLabResponse({
+      status: 200,
+      json: { ...mergeRequest, diff_refs: diffRefs },
+    });
+
+    await expect(
+      getMRDiffRefs('test-token', 'group/project', 9, 'https://gitlab.example.com')
+    ).rejects.toThrow('GitLab merge request has no diff refs');
+  });
+
   it('reports a failed merge request fetch with its status', async () => {
     mockSelfHostedGitLabResponse({ status: 500, body: 'boom' });
 
     await expect(getMRDiffRefs('test-token', 123, 9, 'https://gitlab.example.com')).rejects.toThrow(
       'GitLab MR fetch failed: 500'
     );
+  });
+});
+
+describe('revokeProjectAccessToken', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('treats a 404 response as already revoked', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      text: async () => 'Not found',
+    });
+
+    await expect(revokeProjectAccessToken('user-token', 42, 601)).resolves.toBeUndefined();
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://gitlab.com/api/v4/projects/42/access_tokens/601',
+      expect.objectContaining({
+        method: 'DELETE',
+        headers: { Authorization: 'Bearer user-token' },
+      })
+    );
+  });
+
+  it('reports the response status when the revocation is not settled', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      text: async () => 'Service Unavailable',
+    });
+
+    await expect(revokeProjectAccessToken('user-token', 42, 601)).rejects.toMatchObject({
+      name: 'GitLabProjectAccessTokenRevocationError',
+      projectId: 42,
+      status: 503,
+    });
+  });
+
+  it('reports a permission failure for a 403 response', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 403,
+      text: async () => 'Forbidden',
+    });
+
+    await expect(revokeProjectAccessToken('user-token', 42, 601)).rejects.toMatchObject({
+      name: 'GitLabProjectAccessTokenPermissionError',
+      statusCode: 403,
+    });
   });
 });
 
@@ -908,6 +976,75 @@ describe('validatePersonalAccessToken', () => {
       error: 'GitLab instance URL host resolves to an address that is not allowed.',
     });
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('applies the response size cap to a literal-IP instance using the fallback fetch', async () => {
+    const oversizedBody = 'a'.repeat(10 * 1024 * 1024 + 1);
+    mockFetch.mockResolvedValueOnce(
+      new Response(oversizedBody, {
+        status: 200,
+        headers: { 'content-length': String(oversizedBody.length) },
+      })
+    );
+
+    await expect(
+      fetchGitLabRootTextFileAtRef(
+        'test-token',
+        'group/project',
+        'REVIEW.md',
+        'main',
+        'https://[2002:808:808::]/'
+      )
+    ).rejects.toThrow('GitLab response exceeded size limit');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://[2002:808:808::]/api/v4/projects/group%2Fproject/repository/files/REVIEW.md/raw?ref=main',
+      expect.objectContaining({ redirect: 'manual' })
+    );
+  });
+
+  it('applies the streamed size cap to a literal-IP instance without content-length', async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const chunk = new Uint8Array(1024 * 1024).fill(97);
+        for (let i = 0; i < 11; i++) {
+          controller.enqueue(chunk);
+        }
+        controller.close();
+      },
+    });
+    mockFetch.mockResolvedValueOnce(new Response(stream, { status: 200 }));
+
+    await expect(
+      fetchGitLabRootTextFileAtRef(
+        'test-token',
+        'group/project',
+        'REVIEW.md',
+        'main',
+        'https://[2002:808:808::]/'
+      )
+    ).rejects.toThrow('GitLab response exceeded size limit');
+  });
+
+  it('defaults the fallback fetch deadline when the caller passes no signal', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      text: async () => 'ok',
+    });
+
+    const result = await fetchGitLabRootTextFileAtRef(
+      'test-token',
+      'group/project',
+      'REVIEW.md',
+      'main',
+      'https://[2002:808:808::]/'
+    );
+
+    expect(result).toBe('ok');
+    const init = mockFetch.mock.calls[0][1] as RequestInit;
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect((init.signal as AbortSignal).aborted).toBe(false);
   });
 });
 

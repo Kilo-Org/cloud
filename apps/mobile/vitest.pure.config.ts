@@ -53,6 +53,7 @@ export default defineProject({
       'src/lib/kiloclaw/**/*.test.ts',
       'src/glanceable-ios/**/*.test.ts',
       'src/glanceable-android/**/*.test.ts',
+      'src/lib/font-scale/**/*.test.ts',
       'src/lib/hooks/**/*.test.ts',
       'src/lib/iap/**/*.test.ts',
       'src/lib/kilo-pass/**/*.test.ts',

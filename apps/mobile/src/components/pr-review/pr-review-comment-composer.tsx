@@ -107,7 +107,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   useDraftFlushOnBackground(draftUserId, commentDraftKey, true);
 
   // Edit mode ignores the bridge so editing A never shows B's path/lines.
-  const selection = isEdit ? null : getDiffSelection({ owner, repo, number });
+  const selection = isEdit ? null : getDiffSelection({ owner, repo, number, ref: prRef });
 
   // iOS uncontrolled: ref + defaultValue; no value+state.
   const bodyRef = useRef<string>(initialBody);

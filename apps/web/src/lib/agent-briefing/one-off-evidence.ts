@@ -51,7 +51,12 @@ export function boundBriefingSlices<T extends { id: string; slice: number }>(
 
 export function freezeBriefingEvidence(
   facts: Facts,
-  provenance: { eventIds: string[]; sessionIds: string[]; partial: boolean }
+  provenance: {
+    eventIds: string[];
+    sessionIds: string[];
+    usage?: { id: string; sessionId: string }[];
+    partial: boolean;
+  }
 ): FrozenFacts {
   const allSources = facts.sources.map(source => ({
     ...source,
@@ -66,12 +71,14 @@ export function freezeBriefingEvidence(
         ? null
         : session.status,
   }));
-  const evidenceUsage = facts.sources
-    .filter(source => source.kind === 'cost')
-    .map(source => ({
-      id: source.id.slice(6),
-      sessionId: source.sessionId,
-    }));
+  const evidenceUsage =
+    provenance.usage ??
+    facts.sources
+      .filter(source => source.kind === 'cost')
+      .map(source => ({
+        id: source.id.slice(6),
+        sessionId: source.sessionId,
+      }));
   let sourceLimit = allSources.length;
   let sessionLimit = allSessions.length;
   let truncated = provenance.partial;

@@ -1,4 +1,4 @@
-import { type Href, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -6,9 +6,8 @@ import { ProfilePickerSheet } from '@/components/agents/profile-picker-sheet';
 import { resolveSessionProfilePicker } from '@/components/agents/session-profile-picker-model';
 import { useEffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import { PickerSheet } from '@/components/picker-sheet';
+import { getProfilesPath } from '@/lib/profile-agent-navigation';
 import { profilePickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
-
-const PROFILES_HREF = '/(app)/(tabs)/(3_profile)/profiles' as Href;
 
 /**
  * The new-session profile picker, presented as the standard native formSheet.
@@ -70,7 +69,9 @@ export default function ProfilePickerScreen() {
       }}
       onManageProfiles={() => {
         close();
-        router.push(PROFILES_HREF);
+        // The picker lives in the composer's Stack; the profile list it opens
+        // must stay there too, or Back would leave the composer behind.
+        router.push(getProfilesPath('app'));
       }}
       onRetry={() => {
         void refetch();

@@ -13,11 +13,13 @@ import type {
 import type { GatewayMessagesRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   computeOpenRouterCostFields,
+  providerReportsIsByok,
   computeVercelCostMicrodollars,
   drainSseStream,
   extractVercelGenerationTime,
   extractVercelIsByok,
   extractVercelUpstreamId,
+  reportUpstreamStreamError,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import type Anthropic from '@anthropic-ai/sdk';
@@ -83,7 +85,8 @@ function getVercelResolvedModel(
 export function processMessagesApiUsage(
   usage: MessagesApiUsage | null | undefined,
   providerMetadata: VercelProviderMetaData | null | undefined,
-  coreProps: NotYetCostedUsageStats
+  coreProps: NotYetCostedUsageStats,
+  provider: ProviderId
 ): JustTheCostsUsageStats {
   const cacheHitTokens = usage?.cache_read_input_tokens ?? 0;
   const cacheWriteTokens = usage?.cache_creation_input_tokens ?? 0;
@@ -95,7 +98,8 @@ export function processMessagesApiUsage(
     const { cost_mUsd, is_byok } = computeOpenRouterCostFields(
       usage,
       coreProps,
-      'messages_sse_processing'
+      'messages_sse_processing',
+      providerReportsIsByok(provider)
     );
     return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, cost_mUsd, is_byok };
   }
@@ -130,7 +134,8 @@ export async function parseMessagesMicrodollarUsageFromStream(
   kiloUserId: string,
   openrouterRequestSpan: Span | undefined,
   provider: ProviderId,
-  statusCode: number
+  statusCode: number,
+  usesUserCredentials: boolean
 ): Promise<MicrodollarUsageStats> {
   openrouterRequestSpan?.end();
   const streamProcessingSpan = startInactiveSpan({
@@ -183,13 +188,14 @@ export async function parseMessagesMicrodollarUsageFromStream(
       if (json.type === 'error') {
         reportedError = true;
         finish_reason = json.error?.error_type ?? json.error?.type ?? 'error';
-        captureException(
-          new Error(`Messages API stream error: ${json.error?.message ?? 'unknown'}`),
-          {
-            tags: { source: 'messages_sse_processing' },
-            extra: { json, event },
-          }
-        );
+        reportUpstreamStreamError({
+          label: 'Messages API stream error',
+          source: 'messages_sse_processing',
+          error: json.error ?? {},
+          usesUserCredentials,
+          logContext: { provider, inference_provider, messageId, model },
+          sentryExtra: { json, event },
+        });
         return;
       }
 
@@ -255,13 +261,14 @@ export async function parseMessagesMicrodollarUsageFromStream(
   } satisfies NotYetCostedUsageStats;
 
   const usage = deltaUsage ? mergeMessageDeltaUsage(startUsage, deltaUsage) : startUsage;
-  const costs = processMessagesApiUsage(usage, providerMetadata, coreProps);
+  const costs = processMessagesApiUsage(usage, providerMetadata, coreProps, provider);
   return { ...coreProps, ...costs };
 }
 
 export function parseMessagesMicrodollarUsageFromString(
   fullResponse: string,
-  statusCode: number
+  statusCode: number,
+  provider: ProviderId
 ): MicrodollarUsageStats {
   const responseJson = JSON.parse(fullResponse) as
     | (Anthropic.Messages.Message & MaybeHasVercelProviderMetadata & MaybeHasOpenRouterProvider)
@@ -294,7 +301,7 @@ export function parseMessagesMicrodollarUsageFromString(
     status_code: statusCode,
   } satisfies NotYetCostedUsageStats;
 
-  const costs = processMessagesApiUsage(usage, providerMetadata, coreProps);
+  const costs = processMessagesApiUsage(usage, providerMetadata, coreProps, provider);
   return { ...coreProps, ...costs };
 }
 

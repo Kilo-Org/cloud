@@ -17,8 +17,11 @@ import type { ModelRef, RemoteModelOverride } from './remote-model-catalog';
  */
 type CreateRemoteSessionInput = {
   /**
-   * Stable key for a caller retry of the same create intent. The spawn helper
-   * derives distinct durable wire identities from it (`${key}:ext`, `${key}:bare`).
+   * Stable key for a caller retry of the same create intent. Both create
+   * paths derive distinct durable wire identities from it (`${key}:ext`,
+   * `${key}:bare`), so the key is at most
+   * `MAX_CREATE_SESSION_MUTATION_ID_LENGTH` characters; a longer key fails the
+   * create with a clear error before any wire traffic.
    */
   mutationId?: string;
   agent?: string;
@@ -190,7 +193,12 @@ type CloudAgentApi = {
   send: (payload: {
     sessionId: CloudAgentSessionId;
     payload: CloudAgentSendPayload;
-    messageId?: string;
+    /**
+     * Durable user-message identity minted by the caller. The Cloud Agent
+     * replays a repeated id instead of admitting a second turn, so it must be
+     * the same value on a retry of the same turn.
+     */
+    messageId: string;
     attachments?: CloudAgentAttachments;
     images?: Images;
   }) => Promise<unknown>;

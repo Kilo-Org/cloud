@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { collator } from '@/lib/intl-cache';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import {
@@ -114,6 +115,7 @@ export function OrganizationMembersScreen() {
       action={
         canInvite ? (
           <Button
+            className={STATE_ACTION_CLASS}
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/organization/invite-member' as Href);
             }}

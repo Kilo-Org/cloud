@@ -76,7 +76,6 @@ jest.mock('@/lib/provider-review/gitlab-read', () => ({
   listChecks: (...a: unknown[]) => gitlabRead.listChecks(...a),
   listInbox: (...a: unknown[]) => gitlabRead.listInbox(...a),
   getMergeState: (...a: unknown[]) => gitlabRead.getMergeState(...a),
-  requestGitLabJson: jest.fn(),
 }));
 
 const bitbucketRead = {

@@ -1484,6 +1484,22 @@
       "loadingProposals": "Waa la soo dejinayaa soo-jeedinnada",
       "couldNotLoadProposals": "Soo-jeedinnada lama soo dejin karin.",
       "noProposals": "Ma jiraan soo-jeedinno",
+      "proposalDetails": "Faahfaahinta soo-jeedinta",
+      "proposalTitle": "Cinwaanka soo-jeedinta",
+      "rationale": "Sababta",
+      "saveFirst": "Kaydi wax-ka-beddelladaada ka hor intaadan furin pull request.",
+      "proposalSaved": "Soo-jeedinta waa la kaydiyay",
+      "proposalDismissed": "Soo-jeedinta waa la iska dhaafay",
+      "dismissProposalTitle": "Iska dhaaf soo-jeedinta?",
+      "dismissProposalMessage": "Soo-jeedintan waxaa laga saari doonaa liiska firfircoon, dibna looma soo celin karo.",
+      "prOpened": "Pull request-ka REVIEW.md waa la furay",
+      "alreadyPresent": "Tilmaamuhu hore ayay ugu jiraan REVIEW.md",
+      "status": {
+        "edited": "Wax laga beddelay",
+        "opening_change_request": "Waa la furayaa PR",
+        "change_request_failed": "PR wuu fashilmay",
+        "superseded": "Hore ayuu u jiraa"
+      },
       "noProposalsDescription": "Soo-jeedinnada xusuusta dib-u-eegista ayaa halkan ka soo muuqanaya marka Kilo uu falanqeeyo jawaabaha daryeelayaasha mashruuca."
     },
     "manualReview": {
@@ -3730,6 +3746,7 @@
     "title": "Profile-yada",
     "entrySubtitle": "Dib u isticmaal jaangooyooyinka deegaanka ee fadhiyada oo dhan",
     "newProfile": "profile cusub",
+    "openHint": "Wuxuu furayaa profile-ka",
     "emptyTitle": "Weli profiles ma jiraan",
     "emptyDescription": "Abuur profile si dib loogu isticmaalo doorsoomayaasha deegaanka, amarrada dejinta, iyo xirfadaha kalfadhiyada oo dhan.",
     "loadFailed": "Waa la rari waayay muuqaallada",
@@ -3961,11 +3978,13 @@
       "namePlaceholder": "Cilado, Fikrado, Siideyn…",
       "emoji": "Calaamad",
       "mode": "Qaab",
-      "defaultsHint": "Kalfadhiyada laga bilaabo liiskan waxay isticmaalaan kuwan caadiga ah."
+      "defaultsHint": "Kalfadhiyada laga bilaabo liiskan waxay isticmaalaan kuwan caadiga ah.",
+      "saveFailed": "Liiska lama kaydin karin. Hubi xiriirkaaga oo mar kale isku day."
     },
     "list": {
       "addPlaceholder": "Ku dar hawl",
       "add": "Ku dar",
+      "addFailed": "Hawsha lama darin karin. Hubi xiriirkaaga oo mar kale isku day.",
       "empty": "Weli ma jiraan hawlo",
       "setDefaults": "Deji kaydka, qaabka iyo moodeelka",
       "completed_one": "La dhammeeyay ({{count}})",
@@ -4002,7 +4021,8 @@
       "startNewSession": "Bilow fadhi cusub",
       "startNewSessionHint": "Riix muddo dheer si aad u bilowdo fadhi cusub.",
       "linkSession": "Ku xidh kalfadhi",
-      "linkFailed": "Lama xidhi karin kalfadhiga hawsha"
+      "linkFailed": "Lama xidhi karin kalfadhiga hawsha",
+      "startRefreshFailed": "Cashurka waa la bilaabiyay, laakiin liiskan lama cusbooneysiiyin."
     },
     "linkSession": {
       "title": "Ku xidh kalfadhi",

@@ -1014,6 +1014,22 @@
       "loading": "Đang tải bộ nhớ rà soát",
       "loadingProposals": "Đang tải các đề xuất",
       "noProposals": "Không có đề xuất",
+      "proposalDetails": "Chi tiết đề xuất",
+      "proposalTitle": "Tiêu đề đề xuất",
+      "rationale": "Lý do",
+      "saveFirst": "Lưu các chỉnh sửa trước khi mở pull request.",
+      "proposalSaved": "Đã lưu đề xuất",
+      "proposalDismissed": "Đã bỏ qua đề xuất",
+      "dismissProposalTitle": "Bỏ qua đề xuất?",
+      "dismissProposalMessage": "Đề xuất này sẽ bị xóa khỏi danh sách đang hoạt động và không thể khôi phục.",
+      "prOpened": "Đã mở pull request cho REVIEW.md",
+      "alreadyPresent": "Hướng dẫn đã có trong REVIEW.md",
+      "status": {
+        "edited": "Đã chỉnh sửa",
+        "opening_change_request": "Đang mở PR",
+        "change_request_failed": "Không thể mở PR",
+        "superseded": "Đã có"
+      },
       "noProposalsDescription": "Các đề xuất từ bộ nhớ rà soát sẽ xuất hiện tại đây sau khi Kilo phân tích phản hồi của người bảo trì.",
       "off": "Bộ nhớ rà soát đang tắt.",
       "on": "Bộ nhớ rà soát đang bật.",
@@ -3730,6 +3746,7 @@
     "title": "Hồ sơ",
     "entrySubtitle": "Sử dụng lại cài đặt môi trường qua các phiên",
     "newProfile": "Hồ sơ mới",
+    "openHint": "Mở hồ sơ",
     "emptyTitle": "Chưa có hồ sơ nào",
     "emptyDescription": "Tạo hồ sơ để sử dụng lại các biến môi trường, lệnh thiết lập và kỹ năng trong các phiên.",
     "loadFailed": "Không thể tải hồ sơ",
@@ -3961,11 +3978,13 @@
       "namePlaceholder": "Lỗi, Ý tưởng, Bản phát hành…",
       "emoji": "Biểu tượng cảm xúc",
       "mode": "Chế độ",
-      "defaultsHint": "Các phiên bắt đầu từ danh sách này dùng các giá trị mặc định này."
+      "defaultsHint": "Các phiên bắt đầu từ danh sách này dùng các giá trị mặc định này.",
+      "saveFailed": "Không thể lưu danh sách. Kiểm tra kết nối của bạn và thử lại."
     },
     "list": {
       "addPlaceholder": "Thêm việc cần làm",
       "add": "Thêm",
+      "addFailed": "Không thể thêm việc cần làm. Kiểm tra kết nối của bạn và thử lại.",
       "empty": "Chưa có việc cần làm nào",
       "setDefaults": "Đặt kho mã nguồn, chế độ và mô hình",
       "completed_one": "Đã hoàn tất ({{count}})",
@@ -4002,7 +4021,8 @@
       "startNewSession": "Bắt đầu phiên mới",
       "startNewSessionHint": "Nhấn giữ để bắt đầu phiên mới.",
       "linkSession": "Liên kết phiên",
-      "linkFailed": "Không thể liên kết phiên với việc cần làm"
+      "linkFailed": "Không thể liên kết phiên với việc cần làm",
+      "startRefreshFailed": "Phiên đã bắt đầu, nhưng danh sách này chưa được cập nhật."
     },
     "linkSession": {
       "title": "Liên kết một phiên",

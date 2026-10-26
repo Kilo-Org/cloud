@@ -1484,6 +1484,22 @@
       "loadingProposals": "Nilo-load ang mga mungkahi",
       "couldNotLoadProposals": "Hindi ma-load ang mga mungkahi.",
       "noProposals": "Walang mungkahi",
+      "proposalDetails": "Mga detalye ng mungkahi",
+      "proposalTitle": "Pamagat ng mungkahi",
+      "rationale": "Paliwanag",
+      "saveFirst": "I-save ang mga pagbabago mo bago magbukas ng pull request.",
+      "proposalSaved": "Na-save ang mungkahi",
+      "proposalDismissed": "Ibinasura ang mungkahi",
+      "dismissProposalTitle": "Ibasura ang mungkahi?",
+      "dismissProposalMessage": "Aalisin ang mungkahing ito sa listahan ng mga aktibong mungkahi at hindi na ito maibabalik.",
+      "prOpened": "Nabuksan ang pull request para sa REVIEW.md",
+      "alreadyPresent": "Nasa REVIEW.md na ang gabay",
+      "status": {
+        "edited": "Na-edit",
+        "opening_change_request": "Binubuksan ang PR",
+        "change_request_failed": "Nabigong buksan ang PR",
+        "superseded": "Naroon na"
+      },
       "noProposalsDescription": "Lalabas dito ang mga mungkahi mula sa memorya ng pagsusuri kapag nasuri na ng Kilo ang mga tugon ng tagapangalaga ng code."
     },
     "manualReview": {
@@ -3730,6 +3746,7 @@
     "title": "Mga profile",
     "entrySubtitle": "Muling gamitin ang mga setting ng kapaligiran sa mga session",
     "newProfile": "Bagong profile",
+    "openHint": "Binubuksan ang profile",
     "emptyTitle": "Wala pang mga profile",
     "emptyDescription": "Gumawa ng profile para magamit muli ang mga variable ng kapaligiran, mga command sa pag-setup, at mga kasanayan sa mga session.",
     "loadFailed": "Hindi ma-load ang mga profile",
@@ -3961,11 +3978,13 @@
       "namePlaceholder": "Mga bug, ideya, release…",
       "emoji": "Emoji",
       "mode": "Mode",
-      "defaultsHint": "Gagamitin ng mga sesyong sisimulan mula sa listahang ito ang mga default na ito."
+      "defaultsHint": "Gagamitin ng mga sesyong sisimulan mula sa listahang ito ang mga default na ito.",
+      "saveFailed": "Hindi ma-save ang listahan. I-check ang iyong koneksyon at subukang muli."
     },
     "list": {
       "addPlaceholder": "Magdagdag ng gagawin",
       "add": "Idagdag ang gagawin",
+      "addFailed": "Hindi maidagdag ang gagawin. I-check ang iyong koneksyon at subukang muli.",
       "empty": "Wala pang gagawin",
       "setDefaults": "Itakda ang repositoryo, mode at modelo",
       "completed_one": "Nakumpleto ({{count}})",
@@ -4002,7 +4021,8 @@
       "startNewSession": "Magsimula ng bagong session",
       "startNewSessionHint": "Mahabang pindot para magsimula ng bagong session.",
       "linkSession": "I-link ang sesyon",
-      "linkFailed": "Hindi na-link ang sesyon sa gagawin"
+      "linkFailed": "Hindi na-link ang sesyon sa gagawin",
+      "startRefreshFailed": "Nagsimula na ang sesyon, pero hindi na-update ang listahang ito."
     },
     "linkSession": {
       "title": "Mag-link ng sesyon",

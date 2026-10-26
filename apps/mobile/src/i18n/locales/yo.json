@@ -1484,6 +1484,22 @@
       "loadingProposals": "A ń gbé àwọn àbá wọlé",
       "couldNotLoadProposals": "A kò lè gbé àwọn àbá wọlé.",
       "noProposals": "Kò sí àbá",
+      "proposalDetails": "Àlàyé àbá",
+      "proposalTitle": "Àkọlé àbá",
+      "rationale": "Ìdí",
+      "saveFirst": "Fi àwọn àtúnṣe rẹ pamọ́ kí o tó ṣí PR.",
+      "proposalSaved": "A ti fi àbá pamọ́",
+      "proposalDismissed": "A ti kọ àbá sílẹ̀",
+      "dismissProposalTitle": "Kọ àbá sílẹ̀?",
+      "dismissProposalMessage": "Àbá yìí yóò kúrò nínú àtòjọ tó ń ṣiṣẹ́, kò sì ṣeé mú padà.",
+      "prOpened": "A ti ṣí PR fún REVIEW.md",
+      "alreadyPresent": "Ìtọ́sọ́nà ti wà nínú REVIEW.md tẹ́lẹ̀",
+      "status": {
+        "edited": "A ti ṣàtúnṣe",
+        "opening_change_request": "A ń ṣí PR",
+        "change_request_failed": "Ṣíṣí PR kùnà",
+        "superseded": "Ó ti wà tẹ́lẹ̀"
+      },
       "noProposalsDescription": "Àwọn àbá ìrántí àtúnyẹ̀wò yóò hàn níbí lẹ́yìn tí Kilo bá ṣe ìtúpalẹ̀ àwọn ìdáhùn olùtọ́jú."
     },
     "manualReview": {
@@ -3730,6 +3746,7 @@
     "title": "Awọn profaili",
     "entrySubtitle": "Tun lo awọn eto ayika kọja awọn akoko",
     "newProfile": "Profaili tuntun",
+    "openHint": "Ó ń ṣí profaili náà",
     "emptyTitle": "Ko si awọn profaili sibẹsibẹ",
     "emptyDescription": "Ṣẹda profaili kan lati tun lo awọn oniyipada ayika, awọn pipaṣẹ iṣeto, ati awọn ọgbọn kọja awọn akoko.",
     "loadFailed": "Ko le kojọpọ awọn profaili",
@@ -3961,11 +3978,13 @@
       "namePlaceholder": "Àwọn àṣìṣe, Àwọn èrò, Àwọn ìtúsílẹ̀…",
       "emoji": "Emoji",
       "mode": "Ipò",
-      "defaultsHint": "Àwọn ìgbà iṣẹ́ tí ó bẹ̀rẹ̀ láti inú àkójọ yìí máa ń lo àwọn ìpìlẹ̀ wọ̀nyí."
+      "defaultsHint": "Àwọn ìgbà iṣẹ́ tí ó bẹ̀rẹ̀ láti inú àkójọ yìí máa ń lo àwọn ìpìlẹ̀ wọ̀nyí.",
+      "saveFailed": "A kò lè fi àkójọ náà pamọ́. Ṣàyẹ̀wò ìdarapọ̀ rẹ kí o sì tún gbiyanjú."
     },
     "list": {
       "addPlaceholder": "Fi iṣẹ́ kún un",
       "add": "Ṣàfikún iṣẹ́",
+      "addFailed": "A kò lè ṣàfikún iṣẹ́ náà. Ṣàyẹ̀wò ìdarapọ̀ rẹ kí o sì tún gbiyanjú.",
       "empty": "Kò sí iṣẹ́ síbẹ̀",
       "setDefaults": "Ṣètò ibi ìpamọ́ kóòdù, ipò àti àwòṣe",
       "completed_one": "A ti parí ({{count}})",
@@ -4002,7 +4021,8 @@
       "startNewSession": "Bẹ̀rẹ̀ ìpàdé tuntun",
       "startNewSessionHint": "Tẹ̀ pẹ́ láti bẹ̀rẹ̀ ìpàdé tuntun.",
       "linkSession": "So ìgbà iṣẹ́ pọ̀",
-      "linkFailed": "A kò lè so ìgbà iṣẹ́ pọ̀ mọ́ iṣẹ́ náà"
+      "linkFailed": "A kò lè so ìgbà iṣẹ́ pọ̀ mọ́ iṣẹ́ náà",
+      "startRefreshFailed": "Ìgbà iṣẹ́ ti bẹ̀rẹ̀, ṣùgbọ́n àkójọ yìí kò ṣe àgbéga."
     },
     "linkSession": {
       "title": "So ìgbà iṣẹ́ kan pọ̀",

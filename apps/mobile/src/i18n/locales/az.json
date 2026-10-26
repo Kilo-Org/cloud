@@ -1484,6 +1484,22 @@
       "loadingProposals": "Təkliflər yüklənir",
       "couldNotLoadProposals": "Təklifləri yükləmək mümkün olmadı.",
       "noProposals": "Təklif yoxdur",
+      "proposalDetails": "Təklifin təfərrüatları",
+      "proposalTitle": "Təklifin başlığı",
+      "rationale": "Əsaslandırma",
+      "saveFirst": "Pull sorğusu açmazdan əvvəl dəyişikliklərini yadda saxla.",
+      "proposalSaved": "Təklif yadda saxlanıldı",
+      "proposalDismissed": "Təklif rədd edildi",
+      "dismissProposalTitle": "Təklif rədd edilsin?",
+      "dismissProposalMessage": "Bu təklif aktiv siyahıdan silinəcək və onu bərpa etmək mümkün olmayacaq.",
+      "prOpened": "REVIEW.md üçün pull sorğusu açıldı",
+      "alreadyPresent": "Təlimatlar artıq REVIEW.md faylında mövcuddur",
+      "status": {
+        "edited": "Redaktə edilib",
+        "opening_change_request": "PR açılır",
+        "change_request_failed": "PR uğursuz oldu",
+        "superseded": "Artıq mövcuddur"
+      },
       "noProposalsDescription": "Kilo layihəyə cavabdeh şəxslərin cavablarını təhlil etdikdən sonra kod yoxlaması yaddaşının təklifləri burada görünəcək."
     },
     "manualReview": {
@@ -3730,6 +3746,7 @@
     "title": "Profillər",
     "entrySubtitle": "Seanslar arasında mühit parametrlərini təkrar istifadə edin",
     "newProfile": "Yeni profil",
+    "openHint": "Profili açır",
     "emptyTitle": "Hələ profil yoxdur",
     "emptyDescription": "Mühit dəyişənlərindən, quraşdırma əmrlərindən və sessiyalar arasında bacarıqlardan təkrar istifadə etmək üçün profil yaradın.",
     "loadFailed": "Profilləri yükləmək mümkün olmadı",
@@ -3961,11 +3978,13 @@
       "namePlaceholder": "Xətalar, İdeyalar, Buraxılış…",
       "emoji": "Emoji",
       "mode": "Rejim",
-      "defaultsHint": "Bu siyahıdan başladılan sessiyalar bu standart dəyərlərdən istifadə edir."
+      "defaultsHint": "Bu siyahıdan başladılan sessiyalar bu standart dəyərlərdən istifadə edir.",
+      "saveFailed": "Siyahını yadda saxlamaq alınmadı. Bağlantınızı yoxlayın və yenidən cəhd edin."
     },
     "list": {
       "addPlaceholder": "Yeni tapşırıq əlavə et",
       "add": "Tapşırıq əlavə et",
+      "addFailed": "Tapşırığı əlavə etmək alınmadı. Bağlantınızı yoxlayın və yenidən cəhd edin.",
       "empty": "Hələ tapşırıq yoxdur",
       "setDefaults": "Repozitoriya, rejim və model təyin et",
       "completed_one": "Tamamlanıb ({{count}})",
@@ -4002,7 +4021,8 @@
       "startNewSession": "Yeni sessiya başlat",
       "startNewSessionHint": "Yeni sessiya başlatmaq üçün uzun bas.",
       "linkSession": "Sessiyanı əlaqələndir",
-      "linkFailed": "Sessiyanı tapşırıqla əlaqələndirmək mümkün olmadı"
+      "linkFailed": "Sessiyanı tapşırıqla əlaqələndirmək mümkün olmadı",
+      "startRefreshFailed": "Sessiya başladı, lakin bu siyahı yenilənmədi."
     },
     "linkSession": {
       "title": "Sessiya əlaqələndir",

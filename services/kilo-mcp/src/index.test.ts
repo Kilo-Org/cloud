@@ -7,6 +7,7 @@ import worker, {
 } from './index';
 import { ANONYMOUS_DISTINCT_ID, createMcpAnalytics, type McpAnalytics } from './analytics';
 import { ORGANIZATION_ID_HEADER } from './auth';
+import { MAX_SEARCH_QUERY_LENGTH } from './search';
 import type {
   Catalog,
   ForwardedAuth,
@@ -361,7 +362,13 @@ describe('initialize / ping / tools/list', () => {
     expect(tools[1]!.description.toLowerCase()).toContain('search');
     expect(tools[0]!.inputSchema).toMatchObject({
       type: 'object',
-      properties: { query: { type: 'string' }, limit: { type: 'integer' } },
+      properties: {
+        // The advertised bound and the parser's bound come from the same
+        // constant, so an agent that respects the schema never meets the
+        // refusal.
+        query: { type: 'string', maxLength: MAX_SEARCH_QUERY_LENGTH },
+        limit: { type: 'integer' },
+      },
       required: ['query'],
     });
     expect(tools[1]!.inputSchema).toMatchObject({
@@ -828,6 +835,119 @@ describe('tools/call search', () => {
     expect(semanticCandidates).toHaveBeenCalledTimes(1);
   });
 
+  it('spends one allowance unit keyed by the grant user and runs the semantic stage', async () => {
+    const semanticCandidates = vi.fn(async () => []);
+    const limit = vi.fn(async () => ({ success: true }));
+    const handler = createMcpHandler({
+      catalog: testCatalog,
+      webBaseUrl: 'https://app.kilo.ai',
+      semanticCandidates,
+      searchAllowance: { limit },
+    });
+    const response = await rpc(
+      handler,
+      {
+        jsonrpc: '2.0',
+        id: 35,
+        method: 'tools/call',
+        params: { name: 'search', arguments: { query: 'organizations list' } },
+      },
+      AUTH
+    );
+    const json = (await response.json()) as { result?: unknown };
+    expect('result' in json).toBe(true);
+    // The key comes from the verified grant, never from the request body or a
+    // caller-supplied header.
+    expect(limit).toHaveBeenCalledTimes(1);
+    expect(limit).toHaveBeenCalledWith({ key: 'user-1' });
+    expect(semanticCandidates).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers from the catalog alone once the allowance is spent', async () => {
+    const semanticCandidates = vi.fn(async () => [{ path: 'teams.create', score: 0.9 }]);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const handler = createMcpHandler({
+        catalog: testCatalog,
+        webBaseUrl: 'https://app.kilo.ai',
+        semanticCandidates,
+        searchAllowance: { limit: async () => ({ success: false }) },
+      });
+      const response = await rpc(
+        handler,
+        {
+          jsonrpc: '2.0',
+          id: 36,
+          method: 'tools/call',
+          params: { name: 'search', arguments: { query: 'organizations list' } },
+        },
+        AUTH
+      );
+      const json = (await response.json()) as {
+        result?: { content: Array<{ text: string }> };
+      };
+      // Same answer shape and the same catalog hits: the spent allowance
+      // removes only the semantic stage.
+      const payload = JSON.parse(json.result!.content[0]!.text) as {
+        results: Array<{ path: string }>;
+      };
+      expect(payload.results.map(hit => hit.path)).toContain('organizations.list');
+      expect(payload.results.map(hit => hit.path)).not.toContain('teams.create');
+      expect(semanticCandidates).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        '[kilo-mcp] search allowance spent for this account; answering without semantic search'
+      );
+      // The warning names no account.
+      for (const call of warn.mock.calls) {
+        expect(String(call[0])).not.toContain('user-1');
+      }
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('answers without the semantic stage when the allowance check itself fails', async () => {
+    const semanticCandidates = vi.fn(async () => []);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const handler = createMcpHandler({
+        catalog: testCatalog,
+        webBaseUrl: 'https://app.kilo.ai',
+        semanticCandidates,
+        searchAllowance: {
+          limit: async () => {
+            throw new Error('rate limit binding unavailable');
+          },
+        },
+      });
+      const response = await rpc(
+        handler,
+        {
+          jsonrpc: '2.0',
+          id: 37,
+          method: 'tools/call',
+          params: { name: 'search', arguments: { query: 'organizations list' } },
+        },
+        AUTH
+      );
+      const json = (await response.json()) as {
+        result?: { content: Array<{ text: string }> };
+      };
+      const payload = JSON.parse(json.result!.content[0]!.text) as {
+        results: Array<{ path: string }>;
+      };
+      expect(payload.results.map(hit => hit.path)).toContain('organizations.list');
+      // The semantic stage is skipped when the allowance check fails, and the
+      // search still answers.
+      expect(semanticCandidates).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        '[kilo-mcp] search allowance check failed; answering without semantic search: rate limit binding unavailable'
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('keeps an over-cap search payload parseable JSON instead of cutting it mid-token', async () => {
     // Every hit now carries its full input schema, so a result set can exceed
     // the cap the call tool already enforces. A lone hit whose schema alone
@@ -924,15 +1044,36 @@ describe('tools/call search', () => {
     expect(payload.message).toContain('Dropped 1 of 3');
   });
 
-  it('keeps the empty-results payload parseable for an oversized query', async () => {
-    // The empty state echoes the query back, and the query has no length bound.
-    // The echo is bounded before JSON.stringify, so the payload stays valid JSON
-    // under the cap instead of being cut mid-token by the generic cap.
+  it('rejects a query longer than the published maximum', async () => {
+    const semanticCandidates = vi.fn(async () => []);
+    const searchAllowance = { limit: vi.fn(async () => ({ success: true })) };
+    const handler = createMcpHandler({
+      catalog: testCatalog,
+      webBaseUrl: 'https://app.kilo.ai',
+      semanticCandidates,
+      searchAllowance,
+    });
+    const response = await rpc(handler, {
+      jsonrpc: '2.0',
+      id: 23,
+      method: 'tools/call',
+      params: { name: 'search', arguments: { query: 'z'.repeat(MAX_SEARCH_QUERY_LENGTH + 1) } },
+    });
+    const json = (await response.json()) as { error: { code: number; message: string } };
+    expect(json.error.code).toBe(-32602);
+    expect(json.error.message).toContain(`at most ${MAX_SEARCH_QUERY_LENGTH} characters`);
+    // A rejected query spends no allowance unit and starts no search pass.
+    expect(semanticCandidates).not.toHaveBeenCalled();
+    expect(searchAllowance.limit).not.toHaveBeenCalled();
+  });
+
+  it('accepts a query at the maximum length and echoes it inside the payload cap', async () => {
+    const query = 'z'.repeat(MAX_SEARCH_QUERY_LENGTH);
     const { json } = await rpcResult({
       jsonrpc: '2.0',
       id: 23,
       method: 'tools/call',
-      params: { name: 'search', arguments: { query: 'z'.repeat(20_000) } },
+      params: { name: 'search', arguments: { query } },
     });
     const result = (json as { result: { content: Array<{ text: string }>; truncated?: boolean } })
       .result;
@@ -940,13 +1081,10 @@ describe('tools/call search', () => {
     expect(new TextEncoder().encode(result.content[0]!.text).byteLength).toBeLessThanOrEqual(
       16 * 1024
     );
-    // Parseable, unlike a payload cut at a byte boundary.
     const payload = JSON.parse(result.content[0]!.text) as { results: unknown[]; message: string };
     expect(payload.results).toEqual([]);
     expect(payload.message).toContain('No endpoints matched');
-    expect(payload.message.toLowerCase()).toContain('refine your query');
-    // The echo is bounded, so an unbounded query is never printed in full.
-    expect(payload.message).not.toContain('z'.repeat(1_000));
+    expect(payload.message).toContain(query);
   });
 
   it('does not mark a small search payload truncated', async () => {

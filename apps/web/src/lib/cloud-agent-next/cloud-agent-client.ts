@@ -13,7 +13,6 @@ import {
 } from '@kilocode/worker-utils/sandbox-allocation';
 import type { EncryptedEnvelope } from '@kilocode/web-shared/lib/encryption';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
-import type { Images } from '@/lib/images-schema';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
@@ -148,8 +147,6 @@ type PrepareSessionSharedFields = {
   appendSystemPrompt?: string;
   /** Canonical Cloud Agent attachments for the prompt */
   attachments?: CloudAgentAttachments;
-  /** Legacy image attachments accepted during client migration */
-  images?: Images;
   /** Callback configuration for execution completion events */
   callbackTarget?: CallbackTarget;
   /** Platform that created this session (e.g. 'security-agent', 'slack') */
@@ -250,8 +247,6 @@ export type SendMessageInput = {
   gitToken?: string;
   /** Canonical Cloud Agent attachments for the message */
   attachments?: CloudAgentAttachments;
-  /** Legacy image attachments accepted during client migration */
-  images?: Images;
   condenseOnComplete?: boolean;
   /** Custom text to append to the system prompt */
   appendSystemPrompt?: string;

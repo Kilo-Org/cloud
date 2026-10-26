@@ -33,6 +33,10 @@
         "class_name": "PreviewPortTestDO",
         "name": "PREVIEW_PORT_TEST",
       },
+      {
+        "class_name": "EnvironmentBuild",
+        "name": "ENVIRONMENT_BUILD",
+      },
     ],
   },
   "migrations": [
@@ -55,6 +59,10 @@
     {
       "new_classes": ["PreviewPortTestDO"],
       "tag": "v11",
+    },
+    {
+      "new_sqlite_classes": ["EnvironmentBuild"],
+      "tag": "v12",
     },
   ],
   "kv_namespaces": [{ "binding": "SHARED_SANDBOX_OVERRIDES" }],

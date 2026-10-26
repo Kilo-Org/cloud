@@ -1528,6 +1528,22 @@
       "loadingProposals": "Įkeliami pasiūlymai",
       "couldNotLoadProposals": "Nepavyko įkelti pasiūlymų.",
       "noProposals": "Pasiūlymų nėra",
+      "proposalDetails": "Pasiūlymo informacija",
+      "proposalTitle": "Pasiūlymo pavadinimas",
+      "rationale": "Pagrindimas",
+      "saveFirst": "Prieš atidarant PR, išsaugok pakeitimus.",
+      "proposalSaved": "Pasiūlymas išsaugotas",
+      "proposalDismissed": "Pasiūlymas atmestas",
+      "dismissProposalTitle": "Atmesti pasiūlymą?",
+      "dismissProposalMessage": "Šis pasiūlymas bus pašalintas iš aktyvių pasiūlymų sąrašo ir jo nebus galima atkurti.",
+      "prOpened": "Atidaryta REVIEW.md PR",
+      "alreadyPresent": "Gairės jau yra REVIEW.md faile",
+      "status": {
+        "edited": "Redaguota",
+        "opening_change_request": "Atidaroma PR",
+        "change_request_failed": "Nepavyko atidaryti PR",
+        "superseded": "Jau yra"
+      },
       "noProposalsDescription": "Peržiūros atminties pasiūlymai bus rodomi čia, kai Kilo išanalizuos prižiūrėtojų atsakymus."
     },
     "manualReview": {
@@ -3822,6 +3838,7 @@
     "title": "Profiliai",
     "entrySubtitle": "Pakartotinai naudokite aplinkos nustatymus per seansus",
     "newProfile": "Naujas profilis",
+    "openHint": "Atidaro profilį",
     "emptyTitle": "Dar nėra profilių",
     "emptyDescription": "Sukurkite profilį, kad seansų metu pakartotinai naudotumėte aplinkos kintamuosius, sąrankos komandas ir įgūdžius.",
     "loadFailed": "Nepavyko įkelti profilių",
@@ -4067,11 +4084,13 @@
       "namePlaceholder": "Klaidos, idėjos, leidimas…",
       "emoji": "Emodžis",
       "mode": "Režimas",
-      "defaultsHint": "Sesijos, pradėtos iš šio sąrašo, naudoja šias numatytąsias reikšmes."
+      "defaultsHint": "Sesijos, pradėtos iš šio sąrašo, naudoja šias numatytąsias reikšmes.",
+      "saveFailed": "Nepavyko išsaugoti sąrašo. Patikrinkite interneto ryšį ir bandykite dar kartą."
     },
     "list": {
       "addPlaceholder": "Pridėti naują užduotį",
       "add": "Pridėti užduotį",
+      "addFailed": "Nepavyko pridėti užduoties. Patikrinkite interneto ryšį ir bandykite dar kartą.",
       "empty": "Užduočių dar nėra",
       "setDefaults": "Nustatyti saugyklą, režimą ir modelį",
       "completed_one": "Baigta ({{count}})",
@@ -4112,7 +4131,8 @@
       "startNewSession": "Pradėti naują sesiją",
       "startNewSessionHint": "Paspauskite ir palaikykite, kad pradėtumėte naują sesiją.",
       "linkSession": "Susieti sesiją",
-      "linkFailed": "Sesijos susieti su užduotimi nepavyko"
+      "linkFailed": "Sesijos susieti su užduotimi nepavyko",
+      "startRefreshFailed": "Sesija prasidėjo, bet šis sąrašas neatsinaujino."
     },
     "linkSession": {
       "title": "Sesijos susiejimas",

@@ -5,7 +5,7 @@ import {
   organizations,
   type CloudAgentEnvironment,
 } from '@kilocode/db/schema';
-import { and, count, eq, inArray, isNull } from 'drizzle-orm';
+import { and, count, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { encryptWithPublicKey } from '@kilocode/encryption';
 import type { EnvironmentPlatform } from './environment-contracts';
@@ -21,13 +21,14 @@ import {
   validateEnvironmentVarCount,
   normalizeRepoFullName,
   normalizeBitbucketUuid,
+  type EnvironmentBuildInput,
   type EnvironmentCreateInput,
   type EnvironmentForSession,
   type EnvironmentOwner,
+  type EnvironmentReference,
   type EnvironmentRepositoryIdentity,
   type EnvironmentResponse,
   type EnvironmentSecretChange,
-  type EnvironmentSessionLayer,
   type EnvironmentSummary,
   type EnvironmentUpdateInput,
 } from './environment-contracts';
@@ -159,6 +160,7 @@ function toResponseColumns(environment: CloudAgentEnvironment): {
   bitbucketRepositoryUuid: string | null;
   createdAt: string;
   updatedAt: string;
+  configurationRevision: number;
   sandboxAllocation: string | null;
 } {
   return {
@@ -171,8 +173,67 @@ function toResponseColumns(environment: CloudAgentEnvironment): {
     bitbucketRepositoryUuid: environment.bitbucket_repository_uuid,
     createdAt: environment.created_at,
     updatedAt: environment.updated_at,
+    configurationRevision: environment.configuration_revision,
     sandboxAllocation: environment.sandbox_allocation,
   };
+}
+
+function ownerOf(environment: CloudAgentEnvironment): EnvironmentOwner {
+  if (environment.owned_by_organization_id !== null) {
+    return { type: 'organization', id: environment.owned_by_organization_id };
+  }
+  if (environment.owned_by_user_id !== null) {
+    return { type: 'user', id: environment.owned_by_user_id };
+  }
+  throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Environment has no owner' });
+}
+
+/** The stored repository identity, in the shape every comparison uses. */
+function repositoryIdentityOf(environment: CloudAgentEnvironment): EnvironmentRepositoryIdentity {
+  switch (environment.platform) {
+    case 'github':
+      return { platform: 'github', repoFullName: environment.repo_full_name };
+    case 'gitlab':
+      if (environment.gitlab_clone_url === null) break;
+      return { platform: 'gitlab', cloneUrl: environment.gitlab_clone_url };
+    case 'bitbucket':
+      if (
+        environment.bitbucket_workspace_uuid === null ||
+        environment.bitbucket_repository_uuid === null
+      ) {
+        break;
+      }
+      return {
+        platform: 'bitbucket',
+        workspaceUuid: environment.bitbucket_workspace_uuid,
+        repositoryUuid: environment.bitbucket_repository_uuid,
+      };
+  }
+  throw new TRPCError({
+    code: 'INTERNAL_SERVER_ERROR',
+    message: 'Environment repository identity is incomplete',
+  });
+}
+
+function referenceOf(environment: CloudAgentEnvironment): EnvironmentReference {
+  return {
+    environmentId: environment.id,
+    owner: ownerOf(environment),
+    configurationRevision: environment.configuration_revision,
+    repository: repositoryIdentityOf(environment),
+  };
+}
+
+function sameStrings(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function sameRecord(left: Record<string, string>, right: Record<string, string>): boolean {
+  const keys = Object.keys(left);
+  return (
+    keys.length === Object.keys(right).length &&
+    keys.every(key => Object.hasOwn(right, key) && right[key] === left[key])
+  );
 }
 
 async function replacePlainVars(
@@ -196,15 +257,17 @@ async function replacePlainVars(
   }
 }
 
+/** Apply secret changes; returns whether any stored secret was replaced or removed. */
 async function applySecretChanges(
   tx: EnvironmentTransaction,
   environmentId: string,
   publicKeyBase64: string,
   changes: EnvironmentSecretChange[]
-): Promise<void> {
+): Promise<boolean> {
+  let changed = false;
   for (const change of changes) {
     if ('delete' in change) {
-      await tx
+      const deleted = await tx
         .delete(cloud_agent_environment_vars)
         .where(
           and(
@@ -212,9 +275,12 @@ async function applySecretChanges(
             eq(cloud_agent_environment_vars.key, change.key),
             eq(cloud_agent_environment_vars.is_secret, true)
           )
-        );
+        )
+        .returning({ id: cloud_agent_environment_vars.id });
+      if (deleted.length > 0) changed = true;
       continue;
     }
+    changed = true;
 
     const encryptedValue = encryptValue(publicKeyBase64, change.value);
     await tx
@@ -234,6 +300,7 @@ async function applySecretChanges(
         },
       });
   }
+  return changed;
 }
 
 async function countsFor(
@@ -335,7 +402,7 @@ export async function updateEnvironment(
   tx: EnvironmentTransaction,
   publicKeyBase64: string,
   input: EnvironmentUpdateInput
-): Promise<void> {
+): Promise<{ configurationRevision: number }> {
   const name = input.name === undefined ? undefined : validateEnvironmentName(input.name);
   const plainVars =
     input.plainVars === undefined ? undefined : validateEnvironmentPlainVars(input.plainVars);
@@ -363,6 +430,7 @@ export async function updateEnvironment(
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Environment not found' });
   }
 
+  // Name and allocation are not build inputs; they never advance the revision.
   if (name !== undefined || input.sandboxAllocation !== undefined) {
     await tx
       .update(cloud_agent_environments)
@@ -380,6 +448,24 @@ export async function updateEnvironment(
       assertValidEnvironmentKey(change.key);
       if (!('delete' in change)) validateEnvironmentSecretValue(change.value);
     }
+  }
+
+  // Build inputs change when the submitted commands or plaintext variables
+  // differ from the stored ones, or when any secret is replaced or removed. A
+  // submitted secret value is never compared: the stored value is encrypted.
+  let buildInputsChanged = commands !== undefined && !sameStrings(commands, environment.commands);
+  if (plainVars !== undefined && !buildInputsChanged) {
+    const storedPlainRows = await tx
+      .select({ key: cloud_agent_environment_vars.key, value: cloud_agent_environment_vars.value })
+      .from(cloud_agent_environment_vars)
+      .where(
+        and(
+          eq(cloud_agent_environment_vars.environment_id, input.environmentId),
+          eq(cloud_agent_environment_vars.is_secret, false)
+        )
+      );
+    const storedPlainVars = Object.fromEntries(storedPlainRows.map(row => [row.key, row.value]));
+    buildInputsChanged = !sameRecord(plainVars, storedPlainVars);
   }
 
   if (plainVars !== undefined) {
@@ -404,8 +490,10 @@ export async function updateEnvironment(
 
   // Secret changes run before the plaintext replacement so a deleted secret
   // frees its key for a plaintext variable of the same name.
-  if (secretChanges !== undefined) {
-    await applySecretChanges(tx, input.environmentId, publicKeyBase64, secretChanges);
+  if (secretChanges !== undefined && secretChanges.length > 0) {
+    if (await applySecretChanges(tx, input.environmentId, publicKeyBase64, secretChanges)) {
+      buildInputsChanged = true;
+    }
   }
 
   if (plainVars !== undefined) {
@@ -424,6 +512,19 @@ export async function updateEnvironment(
     .from(cloud_agent_environment_vars)
     .where(eq(cloud_agent_environment_vars.environment_id, input.environmentId));
   validateEnvironmentVarCount(rows.length);
+
+  if (!buildInputsChanged) return { configurationRevision: environment.configuration_revision };
+  // The row is locked FOR UPDATE above, so the increment is serialized with
+  // every other edit of this environment.
+  const [updated] = await tx
+    .update(cloud_agent_environments)
+    .set({ configuration_revision: sql`${cloud_agent_environments.configuration_revision} + 1` })
+    .where(eq(cloud_agent_environments.id, input.environmentId))
+    .returning({ configurationRevision: cloud_agent_environments.configuration_revision });
+  if (!updated) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Environment not found' });
+  }
+  return { configurationRevision: updated.configurationRevision };
 }
 
 export async function deleteEnvironment(
@@ -543,16 +644,40 @@ export async function listEnvironmentsForOwner(
   return summarizeEnvironments(db, environments);
 }
 
-/**
- * Load the environment of a session's repository: the primitives the session
- * merges and the saved allocation. Null when the owner has no environment for
- * the repository or the owning organization is soft-deleted. An owner has at
- * most one environment per repository.
- */
-export async function loadEnvironmentForSession(
-  db: WorkerDb,
-  input: { owner: EnvironmentOwner; repository: EnvironmentRepositoryIdentity }
-): Promise<EnvironmentForSession | null> {
+/** Split variable rows into plaintext values and parsed secret envelopes. */
+function splitVariables(vars: ReadonlyArray<{ key: string; value: string; isSecret: boolean }>): {
+  plainVars: Record<string, string>;
+  encryptedSecrets: EnvironmentBuildInput['encryptedSecrets'];
+} {
+  const plainVars: Record<string, string> = {};
+  const encryptedSecrets: EnvironmentBuildInput['encryptedSecrets'] = {};
+  for (const variable of vars) {
+    if (variable.isSecret) {
+      encryptedSecrets[variable.key] = encryptedEnvelopeSchema.parse(JSON.parse(variable.value));
+    } else {
+      plainVars[variable.key] = variable.value;
+    }
+  }
+  return { plainVars, encryptedSecrets };
+}
+
+async function readVariables(db: Pick<WorkerDb, 'select'>, environmentId: string) {
+  return db
+    .select({
+      key: cloud_agent_environment_vars.key,
+      value: cloud_agent_environment_vars.value,
+      isSecret: cloud_agent_environment_vars.is_secret,
+    })
+    .from(cloud_agent_environment_vars)
+    .where(eq(cloud_agent_environment_vars.environment_id, environmentId))
+    .orderBy(cloud_agent_environment_vars.key);
+}
+
+/** The matching environment row when its owning organization is active. */
+async function readActiveEnvironment(
+  db: Pick<WorkerDb, 'select'>,
+  condition: SQL | undefined
+): Promise<CloudAgentEnvironment | null> {
   const [row] = await db
     .select({ environment: cloud_agent_environments })
     .from(cloud_agent_environments)
@@ -560,31 +685,91 @@ export async function loadEnvironmentForSession(
       organizations,
       eq(cloud_agent_environments.owned_by_organization_id, organizations.id)
     )
-    .where(and(identityCondition(input.owner, input.repository), isNull(organizations.deleted_at)))
+    .where(and(condition, isNull(organizations.deleted_at)))
     .limit(1);
-  if (!row) return null;
+  return row?.environment ?? null;
+}
 
-  const vars = await db
-    .select({
-      key: cloud_agent_environment_vars.key,
-      value: cloud_agent_environment_vars.value,
-      isSecret: cloud_agent_environment_vars.is_secret,
-    })
-    .from(cloud_agent_environment_vars)
-    .where(eq(cloud_agent_environment_vars.environment_id, row.environment.id));
+/**
+ * Load the environment of a session's repository: the primitives the session
+ * merges, the authorized reference that travels beside them, and the saved
+ * allocation. Null when the owner has no environment for the repository or the
+ * owning organization is soft-deleted. An owner has at most one environment
+ * per repository.
+ */
+export async function loadEnvironmentForSession(
+  db: WorkerDb,
+  input: { owner: EnvironmentOwner; repository: EnvironmentRepositoryIdentity }
+): Promise<EnvironmentForSession | null> {
+  return db.transaction(
+    async tx => {
+      const environment = await readActiveEnvironment(
+        tx,
+        identityCondition(input.owner, input.repository)
+      );
+      if (!environment) return null;
 
-  const envVars: Record<string, string> = {};
-  const encryptedSecrets: EnvironmentSessionLayer['encryptedSecrets'] = {};
-  for (const variable of vars) {
-    if (variable.isSecret) {
-      encryptedSecrets[variable.key] = encryptedEnvelopeSchema.parse(JSON.parse(variable.value));
-    } else {
-      envVars[variable.key] = variable.value;
-    }
-  }
+      const { plainVars, encryptedSecrets } = splitVariables(
+        await readVariables(tx, environment.id)
+      );
+      return {
+        layer: {
+          envVars: plainVars,
+          encryptedSecrets,
+          setupCommands: environment.commands,
+        },
+        reference: referenceOf(environment),
+        sandboxAllocation: environment.sandbox_allocation,
+      };
+    },
+    { isolationLevel: 'repeatable read', accessMode: 'read only' }
+  );
+}
 
-  return {
-    layer: { envVars, encryptedSecrets, setupCommands: row.environment.commands },
-    sandboxAllocation: row.environment.sandbox_allocation,
-  };
+/**
+ * The current owner, revision and repository of an environment, or null when
+ * it no longer exists or its owning organization is deleted. Build admission
+ * and publication recheck this before acting.
+ */
+export async function readEnvironmentReference(
+  db: WorkerDb,
+  environmentId: string
+): Promise<EnvironmentReference | null> {
+  const environment = await readActiveEnvironment(
+    db,
+    eq(cloud_agent_environments.id, environmentId)
+  );
+  return environment === null ? null : referenceOf(environment);
+}
+
+/**
+ * Read one build's inputs consistently: the environment row and its variable
+ * rows come from one repeatable-read snapshot, so a concurrent edit cannot mix
+ * two revisions. Secrets stay encrypted envelopes. Null when the environment
+ * no longer exists.
+ */
+export async function loadEnvironmentBuildInput(
+  db: WorkerDb,
+  environmentId: string
+): Promise<EnvironmentBuildInput | null> {
+  return db.transaction(
+    async tx => {
+      const environment = await readActiveEnvironment(
+        tx,
+        eq(cloud_agent_environments.id, environmentId)
+      );
+      if (environment === null) return null;
+      const { plainVars, encryptedSecrets } = splitVariables(
+        await readVariables(tx, environmentId)
+      );
+      return {
+        reference: referenceOf(environment),
+        repoFullName: environment.repo_full_name,
+        commands: environment.commands,
+        plainVars,
+        encryptedSecrets,
+      };
+    },
+    { isolationLevel: 'repeatable read', accessMode: 'read only' }
+  );
 }

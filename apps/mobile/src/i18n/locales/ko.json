@@ -1014,6 +1014,22 @@
       "loading": "리뷰 메모리 불러오는 중",
       "loadingProposals": "제안 불러오는 중",
       "noProposals": "제안 없음",
+      "proposalDetails": "제안 상세 정보",
+      "proposalTitle": "제안 제목",
+      "rationale": "제안 근거",
+      "saveFirst": "풀 리퀘스트를 만들기 전에 변경 사항을 저장하세요.",
+      "proposalSaved": "제안이 저장되었습니다",
+      "proposalDismissed": "제안이 기각되었습니다",
+      "dismissProposalTitle": "제안을 기각할까요?",
+      "dismissProposalMessage": "이 제안은 활성 목록에서 제거되며 복원할 수 없습니다.",
+      "prOpened": "REVIEW.md 풀 리퀘스트가 생성되었습니다",
+      "alreadyPresent": "지침이 이미 REVIEW.md에 있습니다",
+      "status": {
+        "edited": "수정됨",
+        "opening_change_request": "PR 생성 중",
+        "change_request_failed": "PR 생성 실패",
+        "superseded": "이미 있음"
+      },
       "noProposalsDescription": "Kilo가 유지보수 담당자의 답변을 분석하면 리뷰 메모리 제안이 여기에 표시됩니다.",
       "off": "리뷰 메모리가 꺼져 있습니다.",
       "on": "리뷰 메모리가 켜져 있습니다.",
@@ -3730,6 +3746,7 @@
     "title": "프로필",
     "entrySubtitle": "세션 전체에서 환경 설정 재사용",
     "newProfile": "새 프로필",
+    "openHint": "프로필을 엽니다",
     "emptyTitle": "아직 프로필이 없습니다.",
     "emptyDescription": "세션 전체에서 환경 변수, 설정 명령 및 기술을 재사용하기 위한 프로필을 만듭니다.",
     "loadFailed": "프로필을 로드할 수 없습니다.",
@@ -3961,11 +3978,13 @@
       "namePlaceholder": "버그, 아이디어, 릴리스…",
       "emoji": "이모지",
       "mode": "모드",
-      "defaultsHint": "이 목록에서 시작한 세션은 이 기본값을 사용합니다."
+      "defaultsHint": "이 목록에서 시작한 세션은 이 기본값을 사용합니다.",
+      "saveFailed": "목록을 저장할 수 없습니다. 연결을 확인한 후 다시 시도해 주세요."
     },
     "list": {
       "addPlaceholder": "할 일 추가",
       "add": "할 일 추가하기",
+      "addFailed": "할 일을 추가할 수 없습니다. 연결을 확인한 후 다시 시도해 주세요.",
       "empty": "아직 할 일이 없습니다",
       "setDefaults": "저장소, 모드 및 모델 설정",
       "completed_one": "완료 ({{count}})",
@@ -4002,7 +4021,8 @@
       "startNewSession": "새 세션 시작",
       "startNewSessionHint": "길게 눌러 새 세션을 시작하세요.",
       "linkSession": "세션 연결",
-      "linkFailed": "세션을 할 일에 연결할 수 없습니다"
+      "linkFailed": "세션을 할 일에 연결할 수 없습니다",
+      "startRefreshFailed": "세션이 시작되었지만 이 목록은 업데이트되지 않았습니다."
     },
     "linkSession": {
       "title": "세션 연결하기",

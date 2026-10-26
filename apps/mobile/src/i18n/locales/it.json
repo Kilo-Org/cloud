@@ -985,6 +985,22 @@
       "loading": "Caricamento della memoria di revisione",
       "loadingProposals": "Caricamento delle proposte",
       "noProposals": "Nessuna proposta",
+      "proposalDetails": "Dettagli della proposta",
+      "proposalTitle": "Titolo della proposta",
+      "rationale": "Motivazione",
+      "saveFirst": "Salva le modifiche prima di aprire una pull request.",
+      "proposalSaved": "Proposta salvata",
+      "proposalDismissed": "Proposta scartata",
+      "dismissProposalTitle": "Scartare la proposta?",
+      "dismissProposalMessage": "Questa proposta verrà rimossa dall'elenco attivo e non potrà essere ripristinata.",
+      "prOpened": "Pull request per REVIEW.md aperta",
+      "alreadyPresent": "Le indicazioni sono già presenti in REVIEW.md",
+      "status": {
+        "edited": "Modificata",
+        "opening_change_request": "Apertura della PR",
+        "change_request_failed": "Apertura della PR non riuscita",
+        "superseded": "Già presente"
+      },
       "noProposalsDescription": "Le proposte della memoria di revisione compaiono qui dopo che Kilo ha analizzato le risposte dei responsabili del progetto.",
       "off": "La memoria di revisione è disattivata.",
       "on": "La memoria di revisione è attivata.",
@@ -3776,6 +3792,7 @@
     "title": "Profili",
     "entrySubtitle": "Riutilizza le impostazioni dell'ambiente tra le sessioni",
     "newProfile": "Nuovo profilo",
+    "openHint": "Apre il profilo",
     "emptyTitle": "Nessun profilo ancora",
     "emptyDescription": "Crea un profilo per riutilizzare variabili di ambiente, comandi di configurazione e competenze tra le sessioni.",
     "loadFailed": "Impossibile caricare i profili",
@@ -4014,11 +4031,13 @@
       "namePlaceholder": "Bug, Idee, Release…",
       "emoji": "Emoji",
       "mode": "Modalità",
-      "defaultsHint": "Le sessioni avviate da questo elenco usano questi valori predefiniti."
+      "defaultsHint": "Le sessioni avviate da questo elenco usano questi valori predefiniti.",
+      "saveFailed": "Impossibile salvare l’elenco. Controlla la connessione e riprova."
     },
     "list": {
       "addPlaceholder": "Aggiungi un'attività",
       "add": "Aggiungi attività",
+      "addFailed": "Impossibile aggiungere l’attività. Controlla la connessione e riprova.",
       "empty": "Ancora nessuna attività",
       "setDefaults": "Imposta repository, modalità e modello",
       "completed_one": "Completate ({{count}})",
@@ -4057,7 +4076,8 @@
       "startNewSession": "Avvia nuova sessione",
       "startNewSessionHint": "Tieni premuto per avviare una nuova sessione.",
       "linkSession": "Collega sessione",
-      "linkFailed": "Impossibile collegare la sessione all'attività"
+      "linkFailed": "Impossibile collegare la sessione all'attività",
+      "startRefreshFailed": "La sessione è stata avviata, ma questo elenco non è stato aggiornato."
     },
     "linkSession": {
       "title": "Collega una sessione",

@@ -18,8 +18,8 @@ import {
   listChecks,
   listDiscussions,
   listInbox,
-  requestGitLabJson,
 } from './gitlab-read';
+import { requestGitLabJson } from './gitlab-http';
 import { GitLabApiStatusError, GitLabReviewError } from './gitlab-authorization';
 
 // The bound transport runs through Node https.request; mirror adapter.test.ts.
@@ -47,6 +47,7 @@ jest.mock('@/lib/integrations/gitlab-service', () => ({
 }));
 
 jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
+  ...jest.requireActual('@/lib/integrations/platforms/gitlab/adapter'),
   fetchGitLabMergeRequest: (params: unknown) => mockFetchGitLabMergeRequest(params),
   getMRHeadCommit: (...args: unknown[]) => mockGetMRHeadCommit(...args),
   getMRDiffRefs: (...args: unknown[]) => mockGetMRDiffRefs(...args),
@@ -147,6 +148,70 @@ const diffFixture = [
     diff: '@@ -1,2 +1,2 @@\n-old\n+new\n',
   },
 ];
+
+const discussionStateCases = [
+  {
+    name: 'resolved first resolvable note after a non-resolvable note',
+    flags: [
+      { resolvable: false, resolved: false },
+      { resolvable: true, resolved: true },
+      { resolvable: true, resolved: false },
+    ],
+    resolvable: true,
+    resolved: true,
+  },
+  {
+    name: 'unresolved first resolvable note after a non-resolvable note',
+    flags: [
+      { resolvable: false, resolved: true },
+      { resolvable: true, resolved: false },
+      { resolvable: true, resolved: true },
+    ],
+    resolvable: true,
+    resolved: false,
+  },
+  {
+    name: 'missing resolved flag on the first resolvable note',
+    flags: [
+      { resolvable: false, resolved: true },
+      { resolvable: true },
+      { resolvable: true, resolved: true },
+    ],
+    resolvable: true,
+    resolved: false,
+  },
+  {
+    name: 'no resolvable notes despite a resolved flag',
+    flags: [{ resolvable: false, resolved: true }],
+    resolvable: false,
+    resolved: false,
+  },
+  {
+    name: 'no notes',
+    flags: [],
+    resolvable: false,
+    resolved: false,
+  },
+];
+
+function discussionWithState(flags: { resolvable: boolean; resolved?: boolean }[]) {
+  return {
+    id: 'disc-state',
+    individual_note: false,
+    notes: flags.map((flag, index) => ({
+      id: index + 1,
+      body: `Note ${index + 1}`,
+      author: { id: 1, username: 'alice', name: 'Alice' },
+      created_at: '2026-01-02T00:00:00Z',
+      updated_at: '2026-01-02T00:00:00Z',
+      system: false,
+      noteable_id: 100,
+      noteable_type: 'MergeRequest',
+      noteable_iid: 12,
+      ...flag,
+    })),
+  };
+}
 
 let fetchMock: jest.Mock;
 
@@ -615,6 +680,19 @@ describe('listDiscussions', () => {
     expect(page.threads[2]?.comments.map(comment => comment.commentId)).toEqual(['14']);
   });
 
+  it.each(discussionStateCases)('maps discussion state for $name', async testCase => {
+    fetchMock.mockResolvedValue(jsonResponse([discussionWithState(testCase.flags)]));
+
+    const page = await listDiscussions(OWNER, PROJECT_PATH, 12);
+
+    expect(page.threads).toHaveLength(1);
+    expect(page.threads[0]).toMatchObject({
+      threadId: 'disc-state',
+      resolvable: testCase.resolvable,
+      resolved: testCase.resolved,
+    });
+  });
+
   it('reuses the same cursor rule: foreign identity restarts at page 1', async () => {
     const foreign = Buffer.from(
       JSON.stringify({ identity: 'other/repo', page: 9 }),
@@ -915,6 +993,21 @@ describe('getMergeState', () => {
       conflicts: false,
       blockedReasons: [],
     });
+  });
+
+  it.each(discussionStateCases)('applies the discussion merge gate for $name', async testCase => {
+    routeResponses({
+      settings: { only_allow_merge_if_all_discussions_are_resolved: true },
+      discussions: [discussionWithState(testCase.flags)],
+    });
+
+    const state = await getMergeState(OWNER, PROJECT_PATH, 12);
+
+    const blocked = testCase.resolvable && !testCase.resolved;
+    expect(state.canMerge).toBe(!blocked);
+    expect(state.blockedReasons).toEqual(
+      blocked ? [{ code: 'other', message: 'Resolve all discussions before merging.' }] : []
+    );
   });
 
   it('treats a 404 approvals endpoint (no approval rules) as no approval gate', async () => {

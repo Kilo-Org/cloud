@@ -1572,6 +1572,22 @@
       "loadingProposals": "Llwytho cynigion",
       "couldNotLoadProposals": "Ni ellid llwytho'r cynigion.",
       "noProposals": "Dim cynigion",
+      "proposalDetails": "Manylion y cynnig",
+      "proposalTitle": "Teitl y cynnig",
+      "rationale": "Sail resymegol",
+      "saveFirst": "Cadwch eich newidiadau cyn agor cais tynnu.",
+      "proposalSaved": "Cynnig wedi'i gadw",
+      "proposalDismissed": "Cynnig wedi'i ddiystyru",
+      "dismissProposalTitle": "Diystyru'r cynnig?",
+      "dismissProposalMessage": "Bydd y cynnig hwn yn cael ei dynnu o'r rhestr weithredol ac ni fydd modd ei adfer.",
+      "prOpened": "Cais tynnu REVIEW.md wedi'i agor",
+      "alreadyPresent": "Mae'r canllawiau eisoes yn REVIEW.md",
+      "status": {
+        "edited": "Wedi'i olygu",
+        "opening_change_request": "Agor PR",
+        "change_request_failed": "PR wedi methu",
+        "superseded": "Eisoes yn bodoli"
+      },
       "noProposalsDescription": "Bydd cynigion y cof adolygu yn ymddangos yma ar ôl i Kilo ddadansoddi ymatebion y cynhalwyr."
     },
     "manualReview": {
@@ -3914,6 +3930,7 @@
     "title": "Proffiliau",
     "entrySubtitle": "Ailddefnyddio gosodiadau amgylchedd ar draws sesiynau",
     "newProfile": "Proffil newydd",
+    "openHint": "Yn agor y proffil",
     "emptyTitle": "Dim proffiliau eto",
     "emptyDescription": "Creu proffil i ailddefnyddio newidynnau amgylchedd, gorchmynion gosod, a sgiliau ar draws sesiynau.",
     "loadFailed": "Methu llwytho proffiliau",
@@ -4173,11 +4190,13 @@
       "namePlaceholder": "Bygiau, Syniadau, Rhyddhau…",
       "emoji": "Emoji",
       "mode": "Modd",
-      "defaultsHint": "Mae sesiynau sy'n dechrau o'r rhestr hon yn defnyddio'r rhagosodiadau hyn."
+      "defaultsHint": "Mae sesiynau sy'n dechrau o'r rhestr hon yn defnyddio'r rhagosodiadau hyn.",
+      "saveFailed": "Ni fu modd cadw'r rhestr. Gwiriwch eich cysylltiad a rhowch gynnig arall."
     },
     "list": {
       "addPlaceholder": "Ychwanegu tasg",
       "add": "Ychwanegu tasg",
+      "addFailed": "Ni fu modd ychwanegu'r dasg. Gwiriwch eich cysylltiad a rhowch gynnig arall.",
       "empty": "Dim tasgau eto",
       "setDefaults": "Gosod ystorfa, modd a model",
       "completed_zero": "Wedi'u cwblhau ({{count}})",
@@ -4222,7 +4241,8 @@
       "startNewSession": "Dechrau sesiwn newydd",
       "startNewSessionHint": "Gwasga'n hir i ddechrau sesiwn newydd.",
       "linkSession": "Cysylltu sesiwn",
-      "linkFailed": "Methu cysylltu'r sesiwn â'r dasg"
+      "linkFailed": "Methu cysylltu'r sesiwn â'r dasg",
+      "startRefreshFailed": "Dechreuodd y sesiwn, ond ni fu modd diweddaru'r rhestr hon."
     },
     "linkSession": {
       "title": "Cysylltu sesiwn",

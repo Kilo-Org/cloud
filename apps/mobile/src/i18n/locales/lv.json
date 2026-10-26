@@ -1506,6 +1506,22 @@
       "loadingProposals": "Tiek ielādēti priekšlikumi",
       "couldNotLoadProposals": "Neizdevās ielādēt priekšlikumus.",
       "noProposals": "Nav priekšlikumu",
+      "proposalDetails": "Priekšlikuma informācija",
+      "proposalTitle": "Priekšlikuma nosaukums",
+      "rationale": "Pamatojums",
+      "saveFirst": "Saglabā labojumus pirms PR atvēršanas.",
+      "proposalSaved": "Priekšlikums saglabāts",
+      "proposalDismissed": "Priekšlikums noraidīts",
+      "dismissProposalTitle": "Noraidīt priekšlikumu?",
+      "dismissProposalMessage": "Šis priekšlikums tiks noņemts no aktīvo priekšlikumu saraksta, un to nevarēs atjaunot.",
+      "prOpened": "Atvērts PR failam REVIEW.md",
+      "alreadyPresent": "Norādījumi jau ir REVIEW.md failā",
+      "status": {
+        "edited": "Rediģēts",
+        "opening_change_request": "Tiek atvērts PR",
+        "change_request_failed": "Neizdevās atvērt PR",
+        "superseded": "Jau ir pievienots"
+      },
       "noProposalsDescription": "Koda pārskatīšanas atmiņas priekšlikumi būs redzami šeit pēc tam, kad Kilo būs analizējis uzturētāju atbildes."
     },
     "manualReview": {
@@ -3776,6 +3792,7 @@
     "title": "Profili",
     "entrySubtitle": "Atkārtoti izmantojiet vides iestatījumus sesijās",
     "newProfile": "Jauns profils",
+    "openHint": "Atver profilu",
     "emptyTitle": "Vēl nav neviena profila",
     "emptyDescription": "Izveidojiet profilu, lai sesijās atkārtoti izmantotu vides mainīgos, iestatīšanas komandas un prasmes.",
     "loadFailed": "Nevarēja ielādēt profilus",
@@ -4014,11 +4031,13 @@
       "namePlaceholder": "Kļūdas, idejas, laidieni…",
       "emoji": "Emocijzīme",
       "mode": "Režīms",
-      "defaultsHint": "Sesijas, kas sāktas no šī saraksta, izmanto šos noklusējumus."
+      "defaultsHint": "Sesijas, kas sāktas no šī saraksta, izmanto šos noklusējumus.",
+      "saveFailed": "Neizdevās saglabāt sarakstu. Pārbaudiet savienojumu un mēģiniet vēlreiz."
     },
     "list": {
       "addPlaceholder": "Pievienot jaunu uzdevumu",
       "add": "Pievienot uzdevumu",
+      "addFailed": "Neizdevās pievienot uzdevumu. Pārbaudiet savienojumu un mēģiniet vēlreiz.",
       "empty": "Vēl nav uzdevumu",
       "setDefaults": "Iestatīt repozitoriju, režīmu un modeli",
       "completed_one": "Pabeigti ({{count}})",
@@ -4057,7 +4076,8 @@
       "startNewSession": "Sākt jaunu sesiju",
       "startNewSessionHint": "Turiet nospiestu, lai sāktu jaunu sesiju.",
       "linkSession": "Saistīt sesiju",
-      "linkFailed": "Neizdevās saistīt sesiju ar uzdevumu"
+      "linkFailed": "Neizdevās saistīt sesiju ar uzdevumu",
+      "startRefreshFailed": "Sesija tika sākta, bet šis saraksts neatjaunojās."
     },
     "linkSession": {
       "title": "Sesijas saistīšana",

@@ -3,6 +3,7 @@ import type { Span } from '@sentry/nextjs';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gateway/processUsage.constants';
+import type { ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type {
   NotYetCostedUsageStats,
   VercelProviderAttempt,
@@ -16,13 +17,28 @@ type OpenRouterCostFields = {
 };
 
 /**
+ * Whether the provider reports `usage.is_byok` next to `usage.cost`. OpenRouter
+ * does on chat completions, Messages, Responses and embeddings, and Vercel AI
+ * Gateway does on chat completions. Martian reports `cost` in the same shape but
+ * never `is_byok`.
+ */
+export function providerReportsIsByok(provider: ProviderId): boolean {
+  return provider === 'openrouter' || provider === 'vercel';
+}
+
+/**
  * Computes cost_mUsd and is_byok from OpenRouter usage cost fields, and emits a
  * Sentry warning when the accounting looks suspicious.
+ *
+ * With BYOK, OpenRouter's `cost` is only its 5% fee and the real cost is
+ * `cost_details.upstream_inference_cost`, so a cost without a BYOK status cannot
+ * be trusted. `requireIsByok` says whether that is suspicious for this response.
  */
 export function computeOpenRouterCostFields(
   usage: OpenRouterCostFields,
   coreProps: NotYetCostedUsageStats,
-  source: string
+  source: string,
+  requireIsByok: boolean
 ): { cost_mUsd: number; is_byok: boolean | null } {
   const is_byok = usage.is_byok ?? null;
   const openrouterCost_USD = usage.cost ?? 0;
@@ -31,7 +47,7 @@ export function computeOpenRouterCostFields(
   const inferredUpstream_USD = openrouterCost_USD * OPENROUTER_BYOK_COST_MULTIPLIER;
   const microdollar_error = (inferredUpstream_USD - upstream_inference_cost_USD) * 1000000;
   if (
-    (is_byok == null && (openrouterCost_USD || upstream_inference_cost_USD)) || // unknown byok status but known non-zero costs? We're borked!
+    (requireIsByok && is_byok == null && (openrouterCost_USD || upstream_inference_cost_USD)) || // unknown byok status but known non-zero costs? We're borked!
     (is_byok && usage.cost !== 0 && 1.1 < Math.abs(microdollar_error)) // byok and cost is not 5% of upstream? Weird, EXCEPT sometimes cost is 0 due to openrouter promo.
   ) {
     const { responseContent: _ignore, ...corePropsCopy } = coreProps;

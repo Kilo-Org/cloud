@@ -160,8 +160,8 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
     body = (
       <>
         <TodoQuickAdd
-          onAdd={todoTitle => {
-            create.mutate({ listId, title: todoTitle });
+          onAdd={async todoTitle => {
+            await create.mutateAsync({ listId, title: todoTitle });
           }}
         />
         {openItems.length === 0 && doneItems.length === 0 ? (

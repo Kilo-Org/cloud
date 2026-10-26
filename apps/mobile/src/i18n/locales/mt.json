@@ -1550,6 +1550,22 @@
       "loadingProposals": "Qed jitgħabbew il-proposti",
       "couldNotLoadProposals": "Ma setgħux jitgħabbew il-proposti.",
       "noProposals": "L-ebda proposta",
+      "proposalDetails": "Dettalji tal-proposta",
+      "proposalTitle": "Titlu tal-proposta",
+      "rationale": "Raġuni",
+      "saveFirst": "Issejvja l-bidliet tiegħek qabel tiftaħ pull request.",
+      "proposalSaved": "Il-proposta ġiet issejvjata",
+      "proposalDismissed": "Il-proposta twarrbet",
+      "dismissProposalTitle": "Twarrab il-proposta?",
+      "dismissProposalMessage": "Din il-proposta se titneħħa mil-lista attiva u ma tkunx tista’ tiġi rrestawrata.",
+      "prOpened": "Infetħet pull request għal REVIEW.md",
+      "alreadyPresent": "Il-linji gwida diġà jinsabu f'REVIEW.md",
+      "status": {
+        "edited": "Editjata",
+        "opening_change_request": "Qed tinfetaħ PR",
+        "change_request_failed": "Il-PR falliet",
+        "superseded": "Diġà preżenti"
+      },
       "noProposalsDescription": "Il-proposti tal-memorja tar-reviżjoni jidhru hawn wara li Kilo janalizza t-tweġibiet tal-manutenturi."
     },
     "manualReview": {
@@ -3868,6 +3884,7 @@
     "title": "Profili",
     "entrySubtitle": "Uża mill-ġdid is-settings tal-ambjent matul is-sessjonijiet",
     "newProfile": "Profil ġdid",
+    "openHint": "Jiftaħ il-profil",
     "emptyTitle": "Għadu l-ebda profil",
     "emptyDescription": "Oħloq profil biex tuża mill-ġdid il-varjabbli ambjentali, il-kmandi tas-setup, u l-ħiliet matul is-sessjonijiet.",
     "loadFailed": "Ma setgħetx tagħbija profili",
@@ -4120,11 +4137,13 @@
       "namePlaceholder": "Żbalji, Ideat, Ħruġ…",
       "emoji": "Emoji",
       "mode": "Mod",
-      "defaultsHint": "Is-sessjonijiet li jinbdew minn din il-lista jużaw dawn id-defaults."
+      "defaultsHint": "Is-sessjonijiet li jinbdew minn din il-lista jużaw dawn id-defaults.",
+      "saveFailed": "Il-lista ma ġietx salvata. Iċċekkja l-konnessjoni tiegħek u erġa’ pprova."
     },
     "list": {
       "addPlaceholder": "Kompitu ġdid",
       "add": "Żid kompitu",
+      "addFailed": "Il-kompitu ma ġiex miżjud. Iċċekkja l-konnessjoni tiegħek u erġa’ pprova.",
       "empty": "S'issa m'hemmx kompiti",
       "setDefaults": "Issettja repożitorju, mod u mudell",
       "completed_one": "Lest ({{count}})",
@@ -4167,7 +4186,8 @@
       "startNewSession": "Ibda sessjoni ġdida",
       "startNewSessionHint": "Agħfas fit-tul biex tibda sessjoni ġdida.",
       "linkSession": "Qabbad sessjoni",
-      "linkFailed": "Ma setgħetx tiġi marbuta s-sessjoni mal-kompitu"
+      "linkFailed": "Ma setgħetx tiġi marbuta s-sessjoni mal-kompitu",
+      "startRefreshFailed": "Is-sessjoni bdiet, imma din il-lista ma ġietx aġġornata."
     },
     "linkSession": {
       "title": "Agħżel sessjoni",

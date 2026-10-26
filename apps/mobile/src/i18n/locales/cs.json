@@ -1528,6 +1528,22 @@
       "loadingProposals": "Načítání návrhů",
       "couldNotLoadProposals": "Návrhy se nepodařilo načíst.",
       "noProposals": "Žádné návrhy",
+      "proposalDetails": "Podrobnosti návrhu",
+      "proposalTitle": "Název návrhu",
+      "rationale": "Odůvodnění",
+      "saveFirst": "Před otevřením pull requestu uložte změny.",
+      "proposalSaved": "Návrh uložen",
+      "proposalDismissed": "Návrh zamítnut",
+      "dismissProposalTitle": "Zamítnout návrh?",
+      "dismissProposalMessage": "Tento návrh bude odstraněn ze seznamu aktivních návrhů a nebude možné ho obnovit.",
+      "prOpened": "Pull request pro REVIEW.md otevřen",
+      "alreadyPresent": "Pokyny již existují v souboru REVIEW.md",
+      "status": {
+        "edited": "Upraveno",
+        "opening_change_request": "Otevírání PR",
+        "change_request_failed": "PR selhal",
+        "superseded": "Již existuje"
+      },
       "noProposalsDescription": "Návrhy z paměti kontrol se zde zobrazí, jakmile Kilo analyzuje odpovědi správců."
     },
     "manualReview": {
@@ -3822,6 +3838,7 @@
     "title": "Profily",
     "entrySubtitle": "Znovu použijte nastavení prostředí napříč relacemi",
     "newProfile": "Nový profil",
+    "openHint": "Otevře profil",
     "emptyTitle": "Zatím žádné profily",
     "emptyDescription": "Vytvořte profil pro opětovné použití proměnných prostředí, instalačních příkazů a dovedností napříč relacemi.",
     "loadFailed": "Profily se nepodařilo načíst",
@@ -4067,11 +4084,13 @@
       "namePlaceholder": "Chyby, Nápady, Vydání…",
       "emoji": "Emoji",
       "mode": "Režim",
-      "defaultsHint": "Relace spuštěné z tohoto seznamu použijí tato výchozí nastavení."
+      "defaultsHint": "Relace spuštěné z tohoto seznamu použijí tato výchozí nastavení.",
+      "saveFailed": "Seznam se nepodařilo uložit. Zkontrolujte připojení a zkuste to znovu."
     },
     "list": {
       "addPlaceholder": "Přidat úkol",
       "add": "Přidat",
+      "addFailed": "Úkol se nepodařilo přidat. Zkontrolujte připojení a zkuste to znovu.",
       "empty": "Zatím žádné úkoly",
       "setDefaults": "Nastavit repozitář, režim a model",
       "completed_one": "Dokončeno ({{count}})",
@@ -4112,7 +4131,8 @@
       "startNewSession": "Zahájit novou relaci",
       "startNewSessionHint": "Dlouhým stisknutím zahájíš novou relaci.",
       "linkSession": "Připojit relaci",
-      "linkFailed": "Relaci se nepodařilo připojit k úkolu"
+      "linkFailed": "Relaci se nepodařilo připojit k úkolu",
+      "startRefreshFailed": "Relace byla spuštěna, ale tento seznam se neaktualizoval."
     },
     "linkSession": {
       "title": "Připojení relace",

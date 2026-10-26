@@ -1,9 +1,10 @@
+/* eslint-disable max-lines -- one form surface: platform choice, URL field with its validation, instructions, model choice, and the pinned action share the scroll body */
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { GitPullRequest } from '@/components/ui/icons';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, TextInput, View } from 'react-native';
+import { ScrollView, type ScrollViewInstance, TextInput, View } from 'react-native';
 
 import { matchesCodeReviewUrlSuffix } from '@kilocode/app-shared/code-review';
 import { ModelSelector } from '@/components/agents/model-selector';
@@ -11,6 +12,7 @@ import { EmptyState } from '@/components/empty-state';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
 import { Input } from '@/components/ui/input';
@@ -75,6 +77,10 @@ function isDeadlineStall(error: unknown): boolean {
   return false;
 }
 
+// Breathing room kept above the URL section when the body scrolls back to it, so
+// the field label is not flush against the header.
+const FORM_EDGE_GAP = 16;
+
 export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const { t } = useTranslation();
@@ -90,6 +96,8 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const platform = platformChoice ?? firstConnected ?? 'github';
   const urlRef = useRef('');
   const instructionsRef = useRef('');
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
+  const urlSectionY = useRef(0);
   const [urlError, setUrlError] = useState<string | null>(null);
   const config = useReviewConfig(scope, platform);
   // The screen renders the create's failure inline (stall or settled error),
@@ -104,6 +112,15 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
       const url = urlRef.current.trim();
       if (!isValidManualReviewUrl(platform, url)) {
         setUrlError(t('codeReviewer.manualReview.invalidUrl'));
+        // The action is pinned outside the scroll body, so the URL section can
+        // be above the fold when Start is pressed (a short viewport, a raised
+        // keyboard). Bring that section back on screen with the message; the
+        // offset is measured, so a viewport too short for the platform group
+        // above it still reaches the field instead of stopping at the top.
+        scrollRef.current?.scrollTo({
+          y: Math.max(0, urlSectionY.current - FORM_EDGE_GAP),
+          animated: true,
+        });
         return false;
       }
       setUrlError(null);
@@ -223,6 +240,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
       />
       <KeyboardAvoidingView className="flex-1" behavior="padding">
         <ScrollView
+          ref={scrollRef}
           className="flex-1"
           contentContainerClassName="px-6 gap-6 pt-4 pb-4"
           automaticallyAdjustKeyboardInsets
@@ -240,12 +258,18 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               onSelect={option => {
                 urlRef.current = '';
                 setUrlError(null);
+                start.reset();
                 setPlatformChoice(option);
               }}
             />
           </View>
 
-          <View className="gap-3">
+          <View
+            className="gap-3"
+            onLayout={event => {
+              urlSectionY.current = event.nativeEvent.layout.y;
+            }}
+          >
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               {t('codeReviewer.manualReview.pullRequestUrl')}
             </Text>
@@ -253,8 +277,13 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               key={platform}
               // The shared single-line box supplies the touch floor
               // (`min-h-[44px]`, never a fixed height); the field keeps its
-              // own chrome, horizontal inset and line box.
-              className="rounded-md border border-input bg-background pl-3 pr-3 text-sm leading-[normal] text-foreground"
+              // own chrome, horizontal inset and line box. An invalid URL adds
+              // the same destructive border the shared `FormField` gives its
+              // own field, so the error reads on the box as well as below it.
+              className={cn(
+                'rounded-md border border-input bg-background pl-3 pr-3 text-sm leading-[normal] text-foreground',
+                urlError && 'border-destructive'
+              )}
               placeholder={URL_PLACEHOLDER[platform]}
               placeholderTextColor={colors.mutedForeground}
               autoCapitalize="none"
@@ -269,9 +298,14 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
                 if (urlError) {
                   setUrlError(null);
                 }
+                start.reset();
               }}
             />
-            {urlError ? <Text className="text-xs text-destructive">{urlError}</Text> : null}
+            {/* The shared status renders the visible line and owns the
+                announcement: a polite live region on Android, one imperative
+                iOS announcement per new message. A bare `Text` showed the copy
+                but told a screen reader nothing. */}
+            <AccessibleStatus message={urlError} className="text-xs" />
           </View>
 
           <View className="gap-3">
@@ -286,6 +320,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               placeholderTextColor={colors.mutedForeground}
               onChangeText={value => {
                 instructionsRef.current = value;
+                start.reset();
               }}
             />
           </View>
@@ -302,6 +337,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
                 variant={effectiveModel.thinkingEffort ?? ''}
                 onSelect={(modelId, variant) => {
                   setModelChoice({ modelSlug: modelId, thinkingEffort: variant || null });
+                  start.reset();
                 }}
               />
             </View>

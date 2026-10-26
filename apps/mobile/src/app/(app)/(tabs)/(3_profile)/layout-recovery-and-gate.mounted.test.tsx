@@ -7,9 +7,9 @@ import ProfileLayout from './_layout';
 // The tab's recovery boundary owns the error surface and its reads, which its
 // own suite covers. Here it must only still wrap the navigator: a screen throw
 // has to reach it while the scene gate under the Stack hides covered scenes.
-vi.mock('@/components/profile-stack-error-boundary', () => ({
-  ProfileStackErrorBoundary: ({ children }: { children: ReactElement }) =>
-    createElement('ProfileStackErrorBoundary', null, children),
+vi.mock('@/components/tab-stack-error-boundary', () => ({
+  TabStackErrorBoundary: ({ children }: { children: ReactElement }) =>
+    createElement('TabStackErrorBoundary', null, children),
 }));
 vi.mock('@/components/app-unlock-screen', () => ({
   appUnlockScreenLayout: ({ children }: { children: ReactElement }) => children,
@@ -89,7 +89,7 @@ beforeEach(() => {
 
 it('keeps the recovery boundary around the navigator that the gate covers', () => {
   const renderer = mount();
-  const boundary = renderer.root.findByType('ProfileStackErrorBoundary' as never);
+  const boundary = renderer.root.findByType('TabStackErrorBoundary' as never);
   expect(boundary.findAllByType('TabStack' as never).length).toBe(1);
   expect(boundary.findAllByType('SceneBody' as never).length).toBe(1);
   expect(gate(renderer).props).toMatchObject({

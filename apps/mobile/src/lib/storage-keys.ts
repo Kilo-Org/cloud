@@ -42,6 +42,8 @@ export const THEME_PREFERENCE_KEY = 'theme-preference';
 export const LANGUAGE_PREFERENCE_KEY = 'language-preference';
 /** One-shot screen to reopen after an RTL language reload. */
 export const LANGUAGE_RETURN_TARGET_KEY = 'language-return-target';
+/** Language whose forced layout direction the last launch already reloaded for. */
+export const LANGUAGE_DIRECTION_ATTEMPT_KEY = 'language-direction-attempt';
 /** Login email draft, persisted before an RTL language reload. */
 export const LOGIN_EMAIL_DRAFT_KEY = 'login-email-draft';
 /** Login SSO-recovery banner draft, persisted before an RTL language reload. */

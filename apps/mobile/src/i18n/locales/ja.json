@@ -1014,6 +1014,22 @@
       "loading": "レビューメモリを読み込み中",
       "loadingProposals": "提案を読み込み中",
       "noProposals": "提案はありません",
+      "proposalDetails": "提案の詳細",
+      "proposalTitle": "提案のタイトル",
+      "rationale": "提案の理由",
+      "saveFirst": "プルリクエストを作成する前に、変更を保存してください。",
+      "proposalSaved": "提案を保存しました",
+      "proposalDismissed": "提案を却下しました",
+      "dismissProposalTitle": "提案を却下しますか？",
+      "dismissProposalMessage": "この提案はアクティブなリストから削除され、復元できなくなります。",
+      "prOpened": "REVIEW.mdのプルリクエストを作成しました",
+      "alreadyPresent": "指針はすでにREVIEW.mdに記載されています",
+      "status": {
+        "edited": "編集済み",
+        "opening_change_request": "PRを作成中",
+        "change_request_failed": "PR作成失敗",
+        "superseded": "記載済み"
+      },
       "noProposalsDescription": "Kiloがメンテナーの返信を分析すると、レビューメモリの提案がここに表示されます。",
       "off": "レビューメモリはオフです。",
       "on": "レビューメモリはオンです。",
@@ -1094,8 +1110,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "利用可能なフィルターがありません",
-      "noFiltersDescription": "前の画面に戻り、検出結果の一覧からフィルターを開き直してください。",
       "title": "検出結果の絞り込み",
       "fixed": "修正済み",
       "outcome": "結果",
@@ -1649,8 +1663,8 @@
       "title": "セッション",
       "copyErrorDetails": "エラーの詳細をコピー",
       "backToSessions": "セッション一覧に戻る",
-      "follow": "ロック画面でフォロー",
-      "unfollow": "ロック画面でのフォローを停止",
+      "follow": "セッションをフォロー",
+      "unfollow": "セッションのフォローを停止",
       "couldNotLoad": "セッションを読み込めませんでした。",
       "failedToLoadDetails": "セッションの詳細を読み込めませんでした。",
       "failedToStopExecution": "実行を停止できませんでした。",
@@ -2433,7 +2447,6 @@
     "allow": "許可",
     "onlineMessage": "このデバイスではオフラインで文字起こしができません。文字起こしのために、録音した音声を{{provider}}に送信します。Kiloは音声を保存しません。",
     "onlineTitle": "音声はオンラインで処理されます",
-    "staysOff": "オンラインでの文字起こしを許可するまで、音声入力は利用できません。",
     "start": "音声入力を開始",
     "stop": "音声入力を停止",
     "restricted": "このデバイスでは音声入力が制限されています。",
@@ -3359,7 +3372,7 @@
     "activityKitDisabledBody": "ロック画面にアクティブなエージェントを表示するには、設定でライブアクティビティをオンにしてください。",
     "openSession": "開く",
     "finished": "終了",
-    "followFailed": "このエージェントをロック画面に表示できませんでした。",
+    "followFailed": "このセッションをフォローできませんでした。",
     "approveFailed": "承認できませんでした。もう一度試すには$t(common.approve)をタップしてください。",
     "checked": "最終確認",
     "lastKnown": "最終記録",
@@ -3733,6 +3746,7 @@
     "title": "プロフィール",
     "entrySubtitle": "セッション間で環境設定を再利用する",
     "newProfile": "新しいプロフィール",
+    "openHint": "プロフィールを開きます",
     "emptyTitle": "まだプロフィールがありません",
     "emptyDescription": "プロフィールを作成して、セッション間で環境変数、セットアップ コマンド、スキルを再利用します。",
     "loadFailed": "プロフィールを読み込めませんでした",
@@ -3964,11 +3978,13 @@
       "namePlaceholder": "バグ、アイデア、リリース…",
       "emoji": "絵文字",
       "mode": "モード",
-      "defaultsHint": "このリストから開始したセッションには、この既定値が使われます。"
+      "defaultsHint": "このリストから開始したセッションには、この既定値が使われます。",
+      "saveFailed": "リストを保存できませんでした。接続を確認して、もう一度お試しください。"
     },
     "list": {
       "addPlaceholder": "タスクを追加",
       "add": "タスクを追加",
+      "addFailed": "タスクを追加できませんでした。接続を確認して、もう一度お試しください。",
       "empty": "タスクはまだありません",
       "setDefaults": "リポジトリ、モード、モデルを設定",
       "completed_one": "完了 ({{count}})",
@@ -4005,7 +4021,8 @@
       "startNewSession": "新しいセッションを開始",
       "startNewSessionHint": "長押しして新しいセッションを開始します。",
       "linkSession": "セッションをリンク",
-      "linkFailed": "セッションをタスクにリンクできませんでした"
+      "linkFailed": "セッションをタスクにリンクできませんでした",
+      "startRefreshFailed": "セッションは開始されましたが、このリストは更新されませんでした。"
     },
     "linkSession": {
       "title": "セッションをリンク",
@@ -4029,7 +4046,7 @@
     "coverageHint": "過去のアクティビティの一部が欠けている可能性があります。≥は「少なくともこの量」を意味し、不明はゼロではありません。",
     "available": "利用可能なブリーフィング",
     "history": "ブリーフィング履歴",
-    "historyHint": "ブリーフィングは却下されたものも含めて30日間保存されます。",
+    "historyHint": "ブリーフィングは非表示にしたものも含めて30日間保存されます。",
     "settings": "ブリーフィング設定",
     "empty": "このブリーフ期間中のアクティビティはありません",
     "emptyHint": "スケジュールされたブリーフにアクティビティがあると、クラウドとCLIのコーディングセッションがここに表示されます。",
@@ -4041,7 +4058,7 @@
     "view": "ブリーフィングを読む",
     "viewWithPreview": "$t(agentBriefing.view). {{preview}}",
     "scheduleTimeLabel": "{{label}}、{{time}}",
-    "dismiss": "ブリーフィングを却下",
+    "dismiss": "ブリーフィングを非表示にする",
     "offline": "オフライン · 保存済みブリーフィング",
     "cached": "保存済みレポート · 更新できません",
     "revised": "改訂 · {{revision}}",
@@ -4068,7 +4085,7 @@
     "notificationsHint": "スケジュールされたブリーフごとに1回、一般的な通知が届きます。有料のAI要約とは無関係です。",
     "notificationPermission": "ブリーフィングを受け取るには、$t(common.notifications)でデバイスの通知を有効にしてください。",
     "aiOptIn": "有料AI要約",
-    "aiHint": "このコンテキストのみのオプションです。選択・編集済みの抜粋と構造化された事実が、アプリの言語でモデルに送信されます。料金はこのコンテキストの残高から支払われます。",
+    "aiHint": "このコンテキストで利用するかどうかを選択できます。選択され、機密情報が除去された抜粋と構造化された事実が、アプリの言語でモデルに送信されます。料金はこのコンテキストの残高から支払われます。",
     "defaultModel": "Kiloのデフォルトモデルを使用",
     "duration": "時間の上限(分)",
     "spendLimit": "支出の上限(USD)",
@@ -4115,6 +4132,12 @@
     "estimateBalanceUnavailable": "有料サマリーには残高が不足しています。",
     "estimateModelNotAllowed": "このモデルはここでは使用できません。",
     "estimateSpendLimitTooLow": "このサマリーを許可するには利用上限を引き上げてください。",
-    "saved": "ブリーフィング設定を保存しました"
+    "saved": "ブリーフィング設定を保存しました",
+    "preparing": "ブリーフィングを準備中…",
+    "preparationHint": "アクティビティの収集中は、この画面を離れて後で戻ることができます。内容を確認し、見積もりを承認するまで、AIによる処理や課金は開始されません。",
+    "resumeReview": "確認を続ける",
+    "preparationFailed": "このブリーフィングのアクティビティを収集できませんでした。もう一度お試しください。",
+    "preparationTimedOut": "アクティビティの収集に時間がかかりすぎました。もう一度お試しください。",
+    "preparationDrafts": "未確定のブリーフィング"
   }
 }

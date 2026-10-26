@@ -2,6 +2,7 @@ export type {
   Part,
   TextPart,
   ToolPart,
+  ToolState,
   FilePart,
   ReasoningPart,
   StepStartPart,

@@ -256,6 +256,11 @@ export async function briefingReportRow(
     );
   if (!row) throw new TRPCError({ code: 'NOT_FOUND', message: 'Briefing not found' });
   await requireBriefingContext(userId, row.organization_id);
+  if (row.kind === 'one_off' && row.revision === 0)
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'Briefing activity is still being prepared',
+    });
   if (row.kind === 'one_off') return revalidateOneOffEvidence(row);
   const facts = factsSchema.parse(row.facts);
   const sourceSessionIds = [

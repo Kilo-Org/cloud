@@ -56,7 +56,10 @@ beforeEach(() => {
   mockedGetDirectByokModel.mockImplementation(async modelId =>
     modelId.startsWith('synthetic/')
       ? {
-          provider: { id: 'synthetic' } as never,
+          provider: {
+            id: 'synthetic',
+            resolveUpstream: async () => ({ supportedChatApis: ['chat_completions'] }),
+          } as never,
           model: { id: modelId.slice('synthetic/'.length) } as never,
         }
       : { provider: null, model: null }
@@ -87,6 +90,21 @@ describe('validateOrganizationAutoTarget with direct BYOK targets', () => {
     await expect(
       validateOrganizationAutoTarget(organization(), 'synthetic/hf:moonshotai/kimi-k2.6')
     ).resolves.toEqual({ kind: 'ok', modelId: 'moonshotai/kimi-k2.6' });
+  });
+
+  test('checks API support of the key before resolving the catalog id', async () => {
+    mockedGetByokCredentials.mockResolvedValue([credential(true)]);
+    mockedGetCatalogModelId.mockResolvedValue('moonshotai/kimi-k2.6');
+
+    await expect(
+      validateOrganizationAutoTarget(organization(), 'synthetic/hf:moonshotai/kimi-k2.6', {
+        apiKind: 'messages',
+      })
+    ).resolves.toEqual({
+      kind: 'error',
+      message:
+        "Organization Auto route target 'synthetic/hf:moonshotai/kimi-k2.6' does not support the messages API.",
+    });
   });
 
   test('applies the model policy to the catalog id', async () => {

@@ -385,9 +385,52 @@ export function validateCloudAgentRootSessionsCursor(cursor: string): boolean {
   }
 }
 
+export const cloudAgentWorkspacesCursorSchema = z
+  .object({
+    version: z.literal(1),
+    updatedAt: cloudAgentRootSessionsCursorTimestampSchema,
+    workspaceId: cloudAgentWorktreeIdSchema,
+  })
+  .strict();
+export type CloudAgentWorkspacesCursor = z.infer<typeof cloudAgentWorkspacesCursorSchema>;
+
+export function encodeCloudAgentWorkspacesCursor(
+  cursor: Omit<CloudAgentWorkspacesCursor, 'version'>
+): string {
+  const parsed = cloudAgentWorkspacesCursorSchema.parse({ version: 1, ...cursor });
+  return encodeBase64Url(JSON.stringify(parsed));
+}
+
+export function decodeCloudAgentWorkspacesCursor(cursor: string): CloudAgentWorkspacesCursor {
+  if (!/^[A-Za-z0-9_-]{1,256}$/.test(cursor)) {
+    throw new Error('Invalid Cloud Agent workspaces cursor');
+  }
+  const base64 = cursor.replace(/-/g, '+').replace(/_/g, '/');
+  const paddingLength = (4 - (base64.length % 4)) % 4;
+  const binary = atob(base64 + '='.repeat(paddingLength));
+  const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
+  const parsed = cloudAgentWorkspacesCursorSchema.parse(
+    JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes))
+  );
+  if (encodeBase64Url(JSON.stringify(parsed)) !== cursor) {
+    throw new Error('Invalid Cloud Agent workspaces cursor');
+  }
+  return parsed;
+}
+
+export function validateCloudAgentWorkspacesCursor(cursor: string): boolean {
+  try {
+    decodeCloudAgentWorkspacesCursor(cursor);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export const listCloudAgentRootSessionsSchema = z
   .object({
     kiloUserId: z.string().min(1),
+    workspaceId: cloudAgentWorktreeIdSchema.optional(),
     limit: z.number().int().min(1).max(100).optional().default(100),
     cursor: z.string().min(1).max(256).optional(),
     start: z.number().int().nonnegative().max(8_640_000_000_000_000).optional(),
@@ -406,6 +449,7 @@ export type ListCloudAgentRootSessionsParams = z.input<typeof listCloudAgentRoot
 export type CloudAgentRootSessionSummary = {
   kiloSessionId: string;
   cloudAgentSessionId: string;
+  workspaceId: CloudAgentWorktreeId | null;
   userId: string;
   organizationId: string | null;
   title: string | null;
@@ -420,6 +464,73 @@ export type CloudAgentRootSessionsPage = {
   items: CloudAgentRootSessionSummary[];
   nextCursor: string | null;
 };
+
+export const listCloudAgentWorkspacesSchema = z
+  .object({
+    kiloUserId: z.string().min(1),
+    workspaceId: cloudAgentWorktreeIdSchema.optional(),
+    limit: z.number().int().min(1).max(50).optional().default(50),
+    sessionLimit: z.number().int().min(1).max(100).optional().default(10),
+    cursor: z.string().min(1).max(256).optional(),
+    repositoryUrl: z.string().min(1).max(2048).optional(),
+  })
+  .strict()
+  .superRefine((params, ctx) => {
+    if (params.cursor !== undefined && !validateCloudAgentWorkspacesCursor(params.cursor)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['cursor'],
+        message: 'cursor is not a valid Cloud Agent workspaces cursor',
+      });
+    }
+  });
+export type ListCloudAgentWorkspacesParams = z.input<typeof listCloudAgentWorkspacesSchema>;
+
+export const getCloudAgentWorkspaceSchema = z
+  .object({
+    kiloUserId: z.string().min(1),
+    workspaceId: cloudAgentWorktreeIdSchema,
+    sessionLimit: z.number().int().min(1).max(100).optional().default(100),
+    sessionCursor: z.string().min(1).max(256).optional(),
+  })
+  .strict()
+  .superRefine((params, ctx) => {
+    if (
+      params.sessionCursor !== undefined &&
+      !validateCloudAgentRootSessionsCursor(params.sessionCursor)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['sessionCursor'],
+        message: 'sessionCursor is not a valid Cloud Agent root sessions cursor',
+      });
+    }
+  });
+export type GetCloudAgentWorkspaceParams = z.input<typeof getCloudAgentWorkspaceSchema>;
+
+export type CloudAgentWorkspaceSummary = {
+  workspaceId: CloudAgentWorktreeId;
+  userId: string;
+  organizationId: string | null;
+  name: string | null;
+  repositoryProvider: 'github' | 'gitlab' | 'bitbucket' | 'git' | null;
+  gitUrl: string | null;
+  gitBranch: string | null;
+  profileId: string | null;
+  deletionState: 'active' | 'deleting' | 'deleted';
+  created: number;
+  updated: number;
+  lastActivity: number;
+  sessions: CloudAgentRootSessionSummary[];
+  nextSessionCursor: string | null;
+};
+
+export type CloudAgentWorkspacesPage = {
+  items: CloudAgentWorkspaceSummary[];
+  nextCursor: string | null;
+};
+
+export type GetCloudAgentWorkspaceResult = CloudAgentWorkspaceSummary | null;
 
 export const sdkApiErrorSchema = z.object({
   name: z.literal('APIError'),
@@ -1045,6 +1156,12 @@ export type SessionIngestRpcMethods = {
   listCloudAgentRootSessions: (
     params: ListCloudAgentRootSessionsParams
   ) => Promise<CloudAgentRootSessionsPage>;
+  listCloudAgentWorkspaces: (
+    params: ListCloudAgentWorkspacesParams
+  ) => Promise<CloudAgentWorkspacesPage>;
+  getCloudAgentWorkspace: (
+    params: GetCloudAgentWorkspaceParams
+  ) => Promise<GetCloudAgentWorkspaceResult>;
   getCloudAgentRootSessionMessages: (
     params: GetCloudAgentRootSessionMessagesParams
   ) => Promise<GetCloudAgentRootSessionMessagesResult>;

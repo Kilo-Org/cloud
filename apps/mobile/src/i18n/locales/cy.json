@@ -227,7 +227,6 @@
     "hideBalance": "Cuddio'r balans",
     "showBalance": "Dangos y balans",
     "balanceHidden": "Balans wedi'i guddio",
-    "bonusCreditsExpiring": "Mae {{amount}} o gredydau yn dod i ben ar {{date}}.",
     "signOutTitle": "Allgofnodi?",
     "signOutMessage": "Bydd angen i ti fewngofnodi eto i gael mynediad i dy weithle.",
     "deleteAccountTitle": "Dileu cyfrif?",
@@ -1572,6 +1571,22 @@
       "loadingProposals": "Llwytho cynigion",
       "couldNotLoadProposals": "Ni ellid llwytho'r cynigion.",
       "noProposals": "Dim cynigion",
+      "proposalDetails": "Manylion y cynnig",
+      "proposalTitle": "Teitl y cynnig",
+      "rationale": "Sail resymegol",
+      "saveFirst": "Cadwch eich newidiadau cyn agor cais tynnu.",
+      "proposalSaved": "Cynnig wedi'i gadw",
+      "proposalDismissed": "Cynnig wedi'i ddiystyru",
+      "dismissProposalTitle": "Diystyru'r cynnig?",
+      "dismissProposalMessage": "Bydd y cynnig hwn yn cael ei dynnu o'r rhestr weithredol ac ni fydd modd ei adfer.",
+      "prOpened": "Cais tynnu REVIEW.md wedi'i agor",
+      "alreadyPresent": "Mae'r canllawiau eisoes yn REVIEW.md",
+      "status": {
+        "edited": "Wedi'i olygu",
+        "opening_change_request": "Agor PR",
+        "change_request_failed": "PR wedi methu",
+        "superseded": "Eisoes yn bodoli"
+      },
       "noProposalsDescription": "Bydd cynigion y cof adolygu yn ymddangos yma ar ôl i Kilo ddadansoddi ymatebion y cynhalwyr."
     },
     "manualReview": {
@@ -1706,8 +1721,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Dim hidlwyr ar gael",
-      "noFiltersDescription": "Ewch yn ôl ac agorwch yr hidlwyr eto o'r rhestr canfyddiadau.",
       "title": "Hidlo canfyddiadau",
       "reset": "Ailosod",
       "severity": "Difrifoldeb",
@@ -2301,8 +2314,8 @@
       "title": "Sesiwn",
       "copyErrorDetails": "Copïo manylion gwall",
       "backToSessions": "Yn ôl i sesiynau",
-      "follow": "Dilyn ar y sgrin glo",
-      "unfollow": "Peidio â dilyn ar y sgrin glo",
+      "follow": "Dilyn y sesiwn",
+      "unfollow": "Peidio â dilyn y sesiwn",
       "couldNotLoad": "Methu llwytho'r sesiwn.",
       "failedToLoadDetails": "Methu llwytho manylion y sesiwn.",
       "failedToStopExecution": "Methu atal y gweithrediad.",
@@ -3126,7 +3139,6 @@
   },
   "voiceInput": {
     "listening": "Yn gwrando...",
-    "staysOff": "Bydd mewnbwn llais yn aros wedi'i ddiffodd nes i chi ganiatáu trawsgrifio ar-lein.",
     "onlineTitle": "Prosesir lleferydd ar-lein",
     "onlineMessage": "Ni all y ddyfais hon drawsgrifio all-lein. Anfonir eich recordiad at {{provider}} i'w droi'n destun. Nid yw Kilo yn storio'r sain.",
     "allow": "Caniatáu",
@@ -3322,7 +3334,7 @@
     "creditActivity": {
       "emptyDescription": "Bydd pryniannau, defnydd ac addasiadau credyd y sefydliad hwn yn ymddangos yma wrth iddynt ddigwydd.",
       "emptyTitle": "Dim gweithgaredd credyd",
-      "expires": "Yn dod i ben {{date}}",
+      "expiresUtc": "Yn dod i ben {{date}} (UTC)",
       "title": "Gweithgaredd credyd",
       "transactionFallback": "Trafodiad credyd",
       "category": {
@@ -3539,7 +3551,7 @@
     "activityKitDisabledBody": "Trowch weithgareddau byw ymlaen yn y gosodiadau i weld asiantau gweithredol ar y sgrin glo.",
     "openSession": "Agor",
     "finished": "Wedi gorffen",
-    "followFailed": "Methu dangos yr asiant hwn ar y sgrin glo.",
+    "followFailed": "Methu dilyn y sesiwn hon.",
     "approveFailed": "Methu cymeradwyo. Tapiwch $t(common.approve) i geisio eto.",
     "checked": "Gwiriwyd",
     "lastKnown": "Hysbys diwethaf",
@@ -3917,6 +3929,7 @@
     "title": "Proffiliau",
     "entrySubtitle": "Ailddefnyddio gosodiadau amgylchedd ar draws sesiynau",
     "newProfile": "Proffil newydd",
+    "openHint": "Yn agor y proffil",
     "emptyTitle": "Dim proffiliau eto",
     "emptyDescription": "Creu proffil i ailddefnyddio newidynnau amgylchedd, gorchmynion gosod, a sgiliau ar draws sesiynau.",
     "loadFailed": "Methu llwytho proffiliau",
@@ -4128,6 +4141,10 @@
   "credits": {
     "title": "Prynu credydau",
     "description": "Mae credydau yn bryniant un-tro sy'n cael ei ychwanegu at eich balans Kilo ar gyfer rhedeg sesiynau codio AI yn Kilo App. Mae'r siop yn codi eich cyfrif ac mae credydau'n cael eu hychwanegu ar ôl i'r siop gadarnhau'r taliad.",
+    "nextExpiry": "Mae {{amount}} o gredydau yn dod i ben ar {{date}} (UTC). Defnyddir y credydau sy'n dod i ben gyntaf yn gyntaf.",
+    "appStoreExpiry": "Nid yw credydau a brynwyd drwy'r App Store yn dod i ben.",
+    "playOneYearExpiry": "Mae'r credydau hyn yn dod i ben un flwyddyn galendr ar ôl eu prynu.",
+    "playNonexpiring": "Nid yw'r credydau hyn yn dod i ben.",
     "packLabel": "Ychwanegu {{amount}} o gredydau",
     "priceUnavailable": "Pris ddim ar gael",
     "purchased": "Ychwanegwyd credydau at eich balans.",
@@ -4176,11 +4193,13 @@
       "namePlaceholder": "Bygiau, Syniadau, Rhyddhau…",
       "emoji": "Emoji",
       "mode": "Modd",
-      "defaultsHint": "Mae sesiynau sy'n dechrau o'r rhestr hon yn defnyddio'r rhagosodiadau hyn."
+      "defaultsHint": "Mae sesiynau sy'n dechrau o'r rhestr hon yn defnyddio'r rhagosodiadau hyn.",
+      "saveFailed": "Ni fu modd cadw'r rhestr. Gwiriwch eich cysylltiad a rhowch gynnig arall."
     },
     "list": {
       "addPlaceholder": "Ychwanegu tasg",
       "add": "Ychwanegu tasg",
+      "addFailed": "Ni fu modd ychwanegu'r dasg. Gwiriwch eich cysylltiad a rhowch gynnig arall.",
       "empty": "Dim tasgau eto",
       "setDefaults": "Gosod ystorfa, modd a model",
       "completed_zero": "Wedi'u cwblhau ({{count}})",
@@ -4225,7 +4244,9 @@
       "startNewSession": "Dechrau sesiwn newydd",
       "startNewSessionHint": "Gwasga'n hir i ddechrau sesiwn newydd.",
       "linkSession": "Cysylltu sesiwn",
-      "linkFailed": "Methu cysylltu'r sesiwn â'r dasg"
+      "linkFailed": "Methu cysylltu'r sesiwn â'r dasg",
+      "moveToAnotherTodo": "Symud i dasg arall",
+      "startRefreshFailed": "Dechreuodd y sesiwn, ond ni fu modd diweddaru'r rhestr hon."
     },
     "linkSession": {
       "title": "Cysylltu sesiwn",
@@ -4234,6 +4255,7 @@
     },
     "upNext": "Nesaf",
     "sessionTodo": "Tasg: {{title}}",
+    "openTodoHint": "Yn agor y dasg.",
     "linkToTodo": "Cysylltu â thasg",
     "candidates": {
       "empty": "Dim tasgau ar agor"
@@ -4270,7 +4292,7 @@
     "summaryDisabled": "Adroddiad strwythuredig · mae AI wedi'i ddiffodd ar gyfer y cyd-destun hwn",
     "summaryPending": "Mae'r crynodeb AI ar y gweill. Bydd yn ymddangos yma pan fydd yn barod.",
     "summaryFailed": "Methodd y crynodeb AI. Gall rhoi cynnig eto arwain at dâl arall.",
-    "summaryUnavailable": "Crynodeb AI ddim ar gael. Mae eich adroddiad strwythuredig dal ar gael.",
+    "summaryUnavailable": "Crynodeb AI ddim ar gael. Mae eich adroddiad strwythuredig yn dal ar gael.",
     "summaryOutdated": "Mae'r crynodeb hwn yn hŷn na'r diwygiad diweddaraf o'r adroddiad.",
     "summaryCharge": "Tâl AI: {{cost}}",
     "summaryChargePending": "Tâl AI yn aros i'w gysoni",
@@ -4288,18 +4310,18 @@
     "notificationsHint": "Un hysbysiad cyffredinol fesul briff a drefnwyd. Ar wahân i grynodebau AI taledig.",
     "notificationPermission": "Galluogwch hysbysiadau'r ddyfais yn $t(common.notifications) i dderbyn eich briff.",
     "aiOptIn": "Crynodebau AI taledig",
-    "aiHint": "Dewisol ar gyfer y cyd-destun hwn yn unig. Anfonir dyfyniadau dethol wedi'u golygu a ffeithiau strwythuredig i'ch model yn iaith eich ap. Codir tâl ar falans y cyd-destun hwn.",
+    "aiHint": "Dewisol ar gyfer y cyd-destun hwn yn unig. Anfonir dyfyniadau dethol, gyda gwybodaeth sensitif wedi'i chuddio, a ffeithiau strwythuredig i'ch model yn iaith eich ap. Codir tâl ar falans y cyd-destun hwn.",
     "defaultModel": "Defnyddio model diofyn Kilo",
     "duration": "Terfyn amser (munudau)",
     "spendLimit": "Terfyn gwariant (USD)",
-    "safeguardHint": "Terfynau penodol fesul crynodeb, nid cyllideb ddyddiol. Diofyn: 10 munud a $2. Cyhoeddir adroddiad ar ôl pum munud fan bellaf tra bo'r creu'n parhau o fewn y terfynau hyn.",
-    "invalidSafeguards": "Rhowch derfynau amser a gwariant positif a phenodol.",
+    "safeguardHint": "Terfynau meidraidd fesul crynodeb, nid cyllideb ddyddiol. Diofyn: 10 munud a $2. Cyhoeddir adroddiad ar ôl pum munud fan bellaf tra bo'r creu'n parhau o fewn y terfynau hyn.",
+    "invalidSafeguards": "Rhowch derfynau amser a gwariant positif a meidraidd.",
     "estimate": "Amcangyfrif {{estimate}} · uchafswm {{maximum}}",
     "estimateUnavailable": "Nid oes crynodeb taledig ar gael ar gyfer y gosodiadau hyn.",
     "estimatePricingUnavailable": "Nid yw prisio'r model hwn ar gael.",
-    "estimateBalanceUnavailable": "Does dim digon o gydbwysedd ar gyfer crynodeb â thâl.",
+    "estimateBalanceUnavailable": "Does dim digon o falans ar gyfer crynodeb â thâl.",
     "estimateModelNotAllowed": "Nid yw'r model hwn yn cael ei ganiatáu yma.",
-    "estimateSpendLimitTooLow": "Cynyddwch y diogelwch gwariant i ganiatáu'r crynodeb hwn.",
+    "estimateSpendLimitTooLow": "Cynyddwch y terfyn gwariant i ganiatáu'r crynodeb hwn.",
     "confirmPaid": "Galluogi crynodebau taledig ar gyfer {{context}}?",
     "confirmGeneration": "Creu crynodeb taledig?",
     "paidDisclosure": "Amcangyfrif {{estimate}}, hyd at {{maximum}}, gyda therfyn o {{minutes}} munud. Codir tâl hyd yn oed os bydd y creu'n methu.",
@@ -4335,6 +4357,12 @@
     "estimatePermissionUnavailable": "Nid oes gennych ganiatâd i ddefnyddio balans y cyd-destun hwn.",
     "createFailed": "Methu creu'r briff hwn.",
     "reviewFailed": "Methu adolygu'r briff hwn.",
-    "saved": "Mae gosodiadau briffio wedi'u cadw"
+    "saved": "Mae gosodiadau briff wedi'u cadw",
+    "preparing": "Wrthi'n paratoi eich briff…",
+    "preparationHint": "Gallwch adael a dychwelyd tra bo gweithgarwch yn cael ei gasglu. Ni fydd unrhyw waith AI yn dechrau ac ni chodir unrhyw dâl nes i chi adolygu a chadarnhau'r amcangyfrif.",
+    "resumeReview": "Parhau â'r adolygiad",
+    "preparationFailed": "Methu casglu gweithgarwch ar gyfer y briff hwn. Rhowch gynnig arall arni.",
+    "preparationTimedOut": "Cymerodd casglu'r gweithgarwch ormod o amser. Rhowch gynnig arall arni.",
+    "preparationDrafts": "Briffiau heb eu cadarnhau"
   }
 }

@@ -227,7 +227,6 @@
     "hideBalance": "Skjul saldo",
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
-    "bonusCreditsExpiring": "{{amount}} i kreditter udløber {{date}}.",
     "signOutTitle": "Log ud?",
     "signOutMessage": "Du skal logge ind igen for at få adgang til dit arbejdsområde.",
     "deleteAccountTitle": "Slet konto?",
@@ -1484,6 +1483,22 @@
       "loadingProposals": "Indlæser forslag",
       "couldNotLoadProposals": "Forslagene kunne ikke indlæses.",
       "noProposals": "Ingen forslag",
+      "proposalDetails": "Forslagsdetaljer",
+      "proposalTitle": "Forslagets titel",
+      "rationale": "Begrundelse",
+      "saveFirst": "Gem dine ændringer, før du åbner en pull request.",
+      "proposalSaved": "Forslag gemt",
+      "proposalDismissed": "Forslag afvist",
+      "dismissProposalTitle": "Afvis forslag?",
+      "dismissProposalMessage": "Dette forslag fjernes fra den aktive liste og kan ikke gendannes.",
+      "prOpened": "Pull request til REVIEW.md åbnet",
+      "alreadyPresent": "Retningslinjerne findes allerede i REVIEW.md",
+      "status": {
+        "edited": "Redigeret",
+        "opening_change_request": "Åbner PR",
+        "change_request_failed": "PR mislykkedes",
+        "superseded": "Findes allerede"
+      },
       "noProposalsDescription": "Forslag fra hukommelsen for gennemgange vises her, når Kilo har analyseret svar fra de vedligeholdelsesansvarlige."
     },
     "manualReview": {
@@ -1618,8 +1633,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Ingen filtre tilgængelige",
-      "noFiltersDescription": "Gå tilbage, og åbn filtrene igen fra listen over fund.",
       "title": "Filtrering af fund",
       "reset": "Nulstil",
       "severity": "Alvorlighed",
@@ -2173,8 +2186,8 @@
       "title": "Sessionen",
       "copyErrorDetails": "Kopiér fejloplysninger",
       "backToSessions": "Tilbage til sessioner",
-      "follow": "Følg på låseskærmen",
-      "unfollow": "Stop med at følge på låseskærmen",
+      "follow": "Følg sessionen",
+      "unfollow": "Stop med at følge sessionen",
       "couldNotLoad": "Kunne ikke indlæse sessionen.",
       "failedToLoadDetails": "Kunne ikke indlæse oplysninger om sessionen.",
       "failedToStopExecution": "Kunne ikke stoppe kørslen.",
@@ -2954,7 +2967,6 @@
   },
   "voiceInput": {
     "listening": "Lytter...",
-    "staysOff": "Diktering er slået fra, indtil du tillader transskription på nettet.",
     "onlineTitle": "Tale behandles på nettet",
     "onlineMessage": "Denne enhed kan ikke omdanne tale til tekst uden internetforbindelse. Din optagelse sendes til {{provider}} for at blive omdannet til tekst. Kilo gemmer ikke lyden.",
     "allow": "Tillad",
@@ -3146,7 +3158,7 @@
     "creditActivity": {
       "emptyDescription": "Her vises organisationens køb, forbrug og justeringer af kreditter løbende.",
       "emptyTitle": "Ingen bevægelser på kreditsaldoen",
-      "expires": "Udløber {{date}}",
+      "expiresUtc": "Udløber {{date}} (UTC)",
       "title": "Bevægelser på kreditsaldoen",
       "transactionFallback": "Kredittransaktion",
       "category": {
@@ -3359,7 +3371,7 @@
     "activityKitDisabledBody": "Slå liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen.",
     "openSession": "Åbn",
     "finished": "Afsluttet",
-    "followFailed": "Kunne ikke vise denne agent på låseskærmen.",
+    "followFailed": "Kunne ikke følge denne session.",
     "approveFailed": "Kunne ikke godkende. Tryk på $t(common.approve) for at prøve igen.",
     "checked": "Kontrolleret",
     "lastKnown": "Sidst kendt",
@@ -3733,6 +3745,7 @@
     "title": "Profiler",
     "entrySubtitle": "Genbrug miljøindstillinger på tværs af sessioner",
     "newProfile": "Ny profil",
+    "openHint": "Åbner profilen",
     "emptyTitle": "Ingen profiler endnu",
     "emptyDescription": "Opret en profil for at genbruge miljøvariabler, opsætningskommandoer og færdigheder på tværs af sessioner.",
     "loadFailed": "Kunne ikke indlæse profiler",
@@ -3924,6 +3937,10 @@
   "credits": {
     "title": "Køb kreditter",
     "description": "Kreditter er et engangskøb, der lægges til din Kilo-saldo til at køre AI-kodningssessioner i Kilo App. Butikken opkræver betaling på din konto, og kreditterne tilføjes, når butikken bekræfter betalingen.",
+    "nextExpiry": "{{amount}} i kreditter udløber {{date}} (UTC). Kreditter med den tidligste udløbsdato bruges først.",
+    "appStoreExpiry": "Kreditter købt via App Store udløber ikke.",
+    "playOneYearExpiry": "Disse kreditter udløber ét kalenderår efter købet.",
+    "playNonexpiring": "Disse kreditter udløber ikke.",
     "packLabel": "Tilføj {{amount}} i kreditter",
     "priceUnavailable": "Pris ikke tilgængelig",
     "purchased": "Kreditter er føjet til din saldo.",
@@ -3964,11 +3981,13 @@
       "namePlaceholder": "Fejl, Idéer, Udgivelse…",
       "emoji": "Emoji",
       "mode": "Tilstand",
-      "defaultsHint": "Sessioner, der startes fra denne liste, bruger disse standardindstillinger."
+      "defaultsHint": "Sessioner, der startes fra denne liste, bruger disse standardindstillinger.",
+      "saveFailed": "Kunne ikke gemme listen. Tjek din forbindelse, og prøv igen."
     },
     "list": {
       "addPlaceholder": "Tilføj en opgave",
       "add": "Tilføj opgave",
+      "addFailed": "Kunne ikke tilføje opgaven. Tjek din forbindelse, og prøv igen.",
       "empty": "Ingen opgaver endnu",
       "setDefaults": "Angiv kodelager, tilstand og model",
       "completed_one": "Afsluttet ({{count}})",
@@ -4005,7 +4024,9 @@
       "startNewSession": "Start ny session",
       "startNewSessionHint": "Langt tryk for at starte en ny session.",
       "linkSession": "Tilknyt session",
-      "linkFailed": "Kunne ikke tilknytte sessionen til opgaven"
+      "linkFailed": "Kunne ikke tilknytte sessionen til opgaven",
+      "moveToAnotherTodo": "Flyt til en anden opgave",
+      "startRefreshFailed": "Sessionen startede, men listen blev ikke opdateret."
     },
     "linkSession": {
       "title": "Tilknyt en session",
@@ -4014,6 +4035,7 @@
     },
     "upNext": "Næste",
     "sessionTodo": "Opgave: {{title}}",
+    "openTodoHint": "Åbner opgaven.",
     "linkToTodo": "Tilknyt til opgave",
     "candidates": {
       "empty": "Ingen åbne opgaver"
@@ -4026,7 +4048,7 @@
   "agentBriefing": {
     "title": "Agentbriefing",
     "atLeast": "≥{{value}}",
-    "coverageHint": "Noget historisk aktivitet kan mangle. ≥ betyder mindst så meget; ukendt er ikke nul.",
+    "coverageHint": "Noget af den historiske aktivitet kan mangle. ≥ betyder mindst så meget; ukendt er ikke nul.",
     "available": "Tilgængelige briefinger",
     "history": "Briefinghistorik",
     "historyHint": "Briefinger gemmes i 30 dage, også afviste.",
@@ -4035,7 +4057,7 @@
     "emptyHint": "Dine cloud- og CLI-kodesessioner vises her, når en planlagt briefing har aktivitet.",
     "loadError": "Kunne ikke indlæse briefinger",
     "sessions": "Aktive i briefingvinduet",
-    "pullRequests": "PRs åbnet",
+    "pullRequests": "PR'er åbnet",
     "blockers": "Nye blokeringer",
     "spend": "Forbrug i briefingvinduet",
     "view": "Læs briefing",
@@ -4068,7 +4090,7 @@
     "notificationsHint": "Én generisk notifikation pr. planlagt briefing. Uafhængigt af betalte AI-resuméer.",
     "notificationPermission": "Slå enhedsnotifikationer til under $t(common.notifications) for at modtage din briefing.",
     "aiOptIn": "Betalte AI-resuméer",
-    "aiHint": "Valgfrit og kun for denne kontekst. Udvalgte, redigerede uddrag og strukturerede fakta sendes til din model på appens sprog. Betalinger trækkes fra denne konteksts saldo.",
+    "aiHint": "Valgfrit og aktiveres særskilt for hver kontekst. Udvalgte uddrag med følsomme oplysninger fjernet og strukturerede fakta sendes til din model på appens sprog. Betalinger trækkes fra denne konteksts saldo.",
     "defaultModel": "Brug Kilos standardmodel",
     "duration": "Tidsgrænse (minutter)",
     "spendLimit": "Forbrugsgrænse (USD)",
@@ -4115,6 +4137,12 @@
     "estimatePermissionUnavailable": "Du har ikke tilladelse til at bruge denne konteksts saldo.",
     "createFailed": "Kunne ikke oprette denne briefing.",
     "reviewFailed": "Kunne ikke gennemgå denne briefing.",
-    "saved": "Briefingindstillinger gemt"
+    "saved": "Briefingindstillinger gemt",
+    "preparing": "Forbereder din briefing…",
+    "preparationHint": "Du kan forlade siden og vende tilbage, mens aktivitetsdata indsamles. Der udføres ikke AI-arbejde eller opkræves betaling, før du har gennemgået briefingen og bekræftet estimatet.",
+    "resumeReview": "Fortsæt gennemgangen",
+    "preparationFailed": "Kunne ikke indsamle aktivitetsdata til denne briefing. Prøv igen.",
+    "preparationTimedOut": "Det tog for lang tid at indsamle aktivitetsdata. Prøv igen.",
+    "preparationDrafts": "Briefinger, der afventer bekræftelse"
   }
 }

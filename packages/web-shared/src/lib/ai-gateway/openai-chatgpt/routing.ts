@@ -1,6 +1,7 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { isGptOssModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
+import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { OPENAI_CHATGPT_RECONNECT_MESSAGE, resolveOpenAiChatGptAccessToken } from './refresh';
@@ -132,6 +133,17 @@ function isOpenAiChatGptModel(requestedModel: string): boolean {
 }
 
 /**
+ * The api.openai.com model id for a gateway model id, or null when the model
+ * cannot take the delegated route. A `~` alias such as `~openai/gpt-luna-latest`
+ * routes like its catalog target.
+ */
+async function resolveOpenAiChatGptUpstreamModel(modelId: string): Promise<string | null> {
+  const model = (await resolveOpenRouterModelAlias(modelId.trim())).trim();
+  if (!isOpenAiChatGptModel(model)) return null;
+  return model.replace(OPENAI_MODEL_PREFIX, '');
+}
+
+/**
  * The connection owners a request may use, in order. A member connection is
  * always the caller's own: an organization request uses their connection for
  * that organization and never their personal one, so an organization without
@@ -168,33 +180,38 @@ function openAiChatGptOwnerCandidates(input: OpenAiChatGptRoutingInput): OpenAiC
 export async function isOpenAiChatGptEligible(input: OpenAiChatGptRoutingInput): Promise<boolean> {
   const [owner] = openAiChatGptOwnerCandidates(input);
   if (!owner) return false;
-  return isOpenAiChatGptEligibleForOwner(input, owner);
+  return (await eligibleUpstreamModelForOwner(input, owner)) !== null;
 }
 
-/** Eligibility of one specific owner's connection. */
-async function isOpenAiChatGptEligibleForOwner(
+/**
+ * The upstream model one specific owner's connection would serve the request
+ * with, or null when that connection is not eligible.
+ */
+async function eligibleUpstreamModelForOwner(
   input: OpenAiChatGptRoutingInput,
   owner: OpenAiChatGptOwner
-): Promise<boolean> {
+): Promise<string | null> {
   const { request, requestedModel } = input;
 
-  if (request.kind !== 'responses') return false;
-  if (!isOpenAiChatGptModel(requestedModel)) return false;
+  if (request.kind !== 'responses') return null;
+  const upstreamModel = await resolveOpenAiChatGptUpstreamModel(requestedModel);
+  if (!upstreamModel) return null;
 
   // The catalog can list an OpenAI model the plain API does not serve. A
   // `-pro` slug such as `openai/gpt-5.6-luna-pro` is a reasoning mode on the
   // base model, not an API model id, so sending it upstream fails the request.
   // Only a model this project actually serves may take the delegated route.
-  const upstreamModel = requestedModel.trim().replace(OPENAI_MODEL_PREFIX, '');
   if (!(await isOpenAiModelServed(getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV), upstreamModel))) {
-    return false;
+    return null;
   }
 
   const stored = await getOpenAiChatGptStoredConnection(owner);
   // The payload's `status` mirrors a save or a terminal failure, but a person
   // can also disable the row through the ordinary BYOK toggle, which leaves the
   // payload saying `connected`. Both must hold for the route to be eligible.
-  return stored?.isEnabled === true && stored.connection.status === 'connected';
+  return stored?.isEnabled === true && stored.connection.status === 'connected'
+    ? upstreamModel
+    : null;
 }
 
 /**
@@ -214,8 +231,9 @@ export async function getOpenAiChatGptByokModelIds(
   if (apiKey.trim().length === 0) return null;
 
   const tagged = await Promise.all(
-    candidateModelIds.filter(isOpenAiChatGptModel).map(async modelId => {
-      const upstreamModel = modelId.trim().replace(OPENAI_MODEL_PREFIX, '');
+    candidateModelIds.map(async modelId => {
+      const upstreamModel = await resolveOpenAiChatGptUpstreamModel(modelId);
+      if (!upstreamModel) return null;
       return (await isOpenAiModelServed(apiKey, upstreamModel)) ? modelId : null;
     })
   );
@@ -254,6 +272,7 @@ export async function tagOpenAiChatGptByokModels<
 export function buildOpenAiChatGptProvider(
   apiKey: string,
   accessToken: string,
+  upstreamModel: string,
   owner?: OpenAiChatGptOwner
 ): Provider | null {
   if (apiKey.trim().length === 0) return null;
@@ -279,9 +298,7 @@ export function buildOpenAiChatGptProvider(
       context.extraHeaders[OPENAI_ON_BEHALF_OF_TOKEN_HEADER] = accessToken;
 
       const body = context.request.body;
-      if (typeof body.model === 'string') {
-        body.model = body.model.trim().replace(OPENAI_MODEL_PREFIX, '');
-      }
+      body.model = upstreamModel;
       // Stored conversations, background mode and hosted tools are not
       // supported by the delegated flow, so the request is forced stateless.
       body.store = false;
@@ -332,7 +349,8 @@ export async function checkOpenAiChatGptByok(
   const candidates = openAiChatGptOwnerCandidates(input);
 
   for (const owner of candidates) {
-    if (!(await isOpenAiChatGptEligibleForOwner(input, owner))) continue;
+    const upstreamModel = await eligibleUpstreamModelForOwner(input, owner);
+    if (!upstreamModel) continue;
 
     const outcome = await resolveOpenAiChatGptAccessToken(owner);
 
@@ -346,7 +364,7 @@ export async function checkOpenAiChatGptByok(
     if (outcome.kind !== 'access_token') continue;
 
     const apiKey = getEnvVariable(OPENAI_CHATGPT_API_KEY_ENV);
-    const provider = buildOpenAiChatGptProvider(apiKey, outcome.accessToken, owner);
+    const provider = buildOpenAiChatGptProvider(apiKey, outcome.accessToken, upstreamModel, owner);
     // A missing partner key is a deployment-wide misconfiguration.
     if (!provider) return null;
 

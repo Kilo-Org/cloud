@@ -268,6 +268,19 @@ export function createSandboxTerminalBridge(options: SandboxTerminalBridgeOption
     closeSockets(state.getWebSockets(TERMINAL_TAG), code, reason);
   }
 
+  /**
+   * Closes the browser side of every bridged terminal and returns the count.
+   * Each browser close ends its wrapper peer through the browser-disconnect
+   * path, which leaves the terminal record running.
+   */
+  function closeBrowserSockets(code = 1000, reason = TERMINAL_ENDED_REASON): number {
+    const sockets = state
+      .getWebSockets(TERMINAL_TAG)
+      .filter(socket => readAttachment(socket)?.role === 'browser');
+    closeSockets(sockets, code, reason);
+    return sockets.length;
+  }
+
   function closeRuntime(wrapperId: string, code = 1000, reason = TERMINAL_ENDED_REASON): void {
     const sockets = state
       .getWebSockets(TERMINAL_TAG)
@@ -559,6 +572,7 @@ export function createSandboxTerminalBridge(options: SandboxTerminalBridgeOption
     handleError,
     closeTerminal,
     closeAll,
+    closeBrowserSockets,
     closeRuntime,
   };
 }

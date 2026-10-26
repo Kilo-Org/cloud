@@ -7,6 +7,7 @@ import {
 } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   getSandboxSelectionCapabilities,
+  isByocIncompatibleAllocation,
   isSandboxAllocationAvailable,
   type SandboxAllocationCapability,
   type SessionRepositoryType,
@@ -41,8 +42,9 @@ function profileOwner(owner: SelectionOwner): ProfileOwner {
 
 /**
  * Resolves the allocation that an owner's saved settings give a repository: the
- * eligible repository override first, then the eligible context default. Stale
- * or incompatible saved keys are skipped; the unavailable saved key is never
+ * eligible repository environment allocation first, then the eligible
+ * repository override, then the eligible context default. Stale or
+ * incompatible saved keys are skipped; the unavailable saved key is never
  * disabled or deleted. Session start and the new-session picker both read this,
  * so the picker shows what a session would actually use.
  */
@@ -53,8 +55,9 @@ export async function resolveSavedSandboxAllocation(args: {
   repositoryType: SessionRepositoryType;
   target?: RepositoryAllocationTarget;
   capability?: SandboxAllocationCapability;
+  environmentAllocation?: string;
 }): Promise<SandboxAllocation | undefined> {
-  const { db, env, owner, repositoryType, target, capability } = args;
+  const { db, env, owner, repositoryType, target, capability, environmentAllocation } = args;
   const capabilities = getSandboxSelectionCapabilities(env, owner, {
     repositoryType,
     ...(capability ? { capability } : {}),
@@ -62,10 +65,18 @@ export async function resolveSavedSandboxAllocation(args: {
   if (!capabilities.enabled) return undefined;
 
   const candidates = await getSandboxAllocationCandidates(db, profileOwner(owner), target);
-  for (const candidate of [candidates.repositoryAllocation, candidates.contextAllocation]) {
+  for (const candidate of [
+    environmentAllocation,
+    candidates.repositoryAllocation,
+    candidates.contextAllocation,
+  ]) {
     if (candidate === undefined) continue;
     const allocation = candidate as SandboxAllocation;
-    if (!isSelectableSandboxAllocation(allocation)) continue;
+    if (
+      !isSelectableSandboxAllocation(allocation) ||
+      isByocIncompatibleAllocation(env, owner, allocation)
+    )
+      continue;
     // The same check as the picker, so a saved choice that the picker offered is
     // never skipped here.
     if (isSandboxAllocationAvailable(capabilities, allocation)) return allocation;
@@ -117,6 +128,9 @@ export async function withSavedSandboxAllocation(
     repositoryType: input.repository.type,
     ...(target ? { target } : {}),
     ...(capability ? { capability } : {}),
+    ...(input.environmentSandboxAllocation
+      ? { environmentAllocation: input.environmentSandboxAllocation }
+      : {}),
   });
   return { ...input, savedSandboxAllocation: saved ?? null };
 }

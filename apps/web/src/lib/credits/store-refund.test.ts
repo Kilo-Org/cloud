@@ -793,3 +793,74 @@ describe('isStoreRefundDeliverySuperseded', () => {
     ).resolves.toBe(false);
   });
 });
+
+describe('store refunds with paid-credit expiration', () => {
+  it.each([
+    { refundedMilliunits: STORE_FULL_MILLIUNITS, expectedDebit: 4_000_000 },
+    { refundedMilliunits: 30_000, expectedDebit: 0 },
+  ])(
+    'does not reclaim expired principal for share $refundedMilliunits',
+    async ({ refundedMilliunits, expectedDebit }) => {
+      const user = await insertTestUser();
+      const providerTransactionId = `expiry-${crypto.randomUUID()}`;
+      await grantStoreCreditPack({
+        userId: user.id,
+        paymentProvider: KiloPassPaymentProvider.GooglePlay,
+        providerTransactionId,
+        amountMicrodollars: 10_000_000,
+      });
+      const [source] = await db
+        .select()
+        .from(credit_transactions)
+        .where(
+          eq(
+            credit_transactions.stripe_payment_id,
+            storeCreditPaymentId(KiloPassPaymentProvider.GooglePlay, providerTransactionId)
+          )
+        );
+      await db
+        .update(credit_transactions)
+        .set({
+          expiry_date: '2020-01-01T00:00:00.000Z',
+          expiration_baseline_microdollars_used: 0,
+          paid_credit_policy: 'one_year',
+          credit_source: 'google_play',
+        })
+        .where(eq(credit_transactions.id, source.id));
+      await db
+        .update(kilocode_users)
+        .set({ microdollars_used: 4_000_000 })
+        .where(eq(kilocode_users.id, user.id));
+      const result = await db.transaction(tx =>
+        reverseStoreCreditPurchase(tx, {
+          paymentProvider: KiloPassPaymentProvider.GooglePlay,
+          providerTransactionId,
+          refundedMilliunits,
+        })
+      );
+      expect(result).toMatchObject({ reversed: true, amountMicrodollars: expectedDebit });
+      const [owner] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, user.id));
+      expect(owner.total_microdollars_acquired - owner.microdollars_used).toBe(0 - expectedDebit);
+      const replay = await db.transaction(tx =>
+        reverseStoreCreditPurchase(tx, {
+          paymentProvider: KiloPassPaymentProvider.GooglePlay,
+          providerTransactionId,
+          refundedMilliunits,
+        })
+      );
+      expect(replay.reversed).toBe(false);
+      const reversal = await db.transaction(tx =>
+        restoreStoreCreditPurchase(tx, {
+          paymentProvider: KiloPassPaymentProvider.GooglePlay,
+          providerTransactionId,
+        })
+      );
+      expect(reversal.amountMicrodollars).toBe(expectedDebit);
+      const [restoredOwner] = await db
+        .select()
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, user.id));
+      expect(restoredOwner.total_microdollars_acquired - restoredOwner.microdollars_used).toBe(0);
+    }
+  );
+});

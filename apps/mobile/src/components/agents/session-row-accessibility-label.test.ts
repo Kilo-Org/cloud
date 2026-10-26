@@ -91,6 +91,9 @@ describe('formatSpokenTimeAgo', () => {
     const t = new Date().toISOString();
     expect(formatSpokenTimeAgo(t)).toBe('Just now');
   });
+  it('omits a missing restored timestamp', () => {
+    expect(formatSpokenTimeAgo(null)).toBe('');
+  });
 });
 
 describe('sessionRowAccessibilityLabel', () => {

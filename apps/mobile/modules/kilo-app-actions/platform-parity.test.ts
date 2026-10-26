@@ -314,7 +314,7 @@ describe('the same payload and result surface', () => {
     expect(sorted([...keys])).toEqual(ALL_FIELDS);
   });
 
-  it('carries the awaited result back to the caller on both platforms', () => {
+  it('carries the awaited result back to the caller on the intent surface', () => {
     // iOS: the App Intent's perform returns the bridge's answer — the session
     // id a StartAgent run created on success — and a refusal throws with the
     // pipeline's message for Shortcuts to show.
@@ -326,11 +326,12 @@ describe('the same payload and result surface', () => {
     expect(swiftStruct('StartAgentIntent')).toContain(
       '.result(value: try await KiloAppActionBridge.shared.perform(payload: payload))'
     );
-    // Android: a caller that asked for a result gets the dispatcher's real
-    // outcome through setResult, even across a cold start.
-    expect(activitySource).toContain('AppActionDispatcher.await(payload)');
-    expect(activitySource).toMatch(/putExtra\(KiloActionContract\.EXTRA_RESULT, result\)/);
-    expect(activitySource).toContain('setResult(');
+    // Android: the exported entry point hands the request to the dispatcher
+    // and keeps no result channel at all. The app is the surface that shows
+    // what the action produced.
+    expect(activitySource).not.toContain('setResult(');
+    expect(activitySource).not.toContain('EXTRA_RESULT');
+    expect(androidModuleSource).not.toContain('completeAppAction');
   });
 });
 

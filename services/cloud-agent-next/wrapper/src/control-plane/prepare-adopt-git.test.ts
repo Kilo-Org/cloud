@@ -229,13 +229,16 @@ describe('adopting an environment snapshot against a real repository', () => {
     );
   });
 
-  it('does nothing for a second route on the same allocation', async () => {
+  it('retains local workspace state', async () => {
     const first = manager('alloc-image');
     await first.prepared.prepare(spec());
+    await fs.writeFile(path.join(directory, 'local.txt'), 'local changes');
+    const commit = git(directory, 'rev-parse', 'HEAD');
     const second = manager('alloc-image');
     await second.prepared.prepare(spec({ sessionId: 'ses_b' }));
 
     expect(ready(second.frames)).toMatchObject({ workspace: 'same' });
-    expect(second.gitCalls).toEqual([]);
+    expect(git(directory, 'rev-parse', 'HEAD')).toBe(commit);
+    expect(await fs.readFile(path.join(directory, 'local.txt'), 'utf8')).toBe('local changes');
   });
 });

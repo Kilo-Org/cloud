@@ -205,7 +205,7 @@ async function preparationCommand(
     allocationId: 'allocation_synthetic',
     emit: () => undefined,
     inheritedEnv: {},
-    homeRoot: path.join(root, 'homes'),
+    homeRoots: { directory: path.join(root, 'homes'), legacy: path.join(root, 'legacy-homes') },
     mkdir: async () => undefined,
     hasGit: async () => command !== 'clone',
     readStamp: async () => null,

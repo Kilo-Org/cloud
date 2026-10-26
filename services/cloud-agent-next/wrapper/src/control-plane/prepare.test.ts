@@ -3524,17 +3524,9 @@ describe('credentials buffered during prepare', () => {
       expect(harness.installCalls).toHaveLength(1);
       expect(harness.installCalls[0]?.env.KILOCODE_TOKEN).toBe(handle);
       expect(harness.gitCalls).toEqual([]);
-      const home = path.join(
-        root,
-        createHash('sha256')
-          .update(spec.kilo!.scopeId)
-          .update('\0')
-          .update(spec.directory)
-          .digest('hex')
+      expect(await fs.readFile(recordPath(root, spec), 'utf8')).toBe(
+        'protocol=https\nhost=github.com\nusername=x-access-token\npassword=git-2\n'
       );
-      expect(
-        await fs.readFile(path.join(home, '.local/share/kilo/cloud-agent/git-credentials'), 'utf8')
-      ).toBe('protocol=https\nhost=github.com\nusername=x-access-token\npassword=git-2\n');
     } finally {
       await fs.rm(root, { recursive: true, force: true });
     }

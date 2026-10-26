@@ -2,7 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import React, { type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { SessionCostBreakdown } from './session-cost-breakdown';
-import type { SessionTokenUsage } from './session-token-usage';
+import type { SessionModelUsage, SessionTokenUsage } from './session-token-usage';
 
 jest.mock('./ShareSessionDialog', () => ({ ShareSessionDialog: () => null }));
 
@@ -31,7 +31,8 @@ Object.assign(globalThis, { React });
 function renderSessionInfo(
   sessionCostBreakdown?: SessionCostBreakdown,
   sessionTokenUsage?: SessionTokenUsage,
-  hasIncompleteHistory = false
+  hasIncompleteHistory = false,
+  sessionModelUsage?: SessionModelUsage[]
 ): string {
   return renderToStaticMarkup(
     React.createElement(SessionInfoDialog, {
@@ -41,6 +42,7 @@ function renderSessionInfo(
       model: 'anthropic/claude-sonnet-4',
       sessionCostBreakdown,
       sessionTokenUsage,
+      sessionModelUsage,
       hasIncompleteHistory,
     })
   );
@@ -391,5 +393,129 @@ describe('SessionInfoDialog token usage', () => {
     );
 
     expect(markup).not.toContain('Token counts cover loaded activity only');
+  });
+});
+
+const modelUsage: SessionModelUsage[] = [
+  {
+    providerID: 'anthropic',
+    modelID: 'claude-sonnet-4',
+    costUsd: 1.23456,
+    tokens: {
+      input: 1_234,
+      output: 89,
+      reasoning: 7,
+      cacheRead: 12_345,
+      cacheWrite: 6_789,
+    },
+  },
+  {
+    providerID: 'kilo',
+    modelID: 'anthropic/claude-opus-4.6',
+    costUsd: 0.05,
+    tokens: {
+      input: 2,
+      output: 3,
+      reasoning: 5,
+      cacheRead: 7,
+      cacheWrite: 11,
+    },
+  },
+];
+
+describe('SessionInfoDialog model usage', () => {
+  it('renders every model with its name, exact provider/model tuple, cost, and token counts', () => {
+    const markup = renderSessionInfo(undefined, undefined, false, modelUsage);
+
+    expect(markup).toContain('By model');
+    expect(markup).toContain('claude-sonnet-4');
+    expect(markup).toContain('anthropic / claude-sonnet-4');
+    expect(markup).toContain('$1.23');
+    expect(markup).toContain('claude-opus-4.6');
+    expect(markup).toContain('kilo / anthropic/claude-opus-4.6');
+    expect(markup).toContain('$0.05');
+
+    for (const [label, value] of [
+      ['Input', '1,234'],
+      ['Output', '89'],
+      ['Reasoning', '7'],
+      ['Cache read', '12,345'],
+      ['Cache write', '6,789'],
+      ['Input', '2'],
+      ['Output', '3'],
+      ['Reasoning', '5'],
+      ['Cache read', '7'],
+      ['Cache write', '11'],
+    ]) {
+      expect(markup).toMatch(new RegExp(`${label}</dt><dd[^>]*>${value}</dd>`));
+    }
+  });
+
+  it('uses native details and summary elements with five token buckets per model', () => {
+    const markup = renderSessionInfo(undefined, undefined, false, modelUsage);
+
+    expect(markup.match(/<details\b/g)).toHaveLength(2);
+    expect(markup.match(/<\/details>/g)).toHaveLength(2);
+    expect(markup.match(/<summary\b/g)).toHaveLength(2);
+    expect(markup.match(/<\/summary>/g)).toHaveLength(2);
+
+    for (const label of ['Input', 'Output', 'Reasoning', 'Cache read', 'Cache write']) {
+      expect(markup.match(new RegExp(`>${label}</dt>`, 'g'))).toHaveLength(2);
+    }
+  });
+
+  it.each([
+    { label: 'missing', sessionModelUsage: undefined },
+    { label: 'empty', sessionModelUsage: [] as SessionModelUsage[] },
+  ])('hides the By model section when usage is $label', ({ sessionModelUsage }) => {
+    const markup = renderSessionInfo(undefined, tokenUsage, false, sessionModelUsage);
+
+    expect(markup).not.toContain('By model');
+    expect(markup).not.toContain('Loaded main-agent activity only');
+  });
+
+  it('renders zero-cost and sub-cent models with their formatted costs', () => {
+    const markup = renderSessionInfo(undefined, undefined, false, [
+      {
+        providerID: 'provider-zero',
+        modelID: 'zero-cost-model',
+        costUsd: 0,
+        tokens: {
+          input: 0,
+          output: 0,
+          reasoning: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+        },
+      },
+      {
+        providerID: 'provider-subcent',
+        modelID: 'subcent-model',
+        costUsd: 0.004999,
+        tokens: {
+          input: 1,
+          output: 2,
+          reasoning: 3,
+          cacheRead: 4,
+          cacheWrite: 5,
+        },
+      },
+    ]);
+
+    expect(markup).toContain('zero-cost-model');
+    expect(markup).toContain('$0.00');
+    expect(markup).toContain('subcent-model');
+    expect(markup).toContain('&lt;$0.01');
+    expect(markup.match(/<details\b/g)).toHaveLength(2);
+  });
+
+  it('explains the loaded activity scope and labels the selected model', () => {
+    const markup = renderSessionInfo(undefined, tokenUsage, false, modelUsage);
+
+    expect(markup).toContain(
+      'Loaded main-agent activity only. Subagent and older-activity costs are not attributed to models.'
+    );
+    expect(markup).toMatch(/Selected model<\/dt>/);
+    expect(markup).not.toMatch(/>Model<\/dt>/);
   });
 });

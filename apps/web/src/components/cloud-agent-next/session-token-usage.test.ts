@@ -6,7 +6,7 @@ import type {
   StoredMessage,
   UserMessage,
 } from '@kilocode/cloud-agent-sdk';
-import { getSessionTokenUsage } from './session-token-usage';
+import { getSessionTokenUsage, getSessionUsage } from './session-token-usage';
 
 type TokenCounts = {
   input: number;
@@ -22,6 +22,7 @@ type AssistantOptions = {
   id?: string;
   modelID?: string;
   providerID?: string;
+  cost?: number;
   error?: AssistantMessage['error'];
 };
 
@@ -61,7 +62,7 @@ function createAssistantMessage(
     mode: 'code',
     agent: 'test-agent',
     path: { cwd: '/', root: '/' },
-    cost: 0,
+    cost: options.cost ?? 0,
     tokens,
     ...(options.error ? { error: options.error } : {}),
   };
@@ -69,15 +70,34 @@ function createAssistantMessage(
   return { info, parts };
 }
 
-function createStepFinishPart(tokens: TokenCounts, id = 'step-1'): StepFinishPart {
+function createStepFinishPart(tokens: TokenCounts, id = 'step-1', cost = 0): StepFinishPart {
   return {
     id,
     sessionID: 'session-1',
     messageID: 'assistant-1',
     type: 'step-finish',
     reason: 'stop',
-    cost: 0,
+    cost,
     tokens,
+  };
+}
+
+function createTaskToolPart(): Part {
+  return {
+    id: 'task-1',
+    sessionID: 'session-1',
+    messageID: 'assistant-1',
+    type: 'tool',
+    callID: 'call-1',
+    tool: 'task',
+    state: {
+      status: 'completed',
+      input: {},
+      output: 'done',
+      title: 'Subtask',
+      metadata: {},
+      time: { start: 1, end: 2 },
+    },
   };
 }
 
@@ -235,5 +255,216 @@ describe('getSessionTokenUsage', () => {
       input: 10,
       output: 1,
     });
+  });
+});
+
+describe('getSessionUsage', () => {
+  it('merges non-contiguous messages for the same model in first-seen order', () => {
+    const messages = [
+      createAssistantMessage(
+        createTokens({ input: 10 }),
+        [createStepFinishPart(createTokens({ input: 10 }), 'step-a1', 0.01)],
+        { id: 'assistant-a1', providerID: 'provider-a', modelID: 'model-a' }
+      ),
+      createAssistantMessage(
+        createTokens({ input: 20 }),
+        [createStepFinishPart(createTokens({ input: 20 }), 'step-b1', 0.02)],
+        { id: 'assistant-b1', providerID: 'provider-b', modelID: 'model-b' }
+      ),
+      createAssistantMessage(
+        createTokens({ input: 30 }),
+        [createStepFinishPart(createTokens({ input: 30 }), 'step-a2', 0.03)],
+        { id: 'assistant-a2', providerID: 'provider-a', modelID: 'model-a' }
+      ),
+    ];
+
+    const usage = getSessionUsage(messages);
+
+    expect(usage.tokens).toEqual({ ...zeroUsage, input: 60 });
+    expect(usage.models.map(model => [model.providerID, model.modelID])).toEqual([
+      ['provider-a', 'model-a'],
+      ['provider-b', 'model-b'],
+    ]);
+    expect(usage.models[0].tokens).toEqual({ ...zeroUsage, input: 40 });
+    expect(usage.models[0].costUsd).toBeCloseTo(0.04, 12);
+    expect(usage.models[1].tokens).toEqual({ ...zeroUsage, input: 20 });
+    expect(usage.models[1].costUsd).toBeCloseTo(0.02, 12);
+  });
+
+  it('keeps the same model ID separate for different providers', () => {
+    const messages = [
+      createAssistantMessage(
+        createTokens({ input: 10 }),
+        [createStepFinishPart(createTokens({ input: 10 }), 'step-1', 0.01)],
+        { id: 'assistant-1', providerID: 'provider-a', modelID: 'shared-model' }
+      ),
+      createAssistantMessage(
+        createTokens({ input: 20 }),
+        [createStepFinishPart(createTokens({ input: 20 }), 'step-2', 0.02)],
+        { id: 'assistant-2', providerID: 'provider-b', modelID: 'shared-model' }
+      ),
+    ];
+
+    const usage = getSessionUsage(messages);
+
+    expect(usage.models).toHaveLength(2);
+    expect(usage.models.map(model => [model.providerID, model.modelID])).toEqual([
+      ['provider-a', 'shared-model'],
+      ['provider-b', 'shared-model'],
+    ]);
+    expect(usage.models[0].tokens).toEqual({ ...zeroUsage, input: 10 });
+    expect(usage.models[1].tokens).toEqual({ ...zeroUsage, input: 20 });
+  });
+
+  it('distinguishes tuples whose joined provider and model IDs collide on slashes', () => {
+    const messages = [
+      createAssistantMessage(createTokens({ input: 1 }), [], {
+        id: 'assistant-1',
+        providerID: 'a/b',
+        modelID: 'c',
+      }),
+      createAssistantMessage(createTokens({ input: 2 }), [], {
+        id: 'assistant-2',
+        providerID: 'a',
+        modelID: 'b/c',
+      }),
+    ];
+
+    const usage = getSessionUsage(messages);
+
+    expect(usage.models).toHaveLength(2);
+    expect(usage.models.map(model => [model.providerID, model.modelID])).toEqual([
+      ['a/b', 'c'],
+      ['a', 'b/c'],
+    ]);
+    expect(usage.models[0].tokens).toEqual({ ...zeroUsage, input: 1 });
+    expect(usage.models[1].tokens).toEqual({ ...zeroUsage, input: 2 });
+  });
+
+  it('sums finished step costs and tokens instead of the assistant snapshot', () => {
+    const message = createAssistantMessage(
+      createTokens({
+        input: 999,
+        output: 888,
+        reasoning: 777,
+        cache: { read: 666, write: 555 },
+      }),
+      [
+        createStepFinishPart(
+          createTokens({ input: 10, output: 1, cache: { read: 2, write: 0 } }),
+          'step-1',
+          0.02
+        ),
+        createStepFinishPart(
+          createTokens({ input: 20, output: 2, cache: { read: 3, write: 1 } }),
+          'step-2',
+          0.03
+        ),
+      ],
+      { cost: 99 }
+    );
+
+    const usage = getSessionUsage([message]);
+    const expectedTokens = {
+      input: 30,
+      output: 3,
+      reasoning: 0,
+      cacheRead: 5,
+      cacheWrite: 1,
+    };
+
+    expect(usage.tokens).toEqual(expectedTokens);
+    expect(usage.models).toHaveLength(1);
+    expect(usage.models[0].tokens).toEqual(expectedTokens);
+    expect(usage.models[0].costUsd).toBeCloseTo(0.05, 12);
+  });
+
+  it('excludes folded child cost from a stepless task wrapper', () => {
+    const message = createAssistantMessage(
+      createTokens({ input: 7, output: 3 }),
+      [createTaskToolPart()],
+      { cost: 0.42 }
+    );
+
+    const [model] = getSessionUsage([message]).models;
+
+    expect(model.costUsd).toBe(0);
+    expect(model.tokens).toEqual({ ...zeroUsage, input: 7, output: 3 });
+  });
+
+  it('falls back to assistant cost and tokens when a message has no steps or task tool', () => {
+    const message = createAssistantMessage(
+      createTokens({ input: 40, output: 2, reasoning: 1 }),
+      [createTextPart()],
+      { cost: 0.25 }
+    );
+
+    const [model] = getSessionUsage([message]).models;
+
+    expect(model.costUsd).toBe(0.25);
+    expect(model.tokens).toEqual({ ...zeroUsage, input: 40, output: 2, reasoning: 1 });
+  });
+
+  it('sanitizes negative costs and token counts', () => {
+    const message = createAssistantMessage(
+      createTokens({
+        input: -10,
+        output: Number.NaN,
+        reasoning: Number.POSITIVE_INFINITY,
+        cache: { read: -3, write: Number.NEGATIVE_INFINITY },
+      }),
+      [
+        createStepFinishPart(
+          createTokens({
+            input: -5,
+            output: -6,
+            reasoning: -7,
+            cache: { read: -8, write: -9 },
+          }),
+          'invalid-step',
+          -0.01
+        ),
+        createStepFinishPart(createTokens({ input: 5, output: 2 }), 'valid-step', 0.02),
+      ],
+      { cost: -1 }
+    );
+
+    const usage = getSessionUsage([message]);
+
+    expect(usage.tokens).toEqual({ ...zeroUsage, input: 5, output: 2 });
+    expect(usage.models).toHaveLength(1);
+    expect(usage.models[0].tokens).toEqual({ ...zeroUsage, input: 5, output: 2 });
+    expect(usage.models[0].costUsd).toBeCloseTo(0.02, 12);
+  });
+
+  it.each([
+    { label: 'no messages', messages: [] as StoredMessage[] },
+    {
+      label: 'user-only messages',
+      messages: [
+        createUserMessage([
+          createStepFinishPart(createTokens({ input: 9_000, output: 900 }), 'user-step'),
+        ]),
+      ],
+    },
+  ])('returns no model usage for $label', ({ messages }) => {
+    expect(getSessionUsage(messages)).toEqual({ tokens: zeroUsage, models: [] });
+  });
+
+  it('keeps a zero-cost model in the breakdown', () => {
+    const message = createAssistantMessage(
+      createTokens({ input: 5 }),
+      [createStepFinishPart(createTokens({ input: 5 }), 'step-1', 0)],
+      { providerID: 'provider-zero', modelID: 'zero-cost-model' }
+    );
+
+    expect(getSessionUsage([message]).models).toEqual([
+      {
+        providerID: 'provider-zero',
+        modelID: 'zero-cost-model',
+        costUsd: 0,
+        tokens: { ...zeroUsage, input: 5 },
+      },
+    ]);
   });
 });

@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Share2 } from 'lucide-react';
+import { ChevronDown, Share2 } from 'lucide-react';
 import { ShareSessionDialog } from './ShareSessionDialog';
 import {
   formatSessionCost,
@@ -19,8 +19,8 @@ import {
   isRenderableSessionCost,
   type SessionCostBreakdown,
 } from './session-cost-breakdown';
-import type { SessionTokenUsage } from './session-token-usage';
-import { formatShortModelName } from '@/lib/format-model-name';
+import type { SessionModelUsage, SessionTokenUsage } from './session-token-usage';
+import { formatModelRefName, formatShortModelName } from '@/lib/format-model-name';
 
 type SessionInfoDialogProps = {
   open: boolean;
@@ -33,6 +33,7 @@ type SessionInfoDialogProps = {
   modelDisplayName?: string;
   sessionCostBreakdown?: SessionCostBreakdown;
   sessionTokenUsage?: SessionTokenUsage;
+  sessionModelUsage?: SessionModelUsage[];
   hasIncompleteHistory?: boolean;
 };
 
@@ -45,6 +46,7 @@ export function SessionInfoDialog({
   modelDisplayName,
   sessionCostBreakdown,
   sessionTokenUsage,
+  sessionModelUsage,
   hasIncompleteHistory = false,
   kiloSessionId,
 }: SessionInfoDialogProps) {
@@ -133,22 +135,7 @@ export function SessionInfoDialog({
                 <h3 id="session-token-usage-title" className="text-sm font-medium">
                   Main agent tokens
                 </h3>
-                <dl className="space-y-2 text-sm">
-                  {(
-                    [
-                      ['Input', sessionTokenUsage.input],
-                      ['Output', sessionTokenUsage.output],
-                      ['Reasoning', sessionTokenUsage.reasoning],
-                      ['Cache read', sessionTokenUsage.cacheRead],
-                      ['Cache write', sessionTokenUsage.cacheWrite],
-                    ] as const
-                  ).map(([label, count]) => (
-                    <div key={label} className="flex items-baseline justify-between gap-4">
-                      <dt className="text-muted-foreground">{label}</dt>
-                      <dd className="font-mono tabular-nums">{count.toLocaleString('en-US')}</dd>
-                    </div>
-                  ))}
-                </dl>
+                <TokenUsageDetails usage={sessionTokenUsage} />
                 <p className="text-muted-foreground text-xs">
                   Cumulative reported usage from loaded main-agent activity, excluding subagents.
                   Reasoning may also be included in output, depending on the provider.
@@ -161,9 +148,47 @@ export function SessionInfoDialog({
                 )}
               </section>
             )}
+            {sessionModelUsage && sessionModelUsage.length > 0 && (
+              <section aria-labelledby="session-model-usage-title" className="space-y-2">
+                <h3 id="session-model-usage-title" className="text-sm font-medium">
+                  By model
+                </h3>
+                <p className="text-muted-foreground text-xs">
+                  Loaded main-agent activity only. Subagent and older-activity costs are not
+                  attributed to models.
+                </p>
+                {sessionModelUsage.map(usage => (
+                  <details
+                    key={JSON.stringify([usage.providerID, usage.modelID])}
+                    className="group border-b py-2 last:border-b-0"
+                  >
+                    <summary className="focus-visible:ring-ring flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-sm text-sm focus-visible:ring-2 focus-visible:outline-none [&::-webkit-details-marker]:hidden">
+                      <ChevronDown
+                        className="text-muted-foreground size-4 shrink-0 group-open:rotate-180"
+                        aria-hidden="true"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-medium wrap-anywhere">
+                          {formatModelRefName(usage)}
+                        </span>
+                        <span className="text-muted-foreground block text-xs wrap-anywhere">
+                          {usage.providerID} / {usage.modelID}
+                        </span>
+                      </span>
+                      <span className="shrink-0 font-mono tabular-nums">
+                        {formatSessionTotalCost(usage.costUsd)}
+                      </span>
+                    </summary>
+                    <div className="pt-3 pb-2">
+                      <TokenUsageDetails usage={usage.tokens} />
+                    </div>
+                  </details>
+                ))}
+              </section>
+            )}
             <dl className="space-y-3 border-t pt-4 text-sm">
               <div className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-4">
-                <dt className="text-muted-foreground">Model</dt>
+                <dt className="text-muted-foreground">Selected model</dt>
                 <dd className="text-right font-medium wrap-anywhere">
                   {modelDisplayName ?? formatShortModelName(model)}
                 </dd>
@@ -193,5 +218,26 @@ export function SessionInfoDialog({
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function TokenUsageDetails({ usage }: { usage: SessionTokenUsage }) {
+  return (
+    <dl className="space-y-2 text-sm">
+      {(
+        [
+          ['Input', usage.input],
+          ['Output', usage.output],
+          ['Reasoning', usage.reasoning],
+          ['Cache read', usage.cacheRead],
+          ['Cache write', usage.cacheWrite],
+        ] as const
+      ).map(([label, count]) => (
+        <div key={label} className="flex items-baseline justify-between gap-4">
+          <dt className="text-muted-foreground">{label}</dt>
+          <dd className="font-mono tabular-nums">{count.toLocaleString('en-US')}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }

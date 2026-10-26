@@ -12,7 +12,7 @@ import {
 import { ExternalLink, MoreHorizontal } from 'lucide-react';
 import { SessionInfoDialog } from './SessionInfoDialog';
 import type { SessionCostBreakdown } from './session-cost-breakdown';
-import type { SessionTokenUsage } from './session-token-usage';
+import type { SessionUsage } from './session-token-usage';
 import { SessionActionsDialog } from './SessionActionsDialog';
 import { SoundToggleButton } from '@/components/shared/SoundToggleButton';
 import { FeedbackDialog } from './FeedbackDialog';
@@ -34,7 +34,7 @@ type ChatHeaderProps = {
   model?: string;
   modelDisplayName?: string;
   getSessionCostBreakdown?: () => SessionCostBreakdown;
-  getSessionTokenUsage?: () => SessionTokenUsage;
+  getSessionUsage?: () => SessionUsage;
   hasIncompleteHistory?: boolean;
   sessionInfoOpen: boolean;
   onSessionInfoOpenChange: (open: boolean) => void;
@@ -60,7 +60,7 @@ export function ChatHeader({
   model = 'Unknown',
   modelDisplayName,
   getSessionCostBreakdown,
-  getSessionTokenUsage,
+  getSessionUsage,
   hasIncompleteHistory,
   sessionInfoOpen,
   onSessionInfoOpenChange,
@@ -83,9 +83,9 @@ export function ChatHeader({
     () => (sessionInfoOpen ? getSessionCostBreakdown?.() : undefined),
     [getSessionCostBreakdown, sessionInfoOpen]
   );
-  const sessionTokenUsage = useMemo(
-    () => (sessionInfoOpen ? getSessionTokenUsage?.() : undefined),
-    [getSessionTokenUsage, sessionInfoOpen]
+  const sessionUsage = useMemo(
+    () => (sessionInfoOpen ? getSessionUsage?.() : undefined),
+    [getSessionUsage, sessionInfoOpen]
   );
 
   const browseUrl = buildRepoBrowseUrl(gitUrl);
@@ -111,7 +111,8 @@ export function ChatHeader({
         model={model}
         modelDisplayName={modelDisplayName}
         sessionCostBreakdown={sessionCostBreakdown}
-        sessionTokenUsage={sessionTokenUsage}
+        sessionTokenUsage={sessionUsage?.tokens}
+        sessionModelUsage={sessionUsage?.models}
         hasIncompleteHistory={hasIncompleteHistory}
       />
       <SessionActionsDialog

@@ -46,7 +46,7 @@ import {
   getSessionCostBreakdown,
   getSessionTotalCostUsd,
 } from './session-cost-breakdown';
-import { getSessionTokenUsage } from './session-token-usage';
+import { getSessionUsage } from './session-token-usage';
 import { ConversationMessages } from './ConversationMessages';
 import { useSessionSwitch } from './use-session-switch';
 import { useCachedTranscriptPage } from './use-cached-transcript-page';
@@ -355,8 +355,8 @@ export default function CloudChatPage({
     ]
   );
 
-  const getCurrentSessionTokenUsage = useCallback(
-    () => getSessionTokenUsage(isCurrentSession ? [...staticMessages, ...dynamicMessages] : []),
+  const getCurrentSessionUsage = useCallback(
+    () => getSessionUsage(isCurrentSession ? [...staticMessages, ...dynamicMessages] : []),
     [isCurrentSession, staticMessages, dynamicMessages]
   );
 
@@ -1751,9 +1751,9 @@ export default function CloudChatPage({
           ? getCurrentSessionCostBreakdown
           : undefined
       }
-      getSessionTokenUsage={
+      getSessionUsage={
         !workspaceControlSession && isCurrentSession && transcriptReady
-          ? getCurrentSessionTokenUsage
+          ? getCurrentSessionUsage
           : undefined
       }
       hasIncompleteHistory={

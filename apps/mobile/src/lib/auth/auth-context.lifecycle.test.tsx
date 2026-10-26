@@ -465,6 +465,8 @@ vi.mock('@/lib/storage-keys', () => ({
   KEEP_SCREEN_ON_KEY: 'keep-session-screen-on',
   KILOCLAW_OWNED_KEY: 'kiloclaw-owned',
   LEGACY_EXCHANGE_DONE_KEY: 'legacy-exchange-done',
+  LOGIN_EMAIL_DRAFT_KEY: 'login-email-draft',
+  LOGIN_SSO_RECOVERY_DRAFT_KEY: 'login-sso-recovery-draft',
   NOTIFICATION_PROMPT_SEEN_KEY: 'notification-prompt-seen',
   ORGANIZATION_STORAGE_KEY: 'organization',
   ORGANIZATION_PERSONAL_STORAGE_KEY: 'selected-organization-personal',
@@ -812,6 +814,46 @@ describe('sign-out teardown ordering', () => {
     });
 
     expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).toHaveBeenCalledWith('user-1');
+
+    unmount();
+  });
+
+  it('retires the sign-in form drafts once a sign-in publishes its token', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    // The mount loads auth-context from a fresh module registry, so the drafts
+    // module the provider closes over is the one imported after it.
+    const drafts = await import('@/lib/login-draft');
+    drafts.setLoginEmailDraft('typed@example.com');
+    drafts.setSsoRecoveryDraft({ email: 'typed@example.com', ssoOrganizationId: 'org-1' });
+
+    await act(async () => {
+      await ctx.signIn('signed-in-token');
+    });
+
+    // Every provider ends in signIn, so a published token is the one place
+    // that may drop what the form was holding: the next signed-out screen
+    // must not pre-fill the previous attempt's address or SSO banner.
+    await expect(drafts.restoreLoginDrafts()).resolves.toEqual({ email: '', ssoRecovery: null });
+
+    unmount();
+  });
+
+  it('keeps the sign-in form drafts when the credential write fails', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    const drafts = await import('@/lib/login-draft');
+    drafts.setLoginEmailDraft('typed@example.com');
+    drafts.setSsoRecoveryDraft({ email: 'typed@example.com', ssoOrganizationId: 'org-1' });
+    hoisted.secureStore.setItemAsync.mockRejectedValueOnce(new Error('keychain unavailable'));
+
+    await act(async () => {
+      await expect(ctx.signIn('signed-in-token')).rejects.toThrow('keychain unavailable');
+    });
+
+    // A failed attempt published nothing, so the person keeps what they typed.
+    await expect(drafts.restoreLoginDrafts()).resolves.toEqual({
+      email: 'typed@example.com',
+      ssoRecovery: { email: 'typed@example.com', ssoOrganizationId: 'org-1' },
+    });
 
     unmount();
   });

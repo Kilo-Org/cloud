@@ -667,7 +667,9 @@ export function accountForMicrodollarUsage(
 ) {
   const logFileExtension = usageContext.isStreaming ? '.log.resp.sse' : '.log.resp.json';
   debugSaveProxyResponseStream(clonedReponse, logFileExtension);
-  after(countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan));
+  const accounting = countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan);
+  after(accounting);
+  return accounting;
 }
 
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
@@ -1314,11 +1316,12 @@ type EmbeddingUsage = {
   cost?: number;
 };
 
+// Upstream error bodies (`{ error: {...} }`) carry neither model nor usage.
 type EmbeddingResponse = {
   id?: string;
-  object: 'list';
-  model: string;
-  usage: EmbeddingUsage;
+  object?: 'list';
+  model?: string;
+  usage?: EmbeddingUsage;
 };
 
 type TranscriptionUsage = {
@@ -1338,22 +1341,44 @@ type TranscriptionResponse = {
   usage?: TranscriptionUsage;
 };
 
+// An upstream error can arrive without a JSON body, such as an empty 429 or an
+// HTML error page from an edge proxy. It still carries no usage, so treat it like
+// a JSON error body. A successful response that is not JSON stays a parse failure.
+function parseEmbeddingResponse(responseText: string, statusCode: number): EmbeddingResponse {
+  try {
+    return JSON.parse(responseText) as EmbeddingResponse;
+  } catch (error) {
+    if (statusCode >= 400) return {};
+    throw error;
+  }
+}
+
 export function parseEmbeddingUsageFromResponse(
   responseText: string,
   statusCode: number
 ): MicrodollarUsageStats {
-  const json = JSON.parse(responseText) as EmbeddingResponse;
+  const json = parseEmbeddingResponse(responseText, statusCode);
+  const usage = json.usage;
+  const hasError = !json.model || statusCode >= 400;
+
+  if (!usage && !hasError) {
+    captureMessage('SUSPICIOUS: No embedding usage information', {
+      level: 'error',
+      tags: { source: 'embedding_usage_processing' },
+      extra: { model: json.model, statusCode },
+    });
+  }
 
   // Upstream providers (OpenRouter, Vercel) include cost in USD → convert to microdollars.
-  const cost_mUsd = json.usage.cost != null ? toMicrodollars(json.usage.cost) : 0;
+  const cost_mUsd = usage?.cost != null ? toMicrodollars(usage.cost) : 0;
 
   return {
     messageId: json.id ?? null,
-    model: json.model,
+    model: json.model ?? null,
     responseContent: '',
-    hasError: !json.model || statusCode >= 400,
+    hasError,
     inference_provider: null,
-    inputTokens: json.usage.prompt_tokens,
+    inputTokens: usage?.prompt_tokens ?? 0,
     outputTokens: 0,
     cacheHitTokens: 0,
     cacheWriteTokens: 0,

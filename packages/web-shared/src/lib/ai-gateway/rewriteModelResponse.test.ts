@@ -1,14 +1,14 @@
 import { describe, test, expect, beforeEach } from '@jest/globals';
 import { after } from 'next/server';
 import {
-  rewriteModelResponse_ChatCompletions,
-  rewriteModelResponse_Messages,
-  rewriteModelResponse_Responses,
   rewriteModelResponse,
   logUnrewrittenResponse,
   redactApiRequestLogRequest,
   type RequestLoggingParams,
 } from './rewriteModelResponse';
+import { rewriteModelResponse_ChatCompletions } from './rewriteModelResponse.chatCompletions';
+import { rewriteModelResponse_Messages } from './rewriteModelResponse.messages';
+import { rewriteModelResponse_Responses } from './rewriteModelResponse.responses';
 import {
   getDynamicRequestLoggingMode,
   type RequestLoggingMode,

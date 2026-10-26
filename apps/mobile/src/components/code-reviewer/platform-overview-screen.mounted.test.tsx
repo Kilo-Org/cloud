@@ -7,7 +7,7 @@
 
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { CODE_REVIEW_ACTION_REQUIRED_REASONS } from '@kilocode/app-shared/code-reviews';
 import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
@@ -27,7 +27,11 @@ const config = vi.hoisted(() => ({
 
 const provider = vi.hoisted(() => ({ status: 'connected' }));
 const connectivity = vi.hoisted(() => ({ known: true }));
-const platformError = vi.hoisted(() => ({ variants: [] as string[] }));
+const platformError = vi.hoisted(() => ({
+  variants: [] as string[],
+  retries: [] as (() => void)[],
+  retrying: [] as boolean[],
+}));
 const skeletonRenders = vi.hoisted(() => ({ count: 0 }));
 const centeredState = vi.hoisted(() => vi.fn());
 const scrollView = vi.hoisted(() => vi.fn());
@@ -54,9 +58,18 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
-  FadeIn: { duration: vi.fn() },
+  FadeIn: { duration: (ms: number) => ({ fadeIn: ms }) },
   FadeOut: { duration: vi.fn() },
   LinearTransition: {},
+}));
+const motion = vi.hoisted(() => ({ reducedMotion: false }));
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({
+    reducedMotion: motion.reducedMotion,
+    scrollAnimated: !motion.reducedMotion,
+  }),
+  selectReducedMotionEntrance: <T,>(reducedMotion: boolean, entrance: T) =>
+    reducedMotion ? undefined : entrance,
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -93,8 +106,16 @@ vi.mock('@/components/code-reviewer/provider-connect-card', () => ({
   ProviderConnectCard: () => null,
 }));
 vi.mock('@/components/platform-error-screen', () => ({
-  PlatformErrorScreen: (props: { variant?: string }) => {
+  PlatformErrorScreen: (props: {
+    variant?: string;
+    onRetry?: () => void;
+    isRetrying?: boolean;
+  }) => {
     platformError.variants.push(props.variant ?? 'server');
+    platformError.retrying.push(props.isRetrying ?? false);
+    if (props.onRetry) {
+      platformError.retries.push(props.onRetry);
+    }
     return null;
   },
 }));
@@ -219,6 +240,13 @@ async function render(
   return renderer;
 }
 
+async function renderScreenHandle(platform: 'github' | 'gitlab' = 'github') {
+  const renderer = await render('personal', platform);
+  return {
+    readTexts: () => collectText(renderer.toJSON()),
+  };
+}
+
 async function renderScreen(platform: 'github' | 'gitlab' = 'github'): Promise<string[]> {
   const renderer = await render('personal', platform);
   return collectText(renderer.toJSON());
@@ -252,7 +280,10 @@ beforeEach(() => {
   provider.status = 'connected';
   connectivity.known = true;
   platformError.variants = [];
+  platformError.retries = [];
+  platformError.retrying = [];
   skeletonRenders.count = 0;
+  motion.reducedMotion = false;
   centeredState.mockClear();
   scrollView.mockClear();
   mintInstallState.mockClear();
@@ -333,6 +364,80 @@ describe('PlatformOverviewScreen connected with unavailable config', () => {
 
     expect(platformError.variants).toEqual(['server']);
     expect(skeletonRenders.count).toBe(0);
+  });
+});
+
+describe('PlatformOverviewScreen pending idle config read', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    // A test's refetch implementation must not reach the next one or the
+    // timers of a later test.
+    config.refetch.mockReset();
+  });
+
+  it('shows the skeleton instead of a blank body while nothing is fetching', async () => {
+    // Pending, idle, no data, no error: exactly the state a cancelled first
+    // fetch reverts to. It matched none of the separate isLoading/isError/
+    // paused tests, so the header painted over an empty scroll area with
+    // nothing that would ever resolve it.
+    config.fetchStatus = 'idle';
+
+    const texts = await renderScreen();
+
+    expect(skeletonRenders.count).toBeGreaterThan(0);
+    expect(platformError.variants).toEqual([]);
+    expect(texts).not.toContain('Automatic reviews');
+  });
+
+  it('restarts the idle read on its own and paints the rows once it lands', async () => {
+    vi.useFakeTimers();
+    config.fetchStatus = 'idle';
+    config.refetch.mockImplementation(() => {
+      config.fetchStatus = 'idle';
+      config.data = makeConfig();
+      return Promise.resolve();
+    });
+
+    const { readTexts } = await renderScreenHandle();
+    expect(readTexts()).not.toContain('Automatic reviews');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+
+    expect(config.refetch).toHaveBeenCalledTimes(1);
+    expect(platformError.variants).toEqual([]);
+    expect(readTexts()).toContain('Automatic reviews');
+  });
+
+  it('ends on the error with Retry when the idle read cannot restart', async () => {
+    vi.useFakeTimers();
+    config.fetchStatus = 'idle';
+    // This read cannot be restarted: the attempt leaves it exactly as idle.
+    config.refetch.mockImplementation(() => Promise.resolve());
+
+    const { readTexts } = await renderScreenHandle();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+
+    // The single automatic attempt did not get a fetch running, so the body
+    // stops waiting behind a spinner and offers the action that can.
+    expect(config.refetch).toHaveBeenCalledTimes(1);
+    expect(platformError.variants).toEqual(['server']);
+    expect(readTexts()).not.toContain('Automatic reviews');
+
+    skeletonRenders.count = 0;
+    await act(() => {
+      platformError.retries.at(-1)?.();
+    });
+
+    // Retry restarts the read and returns the body to the loading state while
+    // a fresh cycle (with its own single automatic attempt) runs.
+    expect(config.refetch).toHaveBeenCalledTimes(2);
+    expect(skeletonRenders.count).toBeGreaterThan(0);
+    expect(platformError.variants).toEqual(['server']);
   });
 });
 
@@ -508,5 +613,35 @@ describe('PlatformOverviewScreen actionRequired recovery', () => {
     expect(texts).toContain(
       'Only organization owners, admins, and billing managers can change these settings.'
     );
+  });
+});
+
+describe('PlatformOverviewScreen rows entrance', () => {
+  /** The animated container that holds every configuration row. */
+  function rowsContainer(renderer: TestRenderer.ReactTestRenderer) {
+    return renderer.root
+      .findAllByType('Animated.View')
+      .find(node => node.props.className === 'gap-6');
+  }
+
+  it('paints the rows without an entrance animation under reduced motion', async () => {
+    // An entrance that never runs leaves the container at its initial opacity,
+    // so the rows exist but paint nothing and the body stays empty until the
+    // screen remounts.
+    motion.reducedMotion = true;
+    config.data = makeConfig();
+
+    const renderer = await render();
+
+    expect(rowsContainer(renderer)?.props.entering).toBeUndefined();
+  });
+
+  it('keeps the crossfade entrance while motion is allowed', async () => {
+    motion.reducedMotion = false;
+    config.data = makeConfig();
+
+    const renderer = await render();
+
+    expect(rowsContainer(renderer)?.props.entering).toBeDefined();
   });
 });

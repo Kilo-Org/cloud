@@ -47,6 +47,7 @@ import { PtyIdSchema, sessionIdSchema } from './router/schemas.js';
 import { registerRuntimeArtifactRoutes } from './sandbox-control/runtime-artifact-routes.js';
 import { registerStartupFailureRoute } from './sandbox-control/startup-failure.js';
 import { registerControlLogRoutes } from './sandbox-control/log-routes.js';
+import { registerEnvironmentBuildRoutes } from './environment-build/routes.js';
 import {
   runtimeCredentialProxyFacadeBaseUrl,
   runtimeCredentialProxyUpstream,
@@ -282,6 +283,7 @@ function requireInternalApi(c: Context<HonoContext>): Response | null {
 registerControlLogRoutes(app);
 registerRuntimeArtifactRoutes(app);
 registerStartupFailureRoute(app);
+registerEnvironmentBuildRoutes(app);
 
 app.get('/sandbox-control/:sandboxId', async (c: Context<HonoContext>) => {
   return admitSandboxWrapperUpgrade(c.req.raw, c.env, c.req.param('sandboxId') ?? '');

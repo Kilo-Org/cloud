@@ -107,11 +107,7 @@ describe('native egress policy forwarding', () => {
           SANDBOX_CONTROL_URL: 'wss://agent.example.com',
         },
       });
-      await provider.launch(
-        created.providerRef,
-        { command: preinstalledStartup(), env: {} },
-        { skipRepository: true }
-      );
+      await provider.launch(created.providerRef, { command: preinstalledStartup(), env: {} });
       for (const [input] of launchWrapper.mock.calls) {
         if (egressAllowlist === undefined) expect(input).not.toHaveProperty('egressAllowlist');
         else expect(input.egressAllowlist).toEqual(egressAllowlist);

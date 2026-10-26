@@ -1,13 +1,21 @@
-import { createElement, type ReactElement } from 'react';
-import { act, TestRenderer } from '@/test/renderer';
+import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useStartTodo } from '@/components/todos/use-start-todo';
+import { i18n } from '@/i18n';
+import { AGENT_SESSION_NAV_GUARD_MS } from '@/components/agents/agent-session-nav-guard';
+import { type TodoList } from '@/lib/todos/todo-types';
+import { act, TestRenderer } from '@/test/renderer';
+
+import { type StartTodoControls, useStartTodo } from './use-start-todo';
 
 const state = vi.hoisted(() => ({
-  push: vi.fn((_href: unknown) => undefined),
+  startAgent: vi.fn(),
+  link: vi.fn(),
+  invalidate: vi.fn(),
+  navigate: vi.fn(),
+  push: vi.fn(),
+  toastError: vi.fn(),
   focusEffects: [] as (() => void)[],
-  now: 1_700_000_000_000,
 }));
 
 vi.mock('expo-router', () => ({
@@ -16,142 +24,184 @@ vi.mock('expo-router', () => ({
     state.focusEffects.push(effect);
   },
 }));
-vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({}) }));
-vi.mock('expo-haptics', () => ({ notificationAsync: vi.fn(), NotificationFeedbackType: {} }));
-vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
-vi.mock('@/lib/trpc', () => ({ useTRPC: () => ({}) }));
-// The to-do's "start now" path is not this suite's subject: only the
-// review push (the composer entry) is exercised here.
-vi.mock('@/components/agents/use-agent-session-navigator', () => ({
-  useAgentSessionNavigator: () => vi.fn(),
+vi.mock('sonner-native', () => ({ toast: { error: state.toastError } }));
+vi.mock('expo-haptics', () => ({
+  notificationAsync: async () => {
+    await Promise.resolve();
+  },
+  NotificationFeedbackType: { Success: 'success' },
 }));
-vi.mock('@/lib/app-actions/start-agent', () => ({ startAgent: vi.fn() }));
-vi.mock('@/lib/hooks/todo-session-link', () => ({ linkStartedTodoSession: vi.fn() }));
+vi.mock('@/lib/app-actions/start-agent', () => ({ startAgent: state.startAgent }));
+vi.mock('@/lib/hooks/todo-session-link', () => ({ linkStartedTodoSession: state.link }));
 vi.mock('@/lib/agent-session-cache', () => ({
-  invalidateAgentSessionQueries: vi.fn(),
+  invalidateAgentSessionQueries: state.invalidate,
 }));
+vi.mock('@/components/agents/use-agent-session-navigator', () => ({
+  useAgentSessionNavigator: () => state.navigate,
+}));
+vi.mock('@/lib/trpc', () => ({ useTRPC: () => ({}) }));
+vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({}) }));
 
-const TODO = { id: 'todo-1', title: 'Fix login', notes: null };
-const LIST = {
-  organizationId: 'org-1',
-  gitUrl: 'octocat/hello',
-  mode: 'code',
-  model: 'kilo-auto/efficient',
+const todo = { id: 'todo-1', title: 'Ship the fix', notes: null };
+const list: Pick<TodoList, 'organizationId' | 'gitUrl' | 'mode' | 'model' | 'variant'> = {
+  organizationId: 'organization-1',
+  gitUrl: 'test/project',
+  mode: null,
+  model: null,
   variant: null,
 };
 
-function Probe(): ReactElement {
-  const { review } = useStartTodo();
-  // A host element stands in for the row's Review control.
-  return createElement('ReviewButton', {
-    onPress: () => {
-      review(TODO, LIST);
-    },
-  });
+function Probe({ holder }: Readonly<{ holder: { current: StartTodoControls | null } }>) {
+  holder.current = useStartTodo();
+  return null;
 }
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+const holder: { current: StartTodoControls | null } = { current: null };
 
-function nodesOfType(type: string): TestRenderer.ReactTestInstance[] {
-  return renderer === undefined
-    ? []
-    : renderer.root.findAll(node => typeof node.type === 'string' && node.type === type);
-}
-
-/** The probe's press handler, narrowed once for the calls below. */
-function pressHandler(): () => void {
-  const handler: unknown = nodesOfType('ReviewButton')[0]?.props.onPress;
-  if (typeof handler !== 'function') {
-    throw new TypeError('Expected the probe to expose a Review press handler');
+function mounted() {
+  if (!holder.current) {
+    throw new Error('useStartTodo has not mounted');
   }
-  return handler as () => void;
+  return holder.current;
 }
 
-async function doublePress(): Promise<void> {
-  await act(async () => {
-    const tap = pressHandler();
-    tap();
-    tap();
-    await Promise.resolve();
-  });
-}
-
-async function press(): Promise<void> {
-  await act(async () => {
-    pressHandler()();
-    await Promise.resolve();
-  });
-}
-
-async function regainFocus(): Promise<void> {
-  await act(async () => {
-    for (const effect of state.focusEffects) {
-      effect();
-    }
-    await Promise.resolve();
-  });
-}
-
-async function mount(): Promise<void> {
-  await act(async () => {
-    renderer = TestRenderer.create(createElement(Probe));
-    await Promise.resolve();
-  });
-}
-
-beforeEach(() => {
-  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  state.push.mockReset();
+beforeEach(async () => {
+  const environment = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
+  environment.IS_REACT_ACT_ENVIRONMENT = true;
+  await i18n.changeLanguage('en');
   state.focusEffects = [];
-  state.now = 1_700_000_000_000;
-  vi.spyOn(Date, 'now').mockImplementation(() => state.now);
+  state.startAgent.mockReset();
+  state.link.mockReset();
+  state.invalidate.mockReset();
+  state.navigate.mockReset();
+  state.push.mockReset();
+  state.toastError.mockReset();
+  state.link.mockResolvedValue(undefined);
+  state.invalidate.mockResolvedValue(undefined);
+  act(() => {
+    renderer = TestRenderer.create(createElement(Probe, { holder }));
+  });
 });
 
 afterEach(() => {
-  act(() => renderer?.unmount());
+  renderer?.unmount();
   renderer = undefined;
+  holder.current = null;
   vi.restoreAllMocks();
 });
 
-describe('useStartTodo review', () => {
-  it('opens the prefilled composer', async () => {
-    await mount();
+async function start(startList: typeof list = list) {
+  await act(async () => {
+    await mounted().startNow(todo, startList);
+  });
+}
 
-    await press();
+describe('useStartTodo start now', () => {
+  it('opens the started session when the link fails', async () => {
+    state.startAgent.mockResolvedValue({ ok: true, sessionId: 'session-1', message: '' });
+    state.link.mockRejectedValue(new Error('link failed'));
 
-    const href = state.push.mock.calls[0]?.[0];
-    expect(typeof href).toBe('string');
-    expect(href).toContain('/(app)/agent-chat/new?organizationId=org-1');
-    expect(href).toContain('prefillRepo=octocat%2Fhello');
-    expect(href).toContain('todoId=todo-1');
-    expect(state.push).toHaveBeenCalledTimes(1);
+    await start();
+
+    expect(state.navigate).toHaveBeenCalledExactlyOnceWith('session-1', 'organization-1');
+    expect(state.toastError).toHaveBeenCalledExactlyOnceWith(
+      i18n.t('todos.item.startRefreshFailed')
+    );
+    expect(mounted().startingTodoId).toBeNull();
   });
 
-  it('opens the composer once on a fast double tap', async () => {
-    await mount();
+  it('opens the started session when the cache refresh fails', async () => {
+    state.startAgent.mockResolvedValue({ ok: true, sessionId: 'session-2', message: '' });
+    state.invalidate.mockRejectedValue(new Error('refresh failed'));
 
-    await doublePress();
+    await start();
 
-    expect(state.push).toHaveBeenCalledTimes(1);
+    expect(state.navigate).toHaveBeenCalledExactlyOnceWith('session-2', 'organization-1');
+    expect(state.toastError).toHaveBeenCalledExactlyOnceWith(
+      i18n.t('todos.item.startRefreshFailed')
+    );
   });
 
-  it('opens the composer again on a tap after the guard window', async () => {
-    await mount();
-    await press();
+  it('does not navigate or throw when the start itself fails', async () => {
+    state.startAgent.mockResolvedValue({ ok: false, message: 'No credits left' });
 
-    state.now += 1000;
-    await press();
+    await start();
+
+    expect(state.navigate).not.toHaveBeenCalled();
+    expect(state.toastError).toHaveBeenCalledExactlyOnceWith('No credits left');
+    expect(mounted().startingTodoId).toBeNull();
+  });
+
+  it('reports a thrown start instead of rejecting', async () => {
+    state.startAgent.mockRejectedValue(new Error('exploded'));
+
+    await start();
+
+    expect(state.navigate).not.toHaveBeenCalled();
+    expect(state.toastError).toHaveBeenCalledExactlyOnceWith(i18n.t('common.somethingWentWrong'));
+    expect(mounted().startingTodoId).toBeNull();
+  });
+
+  it('ignores a second start for a to-do that is already starting', async () => {
+    const pending = Promise.withResolvers<unknown>();
+    state.startAgent.mockReturnValueOnce(pending.promise);
+
+    await act(async () => {
+      const first = mounted().startNow(todo, list);
+      const second = mounted().startNow(todo, list);
+      pending.resolve({ ok: true, sessionId: 'session-3', message: '' });
+      await first;
+      await second;
+    });
+
+    expect(state.startAgent).toHaveBeenCalledOnce();
+    expect(state.navigate).toHaveBeenCalledExactlyOnceWith('session-3', 'organization-1');
+  });
+
+  it('opens the review route when the list has no repository', async () => {
+    await start({ ...list, gitUrl: null });
+
+    expect(state.startAgent).not.toHaveBeenCalled();
+    expect(state.push).toHaveBeenCalledTimes(1);
+  });
+  it('opens review once on rapid presses and again after the guard window', () => {
+    const now = Date.now();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
+
+    act(() => {
+      mounted().review(todo, list);
+      mounted().review(todo, list);
+    });
+
+    expect(state.push).toHaveBeenCalledTimes(1);
+    expect(state.push.mock.calls[0]?.[0]).toContain('/(app)/agent-chat/new?organizationId=');
+
+    nowSpy.mockReturnValue(now + AGENT_SESSION_NAV_GUARD_MS);
+    act(() => {
+      mounted().review(todo, list);
+    });
 
     expect(state.push).toHaveBeenCalledTimes(2);
   });
 
-  it('opens the composer again after the screen regains focus', async () => {
-    await mount();
-    await doublePress();
-    await regainFocus();
+  it('opens review again when its screen regains focus', () => {
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(Date.now());
 
-    await press();
+    act(() => {
+      mounted().review(todo, list);
+      mounted().review(todo, list);
+    });
+    expect(state.push).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      for (const effect of state.focusEffects) {
+        effect();
+      }
+      mounted().review(todo, list);
+    });
 
     expect(state.push).toHaveBeenCalledTimes(2);
+    nowSpy.mockRestore();
   });
 });

@@ -67,6 +67,7 @@ export type GetProviderResult =
 async function checkDirectBYOK(
   user: User | AnonymousUserContext,
   requestedModel: string,
+  request: GatewayRequest,
   organizationId: string | undefined
 ): Promise<GetProviderProviderResult | null> {
   const { provider: directByok, model: directByokModel } = await getDirectByokModel(requestedModel);
@@ -79,17 +80,18 @@ async function checkDirectBYOK(
   if (!userByok || userByok.length === 0) {
     return null;
   }
+
+  const upstream = await directByok.resolveUpstream({
+    credential: userByok[0].decryptedAPIKey,
+    model: directByokModel,
+    stream: request.body.stream === true,
+  });
+
   return {
     kind: 'provider',
     provider: {
       id: 'direct-byok',
-      apiUrl: directByok.base_url,
-      apiUrlOverrides: directByok.base_url_overrides,
-      disableUrlSuffix: false,
-      apiKey: userByok[0].decryptedAPIKey,
-      apiKeyHeader: null,
-      supportedChatApis: directByok.supported_chat_apis,
-      responseTransforms: directByok.reasoning_details_transform,
+      ...upstream,
       async transformRequest(context) {
         context.request.body.model = directByokModel.id;
         delete context.request.body.provider;
@@ -248,7 +250,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     return await resolveCustomLlmProvider(customLlm, user, organizationId);
   }
 
-  const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
+  const directByokByok = await checkDirectBYOK(user, requestedModel, request, organizationId);
   if (directByokByok) {
     return directByokByok;
   }

@@ -127,11 +127,11 @@ beforeEach(async () => {
       profile_id, created_on_platform, created_at, updated_at, last_activity_at
     ) VALUES
       ('ses_11111111111111111111111111', ${userId}, ${organizationId}, NULL,
-       'workspace_root_1', ${firstWorkspaceId}, 'Canonical', 'https://github.com/acme/repo',
-       'main', NULL, 'cloud-agent-web', '2026-01-01', '2026-01-04', '2026-01-04'),
+       'workspace_root_1', ${firstWorkspaceId}, 'Canonical', NULL,
+       NULL, NULL, 'cloud-agent-web', '2026-01-01', '2026-01-04', '2026-01-04'),
       ('ses_22222222222222222222222222', ${userId}, ${organizationId}, NULL,
-       'workspace_root_2', ${firstWorkspaceId}, 'Sibling', 'https://gitlab.com/acme/other',
-       'feature', NULL, 'cloud-agent-web', '2026-01-02', '2026-01-05', '2026-01-05'),
+       'workspace_root_2', ${firstWorkspaceId}, 'Sibling', 'https://github.com/acme/repo',
+       'feature', '22222222-2222-4222-8222-222222222222', 'cloud-agent-web', '2026-01-02', '2026-01-05', '2026-01-05'),
       ('ses_33333333333333333333333333', ${userId}, NULL, NULL,
        'workspace_root_3', ${secondWorkspaceId}, 'Second root', 'https://github.com/acme/repo',
        'main', NULL, 'cloud-agent-web', '2026-01-02', '2026-01-06', '2026-01-06'),
@@ -161,7 +161,8 @@ describe('hosted workspace catalog PostgreSQL queries', () => {
     });
     expect(page.items[1]).toMatchObject({
       gitUrl: 'https://github.com/acme/repo',
-      gitBranch: 'main',
+      gitBranch: 'feature',
+      profileId: '22222222-2222-4222-8222-222222222222',
       deletionState: 'active',
       sessions: [
         { workspaceId: firstWorkspaceId, title: 'Sibling' },

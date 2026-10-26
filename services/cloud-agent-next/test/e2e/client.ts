@@ -185,7 +185,10 @@ export async function trpcCall<T>(
   const url = new URL(`/trpc/${procedure}`, config.workerUrl);
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${config.bearerToken ?? mintApiToken(config.user, config.nextAuthSecret)}`,
+    Authorization: `Bearer ${
+      config.bearerToken ??
+      mintApiToken(config.user, config.nextAuthSecret, 60 * 60, config.kilocodeOrganizationId)
+    }`,
   };
   if (config.skipBalanceCheck !== false) {
     // cloud-agent-client.ts sends this for skipped-balance callers; it cleanly

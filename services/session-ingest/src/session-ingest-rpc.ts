@@ -712,7 +712,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     )`;
     const canonicalGitUrl = sql<
       string | null
-    >`(array_agg(${cli_sessions_v2.git_url} order by ${cli_sessions_v2.created_at}, ${cli_sessions_v2.session_id}))[1]`;
+    >`(array_agg(${cli_sessions_v2.git_url} order by ${cli_sessions_v2.created_at}, ${cli_sessions_v2.session_id}) filter (where ${cli_sessions_v2.git_url} is not null))[1]`;
     const conditions: (SQL | undefined)[] = [
       ...accessibleRootConditions(parsed.kiloUserId),
       or(
@@ -747,10 +747,10 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         gitUrl: canonicalGitUrl,
         gitBranch: sql<
           string | null
-        >`(array_agg(${cli_sessions_v2.git_branch} order by ${cli_sessions_v2.created_at}, ${cli_sessions_v2.session_id}))[1]`,
+        >`(array_agg(${cli_sessions_v2.git_branch} order by ${cli_sessions_v2.created_at}, ${cli_sessions_v2.session_id}) filter (where ${cli_sessions_v2.git_branch} is not null))[1]`,
         profileId: sql<
           string | null
-        >`(array_agg(${cli_sessions_v2.profile_id} order by ${cli_sessions_v2.created_at}, ${cli_sessions_v2.session_id}))[1]`,
+        >`(array_agg(${cli_sessions_v2.profile_id} order by ${cli_sessions_v2.created_at}, ${cli_sessions_v2.session_id}) filter (where ${cli_sessions_v2.profile_id} is not null))[1]`,
         deletionStartedAt: cloud_agent_worktrees.deletion_started_at,
         createdAt: sql<string>`coalesce(
           ${cloud_agent_worktrees.created_at},

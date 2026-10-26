@@ -196,16 +196,18 @@ export type MintedTokens = {
 export function mintApiToken(
   user: { id: string; api_token_pepper?: string },
   nextAuthSecret: string | undefined,
-  expiresInSeconds = 60 * 60
+  expiresInSeconds = 60 * 60,
+  organizationId?: string
 ): string {
   if (!nextAuthSecret) {
     throw new Error('mintApiToken requires NEXTAUTH_SECRET for local JWT minting');
   }
-  const pepper = user.api_token_pepper ?? null;
+  const pepper = user.api_token_pepper || null;
   return jwt.sign(
     {
       env: 'development',
       kiloUserId: user.id,
+      ...(organizationId ? { organizationId } : {}),
       apiTokenPepper: pepper,
       version: JWT_TOKEN_VERSION,
       aud: 'cloud-agent-next',

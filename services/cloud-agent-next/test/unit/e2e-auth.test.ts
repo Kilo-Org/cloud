@@ -11,7 +11,8 @@ describe('E2E API token', () => {
       api_token_pepper: 'pepper',
     };
 
-    const payload = jwt.verify(mintApiToken(user, secret), secret, {
+    const organizationId = 'org_e2e_test';
+    const payload = jwt.verify(mintApiToken(user, secret, 60 * 60, organizationId), secret, {
       algorithms: ['HS256'],
       audience: 'cloud-agent-next',
     });
@@ -19,6 +20,7 @@ describe('E2E API token', () => {
     expect(payload).toMatchObject({
       kiloUserId: user.id,
       apiTokenPepper: user.api_token_pepper,
+      organizationId,
       aud: 'cloud-agent-next',
       tokenPurpose: 'human-api',
       credentialExchange: false,
@@ -45,6 +47,21 @@ describe('E2E API token', () => {
       runtimeAdmission: {
         authorizationPepper: null,
       },
+    });
+  });
+
+  it('normalizes an empty persisted pepper to null', () => {
+    const secret = 'test-secret';
+
+    const payload = jwt.verify(
+      mintApiToken({ id: 'usr_e2e_test', api_token_pepper: '' }, secret),
+      secret,
+      { algorithms: ['HS256'], audience: 'cloud-agent-next' }
+    );
+
+    expect(payload).toMatchObject({
+      apiTokenPepper: null,
+      runtimeAdmission: { authorizationPepper: null },
     });
   });
 });

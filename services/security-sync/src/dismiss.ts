@@ -44,7 +44,11 @@ function isRateLimitMessage(body: unknown): boolean {
   const message = body.message;
   if (typeof message !== 'string') return false;
   const normalized = message.toLowerCase();
-  return normalized.includes('secondary rate limit') || normalized.includes('rate limit exceeded');
+  return (
+    normalized.includes('secondary rate limit') ||
+    normalized.includes('rate limit exceeded') ||
+    normalized.includes('abuse detection')
+  );
 }
 
 async function isRateLimitedForbiddenResponse(response: Response): Promise<boolean> {

@@ -436,6 +436,16 @@ describe('processSecurityFindingDismissal', () => {
       403,
       { body: JSON.stringify({ message: 'You have exceeded a secondary rate limit.' }) },
     ],
+    [
+      '403 with an abuse detection message',
+      403,
+      {
+        body: JSON.stringify({
+          message:
+            'You have triggered an abuse detection mechanism. Please wait a few minutes before you try again.',
+        }),
+      },
+    ],
   ] as const)('retries GitHub %s', async (_name, status, options) => {
     const { db, updates, auditRows } = createDb();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(githubResponse(status, options)));

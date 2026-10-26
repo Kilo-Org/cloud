@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
 import type { ControlPlaneConnection } from './connection.js';
+import { createControlLogUploadAuth } from '../control/log-upload-auth.js';
 import {
   controlPlaneExitPolicy,
   createControlPlaneLifecycle,
@@ -144,6 +145,46 @@ describe('controlPlaneExitPolicy', () => {
 });
 
 describe('createControlPlaneLifecycle', () => {
+  it('keeps credential renewal connected through both final uploads', async () => {
+    const connection = createFakeConnection();
+    const tokens: Array<string | undefined> = [];
+    const auth = createControlLogUploadAuth({ initialGrant: 'old-token', send() {} });
+    auth.connected();
+    void auth.rejected('old-token');
+    const close = connection.connection.close;
+    connection.connection.close = () => {
+      close();
+      auth.disconnected();
+    };
+    const lifecycle = createControlPlaneLifecycle({
+      connection: connection.connection,
+      process: createFakeProcess(),
+      diagnostics: {
+        onDiagnostic() {},
+        finalize: async () => {
+          const pending = auth.waitForCurrent(AbortSignal.timeout(100));
+          if (connection.closed() === 0)
+            auth.receive({
+              type: 'logs.credentials',
+              grant: 'fresh-token',
+              expiresAt: Date.now() + 4 * 60 * 60_000,
+            });
+          tokens.push((await pending)?.token);
+        },
+      },
+      fileLogs: {
+        finalize: async () => {
+          tokens.push((await auth.waitForCurrent(AbortSignal.timeout(100)))?.token);
+        },
+      },
+      logUploadAuth: auth,
+      exit() {},
+    });
+    await lifecycle.shutdown(0, 'shutdown during renewal');
+    expect(tokens).toEqual(['fresh-token', 'fresh-token']);
+    expect(connection.closed()).toBe(1);
+  });
+
   it('starts the connection and recycles on demand', () => {
     const { lifecycle, connectionState } = createLifecycle();
     lifecycle.start();

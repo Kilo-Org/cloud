@@ -129,7 +129,6 @@ export function createControlPlaneLifecycle(
     if (shuttingDown) return;
     shuttingDown = true;
     log(`control-plane wrapper stopping exitCode=${exitCode} reason=${reason}`);
-    deps.connection.close();
     await settle(() => deps.stop?.() ?? Promise.resolve());
     const detail = diagnosticDetail(reason);
     deps.diagnostics.onDiagnostic('wrapper.lifecycle', {
@@ -139,6 +138,7 @@ export function createControlPlaneLifecycle(
     });
     await settle(() => deps.diagnostics.finalize(DIAGNOSTICS_FINALIZE_TIMEOUT_MS));
     await settle(() => deps.fileLogs.finalize(FILE_LOG_FINALIZE_TIMEOUT_MS));
+    deps.connection.close();
     // Only after the final uploads have had their budget: stopping earlier
     // would hide the credential those uploads need.
     deps.logUploadAuth?.stop();

@@ -3706,4 +3706,55 @@ describe('turn coverage and fenced abandonment', () => {
     await settle();
     expect(h.client(routeSpec()).prompts.map(call => call.messageId)).toEqual(['expired']);
   });
+
+  it.each(['materialize', 'submit'] as const)(
+    'does not fail a newer prompt when an abandoned %s rejects after cancellation',
+    async phase => {
+      const submission = Promise.withResolvers<void>();
+      const cancellation = Promise.withResolvers<boolean>();
+      let first = true;
+      let retiredSignal: AbortSignal | undefined;
+      const h = createHarness({
+        materializeAttachments: async (_message, deps) => {
+          if (phase === 'materialize' && first) {
+            first = false;
+            retiredSignal = deps?.signal;
+            await submission.promise;
+          }
+          return { prompt: 'hello' };
+        },
+      });
+      h.registerRoute(routeSpec());
+      h.setState(KILO_SESSION, runningState);
+      h.client(routeSpec()).setAbortImpl(() => cancellation.promise);
+      h.client(routeSpec()).setPromptImpl(async call => {
+        if (phase === 'submit' && call.messageId === 'expired') {
+          retiredSignal = call.signal;
+          await submission.promise;
+        }
+      });
+      h.manager.submit(SESSION_ID, promptPayload('expired'));
+      await settle();
+      const abandoning = h.manager.sessionControl({
+        action: 'abandon',
+        sessionId: SESSION_ID,
+        messageIds: ['expired'],
+      });
+      await settle();
+      h.manager.submit(SESSION_ID, promptPayload('newer'));
+      cancellation.resolve(true);
+      await abandoning;
+      expect(retiredSignal?.aborted).toBe(true);
+      submission.reject(retiredSignal?.reason);
+      await settle();
+      expect(outcomeFrames(h.frames)).toEqual([]);
+      expect(h.client(routeSpec()).prompts.at(-1)?.messageId).toBe('newer');
+      h.setState(KILO_SESSION, undefined);
+      h.manager.observeKiloEvent(completedKiloTurn());
+      await settle();
+      expect(outcomeFrames(h.frames)).toEqual([
+        expect.objectContaining({ status: 'completed', lastMessageId: 'newer' }),
+      ]);
+    }
+  );
 });

@@ -133,8 +133,9 @@ batches may span multiple native executions without an accepted-age limit.
 
 The Session DO persists cleanup before failing an unowned message with `no_outcome`; eviction
 replays that settlement. Cleanup names exact expired IDs, cannot interrupt newer prompts, and
-retries at the probe cadence. New queued work resumes after cleanup confirms or its allocation
-retires. Existing messages without an ownership record and older wrappers keep the original
+retries at the probe cadence. A failed or preparing route does not retire cleanup on the same
+allocation. New queued work resumes after cleanup confirms or its allocation retires. Existing
+messages without an ownership record and older wrappers keep the original
 125-minute accepted-age fallback; it does not grow with the new execution cap. The Session DO
 sets its alarm to the earliest ownership, backstop, cleanup, recovery, report or callback
 obligation, and clears it when none remains.
@@ -456,8 +457,11 @@ These keep their current owners and evidence; the rewrite ports them, it does no
   the operation queue, then publication rechecks the allocation, connection, route and full shared
   scope grant. A concurrent join or release invalidates the candidate. Vercel policy writes are
   serialized; discarded candidates restore the live policy, failing closed if restoration fails.
-  Transient issuance failure retains valid authority and retries after five minutes. Actual expiry
-  fails and releases only the affected route with `credentials_expired`.
+  Renewal commits only after its credentials frame is written to the current socket; failed writes
+  leave the prior grant in force for bounded retry. Transient issuance failure retains valid
+  authority and retries after five minutes. Actual expiry fails and releases the affected route
+  with `credentials_expired` and rebuilds Vercel's live policy. A failed policy revocation stops
+  the sandbox rather than leaving injected credentials active.
 - Repeated preparation, new preparation attempts and warm renewal reuse the canonical grant's
   aliases. Renewal refreshes backing material and expiry without revoking credentials installed in
   a busy runtime. The contained resolver and Vercel policy use this same canonical grant set.

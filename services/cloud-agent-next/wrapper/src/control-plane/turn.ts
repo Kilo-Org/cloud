@@ -683,11 +683,14 @@ export function createTurnManager(deps: TurnManagerDeps) {
     turn.submitting = turn.submitting
       .then(() => submitPayloadInner(turn, pending, prompts))
       .catch(error => {
+        if (
+          turns.get(turn.route.sessionId) !== turn ||
+          !turn.prompts.some(current => current.payload.messageId === pending.payload.messageId)
+        )
+          return;
         const message = error instanceof Error ? error.message : String(error);
         log(`turn: prompt submission failed - ${message}`);
-        if (turns.get(turn.route.sessionId) === turn) {
-          sendOutcome(turn, 'failed', 'prompt_failed');
-        }
+        sendOutcome(turn, 'failed', 'prompt_failed');
       });
   }
 
@@ -696,7 +699,10 @@ export function createTurnManager(deps: TurnManagerDeps) {
     pending: PendingPrompt,
     prompts: PendingPrompt[]
   ): Promise<void> {
-    const isCurrent = () => turns.get(turn.route.sessionId) === turn && turn.prompts === prompts;
+    const isCurrent = () =>
+      turns.get(turn.route.sessionId) === turn &&
+      turn.prompts === prompts &&
+      prompts.includes(pending);
     if (!isCurrent()) {
       // The turn already reached a terminal outcome (Stop, failure or restart),
       // which settled everything the wrapper received. Sending it again would

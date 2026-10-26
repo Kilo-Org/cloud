@@ -1895,6 +1895,199 @@ describe('SandboxControlV2 credentials (B3)', () => {
     expect(await wrapper.next()).toMatchObject({ type: 'session.release' });
   });
 
+  it.each(['disconnected', 'send-failed'] as const)(
+    'does not publish an undelivered proactive grant when %s, then recovers delivery',
+    async failure => {
+      const provider = createFakeProvider();
+      const broker = createFakeCredentialBroker();
+      const stub = await setup(provider, broker);
+      const { wrapper, credential, allocationId } = await prepareWarmRoute(stub, provider);
+      await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
+      const original = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}');
+      const gate = createDeferred();
+      let entered = false;
+      let failSend = failure === 'send-failed';
+      await runInDurableObject(stub, instance => {
+        installFakeCredentialEnv(instance.env, {
+          ...broker,
+          async issueGitHubSessionCapability() {
+            entered = true;
+            await gate.promise;
+            return broker.issueGitHubSessionCapability();
+          },
+        });
+        const transport = instance as unknown as {
+          trySendFrame(ws: WebSocket, frame: ControlPlaneWrapperFrame): boolean;
+        };
+        const send = transport.trySendFrame.bind(instance);
+        transport.trySendFrame = (ws, frame) =>
+          failSend && frame.type === 'session.credentials' ? false : send(ws, frame);
+      });
+      const realNow = Date.now.bind(Date);
+      let offset = 0;
+      const clock = vi.spyOn(Date, 'now').mockImplementation(() => realNow() + offset);
+      try {
+        await touchAllocation(stub);
+        await runInDurableObject(stub, instance => instance.alarm());
+        await waitFor(() => expect(entered).toBe(true));
+        if (failure === 'disconnected') {
+          wrapper.close();
+          await waitFor(async () =>
+            expect((await stub.getAllocationState()).kind).toBe('disconnected')
+          );
+        }
+        gate.resolve();
+        await waitFor(async () =>
+          expect(
+            await runInDurableObject(stub, instance =>
+              Boolean(
+                (instance as unknown as { credentialMaintenance: Promise<void> | null })
+                  .credentialMaintenance
+              )
+            )
+          ).toBe(false)
+        );
+        expect(JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}').expiresAt).toBe(
+          original.expiresAt
+        );
+        expect(await readAlarm(stub)).toBeGreaterThan(Date.now());
+
+        failSend = false;
+        const active =
+          failure === 'disconnected'
+            ? await FakeWrapper.connect({
+                sandboxId: SANDBOX_ID,
+                credential,
+                runtimeContract: 'worktree',
+              })
+            : wrapper;
+        const frames: ControlPlaneWrapperFrame[] = [];
+        active.onFrame(frame => frames.push(frame));
+        if (failure === 'disconnected')
+          expect(await active.hello({ wrapperId: 'wr_1', allocationId })).toMatchObject({
+            type: 'welcome',
+          });
+        offset += 5 * 60_000 + 1000;
+        await touchAllocation(stub);
+        await runInDurableObject(stub, instance => instance.alarm());
+        await waitFor(async () =>
+          expect(
+            JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}').expiresAt
+          ).toBeGreaterThan(original.expiresAt)
+        );
+        await waitFor(() =>
+          expect(frames.some(frame => frame.type === 'session.credentials')).toBe(true)
+        );
+        expect(
+          await stub.deliver({ sessionId: SESSION, messages: [promptPayload('after-renewal')] })
+        ).toBe('sent');
+        await waitFor(() =>
+          expect(
+            frames.some(
+              frame =>
+                frame.type === 'session.prompt' && frame.payload.messageId === 'after-renewal'
+            )
+          ).toBe(true)
+        );
+      } finally {
+        gate.resolve();
+        clock.mockRestore();
+      }
+    }
+  );
+
+  it.each([false, true])(
+    'revokes expired last-member Vercel scope policy with provider failure %s',
+    async failPolicy => {
+      const provider = createFakeProvider();
+      const stub = await setupVercel(provider, createFakeCredentialBroker());
+      const { wrapper, allocationId } = await prepareWarmRoute(
+        stub,
+        provider,
+        prepareInput(SESSION, vercelSource(SESSION))
+      );
+      await prepareSibling(stub, wrapper, prepareInput(SESSION_NEXT, vercelSource(SESSION_NEXT)));
+      provider.failPolicy = failPolicy;
+      await setGrantExpiry(stub, SESSION, Date.now() - 1);
+      await runInDurableObject(stub, instance => instance.alarm());
+      expect(await readRouteRow(stub, SESSION)).toBeNull();
+      if (failPolicy) {
+        await waitFor(async () =>
+          expect(['stopping', 'stopped']).toContain((await stub.getAllocationState()).kind)
+        );
+        provider.failPolicy = false;
+        await waitFor(async () => expect((await stub.getAllocationState()).kind).toBe('stopped'));
+        expect(
+          await stub.sessionControl({
+            action: 'abandon',
+            sessionId: SESSION,
+            allocationId,
+            messageIds: ['expired'],
+          })
+        ).toEqual({
+          ok: true,
+          result: { type: 'abandon', outcome: 'absent', cleanedMessageIds: [] },
+        });
+        expect(await stub.prepare(prepareInput(SESSION, vercelSource(SESSION)))).toMatchObject({
+          state: 'preparing',
+        });
+      } else {
+        const expected = await runInDurableObject(stub, (_instance, state) =>
+          buildControlNetworkPolicy(
+            listScopeGrants(drizzle(state.storage)).filter(grant => grant.expiresAt > Date.now())
+          )
+        );
+        expect(JSON.stringify(provider.policyCalls.at(-1)) === JSON.stringify(expected)).toBe(true);
+        expect((await stub.getAllocationState()).kind).toBe('connected');
+        expect(
+          await stub.deliver({
+            sessionId: SESSION_NEXT,
+            messages: [promptPayload('sibling-continues')],
+          })
+        ).toBe('sent');
+      }
+    }
+  );
+
+  it('keeps the old valid grant when a delivery renewal frame fails and retries on the next prompt', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider);
+    const { wrapper } = await prepareWarmRoute(stub, provider);
+    await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
+    const original = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}');
+    let failSend = true;
+    await runInDurableObject(stub, instance => {
+      const transport = instance as unknown as {
+        trySendFrame(ws: WebSocket, frame: ControlPlaneWrapperFrame): boolean;
+      };
+      const send = transport.trySendFrame.bind(instance);
+      transport.trySendFrame = (ws, frame) =>
+        failSend && frame.type === 'session.credentials' ? false : send(ws, frame);
+    });
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('old-valid')] })).toBe(
+      'sent'
+    );
+    expect(JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}').expiresAt).toBe(
+      original.expiresAt
+    );
+    expect(await wrapper.next()).toMatchObject({
+      type: 'session.prompt',
+      payload: { messageId: 'old-valid' },
+    });
+    failSend = false;
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('renewed')] })).toBe(
+      'sent'
+    );
+    expect(await wrapper.next()).toMatchObject({ type: 'session.credentials' });
+    expect(await wrapper.next()).toMatchObject({
+      type: 'session.prompt',
+      payload: { messageId: 'renewed' },
+    });
+    expect(
+      JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}').expiresAt
+    ).toBeGreaterThan(original.expiresAt);
+  });
+
   it('replaces scoped MCP credentials on normal warm credential renewal without persisting them', async () => {
     const provider = createFakeProvider();
     const stub = await setup(provider);

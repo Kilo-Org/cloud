@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import {
   ACCEPTED_OWNERSHIP_KEY,
+  acceptCoveredMessages,
   emptyAcceptedOwnership,
   parseAcceptedOwnership,
   type AcceptedOwnership,
@@ -804,6 +805,29 @@ describe('SandboxSessionV2 queued transport recovery', () => {
     expect((await ownership(stub)).entries.m1).toEqual(before);
   });
 
+  it('rebinds coverage left before acceptance persistence when the queued message moves allocation', async () => {
+    const { stub, peer } = await setup();
+    readyWithContainer(peer);
+    peer.deliverResult = 'not_ready';
+    await stub.send(prompt('replayed'));
+    expect((await rows(stub))[0]?.state).toBe('queued');
+    await setOwnership(
+      stub,
+      acceptCoveredMessages(
+        emptyAcceptedOwnership(),
+        ['replayed'],
+        'retired-allocation',
+        Date.now() - 200_000,
+        CONTROL_PLANE_TIMERS.session
+      )
+    );
+    peer.deliverResult = { type: 'sent', coverage: true, allocationId: 'allocation-coverage' };
+    await stub.send(prompt('continuation'));
+    expect((await ownership(stub)).entries.replayed?.allocationId).toBe('allocation-coverage');
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect((await rows(stub))[0]?.state).toBe('accepted');
+  });
+
   it('replays durable cleanup for a still-accepted row before retiring it, even after route loss', async () => {
     const { stub, peer } = await setup();
     readyWithContainer(peer);
@@ -821,7 +845,7 @@ describe('SandboxSessionV2 queued transport recovery', () => {
       ],
     });
     await evictAllDurableObjects();
-    // Simulate a route that retired without settling this accepted row.
+    // A failed route alone does not prove that its allocation retired.
     await runInDurableObject(stub, instance => {
       instance.route = {
         state: 'failed',
@@ -833,7 +857,66 @@ describe('SandboxSessionV2 queued transport recovery', () => {
     await runInDurableObject(stub, instance => instance.alarm());
 
     expect((await rows(stub))[0]).toMatchObject({ state: 'failed', reason: 'no_outcome' });
+    const retained = await ownership(stub);
+    expect(retained.cleanup).toHaveLength(1);
+    await setOwnership(stub, {
+      ...retained,
+      cleanup: retained.cleanup.map(item => ({ ...item, retryAt: Date.now() - 1 })),
+    });
+    await runInDurableObject(stub, instance => instance.alarm());
     expect((await ownership(stub)).cleanup).toEqual([]);
+  });
+
+  it('retains expired-turn cleanup through failed and preparing attempts on the same allocation', async () => {
+    const { stub, peer } = await setup();
+    readyWithContainer(peer);
+    const container = peer.prepareView.container;
+    peer.deliverResult = { type: 'sent', coverage: true, allocationId: 'allocation-coverage' };
+    await stub.send(prompt('expired'));
+    await setOwnership(stub, {
+      ...emptyAcceptedOwnership(),
+      cleanup: [
+        { allocationId: 'allocation-coverage', messageIds: ['expired'], retryAt: Date.now() - 1 },
+      ],
+    });
+    const failed = {
+      state: 'failed' as const,
+      attemptId: peer.attemptId,
+      reason: 'credentials_expired' as const,
+      container,
+    };
+    peer.prepareView = failed;
+    await stub.onRoute(failed);
+    peer.sessionControlResult = { type: 'abandon', outcome: 'deferred', cleanedMessageIds: [] };
+    peer.sessionControlResults = [{ type: 'abandon', outcome: 'deferred', cleanedMessageIds: [] }];
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect((await ownership(stub)).cleanup).toHaveLength(1);
+
+    peer.attemptId = 'new-attempt-same-allocation';
+    peer.prepareView = { state: 'preparing', attemptId: peer.attemptId, container };
+    await stub.send(prompt('newer'));
+    const retained = await ownership(stub);
+    await setOwnership(stub, {
+      ...retained,
+      cleanup: retained.cleanup.map(item => ({ ...item, retryAt: Date.now() - 1 })),
+    });
+    peer.sessionControlResults = [{ type: 'abandon', outcome: 'deferred', cleanedMessageIds: [] }];
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect((await ownership(stub)).cleanup).toHaveLength(1);
+    peer.prepareView = { state: 'ready', attemptId: peer.attemptId, container };
+    await stub.onRoute(peer.prepareView);
+    expect((await rows(stub)).at(-1)?.state).toBe('queued');
+    expect(peer.deliverCalls).toHaveLength(1);
+
+    const retry = await ownership(stub);
+    await setOwnership(stub, {
+      ...retry,
+      cleanup: retry.cleanup.map(item => ({ ...item, retryAt: Date.now() - 1 })),
+    });
+    peer.sessionControlResults = [{ type: 'abandon', outcome: 'absent', cleanedMessageIds: [] }];
+    await runInDurableObject(stub, instance => instance.alarm());
+    expect((await ownership(stub)).cleanup).toEqual([]);
+    expect((await rows(stub)).at(-1)?.state).toBe('accepted');
   });
 
   it('finishes multi-batch cleanup without leaving the delivery gate closed forever', async () => {

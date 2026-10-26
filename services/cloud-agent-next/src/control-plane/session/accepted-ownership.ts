@@ -76,8 +76,8 @@ function clone(state: AcceptedOwnership): AcceptedOwnership {
 }
 
 /**
- * Start coverage for newly accepted messages. Existing ids keep their original
- * acceptance and deadline, so a repeated admission never extends coverage.
+ * Start coverage for newly accepted messages. Replays on the same allocation
+ * retain their deadline; queued re-admission can replace a retired allocation.
  */
 export function acceptCoveredMessages(
   state: AcceptedOwnership,
@@ -90,7 +90,7 @@ export function acceptCoveredMessages(
   const next = clone(state);
   const coveredUntil = acceptedAt + timers.acceptedCoverageMs;
   for (const messageId of messageIds) {
-    if (next.entries[messageId] !== undefined) continue;
+    if (next.entries[messageId]?.allocationId === allocationId) continue;
     next.entries[messageId] = {
       allocationId,
       acceptedAt,

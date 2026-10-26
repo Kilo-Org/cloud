@@ -2060,8 +2060,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   /**
    * Cleanup can only be abandoned by the allocation that owned the expired
-   * turn. Once the route left that allocation there is no reachable zombie, so
-   * the obligation is retired instead of retried forever.
+   * turn. A changed allocation identity proves retirement; a failed or preparing
+   * route can still belong to the same live allocation.
    */
   private async dropRetiredCleanup(): Promise<void> {
     if (this.acceptedOwnership.cleanup.length === 0) return;
@@ -2077,12 +2077,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   private cleanupAllocationRetired(allocationId: string): boolean {
-    if (
-      this.route.state === 'unknown' ||
-      this.route.state === 'failed' ||
-      this.route.state === 'preparing'
-    )
-      return true;
+    if (this.route.state === 'unknown') return false;
     const current = this.route.container?.allocationId;
     return current !== undefined && current !== allocationId;
   }

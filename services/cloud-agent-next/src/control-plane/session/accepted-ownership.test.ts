@@ -46,6 +46,17 @@ describe('accepted coverage ownership', () => {
     expect(replay.entries.m1).toEqual(state.entries.m1);
   });
 
+  it('rebinds an orphaned admission entry when a queued message is accepted on a new allocation', () => {
+    const orphaned = acceptCoveredMessages(emptyAcceptedOwnership(), ['m1'], ALLOCATION, 0, timers);
+    const accepted = acceptCoveredMessages(orphaned, ['m1'], 'allocation-b', 200_000, timers);
+    expect(accepted.entries.m1).toEqual({
+      allocationId: 'allocation-b',
+      acceptedAt: 200_000,
+      coveredUntil: 380_000,
+      nextProbeAt: 260_000,
+    });
+  });
+
   it('expires only after a failed probe cadence and accumulates a cleanup id', () => {
     let state = acceptCoveredMessages(emptyAcceptedOwnership(), ['m1'], ALLOCATION, 0, timers);
     const firstProbe = advanceAcceptedOwnership(state, 60_000, timers);

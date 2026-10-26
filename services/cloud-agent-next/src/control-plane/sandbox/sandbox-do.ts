@@ -1366,7 +1366,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
     let requestedConnectionId: string | null = null;
     const handoff = await this.enqueue(async () => {
       const state = await this.readAllocation();
-      if (parsed.action === 'abandon' && state.allocationId !== parsed.allocationId) {
+      if (
+        parsed.action === 'abandon' &&
+        (state.allocationId !== parsed.allocationId || state.kind === 'stopped')
+      ) {
         return {
           reply: {
             ok: true,
@@ -3028,9 +3031,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...sessionCredentialsPayloadFromGrant(renewed.grant, route.sessionId),
       ...(renewed.cloudAgentMcp ? { cloudAgentMcp: renewed.cloudAgentMcp } : {}),
     });
-    if (this.trySendFrame(socket, { type: 'session.credentials', ...payload })) {
-      await this.markRouteCredentialsSent(route.sessionId, renewed.grant);
+    if (!this.trySendFrame(socket, { type: 'session.credentials', ...payload })) {
+      this.publishRouteGrant(route);
+      await this.applyVercelNetworkPolicyOrStop('sandbox_lost');
+      return 'failed';
     }
+    await this.markRouteCredentialsSent(route.sessionId, renewed.grant);
     return 'issued';
   }
 
@@ -3049,18 +3055,19 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (latest === null || latest.grant === null) return 'released';
       const verdict = this.credentialTargetVerdict(target, state, latest);
       if (verdict !== 'current') return verdict;
+      const socket = this.boundWrapperSocket(state);
+      if (socket === null) return 'stale';
       const next: RouteRecord = { ...latest, grant: renewed.grant, spec: renewed.spec };
       this.publishRouteGrant(next);
-      const socket = this.boundWrapperSocket(state);
-      if (socket !== null) {
-        const payload = controlPlaneSessionCredentialsPayloadSchema.parse({
-          ...sessionCredentialsPayloadFromGrant(renewed.grant, target.sessionId),
-          ...(renewed.cloudAgentMcp ? { cloudAgentMcp: renewed.cloudAgentMcp } : {}),
-        });
-        if (this.trySendFrame(socket, { type: 'session.credentials', ...payload })) {
-          await this.markRouteCredentialsSent(target.sessionId, renewed.grant);
-        }
+      const payload = controlPlaneSessionCredentialsPayloadSchema.parse({
+        ...sessionCredentialsPayloadFromGrant(renewed.grant, target.sessionId),
+        ...(renewed.cloudAgentMcp ? { cloudAgentMcp: renewed.cloudAgentMcp } : {}),
+      });
+      if (!this.trySendFrame(socket, { type: 'session.credentials', ...payload })) {
+        this.publishRouteGrant(latest);
+        return 'stale';
       }
+      await this.markRouteCredentialsSent(target.sessionId, renewed.grant);
       logControlDiagnostic('credential_renewal', {
         sandboxId: this.sandboxId,
         sessionId: target.sessionId,
@@ -3139,9 +3146,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
   /**
    * Expired authority is a per-route failure: notify that attempt as failed and
    * release its native route (row, scope membership, accepted handles, wrapper
-   * session) so no unusable alias or membership survives. The alias itself is
-   * already denied by `resolveCredential`; no whole-sandbox policy rebuild is
-   * attempted, so healthy siblings keep running.
+   * session) so no unusable alias or membership survives. Expired scopes must
+   * also leave Vercel's injected policy, failing closed on update failure.
    */
   private async releaseExpiredCredentialRoute(
     sessionId: string,
@@ -3179,7 +3185,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
       true
     );
     await deleteRoute(this.db, this.ctx.storage.kv, sessionId);
-    const socket = this.boundWrapperSocket(state);
+    await this.applyVercelNetworkPolicyOrStop('sandbox_lost');
+    const socket = this.boundWrapperSocket(await this.readAllocation());
     if (socket !== null) {
       this.trySendFrame(socket, { type: 'session.release', sessionId });
     }

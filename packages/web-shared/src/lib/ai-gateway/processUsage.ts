@@ -42,10 +42,7 @@ import {
 import type { OrganizationUsageMutationResult } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type { ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import {
-  findKiloExclusiveModel,
-  shouldRedactModelNameInMicrodollarUsage,
-} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { shouldRedactModelNameInMicrodollarUsage } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@kilocode/web-shared/lib/kilo-pass/threshold';
@@ -98,11 +95,7 @@ import {
   reportUpstreamStreamError,
   readResponseText,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
-import {
-  calculateCost_mUsd,
-  type KiloExclusiveModel,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
-import { calculateCustomCost_mUsd } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
 import { enqueueDailyUsageRollupRepair } from './usage-daily-rollup-repairs';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
 import {
@@ -114,6 +107,8 @@ import {
 import { deliverBouncerUsageEventNow } from '@kilocode/web-shared/lib/bouncer/dispatch-usage-event-outbox';
 import { enqueueBouncerUsageEvent } from '@kilocode/db/bouncer-usage-event-outbox';
 import type { BouncerUsageEventEnqueue, UsageRecordRequest } from '@kilocode/usage-contracts';
+
+export { calculateKiloExclusiveCost_mUsd } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
 
 const posthogClient = PostHogClient();
 
@@ -1366,38 +1361,6 @@ export function parseMicrodollarUsageFromString(
   return { ...coreProps, ...costs };
 }
 
-export function calculateKiloExclusiveCost_mUsd(
-  model: KiloExclusiveModel,
-  usage: JustTheCostsUsageStats
-): number | undefined {
-  const pricing = model?.pricing;
-  if (!pricing) {
-    return 0;
-  }
-  if (pricing.fallbackOnly && usage.cost_mUsd > 0) {
-    return undefined;
-  }
-  const uncachedInputTokens = usage.inputTokens - usage.cacheHitTokens - usage.cacheWriteTokens;
-  if (uncachedInputTokens < 0) {
-    captureMessage('SUSPICIOUS: negative uncached input tokens', {
-      level: 'error',
-      tags: { source: 'usage_processing' },
-      extra: { model: model.public_id, usage },
-    });
-  }
-  return Math.round(
-    calculateCost_mUsd(
-      {
-        uncachedInputTokens: uncachedInputTokens >= 0 ? uncachedInputTokens : usage.inputTokens,
-        totalOutputTokens: usage.outputTokens,
-        cacheHitTokens: usage.cacheHitTokens,
-        cacheWriteTokens: usage.cacheWriteTokens,
-      },
-      pricing.tiers
-    )
-  );
-}
-
 export async function processTokenData(
   usageStats: MicrodollarUsageStats | null,
   usageContext: MicrodollarUsageContext
@@ -1494,25 +1457,7 @@ export async function processTokenData(
     usageStats.model = usageContext.requested_model;
   }
 
-  const kiloExclusiveModel = findKiloExclusiveModel(usageContext.requested_model);
-  if (kiloExclusiveModel?.pricing) {
-    const exclusiveCost_mUsd = calculateKiloExclusiveCost_mUsd(kiloExclusiveModel, usageStats);
-    if (exclusiveCost_mUsd !== undefined) {
-      usageStats.market_cost = usageStats.cost_mUsd;
-      usageStats.cost_mUsd = exclusiveCost_mUsd;
-    }
-  }
-
-  const customCost_mUsd = calculateCustomCost_mUsd(usageContext.requested_model, usageStats);
-
-  // Preserve the real cost before zeroing for free/BYOK
-  usageStats.market_cost ??= usageStats.cost_mUsd;
-  usageStats.cost_mUsd = customCost_mUsd ?? usageStats.cost_mUsd;
-
-  if (usageContext.is_free || usageContext.user_byok) {
-    usageStats.cost_mUsd = 0;
-    usageStats.cacheDiscount_mUsd = 0;
-  }
+  applyUsagePricing(usageStats, usageContext);
 
   return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
 }

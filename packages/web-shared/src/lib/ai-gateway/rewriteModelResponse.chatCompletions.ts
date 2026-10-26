@@ -3,6 +3,7 @@ import { getOutputHeaders } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-
 import type {
   ChatCompletionChunk,
   OpenRouterUsage,
+  VercelProviderMetaData,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { applyReasoningDetailsResponseTransform } from '@kilocode/web-shared/lib/ai-gateway/reasoning-details-transform';
@@ -13,6 +14,8 @@ import {
   readResponseText,
   rewriteSseStream,
   rewriteUsage,
+  rewriteResponseMetadata,
+  type ResponseMetadata,
   type RewriteResponseParams,
 } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse.shared';
 import type { EventSourceMessage } from 'eventsource-parser';
@@ -26,7 +29,7 @@ export type RewriteChatCompletionsResponseParams = RewriteResponseParams & {
 
 export async function rewriteModelResponse_ChatCompletions({
   response,
-  removeCost,
+  usageContext,
   capture,
   reasoningEffort,
   vercelRequestId,
@@ -50,9 +53,9 @@ export async function rewriteModelResponse_ChatCompletions({
     }
     capture?.setBody(textResult.text);
     const { text } = textResult;
-    let json: OpenAI.ChatCompletion;
+    let json: OpenAI.ChatCompletion & ResponseMetadata;
     try {
-      json = JSON.parse(text) as OpenAI.ChatCompletion;
+      json = JSON.parse(text) as OpenAI.ChatCompletion & ResponseMetadata;
     } catch {
       // Upstream returned invalid/empty JSON body — pass through as-is
       return new NextResponse(text, {
@@ -62,10 +65,23 @@ export async function rewriteModelResponse_ChatCompletions({
       });
     }
     const usage = json.usage as OpenRouterUsage;
+    const firstMessage = json.choices?.[0]?.message as
+      | (OpenAI.ChatCompletionMessage & ResponseMetadata)
+      | undefined;
+    const providerMetadata =
+      json.provider_metadata ??
+      json.providerMetadata ??
+      firstMessage?.provider_metadata ??
+      firstMessage?.providerMetadata;
     if (usage) {
-      rewriteUsage(usage, removeCost);
+      rewriteUsage(usage, usageContext, providerMetadata);
     }
+    rewriteResponseMetadata(json, usageContext);
     for (const choice of json.choices ?? []) {
+      if (choice.message) {
+        const message = choice.message as OpenAI.ChatCompletionMessage & ResponseMetadata;
+        rewriteResponseMetadata(message, usageContext);
+      }
       // Some APIs set null here, which @openrouter/ai-sdk-provider rejects in non-streaming responses
       if (choice.message?.tool_calls === null) {
         delete choice.message.tool_calls;
@@ -97,6 +113,7 @@ export async function rewriteModelResponse_ChatCompletions({
       let doneReceived = false;
       let terminalEventReceived = false;
       let generationId: string | undefined;
+      let providerMetadata: VercelProviderMetaData | undefined;
       const progress = createStreamProgressLogger();
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
@@ -109,7 +126,7 @@ export async function rewriteModelResponse_ChatCompletions({
             doneReceived = true;
             return;
           }
-          const json = JSON.parse(event.data) as ChatCompletionChunk;
+          const json = JSON.parse(event.data) as ChatCompletionChunk & ResponseMetadata;
           if (generationId === undefined && json.id) {
             generationId = json.id;
             logExceptInTest('[rewriteModelResponse] received generation ID', {
@@ -118,11 +135,15 @@ export async function rewriteModelResponse_ChatCompletions({
             });
           }
 
+          providerMetadata = json.provider_metadata ?? json.providerMetadata ?? providerMetadata;
           for (const choice of json.choices ?? []) {
-            const delta = choice.delta;
+            const delta = choice.delta as typeof choice.delta & ResponseMetadata;
             if (!delta) {
               continue;
             }
+            providerMetadata =
+              delta.provider_metadata ?? delta.providerMetadata ?? providerMetadata;
+            rewriteResponseMetadata(delta, usageContext);
             // Some APIs set null here, which is not accepted by OpenCode
             if (delta.role === null) {
               delete delta.role;
@@ -150,8 +171,9 @@ export async function rewriteModelResponse_ChatCompletions({
           }
 
           if (json.usage) {
-            rewriteUsage(json.usage, removeCost);
+            rewriteUsage(json.usage, usageContext, providerMetadata);
           }
+          rewriteResponseMetadata(json, usageContext);
 
           const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
           controller.enqueue(eventLine + 'data: ' + JSON.stringify(json) + '\n\n');

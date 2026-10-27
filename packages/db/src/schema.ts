@@ -112,10 +112,10 @@ import {
   CodeReviewFindingCategory,
   CodeReviewFindingSecurityClass,
   EnkryptBenchmarkSchema,
-  EnkryptGuardrailApiKind,
-  EnkryptGuardrailDecision,
 } from './schema-types';
 import type {
+  EnkryptGuardrailApiKind,
+  EnkryptGuardrailDecision,
   EnkryptFailureCategory,
   EnkryptSyncCounts,
   EnkryptVerifications,
@@ -10302,7 +10302,7 @@ export const enkrypt_guardrail_charges = pgTable(
       .primaryKey(),
     organization_id: uuid().notNull(),
     kilo_user_id: text().notNull(),
-    request_id: uuid().notNull(),
+    session_id: text(),
     api_kind: text().notNull().$type<EnkryptGuardrailApiKind>(),
     decision: text().notNull().$type<EnkryptGuardrailDecision>(),
     enkrypt_credits_cost: real(),
@@ -10313,12 +10313,6 @@ export const enkrypt_guardrail_charges = pgTable(
     index('IDX_enkrypt_guardrail_charges_organization_created_at').on(
       table.organization_id,
       table.created_at
-    ),
-    enumCheck('enkrypt_guardrail_charges_api_kind_check', table.api_kind, EnkryptGuardrailApiKind),
-    enumCheck('enkrypt_guardrail_charges_decision_check', table.decision, EnkryptGuardrailDecision),
-    check(
-      'enkrypt_guardrail_charges_charged_microdollars_non_negative_check',
-      sql`${table.charged_microdollars} >= 0`
     ),
   ]
 );

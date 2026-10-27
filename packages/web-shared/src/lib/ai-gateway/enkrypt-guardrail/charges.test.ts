@@ -45,7 +45,7 @@ function charge(
   return {
     organizationId,
     kiloUserId,
-    requestId: randomUUID(),
+    sessionId: 'ses_guardrail',
     apiKind: 'messages',
     decision: 'blocked',
     creditsCost: 7,
@@ -68,9 +68,7 @@ describe('enkryptCreditsToMicrodollars', () => {
 describe('recordEnkryptGuardrailCharge', () => {
   it('writes a ledger row and debits the organization and member usage', async () => {
     const { user, organization } = await organizationWithMember();
-    const recorded = charge(organization.id, user.id);
-
-    await recordEnkryptGuardrailCharge(recorded);
+    await recordEnkryptGuardrailCharge(charge(organization.id, user.id));
 
     const rows = await db
       .select()
@@ -79,7 +77,7 @@ describe('recordEnkryptGuardrailCharge', () => {
     expect(rows).toEqual([
       expect.objectContaining({
         kilo_user_id: user.id,
-        request_id: recorded.requestId,
+        session_id: 'ses_guardrail',
         api_kind: 'messages',
         decision: 'blocked',
         enkrypt_credits_cost: 7,

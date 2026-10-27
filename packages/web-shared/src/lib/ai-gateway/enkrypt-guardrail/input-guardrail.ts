@@ -45,7 +45,7 @@ export function startEnkryptInputGuardrail(
         recordEnkryptGuardrailCharge(charge).catch((error: unknown) => {
           logError('[enkrypt-guardrail] failed to record charge', {
             organization_id: charge.organizationId,
-            request_id: charge.requestId,
+            session_id: charge.sessionId,
             error: error instanceof Error ? error.message : String(error),
           });
         })

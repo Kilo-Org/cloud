@@ -44,7 +44,7 @@ const detectResponseSchema = z.object({
 });
 
 export type EnkryptGuardrailScan = {
-  requestId: string;
+  sessionId: string | null;
   organizationId: string;
   kiloUserId: string;
   apiKind: EnkryptGuardrailApiKind;
@@ -200,7 +200,7 @@ export async function scanTurnDelta(
 
   const logFields = {
     organization_id: scan.organizationId,
-    request_id: scan.requestId,
+    session_id: scan.sessionId,
     client_request_id: scan.clientRequestId,
     api_kind: scan.apiKind,
     detectors_enabled: Object.keys(scan.config.detectors),
@@ -224,7 +224,7 @@ export async function scanTurnDelta(
   const body = JSON.stringify({
     text,
     detectors: scan.config.detectors,
-    user_metadata: { request_id: scan.requestId, organization_id: scan.organizationId },
+    user_metadata: { organization_id: scan.organizationId },
   });
   const signal = AbortSignal.timeout(deps.timeoutMs);
   const startedAt = performance.now();
@@ -244,7 +244,7 @@ export async function scanTurnDelta(
   const charges = attempts.map((each): EnkryptGuardrailCharge => ({
     organizationId: scan.organizationId,
     kiloUserId: scan.kiloUserId,
-    requestId: scan.requestId,
+    sessionId: scan.sessionId,
     apiKind: scan.apiKind,
     decision: attemptDecision(each),
     creditsCost: each.creditsCost,

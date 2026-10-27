@@ -17,7 +17,7 @@ const config = {
 
 function makeScan(overrides: Partial<EnkryptGuardrailScan> = {}): EnkryptGuardrailScan {
   return {
-    requestId: '00000000-0000-4000-8000-000000000001',
+    sessionId: 'ses_e2e',
     organizationId: '00000000-0000-4000-8000-000000000002',
     kiloUserId: 'oauth/google:123',
     apiKind: 'chat_completions',
@@ -77,10 +77,7 @@ describe('scanTurnDelta', () => {
         injection_attack: { enabled: true, need_explanation: false },
         pii: { enabled: true, entities: ['secrets'] },
       },
-      user_metadata: {
-        request_id: '00000000-0000-4000-8000-000000000001',
-        organization_id: '00000000-0000-4000-8000-000000000002',
-      },
+      user_metadata: { organization_id: '00000000-0000-4000-8000-000000000002' },
     });
   });
 
@@ -101,7 +98,7 @@ describe('scanTurnDelta', () => {
         {
           organizationId: '00000000-0000-4000-8000-000000000002',
           kiloUserId: 'oauth/google:123',
-          requestId: '00000000-0000-4000-8000-000000000001',
+          sessionId: 'ses_e2e',
           apiKind: 'chat_completions',
           decision: 'allowed',
           creditsCost: 3,

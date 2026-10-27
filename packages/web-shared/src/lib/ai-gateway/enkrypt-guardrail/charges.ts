@@ -11,15 +11,16 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
 
 /**
- * PLACEHOLDER: Kilo's price per Enkrypt Guardrails credit is not known yet. Replace this before the
- * guardrail is enabled for any organization that is not an internal test organization.
+ * PLACEHOLDER: Enkrypt documents Guardrails credits only as a monthly plan allowance, with no price
+ * per credit, so Kilo's rate is not known yet. Replace this before the guardrail is enabled for any
+ * organization that is not an internal test organization.
  */
 export const MICRODOLLARS_PER_ENKRYPT_CREDIT = 100;
 
 export type EnkryptGuardrailCharge = {
   organizationId: string;
   kiloUserId: string;
-  requestId: string;
+  sessionId: string | null;
   apiKind: EnkryptGuardrailApiKind;
   decision: EnkryptGuardrailDecision;
   /** Enkrypt's `X-Enkrypt-Credits-Cost` header, or null when the call returned none. */
@@ -47,7 +48,7 @@ export async function recordEnkryptGuardrailCharge(charge: EnkryptGuardrailCharg
       id,
       organization_id: charge.organizationId,
       kilo_user_id: charge.kiloUserId,
-      request_id: charge.requestId,
+      session_id: charge.sessionId,
       api_kind: charge.apiKind,
       decision: charge.decision,
       enkrypt_credits_cost: charge.creditsCost,

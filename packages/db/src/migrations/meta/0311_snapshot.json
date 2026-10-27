@@ -1,5 +1,5 @@
 {
-  "id": "3fdf48b5-8e5d-494b-a430-7e5b40ecf5ab",
+  "id": "95cf041c-e677-428b-93d1-85a75ffe8ae3",
   "prevId": "a9b5ca0f-ecc8-4c2d-a59d-dea98db61207",
   "version": "7",
   "dialect": "postgresql",
@@ -12130,11 +12130,11 @@
           "primaryKey": false,
           "notNull": true
         },
-        "request_id": {
-          "name": "request_id",
-          "type": "uuid",
+        "session_id": {
+          "name": "session_id",
+          "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "api_kind": {
           "name": "api_kind",
@@ -12195,20 +12195,7 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "enkrypt_guardrail_charges_api_kind_check": {
-          "name": "enkrypt_guardrail_charges_api_kind_check",
-          "value": "\"enkrypt_guardrail_charges\".\"api_kind\" IN ('chat_completions', 'messages', 'responses')"
-        },
-        "enkrypt_guardrail_charges_decision_check": {
-          "name": "enkrypt_guardrail_charges_decision_check",
-          "value": "\"enkrypt_guardrail_charges\".\"decision\" IN ('allowed', 'blocked', 'error')"
-        },
-        "enkrypt_guardrail_charges_charged_microdollars_non_negative_check": {
-          "name": "enkrypt_guardrail_charges_charged_microdollars_non_negative_check",
-          "value": "\"enkrypt_guardrail_charges\".\"charged_microdollars\" >= 0"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.enkrypt_sync_state": {

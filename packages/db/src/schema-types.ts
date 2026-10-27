@@ -2145,23 +2145,9 @@ export const EnkryptVerificationsSchema = z.record(z.string().min(1), EnkryptVer
 
 export type EnkryptVerifications = z.infer<typeof EnkryptVerificationsSchema>;
 
-export const EnkryptGuardrailApiKind = {
-  ChatCompletions: 'chat_completions',
-  Messages: 'messages',
-  Responses: 'responses',
-} as const;
+export type EnkryptGuardrailApiKind = 'chat_completions' | 'messages' | 'responses';
 
-export type EnkryptGuardrailApiKind =
-  (typeof EnkryptGuardrailApiKind)[keyof typeof EnkryptGuardrailApiKind];
-
-export const EnkryptGuardrailDecision = {
-  Allowed: 'allowed',
-  Blocked: 'blocked',
-  Error: 'error',
-} as const;
-
-export type EnkryptGuardrailDecision =
-  (typeof EnkryptGuardrailDecision)[keyof typeof EnkryptGuardrailDecision];
+export type EnkryptGuardrailDecision = 'allowed' | 'blocked' | 'error';
 
 export const ENKRYPT_STALE_AFTER_MS = 26 * 60 * 60 * 1000;
 

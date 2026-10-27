@@ -391,14 +391,13 @@ export async function handleLlmProxyRequest(
 
   // Like the bouncer decide, the organization's guardrail scan overlaps auth, balance, and routing
   // work and is awaited just before the upstream call.
-  const enkryptGuardrailRequestId = randomUUID();
   const enkryptGuardrailVerdictPromise = startEnkryptInputGuardrail(
     Promise.all([authPromise, balanceAndSettingsPromise]).then(([auth, { settings }]) => {
       if (!auth.user || auth.authFailedResponse || !auth.organizationId) return null;
       const config = resolveEnkryptInputGuardrail(auth.organizationId, settings);
       if (!config) return null;
       return {
-        requestId: enkryptGuardrailRequestId,
+        sessionId: taskId ?? sessionHeader ?? null,
         organizationId: auth.organizationId,
         kiloUserId: auth.user.id,
         apiKind: requestBodyParsed.kind,

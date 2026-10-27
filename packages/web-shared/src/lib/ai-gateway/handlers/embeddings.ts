@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
@@ -47,15 +46,15 @@ import {
   isAnonymousContext,
   type AnonymousUserContext,
 } from '@kilocode/web-shared/lib/anonymous';
-import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
 import {
   bareIpLiteral,
   bouncerDecideTier,
-  bouncerRejectionResponse,
-  payerSharingIp,
   rawClientIp,
-  startBouncerDecide,
 } from '@kilocode/web-shared/lib/bouncer/inference';
+import {
+  anonymousBouncerRequest,
+  signedInBouncerRequest,
+} from '@kilocode/web-shared/lib/bouncer/request';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
@@ -219,11 +218,17 @@ export async function handleEmbeddingsRequest(
   // by a genuine feature value or a Kilo client version header.
   const attributionFeature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || '');
 
-  // Resolve bouncer's IP once. Anonymous requests keep the real address (they
-  // are keyed on it and never share a payer); a signed-in usage row drops shared
-  // Kilo infrastructure so it cannot be read as a payer signal.
   const bouncerIp = bareIpLiteral(ipAddress);
-  const bouncerRequestId = randomUUID();
+  const ja4Digest = fraudHeaders.http_x_vercel_ja4_digest;
+  const bouncer = isAnonymousContext(user)
+    ? anonymousBouncerRequest({ ip: bouncerIp, ja4Digest })
+    : signedInBouncerRequest({
+        ip: bouncerIp,
+        ja4Digest,
+        userId: user.id,
+        organizationId,
+        feature,
+      });
 
   // Build usage context
   const promptInfo = extractEmbeddingPromptInfo(requestBodyParsed);
@@ -256,17 +261,14 @@ export async function handleEmbeddingsRequest(
     mode: null,
     auto_model: null,
     ttfb_ms: null,
-    bouncer: {
-      requestId: bouncerRequestId,
+    bouncer: bouncer.usage({
       occurredAt: new Date(requestStartedAtMs),
-      accountId: isAnonymousContext(user) ? null : bouncerAccountId(user.id, organizationId),
-      clientIp: isAnonymousContext(user) ? bouncerIp : payerSharingIp(bouncerIp, feature),
       clientAttributed: attributionFeature !== null || Boolean(xKiloCodeVersion),
       requestedLogprobs: false,
       samples: null,
       // Embedding input is not read by any bouncer rule, so no hash is computed.
       promptSimHash: null,
-    },
+    }),
   };
 
   setTag('ui.ai_model', requestBodyParsed.model);
@@ -344,19 +346,13 @@ export async function handleEmbeddingsRequest(
 
   // The one decide for this request, awaited just before the upstream call within its 500 ms
   // budget. Only an enforced verdict rejects; every other outcome sends the request.
-  const bouncerVerdictPromise = startBouncerDecide({
-    requestId: bouncerRequestId,
-    ip: bouncerIp,
-    ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
-    account: isAnonymousContext(user)
-      ? undefined
-      : {
-          accountId: bouncerAccountId(user.id, organizationId),
-          userId: user.id,
+  const bouncerVerdictPromise =
+    bouncer.kind === 'signed-in'
+      ? bouncer.decide({
           tier: bouncerDecideTier(organizationId, accountPlan, accountBalance),
           payer: accountPayer,
-        },
-  });
+        })
+      : bouncer.decide();
 
   const embeddingRequestSpan = startInactiveSpan({
     name: 'embedding-request-start',
@@ -404,9 +400,8 @@ export async function handleEmbeddingsRequest(
   }
 
   const bouncerVerdict = await bouncerVerdictPromise;
-  const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
+  const bouncerRejection = bouncer.apply(bouncerVerdict, usageContext.bouncer);
   if (bouncerRejection) return bouncerRejection;
-  if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
 
   const response = await embeddingProxyRequest({
     body: upstreamBody,

@@ -150,6 +150,15 @@ describe('callEnkryptDetect', () => {
     expect(Object.keys(body.detectors).sort()).toEqual(['nsfw', 'pii', 'toxicity']);
   });
 
+  it.each(['1e9', '-1', 'abc'])('ignores an implausible credits header (%s)', async header => {
+    const outcome = await callEnkryptDetect({
+      ...baseParams,
+      fetchImpl: async () =>
+        jsonResponse({ summary: {} }, { headers: { 'X-Enkrypt-Credits-Cost': header } }),
+    });
+    expect(outcome.creditsCost).toBeNull();
+  });
+
   it('reports a missing credits header as null', async () => {
     const outcome = await callEnkryptDetect({
       ...baseParams,

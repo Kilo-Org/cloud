@@ -5,6 +5,7 @@ import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pas
 import { scheduleOrganizationLowBalanceAlert } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import {
   estimateEnkryptCredits,
+  MAX_SCAN_TEXT_CHARS,
   type EnkryptDetectOutcome,
   type ScanDirection,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrails/enkrypt-detect';
@@ -23,7 +24,9 @@ export type EnkryptScanCharge = {
 
 /**
  * Charges only for successful scans, using Enkrypt's reported cost when present.
- * Enkrypt does not charge for rejected requests such as a 402.
+ * Enkrypt does not charge for rejected requests such as a 402. The charge never
+ * exceeds the documented maximum for the direction's detectors, so a malformed
+ * header cannot debit an arbitrary amount; the reported credits are still stored.
  */
 export function computeEnkryptScanCharge(
   outcome: Pick<EnkryptDetectOutcome, 'httpStatus' | 'creditsCost'>,
@@ -37,10 +40,14 @@ export function computeEnkryptScanCharge(
   }
   const estimated = outcome.creditsCost === null;
   const enkryptCredits = outcome.creditsCost ?? estimateEnkryptCredits(direction, textChars);
+  const billedCredits = Math.min(
+    enkryptCredits,
+    estimateEnkryptCredits(direction, MAX_SCAN_TEXT_CHARS)
+  );
   return {
     enkryptCredits,
     estimated,
-    costMicrodollars: enkryptCredits * ENKRYPT_CREDIT_PRICE_MICRODOLLARS,
+    costMicrodollars: billedCredits * ENKRYPT_CREDIT_PRICE_MICRODOLLARS,
   };
 }
 

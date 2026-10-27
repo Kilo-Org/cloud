@@ -145,10 +145,14 @@ export type EnkryptDetectOutcome = {
   flagged: boolean | null;
 };
 
+const MAX_REPORTED_CREDITS = 1_000_000;
+
 function parseCreditsHeader(value: string | null): number | null {
   if (value === null || value.trim() === '') return null;
   const credits = Number(value);
-  return Number.isFinite(credits) && credits >= 0 ? Math.ceil(credits) : null;
+  return Number.isFinite(credits) && credits >= 0 && credits <= MAX_REPORTED_CREDITS
+    ? Math.ceil(credits)
+    : null;
 }
 
 export async function callEnkryptDetect(params: {

@@ -38,6 +38,7 @@ import {
 import { differenceInCalendarDays, format, isSameDay, startOfDay, subDays } from 'date-fns';
 import { extractRepoFromGitUrl } from '../utils/git-utils';
 import type { StoredSession } from '../types';
+import type { AssociatedPr } from '../utils/github-pr-link';
 import { getChatDisplayTitle } from '../utils/session-title';
 import { getCachedWorktreeDetails, getLoadingWorktreeIds } from './worktree-details-placeholder';
 import {
@@ -515,9 +516,10 @@ export function sessionCacheKey(s: {
     lastSyncedAt: string;
     reviewDecision: string | null;
     reviewDecisionPending: boolean;
+    observations?: AssociatedPr['observations'];
   } | null;
 }): string {
-  return `${s.session_id}-${s.updated_at}-${s.status ?? ''}-${s.status_updated_at ?? ''}-${s.cloud_agent_worktree_id ?? ''}-${s.associatedPr?.state ?? ''}-${s.associatedPr?.lastSyncedAt ?? ''}-${s.associatedPr?.reviewDecision ?? ''}-${s.associatedPr?.reviewDecisionPending ?? false}`;
+  return `${s.session_id}-${s.updated_at}-${s.status ?? ''}-${s.status_updated_at ?? ''}-${s.cloud_agent_worktree_id ?? ''}-${s.associatedPr?.state ?? ''}-${s.associatedPr?.lastSyncedAt ?? ''}-${s.associatedPr?.reviewDecision ?? ''}-${s.associatedPr?.reviewDecisionPending ?? false}-${JSON.stringify(s.associatedPr?.observations ?? null)}`;
 }
 
 /**

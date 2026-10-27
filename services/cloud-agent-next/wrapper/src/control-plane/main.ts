@@ -86,7 +86,10 @@ export type ControlPlaneLifecycleDeps = {
   connection: ControlPlaneConnection;
   diagnostics: Pick<ControlDiagnostics, 'onDiagnostic' | 'finalize'>;
   fileLogs: Pick<ControlFileLogUploader, 'finalize'>;
-  logUploadAuth?: Pick<ControlLogUploadAuth, 'waitForCurrent' | 'disconnected' | 'stop'>;
+  logUploadAuth?: Pick<
+    ControlLogUploadAuth,
+    'current' | 'waitForCurrent' | 'disconnected' | 'stop'
+  >;
   onNativeDiagnostic?: ControlDiagnosticReporter;
   exit: (code: number) => void;
   process?: ControlPlaneProcess;
@@ -131,7 +134,7 @@ export function createControlPlaneLifecycle(
     log(`control-plane wrapper stopping exitCode=${exitCode} reason=${reason}`);
     let diagnosticsBudget = DIAGNOSTICS_FINALIZE_TIMEOUT_MS;
     const uploadAuth = deps.logUploadAuth;
-    if (uploadAuth) {
+    if (uploadAuth && uploadAuth.current() === undefined) {
       const started = performance.now();
       await settle(async () => {
         await withTimeoutAndAbort(

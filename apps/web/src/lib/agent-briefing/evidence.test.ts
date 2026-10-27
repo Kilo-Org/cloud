@@ -366,11 +366,57 @@ describe('aggregateBriefingEvidence', () => {
         .sort()
     ).toEqual(report.sources.map(source => source.id).sort());
     expect(report.coverage).toEqual({
-      activity: 'partial',
-      spend: 'partial',
-      blockers: 'partial',
+      activity: 'complete',
+      spend: 'complete',
+      blockers: 'complete',
+      pullRequests: 'complete',
+    });
+    expect(report.omittedCollectedSessions).toBe(1);
+    expect(report.omittedCollectedSources).toBe(65 * 33 - 256);
+    expect(
+      report.sessions.every(session => session.omittedSources === 33 - session.sources.length)
+    ).toBe(true);
+  });
+
+  it('takes whole-window counts and marks only a timed-out dimension partial', () => {
+    const pr = event('pr', { kind: 'pull_request', url: 'https://github.com/kilo/repo/pull/7' });
+    const charged = { id: 'charge', sessionId: 'child', cost: 1200, occurredAt: night };
+    const report = aggregateBriefingEvidence(
+      rows,
+      [event('busy', { kind: 'status', status: 'busy' }), pr],
+      [charged],
+      start,
+      cutoff,
+      {
+        collectionStartedAt: collectedBeforeNight,
+        truncated: true,
+        counts: {
+          sessions: 300,
+          pullRequests: null,
+          blockers: { count: 4, untimestampedStatus: false },
+          spend: {
+            microdollars: 9_000,
+            charged: true,
+            byRoot: new Map([['root', 5_000]]),
+            unchargedActivitySessions: 0,
+          },
+        },
+      }
+    );
+    expect(report.scorecard).toEqual({
+      sessions: 300,
+      pullRequests: 1,
+      blockers: 4,
+      spendMicrodollars: 9_000,
+    });
+    expect(report.coverage).toEqual({
+      activity: 'complete',
+      spend: 'complete',
+      blockers: 'complete',
       pullRequests: 'partial',
     });
+    expect(report.omittedCollectedSessions).toBe(299);
+    expect(report.sessions[0]).toMatchObject({ spendMicrodollars: 5_000, status: null });
   });
 
   it('clips display text without marking the report partial', () => {

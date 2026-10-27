@@ -458,6 +458,7 @@ describe('verifyNativeGoogleIdToken', () => {
     jest.clearAllMocks();
     mockConfig.GOOGLE_IOS_CLIENT_ID = 'ios-client-id';
     mockGetFederatedSignonCertsAsync.mockResolvedValue({ certs: { key: 'certificate' } });
+    jest.mocked(redisClient.set).mockResolvedValue('OK');
   });
 
   it('verifies against [GOOGLE_CLIENT_ID, GOOGLE_IOS_CLIENT_ID] audience and returns the payload', async () => {
@@ -545,12 +546,124 @@ describe('verifyNativeGoogleIdToken', () => {
       ['accounts.google.com', 'https://accounts.google.com']
     );
   });
+
+  it('records the verified token once, keyed on its digest', async () => {
+    mockVerifySignedJwtWithCertsAsync.mockResolvedValue({
+      getPayload: () => ({
+        sub: 'google-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+        exp: Math.floor(Date.now() / 1000) + 300,
+      }),
+    });
+
+    await verifyNativeGoogleIdToken('g-token');
+
+    const [key, value, options] = jest.mocked(redisClient.set).mock.calls[0] as [
+      string,
+      string,
+      { nx: boolean; ex: number },
+    ];
+    expect(key).toBe(
+      `auth:google-signin-token:${createHash('sha256').update('g-token').digest('hex')}`
+    );
+    expect(value).toBe('1');
+    expect(options.nx).toBe(true);
+    expect(options.ex).toBeGreaterThan(290);
+    expect(options.ex).toBeLessThanOrEqual(300);
+  });
+
+  it('refuses a token that was already spent', async () => {
+    mockVerifySignedJwtWithCertsAsync.mockResolvedValue({
+      getPayload: () => ({
+        sub: 'google-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+      }),
+    });
+    jest.mocked(redisClient.set).mockResolvedValue(null);
+
+    await expect(verifyNativeGoogleIdToken('g-token')).rejects.toThrow(
+      'Google ID token already used'
+    );
+  });
+
+  it('accepts only one overlapping verification of the same Google token', async () => {
+    mockVerifySignedJwtWithCertsAsync.mockResolvedValue({
+      getPayload: () => ({
+        sub: 'google-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+      }),
+    });
+    jest.mocked(redisClient.set).mockResolvedValueOnce('OK').mockResolvedValueOnce(null);
+
+    const results = await Promise.allSettled([
+      verifyNativeGoogleIdToken('g-token'),
+      verifyNativeGoogleIdToken('g-token'),
+    ]);
+
+    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
+    expect(results.filter(result => result.status === 'rejected')).toHaveLength(1);
+  });
+
+  it('caps the record TTL at the longest Google token lifetime', async () => {
+    mockVerifySignedJwtWithCertsAsync.mockResolvedValue({
+      getPayload: () => ({
+        sub: 'google-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+        exp: Math.floor(Date.now() / 1000) + 7200,
+      }),
+    });
+
+    await verifyNativeGoogleIdToken('g-token');
+
+    const options = jest.mocked(redisClient.set).mock.calls[0][2] as { ex: number };
+    expect(options.ex).toBe(3600);
+  });
+
+  it('uses the lifetime cap when the token carries no exp claim', async () => {
+    mockVerifySignedJwtWithCertsAsync.mockResolvedValue({
+      getPayload: () => ({
+        sub: 'google-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+      }),
+    });
+
+    await verifyNativeGoogleIdToken('g-token');
+
+    const options = jest.mocked(redisClient.set).mock.calls[0][2] as { ex: number };
+    expect(options.ex).toBe(3600);
+  });
+
+  it('refuses the sign-in when the single-use record cannot be written', async () => {
+    mockVerifySignedJwtWithCertsAsync.mockResolvedValue({
+      getPayload: () => ({
+        sub: 'google-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+      }),
+    });
+    jest.mocked(redisClient.set).mockRejectedValue(new Error('upstash unreachable'));
+
+    await expect(verifyNativeGoogleIdToken('g-token')).rejects.toThrow(NonceStoreUnavailableError);
+  });
+
+  it('writes no record for a token the verifier rejects', async () => {
+    mockVerifySignedJwtWithCertsAsync.mockRejectedValue(new Error('invalid signature'));
+
+    await expect(verifyNativeGoogleIdToken('bad-token')).rejects.toThrow(NativeIdTokenError);
+    expect(redisClient.set).not.toHaveBeenCalled();
+  });
 });
 
 describe('exchangeNativeGoogleAuthCode', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockConfig.GOOGLE_CLIENT_SECRET = 'web-client-secret';
+    jest.mocked(redisClient.set).mockResolvedValue('OK');
   });
 
   it('exchanges a serverAuthCode and returns verified Google user data', async () => {
@@ -584,6 +697,28 @@ describe('exchangeNativeGoogleAuthCode', () => {
       { key: 'certificate' },
       ['web-client-id'],
       ['accounts.google.com', 'https://accounts.google.com']
+    );
+  });
+
+  it('records the ID token the exchange returned', async () => {
+    mockGetToken.mockResolvedValue({ tokens: { id_token: 'exchanged-id-token' } });
+    mockGetFederatedSignonCertsAsync.mockResolvedValue({ certs: { key: 'certificate' } });
+    mockVerifySignedJwtWithCertsAsync.mockResolvedValue({
+      getPayload: () => ({
+        sub: 'google-sub-1',
+        email: 'user@example.com',
+        email_verified: true,
+      }),
+    });
+    jest.mocked(redisClient.set).mockResolvedValue(null);
+
+    await expect(exchangeNativeGoogleAuthCode('auth-code')).rejects.toThrow(
+      'Google ID token already used'
+    );
+    expect(redisClient.set).toHaveBeenCalledWith(
+      `auth:google-signin-token:${createHash('sha256').update('exchanged-id-token').digest('hex')}`,
+      '1',
+      expect.objectContaining({ nx: true })
     );
   });
 

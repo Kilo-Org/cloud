@@ -227,7 +227,6 @@
     "hideBalance": "Egyenleg elrejtése",
     "showBalance": "Egyenleg megjelenítése",
     "balanceHidden": "Egyenleg elrejtve",
-    "bonusCreditsExpiring": "{{amount}} értékű kredit lejárati ideje: {{date}}.",
     "signOutTitle": "Kijelentkezel?",
     "signOutMessage": "A munkaterületed eléréséhez újra be kell jelentkezned.",
     "deleteAccountTitle": "Törlöd a fiókodat?",
@@ -876,6 +875,18 @@
       "securityFindingsUnavailable": "Kapcsold be a Kilo biztonsági ügynököt egy hatókörön, hogy biztonsági találatokat kapj.",
       "spendAlertsSubtitle": "küszöbátlépések és óránkénti kiugrások",
       "spendAlertsToggle": "Költésfigyelmeztetések kategóriája"
+    },
+    "history": {
+      "title": "Értesítési előzmények",
+      "subtitle": "Az ehhez a fiókhoz beérkezett értesítések",
+      "bannerBody": "A push értesítések ki vannak kapcsolva ezen az eszközön, ezért az új értesítések nem érkeznek meg ide.",
+      "bannerAction": "Értesítési beállítások",
+      "emptyTitle": "Még nincsenek értesítések",
+      "emptyCategoryTitle": "Ebben a kategóriában nincsenek értesítések",
+      "emptyBody": "Az ehhez a fiókhoz beérkező értesítések itt jelennek meg. {{days}} napig maradnak meg.",
+      "capped": "A legutóbbi értesítések láthatók.",
+      "loadError": "Nem sikerült betölteni az értesítési előzményeket.",
+      "openFailed": "Ez az értesítés már sehol nem nyitható meg."
     },
     "action": {
       "openSession": "Munkamenet megnyitása"
@@ -2592,7 +2603,9 @@
       "retrying": "Újrapróbálás…",
       "retryDeny": "Megtagadás újrapróbálása",
       "retryAllowOnce": "Egyszeri engedélyezés újrapróbálása",
-      "retryAlwaysAllow": "Mindig engedélyezés újrapróbálása"
+      "retryAlwaysAllow": "Mindig engedélyezés újrapróbálása",
+      "unreadableTitle": "Nem sikerült beolvasni az engedélykérést",
+      "unreadableBody": "Az ügynök egy engedélyezési döntésre vár, amelyet ez az alkalmazás nem tud megjeleníteni. Frissítse az alkalmazást vagy a CLI-t, illetve válaszoljon a kérésre a CLI-ben a folytatáshoz."
     },
     "questionCard": {
       "title": "Az ügynök válaszra vagy jóváhagyásra vár",
@@ -2984,8 +2997,9 @@
     "unavailableDevice": "A hangbevitel nem érhető el ezen az eszközön.",
     "unavailableLanguage": "A hangbevitel nem érhető el az eszközön beállított nyelven. Telepítsd a nyelv offline beszédfájljait, vagy használj másik alkalmazásnyelvet.",
     "languageNotInstalledTitle": "A hangbevitel {{language}} nyelven még nem áll készen",
-    "languageNotInstalledMessage": "A(z) {{language}} nyelv offline beszédfájljai nincsenek telepítve ezen a telefonon. Töltsd le őket, majd próbáld újra a hangbevitelt.",
+    "languageNotInstalledMessage": "A {{language}} nyelvű offline beszédfájlok nincsenek telepítve, és az online beszédfeldolgozás ki van kapcsolva. Töltsd le a fájlokat, vagy kapcsold vissza az online beszédfeldolgozást, hogy használhasd a hangbevitelt.",
     "downloadOfflineModel": "Letöltés",
+    "useOnlineTranscription": "Online beszédfeldolgozás engedélyezése",
     "offlineModelDownloadScheduled": "Az offline beszédfájlok a háttérben töltődnek le. Próbáld újra a hangbevitelt később.",
     "listeningStopped": "A beszéd figyelése leállt.",
     "transcribing": "Átírás folyamatban…",
@@ -3159,7 +3173,7 @@
     "creditActivity": {
       "emptyDescription": "Itt jelennek meg a szervezet kreditvásárlásai, kreditfelhasználása és egyenlegmódosításai.",
       "emptyTitle": "Még nincsenek kreditműveletek",
-      "expires": "Lejárat: {{date}}",
+      "expiresUtc": "Lejárat: {{date}} (UTC)",
       "title": "Kreditműveletek",
       "transactionFallback": "Kredittranzakció",
       "category": {
@@ -3840,6 +3854,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "A ••••-ként megjelenő értékek megőrzik a tárolt titkot; egy érték cseréjével rotálhatja azt. A parancssor módosítása minden érték ismételt megadását igényli",
+      "headersHint": "A ••••-ként megjelenő értékek megőrzik a tárolt titkot; egy érték cseréjével rotálhatja azt. Az URL módosítása minden érték ismételt megadását igényli",
       "nameRequired": "Adja meg a szerver nevét",
       "nameInvalid": "A név csak ASCII betűket, számokat, aláhúzásjeleket és kötőjeleket tartalmazhat, legfeljebb 100 karakter lehet",
       "commandRequired": "Írjon be egy parancsot",
@@ -3938,6 +3954,10 @@
   "credits": {
     "title": "Kreditek vásárlása",
     "description": "A kreditek egyszeri vásárlás, amely a Kilo egyenlegedhez adódik AI kódolási munkamenetek futtatásához a Kilo alkalmazásban. Az áruház terheli a fiókodat, és a kreditek az áruház fizetésigazolása után kerülnek jóváírásra.",
+    "nextExpiry": "{{amount}} értékű kredit lejárati ideje: {{date}} (UTC). A legkorábban lejáró kreditek használódnak fel először.",
+    "appStoreExpiry": "Az App Store-on keresztül vásárolt kreditek nem járnak le.",
+    "playOneYearExpiry": "Ezek a kreditek a vásárlás után egy naptári évvel járnak le.",
+    "playNonexpiring": "Ezek a kreditek nem járnak le.",
     "packLabel": "{{amount}} értékű kredit hozzáadása",
     "priceUnavailable": "Az ár nem érhető el",
     "purchased": "A kreditek hozzáadva az egyenlegedhez.",
@@ -4076,6 +4096,10 @@
     "generate": "Összefoglaló készítése",
     "retrySummary": "Fizetős összefoglaló újrapróbálása",
     "sources": "Bizonyítékok és artefaktumok",
+    "sessionsShown_one": "{{total}} munkamenetből {{shown}} látható",
+    "sessionsShown_other": "{{total}} munkamenetből {{shown}} látható",
+    "itemsShown_one": "{{total}} elemből {{shown}} látható",
+    "itemsShown_other": "{{total}} elemből {{shown}} látható",
     "timezone": "Jelentés időzónája",
     "deviceTimezone": "Eszköz időzónájának használata",
     "timezoneHint": "IANA időzóna, például Europe/Berlin. Az ütemezés módosításai a következő jelentésekre érvényesek.",

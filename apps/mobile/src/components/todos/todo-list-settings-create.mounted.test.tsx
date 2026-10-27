@@ -153,7 +153,12 @@ function host(root: TestRenderer.ReactTestInstance, type: string, props: Record<
 
 function enter(label: string, value: string) {
   const field = host(renderedTree(), 'TextInput', { accessibilityLabel: label });
-  const props = field.props as { onChangeText: (text: string) => void };
+  const props = field.props as { onChangeText: (text: string) => void; onFocus?: () => void };
+  // Typing implies focus: the field only falls back to the start-visible
+  // preview once it loses focus again.
+  act(() => {
+    props.onFocus?.();
+  });
   act(() => {
     props.onChangeText(value);
   });

@@ -52,6 +52,14 @@ describe('deepStrict', () => {
     expect(schema.safeParse({ items: [{ id: 'a' }, { id: 'b' }] }).success).toBe(true);
   });
 
+  test('rejects unknown keys inside tuple items and rest elements', () => {
+    const schema = deepStrict(z.tuple([z.object({ id: z.string() })], z.object({ n: z.number() })));
+    expect(schema.safeParse([{ id: 'a', typo: 1 }]).success).toBe(false);
+    expect(schema.safeParse([{ id: 'a' }, { n: 1, typo: 1 }]).success).toBe(false);
+    expect(schema.safeParse([{ id: 'a' }, { n: 1 }, { n: 2 }]).success).toBe(true);
+    expect(schema.safeParse([]).success).toBe(false);
+  });
+
   test('rejects unknown keys inside record values', () => {
     const schema = deepStrict(
       z.object({
@@ -145,8 +153,8 @@ describe('deepStrict', () => {
   });
 
   test('throws on unsupported wrappers so new Zod types surface loudly', () => {
-    expect(() => deepStrict(z.tuple([z.string(), z.number()]))).toThrow(
-      /deepStrict: unsupported Zod type 'tuple'/
+    expect(() => deepStrict(z.map(z.string(), z.number()))).toThrow(
+      /deepStrict: unsupported Zod type 'map'/
     );
     expect(() => deepStrict(z.string().transform(s => s.length))).toThrow(
       /deepStrict: unsupported Zod type/

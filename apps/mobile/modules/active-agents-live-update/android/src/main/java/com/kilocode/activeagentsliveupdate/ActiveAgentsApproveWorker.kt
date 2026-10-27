@@ -67,9 +67,9 @@ class ActiveAgentsApproveWorker(context: Context, params: WorkerParameters) :
    * Bound on the wait for the ReactContext. The shared host can be already
    * running without ever delivering another init event, or a start can stall;
    * with no bound this worker's future would never resolve, WorkManager would
-   * keep `UNIQUE_WORK_NAME` in flight, and `ExistingWorkPolicy.KEEP` would then
-   * drop every later Approve tap. Runs on the main thread, like the listener
-   * registration it guards.
+   * keep the answer's unique work in flight, and `ExistingWorkPolicy.KEEP`
+   * would then drop every later tap on that same ask. Runs on the main thread,
+   * like the listener registration it guards.
    */
   private val mainHandler = Handler(Looper.getMainLooper())
   private val reactHostTimeout = Runnable { onReactHostTimeout() }
@@ -129,8 +129,8 @@ class ActiveAgentsApproveWorker(context: Context, params: WorkerParameters) :
   /**
    * The ReactContext never arrived. Detach the pending listener so the shared
    * host keeps no callback for a dead work order, then fail the future: that
-   * resolves the worker, releases `UNIQUE_WORK_NAME`, and lets the next Approve
-   * tap enqueue again.
+   * resolves the worker, releases the ask's unique work, and lets a later tap
+   * on that ask enqueue again.
    */
   private fun onReactHostTimeout() {
     if (stopped || completer == null) {
@@ -217,7 +217,11 @@ class ActiveAgentsApproveWorker(context: Context, params: WorkerParameters) :
   }
 
   companion object {
-    /** Unique work name: one pending answer, so a double tap cannot double-answer. */
+    /**
+     * The aggregate card's unique work name. A session notification's Approve
+     * is named for the ask it answers instead (`ApprovalGate.workName`), so its
+     * `KEEP` suppresses a repeat of that ask alone.
+     */
     const val UNIQUE_WORK_NAME = "active-agents-approve"
 
     /** Input key carrying the action the receiver enqueued. */
@@ -232,9 +236,6 @@ class ActiveAgentsApproveWorker(context: Context, params: WorkerParameters) :
 
     /** Input key carrying the approval key of the request the card showed. */
     const val KEY_APPROVAL_KEY = "approval_key"
-
-    /** Input key carrying the scope the card was followed in. */
-    const val KEY_ORGANIZATION_ID = "organization_id"
 
     /**
      * Headless task key the JS entrypoint registers with `AppRegistry` (the

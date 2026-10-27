@@ -426,6 +426,7 @@ describe('CloudChatPage terminal ownership across navigation', () => {
       pendingMessages: new Map(),
       preparationAttempts: [],
       commits: [],
+      unreadablePermissions: [],
       chatUI: { shouldAutoScroll: false },
     };
     dom = installTerminalTestDom();

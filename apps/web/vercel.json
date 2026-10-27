@@ -3,6 +3,10 @@
   "skipMiddlewareRequestBody": true,
   "crons": [
     {
+      "path": "/api/cron/expire-credits",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/agent-briefing",
       "schedule": "* * * * *"
     },

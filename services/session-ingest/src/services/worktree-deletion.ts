@@ -775,9 +775,21 @@ export async function recordWorktreeCleanup(
           runtimeLocations.push(location);
         }
       }
+      const completedRuntimeLocations = [...(state.manifest.completedRuntimeLocations ?? [])];
+      if (
+        params.completedRuntimeLocation &&
+        !completedRuntimeLocations.some(
+          item =>
+            item.sandboxId === params.completedRuntimeLocation?.sandboxId &&
+            item.provider === params.completedRuntimeLocation.provider
+        )
+      ) {
+        completedRuntimeLocations.push(params.completedRuntimeLocation);
+      }
       const manifest = {
         version: 1,
         sessions: [...sessions.values()],
+        ...(completedRuntimeLocations.length > 0 ? { completedRuntimeLocations } : {}),
       } satisfies typeof state.manifest;
       await tx
         .update(cloud_agent_worktrees)

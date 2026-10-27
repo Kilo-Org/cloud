@@ -1,7 +1,27 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
-import { eq, and, desc, gte, isNotNull, isNull, lt, or, sql, type SQL } from 'drizzle-orm';
+import { z } from 'zod';
+import {
+  eq,
+  and,
+  asc,
+  desc,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import { getWorkerDb } from '@kilocode/db/client';
-import { cli_sessions_v2, organization_memberships, organizations } from '@kilocode/db/schema';
+import {
+  cli_sessions_v2,
+  cloud_agent_worktrees,
+  organization_memberships,
+  organizations,
+} from '@kilocode/db/schema';
 import {
   activeOrganizationJoinCondition,
   organizationMembershipJoinCondition,
@@ -14,7 +34,10 @@ import {
 import { queryAccessibleKiloSession } from '@kilocode/worker-utils/cloud-agent-session-access';
 import {
   createSessionForCloudAgentSchema,
+  cloudAgentWorktreeIdSchema,
+  cloudAgentWorktreeDeletionManifestSchema,
   cloudAgentWorktreeDeletionSchema,
+  cloudAgentWorktreeLocationSchema,
   recordCloudAgentWorktreeCleanupSchema,
   canDestroyCloudAgentWorktreeSandboxSchema,
   retireCloudAgentWorktreeIfSoleMemberSchema,
@@ -23,17 +46,31 @@ import {
   type CanDestroyCloudAgentWorktreeSandboxParams,
   type RetireCloudAgentWorktreeIfSoleMemberParams,
   deleteSessionForCloudAgentSchema,
+  deleteHostedWorkspaceSessionSchema,
+  assertHostedWorkspaceSessionDeletableSchema,
+  type AssertHostedWorkspaceSessionDeletableParams,
+  type AssertHostedWorkspaceSessionDeletableResult,
+  type DeleteHostedWorkspaceSessionParams,
+  type DeleteHostedWorkspaceSessionResult,
   decodeCloudAgentRootSessionsCursor,
+  decodeCloudAgentWorkspacesCursor,
   encodeCloudAgentRootSessionsCursor,
+  encodeCloudAgentWorkspacesCursor,
+  getCloudAgentWorkspaceSchema,
+  getCloudAgentWorkspaceStatusSchema,
   getCloudAgentRootSessionMessagesSchema,
   getSessionMessagesSchema,
   kiloSdkSessionSnapshotOutcomeSchema,
   listCloudAgentRootSessionsSchema,
+  listCloudAgentWorkspacesSchema,
   persistedKiloSdkMessageHistorySchema,
   resolveCloudAgentRootSessionSchema,
+  sessionIdSchema,
   type CloudAgentRootSessionSnapshot,
   type CloudAgentRootSessionsPage,
   type CloudAgentRootSessionSummary,
+  type CloudAgentWorkspaceSummary,
+  type CloudAgentWorkspacesPage,
   type CreateSessionForCloudAgentParams,
   type CreateSessionForCloudAgentResult,
   type DeleteSessionForCloudAgentParams,
@@ -41,9 +78,14 @@ import {
   type GetCloudAgentRootSessionMessagesResult,
   type GetCloudAgentRootSessionSnapshotParams,
   type GetCloudAgentRootSessionSnapshotResult,
+  type GetCloudAgentWorkspaceParams,
+  type GetCloudAgentWorkspaceResult,
+  type GetCloudAgentWorkspaceStatusParams,
+  type GetCloudAgentWorkspaceStatusResult,
   type GetSessionMessagesParams,
   type GetSessionMessagesResult,
   type ListCloudAgentRootSessionsParams,
+  type ListCloudAgentWorkspacesParams,
   type ResolveCloudAgentRootSessionForKiloSessionParams,
   type ResolveCloudAgentRootSessionForKiloSessionResult,
   type SessionIngestRpcMethods,
@@ -76,6 +118,12 @@ import {
   isWorktreeSessionDeleting,
   WORKTREE_DELETING,
 } from './services/worktree-deletion';
+import {
+  assertHostedWorkspaceSessionDeletable as checkHostedWorkspaceSessionDeletable,
+  deleteHostedWorkspaceSessionRows,
+  HostedWorkspaceSessionDeleteError,
+} from './services/hosted-workspace-session';
+import { clearSessionLocalState } from './services/session-local-state';
 
 const MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS = 512;
 const CLOUD_AGENT_ROOT_SESSION_IDENTITY_CONFLICT_ERROR =
@@ -103,6 +151,28 @@ function personalOrAccessibleOrganizationCondition() {
   return personalOrInheritedOrganizationCondition(cli_sessions_v2.organization_id);
 }
 
+function worktreeOrganizationMembershipJoin(kiloUserId: string) {
+  return organizationMembershipJoinCondition(kiloUserId, cloud_agent_worktrees.organization_id);
+}
+
+function worktreeOrganizationJoin() {
+  return activeOrganizationJoinCondition(cloud_agent_worktrees.organization_id);
+}
+
+function worktreePersonalOrAccessibleOrganizationCondition() {
+  return personalOrInheritedOrganizationCondition(cloud_agent_worktrees.organization_id);
+}
+
+function accessibleRootConditions(kiloUserId: string): SQL[] {
+  return [
+    eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+    isNull(cli_sessions_v2.parent_session_id),
+    isNotNull(cli_sessions_v2.cloud_agent_session_id),
+    isNotNull(cli_sessions_v2.cloud_agent_worktree_id),
+    personalOrAccessibleOrganizationCondition(),
+  ];
+}
+
 function safeGitUrl(value: string | null): string | null {
   if (value === null || !isValidGitUrl(value)) return null;
   const sanitized = sanitizeGitUrl(value);
@@ -118,6 +188,22 @@ function safeGitBranch(value: string | null): string | null {
     if (codePoint !== undefined && (codePoint < 32 || codePoint === 127)) return null;
   }
   return value;
+}
+
+function repositoryProvider(
+  value: string | null
+): CloudAgentWorkspaceSummary['repositoryProvider'] {
+  const sanitized = safeGitUrl(value);
+  if (!sanitized) return null;
+  try {
+    const hostname = new URL(sanitized).hostname.toLowerCase();
+    if (hostname === 'github.com') return 'github';
+    if (hostname === 'gitlab.com') return 'gitlab';
+    if (hostname === 'bitbucket.org') return 'bitbucket';
+    return 'git';
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -550,6 +636,9 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
       isNotNull(cli_sessions_v2.cloud_agent_session_id),
       personalOrAccessibleOrganizationCondition(),
     ];
+    if (parsed.workspaceId !== undefined) {
+      conditions.push(eq(cli_sessions_v2.cloud_agent_worktree_id, parsed.workspaceId));
+    }
     if (parsed.start !== undefined) {
       conditions.push(gte(cli_sessions_v2.updated_at, new Date(parsed.start).toISOString()));
     }
@@ -569,6 +658,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
       .select({
         kiloSessionId: cli_sessions_v2.session_id,
         cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
+        workspaceId: cli_sessions_v2.cloud_agent_worktree_id,
         userId: cli_sessions_v2.kilo_user_id,
         organizationId: cli_sessions_v2.organization_id,
         title: sql<
@@ -597,10 +687,14 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     const sessions: CloudAgentRootSessionSummary[] = [];
     for (const row of rows.slice(0, parsed.limit)) {
       if (!row.cloudAgentSessionId) continue;
+      const workspaceId = row.workspaceId
+        ? cloudAgentWorktreeIdSchema.parse(row.workspaceId)
+        : null;
       const title: string | null = row.title;
       sessions.push({
         kiloSessionId: row.kiloSessionId,
         cloudAgentSessionId: row.cloudAgentSessionId,
+        workspaceId,
         userId: row.userId,
         organizationId: row.organizationId,
         title: title?.slice(0, MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS) ?? null,
@@ -623,6 +717,407 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
             })
           : null,
     };
+  }
+
+  async listCloudAgentWorkspaces(
+    params: ListCloudAgentWorkspacesParams
+  ): Promise<CloudAgentWorkspacesPage> {
+    const parsed = listCloudAgentWorkspacesSchema.parse(params);
+    const cursor = parsed.cursor ? decodeCloudAgentWorkspacesCursor(parsed.cursor) : undefined;
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    const workspaceUpdatedAt = sql<string>`greatest(
+      max(${cli_sessions_v2.updated_at}),
+      coalesce(${cloud_agent_worktrees.updated_at}, '-infinity'::timestamptz)
+    )`;
+    const canonicalGitUrl = sql<
+      string | null
+    >`(array_agg(${cli_sessions_v2.git_url} order by ${cli_sessions_v2.created_at}, ${cli_sessions_v2.session_id}) filter (where ${cli_sessions_v2.git_url} is not null))[1]`;
+    const conditions: (SQL | undefined)[] = [
+      ...accessibleRootConditions(parsed.kiloUserId),
+      or(
+        isNull(cloud_agent_worktrees.worktree_id),
+        isNull(cloud_agent_worktrees.deletion_completed_at)
+      ),
+      parsed.workspaceId === undefined
+        ? undefined
+        : eq(cli_sessions_v2.cloud_agent_worktree_id, parsed.workspaceId),
+    ];
+    const having = and(
+      cursor
+        ? or(
+            lt(workspaceUpdatedAt, cursor.updatedAt),
+            and(
+              eq(workspaceUpdatedAt, cursor.updatedAt),
+              lt(cli_sessions_v2.cloud_agent_worktree_id, cursor.workspaceId)
+            )
+          )
+        : undefined,
+      parsed.repositoryUrl === undefined
+        ? undefined
+        : eq(canonicalGitUrl, normalizeGitUrl(parsed.repositoryUrl))
+    );
+
+    const rows = await db
+      .select({
+        workspaceId: cli_sessions_v2.cloud_agent_worktree_id,
+        userId: cli_sessions_v2.kilo_user_id,
+        organizationId: cli_sessions_v2.organization_id,
+        name: cloud_agent_worktrees.name,
+        gitUrl: canonicalGitUrl,
+        gitBranch: sql<
+          string | null
+        >`(array_agg(${cli_sessions_v2.git_branch} order by ${cli_sessions_v2.created_at}, ${cli_sessions_v2.session_id}) filter (where ${cli_sessions_v2.git_branch} is not null))[1]`,
+        profileId: sql<
+          string | null
+        >`(array_agg(${cli_sessions_v2.profile_id} order by ${cli_sessions_v2.created_at}, ${cli_sessions_v2.session_id}) filter (where ${cli_sessions_v2.profile_id} is not null))[1]`,
+        deletionStartedAt: cloud_agent_worktrees.deletion_started_at,
+        createdAt: sql<string>`coalesce(
+          ${cloud_agent_worktrees.created_at},
+          min(${cli_sessions_v2.created_at})
+        )`,
+        updatedAt: workspaceUpdatedAt,
+        lastActivityAt: sql<string>`max(coalesce(
+          ${cli_sessions_v2.last_activity_at},
+          ${cli_sessions_v2.updated_at}
+        ))`,
+      })
+      .from(cli_sessions_v2)
+      .leftJoin(organization_memberships, organizationMembershipJoin(parsed.kiloUserId))
+      .leftJoin(organizations, organizationJoin())
+      .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
+      .leftJoin(
+        parentOrganizationMembershipsTable,
+        parentOrganizationMembershipJoinCondition(parsed.kiloUserId)
+      )
+      .leftJoin(
+        cloud_agent_worktrees,
+        and(
+          eq(cloud_agent_worktrees.worktree_id, cli_sessions_v2.cloud_agent_worktree_id),
+          eq(cloud_agent_worktrees.kilo_user_id, cli_sessions_v2.kilo_user_id),
+          sql`${cloud_agent_worktrees.organization_id} is not distinct from ${cli_sessions_v2.organization_id}`
+        )
+      )
+      .where(and(...conditions))
+      .groupBy(
+        cli_sessions_v2.cloud_agent_worktree_id,
+        cli_sessions_v2.kilo_user_id,
+        cli_sessions_v2.organization_id,
+        cloud_agent_worktrees.name,
+        cloud_agent_worktrees.created_at,
+        cloud_agent_worktrees.updated_at,
+        cloud_agent_worktrees.deletion_started_at
+      )
+      .having(having)
+      .orderBy(desc(workspaceUpdatedAt), desc(cli_sessions_v2.cloud_agent_worktree_id))
+      .limit(parsed.limit + 1);
+
+    const visibleRows = rows
+      .slice(0, parsed.limit)
+      .filter(
+        (row): row is typeof row & { workspaceId: NonNullable<typeof row.workspaceId> } =>
+          row.workspaceId !== null
+      );
+    const parsedRows = visibleRows.map(row => ({
+      ...row,
+      workspaceId: cloudAgentWorktreeIdSchema.parse(row.workspaceId),
+    }));
+    const sessionsByWorkspace = await this.listWorkspaceRootSessions({
+      kiloUserId: parsed.kiloUserId,
+      workspaceIds: parsedRows.map(row => row.workspaceId),
+      limit: parsed.sessionLimit,
+    });
+    const items: CloudAgentWorkspaceSummary[] = parsedRows.map(row => {
+      const sessionPage = sessionsByWorkspace.get(row.workspaceId);
+      if (!sessionPage) throw new Error('Missing Cloud Agent workspace session page');
+      return {
+        workspaceId: row.workspaceId,
+        userId: row.userId,
+        organizationId: row.organizationId,
+        name: row.name,
+        repositoryProvider: repositoryProvider(row.gitUrl),
+        gitUrl: safeGitUrl(row.gitUrl),
+        gitBranch: safeGitBranch(row.gitBranch),
+        profileId: row.profileId,
+        deletionState: row.deletionStartedAt === null ? 'active' : 'deleting',
+        created: databaseTimestampToMilliseconds(row.createdAt),
+        updated: databaseTimestampToMilliseconds(row.updatedAt),
+        lastActivity: databaseTimestampToMilliseconds(row.lastActivityAt),
+        ...sessionPage,
+      };
+    });
+    const lastRow = rows[Math.min(rows.length, parsed.limit) - 1];
+
+    return {
+      items,
+      nextCursor:
+        rows.length > parsed.limit && lastRow?.workspaceId
+          ? encodeCloudAgentWorkspacesCursor({
+              updatedAt: lastRow.updatedAt,
+              workspaceId: cloudAgentWorktreeIdSchema.parse(lastRow.workspaceId),
+            })
+          : null,
+    };
+  }
+
+  async getCloudAgentWorkspace(
+    params: GetCloudAgentWorkspaceParams
+  ): Promise<GetCloudAgentWorkspaceResult> {
+    const parsed = getCloudAgentWorkspaceSchema.parse(params);
+    const page = await this.listCloudAgentWorkspaces({
+      kiloUserId: parsed.kiloUserId,
+      workspaceId: parsed.workspaceId,
+      limit: 1,
+      sessionLimit: parsed.sessionCursor ? 1 : parsed.sessionLimit,
+    });
+    const workspace = page.items.find(item => item.workspaceId === parsed.workspaceId);
+    if (!workspace)
+      return this.getDeletedCloudAgentWorkspace(parsed.kiloUserId, parsed.workspaceId);
+    if (!parsed.sessionCursor) return workspace;
+
+    const sessions = await this.listCloudAgentRootSessions({
+      kiloUserId: parsed.kiloUserId,
+      workspaceId: parsed.workspaceId,
+      limit: parsed.sessionLimit,
+      cursor: parsed.sessionCursor,
+    });
+    return { ...workspace, sessions: sessions.items, nextSessionCursor: sessions.nextCursor };
+  }
+
+  /**
+   * Passive workspace lifecycle projection. Authorization is the catalog's
+   * owner/current-organization rule; everything else is a stored row read.
+   */
+  async getCloudAgentWorkspaceStatus(
+    params: GetCloudAgentWorkspaceStatusParams
+  ): Promise<GetCloudAgentWorkspaceStatusResult> {
+    const parsed = getCloudAgentWorkspaceStatusSchema.parse(params);
+    const workspace =
+      parsed.authorizedWorkspace === undefined
+        ? await this.getCloudAgentWorkspace({
+            kiloUserId: parsed.kiloUserId,
+            workspaceId: parsed.workspaceId,
+            sessionLimit: 1,
+          })
+        : { workspaceId: parsed.workspaceId, ...parsed.authorizedWorkspace };
+    if (!workspace) return null;
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    const [row] = await db
+      .select({
+        deletionStartedAt: cloud_agent_worktrees.deletion_started_at,
+        deletionCompletedAt: cloud_agent_worktrees.deletion_completed_at,
+        deletionManifest: cloud_agent_worktrees.deletion_manifest,
+        runtimeLocations: cloud_agent_worktrees.runtime_locations,
+        deletedSessionIds: cloud_agent_worktrees.deleted_session_ids,
+      })
+      .from(cloud_agent_worktrees)
+      // The catalog above authorized the caller (owner or current organization
+      // member), so the journal belongs to the requesting scope; the row owner
+      // may be a different member of the same organization.
+      .where(eq(cloud_agent_worktrees.worktree_id, parsed.workspaceId))
+      .limit(1);
+    const completed = row?.deletionCompletedAt != null;
+    const manifest = row?.deletionManifest
+      ? cloudAgentWorktreeDeletionManifestSchema.parse(row.deletionManifest)
+      : null;
+    const runtimeLocations = row?.runtimeLocations
+      ? z.array(cloudAgentWorktreeLocationSchema).parse(row.runtimeLocations)
+      : [];
+    const completedRuntimeLocationCount = completed
+      ? 0
+      : (manifest?.completedRuntimeLocations?.length ?? 0);
+    const remainingRuntimeLocationCount = completed
+      ? 0
+      : Math.max(0, runtimeLocations.length - completedRuntimeLocationCount);
+    const [activity] = completed
+      ? [{ activeSessionCount: 0 }]
+      : await db
+          .select({
+            activeSessionCount: sql<number>`count(*) filter (
+              where ${cli_sessions_v2.status} in ('busy', 'question', 'permission', 'retry')
+            )::int`,
+          })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.kilo_user_id, workspace.userId),
+              eq(cli_sessions_v2.cloud_agent_worktree_id, parsed.workspaceId),
+              isNotNull(cli_sessions_v2.cloud_agent_session_scope_id)
+            )
+          );
+    return {
+      workspaceId: cloudAgentWorktreeIdSchema.parse(workspace.workspaceId),
+      userId: workspace.userId,
+      organizationId: workspace.organizationId,
+      deletionState: workspace.deletionState,
+      activeSessionCount: Number(activity?.activeSessionCount ?? 0),
+      deletion: {
+        started: row?.deletionStartedAt != null,
+        completed,
+        startedAt:
+          row?.deletionStartedAt == null
+            ? null
+            : databaseTimestampToMilliseconds(row.deletionStartedAt),
+        phase: completed
+          ? 'completed'
+          : row?.deletionStartedAt == null
+            ? 'not_started'
+            : remainingRuntimeLocationCount > 0
+              ? 'runtime_cleanup'
+              : 'finalizing',
+        sessionCount: completed
+          ? (row?.deletedSessionIds?.length ?? 0)
+          : (manifest?.sessions.length ?? 0),
+        runtimeLocationCount: completed ? 0 : runtimeLocations.length,
+        completedRuntimeLocationCount,
+        remainingRuntimeLocationCount,
+        deletedSessionIds: completed
+          ? sessionIdSchema.array().parse(row?.deletedSessionIds ?? [])
+          : [],
+      },
+    };
+  }
+
+  private async getDeletedCloudAgentWorkspace(
+    kiloUserId: string,
+    workspaceId: GetCloudAgentWorkspaceParams['workspaceId']
+  ): Promise<GetCloudAgentWorkspaceResult> {
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    const [row] = await db
+      .select({
+        workspaceId: cloud_agent_worktrees.worktree_id,
+        userId: cloud_agent_worktrees.kilo_user_id,
+        organizationId: cloud_agent_worktrees.organization_id,
+        createdAt: cloud_agent_worktrees.created_at,
+        updatedAt: cloud_agent_worktrees.updated_at,
+      })
+      .from(cloud_agent_worktrees)
+      .leftJoin(organization_memberships, worktreeOrganizationMembershipJoin(kiloUserId))
+      .leftJoin(organizations, worktreeOrganizationJoin())
+      .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
+      .leftJoin(
+        parentOrganizationMembershipsTable,
+        parentOrganizationMembershipJoinCondition(kiloUserId)
+      )
+      .where(
+        and(
+          eq(cloud_agent_worktrees.worktree_id, workspaceId),
+          eq(cloud_agent_worktrees.kilo_user_id, kiloUserId),
+          isNotNull(cloud_agent_worktrees.deletion_completed_at),
+          worktreePersonalOrAccessibleOrganizationCondition()
+        )
+      )
+      .limit(1);
+    if (!row) return null;
+
+    return {
+      workspaceId: cloudAgentWorktreeIdSchema.parse(row.workspaceId),
+      userId: row.userId,
+      organizationId: row.organizationId,
+      name: null,
+      repositoryProvider: null,
+      gitUrl: null,
+      gitBranch: null,
+      profileId: null,
+      deletionState: 'deleted',
+      created: databaseTimestampToMilliseconds(row.createdAt),
+      updated: databaseTimestampToMilliseconds(row.updatedAt),
+      lastActivity: databaseTimestampToMilliseconds(row.updatedAt),
+      sessions: [],
+      nextSessionCursor: null,
+    };
+  }
+
+  private async listWorkspaceRootSessions(params: {
+    kiloUserId: string;
+    workspaceIds: string[];
+    limit: number;
+  }): Promise<Map<string, Pick<CloudAgentWorkspaceSummary, 'sessions' | 'nextSessionCursor'>>> {
+    const output = new Map<
+      string,
+      Pick<CloudAgentWorkspaceSummary, 'sessions' | 'nextSessionCursor'>
+    >();
+    if (params.workspaceIds.length === 0) return output;
+
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    const rankedRoots = db
+      .select({
+        kiloSessionId: cli_sessions_v2.session_id,
+        cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
+        workspaceId: cli_sessions_v2.cloud_agent_worktree_id,
+        userId: cli_sessions_v2.kilo_user_id,
+        organizationId: cli_sessions_v2.organization_id,
+        title: sql<
+          string | null
+        >`left(${cli_sessions_v2.title}, ${MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS})`.as(
+          'title'
+        ),
+        gitUrl: cli_sessions_v2.git_url,
+        gitBranch: cli_sessions_v2.git_branch,
+        profileId: cli_sessions_v2.profile_id,
+        createdOnPlatform: cli_sessions_v2.created_on_platform,
+        createdAt: cli_sessions_v2.created_at,
+        updatedAt: cli_sessions_v2.updated_at,
+        rank: sql<number>`row_number() over (
+          partition by ${cli_sessions_v2.cloud_agent_worktree_id}
+          order by ${cli_sessions_v2.updated_at} desc, ${cli_sessions_v2.session_id} desc
+        )`.as('rank'),
+      })
+      .from(cli_sessions_v2)
+      .leftJoin(organization_memberships, organizationMembershipJoin(params.kiloUserId))
+      .leftJoin(organizations, organizationJoin())
+      .leftJoin(parentOrganizationsTable, parentOrganizationJoinCondition())
+      .leftJoin(
+        parentOrganizationMembershipsTable,
+        parentOrganizationMembershipJoinCondition(params.kiloUserId)
+      )
+      .where(
+        and(
+          ...accessibleRootConditions(params.kiloUserId),
+          inArray(cli_sessions_v2.cloud_agent_worktree_id, params.workspaceIds)
+        )
+      )
+      .as('ranked_cloud_agent_workspace_roots');
+    const rows = await db
+      .select()
+      .from(rankedRoots)
+      .where(lte(rankedRoots.rank, params.limit + 1))
+      .orderBy(asc(rankedRoots.workspaceId), asc(rankedRoots.rank));
+
+    for (const workspaceId of params.workspaceIds) {
+      const workspaceRows = rows.filter(row => row.workspaceId === workspaceId);
+      const visibleRows = workspaceRows.slice(0, params.limit);
+      const sessions: CloudAgentRootSessionSummary[] = [];
+      for (const row of visibleRows) {
+        if (!row.cloudAgentSessionId || !row.workspaceId) continue;
+        const parsedWorkspaceId = cloudAgentWorktreeIdSchema.parse(row.workspaceId);
+        sessions.push({
+          kiloSessionId: row.kiloSessionId,
+          cloudAgentSessionId: row.cloudAgentSessionId,
+          workspaceId: parsedWorkspaceId,
+          userId: row.userId,
+          organizationId: row.organizationId,
+          title: row.title?.slice(0, MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS) ?? null,
+          gitUrl: safeGitUrl(row.gitUrl),
+          gitBranch: safeGitBranch(row.gitBranch),
+          profileId: row.profileId,
+          createdOnPlatform: row.createdOnPlatform,
+          created: databaseTimestampToMilliseconds(row.createdAt),
+          updated: databaseTimestampToMilliseconds(row.updatedAt),
+        });
+      }
+      const lastRow = visibleRows.at(-1);
+      output.set(workspaceId, {
+        sessions,
+        nextSessionCursor:
+          workspaceRows.length > params.limit && lastRow
+            ? encodeCloudAgentRootSessionsCursor({
+                updatedAt: lastRow.updatedAt,
+                sessionId: lastRow.kiloSessionId,
+              })
+            : null,
+      });
+    }
+    return output;
   }
 
   private async hydrateCloudAgentRootSessionSnapshot(params: {
@@ -843,6 +1338,81 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         kiloUserId: parsed.kiloUserId,
         errors: cacheErrors,
       });
+    }
+  }
+
+  /**
+   * RPC method: delete one hosted root session (and its descendants) from a
+   * workspace without touching the workspace or its other roots.
+   *
+   * The final-root invariant and the row deletions share one transaction, so a
+   * concurrent final-root delete cannot leave an active workspace rootless.
+   * Ingest storage and caches are cleared after the commit. A missing row is
+   * treated as already deleted so same-intent retries converge.
+   */
+  async deleteHostedWorkspaceSession(
+    params: DeleteHostedWorkspaceSessionParams
+  ): Promise<DeleteHostedWorkspaceSessionResult> {
+    const parsed = deleteHostedWorkspaceSessionSchema.parse(params);
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    let outcome: Awaited<ReturnType<typeof deleteHostedWorkspaceSessionRows>>;
+    try {
+      outcome = await deleteHostedWorkspaceSessionRows(db, parsed);
+    } catch (error) {
+      if (error instanceof HostedWorkspaceSessionDeleteError) throw new Error(error.code);
+      throw error;
+    }
+
+    if (outcome.deleted) {
+      const deletedAt = new Date().toISOString();
+      for (const row of outcome.rows) {
+        notifyUserSessionEvent(
+          this.env,
+          parsed.kiloUserId,
+          {
+            type: 'session.deleted',
+            data: {
+              source: 'v2',
+              sessionId: row.session_id,
+              parentSessionId: row.parent_session_id,
+              organizationId: row.organization_id,
+              gitUrl: row.git_url,
+              gitBranch: row.git_branch,
+              createdOnPlatform: row.created_on_platform,
+              deletedAt,
+            },
+          },
+          this.ctx
+        );
+      }
+    }
+
+    for (const sessionId of outcome.deleted ? outcome.deletedSessionIds : [parsed.sessionId]) {
+      await clearSessionLocalState(this.env, parsed.kiloUserId, sessionId);
+    }
+
+    return {
+      success: true,
+      sessionId: parsed.sessionId,
+      deletedSessionIds: outcome.deletedSessionIds,
+    };
+  }
+
+  /**
+   * RPC method: answer whether a destructive session delete would remove the
+   * final hosted root of an active workspace. Authorization stays with the
+   * caller; this only enforces the workspace invariant before runtime teardown.
+   */
+  async assertHostedWorkspaceSessionDeletable(
+    params: AssertHostedWorkspaceSessionDeletableParams
+  ): Promise<AssertHostedWorkspaceSessionDeletableResult> {
+    const parsed = assertHostedWorkspaceSessionDeletableSchema.parse(params);
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    try {
+      return await checkHostedWorkspaceSessionDeletable(db, parsed);
+    } catch (error) {
+      if (error instanceof HostedWorkspaceSessionDeleteError) throw new Error(error.code);
+      throw error;
     }
   }
 

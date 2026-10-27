@@ -136,6 +136,7 @@ export function OrganizationDashboard({
         {showTopupSuccess && organizationData && (
           <OrganizationTopupSuccessHeader
             organizationName={organizationData.name}
+            organizationId={organizationId}
             amountUsd={topupAmount.toString()}
             onDismiss={() => setShowTopupSuccess(false)}
           />

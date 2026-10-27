@@ -12,55 +12,53 @@ KiloClaw reaches end of life in December 2026, and the monthly subscriptions nee
 ## Evidence
 
 - apps/web/src/routers/admin-router.ts:1488-1760 has cancelKiloClawSubscription. Its period_end branch requires status 'active' and a cancel_at_period_end that is not already set. If a Stripe subscription exists, it releases the schedule (tolerating schedules that are already inactive) and calls stripe subscriptions.update(cancel_at_period_end: true). It then reconciles in a transaction: it sets cancel_at_period_end=true and clears the stripe_schedule_id, scheduled_plan and scheduled_by fields, writes a change log with reason 'admin_cancel_at_period_end', and writes an admin audit row 'kiloclaw.subscription.admin_cancel'.
-- admin-router.ts:247-300 has the lockMutableKiloClawSubscription, localKiloClawSubscriptionStateForAudit and isKiloClawCancelDesiredState helpers. These are private to the router file today.
+- admin-router.ts:196-300 defines KiloClawCancelAuditMetadata and the file-local lockMutableKiloClawSubscription, localKiloClawSubscriptionStateForAudit and isKiloClawCancelDesiredState helpers, so the bulk path can sit in the same file without changing module boundaries.
+- Today a period_end call that fails before reconciliation (validation error, Stripe error) writes no audit row. Only the reconcile transaction writes 'kiloclaw.subscription.admin_cancel'.
 - .specs/kiloclaw-billing.md 'Cancellation and Reactivation' (rules 1-6) says access continues until the period ends. Stripe-funded rows must have the flag set on both Stripe and the DB, and a pending schedule must be released first. Pure-credit rows need the local flag only.
-- packages/db/src/schema.ts:9230 defines kiloclaw_subscriptions with status, cancel_at_period_end, stripe_subscription_id, stripe_schedule_id, transferred_to_subscription_id, instance_id and payment_source. Org ownership comes from kiloclaw_instances.organization_id, which credit-billing.ts filters with isNull().
+- packages/db/src/schema.ts:9230 defines kiloclaw_subscriptions with status, cancel_at_period_end, stripe_subscription_id, transferred_to_subscription_id and instance_id. Org ownership comes from kiloclaw_instances.organization_id, which credit-billing.ts filters with isNull().
 - packages/db/src/schema-types.ts:825 defines the KiloClawAdminAuditAction zod enum. The audit table action column is plain text with no DB check constraint, so adding an action value needs no migration.
-- apps/web/src/app/admin/components/KiloclawInstances/KiloclawInstancesPage.tsx:311-405 has DevNukeAllButton, which uses an AlertDialog confirm and a result dialog that lists per-user errors. The bulk action can reuse this UI pattern.
-- admin-kiloclaw-instances-router.ts has preview/create pairs (previewFleetUpgrade and createFleetUpgrade) with audit logging. The bulk action can follow the same pattern.
+- apps/web/src/app/api/trpc/[trpc]/route.ts sets maxDuration = 800s. The operator says there are about 300 subscriptions, which fits comfortably in a single call at modest concurrency.
+- KiloclawInstancesPage.tsx:311-405 has DevNukeAllButton, which uses an AlertDialog confirm and a result dialog that lists per-user errors. The new button can reuse this UI pattern.
 
 ## Desired outcome
 
-On the KiloClaw admin page, an admin can preview how many subscriptions are eligible, split by funding type, and then confirm a single 'Stop renewal for all subscriptions' action. Each eligible subscription is set to cancel at its period end in both Stripe (where applicable) and the local DB. Access continues until each period ends. Every change is recorded in the change log and the admin audit log. The admin then sees per-subscription success, skip and failure counts. The action is idempotent, so running it again only processes rows that are still eligible or that failed earlier.
+On the KiloClaw admin page, an admin sees how many subscriptions are eligible and confirms a single 'Stop renewal for all subscriptions' action. In one call, each eligible subscription is set to cancel at its period end in both Stripe (where applicable) and the local DB, and access continues until each period ends. The audit log gets one summary row for the bulk run plus one row per subscription, covering both successes and failures and tagged with the bulk run ID. The admin then sees updated, skipped and failed counts with a failure list. Running it again only processes rows that are still eligible.
 
 ## Scope
 
-- Move the existing period_end cancellation logic (schedule release, Stripe update, locked reconcile, change log, admin audit) into a shared server helper. The existing per-user mutation keeps its current behavior and error contract.
-- Add an eligibility query for: status='active', cancel_at_period_end=false, transferred_to_subscription_id IS NULL, and personal ownership (the joined instance has a null organization_id, or there is no instance). This covers Stripe-funded, hybrid and pure-credit rows, including Commit plans.
-- Add an admin query, previewBulkCancelAtPeriodEnd, that returns eligible counts by payment type (stripe-backed vs pure credit) and counts of excluded rows by reason.
-- Add an admin mutation, bulkCancelAtPeriodEnd. It requires an explicit confirmation input, processes eligible rows in bounded batches with limited concurrency, isolates failures per row, and returns {processed, updated, alreadyDesired, failed: [{subscriptionId, userId, error}]}. It accepts an optional limit or cursor so a large fleet can be handled in several calls within the function timeout.
-- Add a summary admin audit action, 'kiloclaw.subscription.bulk_cancel_at_period_end', alongside the existing per-row 'kiloclaw.subscription.admin_cancel' entries.
-- Add a UI control on the KiloclawInstancesPage. It shows the preview counts and requires typed confirmation in a destructive AlertDialog, then shows a result dialog with a failure list and a way to re-run.
-- Update .specs/kiloclaw-billing.md to describe the admin EOL bulk non-renewal operation.
-- Add router tests that cover the bulk path.
+- In admin-router.ts, move the existing period_end branch and its reconcile code into a file-local async function. Both the existing per-user mutation and the new bulk mutation call it. No new module and no change to immediate mode.
+- Add an eligibility query (inline or file-local) for: status='active', cancel_at_period_end=false, transferred_to_subscription_id IS NULL, and personal ownership (the joined instance has a null organization_id, or there is no instance).
+- Add an admin query, previewBulkCancelKiloClawSubscriptions, that returns the eligible count, split by Stripe-backed vs pure credit.
+- Add an admin mutation, bulkCancelKiloClawSubscriptions. It requires a confirmation literal, processes every eligible row in one call with small fixed concurrency, isolates failures per row, and returns {total, updated, skipped, failed: [{subscriptionId, userId, error}]}.
+- Write audit rows: one summary 'kiloclaw.subscription.bulk_cancel_at_period_end' row per run, plus a per-subscription 'kiloclaw.subscription.admin_cancel' row for every processed subscription, including failures. Each per-row entry carries bulkRunId and its outcome.
+- Add a UI control on the KiloclawInstancesPage: preview count, typed confirmation, and a result dialog with the failure list.
+- Add router tests for the bulk path, plus a short note in .specs/kiloclaw-billing.md.
 
 ## Exclusions
 
-- Trialing, past_due and organization-managed subscriptions, unless the open operator question widens the scope.
-- Immediate cancellation, refunds, proration, and any suspension or destruction of instances. The existing lifecycle sweeps handle period-end transitions unchanged.
-- Blocking new enrollment or reactivation, and any persistent EOL feature flag.
-- User-facing email notifications about the cancellation.
-- Schema migrations. None are expected.
+- Trialing, past_due and organization-managed subscriptions.
+- Immediate cancellation, refunds, and any suspension or destruction of instances. The existing period-end sweeps stay as they are.
+- Blocking enrollment or reactivation, and any persistent EOL flag.
+- Client-driven batching, cursor or limit inputs. Not needed at about 300 rows within the 800s function budget.
+- Extracting the logic into a new shared lib module.
+- User emails and schema migrations.
 
 ## Approach
 
-- 1. In apps/web/src/lib/kiloclaw (for example, admin-subscription-cancel.ts), extract `cancelKiloClawSubscriptionAtPeriodEnd({ userId, subscriptionId, actor })`. It takes the period_end branch plus the reconciliation transaction from admin-router.ts and moves the lock, audit-state and desired-state helpers with it. It returns a discriminated result ('updated' | 'already_desired' | 'local_row_changed_after_stripe') and throws typed errors for validation failures and Stripe failures. Refactor admin.users.cancelKiloClawSubscription so period_end mode delegates to this helper, keeping its existing TRPCError codes and messages. Immediate mode stays as it is.
-- 2. Add `listBulkCancelEligibleSubscriptions` / `countBulkCancelEligibility`. The query left-joins kiloclaw_instances, filters for active, not canceling, not transferred and personal rows, and orders by id so cursor paging is stable.
-- 3. In admin-kiloclaw-instances-router.ts, add `previewBulkCancelAtPeriodEnd` (query) and `bulkCancelAtPeriodEnd` (mutation). The mutation input is z.object({ confirm: z.literal('STOP RENEWALS'), afterId?: uuid, limit: 1..500 default 200 }). It loops over the eligible rows with a concurrency of about 5, catching errors per row; Stripe rate limits are well above this. It writes one summary audit row (target_user_id = actor id, the same convention createFleetUpgrade uses) with the counts and the failed IDs, and returns the results plus a nextAfterId when more rows remain.
-- 4. Add 'kiloclaw.subscription.bulk_cancel_at_period_end' to KiloClawAdminAuditAction in packages/db/src/schema-types.ts. This is text-only, so no migration is needed. Follow packages/db/AGENTS.md.
-- 5. UI: add a StopAllRenewalsButton component to the KiloclawInstances admin page, available in all environments rather than only in development. It fetches the preview when opened and requires typing the confirmation phrase. The client keeps calling the mutation while nextAfterId is returned, shows progress, then shows the result dialog with the failure list. Follow the kilo-design-cloud guidance and the existing AlertDialog patterns.
-- 6. Add a short 'Admin EOL Bulk Non-Renewal' subsection to the billing spec. It should state the eligibility rules, the dual Stripe/DB updates, that access continues, and the audit requirements.
-- 7. Tests in admin-kiloclaw-user-router.test.ts or a new admin-kiloclaw-bulk-cancel.test.ts, using the existing Stripe mocks: a mixed fleet (stripe-backed with a schedule, pure-credit, already-canceling, trialing, past_due, org-owned, transferred) gets only the eligible rows updated. A Stripe failure on one row does not stop the others. A second run is a no-op. The existing single-cancel tests must keep passing.
+- 1. In admin-router.ts, lift the period_end branch and its reconcile transaction into a file-local `cancelKiloClawSubscriptionAtPeriodEnd({ userId, subscriptionId, actor, bulkRunId? })`. It returns 'updated' | 'already_desired' | 'local_row_changed_after_stripe' and throws the same TRPCErrors as today. The existing mutation's period_end case calls it and keeps the same responses. Metadata gains an optional bulkRunId.
+- 2. Next to it, add `previewBulkCancelKiloClawSubscriptions` (query) and `bulkCancelKiloClawSubscriptions` (mutation, input { confirm: z.literal('STOP RENEWALS') }) on the admin users router. The mutation generates a bulkRunId, selects all eligible rows, and runs the helper with a concurrency of about 5. For each row it maps 'updated' to updated, 'already_desired' to skipped, and a thrown error or 'local_row_changed_after_stripe' to failed.
+- 3. When a row fails before reconciliation (for example a Stripe error), the bulk loop writes a 'kiloclaw.subscription.admin_cancel' audit row for that subscription's user, with metadata { bulkRunId, subscriptionId, outcome: 'failed', error } and a non-sensitive message. Successful and skipped rows already get their per-row audit from the helper, with bulkRunId attached. After the loop, it writes one 'kiloclaw.subscription.bulk_cancel_at_period_end' summary row (target_user_id = actor id, matching createFleetUpgrade) containing bulkRunId, the counts and the failed subscription IDs.
+- 4. Add 'kiloclaw.subscription.bulk_cancel_at_period_end' to KiloClawAdminAuditAction in packages/db/src/schema-types.ts. This is text-only, so no migration is needed.
+- 5. UI: add a StopAllRenewalsButton on KiloclawInstancesPage, not gated to development. It shows the preview count, requires typing the confirmation phrase, makes a single mutation call, and shows a result dialog in the DevNukeAllButton style that lists failures.
+- 6. Tests: a mixed fleet (stripe-backed with a schedule, pure-credit, already-canceling, trialing, past_due, org-owned, transferred) gets only the eligible rows updated. One injected Stripe failure is reported, gets its own audit row, and does not stop the others. A second run is a no-op. The existing single-cancel tests stay unchanged.
 
 ## Affected areas
 
 - apps/web/src/routers/admin-router.ts
-- apps/web/src/lib/kiloclaw/ (new shared period-end cancel helper and eligibility query)
-- apps/web/src/routers/admin-kiloclaw-instances-router.ts
-- apps/web/src/app/admin/components/KiloclawInstances/ (new button and dialogs)
+- apps/web/src/app/admin/components/KiloclawInstances/KiloclawInstancesPage.tsx (or a sibling component)
 - packages/db/src/schema-types.ts (KiloClawAdminAuditAction)
 - .specs/kiloclaw-billing.md
-- apps/web/src/routers/*.test.ts
+- apps/web/src/routers/admin-kiloclaw-user-router.test.ts (or a new sibling test)
 
 ## Acceptance criteria
 
@@ -84,7 +82,7 @@ On the KiloClaw admin page, an admin can preview how many subscriptions are elig
 
 **Verification:** Code review
 
-### ac-6: Each updated row gets a kiloclaw subscription change-log entry (action 'canceled', admin actor) and a per-row 'kiloclaw.subscription.admin_cancel' audit row. Each bulk invocation also writes one 'kiloclaw.subscription.bulk_cancel_at_period_end' audit row containing the actor and the counts. No secrets or Stripe credentials appear in the logs.
+### ac-11: Each bulk run writes one 'kiloclaw.subscription.bulk_cancel_at_period_end' summary audit row with the actor, bulkRunId, counts and failed subscription IDs. It also writes one 'kiloclaw.subscription.admin_cancel' audit row per processed subscription for every outcome (updated, skipped and failed, including failures before reconciliation such as Stripe errors), each carrying the same bulkRunId and its outcome. Updated rows also get a subscription change-log entry. No secrets or Stripe credentials appear in the logs. Tests assert the per-row audit row for the injected failure.
 
 **Verification:** Code review
 
@@ -96,9 +94,9 @@ On the KiloClaw admin page, an admin can preview how many subscriptions are elig
 
 **Verification:** Source review
 
-### ac-9: In a production build, the KiloClaw admin page shows a stop-renewals control (not limited to development). It displays the preview counts, requires typed confirmation, pages through batches until done, and shows a result summary with any failures.
+### ac-12: In a production build, the KiloClaw admin page shows a stop-renewals control (not limited to development). It displays the eligible count, requires typed confirmation, processes all eligible subscriptions in a single request, and shows a result summary with updated, skipped and failed counts and the failure list.
 
-**Verification:** Manual: Against a Stripe test-mode environment, open /admin/kiloclaw as an admin, check the preview counts against the seeded data, run the action, and confirm the result dialog appears and the affected Stripe test subscriptions show cancel_at_period_end=true.
+**Verification:** Manual: Against a Stripe test-mode environment, open /admin/kiloclaw as an admin, check the preview count against the seeded data, run the action, confirm the result dialog, check that the affected Stripe test subscriptions show cancel_at_period_end=true, and check that the admin audit log has a summary row plus one row per subscription.
 
 ### ac-10: .specs/kiloclaw-billing.md documents the admin bulk non-renewal operation: eligibility, dual provider/local updates, access continuing to period end, and audit.
 
@@ -106,25 +104,25 @@ On the KiloClaw admin page, an admin can preview how many subscriptions are elig
 
 ## Risks
 
-- Running the action in production affects real billing across the fleet. The mitigations are typed confirmation, the preview counts, per-row audit entries, and reversibility: the cancel flag can be cleared through the existing reactivation flows.
-- Stripe can succeed while the local reconcile fails (local_row_changed_after_stripe). These cases are reported as failures needing review, and the existing audit metadata is preserved.
-- Function timeout or Stripe rate limits on a large fleet. This is handled with bounded batches, cursor paging driven by the client, and limited concurrency.
+- Running the action in production affects real billing across the fleet. The mitigations are typed confirmation, the preview count, per-row audit entries, and reversibility through the existing reactivation flows.
+- Stripe can succeed while the local reconcile fails (local_row_changed_after_stripe). These cases are reported as failures with audit rows for manual review.
+- A single request processes all rows. At about 300 rows with concurrency 5 this takes well under the 800s maxDuration. If the request is cut off, re-running is safe because the action is idempotent.
 - Hybrid rows (payment_source 'credits' with a Stripe subscription ID) must still go through Stripe. Eligibility is based on stripe_subscription_id, not payment_source.
-- Commit final terms already do not renew. Setting the flag on them is harmless but could interact with a pending Standard continuation (scheduled_plan). Clearing scheduled_plan matches the existing single-cancel semantics and should be called out in review.
-- Users can still reactivate after the bulk action, so the action is not a permanent EOL lock. Blocking reactivation is out of scope.
+- As with the single cancel, this clears a pending scheduled_plan, including a Commit-to-Standard continuation.
+- Users can still reactivate afterwards, so this is not a permanent lock.
 
 ## Assumptions
 
-- The bulk action can reuse the existing single-row period_end semantics, including clearing a scheduled plan or Commit continuation.
+- The fleet is about 300 eligible subscriptions and the action is essentially single-use, per the operator.
 - Personal ownership is determined by kiloclaw_instances.organization_id IS NULL. Rows with no instance are treated as personal.
-- No user notification email is needed as part of this change.
-- Configured verification commands could not be established from the pinned checkout (.kfab has no command config), so criteria use code/source review and one manual check.
+- No user notification email is needed.
+- Configured verification commands could not be established from the pinned checkout, so criteria use code/source review and one manual check.
 
 ## Decisions
 
 ### d-1: Which subscriptions are in scope for the bulk action?
 
-**Answer:** Provisional default until the operator answers: personal, status='active', not already canceling, not transferred. This includes Stripe-funded, hybrid, pure-credit and Commit rows. Trialing, past_due and org-managed rows are excluded.
+**Answer:** Provisional default; the scope question is still open with the operator: personal, status='active', not already canceling, not transferred. This includes Stripe-funded, hybrid, pure-credit and Commit rows. Trialing, past_due and org-managed rows are excluded.
 
 **Blocking:** no
 
@@ -142,6 +140,18 @@ On the KiloClaw admin page, an admin can preview how many subscriptions are elig
 
 ### d-4: How should the bulk path relate to the existing single-subscription cancel logic?
 
-**Answer:** Extract a shared helper that both paths use, rather than duplicating the Stripe and reconcile logic.
+**Answer:** Keep it minimal. Lift the period_end body into a file-local function inside admin-router.ts that both mutations call. Do not create a shared lib module or duplicate the Stripe/reconcile code.
+
+**Blocking:** no
+
+### d-5: Should the bulk mutation be batched or paginated?
+
+**Answer:** No. It processes all eligible rows in one call with small concurrency, taking no limit or cursor input (about 300 rows, single-use).
+
+**Blocking:** no
+
+### d-6: What should be written to the audit log?
+
+**Answer:** One summary row per bulk run, plus one per-subscription row for every outcome, including failures, linked by bulkRunId.
 
 **Blocking:** no

@@ -4,6 +4,7 @@
   "hasError": true,
   "model": null,
   "responseContent": "",
+  "toolCallArguments": "",
   "inference_provider": null,
   "finish_reason": null,
   "upstream_id": null,

@@ -45,6 +45,7 @@ type ResponsesApiResponse = OpenAI.Responses.Response &
 type ResponsesApiStreamEvent = {
   type: string;
   delta?: string;
+  item?: OpenAI.Responses.ResponseOutputItem;
   response?: ResponsesApiResponse;
   error?: { message: string; code: string };
 };
@@ -109,6 +110,12 @@ function extractResponseContent(output: OpenAI.Responses.ResponseOutputItem[]): 
     .join('');
 }
 
+function toolCallArgumentsOf(item: OpenAI.Responses.ResponseOutputItem | undefined): string | null {
+  if (item?.type === 'function_call') return item.arguments;
+  if (item?.type === 'custom_tool_call') return item.input;
+  return null;
+}
+
 export async function parseResponsesMicrodollarUsageFromStream(
   stream: ReadableStream<Uint8Array>,
   kiloUserId: string,
@@ -130,6 +137,7 @@ export async function parseResponsesMicrodollarUsageFromStream(
   let messageId: string | null = null;
   let model: string | null = null;
   let responseContent = '';
+  const toolCallArguments: string[] = [];
   let reportedError = statusCode >= 400;
   const startedAt = performance.now();
   let firstTokenReceived = false;
@@ -178,6 +186,11 @@ export async function parseResponsesMicrodollarUsageFromStream(
         responseContent += json.delta;
       }
 
+      if (json.type === 'response.output_item.done') {
+        const argumentsText = toolCallArgumentsOf(json.item);
+        if (argumentsText) toolCallArguments.push(argumentsText);
+      }
+
       // Extract metadata whenever json.response is present so that aborted
       // streams still capture messageId/model/usage from early events like
       // response.created and response.in_progress.
@@ -221,6 +234,7 @@ export async function parseResponsesMicrodollarUsageFromStream(
     hasError: reportedError || wasAborted || isErrorFinishReason(finish_reason),
     model,
     responseContent,
+    toolCallArguments: toolCallArguments.join('\n'),
     inference_provider,
     finish_reason,
     upstream_id: extractVercelUpstreamId(providerMetadata),
@@ -253,6 +267,10 @@ export function parseResponsesMicrodollarUsageFromString(
     hasError: !responseJson?.model || statusCode >= 400 || responseJson?.status !== 'completed',
     model: responseJson?.model ?? null,
     responseContent: responseJson?.output ? extractResponseContent(responseJson.output) : '',
+    toolCallArguments: (responseJson?.output ?? [])
+      .map(toolCallArgumentsOf)
+      .filter(argumentsText => argumentsText !== null)
+      .join('\n'),
     inference_provider,
     upstream_id: extractVercelUpstreamId(providerMetadata),
     finish_reason: responseJson?.status ?? null,

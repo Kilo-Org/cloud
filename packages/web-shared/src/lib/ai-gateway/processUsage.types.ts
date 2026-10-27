@@ -89,6 +89,8 @@ export type NotYetCostedUsageStats = {
   messageId: string | null;
   model: string | null;
   responseContent: string;
+  /** Tool-call arguments from the response, one call per line. Never persisted. */
+  toolCallArguments?: string;
   hasError: boolean;
   inference_provider: string | null;
   upstream_id: string | null;

@@ -3,6 +3,7 @@
   "hasError": false,
   "model": "openai/gpt-5.4-20260305",
   "responseContent": "hi",
+  "toolCallArguments": "",
   "inference_provider": null,
   "finish_reason": "completed",
   "upstream_id": null,

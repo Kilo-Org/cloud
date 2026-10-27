@@ -1098,7 +1098,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
 export function countAndStoreUsage(
   clonedReponse: Response,
   usageContext: MicrodollarUsageContext,
-  openrouterRequestSpan: Span | undefined
+  openrouterRequestSpan: Span | undefined,
+  resolveUsageStats?: (usageStats: MicrodollarUsageStats | null) => void
 ) {
   let usageStatsPromise: Promise<MicrodollarUsageStats | null> = Promise.resolve(null);
 
@@ -1174,7 +1175,16 @@ export function countAndStoreUsage(
     }
   }
 
-  return usageStatsPromise.then(usageStats => processTokenData(usageStats, usageContext));
+  return usageStatsPromise.then(
+    usageStats => {
+      resolveUsageStats?.(usageStats);
+      return processTokenData(usageStats, usageContext);
+    },
+    (error: unknown) => {
+      resolveUsageStats?.(null);
+      throw error;
+    }
+  );
 }
 
 export function processOpenRouterUsage(
@@ -1226,6 +1236,7 @@ export async function parseMicrodollarUsageFromStream(
   let messageId: string | null = null;
   let model: string | null = null;
   let responseContent = ''; // for abuse investigation
+  const toolCallArguments = new Map<number, string>();
   let reportedError = statusCode >= 400;
   let effectiveStatusCode = statusCode;
   const startedAt = performance.now();
@@ -1298,6 +1309,15 @@ export async function parseMicrodollarUsageFromStream(
       if (contentDelta) {
         responseContent += contentDelta;
       }
+      for (const toolCall of choice?.delta?.tool_calls ?? []) {
+        const argumentsDelta = toolCall.function?.arguments;
+        if (argumentsDelta) {
+          toolCallArguments.set(
+            toolCall.index,
+            (toolCallArguments.get(toolCall.index) ?? '') + argumentsDelta
+          );
+        }
+      }
     },
   });
 
@@ -1321,6 +1341,7 @@ export async function parseMicrodollarUsageFromStream(
     hasError: reportedError || wasAborted || isErrorFinishReason(finish_reason),
     model,
     responseContent,
+    toolCallArguments: [...toolCallArguments.values()].join('\n'),
     inference_provider,
     finish_reason,
     upstream_id: extractVercelUpstreamId(vercelProviderMetadata),
@@ -1368,6 +1389,11 @@ export function parseMicrodollarUsageFromString(
     hasError: !responseJson?.model || statusCode >= 400 || isErrorFinishReason(finish_reason),
     model: responseJson?.model ?? null,
     responseContent: choice?.message.content ?? '',
+    toolCallArguments: (choice?.message.tool_calls ?? [])
+      .map(toolCall =>
+        toolCall.type === 'function' ? toolCall.function.arguments : toolCall.custom.input
+      )
+      .join('\n'),
     inference_provider:
       responseJson?.provider ?? vercelProviderMetadata?.gateway?.routing?.finalProvider ?? null,
     upstream_id: extractVercelUpstreamId(vercelProviderMetadata),

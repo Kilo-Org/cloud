@@ -688,11 +688,17 @@ export function wrapInSafeNextResponse(response: Response) {
 export function accountForMicrodollarUsage(
   clonedReponse: Response,
   usageContext: MicrodollarUsageContext,
-  openrouterRequestSpan: Span | undefined
+  openrouterRequestSpan: Span | undefined,
+  resolveUsageStats?: (usageStats: MicrodollarUsageStats | null) => void
 ) {
   const logFileExtension = usageContext.isStreaming ? '.log.resp.sse' : '.log.resp.json';
   debugSaveProxyResponseStream(clonedReponse, logFileExtension);
-  const accounting = countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan);
+  const accounting = countAndStoreUsage(
+    clonedReponse,
+    usageContext,
+    openrouterRequestSpan,
+    resolveUsageStats
+  );
   after(accounting);
   return accounting;
 }

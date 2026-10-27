@@ -50,7 +50,11 @@ export function computeOpenRouterCostFields(
     (requireIsByok && is_byok == null && (openrouterCost_USD || upstream_inference_cost_USD)) || // unknown byok status but known non-zero costs? We're borked!
     (is_byok && usage.cost !== 0 && 1.1 < Math.abs(microdollar_error)) // byok and cost is not 5% of upstream? Weird, EXCEPT sometimes cost is 0 due to openrouter promo.
   ) {
-    const { responseContent: _ignore, ...corePropsCopy } = coreProps;
+    const {
+      responseContent: _ignoreContent,
+      toolCallArguments: _ignoreToolCalls,
+      ...corePropsCopy
+    } = coreProps;
     captureMessage("SUSPICIOUS: openrouters cost accounting doesn't make sense", {
       level: 'error',
       tags: { source },

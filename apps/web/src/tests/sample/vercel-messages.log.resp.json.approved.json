@@ -3,6 +3,7 @@
   "hasError": false,
   "model": "anthropic/claude-sonnet-4.6",
   "responseContent": "Hi there! 👋 How are you doing? Is there something I can help you with today?",
+  "toolCallArguments": "",
   "inference_provider": "bedrock",
   "upstream_id": null,
   "finish_reason": "end_turn",

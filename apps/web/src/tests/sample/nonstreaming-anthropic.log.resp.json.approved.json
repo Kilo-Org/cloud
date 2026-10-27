@@ -4,6 +4,7 @@
   "hasError": false,
   "model": "anthropic/claude-3.7-sonnet",
   "responseContent": "Lorem ipsum dolor sit amet, consectetur adipiscing elit",
+  "toolCallArguments": "",
   "inference_provider": "Google",
   "upstream_id": null,
   "finish_reason": "stop",

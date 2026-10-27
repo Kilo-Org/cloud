@@ -4,6 +4,7 @@
   "hasError": false,
   "model": "anthropic/claude-3.7-sonnet",
   "responseContent": "Let me check the providers test file to see if it might be importing the function:\n\n<read_file>\n<path>src/tests/providers.test.ts</path>\n</read_file>",
+  "toolCallArguments": "",
   "inference_provider": "Google",
   "finish_reason": "stop",
   "upstream_id": null,

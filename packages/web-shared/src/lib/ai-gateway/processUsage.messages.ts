@@ -150,6 +150,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
   let messageId: string | null = null;
   let model: string | null = null;
   let responseContent = '';
+  const toolCallArguments = new Map<number, string>();
   let reportedError = statusCode >= 400;
   const startedAt = performance.now();
   let firstTokenReceived = false;
@@ -223,6 +224,17 @@ export async function parseMessagesMicrodollarUsageFromStream(
         responseContent += json.delta.text;
       }
 
+      if (
+        json.type === 'content_block_delta' &&
+        json.delta.type === 'input_json_delta' &&
+        json.delta.partial_json
+      ) {
+        toolCallArguments.set(
+          json.index,
+          (toolCallArguments.get(json.index) ?? '') + json.delta.partial_json
+        );
+      }
+
       if (json.type === 'message_delta') {
         finish_reason = json.delta.stop_reason;
         deltaUsage = json.usage ?? deltaUsage;
@@ -255,6 +267,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
     hasError: reportedError || wasAborted || isErrorFinishReason(finish_reason),
     model,
     responseContent,
+    toolCallArguments: [...toolCallArguments.values()].join('\n'),
     inference_provider,
     finish_reason,
     upstream_id: extractVercelUpstreamId(providerMetadata),
@@ -289,6 +302,10 @@ export function parseMessagesMicrodollarUsageFromString(
     .filter((c): c is Anthropic.Messages.TextBlock => c != null && c.type === 'text')
     .map(c => c.text)
     .join('');
+  const toolCallArguments = (responseJson?.content ?? [])
+    .filter((c): c is Anthropic.Messages.ToolUseBlock => c != null && c.type === 'tool_use')
+    .map(c => JSON.stringify(c.input))
+    .join('\n');
 
   const finish_reason = responseJson?.stop_reason ?? null;
   const coreProps = {
@@ -296,6 +313,7 @@ export function parseMessagesMicrodollarUsageFromString(
     hasError: !responseJson?.model || statusCode >= 400 || isErrorFinishReason(finish_reason),
     model: getVercelResolvedModel(providerMetadata) ?? responseJson?.model ?? null,
     responseContent,
+    toolCallArguments,
     inference_provider,
     upstream_id: extractVercelUpstreamId(providerMetadata),
     finish_reason,

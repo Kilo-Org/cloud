@@ -4,6 +4,7 @@
   "hasError": false,
   "model": "openai/gpt-4.1",
   "responseContent": "<attempt_completion>\n<result>\nThe duplicated suffix logic in the if/else branches has been refactored. Now, the code only handles the differing parts (stream vs. string) inside the branches, and the shared logic (waitUntil and return) is moved after the conditional. This reduces duplication and improves maintainability while preserving the original behavior.\n</result>\n</attempt_completion>",
+  "toolCallArguments": "",
   "inference_provider": "OpenAI",
   "finish_reason": "stop",
   "upstream_id": null,

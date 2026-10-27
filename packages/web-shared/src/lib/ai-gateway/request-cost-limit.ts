@@ -14,7 +14,10 @@ import {
   getCustomPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
-import type { EndpointPricing } from './providers/openrouter/display-pricing';
+import {
+  getModelDisplayPricing,
+  type EndpointPricing,
+} from './providers/openrouter/display-pricing';
 import type { OpenRouterProviderConfig } from './providers/openrouter/types';
 import {
   getVercelModelIdOverrides,
@@ -32,9 +35,9 @@ type RateTier = {
   };
 };
 
-function ratesForTier(tier: RateTier, requestCost: number): TextPricingRates {
+function tierPricing(tier: RateTier): EndpointPricing {
   const { pricing } = tier;
-  const rates = textPricingRates({
+  return {
     prompt: formatPricePerToken(pricing.prompt_per_million),
     completion: formatPricePerToken(pricing.completion_per_million),
     input_cache_read: formatPricePerToken(
@@ -44,7 +47,12 @@ function ratesForTier(tier: RateTier, requestCost: number): TextPricingRates {
       pricing.input_cache_write_per_million ?? pricing.prompt_per_million
     ),
     request: '0',
-  });
+  };
+}
+
+function ratesForTier(tier: RateTier, requestCost: number): TextPricingRates {
+  const rates = pricedRates(tierPricing(tier));
+  if (!rates) throw new Error('Model has invalid billed pricing');
   return { ...rates, requestCost };
 }
 function tierAtInputLength(
@@ -117,10 +125,11 @@ export type TextPricingRates = {
 /**
  * Per-token rates for a text request under one price: the prompt rate plus the
  * worse of the cache read/write rates for input, the completion rate plus the
- * reasoning rate for output, and the per-request fee.
+ * reasoning rate for output, and the per-request fee. `null` when the price is
+ * missing or unusable.
  */
-export function textPricingRates(pricing: EndpointPricing | undefined): TextPricingRates {
-  if (!pricing) throw new Error('Model has an unpriced route');
+function pricedRates(pricing: EndpointPricing | undefined): TextPricingRates | null {
+  if (!pricing) return null;
   const values = [
     pricing.prompt,
     pricing.completion,
@@ -129,13 +138,20 @@ export function textPricingRates(pricing: EndpointPricing | undefined): TextPric
     pricing.input_cache_read ?? '0',
     pricing.internal_reasoning ?? '0',
   ].map(Number);
-  if (values.some(value => !Number.isFinite(value) || value < 0))
-    throw new Error('Model has invalid pricing');
+  if (values.some(value => !Number.isFinite(value) || value < 0)) return null;
   return {
     inputRate: values[0] + Math.max(values[3], values[4]),
     outputRate: values[1] + values[5],
     requestCost: values[2],
   };
+}
+
+/** {@link pricedRates} for a caller that cannot proceed without a price. */
+export function textPricingRates(pricing: EndpointPricing | undefined): TextPricingRates {
+  if (!pricing) throw new Error('Model has an unpriced route');
+  const rates = pricedRates(pricing);
+  if (!rates) throw new Error('Model has invalid pricing');
+  return rates;
 }
 
 function requestTextBytes(value: unknown): number {
@@ -384,4 +400,66 @@ export async function enforceRequestCostLimit(
   } catch (error) {
     return refused(error instanceof Error ? error.message : 'Request pricing unavailable');
   }
+}
+
+/** The worst rates across the given prices, or `null` when one of them cannot be read. */
+function worstRates(rates: readonly (TextPricingRates | null)[]): TextPricingRates | null {
+  let worst: TextPricingRates | null = null;
+  for (const rate of rates) {
+    if (!rate) return null;
+    worst = worst ? combineRates(worst, rate) : rate;
+  }
+  return worst;
+}
+
+/**
+ * The rates a stored model may be billed at: every route at both its stored price and its
+ * undiscounted list price, plus its most expensive billed tier, so a bound built from them covers
+ * whichever route serves the request at whichever price it is quoted. `null` when the catalog
+ * cannot price every one of them.
+ */
+function storedModelWorstRates(metadata: StoredModel): TextPricingRates | null {
+  const routes = worstRates(
+    metadata.endpoints.flatMap(endpoint => [
+      pricedRates(endpoint.pricing),
+      pricedRates(getModelDisplayPricing(endpoint.pricing)),
+    ])
+  );
+  const tiers = worstRates(
+    [
+      ...(getCustomPricing(metadata.id)?.pricing ?? []),
+      ...(findKiloExclusiveModel(metadata.id)?.pricing?.tiers ?? []),
+    ].map(tier => pricedRates(tierPricing(tier)))
+  );
+  if (!routes) return null;
+  return tiers ? combineRates(routes, tiers) : routes;
+}
+
+/** Output-token allowance for one System One answer, covering its generation and envelope. */
+export const SYSTEM_ONE_MAX_OUTPUT_TOKENS = 16_384;
+
+/**
+ * Cost bound, in microdollars, of one System One request at the model's current prices, or `null`
+ * when the stored catalog cannot price every route the request may be served on.
+ *
+ * The request's own serialized bytes bound the input tokens, and answers repeat the question
+ * criteria keys, so the questions bound the output tokens as well. The output allowance adds room
+ * for the answer generation each model also prices.
+ */
+export function systemOneRequestCostBound(
+  metadata: StoredModel,
+  request: { state: unknown; questions: Record<string, unknown> }
+): number | null {
+  const price = storedModelWorstRates(metadata);
+  if (!price) return null;
+  const questionBytes = Buffer.byteLength(JSON.stringify(request.questions) ?? '', 'utf8');
+  const inputTokenCeiling =
+    Buffer.byteLength(JSON.stringify(request.state) ?? '', 'utf8') + questionBytes + 1024;
+  const outputTokenCeiling = questionBytes + SYSTEM_ONE_MAX_OUTPUT_TOKENS;
+  return Math.ceil(
+    (inputTokenCeiling * price.inputRate +
+      outputTokenCeiling * price.outputRate +
+      price.requestCost) *
+      1_000_000
+  );
 }

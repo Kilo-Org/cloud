@@ -3816,10 +3816,12 @@
               "type": "string",
               "enum": [
                 "alibaba-token-plan",
+                "aws-bedrock",
                 "byteplus-coding",
                 "chutes-byok",
                 "codestral",
                 "edenai",
+                "gcp-vertex",
                 "inceptron-byok",
                 "kimi-coding",
                 "martian",
@@ -3886,6 +3888,28 @@
       "id"
     ],
     "searchBlob": "byok.delete Remove a stored BYOK provider API key belonging to the current user or an organization. Deletes the saved credential so it can no longer be used for inference. byok delete organizationid id organizationId id"
+  },
+  "byok.directCloudByokAvailable": {
+    "path": "byok.directCloudByokAvailable",
+    "kind": "query",
+    "summary": "Check whether direct cloud BYOK is available for the current user or a specified organization. Use to determine if bring-your-own-key is enabled before prompting for keys.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "byok",
+      "directcloudbyokavailable",
+      "organizationid"
+    ],
+    "searchBlob": "byok.directCloudByokAvailable Check whether direct cloud BYOK is available for the current user or a specified organization. Use to determine if bring-your-own-key is enabled before prompting for keys. byok directcloudbyokavailable organizationid organizationId"
   },
   "byok.list": {
     "path": "byok.list",

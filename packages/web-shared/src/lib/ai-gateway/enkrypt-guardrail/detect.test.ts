@@ -219,6 +219,15 @@ describe('scanTurnDelta', () => {
     ]);
   });
 
+  it('does not retry a rate-limited call', async () => {
+    const dependencies = deps(async () => detectResponse({ summary: {} }, { status: 429 }));
+
+    const result = await scanTurnDelta(makeScan(), dependencies);
+
+    expect(dependencies.fetch).toHaveBeenCalledTimes(1);
+    expect(result.verdict).toEqual({ action: 'allow' });
+  });
+
   describe('fail mode', () => {
     const failures: [string, () => Promise<Response>][] = [
       ['a persistent server error', async () => detectResponse({ summary: {} }, { status: 503 })],

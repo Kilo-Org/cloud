@@ -136,7 +136,8 @@ async function detectOnce(
     return {
       kind: 'failed',
       error: `http_${response.status}`,
-      retryable: response.status === 429 || response.status >= 500,
+      // An immediate retry of a 429 would hit the same limiter within the deadline.
+      retryable: response.status >= 500,
       creditsCost,
     };
   }

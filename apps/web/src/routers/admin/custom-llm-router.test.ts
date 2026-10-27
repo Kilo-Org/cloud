@@ -660,6 +660,27 @@ describe('adminCustomLlmRouter', () => {
       expect(result.definition.organization_ids).toBeUndefined();
     });
 
+    it('rejects api_kinds without the API that clients use', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: 'acme/api-kinds-model',
+          definition: { ...publicDefinition, api_kinds: ['messages', 'responses'] },
+          credentials,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: 'acme/api-kinds-model',
+          definition: { ...publicDefinition, api_kinds: ['chat_completions', 'messages'] },
+          credentials,
+        })
+      ).resolves.toMatchObject({
+        definition: { api_kinds: ['chat_completions', 'messages'] },
+      });
+    });
+
     it('rejects an inference provider that is not a lowercase slug', async () => {
       const caller = await createCallerForUser(admin.id);
 

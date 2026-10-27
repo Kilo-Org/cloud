@@ -2329,9 +2329,23 @@ export const CustomLlmApiKindSchema = z.enum(['chat_completions', 'messages', 'r
 
 export type CustomLlmApiKind = z.infer<typeof CustomLlmApiKindSchema>;
 
+/** The API that clients use for a custom LLM, given its `opencode_settings.ai_sdk_provider`. */
+export function getCustomLlmClientApiKind(
+  aiSdkProvider: CustomLlmProvider | undefined
+): CustomLlmApiKind {
+  switch (aiSdkProvider) {
+    case 'anthropic':
+      return 'messages';
+    case 'openai':
+      return 'responses';
+    default:
+      return 'chat_completions';
+  }
+}
+
 export const CustomLlmApiConfigSchema = z.object({
   internal_id: z.string().min(1).optional(),
-  /** Gateway APIs the upstream serves. Without it, `opencode_settings.ai_sdk_provider` picks one. */
+  /** Gateway APIs the upstream serves, including the one clients use. Without it, only that one. */
   api_kinds: z.array(CustomLlmApiKindSchema).min(1).optional(),
   base_url: z.url(),
   disable_url_suffix: z.boolean().optional(),
@@ -2463,6 +2477,14 @@ export const CustomLlmDefinitionSchema = z
     public: CustomLlmPublicSchema.optional(),
   })
   .superRefine((definition, ctx) => {
+    const clientApiKind = getCustomLlmClientApiKind(definition.opencode_settings?.ai_sdk_provider);
+    if (definition.api_kinds && !definition.api_kinds.includes(clientApiKind)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['api_kinds'],
+        message: `api_kinds must include ${clientApiKind}, the API clients use for this ai_sdk_provider`,
+      });
+    }
     if (!definition.public) return;
     for (const key of ['organization_ids', 'group_ids'] as const) {
       if (definition[key] !== undefined) {

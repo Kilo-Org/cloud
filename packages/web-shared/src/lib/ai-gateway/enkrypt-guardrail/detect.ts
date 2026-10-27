@@ -2,7 +2,7 @@ import * as z from 'zod';
 import type { EnkryptGuardrailApiKind, EnkryptGuardrailDecision } from '@kilocode/db/schema-types';
 import type { EnkryptGuardrailCharge } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/charges';
 import type { EnkryptInputGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
-import { sentryLogger, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export const ENKRYPT_DETECT_URL = 'https://api.enkryptai.com/guardrails/detect';
 
@@ -77,8 +77,6 @@ type DetectAttempt =
       creditsCost: number | null;
     }
   | { kind: 'failed'; error: string; retryable: boolean; creditsCost: number | null };
-
-const logDecision = sentryLogger('enkrypt-guardrail', 'info');
 
 function isDetectorName(name: string): name is DetectorName {
   return Object.hasOwn(DETECTOR_TYPES, name);
@@ -263,10 +261,10 @@ export async function scanTurnDelta(
     credits_cost: totalCredits(charges),
   };
   if (blocking.length === 0) {
-    logDecision('[enkrypt-guardrail] decision', { ...decided, decision: 'allowed' });
+    console.debug('[enkrypt-guardrail] decision', { ...decided, decision: 'allowed' });
     return { verdict: { action: 'allow' }, charges };
   }
-  logDecision('[enkrypt-guardrail] decision', { ...decided, decision: 'blocked' });
+  console.debug('[enkrypt-guardrail] decision', { ...decided, decision: 'blocked' });
   return {
     verdict: { action: 'block', message: guardrailBlockMessage(blocking, attempt.resultMessage) },
     charges,

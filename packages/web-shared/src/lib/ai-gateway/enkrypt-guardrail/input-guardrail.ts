@@ -10,9 +10,6 @@ import {
   type EnkryptGuardrailVerdict,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import { ENKRYPT_API_KEY } from '@kilocode/web-shared/lib/config.server';
-import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
-
-const logError = sentryLogger('enkrypt-guardrail', 'error');
 
 const notScanned: EnkryptGuardrailScanResult = { verdict: { action: 'allow' }, charges: [] };
 
@@ -43,7 +40,7 @@ export function startEnkryptInputGuardrail(
     await Promise.all(
       charges.map(charge =>
         recordEnkryptGuardrailCharge(charge).catch((error: unknown) => {
-          logError('[enkrypt-guardrail] failed to record charge', {
+          console.error('[enkrypt-guardrail] failed to record charge', {
             organization_id: charge.organizationId,
             session_id: charge.sessionId,
             error: error instanceof Error ? error.message : String(error),

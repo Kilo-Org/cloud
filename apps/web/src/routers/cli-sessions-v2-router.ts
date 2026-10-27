@@ -2263,6 +2263,7 @@ export const cliSessionsV2Router = createTRPCRouter({
         })
       ).token;
       const client = createCloudAgentNextClient(authToken);
+      let alreadyGone = false;
       try {
         await client.deleteHostedWorkspaceSession({
           workspaceId: cloudAgentWorktreeIdSchema.parse(session.cloud_agent_worktree_id),
@@ -2292,8 +2293,9 @@ export const cliSessionsV2Router = createTRPCRouter({
             cause: err,
           });
         }
+        alreadyGone = true;
       }
-      return { success: true, session_id };
+      if (!alreadyGone) return { success: true, session_id };
     }
 
     if (session.cloud_agent_session_id && SESSION_ID_RE.test(session.cloud_agent_session_id)) {

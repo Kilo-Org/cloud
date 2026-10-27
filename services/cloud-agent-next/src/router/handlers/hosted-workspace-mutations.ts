@@ -2,6 +2,7 @@ import { TRPCError } from '@trpc/server';
 import type { WorkerDb } from '@kilocode/db/client';
 import {
   admitOperation,
+  getOperation,
   markReconcilePending,
   recordOperationProgress,
   settleOperation,
@@ -315,6 +316,32 @@ const deleteHostedWorkspaceSessionHandler = protectedProcedure
 
     const row = await findHostedWorkspaceSession(db, ctx.userId, input.sessionId);
     if (!row) {
+      const existing = await getOperation(db, {
+        userId: ctx.userId,
+        domain: 'session',
+        operationKey: input.operationKey,
+      });
+      if (existing) {
+        assertSessionOperationIdentity(existing, {
+          userId: ctx.userId,
+          intent: 'delete_workspace_session',
+          organizationId: workspace.organizationId ?? undefined,
+          resourceKey: input.workspaceId,
+        });
+        const recorded = readDeletionProgress(existing);
+        if (recorded?.cloudAgentSessionId !== input.sessionId) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'workspace_session_not_found' });
+        }
+        if (existing.status === 'completed') {
+          return {
+            success: true as const,
+            workspaceId: input.workspaceId,
+            sessionId: input.sessionId,
+          };
+        }
+        if (existing.status === 'failed') throw deletionConflict(existing.outcome_code);
+        throw new TRPCError({ code: 'CONFLICT', message: 'session_deletion_in_progress' });
+      }
       throw new TRPCError({ code: 'NOT_FOUND', message: 'workspace_session_not_found' });
     }
     if (row.worktreeId !== input.workspaceId || row.parentSessionId !== null) {

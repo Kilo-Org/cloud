@@ -440,6 +440,27 @@ describe('cliSessionsV2 worktree projections and session deletion', () => {
     expect(mockDeleteSessionIngest).not.toHaveBeenCalled();
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
+
+  it('falls back to ingest cleanup when the authoritative operation reports not found', async () => {
+    mockHostedRuntimeDelete.mockRejectedValueOnce(
+      new TRPCClientError('workspace_not_found', {
+        result: {
+          error: {
+            code: -32603,
+            message: 'workspace_not_found',
+            data: { code: 'NOT_FOUND' },
+          },
+        },
+      })
+    );
+
+    await expect(createCaller({ user }).delete({ session_id: SESSION_ID })).resolves.toEqual({
+      success: true,
+      session_id: SESSION_ID,
+    });
+
+    expect(mockDeleteSessionIngest).toHaveBeenCalledWith(SESSION_ID, user.id);
+  });
 });
 
 describe('cliSessionsV2 worktreeDetails and persistent names', () => {

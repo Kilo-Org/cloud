@@ -2699,7 +2699,9 @@
       "retrying": "Ag triail arís…",
       "retryDeny": "Bain triail eile as diúltú",
       "retryAllowOnce": "Bain triail eile as ceadú uair amháin",
-      "retryAlwaysAllow": "Bain triail eile as ceadú i gcónaí"
+      "retryAlwaysAllow": "Bain triail eile as ceadú i gcónaí",
+      "unreadableTitle": "Níorbh fhéidir an t-iarratas ceada a léamh",
+      "unreadableBody": "Tá an gníomhaire ag fanacht le cinneadh ceada nach féidir leis an aip seo a thaispeáint. Nuashonraigh an aip nó an CLI, nó freagair an t-iarratas sa CLI chun leanúint ar aghaidh."
     },
     "questionCard": {
       "title": "Tá ionchur ag teastáil ón ngníomhaire",
@@ -3112,8 +3114,9 @@
     "unavailableDevice": "Níl ionchur gutha ar fáil ar an ngléas seo.",
     "unavailableLanguage": "Níl ionchur gutha ar fáil don teanga atá roghnaithe ar an ngléas seo.",
     "languageNotInstalledTitle": "Níl ionchur gutha do {{language}} réidh fós",
-    "languageNotInstalledMessage": "Níl comhaid cainte as líne do {{language}} suiteáilte ar an bhfón seo. Íoslódáil iad, agus bain triail as ionchur gutha arís ina dhiaidh sin.",
+    "languageNotInstalledMessage": "Níl comhaid cainte as líne do {{language}} suiteáilte, agus tá an tras-scríobh ar líne múchta. Suiteáil na comhaid sin, nó las an tras-scríobh ar líne arís, chun ionchur gutha a úsáid.",
     "downloadOfflineModel": "Íoslódáil",
+    "useOnlineTranscription": "Ceadaigh tras-scríobh ar líne",
     "offlineModelDownloadScheduled": "Íoslódófar na comhaid cainte as líne sa chúlra. Bain triail as ionchur gutha arís níos déanaí.",
     "listeningStopped": "Stopadh an éisteacht.",
     "transcribing": "Ag tras-scríobh...",

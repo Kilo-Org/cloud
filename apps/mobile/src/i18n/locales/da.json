@@ -2591,7 +2591,9 @@
       "retrying": "Prøver igen…",
       "retryDeny": "Prøv at afvise igen",
       "retryAllowOnce": "Prøv at tillade én gang igen",
-      "retryAlwaysAllow": "Prøv at tillade altid igen"
+      "retryAlwaysAllow": "Prøv at tillade altid igen",
+      "unreadableTitle": "Tilladelsesanmodning kunne ikke læses",
+      "unreadableBody": "Agenten venter på en tilladelsesafgørelse, som denne app ikke kan vise. Opdater appen eller CLI'en, eller besvar anmodningen i CLI'en for at fortsætte."
     },
     "questionCard": {
       "title": "Agenten har brug for svar",
@@ -2983,8 +2985,9 @@
     "unavailableDevice": "Diktering er ikke tilgængelig på denne enhed.",
     "unavailableLanguage": "Diktering er ikke tilgængelig på enhedens valgte sprog.",
     "languageNotInstalledTitle": "Diktering for {{language}} er ikke klar endnu",
-    "languageNotInstalledMessage": "De offline talefiler til {{language}} er ikke installeret på denne telefon. Download dem, og prøv diktering igen.",
+    "languageNotInstalledMessage": "De offline talefiler for {{language}} er ikke installeret, og transskription på nettet er slået fra. Download filerne, eller slå transskription på nettet til igen, for at bruge diktering.",
     "downloadOfflineModel": "Download",
+    "useOnlineTranscription": "Tillad online transskription",
     "offlineModelDownloadScheduled": "De offline talefiler downloades i baggrunden. Prøv diktering igen senere.",
     "listeningStopped": "Dikteringen er stoppet.",
     "transcribing": "Transskriberer...",

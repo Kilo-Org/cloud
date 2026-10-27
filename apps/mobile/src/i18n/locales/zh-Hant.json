@@ -2067,7 +2067,9 @@
       "retrying": "重試中…",
       "retryDeny": "再次嘗試拒絕",
       "retryAllowOnce": "再次嘗試僅允許這次",
-      "retryAlwaysAllow": "再次嘗試一律允許"
+      "retryAlwaysAllow": "再次嘗試一律允許",
+      "unreadableTitle": "無法讀取權限要求",
+      "unreadableBody": "代理程式正在等待一項權限決策，但此應用程式無法顯示該要求。請更新應用程式或 CLI，或在 CLI 中回覆該要求以繼續。"
     },
     "questionCard": {
       "title": "智慧代理需要你的回覆",
@@ -2459,8 +2461,9 @@
     "unavailableDevice": "此裝置上無法使用語音輸入。",
     "unavailableLanguage": "語音輸入不支援此裝置目前使用的語言。請安裝該語言的離線語音檔案，或改用應用程式語言。",
     "languageNotInstalledTitle": "{{language}} 的語音輸入尚未就緒",
-    "languageNotInstalledMessage": "此手機尚未安裝 {{language}} 的離線語音檔案。請下載這些檔案，然後再試一次語音輸入。",
+    "languageNotInstalledMessage": "尚未安裝 {{language}} 的離線語音檔案，且線上轉錄功能已關閉。請安裝檔案或重新開啟線上轉錄功能，即可使用語音輸入。",
     "downloadOfflineModel": "下載",
+    "useOnlineTranscription": "允許線上轉錄",
     "offlineModelDownloadScheduled": "離線語音檔案將在背景下載。請稍後再試一次語音輸入。",
     "listeningStopped": "已停止聆聽。",
     "transcribing": "正在轉錄…",

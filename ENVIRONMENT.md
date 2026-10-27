@@ -18,6 +18,24 @@ This document lists all environment variables used in the Kilo Code cloud monore
 
 Manage shared web env var additions and rotations with `pnpm web:env set <VARIABLE>`. The helper coordinates tracked root and `apps/web` dotenv defaults, the `kilocode-app` and `kilocode-ai-gateway` Vercel deployments, and 1Password storage for sensitive Production values. `pnpm web:env copy` fills a new project from an existing one. See `DEVELOPMENT.md` for the full workflow.
 
+### Code review health monitor
+
+`CODE_REVIEW_HEALTH_SECRET` is a dedicated server-only monitor credential. `[SECRET]`
+The monitor must send `Authorization: Bearer <configured value>`. An unset or empty
+value disables access. Each running instance shares its cached health response
+across authorized callers for 60 seconds; simultaneous refreshes share one evaluation.
+
+Apply `packages/db/src/migrations/0307_review_window_index.sql` before deploying
+the application.
+For initial deployment or rotation, the owner runs
+`pnpm web:env set CODE_REVIEW_HEALTH_SECRET`, supplies a newly generated secret, and
+coordinates the application deployment with the external monitor's header update.
+Verify the monitor after the deployment and header update. Only one configured
+secret is accepted; deployment and monitor configuration must agree.
+Keep credentials out of tracked defaults. For local monitor development, generate
+a separate value with `openssl rand -base64 32` and set it in the local environment;
+ordinary local startup does not require this credential.
+
 ### Configuration & Constant URLs
 
 - `APP_URL_OVERRIDE` - Optional base application URL override in any environment; used in `packages/web-shared/src/lib/constants.ts` and `next.config.mjs`. When unset, Vercel's `staging` target uses `https://staging-app.kilo.ai`, production uses `https://app.kilo.ai`, and local development uses `PORT`. [SERVER]
@@ -99,6 +117,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `RUNTIME_ISOLATION_ENABLED` - Cloud Agent Worker rollout control for new modern control-plane sessions and worktree destinations. Production and dev Worker configs set this to `true`; exact `true` permits adoption, while unset/other values reject it before durable work. Legacy attachments keep directory-shared Kilo runtimes. Persisted modern runtime authorization continues selecting per-session isolation after rollback, and the connected wrapper must advertise the isolation capability. Actual web issuance remains off behind its separate issuance gates. Outstanding smoke failures must be resolved before merge; enabling this Worker admission gate does not remove that merge prerequisite. Foreground expiry recovery retains the same session identity and requires acknowledged idle transport retirement; this flag does not establish complete real-provider smoke coverage. See `docs/token-issuance-policy.md`, Phase 5.2 merge, automatic deployment, and activation. [SERVER]
 - `CALLBACK_TOKEN_SECRET` - Secret for signing callback tokens. Required for local development. `[SECRET]`
 - `INTERNAL_SECRET` - Alias/fallback for `INTERNAL_API_SECRET`; used in KiloClaw E2E scripts (`services/kiloclaw/e2e/`). `[SECRET]`
+- Sign-in code email rate limits are Vercel Firewall rules configured in the project's firewall configuration, not environment variables. `magic-link-email` counts sends per normalized address; `sign-in-code-email-ip` counts sends per caller address. `apps/web/src/lib/auth/email-signin-eligibility.ts` reports a rule that is not configured to Sentry at most once a minute, so both rules belong in that configuration.
 
 ### Social OAuth Clients
 
@@ -398,6 +417,7 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `IMPACT_ADVOCATE_TENANT_ALIAS` - Impact.com Advocate tenant alias. [SERVER]
 - `IMPACT_ADVOCATE_API_BASE_URL` - Impact.com Advocate API base URL. Defaults to `https://app.referralsaasquatch.com`. [SERVER]
 - `IMPACT_CAMPAIGN_ID` - Impact.com campaign ID for event tracking. [SERVER]
+
 ### Cloudflare Analytics
 
 - `CLOUDFLARE_ACCOUNT_ID` - Cloudflare account ID used as the GraphQL `accountTag` for Containers Analytics queries and admin dashboard deep links; used in `packages/web-shared/src/lib/config.server.ts` and `apps/web/src/lib/cloudflare/container-usage-analytics.ts`. [SERVER]

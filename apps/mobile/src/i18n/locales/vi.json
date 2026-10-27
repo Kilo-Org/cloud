@@ -2067,7 +2067,9 @@
       "retrying": "Đang thử lại…",
       "retryDeny": "Thử lại thao tác từ chối",
       "retryAllowOnce": "Thử lại thao tác cho phép một lần",
-      "retryAlwaysAllow": "Thử lại thao tác luôn cho phép"
+      "retryAlwaysAllow": "Thử lại thao tác luôn cho phép",
+      "unreadableTitle": "Không đọc được yêu cầu cấp quyền",
+      "unreadableBody": "Tác nhân đang chờ một quyết định cấp quyền mà ứng dụng này không thể hiển thị. Hãy cập nhật ứng dụng hoặc CLI, hoặc trả lời yêu cầu trong CLI để tiếp tục."
     },
     "questionCard": {
       "title": "Tác nhân cần bạn trả lời",
@@ -2459,8 +2461,9 @@
     "unavailableDevice": "Thiết bị này không hỗ trợ nhập bằng giọng nói.",
     "unavailableLanguage": "Tính năng nhập bằng giọng nói không hỗ trợ ngôn ngữ hiện tại của thiết bị.",
     "languageNotInstalledTitle": "Nhập bằng giọng nói cho {{language}} chưa sẵn sàng",
-    "languageNotInstalledMessage": "Các tệp giọng nói ngoại tuyến cho {{language}} chưa được cài đặt trên điện thoại này. Hãy tải các tệp đó xuống, rồi thử nhập bằng giọng nói lại.",
+    "languageNotInstalledMessage": "Các tệp giọng nói ngoại tuyến cho {{language}} chưa được cài đặt và tính năng chuyển văn bản trực tuyến đang tắt. Hãy tải xuống các tệp này hoặc bật lại chuyển văn bản trực tuyến để dùng tính năng nhập bằng giọng nói.",
     "downloadOfflineModel": "Tải xuống",
+    "useOnlineTranscription": "Cho phép chuyển trực tuyến",
     "offlineModelDownloadScheduled": "Các tệp giọng nói ngoại tuyến sẽ được tải xuống trong nền. Hãy thử nhập bằng giọng nói lại sau.",
     "listeningStopped": "Đã dừng nghe.",
     "transcribing": "Đang chuyển thành văn bản...",

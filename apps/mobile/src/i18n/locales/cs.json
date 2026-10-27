@@ -2663,7 +2663,9 @@
       "retrying": "Opakování…",
       "retryDeny": "Zamítnout znovu",
       "retryAllowOnce": "Povolit jen tentokrát znovu",
-      "retryAlwaysAllow": "Vždy povolit znovu"
+      "retryAlwaysAllow": "Vždy povolit znovu",
+      "unreadableTitle": "Požadavek na oprávnění nelze načíst",
+      "unreadableBody": "Agent čeká na rozhodnutí o oprávnění, které tato aplikace nedokáže zobrazit. Aktualizujte aplikaci nebo CLI, případně odpovězte na žádost v CLI a pokračujte."
     },
     "questionCard": {
       "title": "Agent potřebuje odpověď",
@@ -3069,8 +3071,9 @@
     "unavailableDevice": "Diktování není na tomto zařízení k dispozici.",
     "unavailableLanguage": "Diktování není pro aktuální jazyk zařízení k dispozici.",
     "languageNotInstalledTitle": "Diktování pro jazyk {{language}} zatím není připraveno",
-    "languageNotInstalledMessage": "Offline soubory řeči pro {{language}} nejsou v tomto telefonu nainstalovány. Stáhněte je a poté zkuste diktování znovu.",
+    "languageNotInstalledMessage": "Offline soubory řeči pro {{language}} nejsou nainstalované a online přepis je vypnutý. Stáhněte si soubory nebo online přepis znovu zapněte, aby fungovalo hlasové zadávání.",
     "downloadOfflineModel": "Stáhnout",
+    "useOnlineTranscription": "Povolit online přepis",
     "offlineModelDownloadScheduled": "Offline soubory řeči se stáhnou na pozadí. Zkuste diktování znovu později.",
     "listeningStopped": "Poslech zastaven.",
     "transcribing": "Přepisuji…",

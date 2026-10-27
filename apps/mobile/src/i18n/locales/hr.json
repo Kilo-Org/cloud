@@ -2627,7 +2627,9 @@
       "retrying": "Ponovni pokušaj…",
       "retryDeny": "Pokušaj ponovno odbiti",
       "retryAllowOnce": "Pokušaj ponovno dopustiti jednom",
-      "retryAlwaysAllow": "Pokušaj ponovno uvijek dopustiti"
+      "retryAlwaysAllow": "Pokušaj ponovno uvijek dopustiti",
+      "unreadableTitle": "Zahtjev za dopuštenje nije moguće pročitati",
+      "unreadableBody": "Agent čeka odluku o dopuštenju koju ova aplikacija ne može prikazati. Ažurirajte aplikaciju ili CLI ili odgovorite na zahtjev u CLI-ju kako biste nastavili."
     },
     "questionCard": {
       "title": "Agent treba odgovor",
@@ -3026,8 +3028,9 @@
     "unavailableDevice": "Glasovni unos nije dostupan na ovom uređaju.",
     "unavailableLanguage": "Glasovni unos nije dostupan za jezik ovog uređaja.",
     "languageNotInstalledTitle": "Glasovni unos za {{language}} još nije spreman",
-    "languageNotInstalledMessage": "Datoteke govora za izvanmrežni rad za {{language}} nisu instalirane na ovom telefonu. Preuzmi ih, a zatim pokušaj glasovni unos ponovno.",
+    "languageNotInstalledMessage": "Datoteke govora za izvanmrežni rad za {{language}} nisu instalirane, a transkribiranje putem interneta je isključeno. Preuzmi datoteke ili ponovno uključi transkribiranje putem interneta da bi mogao koristiti glasovni unos.",
     "downloadOfflineModel": "Preuzmi",
+    "useOnlineTranscription": "Dopusti transkribiranje putem interneta",
     "offlineModelDownloadScheduled": "Datoteke govora za izvanmrežni rad preuzet će se u pozadini. Pokušaj glasovni unos ponovno kasnije.",
     "listeningStopped": "Slušanje je zaustavljeno.",
     "transcribing": "Transkripcija…",

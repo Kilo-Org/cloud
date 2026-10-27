@@ -2101,7 +2101,9 @@
       "retrying": "Ponawianie…",
       "retryDeny": "Ponów odmowę",
       "retryAllowOnce": "Ponów zezwolenie tylko tym razem",
-      "retryAlwaysAllow": "Ponów zezwalanie zawsze"
+      "retryAlwaysAllow": "Ponów zezwalanie zawsze",
+      "unreadableTitle": "Nie można odczytać prośby o zgodę",
+      "unreadableBody": "Agent czeka na decyzję o zgodzie, której ta aplikacja nie może pokazać. Zaktualizuj aplikację lub CLI albo odpowiedz na prośbę w CLI, aby kontynuować."
     },
     "questionCard": {
       "title": "Agent czeka na odpowiedź",
@@ -2507,8 +2509,9 @@
     "unavailableDevice": "Dyktowanie nie jest dostępne na tym urządzeniu.",
     "unavailableLanguage": "Dyktowanie nie jest dostępne w języku ustawionym na tym urządzeniu.",
     "languageNotInstalledTitle": "Dyktowanie dla języka {{language}} nie jest jeszcze gotowe",
-    "languageNotInstalledMessage": "Pliki mowy offline dla języka {{language}} nie są zainstalowane na tym telefonie. Pobierz je, a następnie ponownie spróbuj dyktowania.",
+    "languageNotInstalledMessage": "Pliki mowy offline dla języka {{language}} nie są zainstalowane, a transkrypcja online jest wyłączona. Pobierz pliki lub włącz ponownie transkrypcję online, aby korzystać z wprowadzania głosowego.",
     "downloadOfflineModel": "Pobierz",
+    "useOnlineTranscription": "Zezwól na transkrypcję online",
     "offlineModelDownloadScheduled": "Pliki mowy offline zostaną pobrane w tle. Spróbuj dyktowania ponownie później.",
     "listeningStopped": "Nasłuchiwanie zostało zatrzymane.",
     "transcribing": "Transkrypcja...",

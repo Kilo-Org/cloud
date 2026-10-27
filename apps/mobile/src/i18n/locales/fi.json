@@ -2591,7 +2591,9 @@
       "retrying": "Yritetään uudelleen…",
       "retryDeny": "Yritä kieltää uudelleen",
       "retryAllowOnce": "Yritä salli kerran uudelleen",
-      "retryAlwaysAllow": "Yritä salli aina uudelleen"
+      "retryAlwaysAllow": "Yritä salli aina uudelleen",
+      "unreadableTitle": "Lupapyyntöä ei voitu lukea",
+      "unreadableBody": "Agentti odottaa lupapäätöstä, jota tämä sovellus ei voi näyttää. Päivitä sovellus tai CLI tai vastaa pyyntöön CLI:ssä jatkaaksesi."
     },
     "questionCard": {
       "title": "Agentti tarvitsee vastauksesi",
@@ -2983,8 +2985,9 @@
     "unavailableDevice": "Puheentunnistus ei ole käytettävissä tällä laitteella.",
     "unavailableLanguage": "Puheentunnistus ei ole käytettävissä laitteen nykyisellä kielellä. Asenna kielen offline-puhetiedostot tai käytä toista sovelluksen kieltä.",
     "languageNotInstalledTitle": "Puheentunnistus ei ole vielä valmis kielelle {{language}}",
-    "languageNotInstalledMessage": "Kielen {{language}} offline-puhetiedostoja ei ole asennettu tähän puhelimeen. Lataa ne ja kokeile puheentunnistusta uudelleen.",
+    "languageNotInstalledMessage": "Kielen {{language}} offline-puhetiedostot eivät ole asennettuna, ja online-puheentunnistus on poissa käytöstä. Lataa tiedostot tai ota online-puheentunnistus takaisin käyttöön, jotta äänisyöttö toimii.",
     "downloadOfflineModel": "Lataa",
+    "useOnlineTranscription": "Salli online-puheentunnistus",
     "offlineModelDownloadScheduled": "Offline-puhetiedostot ladataan taustalla. Kokeile puheentunnistusta myöhemmin uudelleen.",
     "listeningStopped": "Kuuntelu lopetettiin.",
     "transcribing": "Muunnetaan tekstiksi…",

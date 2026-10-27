@@ -494,7 +494,7 @@ jobs:
           for attempt in $(seq 1 360); do
             conclusion=$(gh api \
               "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100" \
-              --jq '.jobs[] | select(.name == "Deploy services/session-ingest") | (.conclusion // .status)' \
+              --jq '.jobs[] | select(.name == "Deploy services/session-ingest" or (.name | endswith(" / Deploy services/session-ingest"))) | (.conclusion // .status)' \
               | head -n 1)
             if [ "$conclusion" = success ]; then exit 0; fi
             if [ -n "$conclusion" ] \

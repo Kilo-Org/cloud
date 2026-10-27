@@ -296,7 +296,11 @@ export function assertSessionOperationIdentity(
   row: OperationLedgerRow,
   expected: {
     userId: string;
-    intent: 'create_cloud' | 'create_worktree_chat';
+    intent:
+      | 'create_cloud'
+      | 'create_worktree_chat'
+      | 'create_workspace_session'
+      | 'delete_workspace_session';
     organizationId?: string | null;
     resourceKey?: string | null;
   }
@@ -541,14 +545,36 @@ function computeCredentialContainment(
   };
 }
 
+/**
+ * Client provenance values trusted to create the first hosted session of a
+ * workspace. Each provenance is only accepted with the origin its owning
+ * endpoint sets server-side; a caller cannot select a trusted pair through a
+ * public input field.
+ */
+const TRUSTED_WORKTREE_CREATE_ORIGINS: Readonly<Record<string, string>> = {
+  browser: 'cloud-agent-web',
+  'agent-manager': 'agent-manager',
+};
+
+export function isTrustedWorktreeCreateOrigin(
+  provenance: string | undefined,
+  createdOnPlatform: string | undefined
+): boolean {
+  return (
+    provenance !== undefined && TRUSTED_WORKTREE_CREATE_ORIGINS[provenance] === createdOnPlatform
+  );
+}
+
 function isEligibleFirstWorktreeSession(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext
 ): boolean {
   return (
-    input.options?.clientProvenance === 'browser' &&
-    input.options.createdOnPlatform === 'cloud-agent-web' &&
-    input.options.operationKey !== undefined &&
+    isTrustedWorktreeCreateOrigin(
+      input.options?.clientProvenance,
+      input.options?.createdOnPlatform
+    ) &&
+    input.options?.operationKey !== undefined &&
     input.initialTurn !== undefined &&
     input.clone === undefined &&
     ctx.botId === undefined
@@ -1798,7 +1824,11 @@ export async function sessionCreateIntentFingerprint(
         ? {
             kilocodeOrganizationId: input.options.kilocodeOrganizationId || undefined,
             createdOnPlatform: input.options.createdOnPlatform || undefined,
-            clientProvenance: input.options.clientProvenance === 'browser' ? 'browser' : undefined,
+            clientProvenance:
+              input.options.clientProvenance === 'browser' ||
+              input.options.clientProvenance === 'agent-manager'
+                ? input.options.clientProvenance
+                : undefined,
             shallow: input.options.shallow === true ? true : undefined,
           }
         : undefined,

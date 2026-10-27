@@ -570,7 +570,9 @@ function repositoryFromSource(
         : {}),
       ...(repository.githubAccessPurpose ? { accessPurpose: repository.githubAccessPurpose } : {}),
       allowUserAuthorization:
-        context.createdOnPlatform === 'cloud-agent-web' || context.createdOnPlatform === 'slack',
+        context.createdOnPlatform === 'cloud-agent-web' ||
+        context.createdOnPlatform === 'agent-manager' ||
+        context.createdOnPlatform === 'slack',
     };
   }
   const url = canonicalRepositoryUrl(repository.url, repository.type !== 'git', diagnostic);

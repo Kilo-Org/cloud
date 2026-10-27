@@ -43,6 +43,12 @@ import {
   type CanDestroyCloudAgentWorktreeSandboxParams,
   type RetireCloudAgentWorktreeIfSoleMemberParams,
   deleteSessionForCloudAgentSchema,
+  deleteHostedWorkspaceSessionSchema,
+  assertHostedWorkspaceSessionDeletableSchema,
+  type AssertHostedWorkspaceSessionDeletableParams,
+  type AssertHostedWorkspaceSessionDeletableResult,
+  type DeleteHostedWorkspaceSessionParams,
+  type DeleteHostedWorkspaceSessionResult,
   decodeCloudAgentRootSessionsCursor,
   decodeCloudAgentWorkspacesCursor,
   encodeCloudAgentRootSessionsCursor,
@@ -105,6 +111,12 @@ import {
   isWorktreeSessionDeleting,
   WORKTREE_DELETING,
 } from './services/worktree-deletion';
+import {
+  assertHostedWorkspaceSessionDeletable as checkHostedWorkspaceSessionDeletable,
+  deleteHostedWorkspaceSessionRows,
+  HostedWorkspaceSessionDeleteError,
+} from './services/hosted-workspace-session';
+import { clearSessionLocalState } from './services/session-local-state';
 
 const MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS = 512;
 const CLOUD_AGENT_ROOT_SESSION_IDENTITY_CONFLICT_ERROR =
@@ -1225,6 +1237,81 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         kiloUserId: parsed.kiloUserId,
         errors: cacheErrors,
       });
+    }
+  }
+
+  /**
+   * RPC method: delete one hosted root session (and its descendants) from a
+   * workspace without touching the workspace or its other roots.
+   *
+   * The final-root invariant and the row deletions share one transaction, so a
+   * concurrent final-root delete cannot leave an active workspace rootless.
+   * Ingest storage and caches are cleared after the commit. A missing row is
+   * treated as already deleted so same-intent retries converge.
+   */
+  async deleteHostedWorkspaceSession(
+    params: DeleteHostedWorkspaceSessionParams
+  ): Promise<DeleteHostedWorkspaceSessionResult> {
+    const parsed = deleteHostedWorkspaceSessionSchema.parse(params);
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    let outcome: Awaited<ReturnType<typeof deleteHostedWorkspaceSessionRows>>;
+    try {
+      outcome = await deleteHostedWorkspaceSessionRows(db, parsed);
+    } catch (error) {
+      if (error instanceof HostedWorkspaceSessionDeleteError) throw new Error(error.code);
+      throw error;
+    }
+
+    if (outcome.deleted) {
+      const deletedAt = new Date().toISOString();
+      for (const row of outcome.rows) {
+        notifyUserSessionEvent(
+          this.env,
+          parsed.kiloUserId,
+          {
+            type: 'session.deleted',
+            data: {
+              source: 'v2',
+              sessionId: row.session_id,
+              parentSessionId: row.parent_session_id,
+              organizationId: row.organization_id,
+              gitUrl: row.git_url,
+              gitBranch: row.git_branch,
+              createdOnPlatform: row.created_on_platform,
+              deletedAt,
+            },
+          },
+          this.ctx
+        );
+      }
+    }
+
+    for (const sessionId of outcome.deleted ? outcome.deletedSessionIds : [parsed.sessionId]) {
+      await clearSessionLocalState(this.env, parsed.kiloUserId, sessionId);
+    }
+
+    return {
+      success: true,
+      sessionId: parsed.sessionId,
+      deletedSessionIds: outcome.deletedSessionIds,
+    };
+  }
+
+  /**
+   * RPC method: answer whether a destructive session delete would remove the
+   * final hosted root of an active workspace. Authorization stays with the
+   * caller; this only enforces the workspace invariant before runtime teardown.
+   */
+  async assertHostedWorkspaceSessionDeletable(
+    params: AssertHostedWorkspaceSessionDeletableParams
+  ): Promise<AssertHostedWorkspaceSessionDeletableResult> {
+    const parsed = assertHostedWorkspaceSessionDeletableSchema.parse(params);
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    try {
+      return await checkHostedWorkspaceSessionDeletable(db, parsed);
+    } catch (error) {
+      if (error instanceof HostedWorkspaceSessionDeleteError) throw new Error(error.code);
+      throw error;
     }
   }
 

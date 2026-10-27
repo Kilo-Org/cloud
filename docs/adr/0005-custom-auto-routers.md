@@ -283,8 +283,8 @@ to keep selecting a platform routing mode.
 #### Historical pool conversion (before tooling retirement)
 
 The conversion script and its worker endpoint are removed at this revision. The commands below
-document the pre-retirement procedure and require the #7808 cutover revision
-(`cdc4ca4c0273207dd56b671e71857ca951fd4d04`), not this checkout. Do not deploy the retired
+document the pre-retirement procedure and require the #7808 cutover revision on `main`
+(`c03b06b1cae03f5f400119133469813bba27ef62`), not this checkout. Do not deploy the retired
 conversion endpoint again after cutover.
 
 From that revision, run from the repository root with approved production credentials.

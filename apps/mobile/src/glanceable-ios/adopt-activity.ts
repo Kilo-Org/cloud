@@ -30,11 +30,12 @@ async function readStoredContext(): Promise<SessionFollowContext | null> {
 }
 
 /**
- * Rebuild the followed session cards from native truth and register their
- * tokens again (`session-follow.ts`). Runs at launch and on every foreground.
+ * Rebuild the followed session cards from native truth and register again the
+ * ones this account and organization followed (`session-follow.ts`). Runs at
+ * launch and on every foreground.
  */
 export async function restoreStoredSessionCards(): Promise<void> {
-  restoreFollowedSessionCards(await readStoredContext());
+  await restoreFollowedSessionCards(await readStoredContext());
 }
 
 /**
@@ -61,7 +62,7 @@ export async function adoptPushStartedActivity(): Promise<void> {
   sweepStrayActivities();
   const snapshot = getLastGlanceableSnapshot();
   const ctx = await readStoredContext();
-  restoreFollowedSessionCards(ctx);
+  await restoreFollowedSessionCards(ctx);
   if (snapshot === null || ctx === null) {
     return;
   }

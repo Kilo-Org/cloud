@@ -76,8 +76,8 @@ export const environmentBuildStatusSchema = z
       })
       .strict()
       .nullable(),
-    /** Unused. Optional so web and worker deploys can land in either order; removed once both ship. */
-    sessionPreparationBudgetMs: z.number().int().positive().optional(),
+    /** A fresh session start that takes longer than this times out. */
+    sessionPreparationBudgetMs: z.number().int().positive(),
   })
   .strict();
 export type EnvironmentBuildStatus = z.infer<typeof environmentBuildStatusSchema>;

@@ -108,6 +108,15 @@ export function formatAge(timestamp: number, now: number): string {
   return `${Math.floor(hours / 24)} days ago`;
 }
 
+/** A fresh session start would time out when setup alone exceeds its budget. */
+export function setupBudgetWarning(status: EnvironmentBuildStatus): string | null {
+  const duration = status.published?.setupDurationMs ?? status.latestBuild?.setupDurationMs ?? null;
+  if (duration === null || duration <= status.sessionPreparationBudgetMs) return null;
+  return `Fresh setup took ${formatDuration(duration)}, longer than the ${formatDuration(
+    status.sessionPreparationBudgetMs
+  )} a session start allows. Sessions without the snapshot would time out.`;
+}
+
 export function stalenessText(status: EnvironmentBuildStatus): string | null {
   switch (status.published?.stale) {
     case 'revision':

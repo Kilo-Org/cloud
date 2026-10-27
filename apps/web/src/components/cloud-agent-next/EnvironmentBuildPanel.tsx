@@ -28,6 +28,7 @@ import {
   formatDuration,
   isBuildActive,
   backoffText,
+  setupBudgetWarning,
   stalenessText,
   type BuildAction,
   type EnvironmentBuildRequestResult,
@@ -239,6 +240,7 @@ function BuildStatusDetail({
   }
   const published = status.published;
   const staleness = stalenessText(status);
+  const budget = setupBudgetWarning(status);
   return (
     <div className="space-y-1.5 text-xs">
       {published ? (
@@ -288,6 +290,7 @@ function BuildStatusDetail({
         <p className="text-muted-foreground">Not built yet.</p>
       )}
       {staleness && <p className="text-muted-foreground">{staleness}</p>}
+      {budget && <p className="text-amber-300">{budget}</p>}
     </div>
   );
 }

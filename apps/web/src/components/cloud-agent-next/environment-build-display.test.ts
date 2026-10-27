@@ -4,6 +4,7 @@ import {
   buildStageLabel,
   failureText,
   formatAge,
+  setupBudgetWarning,
   snapshotBadge,
   stalenessText,
   type EnvironmentBuildStatus,
@@ -43,6 +44,7 @@ function status(overrides: Partial<EnvironmentBuildStatus> = {}): EnvironmentBui
     latestBuild: null,
     published: null,
     automaticBackoff: null,
+    sessionPreparationBudgetMs: 12 * 60_000,
     ...overrides,
   };
 }
@@ -106,6 +108,15 @@ describe('environment build display', () => {
     expect(stalenessText(status({ published: PUBLISHED }))).toBeNull();
     expect(stalenessText(status({ published: { ...PUBLISHED, stale: 'image' } }))).toBe(
       'The snapshot was built for an earlier sandbox image. Sessions start without it until a refresh completes.'
+    );
+  });
+
+  it('warns when fresh setup exceeds the session preparation budget', () => {
+    expect(setupBudgetWarning(status({ published: PUBLISHED }))).toBeNull();
+    expect(
+      setupBudgetWarning(status({ published: { ...PUBLISHED, setupDurationMs: 15 * 60_000 } }))
+    ).toBe(
+      'Fresh setup took 15m, longer than the 12m a session start allows. Sessions without the snapshot would time out.'
     );
   });
 

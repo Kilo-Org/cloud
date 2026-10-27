@@ -1,5 +1,4 @@
 import { randomUUID } from 'crypto';
-import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { INCEPTION_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -7,10 +6,7 @@ import z from 'zod';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
-import {
-  isFreeModel,
-  isFreeModelExcludingCustomLlms,
-} from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
@@ -23,16 +19,14 @@ import {
   wrapInSafeNextResponse,
   captureProxyError,
   extractHeaderAndLimitLength,
-  modelNotAllowedResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
-import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { checkDirectProviderAccess } from '@kilocode/web-shared/lib/ai-gateway/direct-provider-access';
 import { findSupportedFimModel } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
@@ -217,41 +211,16 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
   };
 
   setTag('ui.ai_model', requestBody.model);
-
-  // Use read replica for balance check - this is a read-only operation that can tolerate
-  // slight replication lag, and provides lower latency for US users.
-  const freeRequest = await isFreeModel(requestBody.model);
-  const { balance, plan, payer } = await getBalanceAndOrgSettings(
-    organizationId,
+  const accessResult = await checkDirectProviderAccess({
     user,
-    readDb,
-    freeRequest ? undefined : 'usage'
-  );
-
-  if (!canSpendPaidUsage(balance) && !usageContext.is_free && !userByok) {
-    return NextResponse.json(
-      {
-        error: { message: 'Insufficient credits' },
-        error_type: ProxyErrorType.insufficient_credits,
-      },
-      { status: 402 }
-    );
-  }
-
-  if (organizationId) {
-    const { decision } = await resolveOrganizationMemberModelDecision({
-      organizationId,
-      kiloUserId: user.id,
-      modelId: requestBody.model,
-      fromDb: readDb,
-    });
-    if (
-      !decision.allowed ||
-      (decision.eligibleProviderRoutes && !decision.eligibleProviderRoutes.has(editProvider))
-    ) {
-      return modelNotAllowedResponse();
-    }
-  }
+    organizationId,
+    model: requestBody.model,
+    provider: editProvider,
+    isFreeUsage: usageContext.is_free,
+    hasByok: !!userByok,
+  });
+  if (accessResult.rejection) return accessResult.rejection;
+  const { balance, plan, payer } = accessResult.access;
 
   // Data-use contract for this route: edit goes straight to Inception, which the gateway's
   // provider data policy classifies as not training on prompts and not retaining them

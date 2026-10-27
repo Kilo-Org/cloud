@@ -10,10 +10,10 @@ export function isolatedKiloEnvironment(input: {
   web: string;
   worker: string;
   gateway: string;
-  parent?: NodeJS.ProcessEnv;
-}): NodeJS.ProcessEnv {
+  parent?: NodeJS.Dict<string>;
+}): NodeJS.Dict<string> {
   const parent = input.parent ?? process.env;
-  const env: NodeJS.ProcessEnv = {};
+  const env: NodeJS.Dict<string> = {};
   for (const key of ['PATH', 'TMPDIR', 'LANG', 'LC_ALL', 'SHELL', 'NODE_EXTRA_CA_CERTS']) {
     if (parent[key] !== undefined) env[key] = parent[key];
   }
@@ -84,7 +84,7 @@ export async function startLocalKilo(input: {
     ],
     {
       cwd: input.repo,
-      env: isolatedKiloEnvironment({ ...input, password }),
+      env: isolatedKiloEnvironment({ ...input, password }) as NodeJS.ProcessEnv,
       stdio: ['ignore', 'pipe', 'pipe'],
     }
   );

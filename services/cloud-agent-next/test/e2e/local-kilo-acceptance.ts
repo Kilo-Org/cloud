@@ -502,13 +502,14 @@ async function main() {
     if (!owned && reconcileCreation)
       await cleanup('workspace creation reconciliation', reconcileCreation);
     if (server) {
+      const local = server;
       for (const attachment of attachments) {
         await cleanup('attachment cleanup', async () => {
           const response = await fetch(
-            `${server.url}/kilocode/session-host/attachment/${attachment}?directory=${encodeURIComponent(kiloRepo)}`,
+            `${local.url}/kilocode/session-host/attachment/${attachment}?directory=${encodeURIComponent(kiloRepo)}`,
             {
               method: 'DELETE',
-              headers: server.headers,
+              headers: local.headers,
               signal: AbortSignal.timeout(10_000),
             }
           );

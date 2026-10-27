@@ -125,7 +125,7 @@ export function snapshotStart(resolution: SnapshotResolution): ProviderSnapshotS
 function admissionText(admission: SnapshotAdmission): string | null {
   switch (admission.status) {
     case 'admitted':
-      return 'a replacement build was started';
+      return 'a new snapshot build is queued';
     case 'active':
       return 'a replacement build is running';
     case 'not_needed':
@@ -162,7 +162,7 @@ export function environmentStartDetail(
   const { snapshot, admission } = lookup.resolution;
   const build = admissionText(admission);
   if (snapshot === null) {
-    return `Starting without an environment snapshot${build === null ? '' : `; ${build}`}`;
+    return `No usable snapshot available${build === null ? '' : `; ${build}`}`;
   }
   const settings =
     snapshot.revision === reference.configurationRevision

@@ -180,7 +180,7 @@ describe('environment snapshot lookup', () => {
 
   it('names the snapshot by capture time and explains changed settings', () => {
     expect(environmentStartDetail(REFERENCE, { kind: 'resolved', resolution: RESOLVED })).toBe(
-      'Using snapshot · 24 Oct 2026, 21:32:19 UTC; environment settings have changed; cached files may retain earlier values; a replacement build was started'
+      'Using snapshot · 24 Oct 2026, 21:32:19 UTC; environment settings have changed; cached files may retain earlier values; a new snapshot build is queued'
     );
     expect(
       environmentStartDetail(REFERENCE, {
@@ -191,11 +191,18 @@ describe('environment snapshot lookup', () => {
           admission: { status: 'skipped', reason: 'backoff', retryAt: 5 },
         },
       })
-    ).toBe(
-      'Starting without an environment snapshot; the replacement build is waiting after earlier failures'
-    );
+    ).toBe('No usable snapshot available; the replacement build is waiting after earlier failures');
     expect(environmentStartDetail(REFERENCE, { kind: 'timeout' })).toBe(
       'Starting without an environment snapshot (lookup unavailable)'
     );
+  });
+
+  it('explains that no usable snapshot is available and a new build is queued', () => {
+    expect(
+      environmentStartDetail(REFERENCE, {
+        kind: 'resolved',
+        resolution: { ...RESOLVED, snapshot: null, reason: 'missing' },
+      })
+    ).toBe('No usable snapshot available; a new snapshot build is queued');
   });
 });

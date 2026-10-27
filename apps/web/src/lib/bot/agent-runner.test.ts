@@ -1,9 +1,13 @@
 import type { PlatformIntegration, User } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
 import { z } from 'zod';
+import {
+  createCloudAgentNextClient,
+  createCloudAgentNextClientForModel,
+} from '@/lib/cloud-agent-next/cloud-agent-client';
+import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
 import { runBotAgent } from './agent-runner';
 import type { SpawnCloudAgentInput as SpawnInput } from './tools/spawn-cloud-agent-session';
-import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import {
   buildGitLabCloneUrl,
   getGitLabInstanceUrlForOrganization,
@@ -74,6 +78,11 @@ jest.mock('@/lib/cloud-agent-next/session-url', () => ({
 }));
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: jest.fn(),
+  createCloudAgentNextClientForModel: jest.fn(),
+  InsufficientCreditsError: class InsufficientCreditsError extends Error {},
+}));
+jest.mock('@/lib/cloud-agent-next/balance-check-eligibility', () => ({
+  computeCloudAgentNextBalanceCheckEligibility: jest.fn(),
 }));
 jest.mock('@/lib/slack-bot/github-repository-context', () => ({
   getGitHubRepositoryContext: jest.fn(),
@@ -203,6 +212,13 @@ beforeEach(() => {
     prepareSession: mockPrepareSession,
     initiateFromPreparedSession: mockInitiateFromPreparedSession,
   } as never);
+  jest.mocked(computeCloudAgentNextBalanceCheckEligibility).mockResolvedValue({
+    isFree: false,
+    hasUserByokAvailable: false,
+  });
+  jest
+    .mocked(createCloudAgentNextClientForModel)
+    .mockImplementation(token => jest.mocked(createCloudAgentNextClient)(token) as never);
   mockPrepareSession.mockResolvedValue({
     cloudAgentSessionId: 'cloud-session-1',
     kiloSessionId: 'kilo-session-1',
@@ -316,6 +332,13 @@ describe.each(['initial', 'continuation'] as const)('GitHub %s execution', execu
       expect.objectContaining({ githubRepo: threadRepository, mode: 'ask' })
     );
     expect(getGitLabTokenForOrganization).not.toHaveBeenCalled();
+    expect(computeCloudAgentNextBalanceCheckEligibility).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user: { id: 'user-1' },
+        organizationId: 'org-1',
+      })
+    );
+    expect(createCloudAgentNextClientForModel).toHaveBeenCalledTimes(1);
   });
 
   it('cannot select another accessible GitHub repository in code mode', async () => {

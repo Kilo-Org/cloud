@@ -4,7 +4,11 @@ import { extractEntityId } from '../session/ingest-handlers/entity-id.js';
 import type { EventId } from '../types/ids.js';
 import type { StoredEvent } from '../websocket/types.js';
 import { slimPersistedKilocodeEvent } from '../shared/ingest-frame.js';
-import { projectSafeAssistantError, projectSafeSessionError } from '../shared/assistant-failure.js';
+import {
+  projectSafeAssistantError,
+  projectSafeSdkAssistantError,
+  projectSafeSessionError,
+} from '../shared/assistant-failure.js';
 
 const PERSISTED_KILO_EVENT_NAMES: ReadonlySet<string> = new Set([
   'message.removed',
@@ -121,7 +125,13 @@ export function publicEventProperties({
     return properties;
   return {
     ...properties,
-    [key]: { ...carrier, error: projectSafeAssistantError(carrier.error) },
+    [key]: {
+      ...carrier,
+      error:
+        key === 'part' && 'type' in carrier && carrier.type === 'retry'
+          ? projectSafeSdkAssistantError(carrier.error)
+          : projectSafeAssistantError(carrier.error),
+    },
   };
 }
 

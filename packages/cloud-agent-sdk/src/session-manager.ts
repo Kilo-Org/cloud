@@ -2805,6 +2805,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     const { kiloSessionId, expectedGeneration } = open;
     let data: FetchedSessionData;
     try {
+      startCachedPageRead(open);
       if (config.fetchCloudSession || config.fetchCloudSnapshotPage) {
         const initialResolvedSession = await config.resolveSession(kiloSessionId);
         if (expectedGeneration !== switchGeneration) return null;
@@ -2816,8 +2817,6 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
           activeCloudSessionId = initialResolvedSession.cloudAgentSessionId;
         }
       }
-
-      if (!activeCloudSessionId) startCachedPageRead(open);
 
       if (activeCloudSessionId) {
         if (!config.fetchCloudSession) {

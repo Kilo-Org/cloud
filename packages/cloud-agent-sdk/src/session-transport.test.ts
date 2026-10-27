@@ -8,6 +8,7 @@ import type {
   CloudAgentSessionId,
   CloudSessionMetadata,
   CloudSessionSnapshotPage,
+  CachedSessionSnapshotPage,
   KiloSessionId,
   ResolvedSession,
   SessionSnapshotPage,
@@ -1227,7 +1228,9 @@ describe('workspace DO-only session transport', () => {
     const fetchSnapshotPage = jest.fn(async () => {
       throw new Error('ingest page called');
     });
-    const readCachedSnapshotPage = jest.fn(async () => null);
+    const readCachedSnapshotPage = jest.fn(
+      async (): Promise<CachedSessionSnapshotPage | null> => null
+    );
     const fetchCloudSession = jest.fn(async (): Promise<CloudSessionMetadata> => ({
       sessionId: workspaceId,
       kiloSessionId: routeId,
@@ -1309,6 +1312,61 @@ describe('workspace DO-only session transport', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
 
+  it('paints Cloud Agent cache before deferred resolution and metadata, then reconciles the live DO page', async () => {
+    const fixture = workspaceManager();
+    const { manager, store } = fixture;
+    let resolveRoute!: (value: ResolvedSession) => void;
+    let resolveMetadata!: (value: CloudSessionMetadata) => void;
+    let resolveLive!: (value: CloudSessionSnapshotPage) => void;
+    fixture.resolveSession.mockReturnValueOnce(new Promise(resolve => (resolveRoute = resolve)));
+    fixture.fetchCloudSession.mockReturnValueOnce(
+      new Promise(resolve => (resolveMetadata = resolve))
+    );
+    fixture.fetchCloudSnapshotPage.mockReturnValueOnce(
+      new Promise(resolve => (resolveLive = resolve))
+    );
+    fixture.readCachedSnapshotPage.mockResolvedValueOnce({
+      info: { id: routeId },
+      messages: [{ info: stubUserMessage({ id: 'msg_002', sessionID: routeId }), parts: [] }],
+      nextCursor: null,
+      omittedItemCount: 0,
+    });
+    try {
+      const opening = manager.switchSession(routeId);
+      await jest.advanceTimersByTimeAsync(0);
+      expect(fixture.readCachedSnapshotPage).toHaveBeenCalledWith(routeId);
+      expect(store.get(manager.atoms.messagesList).map(item => item.info.id)).toEqual(['msg_002']);
+      expect(store.get(manager.atoms.isLoading)).toBe(false);
+      expect(store.get(manager.atoms.isRefreshingCachedTranscript)).toBe(true);
+      expect(store.get(manager.atoms.fetchedSessionData)).toBeNull();
+      resolveRoute({
+        type: 'cloud-agent',
+        kiloSessionId: routeId,
+        cloudAgentSessionId: workspaceId,
+      });
+      await jest.advanceTimersByTimeAsync(0);
+      expect(fixture.fetchCloudSession).toHaveBeenCalledWith(workspaceId);
+      expect(fixture.fetchSession).not.toHaveBeenCalled();
+      resolveMetadata({
+        sessionId: workspaceId,
+        kiloSessionId: routeId,
+        title: 'Authoritative title',
+      });
+      await opening;
+      await jest.advanceTimersByTimeAsync(0);
+      expect(store.get(manager.atoms.fetchedSessionData)?.title).toBe('Authoritative title');
+      expect(fixture.fetchCloudSnapshotPage).toHaveBeenCalledWith(workspaceId, {});
+      resolveLive(page());
+      await jest.advanceTimersByTimeAsync(0);
+      expect(store.get(manager.atoms.messagesList)[0]?.parts).toEqual(page().messages[0].parts);
+      expect(store.get(manager.atoms.isRefreshingCachedTranscript)).toBe(false);
+      expect(fixture.fetchSnapshot).not.toHaveBeenCalled();
+      expect(fixture.fetchSnapshotPage).not.toHaveBeenCalled();
+    } finally {
+      manager.destroy();
+    }
+  });
+
   it('loads initial metadata and older pages only from the DO without an upfront ingest read', async () => {
     const fixture = workspaceManager();
     const { manager, store, fetchCloudSnapshotPage } = fixture;
@@ -1350,7 +1408,69 @@ describe('workspace DO-only session transport', () => {
       expect(fixture.fetchSession).not.toHaveBeenCalled();
       expect(fixture.fetchSnapshot).not.toHaveBeenCalled();
       expect(fixture.fetchSnapshotPage).not.toHaveBeenCalled();
-      expect(fixture.readCachedSnapshotPage).not.toHaveBeenCalled();
+      expect(fixture.readCachedSnapshotPage).toHaveBeenCalledWith(routeId);
+    } finally {
+      manager.destroy();
+    }
+  });
+
+  it('rejects a late cached page from an older same-session Cloud Agent open', async () => {
+    const fixture = workspaceManager();
+    const { manager, store } = fixture;
+    let resolveCache!: (value: CachedSessionSnapshotPage) => void;
+    let resolveMetadata!: (value: CloudSessionMetadata) => void;
+    fixture.readCachedSnapshotPage.mockReturnValueOnce(
+      new Promise(resolve => (resolveCache = resolve))
+    );
+    fixture.fetchCloudSession.mockReturnValueOnce(
+      new Promise(resolve => (resolveMetadata = resolve))
+    );
+    try {
+      const staleOpen = manager.switchSession(routeId);
+      await jest.advanceTimersByTimeAsync(0);
+      await manager.switchSession(routeId);
+      await jest.advanceTimersByTimeAsync(0);
+      resolveCache({
+        info: { id: routeId },
+        messages: [{ info: stubUserMessage({ id: 'msg_stale', sessionID: routeId }), parts: [] }],
+        nextCursor: null,
+        omittedItemCount: 0,
+      });
+      resolveMetadata({ sessionId: workspaceId, kiloSessionId: routeId, title: 'Stale title' });
+      await staleOpen;
+      await jest.advanceTimersByTimeAsync(0);
+      expect(store.get(manager.atoms.messagesList).map(item => item.info.id)).toEqual(['msg_002']);
+      expect(store.get(manager.atoms.fetchedSessionData)?.title).toBe('DO transcript');
+      expect(fixture.fetchSession).not.toHaveBeenCalled();
+    } finally {
+      manager.destroy();
+    }
+  });
+
+  it('rejects a cached page with the wrong native session identity on Cloud Agent open', async () => {
+    const fixture = workspaceManager();
+    const { manager, store } = fixture;
+    let resolveMetadata!: (value: CloudSessionMetadata) => void;
+    fixture.fetchCloudSession.mockReturnValueOnce(
+      new Promise(resolve => (resolveMetadata = resolve))
+    );
+    fixture.readCachedSnapshotPage.mockResolvedValueOnce({
+      info: { id: 'ses_foreign' },
+      messages: [
+        { info: stubUserMessage({ id: 'msg_foreign', sessionID: 'ses_foreign' }), parts: [] },
+      ],
+      nextCursor: null,
+      omittedItemCount: 0,
+    });
+    try {
+      const opening = manager.switchSession(routeId);
+      await jest.advanceTimersByTimeAsync(0);
+      expect(store.get(manager.atoms.messagesList)).toEqual([]);
+      expect(store.get(manager.atoms.cachedTranscriptSessionId)).toBeNull();
+      resolveMetadata({ sessionId: workspaceId, kiloSessionId: routeId });
+      await opening;
+      await jest.advanceTimersByTimeAsync(0);
+      expect(store.get(manager.atoms.messagesList).map(item => item.info.id)).toEqual(['msg_002']);
     } finally {
       manager.destroy();
     }
@@ -1447,7 +1567,8 @@ describe('workspace DO-only session transport', () => {
       expect(fixture.fetchSession).not.toHaveBeenCalled();
       expect(fixture.fetchSnapshot).not.toHaveBeenCalled();
       expect(fixture.fetchSnapshotPage).not.toHaveBeenCalled();
-      expect(fixture.readCachedSnapshotPage).not.toHaveBeenCalled();
+      expect(fixture.readCachedSnapshotPage).toHaveBeenCalledTimes(1);
+      expect(fixture.readCachedSnapshotPage).toHaveBeenCalledWith(routeId);
     } finally {
       manager.destroy();
     }

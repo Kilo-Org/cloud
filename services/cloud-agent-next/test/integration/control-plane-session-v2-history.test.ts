@@ -2,6 +2,8 @@ import { env, reset, runInDurableObject } from 'cloudflare:test';
 import { asc, eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { kiloSdkPartSchema } from '@kilocode/session-ingest-contracts';
+import { cloudSessionMessagesPageSchema } from '../../../../packages/cloud-agent-sdk/src/schemas.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { createSessionEventQueries } from '../../src/control-plane/session/event-queries.js';
 import { MAX_SESSION_PAGE_BYTES } from '../../src/control-plane/session/history.js';
@@ -110,6 +112,50 @@ afterEach(async () => {
 });
 
 describe('workspace DO history and mutation cursors', () => {
+  it('keeps safe structured retry errors through production persistence and strict SDK parsing', async () => {
+    const { stub, kiloSessionId } = await fixture();
+    const messageId = `msg_${'a'.repeat(26)}`;
+    const retryPart = {
+      id: `prt_${'b'.repeat(26)}`,
+      sessionID: kiloSessionId,
+      messageID: messageId,
+      type: 'retry',
+      attempt: 2,
+      time: { created: 2 },
+      error: {
+        name: 'APIError',
+        data: {
+          message: '429 private-provider-message',
+          statusCode: 429,
+          isRetryable: true,
+          responseHeaders: { authorization: 'private-provider-header' },
+          responseBody: 'private-provider-body',
+          metadata: { request: 'private-provider-metadata' },
+        },
+      },
+    };
+    expect(kiloSdkPartSchema.safeParse(retryPart).success).toBe(true);
+    await publish(stub, 'message.updated', { info: message(kiloSessionId, messageId, 1) });
+    await publish(stub, 'message.part.updated', { part: retryPart });
+    const page = cloudSessionMessagesPageSchema.parse(await stub.getSessionMessagesPage());
+    expect(page?.omittedItemCount).toBe(0);
+    expect(page?.messages[0]?.parts).toEqual([
+      {
+        ...retryPart,
+        error: {
+          name: 'APIError',
+          data: {
+            message: 'Assistant request was rate limited',
+            statusCode: 429,
+            isRetryable: true,
+          },
+        },
+      },
+    ]);
+    expect(JSON.stringify(page)).not.toContain('private-provider');
+    expect(retryPart.error.data.responseBody).toBe('private-provider-body');
+  });
+
   it('retains stable row identities while mutations advance independently', async () => {
     const { stub, sessionId, kiloSessionId } = await fixture();
     await publish(stub, 'message.updated', { info: message(kiloSessionId, 'msg_first', 1) });
@@ -493,6 +539,82 @@ describe('workspace DO history and mutation cursors', () => {
         expect(batch.all()).toEqual([]);
       }
     });
+  });
+
+  it('looks up removals once after async staging and preserves newer message and part tombstones', async () => {
+    const { stub, sessionId, kiloSessionId } = await fixture();
+    await runInDurableObject(stub, async (_instance, state) => {
+      state.storage.kv.delete('client_history_hydration');
+      const statements: string[] = [];
+      const db = drizzle(state.storage, {
+        logger: { logQuery: query => statements.push(query) },
+      });
+      const queries = createSessionEventQueries(db, state.storage);
+      const messages = Array.from({ length: 60 }, (_, index) => ({
+        info: message(kiloSessionId, `msg_bulk_${index}`, index),
+        parts: Array.from({ length: 3 }, (_, partIndex) =>
+          part(kiloSessionId, `msg_bulk_${index}`, `prt_bulk_${index}_${partIndex}`)
+        ),
+      }));
+      const remove = (type: string, messageID: string, partID?: string) =>
+        persistSessionEvent({
+          sessionId,
+          queries,
+          event: {
+            type,
+            properties: { sessionID: kiloSessionId, messageID, ...(partID ? { partID } : {}) },
+          },
+        });
+      const ingest = {
+        getCloudAgentRootSessionSnapshot: async () => ({
+          kiloSessionId,
+          cloudAgentSessionId: sessionId,
+          snapshot: { kind: 'value', info: snapshot(kiloSessionId), byteLength: 1 },
+        }),
+        getCloudAgentRootSessionMessages: async () => {
+          await Promise.resolve();
+          remove('message.removed', 'msg_bulk_0');
+          remove('message.part.removed', 'msg_bulk_1', 'prt_bulk_1_0');
+          return {
+            kiloSessionId,
+            cloudAgentSessionId: sessionId,
+            history: { messages, nextCursor: null, omittedItemCount: 0 },
+          };
+        },
+      } as unknown as SessionIngestBinding;
+      await hydrateSessionHistory({
+        db,
+        storage: state.storage,
+        queries,
+        ingest,
+        sessionId,
+        kiloSessionId,
+        userId: USER_ID,
+        isCurrent: () => true,
+        broadcast: () => undefined,
+      });
+      const lookups = statements.filter(
+        query =>
+          query.startsWith('select') &&
+          query.includes('from "events"') &&
+          query.includes('$.properties.messageID') &&
+          query.includes('$.properties.sessionID')
+      );
+      expect(lookups).toHaveLength(1);
+      expect(queries.findByEntityId('part/msg_bulk_0/prt_bulk_0_0')).toBeNull();
+      expect(
+        readNativeEventPayload(
+          queries.findByEntityId('part/msg_bulk_1/prt_bulk_1_0')?.payload ?? ''
+        )?.event
+      ).toBe('message.part.removed');
+      expect(queries.findByEntityId('part/msg_bulk_1/prt_bulk_1_1')).not.toBeNull();
+      remove('message.removed', 'msg_bulk_2');
+      expect(readHistoryHydration(state.storage)?.phase).toBe('complete');
+    });
+    const page = await stub.getSessionMessagesPage({ limit: 100 });
+    expect(page?.messages.map(item => item.info.id)).not.toContain('msg_bulk_0');
+    expect(page?.messages.map(item => item.info.id)).not.toContain('msg_bulk_2');
+    expect(page?.messages.find(item => item.info.id === 'msg_bulk_1')?.parts).toHaveLength(2);
   });
 
   it('stages root history without overwriting fresher live rows or tombstones', async () => {

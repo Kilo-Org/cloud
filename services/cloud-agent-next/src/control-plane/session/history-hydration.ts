@@ -429,35 +429,40 @@ export async function hydrateSessionHistory(input: {
       });
     }
   }
-  const removed = (messageId: string, partId?: string) =>
-    input.db
-      .select({ id: events.id })
-      .from(events)
-      .where(
-        and(
-          eq(events.session_id, input.sessionId),
-          eq(events.stream_event_type, 'kilocode'),
-          eq(
-            sql<string>`json_extract(${events.payload}, '$.properties.sessionID')`,
-            input.kiloSessionId
-          ),
-          eq(sql<string>`json_extract(${events.payload}, '$.properties.messageID')`, messageId),
-          partId === undefined
-            ? eq(sql<string>`json_extract(${events.payload}, '$.event')`, 'message.removed')
-            : or(
-                eq(sql<string>`json_extract(${events.payload}, '$.event')`, 'message.removed'),
-                and(
-                  eq(
-                    sql<string>`json_extract(${events.payload}, '$.event')`,
-                    'message.part.removed'
-                  ),
-                  eq(sql<string>`json_extract(${events.payload}, '$.properties.partID')`, partId)
-                )
-              )
+  // All asynchronous ingest reads precede this lookup; applying the staged rows below never yields.
+  const removals = input.db
+    .select({
+      event: sql<string>`json_extract(${events.payload}, '$.event')`,
+      messageId: sql<string>`json_extract(${events.payload}, '$.properties.messageID')`,
+      partId: sql<string | null>`json_extract(${events.payload}, '$.properties.partID')`,
+    })
+    .from(events)
+    .where(
+      and(
+        eq(events.session_id, input.sessionId),
+        eq(events.stream_event_type, 'kilocode'),
+        eq(
+          sql<string>`json_extract(${events.payload}, '$.properties.sessionID')`,
+          input.kiloSessionId
+        ),
+        or(
+          eq(sql<string>`json_extract(${events.payload}, '$.event')`, 'message.removed'),
+          eq(sql<string>`json_extract(${events.payload}, '$.event')`, 'message.part.removed')
         )
       )
-      .limit(1)
-      .get() !== undefined;
+    )
+    .all();
+  const removedMessages = new Set<string>();
+  const removedParts = new Map<string, Set<string>>();
+  for (const removal of removals) {
+    if (typeof removal.messageId !== 'string') continue;
+    if (removal.event === 'message.removed') removedMessages.add(removal.messageId);
+    else if (typeof removal.partId === 'string') {
+      const parts = removedParts.get(removal.messageId) ?? new Set<string>();
+      parts.add(removal.partId);
+      removedParts.set(removal.messageId, parts);
+    }
+  }
   for (;;) {
     checkCurrent();
     const rows = input.db
@@ -477,8 +482,10 @@ export async function hydrateSessionHistory(input: {
         .safeParse(event.properties.part);
       const isRemoved =
         message.success && event.event === 'message.updated'
-          ? removed(message.data.id)
-          : part.success && removed(part.data.messageID, part.data.id);
+          ? removedMessages.has(message.data.id)
+          : part.success &&
+            (removedMessages.has(part.data.messageID) ||
+              removedParts.get(part.data.messageID)?.has(part.data.id));
       if (!isRemoved && !(event.event === 'session.updated' && hasInfo())) {
         const stored = persistSessionEvent({
           sessionId: input.sessionId,

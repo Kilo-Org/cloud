@@ -483,7 +483,7 @@ describe('hosted native history/live fence', { timeout: 30_000 }, () => {
             metadata: { request: 'fixture-request' },
           },
         };
-        const withError = (error: unknown): ControlPlaneEvent[] => [
+        const withError = (error: unknown, partError: unknown = error): ControlPlaneEvent[] => [
           {
             type: 'message.updated',
             properties: {
@@ -507,7 +507,7 @@ describe('hosted native history/live fence', { timeout: 30_000 }, () => {
                 type: 'retry',
                 attempt: 2,
                 time: { created: 1 },
-                error,
+                error: partError,
               },
             },
           },
@@ -525,7 +525,14 @@ describe('hosted native history/live fence', { timeout: 30_000 }, () => {
         );
         const replay = await readAttach(await attach());
         await replay.reader.cancel();
-        const expected = withError('Assistant request was rate limited').map(event => ({
+        const expected = withError('Assistant request was rate limited', {
+          name: 'APIError',
+          data: {
+            message: 'Assistant request was rate limited',
+            statusCode: 429,
+            isRetryable: true,
+          },
+        }).map(event => ({
           ...event,
           properties: expect.objectContaining(event.properties),
         }));

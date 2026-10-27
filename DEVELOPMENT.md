@@ -268,6 +268,33 @@ index build. Run `pnpm drizzle check` and `pnpm drizzle generate` to confirm the
 journal and schema agree after synchronizing the branch with `main`.
 
 
+### Credit expiration checks
+
+Single-account expiration locks the primary account before reading its credit transactions.
+It returns current usage, acquired credits, and the next expiration.
+Balance callers use these fields together.
+Closure checks follow the unique original-transaction link.
+The canonical database reconciler remains unconditional by default.
+Lazy balance checks opt into `onlyIfDue`.
+Forced checks pass `{ force: true }`, including checks with no expiration hint.
+
+Use synthetic accounts and a local PostgreSQL database for expiration checks.
+
+```bash
+pnpm test:db
+pnpm --filter web exec env NODE_ENV=test jest --runInBand \
+  ../../packages/web-shared/src/lib/creditExpiration.test.ts \
+  ../../packages/web-shared/src/lib/creditExpirationOrg.test.ts \
+  ../../packages/web-shared/src/lib/creditExpiration.concurrent.test.ts \
+  ../../packages/web-shared/src/lib/paidCreditAccounting.test.ts \
+  ../../packages/web-shared/src/lib/balance-funding.test.ts \
+  ../../packages/web-shared/src/lib/creditAdjustments.test.ts \
+  ../../packages/web-shared/src/lib/organizations/organization-usage.test.ts \
+  src/tests/profile-balance.test.ts \
+  src/lib/recomputeNextCreditExpiration.test.ts \
+  src/routers/organizations/organization-router.test.ts
+```
+
 ## Common Development Commands
 
 | Command | Description |

@@ -95,6 +95,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => ({
         'google/gemma-4-26b-a4b-it:free',
         'google/gemma-4-31b-it:free',
         'thinkingmachines/inkling:free',
+        'acme/unavailable-model',
       ])
   ),
 }));
@@ -488,7 +489,7 @@ describe('GET /api/v1/models', () => {
     expect(responseData.data.some(item => item.id === 'byok/openai/model')).toBe(false);
   });
 
-  test('lists public custom LLMs as free and hides OpenRouter models with the same id', async () => {
+  test('lists available public custom LLMs as free and hides OpenRouter models with the same id', async () => {
     mockAuth = { user: null, organizationId: null };
     const customLlm = (public_id: string, isPublic: boolean): CustomLlm => ({
       public_id,
@@ -509,6 +510,7 @@ describe('GET /api/v1/models', () => {
         ['acme/private-model', customLlm('acme/private-model', false)],
         ['acme/claude-review', customLlm('acme/claude-review', true)],
         ['some-other-model', customLlm('some-other-model', true)],
+        ['acme/unavailable-model', customLlm('Acme/Unavailable-Model', true)],
       ])
     );
     global.fetch = jest
@@ -534,6 +536,9 @@ describe('GET /api/v1/models', () => {
     const sameIdModels = responseData.data.filter(item => item.id === 'some-other-model');
     expect(sameIdModels).toHaveLength(1);
     expect(sameIdModels[0].name).toBe('Custom some-other-model');
+    expect(responseData.data.some(item => item.id.toLowerCase() === 'acme/unavailable-model')).toBe(
+      false
+    );
   });
 
   test('omits the Enkrypt field when no score is available', async () => {

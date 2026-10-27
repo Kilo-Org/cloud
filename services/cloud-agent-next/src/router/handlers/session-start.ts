@@ -67,7 +67,7 @@ function startInputToSessionCreateRequest(
       type: 'prompt',
       id: input.message.id,
       prompt: input.message.prompt,
-      attachments: input.message.attachments ?? input.message.images,
+      attachments: input.message.attachments,
     },
     agent: input.agent,
     repository,

@@ -270,12 +270,15 @@ describe('ProfilesListScreen', () => {
       throw new Error('personal row missing');
     }
     expect(personalRow.props.subtitle).toBe('2 MCP · 9 setup cmds');
-    const star = personalRow.props.trailing as {
-      type: string;
-      props: { accessibilityLabel: string };
-    };
+    // The row's own name carries what the visual row shows plus what
+    // activating it does: the count summary, the default mark and the hint.
+    expect(personalRow.props.accessibilityLabel).toBe(
+      'Personal profile, 2 MCP · 9 setup cmds, Default profile, Opens the profile'
+    );
+    const star = personalRow.props.trailing as { type: string; props: object };
     expect(star.type).toBe('Star');
-    expect(star.props.accessibilityLabel).toBe('Default profile');
+    // The mark is inside the row's name, so it is not a control of its own.
+    expect(star.props).not.toHaveProperty('accessibilityLabel');
 
     const orgRow = findAll(renderer.root, 'ConfigureRow').find(
       row => row.props.title === 'Org profile'
@@ -284,6 +287,7 @@ describe('ProfilesListScreen', () => {
       throw new Error('org row missing');
     }
     expect(orgRow.props.subtitle).toBe('1 var');
+    expect(orgRow.props.accessibilityLabel).toBe('Org profile, 1 var, Opens the profile');
     // The row's leading icon names its owner.
     expect(orgRow.props.icon).toBe('Building2');
     expect(personalRow.props.icon).toBe('User');

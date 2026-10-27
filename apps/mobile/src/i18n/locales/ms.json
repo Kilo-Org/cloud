@@ -227,7 +227,6 @@
     "hideBalance": "Sembunyikan baki",
     "showBalance": "Tunjukkan baki",
     "balanceHidden": "Baki disembunyikan",
-    "bonusCreditsExpiring": "Kredit sebanyak {{amount}} akan tamat tempoh pada {{date}}.",
     "signOutTitle": "Log keluar?",
     "signOutMessage": "Anda perlu log masuk semula untuk mengakses ruang kerja anda.",
     "deleteAccountTitle": "Padam akaun?",
@@ -2592,7 +2591,9 @@
       "retrying": "Mencuba semula…",
       "retryDeny": "Cuba tolak semula",
       "retryAllowOnce": "Cuba benarkan sekali semula",
-      "retryAlwaysAllow": "Cuba sentiasa benarkan semula"
+      "retryAlwaysAllow": "Cuba sentiasa benarkan semula",
+      "unreadableTitle": "Permintaan kebenaran tidak dapat dibaca",
+      "unreadableBody": "Ejen sedang menunggu keputusan kebenaran yang tidak dapat ditunjukkan oleh aplikasi ini. Kemas kini aplikasi atau CLI, atau jawab permintaan itu dalam CLI untuk meneruskan."
     },
     "questionCard": {
       "title": "Ejen memerlukan maklumat",
@@ -2984,8 +2985,9 @@
     "unavailableDevice": "Input suara tidak tersedia pada peranti ini.",
     "unavailableLanguage": "Input suara tidak tersedia untuk bahasa peranti ini.",
     "languageNotInstalledTitle": "Input suara untuk {{language}} belum sedia",
-    "languageNotInstalledMessage": "Fail pertuturan luar talian untuk {{language}} tidak dipasang pada telefon ini. Muat turun fail itu, kemudian cuba input suara lagi.",
+    "languageNotInstalledMessage": "Fail pertuturan luar talian {{language}} belum dipasang, dan transkripsi dalam talian dimatikan. Muat turun fail tersebut, atau hidupkan semula transkripsi dalam talian, untuk menggunakan input suara.",
     "downloadOfflineModel": "Muat turun",
+    "useOnlineTranscription": "Benarkan transkripsi dalam talian",
     "offlineModelDownloadScheduled": "Fail pertuturan luar talian akan dimuat turun di latar belakang. Cuba input suara lagi kemudian.",
     "listeningStopped": "Input suara telah dihentikan.",
     "transcribing": "Mentranskripsi...",
@@ -3159,7 +3161,7 @@
     "creditActivity": {
       "emptyDescription": "Pembelian, penggunaan dan pelarasan kredit organisasi ini akan dipaparkan di sini apabila berlaku.",
       "emptyTitle": "Tiada aktiviti kredit",
-      "expires": "Tamat tempoh pada {{date}}",
+      "expiresUtc": "Tamat tempoh pada {{date}} (UTC)",
       "title": "Aktiviti kredit",
       "transactionFallback": "Transaksi kredit",
       "category": {
@@ -3746,6 +3748,7 @@
     "title": "Profil",
     "entrySubtitle": "Gunakan semula tetapan persekitaran merentas sesi",
     "newProfile": "Profil baharu",
+    "openHint": "Membuka profil",
     "emptyTitle": "Tiada profil lagi",
     "emptyDescription": "Buat profil untuk menggunakan semula pembolehubah persekitaran, arahan persediaan dan kemahiran merentas sesi.",
     "loadFailed": "Tidak dapat memuatkan profil",
@@ -3839,6 +3842,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Nilai yang dipaparkan sebagai •••• mengekalkan rahsia tersimpan; gantikan nilai untuk memutarkannya. Menukar baris perintah memerlukan setiap nilai sekali lagi",
+      "headersHint": "Nilai yang dipaparkan sebagai •••• mengekalkan rahsia tersimpan; gantikan nilai untuk memutarkannya. Menukar URL memerlukan setiap nilai sekali lagi",
       "nameRequired": "Masukkan nama pelayan",
       "nameInvalid": "Nama hanya boleh menggunakan huruf ASCII, nombor, garis bawah dan sempang, sehingga 100 aksara",
       "commandRequired": "Masukkan arahan",
@@ -3937,6 +3942,10 @@
   "credits": {
     "title": "Beli kredit",
     "description": "Kredit ialah pembelian sekali sahaja yang ditambah pada baki Kilo anda untuk menjalankan sesi pengekodan AI dalam Apl Kilo. Kedai mengenakan caj pada akaun anda dan kredit ditambah selepas kedai mengesahkan pembayaran.",
+    "nextExpiry": "Kredit sebanyak {{amount}} akan tamat tempoh pada {{date}} (UTC). Kredit yang paling awal tamat tempoh digunakan dahulu.",
+    "appStoreExpiry": "Kredit yang dibeli melalui App Store tidak tamat tempoh.",
+    "playOneYearExpiry": "Kredit ini tamat tempoh satu tahun kalendar selepas pembelian.",
+    "playNonexpiring": "Kredit ini tidak tamat tempoh.",
     "packLabel": "Tambah kredit {{amount}}",
     "priceUnavailable": "Harga tidak tersedia",
     "purchased": "Kredit telah ditambah pada baki anda.",
@@ -3977,11 +3986,13 @@
       "namePlaceholder": "Pepijat, Idea, Keluaran…",
       "emoji": "Emoji",
       "mode": "Mod",
-      "defaultsHint": "Sesi yang dimulakan daripada senarai ini menggunakan tetapan lalai ini."
+      "defaultsHint": "Sesi yang dimulakan daripada senarai ini menggunakan tetapan lalai ini.",
+      "saveFailed": "Senarai tidak dapat disimpan. Semak sambungan anda dan cuba lagi."
     },
     "list": {
       "addPlaceholder": "Tambah tugasan baharu",
       "add": "Tambah tugasan",
+      "addFailed": "Tugasan tidak dapat ditambah. Semak sambungan anda dan cuba lagi.",
       "empty": "Belum ada tugasan",
       "setDefaults": "Tetapkan repositori, mod dan model",
       "completed_one": "Selesai ({{count}})",
@@ -4018,7 +4029,9 @@
       "startNewSession": "Mulakan sesi baharu",
       "startNewSessionHint": "Tekan lama untuk memulakan sesi baharu.",
       "linkSession": "Pautkan sesi",
-      "linkFailed": "Tidak dapat memautkan sesi pada tugasan"
+      "linkFailed": "Tidak dapat memautkan sesi pada tugasan",
+      "moveToAnotherTodo": "Alihkan ke tugasan lain",
+      "startRefreshFailed": "Sesi telah dimulakan, tetapi senarai ini tidak dikemas kini."
     },
     "linkSession": {
       "title": "Pautkan satu sesi",
@@ -4027,6 +4040,7 @@
     },
     "upNext": "Seterusnya",
     "sessionTodo": "Tugasan: {{title}}",
+    "openTodoHint": "Membuka tugasan.",
     "linkToTodo": "Pautkan pada tugasan",
     "candidates": {
       "empty": "Tiada tugasan terbuka"

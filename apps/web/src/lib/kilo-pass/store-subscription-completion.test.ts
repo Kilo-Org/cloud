@@ -577,10 +577,16 @@ describe('completeStoreKiloPassPurchase', () => {
     expect(items[0]?.amountUsd).toBe(getMonthlyPriceUsd(KiloPassTier.Tier49));
 
     const creditRows = await db
-      .select({ amountMicrodollars: credit_transactions.amount_microdollars })
+      .select({
+        amountMicrodollars: credit_transactions.amount_microdollars,
+        policy: credit_transactions.paid_credit_policy,
+        source: credit_transactions.credit_source,
+        expiry: credit_transactions.expiry_date,
+      })
       .from(credit_transactions)
       .where(eq(credit_transactions.id, items[0]?.creditTransactionId ?? ''));
     expect(creditRows[0]?.amountMicrodollars).toBe(49_000_000);
+    expect(creditRows[0]).toMatchObject({ policy: 'apple_exempt', source: 'apple', expiry: null });
 
     const [updatedUser] = await db
       .select({
@@ -1087,6 +1093,8 @@ describe('completeStoreKiloPassPurchase', () => {
           is_free: true,
           description: 'test Kilo Pass bonus credits',
           credit_category: `test-kilo-pass-bonus-${crypto.randomUUID()}`,
+          expiry_date: '2030-05-31T00:00:00.000Z',
+          expiration_baseline_microdollars_used: 0,
         })
         .returning({ id: credit_transactions.id }),
       db
@@ -1097,6 +1105,8 @@ describe('completeStoreKiloPassPurchase', () => {
           is_free: true,
           description: 'test Kilo Pass promo credits',
           credit_category: `test-kilo-pass-promo-${crypto.randomUUID()}`,
+          expiry_date: '2030-05-31T00:00:00.000Z',
+          expiration_baseline_microdollars_used: 0,
         })
         .returning({ id: credit_transactions.id }),
     ]);
@@ -1168,6 +1178,27 @@ describe('completeStoreKiloPassPurchase', () => {
         }),
       ])
     );
+    const retiredBonus = await db.query.credit_transactions.findFirst({
+      where: eq(credit_transactions.id, bonusTransaction[0]?.id ?? ''),
+    });
+    expect(retiredBonus).toMatchObject({
+      consumed_microdollars: 9_500_000,
+      retired_microdollars: 0,
+    });
+    expect(new Date(retiredBonus?.expiry_date ?? '').toISOString()).toBe(
+      '2030-05-31T00:00:00.000Z'
+    );
+    const upgradedPrincipal = await db.query.credit_transactions.findFirst({
+      where: and(
+        eq(credit_transactions.kilo_user_id, user.id),
+        eq(credit_transactions.description, 'Kilo Pass upgrade base credits (tier_49, monthly)')
+      ),
+    });
+    expect(upgradedPrincipal).toMatchObject({
+      paid_credit_policy: 'apple_exempt',
+      credit_source: 'apple',
+      expiry_date: null,
+    });
 
     const [updatedUser] = await db
       .select({

@@ -258,6 +258,125 @@ describe('review identity', () => {
     expect(result).toEqual({ reviewId: existingReviewId, created: false });
   });
 
+  it('resolves the conflict winner only within the requesting review scope', async () => {
+    const repoFullName = `${REPO}-scope-mismatch-conflict`;
+    const headSha = 'scope-mismatch-conflict-head-sha';
+    const [existingRow] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_user_id: secondUser.id,
+        platform_integration_id: secondIntegrationId,
+        repo_full_name: repoFullName,
+        pr_number: 27,
+        pr_url: `https://github.com/${repoFullName}/pull/27`,
+        pr_title: 'scope mismatch conflict',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/scope-mismatch-conflict',
+        head_sha: headSha,
+        platform: 'github',
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+    createdReviewIds.push(existingRow.id);
+
+    const scope = {
+      owner: { type: 'user' as const, id: firstUser.id, userId: firstUser.id },
+      platform: 'github' as const,
+      repoFullName,
+      prNumber: 27,
+      platformIntegrationId: secondIntegrationId,
+    };
+    const params = {
+      owner: { type: 'user' as const, id: firstUser.id, userId: firstUser.id },
+      platformIntegrationId: secondIntegrationId,
+      repoFullName,
+      prNumber: 27,
+      prUrl: `https://github.com/${repoFullName}/pull/27`,
+      prTitle: 'scope mismatch conflict',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/scope-mismatch-conflict',
+      headSha,
+      platform: 'github' as const,
+      triggerSource: 'webhook' as const,
+    };
+
+    await expect(
+      db.transaction(tx => createCodeReviewIfAbsentInTransaction(tx, scope, params))
+    ).rejects.toThrow('Code review conflict winner not found');
+
+    await expect(
+      db.transaction(tx =>
+        createCodeReviewIfAbsentInTransaction(
+          tx,
+          { ...scope, owner: { type: 'user', id: secondUser.id, userId: secondUser.id } },
+          { ...params, owner: { type: 'user', id: secondUser.id, userId: secondUser.id } }
+        )
+      )
+    ).resolves.toEqual({ reviewId: existingRow.id, created: false });
+  });
+
+  it('reuses the same-owner manual provider review at the same head SHA', async () => {
+    const repoFullName = `${REPO}-manual-provider-conflict`;
+    const headSha = 'manual-provider-conflict-head-sha';
+    const manualConfig: ManualCodeReviewConfig = {
+      agentConfig: {
+        review_style: 'balanced',
+        focus_areas: [],
+        model_slug: 'anthropic/claude-sonnet-4.6',
+      },
+      instructions: null,
+      outputMode: 'provider',
+    };
+    const [manualRow] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_user_id: firstUser.id,
+        platform_integration_id: firstIntegrationId,
+        repo_full_name: repoFullName,
+        pr_number: 28,
+        pr_url: `https://github.com/${repoFullName}/pull/28`,
+        pr_title: 'manual provider conflict',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/manual-provider-conflict',
+        head_sha: headSha,
+        platform: 'github',
+        manual_config: manualConfig,
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+    createdReviewIds.push(manualRow.id);
+
+    const result = await db.transaction(tx =>
+      createCodeReviewIfAbsentInTransaction(
+        tx,
+        {
+          owner: { type: 'user', id: firstUser.id, userId: firstUser.id },
+          platform: 'github',
+          repoFullName,
+          prNumber: 28,
+          platformIntegrationId: firstIntegrationId,
+        },
+        {
+          owner: { type: 'user', id: firstUser.id, userId: firstUser.id },
+          platformIntegrationId: firstIntegrationId,
+          repoFullName,
+          prNumber: 28,
+          prUrl: `https://github.com/${repoFullName}/pull/28`,
+          prTitle: 'manual provider conflict',
+          prAuthor: 'octocat',
+          baseRef: 'main',
+          headRef: 'feature/manual-provider-conflict',
+          headSha,
+          platform: 'github',
+          triggerSource: 'webhook',
+        }
+      )
+    );
+
+    expect(result).toEqual({ reviewId: manualRow.id, created: false });
+  });
+
   it('rejects duplicate reviews in the same organization scope', async () => {
     const params = {
       owner: { type: 'org' as const, id: organizationId, userId: firstUser.id },
@@ -519,7 +638,7 @@ describe('review identity', () => {
     expect(activeReviewIds).toEqual([runningReviewId, queuedReviewId, pendingReviewId]);
   });
 
-  it('finds previous completed review context within the exact owner and repository scope across integrations', async () => {
+  it('finds previous completed review context within the exact owner, integration and repository scope', async () => {
     const createCompletedReview = async (
       user: User,
       platformIntegrationId: string,
@@ -568,13 +687,14 @@ describe('review identity', () => {
         platform: 'github',
         repoFullName: `${REPO}-previous-scope`,
         prNumber: 21,
+        platformIntegrationId: firstIntegrationId,
       },
       'previous-scope-current-head'
     );
 
     expect(previousReview).toEqual({
-      head_sha: 'previous-scope-alternate-integration-head',
-      session_id: 'agent_alternate_integration_previous',
+      head_sha: 'previous-scope-old-head',
+      session_id: 'agent_matching_previous',
     });
   });
 
@@ -1570,12 +1690,17 @@ describe('findPreviousCompletedReview', () => {
     return id;
   }
 
-  async function createGitLabReview(headSha: string, integrationId: string, projectId: number) {
+  async function createGitLabReview(
+    headSha: string,
+    integrationId: string,
+    projectId: number,
+    repoFullName = gitLabRepo
+  ) {
     const id = await createCodeReview({
       owner: { type: 'user', id: testUser.id, userId: testUser.id },
-      repoFullName: gitLabRepo,
+      repoFullName,
       prNumber: 42,
-      prUrl: `https://gitlab.example.com/${gitLabRepo}/-/merge_requests/42`,
+      prUrl: `https://gitlab.example.com/${repoFullName}/-/merge_requests/42`,
       prTitle: 'test GitLab MR',
       prAuthor: 'gitlab-user',
       baseRef: 'main',
@@ -1595,6 +1720,7 @@ describe('findPreviousCompletedReview', () => {
       platform: 'github' as const,
       repoFullName: REPO,
       prNumber: 42,
+      platformIntegrationId: githubIntegrationId,
     };
   }
 
@@ -1669,46 +1795,65 @@ describe('findPreviousCompletedReview', () => {
     expect(result!.session_id).toBeNull();
   });
 
-  it('keeps GitLab session continuation on repo-name scope until provider-stable identity lands', async () => {
-    const olderIntegrationId = await createGitLabReview(
-      'gitlab-older-integration-sha',
+  function gitLabReviewScope(platformIntegrationId: string, repoFullName = gitLabRepo) {
+    return {
+      owner: { type: 'user' as const, id: testUser.id, userId: testUser.id },
+      platform: 'gitlab' as const,
+      repoFullName,
+      prNumber: 42,
+      platformIntegrationId,
+    };
+  }
+
+  it('returns each integration its own previous review session when repository and MR number match', async () => {
+    const integrationAReviewId = await createGitLabReview(
+      'gitlab-integration-a-sha',
       gitLabIntegrationAId,
       501
     );
-    const newerIntegrationId = await createGitLabReview(
-      'gitlab-newer-integration-sha',
+    const integrationBReviewId = await createGitLabReview(
+      'gitlab-integration-b-sha',
       gitLabIntegrationBId,
       501
     );
-    await updateCodeReviewStatus(olderIntegrationId, 'completed', {
-      sessionId: 'agent_older_integration',
+    await updateCodeReviewStatus(integrationAReviewId, 'completed', {
+      sessionId: 'agent_integration_a',
     });
-    await updateCodeReviewStatus(newerIntegrationId, 'completed', {
-      sessionId: 'agent_newer_integration',
+    await updateCodeReviewStatus(integrationBReviewId, 'completed', {
+      sessionId: 'agent_integration_b',
     });
-    const differentProjectId = await createGitLabReview(
-      'gitlab-matching-sha',
-      gitLabIntegrationAId,
-      502
+
+    await expect(
+      findPreviousCompletedReview(gitLabReviewScope(gitLabIntegrationAId), 'current-gitlab-sha')
+    ).resolves.toEqual({
+      head_sha: 'gitlab-integration-a-sha',
+      session_id: 'agent_integration_a',
+    });
+    await expect(
+      findPreviousCompletedReview(gitLabReviewScope(gitLabIntegrationBId), 'current-gitlab-sha')
+    ).resolves.toEqual({
+      head_sha: 'gitlab-integration-b-sha',
+      session_id: 'agent_integration_b',
+    });
+  });
+
+  it('returns null when the scoped integration has no completed review of the repository', async () => {
+    const repoFullName = `${gitLabRepo}-other-integration`;
+    const otherIntegrationReviewId = await createGitLabReview(
+      'gitlab-foreign-integration-sha',
+      gitLabIntegrationBId,
+      601,
+      repoFullName
     );
-    await updateCodeReviewStatus(differentProjectId, 'completed', {
-      sessionId: 'agent_other_project',
+    await updateCodeReviewStatus(otherIntegrationReviewId, 'completed', {
+      sessionId: 'agent_foreign_integration',
     });
 
     const result = await findPreviousCompletedReview(
-      {
-        owner: { type: 'user', id: testUser.id, userId: testUser.id },
-        platform: 'gitlab',
-        repoFullName: gitLabRepo,
-        prNumber: 42,
-      },
+      gitLabReviewScope(gitLabIntegrationAId, repoFullName),
       'current-gitlab-sha'
     );
-
-    expect(result).toEqual({
-      head_sha: 'gitlab-matching-sha',
-      session_id: 'agent_other_project',
-    });
+    expect(result).toBeNull();
   });
 
   it('does not return GitLab context for a GitHub review scope', async () => {

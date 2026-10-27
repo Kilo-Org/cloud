@@ -83,6 +83,7 @@ const userId = 'usr_fixture';
 const listedSession: CloudAgentRootSessionSummary = {
   kiloSessionId,
   cloudAgentSessionId,
+  workspaceId: null,
   userId,
   organizationId: null,
   title: 'Example',

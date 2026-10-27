@@ -4,7 +4,7 @@ import type { MessageInfo, Part, SessionSnapshot, SessionSnapshotPage, ToolPart 
 
 function storedMessage(id: string): SessionSnapshot['messages'][number] {
   return {
-    info: { id, sessionID: 'ses-1', role: 'assistant' } as MessageInfo,
+    info: { id, sessionID: 'ses-1', role: 'assistant', time: { created: 1 } } as MessageInfo,
     parts: [],
   };
 }
@@ -60,6 +60,43 @@ describe('replayStoredMessages', () => {
     });
     expect(events[1]).not.toHaveProperty('time');
     expect(events[2]).toEqual({ type: 'message.part.updated', part: toolPart, time: 7 });
+  });
+
+  it('skips a row the transcript cannot describe, and its parts, without dropping the page', () => {
+    const good = storedMessage('msg-1');
+    good.parts = [textPart('part-1a', 'msg-1')];
+    const unreadable = storedMessage('msg-2');
+    unreadable.info = { id: 'msg-2', sessionID: 'ses-1', role: 'assistant' } as MessageInfo;
+    unreadable.parts = [textPart('part-2a', 'msg-2')];
+    const after = storedMessage('msg-3');
+    after.parts = [textPart('part-3a', 'msg-3')];
+
+    const events: ChatEvent[] = [];
+    replayStoredMessages([good, unreadable, after], event => events.push(event));
+
+    expect(events.map(event => event.type)).toEqual([
+      'message.updated',
+      'message.part.updated',
+      'message.updated',
+      'message.part.updated',
+    ]);
+    expect(events[0]).toEqual({ type: 'message.updated', info: good.info });
+    expect(events[2]).toEqual({ type: 'message.updated', info: after.info });
+    expect(events).not.toContainEqual({ type: 'message.updated', info: unreadable.info });
+    expect(events).not.toContainEqual({ type: 'message.part.updated', part: unreadable.parts[0] });
+  });
+
+  it('skips a row whose time carries no numeric creation stamp', () => {
+    const row = storedMessage('msg-1');
+    row.info = {
+      ...row.info,
+      time: { created: null },
+    } as unknown as MessageInfo;
+
+    const events: ChatEvent[] = [];
+    replayStoredMessages([row], event => events.push(event));
+
+    expect(events).toEqual([]);
   });
 
   it('emits nothing for an empty page', () => {

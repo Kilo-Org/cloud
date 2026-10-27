@@ -5,6 +5,7 @@ import { logExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/util
 
 import crypto from 'crypto';
 import type { InstallationToken } from '@/lib/integrations/core/types';
+import { MAX_INLINE_COMMENT_BODY_CHARS } from '@/lib/code-reviews/core/constants';
 import { type GitHubAppType, getGitHubAppCredentials } from './app-selector';
 import { assertGitHubInstallationRuntimeAuthorized } from '../../github/runtime-authorization';
 
@@ -394,6 +395,8 @@ export async function createPRComment(
 
 /**
  * Checks whether a comment containing the given marker already exists on a PR.
+ * Reads at most MAX_KILO_REVIEW_COMMENT_PAGES pages from both ends of the
+ * comment list and counts comments attributed to the Kilo GitHub App only.
  */
 export async function hasPRCommentWithMarker(
   installationId: string,
@@ -405,34 +408,48 @@ export async function hasPRCommentWithMarker(
 ): Promise<boolean> {
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
+  const appId = String(getGitHubAppCredentials(appType).appId);
 
-  const comments = await octokit.paginate(octokit.issues.listComments, {
+  const { comments, reachedScanLimit } = await scanPRIssueComments(octokit, owner, repo, prNumber);
+
+  const found = comments.some(
+    c => c.body?.includes(marker) && String(c.performed_via_github_app?.id ?? '') === appId
+  );
+
+  logExceptInTest('[hasPRCommentWithMarker] Scanned comments', {
     owner,
     repo,
-    issue_number: prNumber,
-    per_page: 100,
+    prNumber,
+    scannedComments: comments.length,
+    found,
+    reachedScanLimit,
   });
 
-  return comments.some(c => c.body?.includes(marker));
+  return found;
 }
 
 /**
- * Returns the permission string ('admin' | 'write' | 'read' | 'none') or null
+ * Returns the permission string ('admin' | 'maintain' | 'write' | 'read' | 'none') or null
  * if the lookup fails (e.g. the App lacks permission to query collaborators).
  */
-export type CollaboratorPermission = 'admin' | 'write' | 'read' | 'none';
+export type CollaboratorPermission = 'admin' | 'maintain' | 'write' | 'read' | 'none';
 
-const KNOWN_PERMISSIONS = new Set<string>(['admin', 'write', 'read', 'none']);
+const KNOWN_PERMISSIONS = new Set<string>(['admin', 'maintain', 'write', 'read', 'none']);
 
 export async function getCollaboratorPermissionLevel(
   installationId: string,
   owner: string,
   repo: string,
   username: string,
-  appType: GitHubAppType = 'standard'
+  appType: GitHubAppType = 'standard',
+  expectedIntegrationId?: string
 ): Promise<CollaboratorPermission | null> {
   try {
-    const tokenData = await generateGitHubInstallationToken(installationId, appType);
+    const tokenData = await generateGitHubInstallationToken(
+      installationId,
+      appType,
+      expectedIntegrationId
+    );
     const octokit = new Octokit({ auth: tokenData.token });
 
     const { data } = await octokit.repos.getCollaboratorPermissionLevel({
@@ -565,6 +582,80 @@ export async function exchangeGitHubOAuthCode(
 
 const KILO_REVIEW_COMMENTS_PER_PAGE = 100;
 const MAX_KILO_REVIEW_COMMENT_PAGES = 5;
+const MAX_PR_INLINE_COMMENT_BODY_BYTES = 512 * 1024;
+
+type PRIssueComment = {
+  id: number;
+  body?: string | null;
+  updated_at: string;
+  performed_via_github_app?: { id?: number | string } | null;
+};
+
+/**
+ * Reads pull-request issue comments from both ends of the list within the
+ * MAX_KILO_REVIEW_COMMENT_PAGES budget: the first pages and the last pages.
+ * GitHub returns issue comments oldest first and accepts no ordering
+ * parameter, so a bounded scan has to choose which pages to skip. The comments
+ * Kilo writes once and then maintains in place — the review summary and the
+ * billing notice — stay where they were created, near the oldest end, while
+ * the newest discussion stays at the end; reading only one end would miss one
+ * of them. `reachedScanLimit` reports that older comments were not read.
+ */
+async function scanPRIssueComments(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  prNumber: number
+): Promise<{ comments: PRIssueComment[]; reachedScanLimit: boolean }> {
+  const base = {
+    owner,
+    repo,
+    issue_number: prNumber,
+    per_page: KILO_REVIEW_COMMENTS_PER_PAGE,
+  };
+
+  const firstResponse = await octokit.issues.listComments({ ...base, page: 1 });
+  const lastPage = lastIssueCommentPage(firstResponse.headers.link);
+  const comments: PRIssueComment[] = [...firstResponse.data];
+
+  if (lastPage <= MAX_KILO_REVIEW_COMMENT_PAGES) {
+    for (let page = 2; page <= lastPage; page++) {
+      const { data } = await octokit.issues.listComments({ ...base, page });
+      comments.push(...data);
+    }
+    return { comments, reachedScanLimit: false };
+  }
+
+  const pagesAfterTheFirst = MAX_KILO_REVIEW_COMMENT_PAGES - 1;
+  const headPages = Math.ceil(pagesAfterTheFirst / 2);
+  const tailPages = pagesAfterTheFirst - headPages;
+
+  for (let page = 2; page <= 1 + headPages; page++) {
+    const { data } = await octokit.issues.listComments({ ...base, page });
+    comments.push(...data);
+  }
+  for (let page = lastPage - tailPages + 1; page <= lastPage; page++) {
+    const { data } = await octokit.issues.listComments({ ...base, page });
+    comments.push(...data);
+  }
+
+  return { comments, reachedScanLimit: true };
+}
+
+/**
+ * Reads the `rel="last"` page number from a `Link` response header.
+ */
+function lastIssueCommentPage(linkHeader: string | undefined): number {
+  if (!linkHeader) return 1;
+
+  for (const segment of linkHeader.split(',')) {
+    if (!segment.includes('rel="last"')) continue;
+    const page = segment.match(/[?&]page=(\d+)/);
+    if (page) return Number(page[1]);
+  }
+
+  return 1;
+}
 
 /**
  * Looks for the <!-- kilo-review --> marker in issue comments.
@@ -580,27 +671,7 @@ export async function findKiloReviewComment(
   const octokit = new Octokit({ auth: tokenData.token });
   const appId = String(getGitHubAppCredentials(appType).appId);
 
-  const comments: Array<{
-    id: number;
-    body?: string | null;
-    updated_at: string;
-    performed_via_github_app?: { id?: number | string } | null;
-  }> = [];
-  let reachedScanLimit = false;
-
-  for (let page = 1; page <= MAX_KILO_REVIEW_COMMENT_PAGES; page++) {
-    const { data: pageComments } = await octokit.issues.listComments({
-      owner,
-      repo,
-      issue_number: prNumber,
-      per_page: KILO_REVIEW_COMMENTS_PER_PAGE,
-      page,
-    });
-    comments.push(...pageComments);
-
-    if (pageComments.length < KILO_REVIEW_COMMENTS_PER_PAGE) break;
-    reachedScanLimit = page === MAX_KILO_REVIEW_COMMENT_PAGES;
-  }
+  const { comments, reachedScanLimit } = await scanPRIssueComments(octokit, owner, repo, prNumber);
 
   logExceptInTest('[findKiloReviewComment] Fetched comments', {
     owner,
@@ -670,7 +741,19 @@ export async function updateKiloReviewComment(
 }
 
 /**
+ * Fields the REST comment type omits but the API returns on every review comment.
+ * `position` is absent, not null, for comments on lines that no longer exist.
+ */
+type ReviewCommentExtras = {
+  position?: number | null;
+  performed_via_github_app?: { id?: number | string | null } | null;
+};
+
+/**
  * Used to detect duplicates and track outdated inline comments.
+ *
+ * `authoredByKilo` reports whether this app identity created the comment, following the same
+ * `performed_via_github_app.id` ownership test `findKiloReviewComment` applies to summaries.
  */
 export async function fetchPRInlineComments(
   installationId: string,
@@ -685,11 +768,13 @@ export async function fetchPRInlineComments(
     line: number | null;
     body: string;
     isOutdated: boolean;
+    authoredByKilo: boolean;
     user: { login: string };
   }>
 > {
   const tokenData = await generateGitHubInstallationToken(installationId, appType);
   const octokit = new Octokit({ auth: tokenData.token });
+  const kiloAppId = String(getGitHubAppCredentials(appType).appId);
 
   const comments: Array<{
     id: number;
@@ -697,34 +782,49 @@ export async function fetchPRInlineComments(
     line: number | null;
     body: string;
     isOutdated: boolean;
+    authoredByKilo: boolean;
     user: { login: string };
   }> = [];
 
-  let page = 1;
-  const perPage = 100;
+  let reachedPageLimit = false;
+  let reachedByteLimit = false;
+  let storedBodyBytes = 0;
 
-  while (true) {
+  for (let page = 1; page <= MAX_KILO_REVIEW_COMMENT_PAGES; page++) {
     const { data } = await octokit.pulls.listReviewComments({
       owner,
       repo,
       pull_number: prNumber,
-      per_page: perPage,
+      per_page: KILO_REVIEW_COMMENTS_PER_PAGE,
       page,
+      // Newest comments first, so a page or byte cap keeps the freshest
+      // duplicate-detection hints and drops the oldest ones.
+      sort: 'created',
+      direction: 'desc',
     });
+    const rows = data as Array<(typeof data)[number] & ReviewCommentExtras>;
 
-    comments.push(
-      ...data.map(c => ({
+    for (const c of rows) {
+      const body = c.body.slice(0, MAX_INLINE_COMMENT_BODY_CHARS);
+      storedBodyBytes += Buffer.byteLength(body);
+      comments.push({
         id: c.id,
         path: c.path,
         line: c.line ?? null,
-        body: c.body,
-        isOutdated: c.position === null, // null position = outdated
+        body,
+        isOutdated: c.position == null,
+        authoredByKilo: String(c.performed_via_github_app?.id ?? '') === kiloAppId,
         user: { login: c.user?.login ?? 'unknown' },
-      }))
-    );
+      });
 
-    if (data.length < perPage) break;
-    page++;
+      if (storedBodyBytes >= MAX_PR_INLINE_COMMENT_BODY_BYTES) {
+        reachedByteLimit = true;
+        break;
+      }
+    }
+
+    if (reachedByteLimit || data.length < KILO_REVIEW_COMMENTS_PER_PAGE) break;
+    reachedPageLimit = page === MAX_KILO_REVIEW_COMMENT_PAGES;
   }
 
   logExceptInTest('[fetchPRInlineComments] Fetched comments', {
@@ -732,6 +832,8 @@ export async function fetchPRInlineComments(
     repo,
     prNumber,
     totalComments: comments.length,
+    reachedPageLimit,
+    reachedByteLimit,
   });
 
   return comments;

@@ -1,10 +1,13 @@
 /* eslint-disable max-lines -- The Buy credits screen's state and retry-path tests share the same screen, query client and IAP-owner mocks; splitting them would duplicate that harness. */
 import { QueryClientProvider } from '@tanstack/react-query';
+import type * as SharedUtils from '@kilocode/app-shared/utils';
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { type BackendStoreCreditProduct } from '@/lib/credits/store-products';
+import { LEGAL_LINK_BOX_CLASS, LEGAL_LINK_ROW_CLASS } from '@/lib/a11y/tap-target';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { CreditPurchaseScreen } from './credit-purchase-screen';
@@ -16,7 +19,7 @@ const mockedPlatform = vi.hoisted(() => ({ OS: 'ios' as string }));
 const backend = vi.hoisted(() => ({
   response: {
     appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
-    products: [] as { amountUsd: number; appleProductId: string; googleProductId: string }[],
+    products: [] as BackendStoreCreditProduct[],
   },
 }));
 
@@ -32,8 +35,15 @@ const owner = vi.hoisted(() => ({
 }));
 
 const balance = vi.hoisted(() => ({ balance: 1234 }));
+const creditBlocks = vi.hoisted(() => ({
+  entries: [] as { balance_mUsd: number; expiry_date: string | null }[],
+}));
 
 const toastMock = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }));
+
+// The legal links are the only caller of this module on the screen, so the mock
+// is the destination each link opened.
+const externalLink = vi.hoisted(() => ({ openExternalUrl: vi.fn() }));
 
 // The iOS announcement channel behind AccessibleStatus. The screen renders the
 // purchase error inline and suppresses the error toast, so this hook (plus
@@ -64,7 +74,7 @@ vi.mock('@/lib/a11y/status-announcement', () => ({
 }));
 
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.com' }));
-vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+vi.mock('@/lib/external-link', () => externalLink);
 vi.mock('@/lib/iap/legal-links', () => ({
   getStoreLegalLinks: () => [
     { url: 'https://example.com/privacy-app', label: 'Privacy Policy' },
@@ -94,15 +104,25 @@ vi.mock('@/lib/trpc', () => ({
           queryFn: () => ({ balance: balance.balance, isDepleted: false }),
         }),
       },
+      getCreditBlocks: {
+        queryOptions: () => ({
+          queryKey: ['user', 'getCreditBlocks', {}],
+          queryFn: () => ({ creditBlocks: creditBlocks.entries }),
+        }),
+      },
     },
   }),
 }));
 vi.mock('./credit-native-iap-owner', () => ({
   useCreditNativeIap: () => owner,
 }));
-vi.mock('@/lib/utils', () => ({
-  cn: (...args: unknown[]) => args.filter(arg => typeof arg === 'string').join(' '),
-}));
+vi.mock('@/lib/utils', async () => {
+  const sharedUtils = await vi.importActual<typeof SharedUtils>('@kilocode/app-shared/utils');
+  return {
+    cn: (...args: unknown[]) => args.filter(arg => typeof arg === 'string').join(' '),
+    parseTimestamp: sharedUtils.parseTimestamp,
+  };
+});
 
 // ── Fixtures and helpers ─────────────────────────────────────────────
 
@@ -120,11 +140,6 @@ const STORE_LISTINGS = [
   { id: 'credits.usd500.v1', displayPrice: '$549.99' },
 ];
 
-/**
- * The shell a pack row and its loading placeholder share. The placeholder must
- * reserve the row's own height (p-5 around one text-base line), not Kilo Pass's
- * two-line 112px block, or the swap moves the legal copy down the page.
- */
 const PACK_ROW_SHELL = 'rounded-xl border border-border bg-card p-5';
 
 function placeholderShells(
@@ -215,6 +230,7 @@ describe('CreditPurchaseScreen', () => {
     owner.errorMessageKey = null;
     owner.completedPurchaseCount = 0;
     balance.balance = 1234;
+    creditBlocks.entries = [];
   });
 
   it('happy: renders one row per pack with its amount and store price, purchase enabled', async () => {
@@ -228,10 +244,10 @@ describe('CreditPurchaseScreen', () => {
     expect(
       rows.map(row => (row.props as { accessibilityLabel: string }).accessibilityLabel)
     ).toEqual([
-      'Add $10.00 of credits, $10.99',
-      'Add $50.00 of credits, $54.99',
-      'Add $100.00 of credits, $109.99',
-      'Add $500.00 of credits, $549.99',
+      'Add $10.00 of credits, $10.99, Credits purchased through the App Store do not expire.',
+      'Add $50.00 of credits, $54.99, Credits purchased through the App Store do not expire.',
+      'Add $100.00 of credits, $109.99, Credits purchased through the App Store do not expire.',
+      'Add $500.00 of credits, $549.99, Credits purchased through the App Store do not expire.',
     ]);
     expect(allText(renderer)).toContain('Add $10.00 of credits');
     expect(allText(renderer)).toContain('Add $500.00 of credits');
@@ -252,6 +268,41 @@ describe('CreditPurchaseScreen', () => {
     unmount();
   });
 
+  it('discloses each Play pack policy instead of assuming all Android credits expire', async () => {
+    mockedPlatform.OS = 'android';
+    backend.response.products = BACKEND_PRODUCTS.map((product, index) => ({
+      ...product,
+      creditExpiryPolicy: index === 0 ? 'one_year' : 'never',
+    }));
+    owner.fetchStoreProducts.mockResolvedValue(
+      BACKEND_PRODUCTS.map(product => ({ id: product.googleProductId, displayPrice: '$10.99' }))
+    );
+
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+    const labels = packRows(renderer).map(row => row.props.accessibilityLabel);
+    expect(labels[0]).toContain('These credits expire one calendar year after purchase.');
+    expect(labels[1]).toContain('These credits do not expire.');
+    expect(allText(renderer)).not.toContain(
+      'Credits purchased through the App Store do not expire.'
+    );
+    unmount();
+  });
+
+  it('shows the actual next expiring balance without calling purchased credits a bonus', async () => {
+    creditBlocks.entries = [
+      { balance_mUsd: 10_000_000, expiry_date: '2027-10-15T00:00:00Z' },
+      { balance_mUsd: 50_000_000, expiry_date: '2028-10-15T00:00:00Z' },
+      { balance_mUsd: 500_000_000, expiry_date: null },
+    ];
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => allText(renderer).includes('$10.00 in credits expires'));
+    expect(allText(renderer)).not.toContain('$60.00 in credits');
+    expect(allText(renderer)).not.toContain('bonus credits');
+    expect(allText(renderer)).toContain('(UTC). Credits with the earliest expiry are used first.');
+    unmount();
+  });
+
   it('loading: renders skeleton rows sized like a pack row and no pack row', async () => {
     owner.connected = false;
 
@@ -261,14 +312,17 @@ describe('CreditPurchaseScreen', () => {
       renderer.root.findAll(node => String(node.type) === 'Skeleton').length
     ).toBeGreaterThanOrEqual(4);
     expect(packRows(renderer)).toHaveLength(0);
-    // The placeholders reserve the pack row's own shell and one-line content,
-    // so the rows swap in without moving the legal copy below them.
     const shells = placeholderShells(renderer);
     expect(shells).toHaveLength(4);
     for (const shell of shells) {
       const bars = shell.findAll(node => String(node.type) === 'Skeleton');
-      expect(bars).toHaveLength(2);
-      expect(classNamesOf(bars).every(classes => classes.includes('h-6'))).toBe(true);
+      expect(bars).toHaveLength(3);
+      expect(
+        classNamesOf(bars)
+          .slice(0, 2)
+          .every(classes => classes.includes('h-6'))
+      ).toBe(true);
+      expect(classNamesOf(bars)[2]).toContain('h-8');
     }
     unmount();
   });
@@ -380,10 +434,11 @@ describe('CreditPurchaseScreen', () => {
     // The store the platform has is the only difference in the flow. The
     // backend catalog, the four preset amounts, the store prices, the row
     // states and the CTAs are one implementation, so both platforms must
-    // render identical rows and differ only in the store they ask.
+    // render identical rows and differ only in the store they ask and the
+    // store's credit-expiry disclosure: App Store credits never expire, while
+    // Play rows disclose only the policy the backend reports for each pack.
     // Both stores' ids are priced, so whichever product ids the platform's
-    // storefront asks for come back priced: the rows below must then be
-    // identical apart from the store they were asked of.
+    // storefront asks for come back priced.
     const prices = ['$10.99', '$54.99', '$109.99', '$549.99'];
     owner.fetchStoreProducts.mockResolvedValue(
       BACKEND_PRODUCTS.flatMap((product, index) => [
@@ -410,7 +465,12 @@ describe('CreditPurchaseScreen', () => {
     const androidRows = rowState(android.renderer);
     const androidSkus = owner.fetchStoreProducts.mock.calls.at(-1)?.[0];
 
-    expect(androidRows).toEqual(iosRows);
+    const appStoreNote = ', Credits purchased through the App Store do not expire.';
+    expect(iosRows.every(row => row.label.endsWith(appStoreNote))).toBe(true);
+    expect(androidRows.map(row => row.label)).toEqual(
+      iosRows.map(row => row.label.slice(0, -appStoreNote.length))
+    );
+    expect(androidRows.map(row => row.disabled)).toEqual(iosRows.map(row => row.disabled));
     expect(androidRows.every(row => row.disabled === false)).toBe(true);
     // The one fork: each platform asks the store it actually has, for that
     // store's own product ids.
@@ -543,7 +603,9 @@ describe('CreditPurchaseScreen', () => {
     // A user who cannot hear the price also hears why the row is unavailable.
     expect(
       rows.map(row => (row.props as { accessibilityLabel: string }).accessibilityLabel)
-    ).toContain('Add $500.00 of credits, Price unavailable');
+    ).toContain(
+      'Add $500.00 of credits, Price unavailable, Credits purchased through the App Store do not expire.'
+    );
     expect(allText(renderer)).toContain('Price unavailable');
     unmount();
   });
@@ -613,7 +675,9 @@ describe('CreditPurchaseScreen', () => {
     );
     expect(
       (busyRow?.props as { accessibilityLabel?: string } | undefined)?.accessibilityLabel
-    ).toBe('Add $10.00 of credits, Completing purchase');
+    ).toBe(
+      'Add $10.00 of credits, Completing purchase, Credits purchased through the App Store do not expire.'
+    );
     expect(
       rows.every(
         row =>
@@ -685,6 +749,55 @@ describe('CreditPurchaseScreen', () => {
 
     expect(toastMock.success).toHaveBeenCalledWith('Credits added to your balance.');
     expect(packRows(renderer)).toHaveLength(4);
+    unmount();
+  });
+
+  it('gives each store legal link a full legal-link target and its own destination', async () => {
+    const { renderer, unmount } = await renderWithProviders(createElement(CreditPurchaseScreen));
+    await waitFor(() => packRows(renderer).length === 4);
+
+    const legalLinks = renderer.root.findAll(
+      node =>
+        String(node.type) === 'Pressable' &&
+        (node.props as { accessibilityRole?: string }).accessibilityRole === 'link'
+    );
+    expect(legalLinks).toHaveLength(2);
+    const [termsLink, privacyLink] = legalLinks;
+    if (!termsLink || !privacyLink) {
+      throw new Error('store legal links not found');
+    }
+    for (const link of [termsLink, privacyLink]) {
+      const className = String((link.props as { className?: string }).className);
+      // A real 48dp box: the control-size audit reads the node's own rect, so a
+      // 14dp text line with slop around it is still reported as too small.
+      expect(className).toContain(LEGAL_LINK_BOX_CLASS);
+      expect(className).toContain('active:opacity-70');
+    }
+
+    const row = termsLink.parent;
+    expect(String((row?.props as { className?: string } | undefined)?.className)).toContain(
+      LEGAL_LINK_ROW_CLASS
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+      (termsLink.props as { onPress: () => void }).onPress();
+      (privacyLink.props as { onPress: () => void }).onPress();
+    });
+
+    expect(externalLink.openExternalUrl).toHaveBeenCalledTimes(2);
+    expect(externalLink.openExternalUrl).toHaveBeenNthCalledWith(
+      1,
+      'https://example.com/terms-app',
+      {
+        label: 'Terms of Use (EULA)',
+      }
+    );
+    expect(externalLink.openExternalUrl).toHaveBeenNthCalledWith(
+      2,
+      'https://example.com/privacy-app',
+      { label: 'Privacy Policy' }
+    );
     unmount();
   });
 });

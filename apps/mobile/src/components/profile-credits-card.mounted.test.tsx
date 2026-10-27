@@ -44,8 +44,14 @@ vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     user: {
       getContextBalance: {
-        queryOptions: () => ({
-          queryKey: ['user', 'getContextBalance'] as const,
+        // tRPC builds `[path, { input, type }]`, so the account selection lives
+        // in the key: a context switch is a different query, which is what
+        // `keepPreviousData` then bridges while the new context's read runs.
+        queryOptions: (input?: { organizationId?: string }) => ({
+          queryKey: [
+            ['user', 'getContextBalance'],
+            { ...(input !== undefined && { input }), type: 'query' },
+          ] as const,
           queryFn: getContextBalanceQueryFn,
         }),
       },
@@ -206,7 +212,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-const BALANCE_KEY = ['user', 'getContextBalance'] as const;
+const BALANCE_KEY = [['user', 'getContextBalance'], { input: {}, type: 'query' }] as const;
 const organizationName = 'A very long organization name that must leave the credits label visible';
 const savedMetadata = new Map<string, string>();
 let saveCompletion: Promise<undefined> | undefined = undefined;
@@ -318,6 +324,67 @@ beforeEach(() => {
 });
 
 describe('CreditsCard balance state', () => {
+  it('shows no in-progress indicator while a cached balance refreshes', async () => {
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 10 });
+
+    const queryClient = createTestQueryClient();
+    queryClient.setQueryData(BALANCE_KEY, { balance: 10 });
+
+    const { renderer, texts, unmount } = await mountCard(queryClient);
+    await waitFor(() => texts().includes('$10.00'));
+
+    // A refresh that never answers: the indicator used to ride every in-flight
+    // refresh, so this one spun until the read finally settled -- or forever.
+    const stalledRefresh = Promise.withResolvers<undefined>();
+    getContextBalanceQueryFn.mockReturnValue(stalledRefresh.promise);
+    act(() => {
+      // The refetch never answers, so this promise stays pending by design.
+      void queryClient.invalidateQueries({ queryKey: BALANCE_KEY });
+    });
+    await waitFor(() => queryClient.getQueryState(BALANCE_KEY)?.fetchStatus === 'fetching');
+    // Flush the observer notification the refetch schedules, so the card is
+    // judged on a render that knows the refresh is in flight.
+    await act(async () => {
+      const tick = Promise.withResolvers<undefined>();
+      setTimeout(() => {
+        tick.resolve(undefined);
+      }, 0);
+      await tick.promise;
+    });
+
+    expect(renderer.root.findAllByType('ActivityIndicator' as ElementType)).toHaveLength(0);
+    expect(texts()).toContain('$10.00');
+
+    unmount();
+  });
+
+  it('shows the skeleton instead of the previous account balance while a switch settles', async () => {
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 10 });
+    const orgs = [
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+      { organizationId: 'org-b', organizationName: 'Beta', role: 'owner' },
+    ] as OrgListEntry[];
+    listState.payload = orgs;
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+
+    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+    await waitFor(() => texts().includes('$10.00'));
+
+    // The newly selected account's read never answers: the previous account's
+    // amount must not stay on the row under the new account's name.
+    const stalled = Promise.withResolvers<undefined>();
+    getContextBalanceQueryFn.mockReturnValue(stalled.promise);
+    await openSheet(renderer);
+    await choose(renderer, 'Beta');
+
+    await waitFor(() => texts().includes('SKELETON'));
+    expect(texts()).not.toContain('$10.00');
+
+    unmount();
+  });
+
   it.each([
     { name: 'expired grants', future: false },
     { name: 'mixed grants', future: true },
@@ -338,8 +405,14 @@ describe('CreditsCard balance state', () => {
       const { texts, unmount } = await mountCard();
       try {
         await waitFor(() => texts().includes('$0.00') && !texts().includes('SKELETON'));
-        const notes = texts().filter(text => text.includes('in credits expiring'));
-        expect(notes).toEqual(future ? ['$2.00 in credits expiring 12/17/2026'] : []);
+        const notes = texts().filter(text => text.includes('in credits expires'));
+        expect(notes).toEqual(
+          future
+            ? [
+                '$2.00 in credits expires 12/17/2026 (UTC). Credits with the earliest expiry are used first.',
+              ]
+            : []
+        );
       } finally {
         unmount();
       }
@@ -373,8 +446,8 @@ describe('CreditsCard balance state', () => {
       const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
       try {
         await waitFor(() => texts().includes('$0.00') && !texts().includes('SKELETON'));
-        expect(texts().filter(text => text.includes('in credits expiring'))).toEqual([
-          '$2.00 in credits expiring 12/17/2026',
+        expect(texts().filter(text => text.includes('in credits expires'))).toEqual([
+          '$2.00 in credits expires 12/17/2026 (UTC). Credits with the earliest expiry are used first.',
         ]);
       } finally {
         unmount();
@@ -396,7 +469,7 @@ describe('CreditsCard balance state', () => {
     const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
     try {
       await waitFor(() => texts().includes('$0.00') && !texts().includes('SKELETON'));
-      expect(texts().filter(text => text.includes('in credits expiring'))).toEqual([]);
+      expect(texts().filter(text => text.includes('in credits expires'))).toEqual([]);
     } finally {
       unmount();
     }
@@ -621,6 +694,29 @@ describe('CreditsCard balance state', () => {
     expect(texts()).toContain('$10.00');
     expect(texts()).not.toContain('*****');
 
+    unmount();
+  });
+
+  it('shows the nearest paid or bonus deadline and hides it with the balance', async () => {
+    currentUser.userId = 'user-A';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 65 });
+    personalCreditBlocksQueryFn.mockResolvedValue({
+      creditBlocks: [
+        { balance_mUsd: 10_000_000, expiry_date: '2027-10-15T00:00:00Z' },
+        { balance_mUsd: 5_000_000, expiry_date: '2027-10-15T00:00:00Z' },
+        { balance_mUsd: 50_000_000, expiry_date: '2028-10-15T00:00:00Z' },
+      ],
+    });
+    const { renderer, texts, unmount } = await mountCard();
+    await waitFor(() => texts().some(text => text.includes('$15.00 in credits expires')));
+    expect(texts().some(text => text.includes('$65.00 in credits expires'))).toBe(false);
+    expect(texts().some(text => text.includes('bonus credits'))).toBe(false);
+
+    const hide = renderer.root.findByProps({ accessibilityLabel: 'Hide balance' });
+    await act(() => {
+      (hide.props.onPress as () => void)();
+    });
+    expect(texts().some(text => text.includes('in credits expires'))).toBe(false);
     unmount();
   });
 });

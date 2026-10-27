@@ -21,6 +21,7 @@ import {
   parseMultiplier,
   parseThreshold,
   thresholdError,
+  thresholdPlaceholder,
   toWindowHours,
 } from '@/components/organization/spend-alert-validators';
 import { QueryError } from '@/components/query-error';
@@ -43,7 +44,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
 
 /** The Notifications screen owns the push gate the channel rows point at. */
-const NOTIFICATIONS_HREF = '/(app)/(tabs)/(3_profile)/notifications' as Href;
+const NOTIFICATIONS_HREF = '/(app)/notifications' as Href;
 
 const WINDOW_LABEL_KEYS = {
   '24': 'spendAlerts.window24h',
@@ -476,7 +477,7 @@ function SpendAlertsForm({
             <FormField
               label={t('spendAlerts.limitLabel')}
               required={thresholdEnabled}
-              placeholder="25.00"
+              placeholder={thresholdPlaceholder()}
               keyboardType="decimal-pad"
               defaultValue={thresholdRef.current || undefined}
               validate={thresholdEnabled ? thresholdError : undefined}

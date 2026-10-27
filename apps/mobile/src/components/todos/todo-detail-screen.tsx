@@ -17,10 +17,12 @@ import { Circle, CircleCheck } from '@/components/ui/icons';
 import { IconButton } from '@/components/ui/icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { selectableRowA11y } from '@/lib/a11y/selectable-row';
 import { useNowTicker } from '@/lib/hooks/use-now-ticker';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTodoItem, useTodoItemMutations } from '@/lib/hooks/use-todos';
 import { TODO_TITLE_MAX_LENGTH } from '@/lib/todos/todo-model';
+import { selectTodoQueryErrorView } from '@/lib/todos/todo-query-error';
 import { type TodoItemDetail } from '@/lib/todos/todo-types';
 
 const LISTS_HREF = '/(app)/(tabs)/(2_agents)' as Href;
@@ -40,8 +42,7 @@ function TodoCompletionCircle({ todo }: Readonly<{ todo: TodoItemDetail }>) {
         }
         update.mutate({ id: todo.id, done: !done });
       }}
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: done }}
+      {...selectableRowA11y({ multi: true, selected: done })}
       accessibilityLabel={done ? t('todos.item.markOpen') : t('todos.item.markDone')}
     >
       {done ? (
@@ -151,6 +152,7 @@ function TodoDetailBody({ todo }: Readonly<{ todo: TodoItemDetail }>) {
 export function TodoDetailScreen({ itemId }: Readonly<{ itemId: string }>) {
   const query = useTodoItem(itemId);
   const todo = query.data;
+  const errorView = selectTodoQueryErrorView(query.error);
 
   if (todo) {
     return <TodoDetailBody key={todo.id} todo={todo} />;
@@ -167,9 +169,9 @@ export function TodoDetailScreen({ itemId }: Readonly<{ itemId: string }>) {
       />
       {query.isError ? (
         <QueryError
-          variant={query.error.data?.code === 'NOT_FOUND' ? 'not-found' : 'server'}
+          variant={errorView.variant}
           placement="top"
-          onRetry={query.error.data?.code === 'NOT_FOUND' ? undefined : () => void query.refetch()}
+          onRetry={errorView.showRetry ? () => void query.refetch() : undefined}
           isRetrying={query.isFetching}
         />
       ) : (

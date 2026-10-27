@@ -327,4 +327,90 @@ describe('SessionItemSchema storage key identity', () => {
       }).success
     ).toBe(false);
   });
+
+  it('rejects a message ID over 256 characters before persistence', () => {
+    expect(
+      SessionItemSchema.safeParse({ type: 'message', data: { id: `msg_${'a'.repeat(256)}` } })
+        .success
+    ).toBe(false);
+  });
+
+  it('accepts a message ID exactly 256 characters', () => {
+    expect(
+      SessionItemSchema.safeParse({ type: 'message', data: { id: `msg_${'a'.repeat(252)}` } })
+        .success
+    ).toBe(true);
+  });
+
+  it('rejects a part ID or part message ID over 256 characters before persistence', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: `prt_${'a'.repeat(256)}`, messageID: 'msg_parent' },
+      }).success
+    ).toBe(false);
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: 'prt_child', messageID: `msg_${'a'.repeat(256)}` },
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts a part identity with both segments exactly 256 characters', () => {
+    // The largest derived part identity is 256 + 1 + 256 bytes.
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: `prt_${'a'.repeat(252)}`, messageID: `msg_${'a'.repeat(252)}` },
+      }).success
+    ).toBe(true);
+  });
+});
+
+describe('SessionItemSchema identity segments', () => {
+  it.each(['message', 'part', 'agent_notification'])(
+    'refuses a part whose message id equals the %s root',
+    reserved => {
+      expect(
+        SessionItemSchema.safeParse({
+          type: 'part',
+          data: { id: 'prt_child', messageID: reserved },
+        }).success
+      ).toBe(false);
+    }
+  );
+
+  it.each(['message', 'part', 'agent_notification'])(
+    'refuses a message whose id equals the %s root',
+    reserved => {
+      expect(SessionItemSchema.safeParse({ type: 'message', data: { id: reserved } }).success).toBe(
+        false
+      );
+    }
+  );
+
+  it('accepts ordinary message and part identities', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'message',
+        data: { id: 'msg_42', role: 'assistant' },
+      }).success
+    ).toBe(true);
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: 'prt_1', messageID: 'msg_42' },
+      }).success
+    ).toBe(true);
+  });
+
+  it('accepts a part id equal to an item-type root', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: 'message', messageID: 'msg_42' },
+      }).success
+    ).toBe(true);
+  });
 });

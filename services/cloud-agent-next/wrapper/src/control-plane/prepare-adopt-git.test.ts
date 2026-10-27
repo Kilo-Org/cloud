@@ -11,13 +11,7 @@ import type {
 } from '../../../src/shared/control-plane-protocol.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import { createPreparationManager } from './prepare.js';
-import {
-  readWorkspaceStamp,
-  SNAPSHOT_MAX_GENERATION,
-  SNAPSHOT_REFRESH_AFTER_MS,
-} from './workspace-stamp.js';
-
-const T0 = 1_800_000_000_000;
+import { readWorkspaceStamp } from './workspace-stamp.js';
 
 // These tests run real git against a local origin. A mocked git proves the command
 // sequence; only a real repository proves an adopted snapshot ends on the same
@@ -86,34 +80,12 @@ function spec(overrides: Partial<ControlPlaneRouteSpec> = {}): ControlPlaneRoute
   };
 }
 
-type GitState = { origin: string; fetchHead: boolean; reflog: string };
-
-/** What `.git` holds at the moment the Sandbox DO would snapshot the container. */
-async function gitStateAtCapture(): Promise<GitState> {
-  return {
-    origin: git(directory, 'remote', 'get-url', 'origin'),
-    fetchHead: await fs
-      .access(path.join(directory, '.git', 'FETCH_HEAD'))
-      .then(() => true)
-      .catch(() => false),
-    reflog: git(directory, 'reflog', '--all'),
-  };
-}
-
-function manager(allocationId: string, now = T0) {
+function manager(allocationId: string) {
   const frames: ControlPlaneWrapperFrame[] = [];
   const gitCalls: string[][] = [];
-  const captures: GitState[] = [];
   const prepared = createPreparationManager({
     timers: CONTROL_PLANE_TIMERS,
     allocationId,
-    now: () => now,
-    capture: {
-      request: async () => {
-        captures.push(await gitStateAtCapture());
-        return true;
-      },
-    },
     emit: frame => frames.push(frame),
     runtimes: {
       ensure: async () => ({ serverUrl: 'http://127.0.0.1:1' }) as unknown as WrapperKiloClient,
@@ -124,7 +96,7 @@ function manager(allocationId: string, now = T0) {
       release: () => undefined,
     },
     inheritedEnv: { PATH: process.env.PATH ?? '', ...GIT_ENV } as NodeJS.ProcessEnv,
-    homeRoot: path.join(root, 'homes'),
+    homeRoots: { directory: path.join(root, 'homes'), legacy: path.join(root, 'legacy-homes') },
     runGit: async (args, options) => {
       gitCalls.push(args);
       const { git: run } = await import('../utils.js');
@@ -134,19 +106,20 @@ function manager(allocationId: string, now = T0) {
     sessionExists: async () => true,
     sleep: async () => undefined,
   });
-  return { prepared, frames, gitCalls, captures };
+  return { prepared, frames, gitCalls };
 }
 
 function ready(frames: ControlPlaneWrapperFrame[]) {
   return frames.findLast(frame => frame.type === 'session.ready');
 }
 
-describe('adopting a repository snapshot against a real repository', () => {
+// The first manager stands in for the environment builder: another allocation
+// prepared the workspace, so the second classifies it as a snapshot to adopt.
+describe('adopting an environment snapshot against a real repository', () => {
   it('starts a new session branch from the current origin tip, not the snapshot commit', async () => {
     const first = manager('alloc-image');
-    await first.prepared.prepare(spec({ capture: true }));
+    await first.prepared.prepare(spec());
     expect(ready(first.frames)).toMatchObject({ workspace: 'cloned' });
-    expect(first.captures).toHaveLength(1);
     const snapshotCommit = git(directory, 'rev-parse', 'HEAD');
 
     const tip = commitFile('README', 'two', 'second');
@@ -166,10 +139,7 @@ describe('adopting a repository snapshot against a real repository', () => {
     expect(await readWorkspaceStamp(directory, true)).toEqual({
       allocationId: 'alloc-restored',
       commit: tip,
-      capturedAt: T0,
-      generation: 0,
     });
-    expect(restored.captures).toEqual([]);
   });
 
   it("gives an existing session the branch it pushed, not the snapshot's stale one", async () => {
@@ -242,74 +212,33 @@ describe('adopting a repository snapshot against a real repository', () => {
     });
   });
 
-  it('does nothing for a second route on the same allocation', async () => {
+  it('rewrites a credential-bearing origin to the canonical URL before Kilo starts', async () => {
+    await manager('alloc-image').prepared.prepare(spec());
+    const credentialed = 'https://x-access-token:stale@github.com/acme/repo.git';
+    git(directory, 'remote', 'set-url', 'origin', credentialed);
+    await fs.rm(path.join(directory, '.git', 'kilo-workspace.json'));
+
+    const reused = manager('alloc-image');
+    await reused.prepared.prepare(spec({ sessionId: 'ses_b' }));
+
+    expect(ready(reused.frames)).toMatchObject({ workspace: 'cloned' });
+    // Only the userinfo is dropped: the agent's chosen remote is preserved.
+    expect(git(directory, 'remote', 'get-url', 'origin')).toBe('https://github.com/acme/repo.git');
+    expect(await fs.readFile(path.join(directory, '.git/config'), 'utf8')).not.toContain(
+      'x-access-token'
+    );
+  });
+
+  it('retains local workspace state', async () => {
     const first = manager('alloc-image');
     await first.prepared.prepare(spec());
+    await fs.writeFile(path.join(directory, 'local.txt'), 'local changes');
+    const commit = git(directory, 'rev-parse', 'HEAD');
     const second = manager('alloc-image');
     await second.prepared.prepare(spec({ sessionId: 'ses_b' }));
 
     expect(ready(second.frames)).toMatchObject({ workspace: 'same' });
-    expect(second.gitCalls).toEqual([]);
-  });
-});
-
-describe('refreshing an adopted snapshot against a real repository', () => {
-  it('captures an old snapshot from the adopted workspace, with no credential left in .git', async () => {
-    const first = manager('alloc-image', T0);
-    await first.prepared.prepare(spec({ capture: true }));
-    await fs.mkdir(path.join(directory, 'node_modules'), { recursive: true });
-    await fs.writeFile(path.join(directory, 'node_modules', 'dep.js'), 'module.exports = 1');
-    const tip = commitFile('README', 'two', 'second');
-    git(author, 'push', '-q', 'origin', 'main');
-
-    const refreshed = manager('alloc-refresh', T0 + SNAPSHOT_REFRESH_AFTER_MS);
-    await refreshed.prepared.prepare(spec({ sessionId: 'ses_b', capture: true }));
-
-    expect(ready(refreshed.frames)).toMatchObject({ workspace: 'adopted' });
-    expect(refreshed.gitCalls.some(args => args[0] === 'clone')).toBe(false);
-    expect(refreshed.captures).toHaveLength(1);
-    const [atCapture] = refreshed.captures;
-    expect(atCapture).toEqual({
-      origin: pathToFileURL(origin).toString(),
-      fetchHead: false,
-      reflog: '',
-    });
-    expect(await readWorkspaceStamp(directory, true)).toEqual({
-      allocationId: 'alloc-refresh',
-      commit: tip,
-      capturedAt: T0 + SNAPSHOT_REFRESH_AFTER_MS,
-      generation: 1,
-    });
-    expect(await fs.readFile(path.join(directory, 'node_modules', 'dep.js'), 'utf8')).toBe(
-      'module.exports = 1'
-    );
-  });
-
-  it('does not capture before the snapshot is due, and rebuilds from a clone at the generation cap', async () => {
-    await manager('alloc-image', T0).prepared.prepare(spec({ capture: true }));
-
-    const early = manager('alloc-early', T0 + SNAPSHOT_REFRESH_AFTER_MS - 1);
-    await early.prepared.prepare(spec({ sessionId: 'ses_b', capture: true }));
-    expect(ready(early.frames)).toMatchObject({ workspace: 'adopted' });
-    expect(early.captures).toEqual([]);
-
-    let at = T0;
-    for (let generation = 1; generation <= SNAPSHOT_MAX_GENERATION; generation += 1) {
-      at += SNAPSHOT_REFRESH_AFTER_MS;
-      const next = manager(`alloc-refresh-${generation}`, at);
-      await next.prepared.prepare(spec({ sessionId: `ses_${generation}`, capture: true }));
-      expect(next.captures).toHaveLength(1);
-      expect(await readWorkspaceStamp(directory, true)).toMatchObject({ generation });
-    }
-
-    const rebuilt = manager('alloc-rebuilt', at + SNAPSHOT_REFRESH_AFTER_MS);
-    await rebuilt.prepared.prepare(spec({ sessionId: 'ses_rebuilt', capture: true }));
-    expect(ready(rebuilt.frames)).toMatchObject({ workspace: 'cloned' });
-    expect(rebuilt.gitCalls.filter(args => args[0] === 'clone')).toHaveLength(1);
-    expect(rebuilt.captures).toHaveLength(1);
-    expect(await readWorkspaceStamp(directory, true)).toMatchObject({
-      capturedAt: at + SNAPSHOT_REFRESH_AFTER_MS,
-      generation: 0,
-    });
+    expect(git(directory, 'rev-parse', 'HEAD')).toBe(commit);
+    expect(await fs.readFile(path.join(directory, 'local.txt'), 'utf8')).toBe('local changes');
   });
 });

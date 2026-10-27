@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
+import { selectableRowA11y } from '@/lib/a11y/selectable-row';
 import { type AgentSessionFilters } from '@/lib/agent-session-filters';
 import { platformLabel } from '@/lib/platform-label';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -93,8 +94,7 @@ function FilterCheckboxRow({ label, isChecked, onPress }: Readonly<FilterCheckbo
     <Pressable
       className="flex-row items-center gap-3 rounded-lg px-3 py-2.5 active:bg-secondary"
       onPress={onPress}
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: isChecked }}
+      {...selectableRowA11y({ multi: true, selected: isChecked })}
     >
       <View
         className={cn(
@@ -195,7 +195,7 @@ export function SessionFilterModal({
         <Text accessibilityRole="header" className="text-center text-base font-semibold">
           {t('agentChat.sessionFilter.title')}
         </Text>
-        <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+        <ScrollView nestedScrollEnabled className="flex-1" showsVerticalScrollIndicator={false}>
           <View className="gap-4">
             {/* The rows are derived from the live sessions, so a list whose
                 rows all have an unknown origin (`liveSessionPlatformBucket`

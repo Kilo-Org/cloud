@@ -36,6 +36,7 @@ import {
   organization_groups,
   organization_group_memberships,
   organization_group_policy_settings,
+  byoc_connections,
   organization_user_limits,
   organization_user_usage,
   organization_invitations,
@@ -59,6 +60,7 @@ import {
   agent_configs,
   agent_environment_profiles,
   cloud_agent_sandbox_allocation_settings,
+  cloud_agent_environments,
   security_findings,
   security_finding_notifications,
   security_remediation_attempts,
@@ -87,6 +89,7 @@ import {
   user_push_tokens,
   user_activity_tokens,
   user_notification_preferences,
+  user_notification_history,
   spend_alert_settings,
   spend_alert_hourly,
   spend_alert_deliveries,
@@ -989,6 +992,8 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - organization_membership_removals (tombstones deleted; removed_by anonymized)
  * - organization_invitations (sent by user + addressed to user's email)
  * - organization_user_limits/usage
+ * - personal byoc_connections rows (organization-owned
+ *   credentials are retained)
  * - organization_audit_logs (actor PII nulled)
  * - kiloclaw_admin_audit_logs (actor PII nulled, target_user_id anonymized)
  * - admin_action_audit_logs (actor PII nulled, user target_id anonymized)
@@ -1011,7 +1016,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - Various user-owned resources (platform_integrations, byok_api_keys,
  *   the person's own openai_chatgpt_connections rows, agent_configs, webhook_events,
  *   code_indexing_*, source_embeddings,
- *   cloud_agent_webhook_triggers, agent_environment_profiles,
+ *   cloud_agent_webhook_triggers, agent_environment_profiles, cloud_agent_environments,
  *   security_findings, security_analysis_owner_state, security_agent_commands,
  *   security_agent_repository_sync_state, security_remediations,
  *   security_remediation_attempts actor references,
@@ -1299,17 +1304,36 @@ export async function anonymizeCloudUserData(
   // User-owned resources (these would have been CASCADE-deleted if we
   // deleted the user row, but since we keep it, we delete them explicitly)
 
+  await tx.delete(byoc_connections).where(eq(byoc_connections.user_id, userId));
+
   // cloud_agent_webhook_triggers has RESTRICT FK on agent_environment_profiles,
   // so delete triggers before profiles
   await tx
     .delete(cloud_agent_webhook_triggers)
     .where(eq(cloud_agent_webhook_triggers.user_id, userId));
+  // Organization triggers can retain a creator's personal profile reference.
+  // Keep those triggers while releasing the profile FK before profile deletion.
+  await tx
+    .update(cloud_agent_webhook_triggers)
+    .set({ profile_id: null })
+    .where(
+      inArray(
+        cloud_agent_webhook_triggers.profile_id,
+        tx
+          .select({ id: agent_environment_profiles.id })
+          .from(agent_environment_profiles)
+          .where(eq(agent_environment_profiles.owned_by_user_id, userId))
+      )
+    );
   await tx
     .delete(agent_environment_profiles)
     .where(eq(agent_environment_profiles.owned_by_user_id, userId));
   await tx
     .delete(cloud_agent_sandbox_allocation_settings)
     .where(eq(cloud_agent_sandbox_allocation_settings.owned_by_user_id, userId));
+  await tx
+    .delete(cloud_agent_environments)
+    .where(eq(cloud_agent_environments.owned_by_user_id, userId));
 
   const authorizedOAuthIntegrationIds = tx
     .select({ id: platform_oauth_credentials.platform_integration_id })
@@ -1579,6 +1603,9 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(user_notification_preferences)
     .where(eq(user_notification_preferences.user_id, userId));
+  // Recorded pushes hold the content that was sent to this account's devices
+  // (titles, bodies, i18n params, payloads), so they go with the account.
+  await tx.delete(user_notification_history).where(eq(user_notification_history.user_id, userId));
   await tx.delete(agent_briefing_reports).where(eq(agent_briefing_reports.kilo_user_id, userId));
   await tx.delete(agent_briefing_events).where(eq(agent_briefing_events.kilo_user_id, userId));
   await tx

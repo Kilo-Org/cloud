@@ -4,7 +4,7 @@ import {
   CUSTOM_ROUTER_ERROR_HTTP_STATUS,
   CreateCustomRouterRequestSchema,
   CustomRouterClientEntryIdSchema,
-  CustomRouterScopeSchema,
+  OwnerTypeSchema,
   CustomRouterSlugSchema,
   MAX_CUSTOM_ROUTERS_PER_OWNER,
   MAX_CUSTOM_ROUTER_ENTRIES,
@@ -19,7 +19,7 @@ import {
   type CustomRouterErrorCode,
   type CustomRouterErrorResponse,
   type CustomRouterListEntry,
-  type CustomRouterScope,
+  type OwnerType,
   type CustomRouterSummary,
   type CustomRouterVariantStatus,
 } from '@kilocode/auto-routing-contracts';
@@ -50,6 +50,9 @@ import { buildEligibleCatalog, type EligibleCatalog } from '@/lib/auto-routing-p
 
 const BENCHMARK_REGISTER_BATCH_SIZE = 10;
 const BENCHMARK_ADMISSION_TIMEOUT_MS = 10_000;
+// The entry bounds count UTF-16 code units while this limit counts UTF-8 bytes, so it carries
+// headroom above the ASCII size of a maximal router.
+export const MAX_CUSTOM_ROUTER_BODY_BYTES = 1024 * 1024;
 // 400 bodies from benchmark workers that cannot benchmark the requested base router: a worker
 // that predates frontier owner profiles, or one without a saved config for that router.
 const UNSUPPORTED_BASE_ROUTER_ERRORS = [
@@ -146,9 +149,63 @@ export async function handleCustomRouterRequest(
   }
 }
 
-async function readJsonBody(request: NextRequest): Promise<unknown> {
+function bodyTooLarge(): CustomRouterApiError {
+  return new CustomRouterApiError(
+    'invalid_request',
+    `Request body must be at most ${MAX_CUSTOM_ROUTER_BODY_BYTES} bytes`
+  );
+}
+
+async function readBoundedBody(request: NextRequest): Promise<Uint8Array> {
+  const contentLength = request.headers.get('content-length');
+  if (
+    contentLength &&
+    (!/^\d+$/.test(contentLength) || Number(contentLength) > MAX_CUSTOM_ROUTER_BODY_BYTES)
+  ) {
+    throw bodyTooLarge();
+  }
+  if (!request.body) return new Uint8Array();
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
   try {
-    return await request.json();
+    while (true) {
+      let chunk: ReadableStreamReadResult<Uint8Array>;
+      try {
+        chunk = await reader.read();
+      } catch {
+        throw new CustomRouterApiError('invalid_request', 'Could not read the request body');
+      }
+      if (chunk.done) break;
+      totalBytes += chunk.value.byteLength;
+      if (totalBytes > MAX_CUSTOM_ROUTER_BODY_BYTES) {
+        try {
+          await reader.cancel();
+        } catch {
+          // The request stays rejected when stream cancellation fails.
+        }
+        throw bodyTooLarge();
+      }
+      chunks.push(chunk.value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const body = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
+}
+
+async function readJsonBody(request: NextRequest): Promise<unknown> {
+  const body = await readBoundedBody(request);
+  try {
+    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(body));
   } catch {
     throw new CustomRouterApiError('invalid_request', 'Invalid JSON body');
   }
@@ -156,10 +213,7 @@ async function readJsonBody(request: NextRequest): Promise<unknown> {
 
 type ScopedOwner = { owner: CustomRouterOwner; canEdit: boolean };
 
-function resolveScopedOwner(
-  context: CustomRouterRequestContext,
-  scope: CustomRouterScope
-): ScopedOwner {
+function resolveScopedOwner(context: CustomRouterRequestContext, scope: OwnerType): ScopedOwner {
   if (scope === 'user') return { owner: { type: 'user', id: context.user.id }, canEdit: true };
   if (!context.organization) throw routerNotFound();
   return {
@@ -170,7 +224,7 @@ function resolveScopedOwner(
 
 async function resolveEditableOwner(
   context: CustomRouterRequestContext,
-  scope: CustomRouterScope
+  scope: OwnerType
 ): Promise<CustomRouterOwner> {
   const { owner, canEdit } = resolveScopedOwner(context, scope);
   if (!canEdit) {
@@ -191,10 +245,10 @@ async function resolveEditableOwner(
 }
 
 export function parseRouterParams(params: { scope: string; slug: string }): {
-  scope: CustomRouterScope;
+  scope: OwnerType;
   slug: string;
 } {
-  const scope = CustomRouterScopeSchema.safeParse(params.scope);
+  const scope = OwnerTypeSchema.safeParse(params.scope);
   const slug = CustomRouterSlugSchema.safeParse(params.slug);
   if (!scope.success || !slug.success) throw routerNotFound();
   return { scope: scope.data, slug: slug.data };
@@ -316,19 +370,64 @@ function validateNewGatewayEntries(params: {
   });
 }
 
+type BenchmarkAdmissionPlan = {
+  baseRouter: AutoRouter;
+  models: string[];
+};
+
+function benchmarkAdmissionPlan(
+  baseRouter: AutoRouter,
+  entries: readonly CustomRouterEntry[]
+): BenchmarkAdmissionPlan {
+  return {
+    baseRouter,
+    models: entries.flatMap(entry =>
+      entry.kind === 'gateway' && !requiresClientEval(entry) ? [entry.model] : []
+    ),
+  };
+}
+
+function sameAdmissionPlan(a: BenchmarkAdmissionPlan, b: BenchmarkAdmissionPlan): boolean {
+  return (
+    a.baseRouter === b.baseRouter &&
+    a.models.length === b.models.length &&
+    a.models.every((model, index) => model === b.models[index])
+  );
+}
+
+// One in-flight admission per owner: concurrent saves from the same owner queue here instead of on
+// an owner-locked database connection, and two saves never register the same owner's models twice.
+const ownerAdmissionSlots = new Map<string, Promise<void>>();
+
+async function withOwnerAdmissionSlot<T>(
+  owner: CustomRouterOwner,
+  run: () => Promise<T>
+): Promise<T> {
+  const key = `${owner.type}:${owner.id}`;
+  const previous = ownerAdmissionSlots.get(key) ?? Promise.resolve();
+  const current = previous.then(run);
+  const settled = current.then(
+    () => undefined,
+    () => undefined
+  );
+  ownerAdmissionSlots.set(key, settled);
+  try {
+    return await current;
+  } finally {
+    if (ownerAdmissionSlots.get(key) === settled) ownerAdmissionSlots.delete(key);
+  }
+}
+
 async function requestPlatformBenchmarks(params: {
   owner: CustomRouterOwner;
-  baseRouter: AutoRouter;
-  entries: CustomRouterEntry[];
+  plan: BenchmarkAdmissionPlan;
 }): Promise<void> {
-  const models = params.entries.flatMap(entry =>
-    entry.kind === 'gateway' && !requiresClientEval(entry) ? [{ model: entry.model }] : []
-  );
+  const models = params.plan.models.map(model => ({ model }));
   if (models.length === 0) return;
   const signal = AbortSignal.timeout(BENCHMARK_ADMISSION_TIMEOUT_MS);
   for (let start = 0; start < models.length; start += BENCHMARK_REGISTER_BATCH_SIZE) {
     const registration = {
-      router: params.baseRouter,
+      router: params.plan.baseRouter,
       ownerType: params.owner.type,
       ownerId: params.owner.id,
       entries: models.slice(start, start + BENCHMARK_REGISTER_BATCH_SIZE),
@@ -346,7 +445,7 @@ async function requestPlatformBenchmarks(params: {
       .catch(error => {
         captureException(error, {
           tags: { source: 'auto_routing_custom_router_admission' },
-          extra: { ownerType: params.owner.type, baseRouter: params.baseRouter },
+          extra: { ownerType: params.owner.type, baseRouter: params.plan.baseRouter },
         });
         throw new CustomRouterApiError('internal_error', 'Could not request benchmarks');
       });
@@ -364,7 +463,7 @@ async function requestPlatformBenchmarks(params: {
     ) {
       throw new CustomRouterApiError(
         'invalid_request',
-        `baseRouter: Benchmarks for the ${params.baseRouter} base router are not available yet. Choose another base router.`
+        `baseRouter: Benchmarks for the ${params.plan.baseRouter} base router are not available yet. Choose another base router.`
       );
     }
     if (result.status === 400) {
@@ -375,6 +474,24 @@ async function requestPlatformBenchmarks(params: {
       `Could not request benchmarks: ${result.error.error}`
     );
   }
+}
+
+/**
+ * Registers the owner's platform-servable models before the write transaction opens, so a save
+ * never holds a pooled database connection across the outbound call. Registration is idempotent,
+ * so a save that later loses a race only repeats profiles that already exist.
+ */
+async function admitPlatformBenchmarks(params: {
+  owner: CustomRouterOwner;
+  baseRouter: AutoRouter;
+  entries: readonly CustomRouterEntry[];
+}): Promise<BenchmarkAdmissionPlan> {
+  const plan = benchmarkAdmissionPlan(params.baseRouter, params.entries);
+  if (plan.models.length === 0) return plan;
+  await withOwnerAdmissionSlot(params.owner, () =>
+    requestPlatformBenchmarks({ owner: params.owner, plan })
+  );
+  return plan;
 }
 
 export async function lockOwner(tx: DrizzleTransaction, owner: CustomRouterOwner): Promise<void> {
@@ -472,8 +589,10 @@ export async function ownerRouterSlugs(
 }
 
 /**
- * Catalog I/O stays outside the owner lock. Final validation, bounded worker admission, and the
- * write are serialized; worker admission cannot be rolled back if the database commit fails.
+ * Catalog I/O and benchmark admission stay outside the owner lock. The transaction serializes the
+ * final validation and the write only, so queued saves never hold a pooled connection across an
+ * outbound benchmark request. The one exception is in `updateCustomRouterResponse`, which admits the
+ * locked definition inside the transaction when a concurrent save changed it after the pre-lock read.
  */
 export async function createCustomRouterResponse(
   context: CustomRouterRequestContext,
@@ -489,16 +608,17 @@ export async function createCustomRouterResponse(
     owner,
     entries: input.entries,
   });
+  validateNewGatewayEntries({ entries: input.entries, existingKeys: new Set(), rejections });
+  await admitPlatformBenchmarks({
+    owner,
+    baseRouter: input.baseRouter,
+    entries: input.entries,
+  });
 
   const router = await db.transaction(async tx => {
     await lockOwner(tx, owner);
     assertCanCreate(await ownerRouterSlugs(tx, owner), input.slug);
     validateNewGatewayEntries({ entries: input.entries, existingKeys: new Set(), rejections });
-    await requestPlatformBenchmarks({
-      owner,
-      baseRouter: input.baseRouter,
-      entries: input.entries,
-    });
     const [row] = await tx
       .insert(auto_routing_custom_routers)
       .values({
@@ -562,6 +682,28 @@ export async function updateCustomRouterResponse(
     entries: input.entries ?? [],
   });
 
+  const existing = await findRouter(db, owner, slug);
+  const planned = applyUpdate(existing, input);
+  if (planned.legacyPool && requestedSlug !== slug) {
+    throw new CustomRouterApiError(
+      'invalid_request',
+      'The migrated pool slug cannot change during the notice period'
+    );
+  }
+  validateNewGatewayEntries({
+    entries: planned.entries,
+    existingKeys: new Set(existing.entries.map(customRouterEntryKey)),
+    rejections,
+  });
+  const changesAdmittedPlan = input.entries !== undefined || input.baseRouter !== undefined;
+  const admitted = changesAdmittedPlan
+    ? await admitPlatformBenchmarks({
+        owner,
+        baseRouter: planned.baseRouter,
+        entries: planned.entries,
+      })
+    : null;
+
   const router = await db.transaction(async tx => {
     await lockOwner(tx, owner);
     const current = await findRouter(tx, owner, slug);
@@ -577,8 +719,13 @@ export async function updateCustomRouterResponse(
       existingKeys: new Set(current.entries.map(customRouterEntryKey)),
       rejections,
     });
-    if (input.entries !== undefined || input.baseRouter !== undefined) {
-      await requestPlatformBenchmarks({
+    if (
+      admitted !== null &&
+      !sameAdmissionPlan(admitted, benchmarkAdmissionPlan(next.baseRouter, next.entries))
+    ) {
+      // A concurrent save changed the base router or pool between the pre-lock read and the lock.
+      // Admission is idempotent, so registering the locked plan keeps the persisted router measured.
+      await admitPlatformBenchmarks({
         owner,
         baseRouter: next.baseRouter,
         entries: next.entries,

@@ -50,6 +50,7 @@ import {
 import { isGitLabReconnectRequiredError } from '@/lib/integrations/platforms/gitlab/credential-errors';
 import type {
   ExistingReviewState,
+  InlineComment,
   PreviousReviewStatus,
   GitLabDiffContext,
 } from '../prompts/generate-prompt';
@@ -59,7 +60,6 @@ import {
   findPreviousCompletedReview,
   updatePreviousReviewSummary,
   updateRepositoryReviewInstructionsMetadata,
-  type ReviewScope,
 } from '../db/code-reviews';
 import { DEFAULT_CODE_REVIEW_MODEL, DEFAULT_CODE_REVIEW_MODE } from '../core/constants';
 import type { Owner } from '../core';
@@ -384,12 +384,6 @@ export async function prepareReviewPayload(
     // 3. Get platform token and build review state based on platform
     let githubToken: string | undefined;
     let gitlabToken: string | undefined;
-    const reviewScope: ReviewScope = {
-      owner,
-      platform,
-      repoFullName: review.repo_full_name,
-      prNumber: review.pr_number,
-    };
     let gitlabInstanceUrl: string | undefined;
     let existingReviewState: ExistingReviewState | null = null;
     let summaryObservation: { observed: boolean; body: string | null } | null = null;
@@ -398,11 +392,9 @@ export async function prepareReviewPayload(
     let repositorySize: string | null = null;
 
     if (outputMode === 'provider') {
-      if (!review.platform_integration_id) {
-        throw new Error(`Provider Code Reviewer job ${reviewId} is missing its integration`);
-      }
-
-      const integration = await getIntegrationById(review.platform_integration_id);
+      const integration = await getIntegrationById(
+        requireProviderIntegrationId(review.platform_integration_id, reviewId)
+      );
 
       if (!integration) {
         throw new Error(`Provider Code Reviewer job ${reviewId} integration is unavailable`);
@@ -644,6 +636,7 @@ export async function prepareReviewPayload(
             line: c.line,
             body: c.body,
             isOutdated: c.isOutdated,
+            authoredByKilo: c.authoredByKilo,
           }));
 
           existingReviewState = buildReviewState(
@@ -700,7 +693,16 @@ export async function prepareReviewPayload(
       const previousReview =
         manualConfig === null
           ? await findPreviousCompletedReview(
-              reviewScope,
+              {
+                owner,
+                platform,
+                repoFullName: review.repo_full_name,
+                prNumber: review.pr_number,
+                platformIntegrationId: requireProviderIntegrationId(
+                  review.platform_integration_id,
+                  reviewId
+                ),
+              },
               existingReviewState?.headCommitSha ?? review.head_sha
             )
           : null;
@@ -986,6 +988,17 @@ type RepositoryReviewInstructionsLookup = {
   truncated: boolean;
 };
 
+/**
+ * Every provider call for a review uses that review's platform integration, so
+ * resolve it once and treat a missing value as a job error.
+ */
+function requireProviderIntegrationId(integrationId: string | null, reviewId: string): string {
+  if (!integrationId) {
+    throw new Error(`Provider Code Reviewer job ${reviewId} is missing its integration`);
+  }
+  return integrationId;
+}
+
 function unusedRepositoryReviewInstructionsLookup(): RepositoryReviewInstructionsLookup {
   return { content: null, used: false, ref: null, truncated: false };
 }
@@ -1057,13 +1070,7 @@ function getReviewInstructionsFetchErrorMetadata(error: unknown): {
  */
 function buildReviewState(
   summaryComment: { commentId: number; body: string } | null,
-  inlineComments: Array<{
-    id: number;
-    path: string;
-    line: number | null;
-    body: string;
-    isOutdated: boolean;
-  }>,
+  inlineComments: InlineComment[],
   headCommitSha: string
 ): ExistingReviewState {
   // Determine previous status from summary body

@@ -12,9 +12,13 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { LEGAL_LINK_BOX_CLASS, LEGAL_LINK_ROW_CLASS } from '@/lib/a11y/tap-target';
 import { WEB_BASE_URL } from '@/lib/config';
 import { getStoreUnavailableCopyKeys } from '@/lib/credits/store-products-loader';
-import { type StoreCreditProduct } from '@/lib/credits/store-products';
+import {
+  getStoreCreditExpiryMessageKey,
+  type StoreCreditProduct,
+} from '@/lib/credits/store-products';
 import { useStoreCreditProducts } from '@/lib/credits/use-store-credit-products';
 import { getCreditStorefront } from '@/lib/credits/storefront';
 import { useInlinePurchaseErrorOwnership } from '@/lib/credits/use-store-credit-purchase';
@@ -24,6 +28,7 @@ import { getStoreLegalLinks } from '@/lib/iap/legal-links';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 import { useCreditNativeIap } from './credit-native-iap-owner';
+import { CreditExpiryNote } from './credit-expiry-note';
 
 /** Reserved pack-row space while the store connects, so rows never jump in. */
 const PACK_SKELETON_ROWS = 4;
@@ -67,6 +72,7 @@ export function CreditPurchaseScreen() {
     placeholderData: keepPreviousData,
   });
   const refetchBalance = balanceQuery.refetch;
+  const creditBlocksQuery = useQuery(trpc.user.getCreditBlocks.queryOptions({}));
 
   const [privacyPolicyLink, termsOfUseLink] = getStoreLegalLinks(WEB_BASE_URL);
 
@@ -140,6 +146,9 @@ export function CreditPurchaseScreen() {
               {t('profile.credits')}
             </Text>
             {renderBalanceValue()}
+            {!balancePending && !balanceFailed && (
+              <CreditExpiryNote creditBlocks={creditBlocksQuery.data?.creditBlocks ?? []} />
+            )}
           </View>
 
           {/* The purchase error is rendered inline (the store sheet has just
@@ -181,15 +190,12 @@ export function CreditPurchaseScreen() {
 
           {isLoading &&
             Array.from({ length: PACK_SKELETON_ROWS }, (_, index) => (
-              // Mirror the pack row's own shell (p-5 + one text-base line) so
-              // the placeholder and the row it swaps with are the same height.
-              // Kilo Pass's 112px placeholder is two lines tall; reusing it
-              // here would drop the legal copy ~192px when the rows arrive.
               <View key={index} className="rounded-xl border border-border bg-card p-5">
                 <View className="flex-row items-start justify-between gap-4">
                   <Skeleton className="h-6 flex-1 rounded" />
                   <Skeleton className="h-6 w-16 rounded" />
                 </View>
+                <Skeleton className="mt-2 h-8 w-full rounded" />
               </View>
             ))}
 
@@ -198,6 +204,8 @@ export function CreditPurchaseScreen() {
               const packLabel = t('credits.packLabel', {
                 amount: formatUsd(pack.backend.amountUsd, i18n.language),
               });
+              const expiryMessageKey = getStoreCreditExpiryMessageKey(pack.backend, storefront);
+              const expiryMessage = expiryMessageKey ? t(expiryMessageKey) : undefined;
               const hasStorePrice = pack.storeProductId !== null && pack.displayPrice !== null;
               const rowCompleting =
                 completingProductId !== null && completingProductId === pack.storeProductId;
@@ -211,7 +219,9 @@ export function CreditPurchaseScreen() {
               // The row is one accessible element: the explicit label replaces
               // its children, so the charge and the disabled reason must be in
               // the label itself (the canonical Kilo Pass row does the same).
-              const rowAccessibilityLabel = [packLabel, priceLabel].join(', ');
+              const rowAccessibilityLabel = [packLabel, priceLabel, expiryMessage]
+                .filter(Boolean)
+                .join(', ');
 
               return (
                 <Pressable
@@ -234,35 +244,41 @@ export function CreditPurchaseScreen() {
                       {priceLabel}
                     </Text>
                   </View>
+                  {expiryMessage && (
+                    <Text className="mt-2 text-xs text-muted-foreground">{expiryMessage}</Text>
+                  )}
                 </Pressable>
               );
             })}
 
-          {/* Do not set a leading class here. Android applies the parent line
-              height to each nested link Text and the block grows to many times
-              its size. */}
           <Text className="px-1 pt-1 text-xs text-muted-foreground">
             {t('credits.description')}
           </Text>
-          <View className="flex-row flex-wrap items-center gap-4 px-1">
-            <Text
+          {/* The two store legal links are controls of their own, not words in
+              the sentence above, so each carries the shared legal-link box: a
+              real 48dp target the control-size audit can read, which keeps its
+              height in the flow so the two boxes never overlap when a long
+              locale wraps them onto two lines. `px-1` stays the screen's inset,
+              not the shared row's. */}
+          <View className={cn('px-1', LEGAL_LINK_ROW_CLASS)}>
+            <Pressable
               accessibilityRole="link"
-              className="text-xs text-primary underline active:opacity-70"
+              className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
               onPress={() => {
                 void openExternalUrl(termsOfUseLink.url, { label: termsOfUseLink.label });
               }}
             >
-              {termsOfUseLink.label}
-            </Text>
-            <Text
+              <Text className="text-xs text-primary underline">{termsOfUseLink.label}</Text>
+            </Pressable>
+            <Pressable
               accessibilityRole="link"
-              className="text-xs text-primary underline active:opacity-70"
+              className={cn(LEGAL_LINK_BOX_CLASS, 'active:opacity-70')}
               onPress={() => {
                 void openExternalUrl(privacyPolicyLink.url, { label: privacyPolicyLink.label });
               }}
             >
-              {privacyPolicyLink.label}
-            </Text>
+              <Text className="text-xs text-primary underline">{privacyPolicyLink.label}</Text>
+            </Pressable>
           </View>
         </DetailScreenScrollView>
       </View>

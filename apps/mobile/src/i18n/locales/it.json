@@ -2052,7 +2052,9 @@
       "retrying": "Nuovo tentativo…",
       "retryDeny": "Riprova a negare",
       "retryAllowOnce": "Riprova a consentire una volta",
-      "retryAlwaysAllow": "Riprova a consentire sempre"
+      "retryAlwaysAllow": "Riprova a consentire sempre",
+      "unreadableTitle": "Impossibile leggere la richiesta di autorizzazione",
+      "unreadableBody": "L'agente è in attesa di una decisione di autorizzazione che questa app non può mostrare. Aggiorna l'app o la CLI, oppure rispondi alla richiesta nella CLI per continuare."
     },
     "questionCard": {
       "title": "Richiesta dell'agente",

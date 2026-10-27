@@ -2699,7 +2699,9 @@
       "retrying": "Qed jerġa' jipprova…",
       "retryDeny": "Erġa' pprova tiċħad",
       "retryAllowOnce": "Erġa' pprova tippermetti darba biss",
-      "retryAlwaysAllow": "Erġa' pprova tippermetti dejjem"
+      "retryAlwaysAllow": "Erġa' pprova tippermetti dejjem",
+      "unreadableTitle": "It-talba għall-permess ma setgħetx inqrat",
+      "unreadableBody": "L-agent qed jistenna deċiżjoni dwar il-permess li din l-app ma tistax turi. Aġġorna l-app jew il-CLI, jew wieġeb it-talba fil-CLI biex tkompli."
     },
     "questionCard": {
       "title": "L-aġent jeħtieġ it-tweġiba tiegħek",

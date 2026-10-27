@@ -2101,7 +2101,9 @@
       "retrying": "Ponawianie…",
       "retryDeny": "Ponów odmowę",
       "retryAllowOnce": "Ponów zezwolenie tylko tym razem",
-      "retryAlwaysAllow": "Ponów zezwalanie zawsze"
+      "retryAlwaysAllow": "Ponów zezwalanie zawsze",
+      "unreadableTitle": "Nie można odczytać prośby o zgodę",
+      "unreadableBody": "Agent czeka na decyzję o zgodzie, której ta aplikacja nie może pokazać. Zaktualizuj aplikację lub CLI albo odpowiedz na prośbę w CLI, aby kontynuować."
     },
     "questionCard": {
       "title": "Agent czeka na odpowiedź",

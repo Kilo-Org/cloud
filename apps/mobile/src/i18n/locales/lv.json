@@ -2627,7 +2627,9 @@
       "retrying": "Mēģina vēlreiz…",
       "retryDeny": "Mēģināt liegt vēlreiz",
       "retryAllowOnce": "Mēģināt atļaut vienreiz vēlreiz",
-      "retryAlwaysAllow": "Mēģināt vienmēr atļaut vēlreiz"
+      "retryAlwaysAllow": "Mēģināt vienmēr atļaut vēlreiz",
+      "unreadableTitle": "Atļaujas pieprasījumu nevarēja nolasīt",
+      "unreadableBody": "Aģents gaida atļaujas lēmumu, ko šī lietotne nevar parādīt. Atjaunināt lietotni vai CLI, vai atbildēt uz pieprasījumu CLI, lai turpinātu."
     },
     "questionCard": {
       "title": "Aģents gaida atbildi",

@@ -705,9 +705,33 @@ export const kilocodePayloadSchema = z.object({
 });
 export type KilocodePayload = z.infer<typeof kilocodePayloadSchema>;
 
-export const messageUpdatedDataSchema = z.object({
-  info: z.object({ id: z.string(), sessionID: z.string() }).passthrough(),
-});
+/**
+ * The time a message carries on the wire: `created` on every message, and the
+ * assistant's `completed` once the turn finishes. Both the transcript's
+ * timestamp and the streaming check read it, so a payload without a readable
+ * `created` has nothing to render.
+ */
+const wireMessageTimeSchema = z
+  .object({ created: z.number(), completed: z.number().optional() })
+  .passthrough();
+
+/**
+ * The message fields this SDK reads, at the single validation boundary: the
+ * identity, the `role` consumers branch on, and the `time` they render. The
+ * generated `Message` union declares all three, but only this schema makes them
+ * true for a payload that arrives from the wire or a replay.
+ *
+ * Mirrored for the history/replay shape in `sessionSnapshotSchema`.
+ */
+const wireMessageInfoSchema = z
+  .object({ id: z.string(), sessionID: z.string(), role: z.string().min(1) })
+  .passthrough()
+  .refine(info => wireMessageTimeSchema.safeParse(info['time']).success, {
+    message: 'a message requires a time with a numeric created',
+    path: ['time'],
+  });
+
+export const messageUpdatedDataSchema = z.object({ info: wireMessageInfoSchema });
 export type MessageUpdatedData = z.infer<typeof messageUpdatedDataSchema>;
 
 /**
@@ -893,15 +917,37 @@ export const questionRejectedDataSchema = z.object({
 });
 export type QuestionRejectedData = z.infer<typeof questionRejectedDataSchema>;
 
+/**
+ * A permission request as it arrives from the wire or a pending-interaction
+ * replay. `id` and `permission` identify the request; `patterns`, `metadata`
+ * and `always` are the scope the consent surface shows before an allow
+ * decision, so each is required and kept only when it parses. A request whose
+ * scope is not the declared shape fails here and is never forwarded with an
+ * empty or partial scope — an approval must never be offered for a scope the
+ * app could not read.
+ */
 export const permissionAskedDataSchema = z.object({
   id: z.string().min(1),
   permission: z.string(),
   tool: z.object({ callID: z.string() }).optional(),
-  patterns: z.array(z.string()).catch([]),
-  metadata: z.record(z.string(), z.unknown()).catch({}),
-  always: z.array(z.string()).catch([]),
+  patterns: z.array(z.string()),
+  metadata: z.record(z.string(), z.unknown()),
+  always: z.array(z.string()),
 });
 export type PermissionAskedData = z.infer<typeof permissionAskedDataSchema>;
+
+/**
+ * The part of a permission request that still identifies it when its scope does
+ * not parse. The consent surface cannot offer a decision for such a request,
+ * but the user must learn that one is waiting, so the event boundary forwards
+ * this identity instead of dropping the request silently. A payload with no
+ * readable `id` has nothing to key the notice to and no `permission.replied`
+ * that could clear it, so it is still dropped.
+ */
+export const permissionAskedIdentitySchema = z.object({
+  id: z.string().min(1),
+});
+export type PermissionAskedIdentity = z.infer<typeof permissionAskedIdentitySchema>;
 
 export const permissionRepliedDataSchema = z.object({
   requestID: z.string(),
@@ -1163,7 +1209,7 @@ export const sessionSnapshotSchema = z.object({
   info: z.object({ id: z.unknown() }).passthrough(),
   messages: z.array(
     z.object({
-      info: z.object({ id: z.string() }).passthrough(),
+      info: wireMessageInfoSchema,
       parts: z.array(wireMessagePartSchema),
     })
   ),

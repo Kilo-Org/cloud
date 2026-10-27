@@ -2591,7 +2591,9 @@
       "retrying": "Prøver på nytt…",
       "retryDeny": "Prøv å nekte på nytt",
       "retryAllowOnce": "Prøv å tillate én gang på nytt",
-      "retryAlwaysAllow": "Prøv å tillate alltid på nytt"
+      "retryAlwaysAllow": "Prøv å tillate alltid på nytt",
+      "unreadableTitle": "Tillatelsesforespørselen kunne ikke leses",
+      "unreadableBody": "Agenten venter på en tillatelsesbeslutning som denne appen ikke kan vise. Oppdater appen eller CLI, eller svar på forespørselen i CLI for å fortsette."
     },
     "questionCard": {
       "title": "Agenten trenger svar",

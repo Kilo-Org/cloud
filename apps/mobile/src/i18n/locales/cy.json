@@ -2735,7 +2735,9 @@
       "retrying": "Yn ceisio eto…",
       "retryDeny": "Ceisio gwrthod eto",
       "retryAllowOnce": "Ceisio caniatáu unwaith eto",
-      "retryAlwaysAllow": "Ceisio caniatáu bob tro eto"
+      "retryAlwaysAllow": "Ceisio caniatáu bob tro eto",
+      "unreadableTitle": "Methwyd darllen y cais am ganiatâd",
+      "unreadableBody": "Mae'r asiant yn aros am benderfyniad ganiatâd na all yr ap hwn ei ddangos. Diweddarwch yr ap neu'r CLI, neu atebwch y cais yn y CLI i barhau."
     },
     "questionCard": {
       "title": "Mae angen mewnbwn ar yr asiant",

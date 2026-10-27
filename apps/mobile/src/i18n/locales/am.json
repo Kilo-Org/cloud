@@ -2591,7 +2591,9 @@
       "retrying": "እንደገና በመሞከር ላይ…",
       "retryDeny": "ላለመፍቀድ እንደገና ይሞክሩ",
       "retryAllowOnce": "አንድ ጊዜ ለመፍቀድ እንደገና ይሞክሩ",
-      "retryAlwaysAllow": "ሁልጊዜ ለመፍቀድ እንደገና ይሞክሩ"
+      "retryAlwaysAllow": "ሁልጊዜ ለመፍቀድ እንደገና ይሞክሩ",
+      "unreadableTitle": "የፈቃድ ጥያቄ ማንበብ አልተቻለም",
+      "unreadableBody": "ወኪሉ ይህ መተግበሪያ ማሳየት የማይችለውን የፈቃድ ውሳኔ በመጠበቅ ላይ ነው። ለመቀጠል መተግበሪያውን ወይም CLI-ን ያሻሽሉ፣ ወይም ጥያቄውን በ CLI ውስጥ ይመልሱ።"
     },
     "questionCard": {
       "title": "ወኪሉ መልስ ይፈልጋል",

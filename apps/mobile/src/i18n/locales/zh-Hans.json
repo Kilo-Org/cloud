@@ -2067,7 +2067,9 @@
       "retrying": "正在重试……",
       "retryDeny": "再次尝试拒绝",
       "retryAllowOnce": "再次尝试仅允许一次",
-      "retryAlwaysAllow": "再次尝试始终允许"
+      "retryAlwaysAllow": "再次尝试始终允许",
+      "unreadableTitle": "无法读取授权请求",
+      "unreadableBody": "Agent 正在等待一项此应用无法显示的授权决定。请更新应用或 CLI，或在 CLI 中回应此请求以继续。"
     },
     "questionCard": {
       "title": "智能体需要你的输入",

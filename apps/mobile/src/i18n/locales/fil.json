@@ -2591,7 +2591,9 @@
       "retrying": "Muling sinusubukan…",
       "retryDeny": "Subukang tanggihan muli",
       "retryAllowOnce": "Subukang payagan nang isang beses muli",
-      "retryAlwaysAllow": "Subukang laging payagan muli"
+      "retryAlwaysAllow": "Subukang laging payagan muli",
+      "unreadableTitle": "Hindi mabasa ang hiling ng pahintulot",
+      "unreadableBody": "Naghihintay ang agent ng desisyon sa pahintulot na hindi maipakita ng app na ito. I-update ang app o ang CLI, o sagutin ang hiling sa CLI upang magpatuloy."
     },
     "questionCard": {
       "title": "Kailangan ng ahente ng sagot",

@@ -2591,7 +2591,9 @@
       "retrying": "Manandrana indray…",
       "retryDeny": "Andramo lavino indray",
       "retryAllowOnce": "Andramo avelao indray mandeha indray",
-      "retryAlwaysAllow": "Andramo avelao foana indray"
+      "retryAlwaysAllow": "Andramo avelao foana indray",
+      "unreadableTitle": "Tsy afaka novakiana ny fangatahana alalana",
+      "unreadableBody": "Miandry fanapahan-kevitra momba ny alalana ny agent fa tsy afaka asehon'ity rindrankajy ity io fangatahana io. Havaozy ny rindrankajy na ny CLI, na valio ao amin'ny CLI ny fangatahana mba hahafahana manohy."
     },
     "questionCard": {
       "title": "Mila valiny ny mpanampy",

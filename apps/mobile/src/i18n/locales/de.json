@@ -2067,7 +2067,9 @@
       "retrying": "Erneuter Versuch…",
       "retryDeny": "Erneut verweigern",
       "retryAllowOnce": "Erneut einmal erlauben",
-      "retryAlwaysAllow": "Erneut immer erlauben"
+      "retryAlwaysAllow": "Erneut immer erlauben",
+      "unreadableTitle": "Berechtigungsanfrage konnte nicht gelesen werden",
+      "unreadableBody": "Der Agent wartet auf eine Berechtigungsentscheidung, die diese App nicht anzeigen kann. Aktualisiere die App oder die CLI oder beantworte die Anfrage in der CLI, um fortzufahren."
     },
     "questionCard": {
       "title": "Der Agent braucht deine Antwort",

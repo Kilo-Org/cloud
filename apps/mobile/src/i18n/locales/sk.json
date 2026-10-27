@@ -2663,7 +2663,9 @@
       "retrying": "Skúša sa znova…",
       "retryDeny": "Skúsiť zamietnuť znova",
       "retryAllowOnce": "Skúsiť povoliť tentoraz znova",
-      "retryAlwaysAllow": "Skúsiť vždy povoliť znova"
+      "retryAlwaysAllow": "Skúsiť vždy povoliť znova",
+      "unreadableTitle": "Žiadosť o povolenie sa nepodarilo prečítať",
+      "unreadableBody": "Agent čaká na rozhodnutie o povolení, ktoré táto aplikácia nedokáže zobraziť. Aktualizujte aplikáciu alebo CLI, prípadne odpovedzte na žiadosť v CLI, aby ste mohli pokračovať."
     },
     "questionCard": {
       "title": "Agent potrebuje odpoveď",

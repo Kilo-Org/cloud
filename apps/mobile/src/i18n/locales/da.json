@@ -2591,7 +2591,9 @@
       "retrying": "Prøver igen…",
       "retryDeny": "Prøv at afvise igen",
       "retryAllowOnce": "Prøv at tillade én gang igen",
-      "retryAlwaysAllow": "Prøv at tillade altid igen"
+      "retryAlwaysAllow": "Prøv at tillade altid igen",
+      "unreadableTitle": "Tilladelsesanmodning kunne ikke læses",
+      "unreadableBody": "Agenten venter på en tilladelsesafgørelse, som denne app ikke kan vise. Opdater appen eller CLI'en, eller besvar anmodningen i CLI'en for at fortsætte."
     },
     "questionCard": {
       "title": "Agenten har brug for svar",

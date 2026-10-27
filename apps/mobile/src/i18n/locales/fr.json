@@ -1983,7 +1983,9 @@
       "retrying": "Nouvel essai…",
       "retryDeny": "Réessayer de refuser",
       "retryAllowOnce": "Réessayer d'autoriser une fois",
-      "retryAlwaysAllow": "Réessayer de toujours autoriser"
+      "retryAlwaysAllow": "Réessayer de toujours autoriser",
+      "unreadableTitle": "Impossible de lire la demande d'autorisation",
+      "unreadableBody": "L'agent attend une décision d'autorisation que cette application ne peut pas afficher. Mettez à jour l'application ou le CLI, ou répondez à la demande dans le CLI pour continuer."
     },
     "questionCard": {
       "title": "Réponse attendue par l'agent",

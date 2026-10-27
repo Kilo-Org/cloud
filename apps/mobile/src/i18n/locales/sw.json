@@ -2591,7 +2591,9 @@
       "retrying": "Inajaribu tena…",
       "retryDeny": "Jaribu tena kukataa",
       "retryAllowOnce": "Jaribu tena kuruhusu mara moja",
-      "retryAlwaysAllow": "Jaribu tena kuruhusu daima"
+      "retryAlwaysAllow": "Jaribu tena kuruhusu daima",
+      "unreadableTitle": "Ombi la ruhusa halikuweza kusomwa",
+      "unreadableBody": "Wakala anasubiri uamuzi wa ruhusa ambao programu hii haiwezi kuonyesha. Sasisha programu au CLI, au jibu ombi hilo kwenye CLI ili kuendelea."
     },
     "questionCard": {
       "title": "Wakala anahitaji jibu",

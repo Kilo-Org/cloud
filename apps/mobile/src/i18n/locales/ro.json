@@ -2627,7 +2627,9 @@
       "retrying": "Se reîncearcă…",
       "retryDeny": "Încearcă din nou să refuzi",
       "retryAllowOnce": "Încearcă din nou să permiți o singură dată",
-      "retryAlwaysAllow": "Încearcă din nou să permiți întotdeauna"
+      "retryAlwaysAllow": "Încearcă din nou să permiți întotdeauna",
+      "unreadableTitle": "Cererea de permisiune nu a putut fi citită",
+      "unreadableBody": "Agentul așteaptă o decizie de permisiune pe care această aplicație nu o poate afișa. Actualizează aplicația sau CLI-ul, ori răspunde la cerere în CLI pentru a continua."
     },
     "questionCard": {
       "title": "Răspuns necesar pentru agent",

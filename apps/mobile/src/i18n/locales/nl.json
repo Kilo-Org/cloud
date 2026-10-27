@@ -2067,7 +2067,9 @@
       "retrying": "Opnieuw proberen…",
       "retryDeny": "Opnieuw weigeren",
       "retryAllowOnce": "Opnieuw eenmalig toestaan",
-      "retryAlwaysAllow": "Opnieuw altijd toestaan"
+      "retryAlwaysAllow": "Opnieuw altijd toestaan",
+      "unreadableTitle": "Toestemmingsverzoek kon niet worden gelezen",
+      "unreadableBody": "De agent wacht op een toestemmingsbeslissing die deze app niet kan tonen. Werk de app of de CLI bij, of beantwoord het verzoek in de CLI om door te gaan."
     },
     "questionCard": {
       "title": "Invoer voor de agent nodig",

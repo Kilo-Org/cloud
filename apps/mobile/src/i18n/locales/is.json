@@ -2591,7 +2591,9 @@
       "retrying": "Reynir aftur…",
       "retryDeny": "Reyna að hafna aftur",
       "retryAllowOnce": "Reyna að leyfa einu sinni aftur",
-      "retryAlwaysAllow": "Reyna að leyfa alltaf aftur"
+      "retryAlwaysAllow": "Reyna að leyfa alltaf aftur",
+      "unreadableTitle": "Ekki tókst að lesa heimildarbeiðni",
+      "unreadableBody": "Agentinn bíður eftir heimildarákvörðun sem þetta forrit getur ekki sýnt. Uppfærðu forritið eða CLI, eða svaraðu beiðninni í CLI til að halda áfram."
     },
     "questionCard": {
       "title": "Fulltrúinn þarf svar",

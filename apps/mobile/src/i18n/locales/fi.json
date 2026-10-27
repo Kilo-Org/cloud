@@ -2591,7 +2591,9 @@
       "retrying": "Yritetään uudelleen…",
       "retryDeny": "Yritä kieltää uudelleen",
       "retryAllowOnce": "Yritä salli kerran uudelleen",
-      "retryAlwaysAllow": "Yritä salli aina uudelleen"
+      "retryAlwaysAllow": "Yritä salli aina uudelleen",
+      "unreadableTitle": "Lupapyyntöä ei voitu lukea",
+      "unreadableBody": "Agentti odottaa lupapäätöstä, jota tämä sovellus ei voi näyttää. Päivitä sovellus tai CLI tai vastaa pyyntöön CLI:ssä jatkaaksesi."
     },
     "questionCard": {
       "title": "Agentti tarvitsee vastauksesi",

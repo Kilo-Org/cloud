@@ -2052,7 +2052,9 @@
       "retrying": "Tentando novamente…",
       "retryDeny": "Tentar negar novamente",
       "retryAllowOnce": "Tentar permitir uma vez novamente",
-      "retryAlwaysAllow": "Tentar permitir sempre novamente"
+      "retryAlwaysAllow": "Tentar permitir sempre novamente",
+      "unreadableTitle": "Não foi possível ler a solicitação de permissão",
+      "unreadableBody": "O agente está aguardando uma decisão de permissão que este app não consegue exibir. Atualize o app ou o CLI, ou responda à solicitação no CLI para continuar."
     },
     "questionCard": {
       "title": "O agente precisa de uma resposta",

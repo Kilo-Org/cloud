@@ -1,0 +1,273 @@
+{
+  "contractVersion": 1,
+  "deletionManifestVersion": 1,
+  "procedures": {
+    "listHostedWorkspaces": "query",
+    "getHostedWorkspace": "query",
+    "getHostedWorkspaceStatus": "query",
+    "createHostedWorkspace": "mutation",
+    "createHostedWorkspaceSession": "mutation",
+    "deleteHostedWorkspaceSession": "mutation",
+    "deleteWorktree": "mutation"
+  },
+  "requests": [
+    {
+      "procedure": "listHostedWorkspaces",
+      "fields": ["cursor", "limit", "repositoryUrl", "sessionLimit"],
+      "example": { "limit": 50, "sessionLimit": 10 }
+    },
+    {
+      "procedure": "getHostedWorkspace",
+      "fields": ["sessionCursor", "sessionLimit", "workspaceId"],
+      "example": {
+        "workspaceId": "worktree_11111111-1111-4111-8111-111111111111",
+        "sessionLimit": 100
+      }
+    },
+    {
+      "procedure": "getHostedWorkspaceStatus",
+      "fields": ["kilocodeOrganizationId", "workspaceId"],
+      "example": { "workspaceId": "worktree_11111111-1111-4111-8111-111111111111" }
+    },
+    {
+      "procedure": "createHostedWorkspace",
+      "fields": [
+        "agent",
+        "clientProvenance",
+        "kiloSessionId",
+        "message",
+        "operationKey",
+        "options",
+        "profile",
+        "repository"
+      ],
+      "example": {
+        "operationKey": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "clientProvenance": "agent-manager",
+        "repository": { "type": "github", "repo": "Kilo-Org/cloud", "branch": "main" },
+        "profile": { "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" },
+        "message": { "prompt": "Create the workspace" },
+        "agent": { "mode": "code", "model": "anthropic/claude-sonnet-4" }
+      }
+    },
+    {
+      "procedure": "createHostedWorkspaceSession",
+      "fields": [
+        "agent",
+        "clientProvenance",
+        "kiloSessionId",
+        "kilocodeOrganizationId",
+        "message",
+        "operationKey",
+        "workspaceId"
+      ],
+      "example": {
+        "workspaceId": "worktree_11111111-1111-4111-8111-111111111111",
+        "operationKey": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "clientProvenance": "agent-manager",
+        "message": { "prompt": "Second chat" },
+        "agent": { "mode": "code", "model": "anthropic/claude-sonnet-4" }
+      }
+    },
+    {
+      "procedure": "deleteHostedWorkspaceSession",
+      "fields": ["operationKey", "sessionId", "workspaceId"],
+      "example": {
+        "workspaceId": "worktree_11111111-1111-4111-8111-111111111111",
+        "sessionId": "workspace_11111111-1111-4111-8111-111111111111",
+        "operationKey": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+      }
+    },
+    {
+      "procedure": "deleteWorktree",
+      "fields": ["kilocodeOrganizationId", "worktreeId"],
+      "example": { "worktreeId": "worktree_11111111-1111-4111-8111-111111111111" }
+    }
+  ],
+  "responses": [
+    {
+      "procedure": "listHostedWorkspaces",
+      "fields": ["items", "nextCursor"],
+      "example": { "items": [], "nextCursor": null }
+    },
+    {
+      "procedure": "getHostedWorkspace",
+      "fields": [
+        "created",
+        "deletionState",
+        "gitBranch",
+        "gitUrl",
+        "lastActivity",
+        "name",
+        "nextSessionCursor",
+        "organizationId",
+        "profileId",
+        "repositoryProvider",
+        "sessions",
+        "updated",
+        "userId",
+        "workspaceId"
+      ],
+      "example": {
+        "workspaceId": "worktree_11111111-1111-4111-8111-111111111111",
+        "userId": "usr_fixture",
+        "organizationId": null,
+        "name": null,
+        "repositoryProvider": "github",
+        "gitUrl": "https://github.com/Kilo-Org/cloud.git",
+        "gitBranch": "main",
+        "profileId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "deletionState": "active",
+        "created": 1761556800000,
+        "updated": 1761556800000,
+        "lastActivity": 1761556800000,
+        "sessions": [],
+        "nextSessionCursor": null
+      }
+    },
+    {
+      "procedure": "getHostedWorkspaceStatus",
+      "fields": [
+        "activity",
+        "billing",
+        "compute",
+        "deletion",
+        "deletionState",
+        "observedAt",
+        "organizationId",
+        "userId",
+        "wakeOnInput",
+        "workspaceId"
+      ],
+      "example": {
+        "workspaceId": "worktree_11111111-1111-4111-8111-111111111111",
+        "userId": "usr_fixture",
+        "organizationId": null,
+        "deletionState": "active",
+        "observedAt": 1761556800000,
+        "compute": {
+          "status": "sleeping",
+          "detailCode": "sandbox_stopped",
+          "provider": "Cloudflare",
+          "observedAt": 1761556800000,
+          "estimatedSleepAt": null
+        },
+        "activity": { "activeSessionCount": 0, "hasActiveTurn": false },
+        "wakeOnInput": { "available": true, "blockedReason": null },
+        "billing": {
+          "payer": { "type": "user", "id": "usr_fixture" },
+          "actor": { "type": "user", "id": "usr_fixture" },
+          "onBehalfOf": null,
+          "sku": "cpu-second",
+          "blocked": false,
+          "enforcementRequested": false,
+          "intervalStartedAt": 1761553200000,
+          "rate": { "rateCentsPerSecond": "0.0001", "estimatedHourlyMicrodollars": 3600 }
+        },
+        "deletion": {
+          "started": false,
+          "completed": false,
+          "startedAt": null,
+          "phase": "not_started",
+          "sessionCount": 1,
+          "runtimeLocationCount": 1,
+          "completedRuntimeLocationCount": 0,
+          "remainingRuntimeLocationCount": 1,
+          "deletedSessionIds": []
+        }
+      }
+    },
+    {
+      "procedure": "createHostedWorkspace",
+      "fields": [
+        "cloudAgentSessionId",
+        "kiloSessionId",
+        "messageId",
+        "replayed",
+        "workspaceId"
+      ],
+      "example": {
+        "workspaceId": "worktree_11111111-1111-4111-8111-111111111111",
+        "cloudAgentSessionId": "workspace_11111111-1111-4111-8111-111111111111",
+        "kiloSessionId": "ses_12345678901234567890123456",
+        "messageId": "msg_0123456789abAAAAAAAAAAAAAA"
+      }
+    },
+    {
+      "procedure": "createHostedWorkspaceSession",
+      "fields": [
+        "cloudAgentSessionId",
+        "kiloSessionId",
+        "messageId",
+        "replayed",
+        "workspaceId"
+      ],
+      "example": {
+        "workspaceId": "worktree_11111111-1111-4111-8111-111111111111",
+        "cloudAgentSessionId": "workspace_11111111-1111-4111-8111-111111111111",
+        "kiloSessionId": "ses_12345678901234567890123456",
+        "messageId": "msg_0123456789abAAAAAAAAAAAAAA"
+      }
+    },
+    {
+      "procedure": "deleteHostedWorkspaceSession",
+      "fields": ["sessionId", "success", "workspaceId"],
+      "example": {
+        "success": true,
+        "workspaceId": "worktree_11111111-1111-4111-8111-111111111111",
+        "sessionId": "workspace_11111111-1111-4111-8111-111111111111"
+      }
+    },
+    {
+      "procedure": "deleteWorktree",
+      "fields": ["deletedSessionIds", "success"],
+      "example": { "success": true, "deletedSessionIds": ["ses_12345678901234567890123456"] }
+    }
+  ],
+  "status": {
+    "computeStatuses": [
+      "active",
+      "sleeping",
+      "starting",
+      "stopping",
+      "error",
+      "unreachable",
+      "unknown"
+    ],
+    "detailCodes": [
+      "sandbox_ready",
+      "sandbox_stopped",
+      "sandbox_starting",
+      "sandbox_stopping",
+      "sandbox_failed",
+      "connection_unavailable",
+      "status_unavailable",
+      "insufficient_evidence",
+      "check_needed"
+    ],
+    "providers": ["Cloudflare", "Cloudflare Containers", "Vercel", "Unknown"],
+    "deletionStates": ["active", "deleting", "deleted"],
+    "deletionPhases": ["not_started", "runtime_cleanup", "finalizing", "completed"],
+    "wakeBlockedReasons": [
+      "deleting",
+      "deleted",
+      "billing_blocked",
+      "billing_status_unavailable"
+    ]
+  },
+  "errorCodes": [
+    "workspace_requires_root_session",
+    "workspace_deleting",
+    "workspace_unavailable",
+    "workspace_identity_conflict",
+    "workspace_not_found",
+    "workspace_session_not_found",
+    "session_create_intent_conflict",
+    "operation_key_reuse_mismatch",
+    "creation_in_progress",
+    "session_deletion_in_progress",
+    "session_deletion_failed",
+    "session_deletion_unavailable",
+    "session_deletion_incomplete"
+  ]
+}

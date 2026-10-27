@@ -36,6 +36,7 @@ import {
 import { assertScenarioPreconditions } from './public-surface-support.js';
 import type { LifecycleArgs, LifecycleResult } from './lifecycle.js';
 import type { SharedScenario } from './scenarios-shared.js';
+import { HOSTED_WORKSPACE_CONTRACT_SCENARIOS } from './scenarios-hosted-workspace-contract.js';
 import type { ScenarioEnvironment } from './scenario-capabilities.js';
 
 const HOSTED_WORKSPACE_TIMEOUT_MS = 25 * 60_000;
@@ -260,7 +261,7 @@ export async function runHostedWorkspaceSessions(
         createHostedWorkspaceSession(
           scenarioConfig,
           {
-            workspaceId: created.workspaceId!,
+            workspaceId: created.workspaceId,
             prompt: `echo:${rootMarkers.secondSibling}`,
           },
           signal
@@ -277,7 +278,7 @@ export async function runHostedWorkspaceSessions(
     );
 
     const catalogBefore = await deadline.within('catalog before delete', signal =>
-      getHostedWorkspace(scenarioConfig, created.workspaceId!, signal)
+      getHostedWorkspace(scenarioConfig, created.workspaceId, signal)
     );
     if (!catalogBefore || catalogBefore.sessions.length !== 3) {
       throw new Error(
@@ -299,7 +300,7 @@ export async function runHostedWorkspaceSessions(
         deleteHostedWorkspaceSession(
           scenarioConfig,
           {
-            workspaceId: created.workspaceId!,
+            workspaceId: created.workspaceId,
             sessionId: firstSibling.cloudAgentSessionId,
           },
           signal
@@ -308,7 +309,7 @@ export async function runHostedWorkspaceSessions(
     );
 
     const afterFirstDelete = await deadline.within('catalog after delete', signal =>
-      getHostedWorkspace(scenarioConfig, created.workspaceId!, signal)
+      getHostedWorkspace(scenarioConfig, created.workspaceId, signal)
     );
     const remaining = new Set(
       afterFirstDelete?.sessions.map(session => session.cloudAgentSessionId) ?? []
@@ -340,13 +341,13 @@ export async function runHostedWorkspaceSessions(
       signal =>
         deleteHostedWorkspaceSession(
           scenarioConfig,
-          { workspaceId: created.workspaceId!, sessionId: secondSibling.cloudAgentSessionId },
+          { workspaceId: created.workspaceId, sessionId: secondSibling.cloudAgentSessionId },
           signal
         ),
       REMOTE_TURN_BUDGET_MS
     );
     const afterSecondDelete = await deadline.within('catalog after second delete', signal =>
-      getHostedWorkspace(scenarioConfig, created.workspaceId!, signal)
+      getHostedWorkspace(scenarioConfig, created.workspaceId, signal)
     );
     const afterSecondDeleteIds = new Set(
       afterSecondDelete?.sessions.map(session => session.cloudAgentSessionId) ?? []
@@ -364,7 +365,7 @@ export async function runHostedWorkspaceSessions(
         signal =>
           deleteHostedWorkspaceSession(
             scenarioConfig,
-            { workspaceId: created.workspaceId!, sessionId: created.cloudAgentSessionId },
+            { workspaceId: created.workspaceId, sessionId: created.cloudAgentSessionId },
             signal
           ),
         FINAL_ROOT_REJECTION_DEADLINE_MS
@@ -414,6 +415,7 @@ export async function runHostedWorkspaceSessions(
 }
 
 export const HOSTED_WORKSPACE_SCENARIOS: Record<string, SharedScenario> = {
+  ...HOSTED_WORKSPACE_CONTRACT_SCENARIOS,
   'hosted-workspace-sessions': {
     name: 'hosted-workspace-sessions',
     requires: ['sessionSandbox', 'database'],

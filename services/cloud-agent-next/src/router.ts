@@ -19,6 +19,10 @@ import { getSandboxSelectionOptions } from './router/handlers/sandbox-selection.
 import { getPreviewOptions } from './router/handlers/preview-options.js';
 import { listHostedSessions } from './router/handlers/hosted-session-list.js';
 import {
+  getHostedWorkspace,
+  listHostedWorkspaces,
+} from './router/handlers/hosted-workspace-list.js';
+import {
   buildEnvironment,
   cancelEnvironmentBuild,
   getEnvironmentBuildLogs,
@@ -31,6 +35,8 @@ export const appRouter = router({
   getSandboxSelectionOptions,
   getPreviewOptions,
   listHostedSessions,
+  listHostedWorkspaces,
+  getHostedWorkspace,
   buildEnvironment,
   getEnvironmentBuildStatus,
   getEnvironmentBuildLogs,

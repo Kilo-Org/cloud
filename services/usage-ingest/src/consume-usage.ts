@@ -1,13 +1,9 @@
 import { UsageRecordRequestSchema } from '@kilocode/usage-contracts';
 import { recordUsage, type UsageWriteOutcome } from '@kilocode/worker-utils/usage-writer-client';
 import type { Env } from './publish-usage';
-import { handleQueue as handleReceiptQueue } from './receipt-usage';
 import { logSafely, queueMetrics } from './diagnostics';
 
-export function handleQueue(batch: MessageBatch<unknown>, env: Env): void | Promise<void> {
-  if (env.USAGE_INGEST_MODE === undefined || env.USAGE_INGEST_MODE === 'receipt') {
-    return handleReceiptQueue(batch);
-  }
+export function handleQueue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
   return processQueue(batch, env, Date.now());
 }
 
@@ -85,13 +81,9 @@ async function processMessage(
         : {}),
       ...queueMetrics(batch),
     }));
-  let outcome:
-    | UsageWriteOutcome
-    | { kind: 'unavailable'; reason: 'invalid_mode' | 'invalid_event' };
+  let outcome: UsageWriteOutcome | { kind: 'unavailable'; reason: 'invalid_event' };
   let writerDurationMs: number | undefined;
-  if (env.USAGE_INGEST_MODE !== 'processing') {
-    outcome = { kind: 'unavailable', reason: 'invalid_mode' };
-  } else if (!parsed.success) {
+  if (!parsed.success) {
     outcome = { kind: 'unavailable', reason: 'invalid_event' };
   } else {
     const writerStartedAt = performance.now();

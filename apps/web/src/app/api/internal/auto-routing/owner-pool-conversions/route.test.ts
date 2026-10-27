@@ -311,6 +311,13 @@ describe(`POST ${OWNER_POOL_CONVERSION_PATH}`, () => {
     expect(await rows()).toHaveLength(1);
   });
 
+  test('rejects a pool model that cannot be a gateway entry without writing', async () => {
+    expect(await convert(userConversion(user, ['client:ollama/llama']))).toEqual([
+      expect.objectContaining({ outcome: 'failed', noticesSent: 0, noticesFailed: 0 }),
+    ]);
+    expect(await rows()).toHaveLength(0);
+  });
+
   test('isolates a failed conversion from the rest of the batch', async () => {
     const other = await insertTestUser();
     const transaction = jest

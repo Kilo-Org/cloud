@@ -1,5 +1,6 @@
 import {
   dateTimeFormat,
+  deviceDecimalSeparator,
   durationFormat,
   listFormat,
   numberFormat,
@@ -122,6 +123,12 @@ export function firstGrapheme(value: string, locale: string): string {
   );
 }
 
+/** Characters with no bearing on a number's value but present in locale output. */
+const BIDI_MARK = /[\u061C\u200E\u200F]/g;
+/** The space characters a locale or a keyboard may use for a space-sized group separator. */
+const SPACE_VARIANTS = /[ \u00A0\u202F]/gu;
+/** Characters a locale's separator could contain that mean something in a RegExp body. */
+const REGEXP_SPECIAL_CHARACTERS = /[.*+?^${}()|[\]\\]/g;
 const DECIMAL_DIGIT = /\p{Nd}/u;
 
 /**
@@ -143,32 +150,125 @@ export function foldDecimalDigits(value: string): string {
   });
 }
 
+/** The separators and group sizes one locale's number formatter writes. */
+type NumberGrammar = Readonly<{
+  /** The group character, or `null` when the reading refuses grouping. */
+  group: string | null;
+  decimal: string;
+  minus: string;
+  firstSize: number;
+  lastSize: number;
+}>;
+
+/** The grammar of the numbers `locale` writes, read from its own formatter. */
+function numberGrammar(locale: string): NumberGrammar {
+  const format = numberFormat(locale, { useGrouping: true });
+  const parts = format.formatToParts(-12_345.6);
+  const part = (type: Intl.NumberFormatPartTypes, fallback: string) =>
+    parts.find(item => item.type === type)?.value.replaceAll(BIDI_MARK, '') ?? fallback;
+  // The integer group sizes this locale writes: `[3]` for most, `[3, 2]` for
+  // the Indian numbering system (hi, bn, gu, …), read from the formatter so the
+  // grammar follows the same data that writes the numbers.
+  const groupSizes = format
+    .formatToParts(1_234_567_890)
+    .filter(item => item.type === 'integer')
+    .map(item => item.value.replaceAll(BIDI_MARK, '').length);
+  const lastSize = groupSizes.at(-1) ?? 1;
+  return {
+    group: part('group', ','),
+    decimal: part('decimal', '.'),
+    minus: part('minusSign', '-'),
+    firstSize: groupSizes.at(-2) ?? lastSize,
+    lastSize,
+  };
+}
+
+const escapeForRegExp = (value: string): string =>
+  value.replaceAll(REGEXP_SPECIAL_CHARACTERS, String.raw`\$&`);
+
+/**
+ * The value `text` reads as under one grammar, or `null` when its separators do
+ * not sit where that grammar writes them. The returned literal is ASCII so
+ * callers can compare magnitudes.
+ */
+function readNumberText(text: string, grammar: NumberGrammar): string | null {
+  const decimalChar = escapeForRegExp(grammar.decimal);
+  let integerPart = String.raw`\d+`;
+  if (grammar.group !== null) {
+    const groupChar = escapeForRegExp(grammar.group);
+    integerPart = `(?:\\d+|\\d{1,${grammar.firstSize}}(?:${groupChar}\\d{${grammar.firstSize}})*${groupChar}\\d{${grammar.lastSize}})`;
+  }
+  const shape = new RegExp(`^[+-]?(?:${integerPart}(?:${decimalChar}\\d*)?|${decimalChar}\\d+)$`);
+  if (!shape.test(text)) {
+    return null;
+  }
+  const ungrouped = grammar.group === null ? text : text.split(grammar.group).join('');
+  return ungrouped.split(grammar.decimal).join('.');
+}
+
 /**
  * A number typed in the active locale as a plain ASCII decimal literal, or
  * `null` when the input is not one. Callers that compare magnitudes use this
  * form: a literal too large for a JS number stays a digit string instead of
  * collapsing into the same `null` a non-number produces.
+ *
+ * The language's own separators, digit shapes and group sizes decide what a
+ * valid input is: at most one decimal separator, group separators only in the
+ * positions that language writes, and none inside the fraction. A value that
+ * does not match returns null.
+ *
+ * Ungrouped integers of any length are accepted, and grouping is optional: a
+ * typed `1.234` has valid group positions even where the formatter leaves
+ * four-digit numbers ungrouped.
+ *
+ * `deviceDecimal` is the decimal separator of the device's own number keyboard,
+ * which on both platforms follows the device locale rather than the app
+ * language: a German app language on a English (US) device offers only `.`
+ * on `decimal-pad`. That reading is accepted when the language grammar cannot
+ * read the input, and refused when both readings fit and disagree — `1.234` is
+ * a thousand in German and 1.234 from a dot keypad, so the field cannot tell
+ * which one the person meant.
  */
-export function normalizeLocalizedNumber(value: string, locale: string): string | null {
-  const parts = numberFormat(locale, { useGrouping: true }).formatToParts(-12_345.6);
-  const part = (type: Intl.NumberFormatPartTypes, fallback: string) =>
-    parts.find(item => item.type === type)?.value ?? fallback;
-  const group = part('group', ',');
-  const decimal = part('decimal', '.');
-  const minus = part('minusSign', '-');
-  let normalized = foldDecimalDigits(value.trim().replaceAll(/[\u061C\u200E\u200F]/g, ''));
-  if (/^[\s\u00A0\u202F]+$/u.test(group)) {
-    normalized = normalized.replaceAll(/[ \u00A0\u202F]/gu, group);
+export function normalizeLocalizedNumber(
+  value: string,
+  locale: string,
+  deviceDecimal: string | null = deviceDecimalSeparator()
+): string | null {
+  const grammar = numberGrammar(locale);
+  let text = foldDecimalDigits(value.trim().replaceAll(BIDI_MARK, ''));
+  if (grammar.group !== null && /^[\s\u00A0\u202F]+$/u.test(grammar.group)) {
+    text = text.replaceAll(SPACE_VARIANTS, grammar.group);
   }
-  normalized = normalized.split(group).join('').split(decimal).join('.').split(minus).join('-');
-  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalized)) {
-    return null;
+  if (grammar.minus !== '-') {
+    text = text.split(grammar.minus).join('-');
   }
-  return normalized;
+  const languageReading = readNumberText(text, grammar);
+  const deviceReading =
+    deviceDecimal === null || deviceDecimal === grammar.decimal
+      ? null
+      : readNumberText(text, {
+          ...grammar,
+          // One character cannot be both, so a device separator that is also the
+          // language's group character leaves that reading with no grouping.
+          group: grammar.group === deviceDecimal ? null : grammar.group,
+          decimal: deviceDecimal,
+        });
+  if (languageReading === null) {
+    return deviceReading;
+  }
+  if (deviceReading === null || deviceReading === languageReading) {
+    return languageReading;
+  }
+  return null;
 }
 
-export function parseLocalizedNumber(value: string, locale: string): number | null {
-  const normalized = normalizeLocalizedNumber(value, locale);
+/** The literal `normalizeLocalizedNumber` accepts, read as a finite number. */
+export function parseLocalizedNumber(
+  value: string,
+  locale: string,
+  deviceDecimal: string | null = deviceDecimalSeparator()
+): number | null {
+  const normalized = normalizeLocalizedNumber(value, locale, deviceDecimal);
   if (normalized === null) {
     return null;
   }

@@ -12,6 +12,18 @@ export const BUILTIN_COMMAND_NAMES = new Set([
   'local-review-uncommitted',
 ]);
 
+/**
+ * Ids a client may send to reorder a profile's commands: a command list can
+ * never hold more than the profile bound, and repeating an id makes the
+ * requested position ambiguous.
+ */
+export const kiloCommandReorderIdsSchema = z
+  .array(z.uuid())
+  .max(MAX_PROFILE_KILO_COMMANDS)
+  .refine(ids => new Set(ids).size === ids.length, {
+    message: 'Command IDs must be unique',
+  });
+
 const COMMAND_NAME_PATTERN = /^[a-z][a-z0-9-]*$/;
 
 export const kiloCommandNameSchema = z

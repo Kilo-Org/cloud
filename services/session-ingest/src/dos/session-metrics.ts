@@ -151,6 +151,20 @@ function nonNegative(value: number): number {
   return Math.max(0, value);
 }
 
+/**
+ * Maximum accepted cost contribution for one assistant message, in USD.
+ */
+export const MAX_ASSISTANT_COST_USD = 1000;
+
+/**
+ * Clamps one assistant-message cost to [0, MAX_ASSISTANT_COST_USD].
+ * Every cost consumer uses this same contribution rule.
+ */
+export function clampAssistantCostUsd(cost: number): number {
+  if (!Number.isFinite(cost) || cost <= 0) return 0;
+  return Math.min(cost, MAX_ASSISTANT_COST_USD);
+}
+
 function processKiloMeta(acc: Accumulator, raw: unknown) {
   const parsed = KiloMetaSchema.safeParse(raw);
   if (!parsed.success) return;
@@ -189,12 +203,12 @@ function processMessage(acc: Accumulator, raw: unknown) {
         acc.firstAssistantMessageCreatedAt = t;
       }
 
-      acc.totalTokens.input += msg.tokens.input;
-      acc.totalTokens.output += msg.tokens.output;
-      acc.totalTokens.reasoning += msg.tokens.reasoning;
-      acc.totalTokens.cacheRead += msg.tokens.cache.read;
-      acc.totalTokens.cacheWrite += msg.tokens.cache.write;
-      acc.totalCost += msg.cost;
+      acc.totalTokens.input += nonNegative(msg.tokens.input);
+      acc.totalTokens.output += nonNegative(msg.tokens.output);
+      acc.totalTokens.reasoning += nonNegative(msg.tokens.reasoning);
+      acc.totalTokens.cacheRead += nonNegative(msg.tokens.cache.read);
+      acc.totalTokens.cacheWrite += nonNegative(msg.tokens.cache.write);
+      acc.totalCost += clampAssistantCostUsd(msg.cost);
 
       if (msg.error) {
         acc.totalErrors++;
@@ -323,11 +337,6 @@ export function computeSessionMetrics(
   };
 }
 
-/**
- * Sum assistant-message `cost` (USD) from inline message rows for live cost persist.
- * Malformed rows and non-assistant messages are skipped; R2-offloaded rows store '{}' → 0.
- * Convert to microdollars at the call site with Math.max(0, Math.round(usd * 1_000_000)).
- */
 export function computeRunningAssistantCostUsd(rows: Array<{ item_data: string }>): number {
   let total = 0;
   for (const row of rows) {
@@ -339,7 +348,7 @@ export function computeRunningAssistantCostUsd(rows: Array<{ item_data: string }
     }
     const parsed = AssistantMessageSchema.safeParse(raw);
     if (!parsed.success) continue;
-    total += parsed.data.cost;
+    total += clampAssistantCostUsd(parsed.data.cost);
   }
   return nonNegative(total);
 }

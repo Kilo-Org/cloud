@@ -227,7 +227,6 @@
     "hideBalance": "Skjul saldo",
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
-    "bonusCreditsExpiring": "{{amount}} i kreditter udløber {{date}}.",
     "signOutTitle": "Log ud?",
     "signOutMessage": "Du skal logge ind igen for at få adgang til dit arbejdsområde.",
     "deleteAccountTitle": "Slet konto?",
@@ -876,6 +875,18 @@
       "securityFindingsUnavailable": "Aktivér Kilo-sikkerhedsagenten på et område for at få sikkerhedsfund.",
       "spendAlertsSubtitle": "grænseoverskridelser og spikes pr. time",
       "spendAlertsToggle": "Kategorien forbrugsadvarsler"
+    },
+    "history": {
+      "title": "Notifikationshistorik",
+      "subtitle": "Notifikationer, som denne konto har modtaget",
+      "bannerBody": "Pushnotifikationer er slået fra på denne enhed, så nye ankommer ikke her.",
+      "bannerAction": "Notifikationsindstillinger",
+      "emptyTitle": "Ingen notifikationer endnu",
+      "emptyCategoryTitle": "Ingen notifikationer i denne kategori",
+      "emptyBody": "Notifikationer, som denne konto modtager, vises her. De gemmes i {{days}} dage.",
+      "capped": "Viser de seneste notifikationer.",
+      "loadError": "Kunne ikke indlæse notifikationshistorikken.",
+      "openFailed": "Denne notifikation kan ikke længere åbnes nogen steder."
     },
     "action": {
       "openSession": "Åbn session"
@@ -2592,7 +2603,9 @@
       "retrying": "Prøver igen…",
       "retryDeny": "Prøv at afvise igen",
       "retryAllowOnce": "Prøv at tillade én gang igen",
-      "retryAlwaysAllow": "Prøv at tillade altid igen"
+      "retryAlwaysAllow": "Prøv at tillade altid igen",
+      "unreadableTitle": "Tilladelsesanmodning kunne ikke læses",
+      "unreadableBody": "Agenten venter på en tilladelsesafgørelse, som denne app ikke kan vise. Opdater appen eller CLI'en, eller besvar anmodningen i CLI'en for at fortsætte."
     },
     "questionCard": {
       "title": "Agenten har brug for svar",
@@ -2984,8 +2997,9 @@
     "unavailableDevice": "Diktering er ikke tilgængelig på denne enhed.",
     "unavailableLanguage": "Diktering er ikke tilgængelig på enhedens valgte sprog.",
     "languageNotInstalledTitle": "Diktering for {{language}} er ikke klar endnu",
-    "languageNotInstalledMessage": "De offline talefiler til {{language}} er ikke installeret på denne telefon. Download dem, og prøv diktering igen.",
+    "languageNotInstalledMessage": "De offline talefiler for {{language}} er ikke installeret, og transskription på nettet er slået fra. Download filerne, eller slå transskription på nettet til igen, for at bruge diktering.",
     "downloadOfflineModel": "Download",
+    "useOnlineTranscription": "Tillad online transskription",
     "offlineModelDownloadScheduled": "De offline talefiler downloades i baggrunden. Prøv diktering igen senere.",
     "listeningStopped": "Dikteringen er stoppet.",
     "transcribing": "Transskriberer...",
@@ -3159,7 +3173,7 @@
     "creditActivity": {
       "emptyDescription": "Her vises organisationens køb, forbrug og justeringer af kreditter løbende.",
       "emptyTitle": "Ingen bevægelser på kreditsaldoen",
-      "expires": "Udløber {{date}}",
+      "expiresUtc": "Udløber {{date}} (UTC)",
       "title": "Bevægelser på kreditsaldoen",
       "transactionFallback": "Kredittransaktion",
       "category": {
@@ -3840,6 +3854,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Værdier vist som •••• beholder deres gemte hemmelighed; erstat en værdi for at rotere den. Ændring af kommandolinjen kræver alle værdier igen",
+      "headersHint": "Værdier vist som •••• beholder deres gemte hemmelighed; erstat en værdi for at rotere den. Ændring af URL'en kræver alle værdier igen",
       "nameRequired": "Indtast et servernavn",
       "nameInvalid": "Navn kan kun bruge ASCII-bogstaver, tal, understregninger og bindestreger, højst 100 tegn",
       "commandRequired": "Indtast en kommando",
@@ -3938,6 +3954,10 @@
   "credits": {
     "title": "Køb kreditter",
     "description": "Kreditter er et engangskøb, der lægges til din Kilo-saldo til at køre AI-kodningssessioner i Kilo App. Butikken opkræver betaling på din konto, og kreditterne tilføjes, når butikken bekræfter betalingen.",
+    "nextExpiry": "{{amount}} i kreditter udløber {{date}} (UTC). Kreditter med den tidligste udløbsdato bruges først.",
+    "appStoreExpiry": "Kreditter købt via App Store udløber ikke.",
+    "playOneYearExpiry": "Disse kreditter udløber ét kalenderår efter købet.",
+    "playNonexpiring": "Disse kreditter udløber ikke.",
     "packLabel": "Tilføj {{amount}} i kreditter",
     "priceUnavailable": "Pris ikke tilgængelig",
     "purchased": "Kreditter er føjet til din saldo.",
@@ -4076,6 +4096,10 @@
     "generate": "Generér resumé",
     "retrySummary": "Prøv betalt resumé igen",
     "sources": "Dokumentation og artefakter",
+    "sessionsShown_one": "Viser {{shown}} af {{total}} session",
+    "sessionsShown_other": "Viser {{shown}} af {{total}} sessioner",
+    "itemsShown_one": "Viser {{shown}} af {{total}} element",
+    "itemsShown_other": "Viser {{shown}} af {{total}} elementer",
     "timezone": "Tidszone for briefing",
     "deviceTimezone": "Brug enhedens tidszone",
     "timezoneHint": "IANA-tidszone, for eksempel Europe/Berlin. Ændringer i tidsplanen gælder fremtidige briefinger.",

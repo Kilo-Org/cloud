@@ -109,17 +109,22 @@ export {
   skillFilesSchema,
   skillCustomInputSchema,
   skillUpdateInputSchema,
+  skillsShInputSchema,
   parseSkillFrontmatter,
   listSkillsForProfile,
   createCustomSkill,
+  createSkillsShSkill,
   updateSkill,
   deleteSkill,
   setSkillEnabled,
   getSkillsForSession,
   type SkillCustomInput,
   type SkillUpdateInput,
+  type SkillsShInput,
   type SkillForSession,
 } from './profile-skills-service';
+
+export type { SkillsShSource } from './skills-sh';
 
 // Agent CRUD + session helpers
 export {
@@ -149,6 +154,7 @@ export {
   MAX_KILO_COMMAND_DESCRIPTION_LENGTH,
   BUILTIN_COMMAND_NAMES,
   kiloCommandNameSchema,
+  kiloCommandReorderIdsSchema,
   kiloCommandCreateInputSchema,
   kiloCommandUpdateInputSchema,
   listKiloCommandsForProfile,

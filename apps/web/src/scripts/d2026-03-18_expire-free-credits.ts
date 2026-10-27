@@ -39,10 +39,7 @@ import pLimit from 'p-limit';
 import { db, closeAllDrizzleConnections } from '@kilocode/web-shared/lib/drizzle';
 import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
 import { and, eq, gt, isNull, sql, inArray } from 'drizzle-orm';
-import {
-  computeExpiration,
-  type ExpiringTransaction,
-} from '@kilocode/web-shared/lib/creditExpiration';
+import { computeExpiration, type ExpiringTransaction } from '@kilocode/db/credit-expiration';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 

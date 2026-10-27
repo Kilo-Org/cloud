@@ -694,8 +694,8 @@ async function listInvoiceCreditNotes(
   stripe: ServiceFeeRefundStripeClient | undefined,
   current?: ServiceFeeCreditNoteObservation
 ): Promise<{ items: ServiceFeeCreditNoteObservation[]; complete: boolean }> {
-  const listCreditNotes = stripe?.creditNotes?.list;
-  if (!listCreditNotes) {
+  const creditNotes = stripe?.creditNotes;
+  if (!creditNotes) {
     return {
       items: current ? [current] : [],
       complete: Boolean(current && current.lines && !current.lines.has_more),
@@ -703,7 +703,7 @@ async function listInvoiceCreditNotes(
   }
 
   const items = await listAllPages(startingAfter =>
-    listCreditNotes({
+    creditNotes.list({
       invoice: invoiceId,
       limit: PAGE_SIZE,
       ...(startingAfter ? { starting_after: startingAfter } : {}),
@@ -719,12 +719,12 @@ async function listCreditNoteLines(
   if (creditNote.lines && !creditNote.lines.has_more) {
     return { items: creditNote.lines.data, complete: true };
   }
-  const listLineItems = stripe?.creditNotes?.listLineItems;
-  if (!listLineItems) {
+  const creditNotes = stripe?.creditNotes;
+  if (!creditNotes) {
     return { items: creditNote.lines?.data ?? [], complete: false };
   }
   const items = await listAllPages(startingAfter =>
-    listLineItems(creditNote.id, {
+    creditNotes.listLineItems(creditNote.id, {
       limit: PAGE_SIZE,
       ...(startingAfter ? { starting_after: startingAfter } : {}),
     })
@@ -736,12 +736,12 @@ async function listInvoiceLines(
   invoiceId: string,
   stripe: ServiceFeeRefundStripeClient | undefined
 ): Promise<{ items: Stripe.InvoiceLineItem[]; complete: boolean }> {
-  const listLineItems = stripe?.invoices?.listLineItems;
-  if (!listLineItems) {
+  const invoices = stripe?.invoices;
+  if (!invoices) {
     return { items: [], complete: false };
   }
   const items = await listAllPages(startingAfter =>
-    listLineItems(invoiceId, {
+    invoices.listLineItems(invoiceId, {
       limit: PAGE_SIZE,
       ...(startingAfter ? { starting_after: startingAfter } : {}),
     })

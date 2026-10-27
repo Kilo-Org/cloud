@@ -341,6 +341,7 @@ describe('CloudChatPage route-aware transcript phase', () => {
       pendingMessages: new Map(),
       preparationAttempts: [],
       commits: [],
+      unreadablePermissions: [],
       chatUI: { shouldAutoScroll: true },
       isLoading: true,
     };

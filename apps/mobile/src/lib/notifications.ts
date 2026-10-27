@@ -793,6 +793,7 @@ async function writeAndroidNotificationChannel(
 const CHANNEL_NAME_KEYS = {
   'needs-input': 'glanceable.needsInput',
   'agent-progress': 'notifications.channel.agentProgress',
+  'agent-briefing': 'agentBriefing.title',
   kiloclaw: 'notifications.channel.kiloclaw',
   balance: 'notifications.channel.balance',
   security: 'notifications.channel.security',

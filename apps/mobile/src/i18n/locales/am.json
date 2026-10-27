@@ -227,7 +227,6 @@
     "hideBalance": "ቀሪ ሂሳብ ደብቅ",
     "showBalance": "ቀሪ ሂሳብ አሳይ",
     "balanceHidden": "ቀሪ ሂሳብ ተደብቋል",
-    "bonusCreditsExpiring": "{{amount}} ክሬዲት በ{{date}} ጊዜው ያበቃል።",
     "signOutTitle": "ከመለያዎ መውጣት ይፈልጋሉ?",
     "signOutMessage": "የሥራ ቦታህን ለመጠቀም እንደገና መግባት ያስፈልግሃል።",
     "deleteAccountTitle": "መለያዎን መሰረዝ ይፈልጋሉ?",
@@ -876,6 +875,18 @@
       "securityFindingsUnavailable": "የደህንነት ግኝቶችን ለማግኘት የKilo የደህንነት ወኪልን በአንድ ወሰን ላይ ያንቁ።",
       "spendAlertsSubtitle": "የገደብ መሻገሪያዎች እና የሰዓት ጭማሪዎች",
       "spendAlertsToggle": "የወጪ ማስጠንቀቂያ ምድብ"
+    },
+    "history": {
+      "title": "የማሳወቂያ ታሪክ",
+      "subtitle": "ይህ መለያ የተቀበላቸው ማሳወቂያዎች",
+      "bannerBody": "ለዚህ መሣሪያ ግፋ ማሳወቂያዎች ጠፍተዋል፣ ስለዚህ አዲሶች እዚህ አይደርሱም።",
+      "bannerAction": "የማሳወቂያ ቅንብሮች",
+      "emptyTitle": "እስካሁን ማሳወቂያዎች የሉም",
+      "emptyCategoryTitle": "በዚህ ምድብ ውስጥ ማሳወቂያዎች የሉም",
+      "emptyBody": "ይህ መለያ የሚቀበላቸው ማሳወቂያዎች እዚህ ይታያሉ። ለ{{days}} ቀናት ይቀመጣሉ።",
+      "capped": "የቅርብ ጊዜ ማሳወቂያዎችን በማሳየት ላይ።",
+      "loadError": "የማሳወቂያ ታሪክን መጫን አልተቻለም።",
+      "openFailed": "ይህ ማሳወቂያ ከእንግዲህ በየትኛውም ቦታ አይከፈትም።"
     },
     "action": {
       "openSession": "ክፍለ ጊዜውን ክፈት"
@@ -2592,7 +2603,9 @@
       "retrying": "እንደገና በመሞከር ላይ…",
       "retryDeny": "ላለመፍቀድ እንደገና ይሞክሩ",
       "retryAllowOnce": "አንድ ጊዜ ለመፍቀድ እንደገና ይሞክሩ",
-      "retryAlwaysAllow": "ሁልጊዜ ለመፍቀድ እንደገና ይሞክሩ"
+      "retryAlwaysAllow": "ሁልጊዜ ለመፍቀድ እንደገና ይሞክሩ",
+      "unreadableTitle": "የፈቃድ ጥያቄ ማንበብ አልተቻለም",
+      "unreadableBody": "ወኪሉ ይህ መተግበሪያ ማሳየት የማይችለውን የፈቃድ ውሳኔ በመጠበቅ ላይ ነው። ለመቀጠል መተግበሪያውን ወይም CLI-ን ያሻሽሉ፣ ወይም ጥያቄውን በ CLI ውስጥ ይመልሱ።"
     },
     "questionCard": {
       "title": "ወኪሉ መልስ ይፈልጋል",
@@ -2984,8 +2997,9 @@
     "unavailableDevice": "የድምፅ ግብዓት በዚህ መሣሪያ ላይ አይገኝም።",
     "unavailableLanguage": "የድምፅ ግብዓት መሣሪያው ለተዋቀረበት ቋንቋ አይገኝም።",
     "languageNotInstalledTitle": "የ{{language}} የድምፅ ግብዓት እስካሁን አልተዘጋጀም",
-    "languageNotInstalledMessage": "የ{{language}} ከመስመር ውጭ ያሉ የንግግር ፋይሎች በዚህ ስልክ ላይ አልተጫኑም። ያውርዱዋቸው፣ ከዚያ የድምፅ ግብዓትን እንደገና ይሞክሩ።",
+    "languageNotInstalledMessage": "የ{{language}} ከመስመር ውጭ ያሉ የንግግር ፋይሎች አልተጫኑም፣ እንዲሁም ንግግርን በመስመር ላይ ወደ ጽሑፍ መቀየር ጠፍቷል። ፋይሎቹን ማውረድ ወይም ንግግርን በመስመር ላይ ወደ ጽሑፍ መቀየርን እንደገና ማብራት የድምፅ ግብዓትን ያሰራል።",
     "downloadOfflineModel": "አውርድ",
+    "useOnlineTranscription": "ንግግርን በመስመር ላይ ይፍቀዱ",
     "offlineModelDownloadScheduled": "ከመስመር ውጭ ያሉ የንግግር ፋይሎች በጀርባ ይወርዳሉ። የድምፅ ግብዓትን በኋላ እንደገና ይሞክሩ።",
     "listeningStopped": "ማዳመጥ ቆሟል።",
     "transcribing": "ወደ ጽሑፍ በመቀየር ላይ...",
@@ -3159,7 +3173,7 @@
     "creditActivity": {
       "emptyDescription": "የዚህ ድርጅት ግዢዎች፣ አጠቃቀም እና የክሬዲት ማስተካከያዎች ሲኖሩ እዚህ ይታያሉ።",
       "emptyTitle": "ምንም የክሬዲት እንቅስቃሴ የለም",
-      "expires": "በ{{date}} ጊዜው ያበቃል",
+      "expiresUtc": "በ{{date}} (UTC) ጊዜው ያበቃል",
       "title": "የክሬዲት እንቅስቃሴ",
       "transactionFallback": "የክሬዲት ግብይት",
       "category": {
@@ -3840,6 +3854,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "እንደ •••• የሚታዩ እሴቶች የተከማቸውን ሚስጥራቸውን ይይዛሉ፤ ሚስጥሩን ለማሽከረከር እሴቱን በአዲስ ይተኩ። የትእዛዝ መስመሩን መቀየር ሁሉንም እሴቶች እንደገና ያስፈልጋል",
+      "headersHint": "እንደ •••• የሚታዩ እሴቶች የተከማቸውን ሚስጥራቸውን ይይዛሉ፤ ሚስጥሩን ለማሽከረከር እሴቱን በአዲስ ይተኩ። URLን መቀየር ሁሉንም እሴቶች እንደገና ያስፈልጋል",
       "nameRequired": "የአገልጋይ ስም አስገባ",
       "nameInvalid": "ስም የASCII ፊደላትን፣ አሃዞችን፣ የስር መስመሮችን እና ሰረዞችን ብቻ መጠቀም ይችላል፣ እስከ 100 ቁምፊዎች።",
       "commandRequired": "ትእዛዝ አስገባ",
@@ -3938,6 +3954,10 @@
   "credits": {
     "title": "ክሬዲት ይግዙ",
     "description": "ክሬዲት በKilo App ውስጥ የAI ኮዲንግ ክፍለ-ጊዜዎችን ለማስኬድ ወደ Kilo ቀሪ ሂሳብዎ የሚጨመር የአንድ ጊዜ ግዢ ነው። መደብሩ ሂሳብዎን ይከፍላል፣ እና መደብሩ ክፍያውን ካረጋገጠ በኋላ ክሬዲት ይጨመራል።",
+    "nextExpiry": "{{amount}} ክሬዲት በ{{date}} (UTC) ጊዜው ያበቃል። ቀድሞ ጊዜው የሚያበቃው ክሬዲት መጀመሪያ ጥቅም ላይ ይውላል።",
+    "appStoreExpiry": "በApp Store የተገዙ ክሬዲቶች ጊዜያቸው አያበቃም።",
+    "playOneYearExpiry": "እነዚህ ክሬዲቶች ከተገዙ ከአንድ የቀን መቁጠሪያ ዓመት በኋላ ጊዜያቸው ያበቃል።",
+    "playNonexpiring": "እነዚህ ክሬዲቶች ጊዜያቸው አያበቃም።",
     "packLabel": "የ{{amount}} ክሬዲት ያክሉ",
     "priceUnavailable": "ዋጋ አይገኝም",
     "purchased": "ክሬዲት ወደ ቀሪ ሂሳብዎ ተጨምሯል።",
@@ -4076,6 +4096,10 @@
     "generate": "ማጠቃለያ ፍጠር",
     "retrySummary": "የሚከፈልበትን ማጠቃለያ እንደገና ሞክር",
     "sources": "ማስረጃዎች እና ውጤቶች",
+    "sessionsShown_one": "ከ{{total}} ክፍለ ጊዜ ውስጥ {{shown}} በመታየት ላይ",
+    "sessionsShown_other": "ከ{{total}} ክፍለ ጊዜዎች ውስጥ {{shown}} በመታየት ላይ",
+    "itemsShown_one": "ከ{{total}} ንጥል ውስጥ {{shown}} በመታየት ላይ",
+    "itemsShown_other": "ከ{{total}} ንጥሎች ውስጥ {{shown}} በመታየት ላይ",
     "timezone": "የሪፖርት የሰዓት ሰቅ",
     "deviceTimezone": "የመሣሪያውን የሰዓት ሰቅ ተጠቀም",
     "timezoneHint": "IANA የሰዓት ሰቅ፣ ለምሳሌ Europe/Berlin። የመርሃ ግብር ለውጦች ለወደፊት ሪፖርቶች ይተገበራሉ።",

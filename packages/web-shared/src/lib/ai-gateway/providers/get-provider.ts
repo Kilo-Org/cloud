@@ -27,6 +27,7 @@ import {
   isPublicCustomLlm,
   type CustomLlm,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { getCustomLlmApiKinds } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/api-kinds';
 import {
   buildDirectProvider,
   type DirectUpstreamAuth,
@@ -169,13 +170,7 @@ async function resolveCustomLlmProvider(
   const { definition } = customLlm;
   const provider = buildDirectProvider(
     'custom',
-    [
-      definition.opencode_settings?.ai_sdk_provider === 'anthropic'
-        ? 'messages'
-        : definition.opencode_settings?.ai_sdk_provider === 'openai'
-          ? 'responses'
-          : 'chat_completions',
-    ],
+    getCustomLlmApiKinds(definition),
     definition,
     await resolveCustomLlmAuth(credentials)
   );

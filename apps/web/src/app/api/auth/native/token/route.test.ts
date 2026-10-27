@@ -46,6 +46,10 @@ jest.mock('@/lib/auth/native-admission', () => ({
   persistAttestedKey: jest.fn(),
 }));
 jest.mock('@/lib/auth/device-sessions');
+jest.mock('@/lib/auth/native-token-rate-limit', () => ({
+  isNativeTokenAddressRateLimited: jest.fn(),
+  isNativeTokenUserRateLimited: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   GOOGLE_CLIENT_ID: 'web-client-id',
 }));
@@ -85,6 +89,10 @@ import {
   createDeviceSessionWithAttestedKey,
   revokeDeviceSession,
 } from '@/lib/auth/device-sessions';
+import {
+  isNativeTokenAddressRateLimited,
+  isNativeTokenUserRateLimited,
+} from '@/lib/auth/native-token-rate-limit';
 import { captureMessage } from '@sentry/nextjs';
 
 const mockVerifyNativeAppleIdToken = jest.mocked(verifyNativeAppleIdToken);
@@ -107,6 +115,8 @@ const mockPersistAttestedKey = jest.mocked(persistAttestedKey);
 const mockCreateDeviceSession = jest.mocked(createDeviceSession);
 const mockIssueSessionCredentials = jest.mocked(issueSessionCredentials);
 const mockCreateDeviceSessionWithAttestedKey = jest.mocked(createDeviceSessionWithAttestedKey);
+const mockIsNativeTokenAddressRateLimited = jest.mocked(isNativeTokenAddressRateLimited);
+const mockIsNativeTokenUserRateLimited = jest.mocked(isNativeTokenUserRateLimited);
 const mockRevokeDeviceSession = jest.mocked(revokeDeviceSession);
 const mockCaptureMessage = jest.mocked(captureMessage);
 
@@ -163,6 +173,8 @@ describe('POST /api/auth/native/token', () => {
     mockCommitSignInCode.mockResolvedValue(true);
     mockReleaseSignInCode.mockResolvedValue(undefined);
     mockConsumeSignInCode.mockResolvedValue(true);
+    mockIsNativeTokenAddressRateLimited.mockResolvedValue(false);
+    mockIsNativeTokenUserRateLimited.mockResolvedValue(false);
     mockRevokeDeviceSession.mockResolvedValue(undefined);
   });
 
@@ -1952,6 +1964,129 @@ describe('POST /api/auth/native/token', () => {
       expect(response.status).toBe(400);
       expect(await response.json()).toEqual({ error: 'INVALID_REQUEST' });
       expect(mockConsumeSignInTicket).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('rate limits', () => {
+    it('refuses a rate-limited address before verifying admission or the provider', async () => {
+      mockIsNativeTokenAddressRateLimited.mockResolvedValue(true);
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+
+      const response = await POST(
+        createRequest({ provider: 'apple', idToken: 'apple-id-token', nonce: 'test-nonce' })
+      );
+
+      expect(response.status).toBe(429);
+      expect(await response.json()).toEqual({ error: 'RATE_LIMITED' });
+      expect(mockIsNativeTokenAddressRateLimited).toHaveBeenCalledWith(expect.any(Object));
+      expect(mockVerifyAdmissionAsync).not.toHaveBeenCalled();
+      expect(mockVerifyNativeAppleIdToken).not.toHaveBeenCalled();
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    });
+
+    it('leaves the account rule unspent when the address is already rate limited', async () => {
+      mockIsNativeTokenAddressRateLimited.mockResolvedValue(true);
+
+      await POST(createRequest({ provider: 'apple', idToken: 'apple-id-token', nonce: 'nonce' }));
+
+      expect(mockIsNativeTokenUserRateLimited).not.toHaveBeenCalled();
+    });
+
+    it('refuses a rate-limited account after settlement and writes no session', async () => {
+      mockIsNativeTokenUserRateLimited.mockResolvedValue(true);
+      mockVerifyNativeAppleIdToken.mockResolvedValue({
+        sub: 'apple-sub-1',
+        email: 'appleuser@example.com',
+      });
+
+      const response = await POST(
+        createRequest({
+          provider: 'apple',
+          idToken: 'apple-id-token',
+          nonce: 'test-nonce',
+          supportsRefresh: true,
+        })
+      );
+
+      expect(response.status).toBe(429);
+      expect(await response.json()).toEqual({ error: 'RATE_LIMITED' });
+      expect(mockIsNativeTokenUserRateLimited).toHaveBeenCalledWith(
+        expect.any(Object),
+        fakeUser.id
+      );
+      expect(mockCreateDeviceSessionWithAttestedKey).not.toHaveBeenCalled();
+      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+    });
+
+    it('refuses a rate-limited account on the passkey path without minting a session', async () => {
+      mockConsumeSignInTicket.mockResolvedValue({
+        id: 'ticket-row-1',
+        ticket_hash: 'hash',
+        kilo_user_id: fakeUser.id,
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+        consumed_at: null,
+        created_at: new Date().toISOString(),
+      });
+      mockFindUserById.mockResolvedValue(fakeUser);
+      mockIsNativeTokenUserRateLimited.mockResolvedValue(true);
+
+      const response = await POST(
+        createRequest({ provider: 'passkey', ticket: 'ticket-1', supportsRefresh: true })
+      );
+
+      expect(response.status).toBe(429);
+      expect(await response.json()).toEqual({ error: 'RATE_LIMITED' });
+      expect(mockCreateDeviceSession).not.toHaveBeenCalled();
+      expect(mockIssueSessionCredentials).not.toHaveBeenCalled();
+    });
+
+    it('releases the email code reservation when the account is rate limited', async () => {
+      mockIsNativeTokenUserRateLimited.mockResolvedValue(true);
+
+      const response = await POST(
+        createRequest({ provider: 'email', email: 'emailuser@example.com', code: '123456' })
+      );
+
+      expect(response.status).toBe(429);
+      expect(await response.json()).toEqual({ error: 'RATE_LIMITED' });
+      expect(mockCommitSignInCode).not.toHaveBeenCalled();
+      expect(mockReleaseSignInCode).toHaveBeenCalled();
+      expect(mockGenerateApiToken).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('single-use provider assertions', () => {
+    it('returns 503 NONCE_STORE_UNAVAILABLE when the Google record cannot be written', async () => {
+      mockVerifyNativeGoogleIdToken.mockRejectedValue(
+        new NonceStoreUnavailableError('Google token record unavailable')
+      );
+
+      const response = await POST(
+        createRequest({ provider: 'google', idToken: 'google-id-token' })
+      );
+
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({ error: 'NONCE_STORE_UNAVAILABLE' });
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 INVALID_TOKEN for a Google token that was already spent', async () => {
+      mockVerifyNativeGoogleIdToken.mockRejectedValue(
+        new NativeIdTokenError('Google ID token already used')
+      );
+
+      const response = await POST(
+        createRequest({ provider: 'google', idToken: 'google-id-token' })
+      );
+
+      expect(response.status).toBe(401);
+      expect(await response.json()).toEqual({ error: 'INVALID_TOKEN' });
+      expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
     });
   });
 });

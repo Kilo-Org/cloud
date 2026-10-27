@@ -7,7 +7,10 @@ import z from 'zod';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
-import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import {
+  isFreeModel,
+  isFreeModelExcludingCustomLlms,
+} from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
@@ -199,6 +202,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     mode: null,
     auto_model: null,
     ttfb_ms: null,
+    requestStartedAt,
     bouncer: {
       requestId: bouncerRequestId,
       occurredAt: new Date(requestStartedAtMs),
@@ -216,7 +220,13 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
 
   // Use read replica for balance check - this is a read-only operation that can tolerate
   // slight replication lag, and provides lower latency for US users.
-  const { balance, plan, payer } = await getBalanceAndOrgSettings(organizationId, user, readDb);
+  const freeRequest = await isFreeModel(requestBody.model);
+  const { balance, plan, payer } = await getBalanceAndOrgSettings(
+    organizationId,
+    user,
+    readDb,
+    freeRequest ? undefined : 'usage'
+  );
 
   if (!canSpendPaidUsage(balance) && !usageContext.is_free && !userByok) {
     return NextResponse.json(
@@ -301,7 +311,6 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     body: JSON.stringify(bodyForUpstream),
   });
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
-  usageContext.ttfb_ms = ttfbMs;
   usageContext.status_code = proxyRes.status;
 
   emitApiMetricsForResponse(

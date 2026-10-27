@@ -38,6 +38,7 @@ describe('shared usage completion observations', () => {
       VERCEL_ENV: undefined,
       VERCEL_TARGET_ENV: undefined,
       VERCEL_REGION: 'fra1',
+      USAGE_RECORD_COMPLETION_SAMPLE_RATE: undefined,
     });
   });
   afterEach(() => {
@@ -68,28 +69,24 @@ describe('shared usage completion observations', () => {
     }
   );
 
-  test.each([
-    { random: 0, emitted: true },
-    { random: 0.009999, emitted: true },
-    { random: 0.01, emitted: false },
-  ])('samples production successes at the 1% boundary: %j', async ({ random, emitted }) => {
-    process.env.VERCEL_ENV = 'production';
-    jest.spyOn(Math, 'random').mockReturnValue(random);
-    for (const wasRedelivery of [false, true]) {
+  test.each([false, true])(
+    'defaults production to full logging, including duplicate=%s',
+    async wasRedelivery => {
+      process.env.VERCEL_ENV = 'production';
+      const random = jest.spyOn(Math, 'random').mockReturnValue(1);
       const result = { ...recorded, wasRedelivery };
       const write = jest.fn(async () => result);
       expect(await observeUsageRecordCompletion(usage, write)).toBe(result);
       expect(write).toHaveBeenCalledTimes(1);
+      expect(info).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(info.mock.calls[0][0])).toMatchObject({
+        outcome: wasRedelivery ? 'duplicate' : 'recorded',
+        sample_rate: 1,
+      });
+      expect(random).not.toHaveBeenCalled();
+      expect(warn).not.toHaveBeenCalled();
     }
-    expect(info).toHaveBeenCalledTimes(emitted ? 2 : 0);
-    expect(warn).not.toHaveBeenCalled();
-    if (emitted) {
-      expect(info.mock.calls.map(([value]) => JSON.parse(value))).toEqual([
-        expect.objectContaining({ outcome: 'recorded', sample_rate: 0.01 }),
-        expect.objectContaining({ outcome: 'duplicate', sample_rate: 0.01 }),
-      ]);
-    }
-  });
+  );
 
   test.each([
     { node: 'production', vercel: 'production', target: undefined, rate: 0.01 },
@@ -110,6 +107,7 @@ describe('shared usage completion observations', () => {
         NODE_ENV: node ?? 'test',
         VERCEL_ENV: vercel,
         VERCEL_TARGET_ENV: target,
+        USAGE_RECORD_COMPLETION_SAMPLE_RATE: rate === 1 ? '0' : '0.01',
       });
       if (node === undefined) Reflect.deleteProperty(process.env, 'NODE_ENV');
       const random = jest.spyOn(Math, 'random').mockReturnValue(0.005);
@@ -117,6 +115,54 @@ describe('shared usage completion observations', () => {
       expect(info).toHaveBeenCalledTimes(1);
       expect(JSON.parse(info.mock.calls[0][0]).sample_rate).toBe(rate);
       expect(random).toHaveBeenCalledTimes(rate === 1 ? 0 : 1);
+    }
+  );
+
+  test.each([
+    { value: '0', random: 0, emitted: false, rate: 0 },
+    { value: '0.01', random: 0.009999, emitted: true, rate: 0.01 },
+    { value: '0.1', random: 0.099999, emitted: true, rate: 0.1 },
+    { value: '0.1', random: 0.1, emitted: false, rate: 0.1 },
+    { value: ' 0.25 ', random: 0.2, emitted: true, rate: 0.25 },
+    { value: '1', random: 1, emitted: true, rate: 1 },
+  ])('uses the configured production probability: %j', async ({ value, random, emitted, rate }) => {
+    process.env.VERCEL_ENV = 'production';
+    process.env.USAGE_RECORD_COMPLETION_SAMPLE_RATE = value;
+    jest.spyOn(Math, 'random').mockReturnValue(random);
+    for (const wasRedelivery of [false, true]) {
+      const result = { ...recorded, wasRedelivery };
+      const write = jest.fn(async () => result);
+      expect(await observeUsageRecordCompletion(usage, write)).toBe(result);
+      expect(write).toHaveBeenCalledTimes(1);
+    }
+    expect(info).toHaveBeenCalledTimes(emitted ? 2 : 0);
+    for (const [value] of info.mock.calls) {
+      expect(JSON.parse(value).sample_rate).toBe(rate);
+    }
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  test.each(['', ' ', 'invalid', '0.1junk', '-0.1', '1.01', 'NaN', 'Infinity'])(
+    'falls back to 100%% for invalid configuration %j',
+    async value => {
+      process.env.VERCEL_ENV = 'production';
+      process.env.USAGE_RECORD_COMPLETION_SAMPLE_RATE = value;
+      const random = jest.spyOn(Math, 'random').mockReturnValue(1);
+      await observeUsageRecordCompletion(usage, async () => recorded);
+      expect(JSON.parse(info.mock.calls[0][0]).sample_rate).toBe(1);
+      expect(info).toHaveBeenCalledTimes(1);
+      expect(random).not.toHaveBeenCalled();
+    }
+  );
+
+  test.each(['preview', 'development', undefined])(
+    'ignores the production override in nonproduction VERCEL_ENV=%s',
+    async vercelEnv => {
+      process.env.USAGE_RECORD_COMPLETION_SAMPLE_RATE = '0';
+      jest.replaceProperty(process, 'env', { ...process.env, VERCEL_ENV: vercelEnv });
+      jest.spyOn(Math, 'random').mockReturnValue(1);
+      await observeUsageRecordCompletion(usage, async () => recorded);
+      expect(JSON.parse(info.mock.calls[0][0]).sample_rate).toBe(1);
     }
   );
 
@@ -151,6 +197,7 @@ describe('shared usage completion observations', () => {
 
   test('distinguishes null outcomes from thrown failures without exposing errors', async () => {
     process.env.VERCEL_ENV = 'production';
+    process.env.USAGE_RECORD_COMPLETION_SAMPLE_RATE = '0';
     const random = jest.spyOn(Math, 'random').mockReturnValue(1);
     expect(await observeUsageRecordCompletion(usage, async () => null)).toBeNull();
     const failure = new Error('sensitive exception with SQL and credentials');
@@ -177,6 +224,7 @@ describe('shared usage completion observations', () => {
     'preserves results/errors with broken console and random=%s',
     async random => {
       process.env.VERCEL_ENV = 'production';
+      process.env.USAGE_RECORD_COMPLETION_SAMPLE_RATE = '0.01';
       jest.spyOn(Math, 'random').mockReturnValue(random);
       info.mockImplementation(() => {
         throw new Error('synthetic log failure');
@@ -467,6 +515,8 @@ describe('shouldEmitUsageRecordTiming', () => {
 
   test('samples a small fraction of fast requests for a baseline', () => {
     expect(shouldEmitUsageRecordTiming(5, () => 0.005)).toBe(true);
+    expect(shouldEmitUsageRecordTiming(5, () => 0.01)).toBe(false);
+    expect(shouldEmitUsageRecordTiming(5, () => 0.05)).toBe(false);
     expect(shouldEmitUsageRecordTiming(5, () => 0.5)).toBe(false);
   });
 });

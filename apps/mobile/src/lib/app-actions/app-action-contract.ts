@@ -69,6 +69,7 @@ export type AppActionResult =
       retryable: boolean;
       code:
         | 'empty-prompt'
+        | 'prompt-too-long'
         | 'unknown-repository'
         | 'unsupported-repository'
         | 'no-repository'

@@ -127,6 +127,7 @@ type OwnershipFixture = {
   parentSessionId: string | null;
   cloudAgentSessionScopeId: string | null;
   gitUrl: string | null;
+  profileId?: string | null;
 };
 
 function sourceMetadata(options?: {
@@ -293,6 +294,7 @@ function fixture(options?: {
     cloudAgentSessionId: metadata.identity.sessionId,
     cloudAgentSessionScopeId: metadata.identity.sessionId,
     kiloSessionId: metadata.auth.kiloSessionId ?? SOURCE_KILO_SESSION_ID,
+    profileId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   });
   const db = makeDb(options?.ownershipResults ?? [[source]]);
   getPgDbMock.mockReturnValue(db);
@@ -1035,6 +1037,7 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
       },
       organizationId: undefined,
       createdOnPlatform: 'cloud-agent-web',
+      profileId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       title: expect.stringMatching(/^New session - /),
       gitUrl: 'https://github.com/acme/repo',
     });

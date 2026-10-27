@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES } from '@kilocode/session-ingest-contracts';
+
 import { SessionItemSchema } from './session-sync';
 
 describe('SessionItemSchema agent_notification validation', () => {
@@ -326,6 +328,43 @@ describe('SessionItemSchema storage key identity', () => {
         data: { id: 'prt_parent\u0000child', messageID: 'msg_parent' },
       }).success
     ).toBe(false);
+  });
+
+  it('accepts a message ID at the cursor id byte limit', () => {
+    // Message ids become history cursor ids, so the cursor contract, not the
+    // 256-byte storage segment cap, is what a message id has to satisfy.
+    const idAtCursorLimit = `msg_${'a'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES - 4)}`;
+    expect(
+      SessionItemSchema.safeParse({ type: 'message', data: { id: idAtCursorLimit } }).success
+    ).toBe(true);
+    expect(
+      SessionItemSchema.safeParse({ type: 'message', data: { id: `${idAtCursorLimit}a` } }).success
+    ).toBe(false);
+  });
+
+  it('rejects a part ID or part message ID over 256 characters before persistence', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: `prt_${'a'.repeat(256)}`, messageID: 'msg_parent' },
+      }).success
+    ).toBe(false);
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: 'prt_child', messageID: `msg_${'a'.repeat(256)}` },
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts a part identity with both segments exactly 256 characters', () => {
+    // The largest derived part identity is 256 + 1 + 256 bytes.
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: `prt_${'a'.repeat(252)}`, messageID: `msg_${'a'.repeat(252)}` },
+      }).success
+    ).toBe(true);
   });
 });
 

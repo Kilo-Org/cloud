@@ -227,7 +227,6 @@
     "hideBalance": "Kache balans",
     "showBalance": "Montre balans",
     "balanceHidden": "Balans kache",
-    "bonusCreditsExpiring": "{{amount}} nan kredi ap ekspire {{date}}.",
     "signOutTitle": "Dekonekte?",
     "signOutMessage": "W ap bezwen konekte ankò pou jwenn aksè nan espas travay ou.",
     "deleteAccountTitle": "Efase kont?",
@@ -876,6 +875,18 @@
       "securityFindingsUnavailable": "Aktive Ajan sekirite Kilo a sou yon limit pou jwenn rezilta sekirite.",
       "spendAlertsSubtitle": "depasman papòt ak ogmantasyon chak èdtan",
       "spendAlertsToggle": "Kategori alèt depans"
+    },
+    "history": {
+      "title": "Istwa notifikasyon",
+      "subtitle": "Notifikasyon kont sa a te resevwa",
+      "bannerBody": "Notifikasyon push dezaktive pou aparèy sa a, donk nouvo yo p ap rive isit la.",
+      "bannerAction": "Paramèt notifikasyon",
+      "emptyTitle": "Poko gen notifikasyon",
+      "emptyCategoryTitle": "Poko gen notifikasyon nan kategori sa a",
+      "emptyBody": "Notifikasyon kont sa a resevwa yo parèt isit la. Yo kenbe yo pandan {{days}} jou.",
+      "capped": "Sa yo se notifikasyon ki pi resan yo.",
+      "loadError": "Nou pa t ka chaje istwa notifikasyon yo.",
+      "openFailed": "Notifikasyon sa a pa ouvri okenn kote ankò."
     },
     "action": {
       "openSession": "Louvri sesyon an"
@@ -2592,7 +2603,9 @@
       "retrying": "Ap eseye ankò…",
       "retryDeny": "Eseye refize ankò",
       "retryAllowOnce": "Eseye pèmèt yon sèl fwa ankò",
-      "retryAlwaysAllow": "Eseye toujou pèmèt ankò"
+      "retryAlwaysAllow": "Eseye toujou pèmèt ankò",
+      "unreadableTitle": "Demann pèmisyon an pa t ka li",
+      "unreadableBody": "Ajan an ap tann yon desizyon pèmisyon a, men aplikasyon sa a pa ka montre demann lan. Mete aplikasyon an oswa CLI a ajou, oswa reponn demann lan nan CLI a pou w ka kontinye."
     },
     "questionCard": {
       "title": "Ajan an bezwen yon repons",
@@ -2984,8 +2997,9 @@
     "unavailableDevice": "Dikte a pa disponib sou aparèy sa a.",
     "unavailableLanguage": "Dikte a pa disponib nan lang aparèy sa a.",
     "languageNotInstalledTitle": "Dikte pou {{language}} poko pare",
-    "languageNotInstalledMessage": "Fichye lapawòl offline pou {{language}} pa enstale sou telefòn sa a. Telechaje yo, epi eseye dikte ankò.",
+    "languageNotInstalledMessage": "Fichye lapawòl offline pou {{language}} yo pa enstale, e transkripsyon sou entènèt a fèmen. Pou w ka sèvi ak dikte vwa a, ou dwe enstale fichye yo oswa reaktive transkripsyon sou entènèt la.",
     "downloadOfflineModel": "Telechaje",
+    "useOnlineTranscription": "Pèmèt transkripsyon sou entènèt",
     "offlineModelDownloadScheduled": "Fichye lapawòl offline yo ap telechaje nan background la. Eseye dikte ankò pita.",
     "listeningStopped": "Sistèm nan sispann koute.",
     "transcribing": "Ap transkripte...",
@@ -3159,7 +3173,7 @@
     "creditActivity": {
       "emptyDescription": "Acha, itilizasyon ak ajisteman kredi òganizasyon sa a ap parèt isit la chak fwa yo fèt.",
       "emptyTitle": "Pa gen aktivite kredi",
-      "expires": "Ekspire {{date}}",
+      "expiresUtc": "Ekspire {{date}} (UTC)",
       "title": "Aktivite kredi",
       "transactionFallback": "Transaksyon kredi",
       "category": {
@@ -3840,6 +3854,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Valè ki parèt kòm •••• kenbe sekrè ki sere yo; ranplase yon valè pou w renouvle l. Chanje liy kòmand la mande tout valè yo ankò",
+      "headersHint": "Valè ki parèt kòm •••• kenbe sekrè ki sere yo; ranplase yon valè pou w renouvle l. Chanje URL la mande tout valè yo ankò",
       "nameRequired": "Antre yon non sèvè",
       "nameInvalid": "Non ka itilize sèlman lèt ASCII, nimewo, tirè ba ak tire, jiska 100 karaktè",
       "commandRequired": "Antre yon lòd",
@@ -3938,6 +3954,10 @@
   "credits": {
     "title": "Achte kredi",
     "description": "Kredi se yon acha yon sèl fwa ki ajoute nan balans Kilo ou pou kouri sesyon kodaj AI nan Kilo App. Magazen an chaje kont ou epi kredi yo ajoute apre magazen an konfime peman an.",
+    "nextExpiry": "{{amount}} nan kredi ap ekspire {{date}} (UTC). Kredi ki ekspire pi bonè yo itilize an premye.",
+    "appStoreExpiry": "Kredi ou achte nan App Store pa ekspire.",
+    "playOneYearExpiry": "Kredi sa yo ekspire yon ane kalandriye apre acha a.",
+    "playNonexpiring": "Kredi sa yo pa ekspire.",
     "packLabel": "Ajoute {{amount}} an kredi",
     "priceUnavailable": "Pri pa disponib",
     "purchased": "Kredi yo ajoute nan balans ou.",
@@ -4076,6 +4096,10 @@
     "generate": "Kreye rezime",
     "retrySummary": "Re-eseye rezime peye a",
     "sources": "Prèv ak atefak",
+    "sessionsShown_one": "N ap montre {{shown}} sou {{total}} sesyon",
+    "sessionsShown_other": "N ap montre {{shown}} sou {{total}} sesyon",
+    "itemsShown_one": "N ap montre {{shown}} sou {{total}} eleman",
+    "itemsShown_other": "N ap montre {{shown}} sou {{total}} eleman",
     "timezone": "Fizo orè rapò a",
     "deviceTimezone": "Sèvi ak fizo orè aparèy la",
     "timezoneHint": "Fizo orè IANA, pa egzanp Europe/Berlin. Chanjman orè yo aplike pou rapò k ap vini yo.",

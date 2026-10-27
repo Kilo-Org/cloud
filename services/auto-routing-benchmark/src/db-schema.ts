@@ -145,6 +145,10 @@ export const modelSummaries = sqliteTable(
     route_key: text('route_key').notNull(),
     accuracy: real('accuracy').notNull(),
     avg_cost_usd: real('avg_cost_usd'),
+    avg_input_tokens: real('avg_input_tokens'),
+    avg_cached_input_tokens: real('avg_cached_input_tokens'),
+    avg_output_tokens: real('avg_output_tokens'),
+    avg_reasoning_tokens: real('avg_reasoning_tokens'),
     avg_latency_ms: real('avg_latency_ms').notNull(),
     p50_latency_ms: real('p50_latency_ms'),
     cases: integer('cases').notNull(),
@@ -171,6 +175,10 @@ export const caseResults = sqliteTable(
     score: real('score').notNull(),
     latency_ms: integer('latency_ms').notNull(),
     cost_usd: real('cost_usd'),
+    input_tokens: integer('input_tokens'),
+    cached_input_tokens: integer('cached_input_tokens'),
+    output_tokens: integer('output_tokens'),
+    reasoning_tokens: integer('reasoning_tokens'),
     error: text('error'),
     // Unused since the System One classifier cutover; kept so old-code upserts
     // during a rolling deploy still succeed.

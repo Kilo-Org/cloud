@@ -3,11 +3,15 @@
 // values and no Node builtins, so the SDK import below stays type-only.
 
 import type { Event } from '@sentry/nextjs';
-import { sanitizeAnalyticsPathname } from '@kilocode/web-shared/lib/sanitize-analytics-url';
+import {
+  SENSITIVE_PATHS,
+  SENSITIVE_QUERY_PARAMS,
+  sanitizeAnalyticsPathname,
+} from '@kilocode/web-shared/lib/sanitize-analytics-url';
 
-// Handoff credential keys are dropped from request data; the rest of the
-// request is kept.
-const REDACTED_QUERY_KEYS = new Set(['state', 'installState'].map(key => key.toLowerCase()));
+// Query keys covered by the shared URL policy, plus the handoff key that only
+// this request carries. The rest of the request is kept.
+const EXTRA_REDACTED_QUERY_KEYS = new Set(['installstate']);
 
 // Decode a raw query key the way URLSearchParams would, so percent-encoded
 // forms of the key are compared against their decoded value. Malformed
@@ -23,7 +27,8 @@ function decodeQueryKey(rawKey: string): string {
 // One decoded-key predicate for every query form: URL, string, array, and
 // object. Keys are matched after URL-decoding and case-folding.
 function isRedactedQueryKey(rawKey: string): boolean {
-  return REDACTED_QUERY_KEYS.has(decodeQueryKey(rawKey).toLowerCase());
+  const key = decodeQueryKey(rawKey).toLowerCase();
+  return SENSITIVE_QUERY_PARAMS.has(key) || EXTRA_REDACTED_QUERY_KEYS.has(key);
 }
 
 type SentryRequest = NonNullable<Event['request']>;
@@ -43,32 +48,35 @@ function sanitizeStringQuery(queryString: string): string {
 }
 
 function sanitizeForwardedHeaders(headers: SentryHeaders): void {
-  for (const name of Object.keys(headers)) {
+  const names = Object.keys(headers);
+  let sensitivePath = false;
+  for (const name of names) {
+    if (name.toLowerCase() !== PATHNAME_HEADER) continue;
+    const pathname = sanitizeAnalyticsPathname(headers[name]);
+    headers[name] = pathname;
+    sensitivePath ||= SENSITIVE_PATHS.has(pathname);
+  }
+  for (const name of names) {
+    if (name.toLowerCase() !== SEARCH_HEADER) continue;
     const value = headers[name];
-    switch (name.toLowerCase()) {
-      case PATHNAME_HEADER:
-        headers[name] = sanitizeAnalyticsPathname(value);
-        break;
-      case SEARCH_HEADER: {
-        const prefix = value.startsWith('?') ? '?' : '';
-        headers[name] = `${prefix}${sanitizeStringQuery(value.slice(prefix.length))}`;
-        break;
-      }
-    }
+    const prefix = value.startsWith('?') ? '?' : '';
+    headers[name] = sensitivePath
+      ? ''
+      : `${prefix}${sanitizeStringQuery(value.slice(prefix.length))}`;
   }
 }
 
-// Relative URLs cannot be parsed with `new URL`; split off the query string
-// manually, reuse the same sanitizer, and preserve any fragment.
 function sanitizeRelativeRequestUrl(url: string): string {
   const hashIndex = url.indexOf('#');
   const fragment = hashIndex === -1 ? '' : url.slice(hashIndex);
   const pathAndQuery = hashIndex === -1 ? url : url.slice(0, hashIndex);
   const queryIndex = pathAndQuery.indexOf('?');
-  if (queryIndex === -1) {
-    return `${sanitizeAnalyticsPathname(pathAndQuery)}${fragment}`;
+  const path = sanitizeAnalyticsPathname(
+    queryIndex === -1 ? pathAndQuery : pathAndQuery.slice(0, queryIndex)
+  );
+  if (queryIndex === -1 || SENSITIVE_PATHS.has(path)) {
+    return `${path}${fragment}`;
   }
-  const path = sanitizeAnalyticsPathname(pathAndQuery.slice(0, queryIndex));
   const sanitizedQuery = sanitizeStringQuery(pathAndQuery.slice(queryIndex + 1));
   return sanitizedQuery.length > 0 ? `${path}?${sanitizedQuery}${fragment}` : `${path}${fragment}`;
 }
@@ -77,6 +85,10 @@ function sanitizeRequestUrl(url: string): string {
   try {
     const parsed = new URL(url);
     parsed.pathname = sanitizeAnalyticsPathname(parsed.pathname);
+    if (SENSITIVE_PATHS.has(parsed.pathname)) {
+      parsed.search = '';
+      return parsed.toString();
+    }
     for (const [key] of Array.from(parsed.searchParams)) {
       if (isRedactedQueryKey(key)) {
         parsed.searchParams.delete(key);
@@ -86,6 +98,27 @@ function sanitizeRequestUrl(url: string): string {
   } catch {
     return sanitizeRelativeRequestUrl(url);
   }
+}
+
+function requestPathname(url: string): string {
+  try {
+    return new URL(url).pathname;
+  } catch {
+    const hashIndex = url.indexOf('#');
+    const withoutFragment = hashIndex === -1 ? url : url.slice(0, hashIndex);
+    const queryIndex = withoutFragment.indexOf('?');
+    return queryIndex === -1 ? withoutFragment : withoutFragment.slice(0, queryIndex);
+  }
+}
+
+function emptyQueryString(queryString: SentryQueryString): SentryQueryString {
+  if (typeof queryString === 'string') {
+    return '';
+  }
+  if (Array.isArray(queryString)) {
+    return [];
+  }
+  return {};
 }
 
 function sanitizeQueryString(queryString: SentryQueryString): SentryQueryString {
@@ -109,11 +142,15 @@ export function sanitizeSentryRequestData(event: Event): Event {
   if (!request) {
     return event;
   }
+  const sensitivePath =
+    typeof request.url === 'string' && SENSITIVE_PATHS.has(requestPathname(request.url));
   if (typeof request.url === 'string') {
     request.url = sanitizeRequestUrl(request.url);
   }
   if (request.query_string !== undefined) {
-    request.query_string = sanitizeQueryString(request.query_string);
+    request.query_string = sensitivePath
+      ? emptyQueryString(request.query_string)
+      : sanitizeQueryString(request.query_string);
   }
   if (request.headers) {
     sanitizeForwardedHeaders(request.headers);

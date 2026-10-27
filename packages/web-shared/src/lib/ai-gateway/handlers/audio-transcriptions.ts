@@ -32,7 +32,10 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import {
+  isFreeModel,
+  isFreeModelExcludingCustomLlms,
+} from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
@@ -279,6 +282,7 @@ export async function handleAudioTranscriptionsRequest(
     mode: null,
     auto_model: null,
     ttfb_ms: null,
+    requestStartedAt,
     bouncer: {
       requestId: bouncerRequestId,
       occurredAt: new Date(requestStartedAtMs),
@@ -294,8 +298,9 @@ export async function handleAudioTranscriptionsRequest(
 
   setTag('ui.ai_model', requestedModel);
 
+  const freeRequest = await isFreeModel(requestedModelLowerCased);
   const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
-    await getBalanceAndOrgSettings(organizationId, user, readDb);
+    await getBalanceAndOrgSettings(organizationId, user, readDb, freeRequest ? undefined : 'usage');
 
   // Free models are Kilo- or partner-funded: a zero balance never blocks them
   // (the embeddings proxy applies the same exemption).
@@ -385,7 +390,6 @@ export async function handleAudioTranscriptionsRequest(
   });
 
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
-  usageContext.ttfb_ms = ttfbMs;
   usageContext.status_code = response.status;
 
   emitApiMetricsForResponse(

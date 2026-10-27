@@ -5,6 +5,7 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { TRPCError } from '@trpc/server';
 import { NextResponse, type NextRequest } from 'next/server';
+import * as z from 'zod';
 import {
   getAutoRoutingMode,
   updateAutoRoutingMode,
@@ -46,8 +47,11 @@ async function resolveOwner(
   }
 
   const organizationId = request.nextUrl.searchParams.get('organizationId');
-  if (!organizationId) {
+  if (organizationId === null) {
     return { ownerType: 'user', ownerId: user.id };
+  }
+  if (!z.uuid().safeParse(organizationId).success) {
+    return { response: NextResponse.json({ error: 'Invalid organization ID' }, { status: 400 }) };
   }
 
   try {

@@ -6,6 +6,7 @@ import type {
   ProviderId,
   ProviderResponseTransforms,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { getDynamicRequestLoggingMode } from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -211,6 +212,7 @@ export async function rewriteModelResponse({
     api_kind: kind,
     is_free: isFree,
     user_byok: userByok,
+    custom_pricing_config: await getCustomPricingConfig(),
   };
 
   console.debug('[rewriteModelResponse] rewriting response for %s', model);

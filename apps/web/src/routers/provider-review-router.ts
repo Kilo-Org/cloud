@@ -61,6 +61,7 @@ import {
   unresolveThread as gitlabUnresolveThread,
 } from '@/lib/provider-review/gitlab-write';
 import * as bitbucketRead from '@/lib/provider-review/bitbucket-read';
+import { providerReviewErrorToTrpcError } from '@/lib/provider-review/error-mapping';
 import {
   BITBUCKET_AUTO_MERGE_UNSUPPORTED_REASON,
   BITBUCKET_PR_REVIEW_CAPABILITIES,
@@ -341,58 +342,49 @@ async function bitbucketOwner(
   };
 }
 
-function providerRef(input: {
-  platform: ProviderPrPlatform;
-  projectPath?: string;
-  mrIid?: number;
-  instanceHint?: string;
-  workspace?: string;
-  repoSlug?: string;
-  prId?: number;
-}): ProviderPrRef {
-  if (input.platform === 'gitlab') {
-    return {
-      platform: 'gitlab',
-      projectPath: String(input.projectPath),
-      mrIid: Number(input.mrIid),
-      instanceHint: input.instanceHint,
-    };
+/** A validated GitLab/Bitbucket identity: the refs this router can build. */
+type ProviderRefIdentity = Extract<ProviderPrRef, { platform: 'gitlab' | 'bitbucket' }>;
+
+/**
+ * The provider-tagged ref of a VALIDATED identity. Every field is required by
+ * its arm, so the ref carries the parsed values as-is; the `never` default
+ * makes a new provider a compile error here instead of an untyped ref.
+ */
+function providerRef(input: ProviderRefIdentity): ProviderPrRef {
+  switch (input.platform) {
+    case 'gitlab':
+      return {
+        platform: 'gitlab',
+        projectPath: input.projectPath,
+        mrIid: input.mrIid,
+        instanceHint: input.instanceHint,
+      };
+    case 'bitbucket':
+      return {
+        platform: 'bitbucket',
+        workspace: input.workspace,
+        repoSlug: input.repoSlug,
+        prId: input.prId,
+      };
+    default: {
+      const unreachable: never = input;
+      throw new Error(`Unhandled provider ref platform: ${JSON.stringify(unreachable)}`);
+    }
   }
-  return {
-    platform: 'bitbucket',
-    workspace: String(input.workspace),
-    repoSlug: String(input.repoSlug),
-    prId: Number(input.prId),
-  };
 }
 
 /**
  * Map one classified provider failure onto the mobile error states.
  * `retryable` becomes BAD_GATEWAY (the ledger's ambiguous marker), a moved
  * head becomes CONFLICT carrying the exact stale-head reason, the rest are
- * deterministic rejections. The provider message is fixed copy that never
- * embeds a token or an instance URL.
+ * deterministic rejections. Anything no layer classified becomes
+ * INTERNAL_SERVER_ERROR, which the ledger records as `internal_error` — never
+ * as a client rejection. The provider message is fixed copy that never embeds
+ * a token or an instance URL.
  */
 function toProviderTrpcError(error: unknown): TRPCError {
   if (error instanceof TRPCError) return error;
-  if (error instanceof ProviderReviewError) {
-    switch (error.kind) {
-      case 'not_found':
-        return new TRPCError({ code: 'NOT_FOUND', message: error.message });
-      case 'forbidden':
-        return new TRPCError({ code: 'FORBIDDEN', message: error.message });
-      case 'reconnect':
-        // The provider connection must be re-established; the caller's Kilo
-        // access is not the problem. This is the mobile reconnect state.
-        return new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });
-      case 'stale_head':
-        return new TRPCError({ code: 'CONFLICT', message: error.message });
-      case 'bad_request':
-        return new TRPCError({ code: 'BAD_REQUEST', message: error.message });
-      case 'retryable':
-        return new TRPCError({ code: 'BAD_GATEWAY', message: error.message });
-    }
-  }
+  if (error instanceof ProviderReviewError) return providerReviewErrorToTrpcError(error);
   return new TRPCError({
     code: 'INTERNAL_SERVER_ERROR',
     message: 'The review request failed. Please try again.',
@@ -647,9 +639,17 @@ async function failProviderRowAmbiguous(
 /**
  * Coarse ledger outcome code derived from the classified failure. The
  * stale-head kind is folded to `head_moved` from the ORIGINAL error (the
- * fixed CONFLICT copy contains no 'head' word to match on); everything else
- * follows the tRPC code, mirroring `outcomeCodeFromTrpcError` in the GitHub
- * write path.
+ * fixed CONFLICT copy contains no 'head' word to match on); every other code
+ * is named explicitly, so an internal failure is never recorded as a client
+ * rejection.
+ *
+ * The codes this router produces are BAD_REQUEST, FORBIDDEN, NOT_FOUND,
+ * PRECONDITION_FAILED and CONFLICT (from `toProviderTrpcError`), plus
+ * INTERNAL_SERVER_ERROR for a failure no layer classified. BAD_GATEWAY never
+ * arrives: `isAmbiguousFailure` routes it to reconcile_pending before any
+ * settle. TOO_MANY_REQUESTS is not produced by a provider layer today and
+ * keeps its mapping for the shared failure taxonomy; every other code falls
+ * back to `unclassified` rather than claiming the provider refused the request.
  */
 function outcomeCodeFromFailure(error: unknown, trpcError: TRPCError): string {
   if (error instanceof ProviderReviewError) {
@@ -666,8 +666,12 @@ function outcomeCodeFromFailure(error: unknown, trpcError: TRPCError): string {
       return 'forbidden';
     case 'CONFLICT':
       return 'conflict';
-    default:
+    case 'BAD_REQUEST':
       return 'bad_request';
+    case 'INTERNAL_SERVER_ERROR':
+      return 'internal_error';
+    default:
+      return 'unclassified';
   }
 }
 

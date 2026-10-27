@@ -249,8 +249,7 @@ function refinePersistedSessionCredentialGrant(
       KILO_OPENROUTER_BASE: grant.kilo.targets.providerBaseUrl,
       KILO_SESSION_INGEST_URL: grant.kilo.targets.sessionIngestBaseUrl,
     },
-    grant.kilo.token,
-    { requireHttps: grant.provider === 'vercel' }
+    grant.kilo.token
   );
   if (!targets.success || JSON.stringify(targets.targets) !== JSON.stringify(grant.kilo.targets)) {
     reject();
@@ -571,7 +570,9 @@ function repositoryFromSource(
         : {}),
       ...(repository.githubAccessPurpose ? { accessPurpose: repository.githubAccessPurpose } : {}),
       allowUserAuthorization:
-        context.createdOnPlatform === 'cloud-agent-web' || context.createdOnPlatform === 'slack',
+        context.createdOnPlatform === 'cloud-agent-web' ||
+        context.createdOnPlatform === 'agent-manager' ||
+        context.createdOnPlatform === 'slack',
     };
   }
   const url = canonicalRepositoryUrl(repository.url, repository.type !== 'git', diagnostic);
@@ -1163,9 +1164,9 @@ export async function prepareCredentialGrant(
   }
   const provider = input.provider;
   const containmentEnabled = input.containmentEnabled;
-  const targets = deriveKiloSandboxTargets(env, token.data, {
-    requireHttps: provider === 'vercel',
-  });
+  // Upstream requests run in the control plane. The runtime uses the separately
+  // validated runtime-proxy facade, including for Vercel.
+  const targets = deriveKiloSandboxTargets(env, token.data);
   if (!targets.success) {
     diagnostic?.record({ grantPhase: 'configuration', grantFailureReason: 'invalid_target' });
     invalidCredentials();

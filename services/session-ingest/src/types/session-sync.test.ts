@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES } from '@kilocode/session-ingest-contracts';
+
 import { SessionItemSchema } from './session-sync';
 
 describe('SessionItemSchema agent_notification validation', () => {
@@ -326,5 +328,89 @@ describe('SessionItemSchema storage key identity', () => {
         data: { id: 'prt_parent\u0000child', messageID: 'msg_parent' },
       }).success
     ).toBe(false);
+  });
+
+  it('accepts a message ID at the cursor id byte limit', () => {
+    // Message ids become history cursor ids, so the cursor contract, not the
+    // 256-byte storage segment cap, is what a message id has to satisfy.
+    const idAtCursorLimit = `msg_${'a'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES - 4)}`;
+    expect(
+      SessionItemSchema.safeParse({ type: 'message', data: { id: idAtCursorLimit } }).success
+    ).toBe(true);
+    expect(
+      SessionItemSchema.safeParse({ type: 'message', data: { id: `${idAtCursorLimit}a` } }).success
+    ).toBe(false);
+  });
+
+  it('rejects a part ID or part message ID over 256 characters before persistence', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: `prt_${'a'.repeat(256)}`, messageID: 'msg_parent' },
+      }).success
+    ).toBe(false);
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: 'prt_child', messageID: `msg_${'a'.repeat(256)}` },
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts a part identity with both segments exactly 256 characters', () => {
+    // The largest derived part identity is 256 + 1 + 256 bytes.
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: `prt_${'a'.repeat(252)}`, messageID: `msg_${'a'.repeat(252)}` },
+      }).success
+    ).toBe(true);
+  });
+});
+
+describe('SessionItemSchema identity segments', () => {
+  it.each(['message', 'part', 'agent_notification'])(
+    'refuses a part whose message id equals the %s root',
+    reserved => {
+      expect(
+        SessionItemSchema.safeParse({
+          type: 'part',
+          data: { id: 'prt_child', messageID: reserved },
+        }).success
+      ).toBe(false);
+    }
+  );
+
+  it.each(['message', 'part', 'agent_notification'])(
+    'refuses a message whose id equals the %s root',
+    reserved => {
+      expect(SessionItemSchema.safeParse({ type: 'message', data: { id: reserved } }).success).toBe(
+        false
+      );
+    }
+  );
+
+  it('accepts ordinary message and part identities', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'message',
+        data: { id: 'msg_42', role: 'assistant' },
+      }).success
+    ).toBe(true);
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: 'prt_1', messageID: 'msg_42' },
+      }).success
+    ).toBe(true);
+  });
+
+  it('accepts a part id equal to an item-type root', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'part',
+        data: { id: 'message', messageID: 'msg_42' },
+      }).success
+    ).toBe(true);
   });
 });

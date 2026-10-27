@@ -1,17 +1,39 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { PlatformIntegration } from '@kilocode/db';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
-import type { createCloudAgentNextClient as CreateCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import type {
   buildGitLabCloneUrl as BuildGitLabCloneUrl,
+  getGitLabInstanceUrlForOrganization as GetGitLabInstanceUrlForOrganization,
   getGitLabInstanceUrlForUser as GetGitLabInstanceUrlForUser,
+  getGitLabTokenForOrganization as GetGitLabTokenForOrganization,
   getGitLabTokenForUser as GetGitLabTokenForUser,
+  validateGitLabRepoAccessForOrganization as ValidateGitLabRepoAccessForOrganization,
+  validateGitLabRepoAccessForUser as ValidateGitLabRepoAccessForUser,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
+import type { getBotUserId as GetBotUserId } from '@/lib/bot-users/bot-user-service';
 import type { resolveGitHubRepositoryForOwner as ResolveGitHubRepositoryForOwner } from '@/lib/slack-bot/github-repository-context';
 import type SpawnCloudAgentSession from './spawn-cloud-agent-session';
+import { INSUFFICIENT_CREDITS_RESPONSE } from '@/lib/cloud-agent-next/run-session';
 
 const mockGetGitHubIntegrationById =
   jest.fn<(...args: unknown[]) => Promise<PlatformIntegration | null>>();
+const mockAuthorizeGitHubRepositoryFn =
+  jest.fn<(params: unknown) => Promise<{ allowed: true } | { allowed: false; markdown: string }>>();
+
+function authorizeGitHubRepository(params: unknown) {
+  return mockAuthorizeGitHubRepositoryFn(params);
+}
+
+jest.mock('@/lib/bot/github-repository-permission', () => ({
+  authorizeGitHubRepository,
+}));
+
+// Hoisted jest fns referenced from the jest.mock factories below; typed
+// loosely to avoid re-instantiating the factories' drizzle generics.
+const mockCreateCloudAgentNextClient = jest.fn<(...args: unknown[]) => unknown>();
+const mockCreateCloudAgentNextClientForModel = jest.fn<(...args: unknown[]) => unknown>();
+const mockComputeCloudAgentNextBalanceCheckEligibility =
+  jest.fn<(...args: unknown[]) => Promise<{ isFree: boolean; hasUserByokAvailable: boolean }>>();
 
 jest.mock('@/lib/web-config.server', () => ({
   CALLBACK_TOKEN_SECRET: 'callback-secret',
@@ -22,7 +44,24 @@ jest.mock('@kilocode/web-shared/lib/constants', () => ({
 }));
 
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
-  createCloudAgentNextClient: jest.fn(),
+  createCloudAgentNextClient: mockCreateCloudAgentNextClient,
+  createCloudAgentNextClientForModel: mockCreateCloudAgentNextClientForModel,
+  InsufficientCreditsError: class InsufficientCreditsError extends Error {
+    readonly httpStatus = 402;
+    readonly code = 'PAYMENT_REQUIRED';
+    constructor(message = 'Insufficient credits: $1 minimum required') {
+      super(message);
+      this.name = 'InsufficientCreditsError';
+    }
+  },
+}));
+
+jest.mock('@/lib/cloud-agent-next/balance-check-eligibility', () => ({
+  computeCloudAgentNextBalanceCheckEligibility: mockComputeCloudAgentNextBalanceCheckEligibility,
+}));
+
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
+  db: {},
 }));
 
 jest.mock('@/lib/slack-bot/github-repository-context', () => ({
@@ -39,6 +78,12 @@ jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
   getGitLabInstanceUrlForOrganization: jest.fn(),
   getGitLabInstanceUrlForUser: jest.fn(),
   buildGitLabCloneUrl: jest.fn(),
+  validateGitLabRepoAccessForOrganization: jest.fn(),
+  validateGitLabRepoAccessForUser: jest.fn(),
+}));
+
+jest.mock('@/lib/bot-users/bot-user-service', () => ({
+  getBotUserId: jest.fn(),
 }));
 
 jest.mock('@sentry/nextjs', () => ({
@@ -69,37 +114,67 @@ const profileDerivedInlineFields = [
 const mockPrepareSession =
   jest.fn<(input: unknown) => Promise<{ cloudAgentSessionId: string; kiloSessionId: string }>>();
 const mockInitiateFromPreparedSession = jest.fn<(input: unknown) => Promise<unknown>>();
+const mockCleanupSession = jest.fn<(sessionId: string) => Promise<{ success: boolean }>>();
 let spawnCloudAgentSession: typeof SpawnCloudAgentSession;
-let mockCreateCloudAgentNextClient: jest.MockedFunction<typeof CreateCloudAgentNextClient>;
 let mockResolveGitHubRepositoryForOwner: jest.MockedFunction<
   typeof ResolveGitHubRepositoryForOwner
 >;
 let mockGetGitLabTokenForUser: jest.MockedFunction<typeof GetGitLabTokenForUser>;
+let mockGetGitLabTokenForOrganization: jest.MockedFunction<typeof GetGitLabTokenForOrganization>;
 let mockGetGitLabInstanceUrlForUser: jest.MockedFunction<typeof GetGitLabInstanceUrlForUser>;
+let mockGetGitLabInstanceUrlForOrganization: jest.MockedFunction<
+  typeof GetGitLabInstanceUrlForOrganization
+>;
 let mockBuildGitLabCloneUrl: jest.MockedFunction<typeof BuildGitLabCloneUrl>;
+let mockValidateGitLabRepoAccessForUser: jest.MockedFunction<
+  typeof ValidateGitLabRepoAccessForUser
+>;
+let mockValidateGitLabRepoAccessForOrganization: jest.MockedFunction<
+  typeof ValidateGitLabRepoAccessForOrganization
+>;
+let mockGetBotUserId: jest.MockedFunction<typeof GetBotUserId>;
 
 describe('spawnCloudAgentSession delegation', () => {
+  // Dynamic imports keep the mocked modules' lazy `server-only` / config
+  // side effects from running before jest.mock factories are registered.
   beforeAll(async () => {
-    const client = await import('@/lib/cloud-agent-next/cloud-agent-client');
     const githubRepositoryContext = await import('@/lib/slack-bot/github-repository-context');
     const gitlab = await import('@/lib/cloud-agent/gitlab-integration-helpers');
+    const botUsers = await import('@/lib/bot-users/bot-user-service');
     const spawn = await import('./spawn-cloud-agent-session');
 
-    mockCreateCloudAgentNextClient = jest.mocked(client.createCloudAgentNextClient);
     mockResolveGitHubRepositoryForOwner = jest.mocked(
       githubRepositoryContext.resolveGitHubRepositoryForOwner
     );
     mockGetGitLabTokenForUser = jest.mocked(gitlab.getGitLabTokenForUser);
+    mockGetGitLabTokenForOrganization = jest.mocked(gitlab.getGitLabTokenForOrganization);
     mockGetGitLabInstanceUrlForUser = jest.mocked(gitlab.getGitLabInstanceUrlForUser);
+    mockGetGitLabInstanceUrlForOrganization = jest.mocked(
+      gitlab.getGitLabInstanceUrlForOrganization
+    );
     mockBuildGitLabCloneUrl = jest.mocked(gitlab.buildGitLabCloneUrl);
+    mockValidateGitLabRepoAccessForUser = jest.mocked(gitlab.validateGitLabRepoAccessForUser);
+    mockValidateGitLabRepoAccessForOrganization = jest.mocked(
+      gitlab.validateGitLabRepoAccessForOrganization
+    );
+    mockGetBotUserId = jest.mocked(botUsers.getBotUserId);
     spawnCloudAgentSession = spawn.default;
   });
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValue({
+      isFree: false,
+      hasUserByokAvailable: false,
+    });
+    mockCreateCloudAgentNextClientForModel.mockImplementation(
+      token => mockCreateCloudAgentNextClient(token) as never
+    );
+    mockAuthorizeGitHubRepositoryFn.mockResolvedValue({ allowed: true });
     mockCreateCloudAgentNextClient.mockReturnValue({
       prepareSession: mockPrepareSession,
       initiateFromPreparedSession: mockInitiateFromPreparedSession,
+      cleanupSession: mockCleanupSession,
     } as never);
     mockPrepareSession.mockResolvedValue({
       cloudAgentSessionId: 'cloud-session-1',
@@ -120,8 +195,13 @@ describe('spawnCloudAgentSession delegation', () => {
       repositories: [{ id: 1, name: 'repo', full_name: 'owner/repo', private: true }],
     });
     mockGetGitLabTokenForUser.mockResolvedValue('gitlab-token');
+    mockGetGitLabTokenForOrganization.mockResolvedValue('gitlab-org-token');
     mockGetGitLabInstanceUrlForUser.mockResolvedValue('https://gitlab.com');
+    mockGetGitLabInstanceUrlForOrganization.mockResolvedValue('https://gitlab.com');
     mockBuildGitLabCloneUrl.mockReturnValue('https://gitlab.com/group/repo.git');
+    mockValidateGitLabRepoAccessForUser.mockResolvedValue(true);
+    mockValidateGitLabRepoAccessForOrganization.mockResolvedValue(true);
+    mockGetBotUserId.mockResolvedValue('bot-user-1');
   });
 
   it('delegates GitHub profile resolution while preserving repository and organization context', async () => {
@@ -156,9 +236,7 @@ describe('spawnCloudAgentSession delegation', () => {
     for (const field of profileDerivedInlineFields) {
       expect(prepareInput).not.toHaveProperty(field);
     }
-    expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('auth-token', {
-      skipBalanceCheck: true,
-    });
+    expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('auth-token');
     expect(mockGetGitHubIntegrationById).toHaveBeenCalledWith(
       { type: 'org', id: 'organization-1' },
       'github-association-1'
@@ -170,6 +248,53 @@ describe('spawnCloudAgentSession delegation', () => {
       cloudAgentSessionId: 'cloud-session-1',
       kiloSessionId: 'kilo-session-1',
     });
+  });
+
+  it('rejects a session target when the triggering account cannot write to it', async () => {
+    mockAuthorizeGitHubRepositoryFn.mockResolvedValue({
+      allowed: false,
+      markdown: 'I could not confirm write access to `other/repo`.',
+    });
+
+    await expect(
+      spawnCloudAgentSession(
+        { githubRepo: 'other/repo', prompt: 'Please change it', mode: 'code' },
+        'model',
+        organizationIntegration,
+        'auth-token',
+        'request-denied',
+        undefined,
+        { actorLogin: 'octocat', threadRepository: 'owner/repo' }
+      )
+    ).resolves.toEqual({ response: 'I could not confirm write access to `other/repo`.' });
+    expect(mockAuthorizeGitHubRepositoryFn).toHaveBeenCalledWith({
+      platformIntegration: organizationIntegration,
+      repository: 'other/repo',
+      threadRepository: 'owner/repo',
+      actorLogin: 'octocat',
+    });
+    expect(mockResolveGitHubRepositoryForOwner).not.toHaveBeenCalled();
+    expect(mockPrepareSession).not.toHaveBeenCalled();
+  });
+
+  it('authorizes the conversation repository with the triggering account', async () => {
+    await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Please change it', mode: 'code' },
+      'model',
+      organizationIntegration,
+      'auth-token',
+      'request-allowed',
+      undefined,
+      { actorLogin: 'octocat', threadRepository: 'owner/repo' }
+    );
+
+    expect(mockAuthorizeGitHubRepositoryFn).toHaveBeenCalledWith({
+      platformIntegration: organizationIntegration,
+      repository: 'owner/repo',
+      threadRepository: 'owner/repo',
+      actorLogin: 'octocat',
+    });
+    expect(mockPrepareSession).toHaveBeenCalled();
   });
 
   it('rejects GitHub repositories outside the owner inventory', async () => {
@@ -232,6 +357,72 @@ describe('spawnCloudAgentSession delegation', () => {
     for (const field of profileDerivedInlineFields) {
       expect(prepareInput).not.toHaveProperty(field);
     }
+    expect(mockValidateGitLabRepoAccessForUser).toHaveBeenCalledWith('owner-1', 'group/repo');
+  });
+
+  it('resolves a GitLab project through the account connection before preparing the session', async () => {
+    mockValidateGitLabRepoAccessForUser.mockResolvedValue(false);
+
+    await expect(
+      spawnCloudAgentSession(
+        { gitlabProject: 'outside/project', prompt: 'Use the files', mode: 'code' },
+        'model',
+        userIntegration,
+        'auth-token',
+        'request-gitlab-outside'
+      )
+    ).resolves.toEqual(
+      expect.objectContaining({
+        response: expect.stringContaining('not available through this account'),
+      })
+    );
+    expect(mockValidateGitLabRepoAccessForUser).toHaveBeenCalledWith('owner-1', 'outside/project');
+    expect(mockGetGitLabTokenForUser).not.toHaveBeenCalled();
+    expect(mockBuildGitLabCloneUrl).not.toHaveBeenCalled();
+    expect(mockPrepareSession).not.toHaveBeenCalled();
+  });
+
+  it('resolves an organization GitLab project through the acting bot user', async () => {
+    await spawnCloudAgentSession(
+      { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },
+      'model',
+      organizationIntegration,
+      'auth-token',
+      'request-gitlab-org'
+    );
+
+    expect(mockValidateGitLabRepoAccessForOrganization).toHaveBeenCalledWith(
+      'organization-1',
+      'bot-user-1',
+      'group/repo'
+    );
+    expect(mockValidateGitLabRepoAccessForUser).not.toHaveBeenCalled();
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        gitUrl: 'https://gitlab.com/group/repo.git',
+        gitToken: 'gitlab-org-token',
+        platform: 'gitlab',
+        kilocodeOrganizationId: 'organization-1',
+      })
+    );
+  });
+
+  it('prepares no session when the project lookup fails', async () => {
+    mockValidateGitLabRepoAccessForUser.mockRejectedValue(new Error('gitlab unavailable'));
+
+    await expect(
+      spawnCloudAgentSession(
+        { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },
+        'model',
+        userIntegration,
+        'auth-token',
+        'request-gitlab-lookup-failed'
+      )
+    ).resolves.toEqual(
+      expect.objectContaining({ response: expect.stringContaining('Could not verify access') })
+    );
+    expect(mockGetGitLabTokenForUser).not.toHaveBeenCalled();
+    expect(mockPrepareSession).not.toHaveBeenCalled();
   });
 
   it.each(['slack', 'github', 'linear'])(
@@ -256,4 +447,109 @@ describe('spawnCloudAgentSession delegation', () => {
       );
     }
   );
+
+  it('selects the client through model eligibility with the payer user and organization', async () => {
+    mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValueOnce({
+      isFree: true,
+      hasUserByokAvailable: false,
+    });
+
+    await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
+      'kilo-auto/free',
+      organizationIntegration,
+      'auth-token',
+      'request-eligible',
+      undefined,
+      { chatPlatform: 'slack', payerUserId: 'user-9' }
+    );
+
+    expect(mockComputeCloudAgentNextBalanceCheckEligibility).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user: { id: 'user-9' },
+        modelId: 'kilo-auto/free',
+        organizationId: 'organization-1',
+      })
+    );
+    expect(mockCreateCloudAgentNextClientForModel).toHaveBeenCalledWith('auth-token', {
+      isFree: true,
+      hasUserByokAvailable: false,
+    });
+  });
+
+  it('falls back to the balance-checked client when eligibility resolution fails', async () => {
+    mockComputeCloudAgentNextBalanceCheckEligibility.mockRejectedValueOnce(new Error('db down'));
+
+    await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
+      'model',
+      userIntegration,
+      'auth-token',
+      'request-fallback',
+      undefined,
+      { chatPlatform: 'slack' }
+    );
+
+    expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('auth-token');
+    expect(mockPrepareSession).toHaveBeenCalled();
+  });
+
+  it('returns the credits response and starts no session when prepare is rejected for insufficient credits', async () => {
+    const { InsufficientCreditsError } = await import('@/lib/cloud-agent-next/cloud-agent-client');
+    mockPrepareSession.mockRejectedValueOnce(new InsufficientCreditsError());
+
+    const result = await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
+      'model',
+      userIntegration,
+      'auth-token',
+      'request-credits',
+      undefined,
+      { chatPlatform: 'slack' }
+    );
+
+    expect(result.response).toBe(INSUFFICIENT_CREDITS_RESPONSE);
+    expect(result).not.toHaveProperty('cloudAgentSessionId');
+    expect(mockInitiateFromPreparedSession).not.toHaveBeenCalled();
+  });
+
+  it('returns the credits response and starts no session when initiate is rejected for insufficient credits', async () => {
+    const { InsufficientCreditsError } = await import('@/lib/cloud-agent-next/cloud-agent-client');
+    mockInitiateFromPreparedSession.mockRejectedValueOnce(new InsufficientCreditsError());
+
+    const result = await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
+      'model',
+      userIntegration,
+      'auth-token',
+      'request-credits-initiate',
+      undefined,
+      { chatPlatform: 'slack' }
+    );
+
+    expect(result.response).toBe(INSUFFICIENT_CREDITS_RESPONSE);
+    expect(result).not.toHaveProperty('cloudAgentSessionId');
+    expect(mockCleanupSession).toHaveBeenCalledWith('cloud-session-1');
+  });
+
+  it('falls back to the integration owner for the payer user when none is supplied', async () => {
+    mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValueOnce({
+      isFree: true,
+      hasUserByokAvailable: false,
+    });
+
+    await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
+      'kilo-auto/free',
+      userIntegration,
+      'auth-token',
+      'request-owner-payer',
+      undefined,
+      { chatPlatform: 'slack' }
+    );
+
+    expect(mockComputeCloudAgentNextBalanceCheckEligibility).toHaveBeenCalledWith(
+      expect.objectContaining({ user: { id: 'owner-1' } })
+    );
+  });
 });

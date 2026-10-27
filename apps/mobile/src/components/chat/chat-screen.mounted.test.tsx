@@ -621,6 +621,22 @@ describe('a retained chat failure', () => {
     expect(state.retry).toHaveBeenCalledOnce();
   });
 
+  it('offers no retry for a chat this place cannot open', async () => {
+    /* Entering it again settles the same state, so the row says what is true
+       without offering a button that cannot change it. */
+    state.status = 'idle';
+    state.failureKey = 'queryError.notFoundDescription';
+
+    const tree = await mount();
+
+    const status = tree.root.find(node => (node.type as string) === 'AccessibleStatus');
+    expect(status.props.message).toBe('This item may have been removed or is no longer available.');
+    const retryLabels = tree.root.findAll(
+      node => (node.type as string) === 'Text' && node.props.children === i18n.t('common.retry')
+    );
+    expect(retryLabels).toHaveLength(0);
+  });
+
   it('says the balance blocked the send and opens where the credit is bought', async () => {
     state.status = 'idle';
     state.asked = 'what is a monad';

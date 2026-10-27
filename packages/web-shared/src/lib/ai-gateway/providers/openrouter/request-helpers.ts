@@ -326,6 +326,44 @@ export function removeChatCompletionsMessageNames(request: OpenRouterChatComplet
   }
 }
 
+function mapReasoningDetailsToReasoningString(
+  request: OpenRouterChatCompletionRequest,
+  field: 'reasoning_content' | 'reasoning'
+) {
+  for (const message of request.messages) {
+    const messageWithReasoning = message as typeof message & MessageWithReasoning;
+    const legacyReasoning = messageWithReasoning.reasoning;
+    delete messageWithReasoning.reasoning;
+
+    const reasoningDetails = messageWithReasoning.reasoning_details;
+    if (!Array.isArray(reasoningDetails)) {
+      if (legacyReasoning && !messageWithReasoning[field]) {
+        messageWithReasoning[field] = legacyReasoning;
+      }
+      continue;
+    }
+    delete messageWithReasoning.reasoning_details;
+
+    const reasoningText = reasoningDetails
+      .map(detail => {
+        switch (detail.type) {
+          case ReasoningDetailType.Text:
+            return detail.text ?? '';
+          case ReasoningDetailType.Summary:
+            return detail.summary;
+          case ReasoningDetailType.Encrypted:
+            // Opaque provider-specific blob; not representable as a reasoning string.
+            return '';
+        }
+      })
+      .join('');
+
+    if (reasoningText) {
+      messageWithReasoning[field] = reasoningText;
+    }
+  }
+}
+
 /**
  * Inverse of the reasoning-content response transform: folds
  * OpenRouter-style `reasoning_details` back into the DeepSeek-style
@@ -334,38 +372,16 @@ export function removeChatCompletionsMessageNames(request: OpenRouterChatComplet
  * string is dropped because strict upstreams reject it as an unknown field.
  */
 export function mapReasoningDetailsToReasoningContent(request: OpenRouterChatCompletionRequest) {
-  for (const message of request.messages) {
-    const messageWithReasoning = message as typeof message & MessageWithReasoning;
-    const legacyReasoning = messageWithReasoning.reasoning;
-    delete messageWithReasoning.reasoning;
+  mapReasoningDetailsToReasoningString(request, 'reasoning_content');
+}
 
-    const reasoningDetails = messageWithReasoning.reasoning_details;
-    if (!Array.isArray(reasoningDetails)) {
-      if (legacyReasoning && !messageWithReasoning.reasoning_content) {
-        messageWithReasoning.reasoning_content = legacyReasoning;
-      }
-      continue;
-    }
-    delete messageWithReasoning.reasoning_details;
-
-    const reasoningContent = reasoningDetails
-      .map(detail => {
-        switch (detail.type) {
-          case ReasoningDetailType.Text:
-            return detail.text ?? '';
-          case ReasoningDetailType.Summary:
-            return detail.summary;
-          case ReasoningDetailType.Encrypted:
-            // Opaque provider-specific blob; not representable as reasoning_content.
-            return '';
-        }
-      })
-      .join('');
-
-    if (reasoningContent) {
-      messageWithReasoning.reasoning_content = reasoningContent;
-    }
-  }
+/**
+ * Inverse of the reasoning response transform: folds OpenRouter-style
+ * `reasoning_details` back into the plain `reasoning` string that upstreams
+ * like Amazon Bedrock's mantle Chat Completions endpoint speak.
+ */
+export function mapReasoningDetailsToReasoning(request: OpenRouterChatCompletionRequest) {
+  mapReasoningDetailsToReasoningString(request, 'reasoning');
 }
 
 export function scrubOpenCodeSpecificProperties(request: OpenRouterChatCompletionRequest) {

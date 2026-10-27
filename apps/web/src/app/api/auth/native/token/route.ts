@@ -5,6 +5,7 @@ import {
   verifyNativeGoogleIdToken,
   exchangeNativeGoogleAuthCode,
   NativeIdTokenError,
+  NonceStoreUnavailableError,
 } from '@/lib/auth/native-id-tokens';
 import { AppleJwtClientError } from '@/lib/auth/apple-jwks';
 import {
@@ -27,6 +28,7 @@ import {
   type CreateOrUpdateUserResult,
 } from '@/lib/user';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
+import type { User } from '@kilocode/db/schema';
 import { checkDomainSignInEligibility } from '@/lib/auth/email-signin-eligibility';
 import {
   requireAdmissionPayload,
@@ -40,6 +42,7 @@ import {
   createDeviceSession,
   issueSessionCredentials,
   createDeviceSessionWithAttestedKey,
+  revokeDeviceSession,
 } from '@/lib/auth/device-sessions';
 import { captureMessage } from '@sentry/nextjs';
 import PostHogClient from '@kilocode/web-shared/lib/posthog';
@@ -107,6 +110,17 @@ async function checkExistingProviderAccount(
   return eligibility.ok ? undefined : eligibilityResponse(eligibility);
 }
 
+/**
+ * Mint the long-lived credential returned to a sign-in that does not receive a
+ * refresh pair. The response shape stays the same, and the credential carries
+ * the device session resolved by the caller.
+ */
+function legacyTokenResponse(params: { user: User; deviceSessionId: string; created: boolean }) {
+  captureMessage('native_token_legacy_long_lived_count: 1');
+  const token = generateApiToken(params.user, { deviceSessionId: params.deviceSessionId });
+  return NextResponse.json({ token, created: params.created }, { status: 200 });
+}
+
 const requestSchema = z.discriminatedUnion('provider', [
   z.object({
     provider: z.literal('apple'),
@@ -166,6 +180,7 @@ const requestSchema = z.discriminatedUnion('provider', [
  *   401 { error: 'INVALID_TICKET' }
  *   425 { error: 'CODE_IN_PROGRESS' }
  *   429 { error: 'TOO_MANY_ATTEMPTS' }
+ *   503 { error: 'NONCE_STORE_UNAVAILABLE' }
  *   403/503 { error: 'BLOCKED' | 'SSO_ERROR', ssoOrganizationId? }
  *   403 { error: AuthErrorType }
  *   403 { error: 'ADMISSION_REQUIRED' }
@@ -260,9 +275,14 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       );
     }
 
-    captureMessage('native_token_legacy_long_lived_count: 1');
-    const token = generateApiToken(user);
-    return NextResponse.json({ token, created: false }, { status: 200 });
+    return legacyTokenResponse({
+      user,
+      deviceSessionId: await createDeviceSession({
+        userId: user.id,
+        userAgent: request.headers.get('user-agent') ?? undefined,
+      }),
+      created: false,
+    });
   }
 
   if (data.provider === 'apple') {
@@ -270,6 +290,9 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     try {
       verified = await verifyNativeAppleIdToken(data.idToken, data.nonce);
     } catch (error) {
+      if (error instanceof NonceStoreUnavailableError) {
+        return NextResponse.json({ error: 'NONCE_STORE_UNAVAILABLE' }, { status: 503 });
+      }
       if (!isInvalidNativeTokenError(error)) {
         throw error;
       }
@@ -357,6 +380,22 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     }
 
     let phase: 'reserved' | 'release' | 'committed' = 'reserved';
+    // Session-bound credentials prepared for this request. They are minted
+    // before the code is finalized, so a request that ends without delivering
+    // them must revoke what it created.
+    let preparedSessionId: string | undefined;
+    let preparedCredentials: { token: string; refreshToken: string; expiresIn: number } | undefined;
+
+    const abandonPreparedCredentials = async () => {
+      if (!preparedSessionId) {
+        return;
+      }
+      try {
+        await revokeDeviceSession(preparedSessionId, 'sign_in_not_completed');
+      } catch {
+        captureMessage('native_token_session_cleanup_failed');
+      }
+    };
 
     try {
       const eligibility = await checkDomainSignInEligibility(email);
@@ -421,11 +460,6 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
       // ── Step 5: Persist attested key after settlement ─────────────────
       // Must run BEFORE code commit so a key collision does not burn the
       // sign-in code without issuing a credential.
-      let sessionId: string | undefined;
-      let refreshCredentials:
-        | { token: string; refreshToken: string; expiresIn: number }
-        | undefined;
-
       if (data.supportsRefresh) {
         // Bind key persistence and session creation in one transaction.
         try {
@@ -435,8 +469,8 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
             user: result.user,
             verification: admissionVerification,
           });
-          sessionId = combined.sessionId;
-          refreshCredentials = {
+          preparedSessionId = combined.sessionId;
+          preparedCredentials = {
             token: combined.token,
             refreshToken: combined.refreshToken,
             expiresIn: combined.expiresIn,
@@ -447,7 +481,7 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
             phase = 'release';
             return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
           }
-          // Bookkeeping failure — log and fall through to the legacy token.
+          // Bookkeeping failure — log and fall through to a plain session.
           captureMessage('native_attested_key_persist_failed_after_settlement');
         }
       } else {
@@ -463,13 +497,25 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         }
       }
 
-      // ── Step 6: Consume the sign-in code AFTER key persistence ─────────
+      // ── Step 5.5: Resolve the device session and credential pair ───────
+      // Prepare session-bound credentials before finalizing the sign-in code.
+      preparedSessionId ??= await createDeviceSession({
+        userId: result.user.id,
+        userAgent: request.headers.get('user-agent') ?? undefined,
+      });
+
+      if (data.supportsRefresh && !preparedCredentials) {
+        preparedCredentials = await issueSessionCredentials(result.user, preparedSessionId);
+      }
+
+      // ── Step 6: Consume the sign-in code AFTER key and session persistence ─
       // The code is only committed once all pre-credential gates pass, so
       // a refusal never burns a code without issuing a credential.
       const committed = await commitSignInCode(data.email, data.code, data.challengeId);
       if (!committed) {
         const consumed = await consumeSignInCode(data.email, data.code, data.challengeId);
         if (!consumed) {
+          await abandonPreparedCredentials();
           return NextResponse.json({ error: 'INVALID_CODE' }, { status: 401 });
         }
         captureMessage('native_token_code_reservation_lapsed');
@@ -481,41 +527,26 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         posthogClient.capture(result.deferredSignInEvent);
       }
 
-      if (refreshCredentials) {
+      if (preparedCredentials) {
         return NextResponse.json(
           {
-            token: refreshCredentials.token,
-            refreshToken: refreshCredentials.refreshToken,
-            expiresIn: refreshCredentials.expiresIn,
+            token: preparedCredentials.token,
+            refreshToken: preparedCredentials.refreshToken,
+            expiresIn: preparedCredentials.expiresIn,
             created: result.isNew,
           },
           { status: 200 }
         );
       }
 
-      if (data.supportsRefresh) {
-        const sid =
-          sessionId ??
-          (await createDeviceSession({
-            userId: result.user.id,
-            userAgent: request.headers.get('user-agent') ?? undefined,
-          }));
-        const pair = await issueSessionCredentials(result.user, sid);
-        return NextResponse.json(
-          {
-            token: pair.token,
-            refreshToken: pair.refreshToken,
-            expiresIn: pair.expiresIn,
-            created: result.isNew,
-          },
-          { status: 200 }
-        );
-      }
-
-      captureMessage('native_token_legacy_long_lived_count: 1');
-      const token = generateApiToken(result.user);
-      return NextResponse.json({ token, created: result.isNew }, { status: 200 });
+      return legacyTokenResponse({
+        user: result.user,
+        deviceSessionId: preparedSessionId,
+        created: result.isNew,
+      });
     } catch (error) {
+      // Nothing was delivered, so nothing minted for this request stays usable.
+      await abandonPreparedCredentials();
       phase = 'release';
       throw error;
     } finally {
@@ -639,7 +670,14 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
     );
   }
 
-  captureMessage('native_token_legacy_long_lived_count: 1');
-  const token = generateApiToken(result.user);
-  return NextResponse.json({ token, created: result.isNew }, { status: 200 });
+  return legacyTokenResponse({
+    user: result.user,
+    deviceSessionId:
+      sessionId ??
+      (await createDeviceSession({
+        userId: result.user.id,
+        userAgent: request.headers.get('user-agent') ?? undefined,
+      })),
+    created: result.isNew,
+  });
 });

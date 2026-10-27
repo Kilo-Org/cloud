@@ -13,6 +13,7 @@ type MetadataFormProps = Readonly<{
   profile: AgentProfileDetail;
   isSaving: boolean;
   onSave: (values: { name: string; description: string }) => Promise<boolean>;
+  disabled?: boolean;
 }>;
 
 /**
@@ -20,7 +21,12 @@ type MetadataFormProps = Readonly<{
  * metadata changes. Defaults follow the draft refs so pending/error renders
  * cannot restore the old server values in the native fields.
  */
-export function ProfileMetadataForm({ profile, isSaving, onSave }: MetadataFormProps) {
+export function ProfileMetadataForm({
+  profile,
+  isSaving,
+  onSave,
+  disabled = false,
+}: MetadataFormProps) {
   const { t } = useTranslation();
   const nameRef = useRef(profile.name);
   const descriptionRef = useRef(profile.description ?? '');
@@ -55,7 +61,7 @@ export function ProfileMetadataForm({ profile, isSaving, onSave }: MetadataFormP
         placeholder={t('profiles.namePlaceholder')}
         defaultValue={nameRef.current}
         error={nameError ?? undefined}
-        disabled={isSaving}
+        disabled={disabled || isSaving}
         required
         returnKeyType="next"
         onChangeText={value => {
@@ -73,7 +79,7 @@ export function ProfileMetadataForm({ profile, isSaving, onSave }: MetadataFormP
         multiline
         textAlignVertical="top"
         className="min-h-20 leading-[1.25rem]"
-        disabled={isSaving}
+        disabled={disabled || isSaving}
         onChangeText={value => {
           descriptionRef.current = value;
           if (descriptionError !== null && validateProfileDescription(value) === null) {
@@ -82,7 +88,7 @@ export function ProfileMetadataForm({ profile, isSaving, onSave }: MetadataFormP
         }}
       />
       {saveFailed ? <AccessibleStatus message={t('profiles.saveFailed')} /> : null}
-      <Button loading={isSaving} disabled={isSaving} onPress={submit}>
+      <Button loading={isSaving} disabled={disabled || isSaving} onPress={submit}>
         <Text>{t(saveFailed ? 'common.retry' : 'common.save')}</Text>
       </Button>
     </View>

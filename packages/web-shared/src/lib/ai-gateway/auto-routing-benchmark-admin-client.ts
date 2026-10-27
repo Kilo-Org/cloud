@@ -21,7 +21,7 @@ import {
   type BenchmarkQueueSelector,
   type BenchmarkRunPurpose,
   type CustomRouterBenchmarkContext,
-  type CustomRouterScope,
+  type OwnerType,
   type PoolEntry,
 } from '@kilocode/auto-routing-contracts';
 import {
@@ -154,7 +154,7 @@ export type RegisterOwnerBenchmarkProfilesResult =
 export async function registerOwnerBenchmarkProfiles(
   request: {
     router: AutoRouter;
-    ownerType: CustomRouterScope;
+    ownerType: OwnerType;
     ownerId: string;
     entries: PoolEntry[];
   },

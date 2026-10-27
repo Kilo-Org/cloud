@@ -28,6 +28,7 @@ export type GroupedRegisterSessionInput = {
   };
   repository?: SessionRepositoryRequest;
   profile?: SessionProfileBundle;
+  environment?: SessionMetadata['environment'];
   finalization?: SessionFinalization;
   callback?: SessionMetadata['callback'];
   workspace?: Pick<
@@ -36,6 +37,7 @@ export type GroupedRegisterSessionInput = {
     | 'sandboxRoute'
     | 'sandboxKind'
     | 'sandboxProvider'
+    | 'sandboxProviderBinding'
     | 'shallow'
     | 'credentialContainment'
     | 'devcontainerRequested'
@@ -199,6 +201,7 @@ export async function buildSessionMetadataFromRegistration(
     },
     finalization: input.finalization,
     profile: input.profile,
+    ...(input.environment ? { environment: input.environment } : {}),
     callback: input.callback,
     workspace: {
       ...input.workspace,

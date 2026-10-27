@@ -18,7 +18,12 @@ import {
   type SessionAttachPayload,
   type SessionRequestIdentity,
 } from '../../../src/shared/sandbox-control-protocol.js';
-import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-environment.js';
+import {
+  CONTROL_RUNTIME_RESERVED_ENV_VARS,
+  RESERVED_ENV_VAR_PREFIXES,
+  SYSTEM_GIT_CONFIG_ENV,
+  isStrippedGitConfigEnvVar,
+} from '../../../src/shared/runtime-environment.js';
 import { kiloServerEnvForOrigin } from '../../../src/shared/kilo-server-env.js';
 import { type WrapperKiloClient } from '../kilo-api.js';
 
@@ -81,17 +86,25 @@ export function buildWorktreeKiloEnvironment(
   const isRuntimeOwned = (name: string): boolean =>
     reserved.has(name) ||
     name === 'HOME' ||
-    name.startsWith('XDG_') ||
-    name.startsWith('KILO') ||
-    name.startsWith('OPENCODE');
+    RESERVED_ENV_VAR_PREFIXES.some(prefix => name.startsWith(prefix));
 
   for (const [name, value] of Object.entries(inherited)) {
-    if (value !== undefined && !isRuntimeOwned(name) && !INHERITED_GIT_CREDENTIALS.has(name)) {
+    if (
+      value !== undefined &&
+      !isRuntimeOwned(name) &&
+      !INHERITED_GIT_CREDENTIALS.has(name) &&
+      !isStrippedGitConfigEnvVar(name)
+    ) {
       env[name] = value;
     }
   }
   for (const [name, value] of Object.entries(environment)) {
-    if (!isRuntimeOwned(name) || BITBUCKET_METADATA_ENV_VARS.has(name)) env[name] = value;
+    if (
+      (!isRuntimeOwned(name) || BITBUCKET_METADATA_ENV_VARS.has(name)) &&
+      !isStrippedGitConfigEnvVar(name)
+    ) {
+      env[name] = value;
+    }
   }
 
   let config = JSON.stringify({
@@ -176,5 +189,11 @@ export function buildWorktreeKiloEnvironment(
     KILO_SESSION_INGEST_URL: kilo.targets.sessionIngestBaseUrl,
     KILO_CONFIG_CONTENT: config,
     OPENCODE_CONFIG_CONTENT: config,
+    // Every process in the sandbox authenticates git through the platform's
+    // read-only helper: the wrapper's own clone/fetch, the Kilo CLI and the
+    // workspace terminal. The credential itself lives in the per-session record,
+    // never in `origin`. Pinned last so profile values cannot displace it.
+    ...SYSTEM_GIT_CONFIG_ENV,
+    GIT_TERMINAL_PROMPT: '0',
   };
 }

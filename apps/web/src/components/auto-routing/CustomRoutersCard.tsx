@@ -2,7 +2,7 @@
 
 import type {
   CustomRouterListResponse,
-  CustomRouterScope,
+  OwnerType,
   CustomRouterSummary,
 } from '@kilocode/auto-routing-contracts';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -42,7 +42,7 @@ export function customRoutersQueryKey(organizationId: string | undefined) {
 export function CustomRoutersCard({ organizationId, readonly = false }: Props) {
   const queryClient = useQueryClient();
   const queryKey = customRoutersQueryKey(organizationId);
-  const scope: CustomRouterScope = organizationId ? 'org' : 'user';
+  const scope: OwnerType = organizationId ? 'org' : 'user';
   const [editor, setEditor] = useState<EditorState>(null);
 
   const query = useQuery({

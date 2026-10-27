@@ -3,7 +3,7 @@ import {
   customRouterEntryKey,
   type AutoRouter,
   type CustomRouterEntryRef,
-  type CustomRouterScope,
+  type OwnerType,
 } from '@kilocode/auto-routing-contracts';
 import { and, eq, inArray, not, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
@@ -17,7 +17,7 @@ import type { OfflineSweep } from './scoreboard/schema';
 export type ClientProfileRow = typeof clientProfiles.$inferSelect;
 export type ClientCaseResultRow = typeof clientCaseResults.$inferSelect;
 
-export type ClientProfileOwner = { ownerType: CustomRouterScope; ownerId: string };
+export type ClientProfileOwner = { ownerType: OwnerType; ownerId: string };
 
 export type ClientProfileIdentity = ClientProfileOwner & {
   router: AutoRouter;

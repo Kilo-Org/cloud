@@ -12,7 +12,16 @@ import {
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { and, eq, sql } from 'drizzle-orm';
-import { createOrganization, addUserToOrganization, getOrganizationMembers } from './organizations';
+import {
+  findOrganizationMemberBalanceRow,
+  findOrganizationMemberRole,
+} from '@kilocode/worker-utils/account-access';
+import {
+  createOrganization,
+  addUserToOrganization,
+  getOrganizationMembers,
+  markOrganizationAsDeleted,
+} from './organizations';
 import {
   getBalanceForOrganizationUser,
   ingestOrganizationTokenUsage,
@@ -94,6 +103,39 @@ describe('Organization Usage Functions', () => {
       const result = await getBalanceForOrganizationUser(organization.id, nonMember.id);
 
       expect(result.balance).toBe(0);
+    });
+
+    test('resolves a role and a balance row only for an organization that is still live', async () => {
+      const user = await insertTestUser();
+      const organization = await createTestOrganization('Test Org', user.id, 100000);
+
+      await expect(findOrganizationMemberRole(db, organization.id, user.id)).resolves.toBe('owner');
+      await expect(
+        findOrganizationMemberBalanceRow(db, organization.id, user.id)
+      ).resolves.not.toBeNull();
+
+      await markOrganizationAsDeleted(organization.id);
+
+      await expect(findOrganizationMemberRole(db, organization.id, user.id)).resolves.toBeNull();
+      await expect(
+        findOrganizationMemberBalanceRow(db, organization.id, user.id)
+      ).resolves.toBeNull();
+    });
+
+    test('returns no balance for an organization that is no longer live', async () => {
+      const user = await insertTestUser();
+      const organization = await createTestOrganization('Test Org', user.id, 100000);
+
+      await expect(getBalanceForOrganizationUser(organization.id, user.id)).resolves.toMatchObject({
+        balance: 0.1,
+      });
+
+      await markOrganizationAsDeleted(organization.id);
+
+      const result = await getBalanceForOrganizationUser(organization.id, user.id);
+
+      expect(result.balance).toBe(0);
+      expect(result.settings).toEqual({});
     });
 
     test('should return 0 balance for billing_manager role', async () => {
@@ -205,10 +247,7 @@ describe('Organization Usage Functions', () => {
     test('processes a credit that expired before the cut-off and reports the reduced balance', async () => {
       const { owner, organization } = await createOrganizationWithDueCredit();
 
-      const result = await getBalanceForOrganizationUser(organization.id, owner.id, {
-        now,
-        expiryJitterHours: 0,
-      });
+      const result = await getBalanceForOrganizationUser(organization.id, owner.id, { now });
       await drainAfterCallbacks();
 
       expect(result.balance).toBe(0);

@@ -1,5 +1,5 @@
-const SENSITIVE_QUERY_PARAMS = new Set(['callbackurl', 'code', 'email', 'state', 'token']);
-const SENSITIVE_PATHS = new Set(['/auth/verify-magic-link']);
+export const SENSITIVE_QUERY_PARAMS = new Set(['callbackurl', 'code', 'email', 'state', 'token']);
+export const SENSITIVE_PATHS = new Set(['/auth/verify-magic-link']);
 const SESSION_SHARE_SEGMENT = 's/:share_token';
 const LEGACY_SHARE_SEGMENT = 'share/:share_id';
 const SHARE_PATH_SEGMENT = /(^|\/)(s|share)\/[^/?#\s"']+/g;

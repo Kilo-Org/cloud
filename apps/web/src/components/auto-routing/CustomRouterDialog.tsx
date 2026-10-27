@@ -13,7 +13,7 @@ import {
   type AutoRouter,
   type AutoRoutingMode,
   type CustomRouterEntry,
-  type CustomRouterScope,
+  type OwnerType,
   type CustomRouterSummary,
 } from '@kilocode/auto-routing-contracts';
 import { isDirectByokModelId } from '@kilocode/worker-utils/direct-byok-model';
@@ -82,7 +82,7 @@ function initialDraft(router: CustomRouterSummary | undefined): Draft {
   };
 }
 
-export function slugError(scope: CustomRouterScope, slug: string): string | null {
+export function slugError(scope: OwnerType, slug: string): string | null {
   if (!CUSTOM_ROUTER_SLUG_PATTERN.test(slug)) {
     return 'Use 1–40 lowercase letters, digits, or hyphens. Start and end with a letter or digit.';
   }
@@ -93,7 +93,7 @@ export function slugError(scope: CustomRouterScope, slug: string): string | null
 }
 
 type Props = {
-  scope: CustomRouterScope;
+  scope: OwnerType;
   organizationId: string | undefined;
   router: CustomRouterSummary | undefined;
   onClose: () => void;
@@ -150,23 +150,22 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
         defaultEntryKey: draft.defaultEntryKey,
       };
       const entriesChanged =
-        draft.entries.length !== router?.entries.length ||
-        draft.entries.some(
-          (entry, index) =>
-            customRouterEntryKey(entry) !== router?.entries[index]?.key ||
-            entry.measuredAs !== router?.entries[index]?.entry.measuredAs
-        );
-      // The API moves entries and the default together, so an entries update always carries it.
+        router !== undefined &&
+        (draft.entries.length !== router.entries.length ||
+          draft.entries.some(
+            (entry, index) =>
+              customRouterEntryKey(entry) !== router.entries[index]?.key ||
+              entry.measuredAs !== router.entries[index]?.entry.measuredAs
+          ));
       const patch = router
         ? {
             name: fields.name,
             ...(draft.baseRouter !== router.baseRouter ? { baseRouter: draft.baseRouter } : {}),
             ...(draft.mode !== router.mode ? { mode: draft.mode } : {}),
-            ...(entriesChanged
-              ? { entries: draft.entries, defaultEntryKey: draft.defaultEntryKey }
-              : draft.defaultEntryKey !== router.defaultEntryKey
-                ? { defaultEntryKey: draft.defaultEntryKey }
-                : {}),
+            ...(entriesChanged ? { entries: draft.entries } : {}),
+            ...(entriesChanged || draft.defaultEntryKey !== router.defaultEntryKey
+              ? { defaultEntryKey: draft.defaultEntryKey }
+              : {}),
           }
         : fields;
       const response = router

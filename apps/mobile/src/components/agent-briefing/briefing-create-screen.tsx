@@ -4,8 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { BriefingCreateReview } from './briefing-create-review';
 import { BriefingPeriodPicker } from './briefing-period-picker';
+import { BriefingDrafts } from './briefing-drafts';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -72,10 +72,11 @@ export function BriefingCreateScreen() {
       creation.reset();
     }
   }, [configuration, creation]);
-  const busy = creation.preparing || creation.creating;
+  const starting = creation.preparing && creation.draft === null;
+  const busy = starting || creation.creating;
   const periodError = preset === 'custom' ? briefingPeriodError(custom, Date.now()) : null;
 
-  const review = () => {
+  const review = async () => {
     if (!timezone || !selected || offline) {
       return;
     }
@@ -86,20 +87,15 @@ export function BriefingCreateScreen() {
       toast.error(t(invalid ?? 'agentBriefing.invalidPeriod'));
       return;
     }
-    void creation.prepare({
+    const draft = await creation.prepare({
       ...period,
       organizationId: organizationId ?? undefined,
       timezone,
       language,
     });
-  };
-  const confirm = async () => {
-    if (!selected || !timezone || offline) {
-      return;
-    }
-    const report = await creation.create();
-    if (report) {
-      router.replace(`${BRIEFING_PATH}/${report.id}` as Href);
+    if (draft) {
+      router.push(`${BRIEFING_PATH}/prepare/${draft.id}` as Href);
+      creation.reset();
     }
   };
 
@@ -138,6 +134,7 @@ export function BriefingCreateScreen() {
     <View className="flex-1 bg-background">
       {header}
       <ScrollView automaticallyAdjustKeyboardInsets contentContainerClassName="gap-5 p-4 pb-12">
+        <BriefingDrafts />
         <View className="gap-2">
           <Text className="font-semibold">{t('agentBriefing.chooseContext')}</Text>
           <View className="flex-row flex-wrap gap-2">
@@ -210,30 +207,13 @@ export function BriefingCreateScreen() {
           <Text className="text-xs text-muted-foreground">{t('agentBriefing.periodHint')}</Text>
           {periodError ? <Text className="text-sm text-destructive">{t(periodError)}</Text> : null}
         </View>
-        {creation.prepared && selected && timezone ? (
-          <BriefingCreateReview
-            prepared={creation.prepared}
-            disabled={offline || busy}
-            creating={creation.creating}
-            onCreate={() => {
-              void confirm();
-            }}
-            onReviewAgain={() => {
-              creation.reset();
-              review();
-            }}
-          />
-        ) : (
-          <Button
-            disabled={offline || !selected || !timezone || Boolean(periodError)}
-            loading={creation.preparing}
-            onPress={review}
-          >
-            <Text>{t('agentBriefing.reviewBriefing')}</Text>
-          </Button>
-        )}
-        {/* One reserved line below the action: a failure or the offline notice
-            appears here without moving the button or the review above it. */}
+        <Button
+          disabled={offline || busy || !selected || !timezone || Boolean(periodError)}
+          loading={starting}
+          onPress={review}
+        >
+          <Text>{t('agentBriefing.reviewBriefing')}</Text>
+        </Button>
         <View className="min-h-[20px]">
           {statusNotice ? <Text className="text-sm text-destructive">{statusNotice}</Text> : null}
         </View>

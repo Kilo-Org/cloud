@@ -324,7 +324,6 @@ describe('raw tRPC scope enforcement', () => {
     { mcpServers: {} },
     { setupCommands: [] },
     { cloudAgentSpawn: {} },
-    { images: {} },
     { attachments: {} },
     { gitUrl: 'https://fixture.invalid' },
     { initialPayload: {} },

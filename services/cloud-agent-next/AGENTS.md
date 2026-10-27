@@ -10,7 +10,7 @@ Every session is a `workspace_*` control-plane session. The Session DO (`Sandbox
 
 The Durable Objects are durable coordinators: they queue messages when a sandbox or wrapper is not ready, persist metadata and event replay state, schedule alarms, prepare or restore sandboxes, and deliver work to the wrapper. Most product behavior after the sandbox is available belongs on the wrapper/Kilo side. Keep the DOs focused on coordination, not feature logic.
 
-Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved via the shared `git-token-service` Worker. The wrapper connects to the Sandbox DO, forwards Kilo events through it to the Session DO, and owns the job lifecycle inside the sandbox.
+Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved via the shared `git-token-service` Worker. The wrapper connects to the Sandbox DO, forwards Kilo events through it to the Session DO, and owns the job lifecycle inside the sandbox. In the sandbox, git authenticates through the platform's read-only credential helper (`scripts/kilo-git-credential`, pinned by `SYSTEM_GIT_CONFIG_ENV`) and the per-session credential record in the runtime home. HTTP(S) worktree remotes use canonical URLs; SSH remotes retain their login.
 
 ## Development Commands
 

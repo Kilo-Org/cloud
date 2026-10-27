@@ -2080,6 +2080,83 @@
       "when": 1792693880283,
       "tag": "0296_orange_jack_power",
       "breakpoints": true
+    },
+    {
+      "idx": 297,
+      "version": "7",
+      "when": 1792780343168,
+      "tag": "0297_white_lenny_balinger",
+      "breakpoints": true
+    },
+    {
+      "idx": 298,
+      "version": "7",
+      "when": 1792829491526,
+      "tag": "0298_youthful_vin_gonzales",
+      "breakpoints": true
+    },
+    {
+      "idx": 299,
+      "version": "7",
+      "when": 1792862877322,
+      "tag": "0299_lame_mojo",
+      "breakpoints": true
+    },
+    {
+      "idx": 300,
+      "version": "7",
+      "when": 1792869596255,
+      "tag": "0300_device_auth_client_details",
+      "breakpoints": true
+    },
+    {
+      "idx": 301,
+      "version": "7",
+      "when": 1792876471766,
+      "tag": "0301_contributor_credit_window",
+      "breakpoints": true
+    },
+    {
+      "idx": 302,
+      "version": "7",
+      "when": 1792878599267,
+      "tag": "0302_loud_victor_mancha",
+      "breakpoints": true
+    },
+    {
+      "idx": 303,
+      "version": "7",
+      "when": 1793016204545,
+      "tag": "0303_rainy_wildside",
+      "breakpoints": true
+    },
+    {
+      "idx": 304,
+      "version": "7",
+      "when": 1793024513267,
+      "tag": "0304_fine_moonstone",
+      "breakpoints": true
+    },
+    {
+      "idx": 305,
+      "version": "7",
+      "when": 1793045874155,
+      "tag": "0305_usage_metadata_non_inference_cost",
+      "breakpoints": true
+    },
+    {
+      "idx": 306,
+      "version": "7",
+      "when": 1793049243861,
+      "tag": "0306_byok_api_key_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 307,
+      "version": "7",
+      "when": 1793099416452,
+      "tag": "0307_review_window_index",
+      "breakpoints": true
     }
   ]
 }

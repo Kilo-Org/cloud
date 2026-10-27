@@ -35,6 +35,7 @@ import { TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
 import { getHTTPStatusCodeFromError } from '@trpc/server/http';
 import type { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
+import type * as PendingUploadsModule from '@/lib/r2/cloud-agent-pending-uploads';
 import type * as StreamTicketModule from '@/lib/cloud-agent/stream-ticket';
 import type {
   organizationPrepareSessionNextSchema,
@@ -54,9 +55,13 @@ const ORGANIZATION_ID = '9a283301-b75d-4375-a1ba-e319a02e18b7';
 
 type AttachmentReference = { path: string; files: string[] };
 
+/** A valid client message id; the send schema requires one. */
+const SEND_MESSAGE_ID = 'msg_123456789abc123456789ABCDE';
+
 const mockPrepareSession = jest.fn<
   (input: {
     githubRepo?: string;
+    githubIntegrationId?: string;
     gitUrl?: string;
     platform?: 'github' | 'gitlab' | 'bitbucket';
     bitbucketWorkspaceUuid?: string;
@@ -179,6 +184,9 @@ const mockFetchGitHubRepositoriesForOrganization = jest.fn<
     syncedAt: null;
   }>
 >();
+const mockResolveGitHubIntegrationIdForRepository = jest.fn<
+  (owner: unknown, repositoryFullName: string) => Promise<string | null>
+>(() => Promise.resolve(null));
 const mockFetchGitLabRepositoriesForOrganization = jest.fn<
   (
     organizationId: string,
@@ -191,6 +199,12 @@ const mockFetchGitLabRepositoriesForOrganization = jest.fn<
     instanceUrl?: string;
   }>
 >();
+const mockValidateGitLabRepoAccessForOrganization =
+  jest.fn<(organizationId: string, actorUserId: string, projectPath: string) => Promise<boolean>>();
+const mockGetGitLabInstanceUrlForOrganization =
+  jest.fn<(organizationId: string) => Promise<string>>();
+const mockBuildGitLabCloneUrl = jest.fn<(projectPath: string, instanceUrl: string) => string>();
+const mockCaptureException = jest.fn();
 const mockOrderRepositoriesByUsage =
   jest.fn<
     <T extends { fullName: string }>(params: {
@@ -251,10 +265,20 @@ jest.mock('@/lib/cloud-agent/github-integration-helpers', () => ({
   fetchAllGitHubRepositoriesForOrganization: mockFetchGitHubRepositoriesForOrganization,
 }));
 
+jest.mock('@/lib/cloud-agent/github-integration-resolution', () => ({
+  resolveGitHubIntegrationIdForRepository: mockResolveGitHubIntegrationIdForRepository,
+}));
+
 jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
-  buildGitLabCloneUrl: jest.fn(),
+  buildGitLabCloneUrl: mockBuildGitLabCloneUrl,
   fetchGitLabRepositoriesForOrganization: mockFetchGitLabRepositoriesForOrganization,
-  getGitLabInstanceUrlForOrganization: jest.fn(),
+  getGitLabInstanceUrlForOrganization: mockGetGitLabInstanceUrlForOrganization,
+  validateGitLabRepoAccessForOrganization: mockValidateGitLabRepoAccessForOrganization,
+}));
+
+jest.mock('@sentry/nextjs', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@sentry/nextjs'),
+  captureException: mockCaptureException,
 }));
 
 jest.mock('@/lib/cloud-agent/order-repositories', () => ({
@@ -272,13 +296,16 @@ jest.mock('@/lib/cloud-agent/stream-ticket', () => {
 });
 
 jest.mock('@/lib/r2/cloud-agent-attachments', () => ({
-  generateImageUploadUrl: jest.fn(),
   generateCloudAgentAttachmentUploadUrl: mockGenerateCloudAgentAttachmentUploadUrl,
 }));
 
 jest.mock('@/lib/r2/cloud-agent-pending-uploads', () => ({
-  linkPendingUploads: jest.fn(),
+  linkAttachmentsForDispatch: jest.fn(async () => ['user-1/cloud-agent/linked/a.md']),
   releasePendingUploads: jest.fn(),
+}));
+
+jest.mock('@/lib/cloud-agent-next/release-refused-send', () => ({
+  releaseRefusedSend: jest.fn(async () => {}),
 }));
 
 jest.mock('@kilocode/web-shared/routers/organizations/utils', () => {
@@ -334,12 +361,11 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
     organizationId: string;
     cloudAgentSessionId: string;
     expectedWorktreeId?: `worktree_${string}`;
-    messageId?: string;
+    messageId: string;
     payload:
       | { type: 'prompt'; prompt: string; mode: string; model: string }
       | { type: 'command'; command: string; arguments: string };
     attachments?: { path: string; files: string[] };
-    images?: { path: string; files: string[] };
   }) => Promise<unknown>;
   getAttachmentUploadUrl: (input: {
     organizationId: string;
@@ -965,6 +991,7 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
       caller.sendMessage({
         organizationId: ORGANIZATION_ID,
         cloudAgentSessionId: 'agent_123',
+        messageId: SEND_MESSAGE_ID,
         payload: { type: 'prompt', prompt: 'Read notes', mode: 'code', model: 'test' },
       })
     ).rejects.toThrow('Organization does not own this session');
@@ -982,6 +1009,7 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
     await caller.sendMessage({
       organizationId: ORGANIZATION_ID,
       cloudAgentSessionId: 'agent_123',
+      messageId: SEND_MESSAGE_ID,
       payload: { type: 'prompt', prompt: 'Read notes', mode: 'code', model: 'test' },
       attachments,
     });
@@ -992,22 +1020,65 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
     );
   });
 
-  it('normalizes legacy image requests to canonical Worker attachments', async () => {
+  it('links the attachment rows before dispatching the send to the Worker', async () => {
     const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
-    const images = {
+    const attachments = {
       path: '12345678-1234-4234-9234-123456789abc',
-      files: ['87654321-4321-4321-8321-cba987654321.png'],
+      files: ['87654321-4321-4321-8321-cba987654321.md'],
     };
+    const pendingUploads = jest.requireMock<typeof PendingUploadsModule>(
+      '@/lib/r2/cloud-agent-pending-uploads'
+    );
+    const linkAttachmentsForDispatch = jest.mocked(pendingUploads.linkAttachmentsForDispatch);
 
     await caller.sendMessage({
       organizationId: ORGANIZATION_ID,
       cloudAgentSessionId: 'agent_123',
-      payload: { type: 'prompt', prompt: 'Read image', mode: 'code', model: 'test' },
-      images,
+      messageId: SEND_MESSAGE_ID,
+      payload: { type: 'prompt', prompt: 'Read notes', mode: 'code', model: 'test' },
+      attachments,
     });
 
-    expect(mockSendMessage).toHaveBeenCalledWith(expect.objectContaining({ attachments: images }));
-    expect(mockSendMessage).not.toHaveBeenCalledWith(expect.objectContaining({ images }));
+    expect(linkAttachmentsForDispatch).toHaveBeenCalledWith('user-1', attachments);
+    expect(mockSendMessage).toHaveBeenCalledTimes(1);
+    expect(linkAttachmentsForDispatch.mock.invocationCallOrder[0]).toBeLessThan(
+      mockSendMessage.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY
+    );
+  });
+
+  it('hands a refused send the rows this dispatch linked', async () => {
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+    const attachments = {
+      path: '12345678-1234-4234-9234-123456789abc',
+      files: ['87654321-4321-4321-8321-cba987654321.md'],
+    };
+    const releaseRefusedSend = jest.mocked(
+      jest.requireMock<{ releaseRefusedSend: (input: unknown) => Promise<void> }>(
+        '@/lib/cloud-agent-next/release-refused-send'
+      ).releaseRefusedSend
+    );
+    mockSendMessage.mockRejectedValueOnce(
+      new TRPCClientError('refused', {
+        result: { error: { code: -32600, message: 'refused', data: { httpStatus: 400 } } },
+      })
+    );
+
+    await expect(
+      caller.sendMessage({
+        organizationId: ORGANIZATION_ID,
+        cloudAgentSessionId: 'agent_123',
+        messageId: SEND_MESSAGE_ID,
+        payload: { type: 'prompt', prompt: 'Read notes', mode: 'code', model: 'test' },
+        attachments,
+      })
+    ).rejects.toThrow('refused');
+
+    expect(releaseRefusedSend).toHaveBeenCalledWith({
+      attachments,
+      error: expect.any(TRPCClientError),
+      kiloUserId: 'user-1',
+      linkedObjectKeys: ['user-1/cloud-agent/linked/a.md'],
+    });
   });
 
   it('routes free follow-up prompt models through the balance-skip client', async () => {
@@ -1020,6 +1091,7 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
     await caller.sendMessage({
       organizationId: ORGANIZATION_ID,
       cloudAgentSessionId: 'agent_123',
+      messageId: SEND_MESSAGE_ID,
       payload: {
         type: 'prompt',
         prompt: 'Follow up on this',
@@ -1052,6 +1124,7 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
     await caller.sendMessage({
       organizationId: ORGANIZATION_ID,
       cloudAgentSessionId: 'agent_123',
+      messageId: SEND_MESSAGE_ID,
       payload: { type: 'command', command: 'review', arguments: '' },
     });
 
@@ -1075,6 +1148,7 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
     await caller.sendMessage({
       organizationId: ORGANIZATION_ID,
       cloudAgentSessionId: 'agent_123',
+      messageId: SEND_MESSAGE_ID,
       payload: { type: 'command', command: 'review', arguments: '' },
     });
 
@@ -1098,6 +1172,7 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
     await caller.sendMessage({
       organizationId: ORGANIZATION_ID,
       cloudAgentSessionId: 'agent_123',
+      messageId: SEND_MESSAGE_ID,
       payload: { type: 'command', command: 'review', arguments: '' },
     });
 
@@ -1116,6 +1191,7 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
     await caller.sendMessage({
       organizationId: ORGANIZATION_ID,
       cloudAgentSessionId: 'agent_123',
+      messageId: SEND_MESSAGE_ID,
       payload: { type: 'command', command: 'review', arguments: '' },
     });
 
@@ -1630,7 +1706,7 @@ describe('organizationCloudAgentNextRouter.getSandboxSelectionOptions', () => {
   it('authorizes membership and forwards the organization with the caller token', async () => {
     const capabilities: SandboxSelectionCapabilities = {
       enabled: true,
-      defaultDestination: { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
+      defaultDestination: { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'default' },
       options: [
         { allocation: getSandboxAllocationRequest('cloudflare-single') },
         {
@@ -1711,7 +1787,7 @@ describe('organizationCloudAgentNextRouter.getSandboxSelectionOptions', () => {
       options: [
         {
           allocation: {
-            provider: { id: 'vercel', account: 'kilo' },
+            provider: { id: 'vercel', account: 'byoc' },
             instanceType: 'medium' as 'small',
           },
         },
@@ -1798,6 +1874,142 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
     model: 'kilo/test-model',
     githubRepo: 'acme/repo',
   };
+
+  it('forwards the GitHub connection that owns the selected repository', async () => {
+    const integrationId = '123e4567-e89b-12d3-a456-426614174030';
+    mockResolveGitHubIntegrationIdForRepository.mockResolvedValueOnce(integrationId);
+    const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+    await caller.prepareSession({
+      organizationId: ORGANIZATION_ID,
+      prompt: 'Test prompt',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+    });
+
+    expect(mockResolveGitHubIntegrationIdForRepository).toHaveBeenCalledWith(
+      { type: 'org', id: ORGANIZATION_ID },
+      'acme/repo'
+    );
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({ githubRepo: 'acme/repo', githubIntegrationId: integrationId })
+    );
+  });
+
+  it('keeps an explicitly supplied GitHub connection without resolving another', async () => {
+    const supplied = '123e4567-e89b-12d3-a456-426614174031';
+    const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+    await caller.prepareSession({
+      organizationId: ORGANIZATION_ID,
+      prompt: 'Test prompt',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+      githubIntegrationId: supplied,
+    });
+
+    expect(mockResolveGitHubIntegrationIdForRepository).not.toHaveBeenCalled();
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({ githubIntegrationId: supplied })
+    );
+  });
+
+  it('sends no GitHub connection when none of them owns the repository', async () => {
+    const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+    await caller.prepareSession({
+      organizationId: ORGANIZATION_ID,
+      prompt: 'Test prompt',
+      mode: 'code',
+      model: 'kilo/test-model',
+      githubRepo: 'acme/repo',
+    });
+
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.not.objectContaining({ githubIntegrationId: expect.anything() })
+    );
+  });
+
+  describe('GitLab project resolution', () => {
+    const gitlabInput = {
+      organizationId: ORGANIZATION_ID,
+      prompt: 'Test prompt',
+      mode: 'code',
+      model: 'kilo/test-model',
+      gitlabProject: 'acme/repo',
+    };
+
+    it('prepares a session for a project the organization connection covers', async () => {
+      mockValidateGitLabRepoAccessForOrganization.mockResolvedValue(true);
+      mockGetGitLabInstanceUrlForOrganization.mockResolvedValue('https://gitlab.com');
+      mockBuildGitLabCloneUrl.mockReturnValue('https://gitlab.com/acme/repo.git');
+      const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+
+      await caller.prepareSession(gitlabInput);
+
+      expect(mockValidateGitLabRepoAccessForOrganization).toHaveBeenCalledWith(
+        ORGANIZATION_ID,
+        'member-user',
+        'acme/repo'
+      );
+      expect(mockBuildGitLabCloneUrl).toHaveBeenCalledWith('acme/repo', 'https://gitlab.com');
+      expect(mockPrepareSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          gitUrl: 'https://gitlab.com/acme/repo.git',
+          platform: 'gitlab',
+          kilocodeOrganizationId: ORGANIZATION_ID,
+        })
+      );
+    });
+    it("prepares a session using the organization's GitLab instance", async () => {
+      mockValidateGitLabRepoAccessForOrganization.mockResolvedValue(true);
+      mockGetGitLabInstanceUrlForOrganization.mockResolvedValue('https://gitlab.example.test');
+      mockBuildGitLabCloneUrl.mockReturnValue('https://gitlab.example.test/acme/repo.git');
+      const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+
+      await caller.prepareSession(gitlabInput);
+
+      expect(mockGetGitLabInstanceUrlForOrganization).toHaveBeenCalledWith(ORGANIZATION_ID);
+      expect(mockBuildGitLabCloneUrl).toHaveBeenCalledWith(
+        'acme/repo',
+        'https://gitlab.example.test'
+      );
+      expect(mockPrepareSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          gitUrl: 'https://gitlab.example.test/acme/repo.git',
+          platform: 'gitlab',
+          kilocodeOrganizationId: ORGANIZATION_ID,
+        })
+      );
+    });
+
+    it('refuses a project the connection does not cover and prepares no session', async () => {
+      mockValidateGitLabRepoAccessForOrganization.mockResolvedValue(false);
+      const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+
+      await expect(caller.prepareSession(gitlabInput)).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+      });
+
+      expect(mockBuildGitLabCloneUrl).not.toHaveBeenCalled();
+      expect(mockPrepareSession).not.toHaveBeenCalled();
+    });
+
+    it('answers a retryable error when the project lookup cannot complete', async () => {
+      mockValidateGitLabRepoAccessForOrganization.mockRejectedValue(new Error('cache offline'));
+      const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+
+      await expect(caller.prepareSession(gitlabInput)).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+      });
+
+      expect(mockCaptureException).toHaveBeenCalled();
+      expect(mockBuildGitLabCloneUrl).not.toHaveBeenCalled();
+      expect(mockPrepareSession).not.toHaveBeenCalled();
+    });
+  });
 
   it.each(SELECTABLE_SANDBOX_ALLOCATIONS)(
     'forwards the normalized legacy organization sandbox preset %s',
@@ -1925,32 +2137,6 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
     ).rejects.toThrow('Devcontainer support has been retired');
     expect(mockIsFeatureFlagEnabledOrDevelopment).not.toHaveBeenCalled();
     expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
-  });
-
-  it('normalizes legacy initial images to canonical Worker attachments', async () => {
-    const caller = createCaller({
-      user: { id: 'user-1', is_admin: false } as User,
-    });
-    const images = {
-      path: '12345678-1234-4234-9234-123456789abc',
-      files: ['87654321-4321-4321-8321-cba987654321.png'],
-    };
-
-    await caller.prepareSession({
-      organizationId: ORGANIZATION_ID,
-      prompt: 'Read image',
-      mode: 'code',
-      model: 'kilo/test-model',
-      githubRepo: 'acme/repo',
-      autoInitiate: true,
-      devcontainer: false,
-      images,
-    });
-
-    expect(mockPrepareSession).toHaveBeenCalledWith(
-      expect.objectContaining({ attachments: images, createdOnPlatform: 'cloud-agent-web' })
-    );
-    expect(mockPrepareSession).not.toHaveBeenCalledWith(expect.objectContaining({ images }));
   });
 
   it('forwards stable Bitbucket identity for organization sessions', async () => {
@@ -2136,6 +2322,7 @@ describe('organizationCloudAgentNextRouter Worker error codes', () => {
         return caller.sendMessage({
           organizationId: ORGANIZATION_ID,
           cloudAgentSessionId: 'agent_123',
+          messageId: SEND_MESSAGE_ID,
           payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'kilo/test-model' },
         });
     }

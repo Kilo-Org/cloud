@@ -1,0 +1,1 @@
+ALTER TABLE "byok_api_keys" ADD COLUMN "settings" jsonb DEFAULT '{}'::jsonb NOT NULL;

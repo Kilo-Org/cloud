@@ -4,6 +4,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
 import {
   provisionComputeUsageChargePartitions,
+  provisionEnkryptGuardrailScanLogPartitions,
   provisionExaUsageLogPartitions,
 } from '@/lib/usage-partitions';
 
@@ -27,12 +28,14 @@ export async function GET(request: Request) {
   const [
     { created: exaCreated, errors: exaErrors },
     { created: chargeCreated, errors: chargeErrors },
+    { created: enkryptCreated, errors: enkryptErrors },
   ] = await Promise.all([
     provisionExaUsageLogPartitions(db),
     provisionComputeUsageChargePartitions(db),
+    provisionEnkryptGuardrailScanLogPartitions(db),
   ]);
-  const created = [...exaCreated, ...chargeCreated];
-  const partitionErrors = [...exaErrors, ...chargeErrors];
+  const created = [...exaCreated, ...chargeCreated, ...enkryptCreated];
+  const partitionErrors = [...exaErrors, ...chargeErrors, ...enkryptErrors];
   const errors: string[] = [];
 
   for (const { name, error } of partitionErrors) {

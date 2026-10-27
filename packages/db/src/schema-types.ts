@@ -1071,6 +1071,8 @@ const OrganizationSettingsSchema = z.object({
   // usage data and the Feature adoption tab.
   recommendations_digest_enabled: z.boolean().optional(),
   suppress_trial_messaging: z.boolean().optional(),
+  // Only honored for organizations in ENKRYPT_SHADOW_GUARDRAILS_ORGANIZATION_IDS.
+  enkrypt_shadow_guardrails_enabled: z.boolean().optional(),
   // OSS Sponsorship fields
   // null/undefined = not an OSS org, values: 1, 2, or 3
   oss_sponsorship_tier: z
@@ -1094,6 +1096,19 @@ const OrganizationSettingsSchema = z.object({
 });
 
 export type OrganizationSettings = z.infer<typeof OrganizationSettingsSchema>;
+
+/** Content-free digest of an Enkrypt detect response. Holds no scanned text or detected values. */
+export type EnkryptGuardrailScanSummary = {
+  injection_attack?: {
+    detected: boolean;
+    attacks: string[];
+    p_injection: number | null;
+    p_jailbreak: number | null;
+  };
+  pii?: { detected: boolean; entity_counts: Record<string, number> };
+  toxicity?: { categories: string[] };
+  nsfw?: { detected: boolean };
+};
 
 export const MAX_ORGANIZATION_GROUPS = 100;
 export const MAX_ORGANIZATION_GROUP_ASSIGNMENTS = 1_000;

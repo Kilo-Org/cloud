@@ -2,6 +2,7 @@ import {
   buildExaUsageLogPartitionIndexDefinitions,
   buildExaUsageLogPartitionIndexDropStatement,
   provisionComputeUsageChargePartitions,
+  provisionEnkryptGuardrailScanLogPartitions,
   provisionExaUsageLogPartitions,
 } from '@/lib/usage-partitions';
 import type { SQL } from 'drizzle-orm';
@@ -132,5 +133,35 @@ describe('compute usage charge partitions', () => {
     );
     expect(statements[1]).toContain('"compute_usage_charge_2026_09"');
     expect(statements[2]).toContain('"compute_usage_charge_2026_10"');
+  });
+});
+
+describe('Enkrypt guardrail scan log partitions', () => {
+  test('provisions current and next two monthly partitions across a year boundary', async () => {
+    const statements: string[] = [];
+    const dialect = new PgDialect();
+    const fakeDb = {
+      execute: async (query: SQL) => {
+        statements.push(dialect.sqlToQuery(query).sql);
+        return { rows: [] };
+      },
+    };
+
+    const result = await provisionEnkryptGuardrailScanLogPartitions(
+      fakeDb as never,
+      new Date(2026, 10, 15, 12)
+    );
+
+    expect(result).toEqual({
+      created: [
+        'enkrypt_guardrail_scan_log_2026_11',
+        'enkrypt_guardrail_scan_log_2026_12',
+        'enkrypt_guardrail_scan_log_2027_01',
+      ],
+      errors: [],
+    });
+    expect(statements[2]).toContain(
+      'PARTITION OF "public"."enkrypt_guardrail_scan_log" FOR VALUES FROM (\'2027-01-01\') TO (\'2027-02-01\')'
+    );
   });
 });

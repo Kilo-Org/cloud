@@ -140,6 +140,7 @@ import type {
 } from './schema-types';
 import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-pricing-catalog';
 import type {
+  EnkryptGuardrailScanSummary,
   OrganizationModeConfig,
   OrganizationGroupPolicies,
   OrganizationPlan,
@@ -10271,6 +10272,47 @@ export const exa_usage_log = pgTable(
 );
 
 export type ExaUsageLog = typeof exa_usage_log.$inferSelect;
+
+// One row per Enkrypt shadow-mode guardrail scan of an AI gateway turn. Also the
+// charge ledger for those scans, so balance recomputation reads it. Partitioned by
+// month on created_at like exa_usage_log; the migration adds the partition clause.
+// Never store scanned text, detector excerpts, or detected values here.
+export const enkrypt_guardrail_scan_log = pgTable(
+  'enkrypt_guardrail_scan_log',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`),
+    organization_id: uuid().notNull(),
+    kilo_user_id: text().notNull(),
+    request_id: uuid().notNull(),
+    usage_id: text(),
+    api_kind: text().notNull(),
+    model: text().notNull(),
+    direction: text().notNull(),
+    text_chars: integer().notNull(),
+    truncated: boolean().notNull(),
+    flagged: boolean(),
+    summary: jsonb().$type<EnkryptGuardrailScanSummary>(),
+    http_status: integer(),
+    error: text(),
+    enkrypt_credits: integer(),
+    enkrypt_credits_estimated: boolean().notNull().default(false),
+    enkrypt_latency_ms: integer(),
+    cost_microdollars: bigint({ mode: 'number' }).notNull(),
+    charged_to_balance: boolean().notNull().default(false),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    primaryKey({ columns: [table.id, table.created_at] }),
+    index('idx_enkrypt_guardrail_scan_log_org_created').on(table.organization_id, table.created_at),
+    check('enkrypt_guardrail_scan_log_direction', sql`${table.direction} IN ('input', 'output')`),
+    check('enkrypt_guardrail_scan_log_cost_nonnegative', sql`${table.cost_microdollars} >= 0`),
+  ]
+);
+
+export type EnkryptGuardrailScanLog = typeof enkrypt_guardrail_scan_log.$inferSelect;
+export type NewEnkryptGuardrailScanLog = typeof enkrypt_guardrail_scan_log.$inferInsert;
 
 // ============ SECURITY ADVISOR SCANS ============
 // Per-scan usage tracking for the security advisor feature.

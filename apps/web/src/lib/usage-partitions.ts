@@ -115,10 +115,10 @@ export async function provisionExaUsageLogPartitions(
   return { created, errors };
 }
 
-/** Keeps the metered-compute debit ledger writable through the current and next two months. */
-export async function provisionComputeUsageChargePartitions(
+async function provisionMonthlyPartitions(
   fromDb: UsagePartitionDb,
-  now: Date = new Date()
+  tableName: 'compute_usage_charge' | 'enkrypt_guardrail_scan_log',
+  now: Date
 ): Promise<UsagePartitionProvisioningResult> {
   const created: string[] = [];
   const errors: Array<{ name: string; error: unknown }> = [];
@@ -126,11 +126,11 @@ export async function provisionComputeUsageChargePartitions(
   for (let offset = 0; offset <= 2; offset++) {
     const target = new Date(now.getFullYear(), now.getMonth() + offset, 1);
     const nextMonth = new Date(target.getFullYear(), target.getMonth() + 1, 1);
-    const name = `compute_usage_charge_${format(target, 'yyyy_MM')}`;
+    const name = `${tableName}_${format(target, 'yyyy_MM')}`;
     try {
       await fromDb.execute(
         sql.raw(
-          `CREATE TABLE IF NOT EXISTS "public"."${name}" PARTITION OF "public"."compute_usage_charge" FOR VALUES FROM ('${format(target, 'yyyy-MM-dd')}') TO ('${format(nextMonth, 'yyyy-MM-dd')}')`
+          `CREATE TABLE IF NOT EXISTS "public"."${name}" PARTITION OF "public"."${tableName}" FOR VALUES FROM ('${format(target, 'yyyy-MM-dd')}') TO ('${format(nextMonth, 'yyyy-MM-dd')}')`
         )
       );
       created.push(name);
@@ -139,4 +139,20 @@ export async function provisionComputeUsageChargePartitions(
     }
   }
   return { created, errors };
+}
+
+/** Keeps the metered-compute debit ledger writable through the current and next two months. */
+export async function provisionComputeUsageChargePartitions(
+  fromDb: UsagePartitionDb,
+  now: Date = new Date()
+): Promise<UsagePartitionProvisioningResult> {
+  return provisionMonthlyPartitions(fromDb, 'compute_usage_charge', now);
+}
+
+/** Keeps the Enkrypt guardrail scan ledger writable through the current and next two months. */
+export async function provisionEnkryptGuardrailScanLogPartitions(
+  fromDb: UsagePartitionDb,
+  now: Date = new Date()
+): Promise<UsagePartitionProvisioningResult> {
+  return provisionMonthlyPartitions(fromDb, 'enkrypt_guardrail_scan_log', now);
 }

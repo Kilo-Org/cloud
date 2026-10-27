@@ -1,14 +1,20 @@
 import type { PlatformIntegration, User } from '@kilocode/db';
 import type { Message, Thread } from 'chat';
 import { z } from 'zod';
+import {
+  createCloudAgentNextClient,
+  createCloudAgentNextClientForModel,
+} from '@/lib/cloud-agent-next/cloud-agent-client';
+import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
 import { runBotAgent } from './agent-runner';
 import type { SpawnCloudAgentInput as SpawnInput } from './tools/spawn-cloud-agent-session';
-import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import {
   buildGitLabCloneUrl,
   getGitLabInstanceUrlForOrganization,
   getGitLabTokenForOrganization,
   getGitLabTokenForUser,
+  validateGitLabRepoAccessForOrganization,
+  validateGitLabRepoAccessForUser,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import {
   formatGitHubRepositoriesForPrompt,
@@ -72,6 +78,11 @@ jest.mock('@/lib/cloud-agent-next/session-url', () => ({
 }));
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: jest.fn(),
+  createCloudAgentNextClientForModel: jest.fn(),
+  InsufficientCreditsError: class InsufficientCreditsError extends Error {},
+}));
+jest.mock('@/lib/cloud-agent-next/balance-check-eligibility', () => ({
+  computeCloudAgentNextBalanceCheckEligibility: jest.fn(),
 }));
 jest.mock('@/lib/slack-bot/github-repository-context', () => ({
   getGitHubRepositoryContext: jest.fn(),
@@ -91,6 +102,8 @@ jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
   getGitLabInstanceUrlForOrganization: jest.fn(),
   getGitLabInstanceUrlForUser: jest.fn(),
   buildGitLabCloneUrl: jest.fn(),
+  validateGitLabRepoAccessForOrganization: jest.fn(),
+  validateGitLabRepoAccessForUser: jest.fn(),
 }));
 jest.mock('@/lib/bot-users/bot-user-service', () => ({
   getBotUserId: jest.fn(async () => 'bot-user-1'),
@@ -199,6 +212,13 @@ beforeEach(() => {
     prepareSession: mockPrepareSession,
     initiateFromPreparedSession: mockInitiateFromPreparedSession,
   } as never);
+  jest.mocked(computeCloudAgentNextBalanceCheckEligibility).mockResolvedValue({
+    isFree: false,
+    hasUserByokAvailable: false,
+  });
+  jest
+    .mocked(createCloudAgentNextClientForModel)
+    .mockImplementation(token => jest.mocked(createCloudAgentNextClient)(token) as never);
   mockPrepareSession.mockResolvedValue({
     cloudAgentSessionId: 'cloud-session-1',
     kiloSessionId: 'kilo-session-1',
@@ -223,8 +243,12 @@ beforeEach(() => {
     repositories: [{ id: 3, name: 'project', full_name: gitlabProject, private: true }],
     instanceUrl: 'https://gitlab.com',
   });
+  jest.mocked(validateGitLabRepoAccessForOrganization).mockResolvedValue(true);
+  jest.mocked(validateGitLabRepoAccessForUser).mockResolvedValue(true);
   jest.mocked(getGitLabTokenForOrganization).mockResolvedValue('gitlab-token');
   jest.mocked(getGitLabTokenForUser).mockResolvedValue('gitlab-token');
+  jest.mocked(validateGitLabRepoAccessForOrganization).mockResolvedValue(true);
+  jest.mocked(validateGitLabRepoAccessForUser).mockResolvedValue(true);
   jest.mocked(getGitLabInstanceUrlForOrganization).mockResolvedValue('https://gitlab.com');
   jest.mocked(buildGitLabCloneUrl).mockReturnValue(`https://gitlab.com/${gitlabProject}.git`);
 });
@@ -310,6 +334,13 @@ describe.each(['initial', 'continuation'] as const)('GitHub %s execution', execu
       expect.objectContaining({ githubRepo: threadRepository, mode: 'ask' })
     );
     expect(getGitLabTokenForOrganization).not.toHaveBeenCalled();
+    expect(computeCloudAgentNextBalanceCheckEligibility).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user: { id: 'user-1' },
+        organizationId: 'org-1',
+      })
+    );
+    expect(createCloudAgentNextClientForModel).toHaveBeenCalledTimes(1);
   });
 
   it('cannot select another accessible GitHub repository in code mode', async () => {
@@ -392,21 +423,16 @@ describe.each(['slack', 'linear'] as const)('%s repository selection', platform 
         ...toolInput,
         ...(source === 'github' ? { githubRepo: otherRepository } : { gitlabProject }),
       };
+      mockGenerate.mockImplementationOnce(async () => {
+        const spawnTool = agentOptions().tools.spawnCloudAgentSession;
+        const args = spawnTool.inputSchema.parse(toolInput);
+        const result = await spawnTool.execute(args);
+        return { text: result.response };
+      });
 
-      await runBotAgent(params);
+      const result = await runBotAgent(params);
 
-      const properties = z.toJSONSchema(
-        agentOptions().tools.spawnCloudAgentSession.inputSchema
-      ).properties;
-      expect(properties).toHaveProperty('githubRepo');
-      expect(properties).toHaveProperty('gitlabProject');
-      expect(getGitHubRepositoryContext).toHaveBeenCalledWith(
-        { type: 'org', id: 'org-1' },
-        platform === 'slack' ? 'agent' : 'workflow'
-      );
-      expect(getGitLabRepositoryContext).toHaveBeenCalledWith({ type: 'org', id: 'org-1' });
-      expect(agentOptions().instructions).toContain(otherRepository);
-      expect(agentOptions().instructions).toContain(gitlabProject);
+      expect(result.startedCloudAgentSession).toBe(true);
       if (source === 'github') {
         expect(mockPrepareSession).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -415,9 +441,7 @@ describe.each(['slack', 'linear'] as const)('%s repository selection', platform 
             createdOnPlatform: platform,
           })
         );
-        expect(getGitLabTokenForOrganization).not.toHaveBeenCalled();
       } else {
-        expect(getGitLabTokenForOrganization).toHaveBeenCalledWith('org-1', 'bot-user-1');
         expect(mockPrepareSession).toHaveBeenCalledWith(
           expect.objectContaining({
             gitUrl: `https://gitlab.com/${gitlabProject}.git`,
@@ -425,7 +449,6 @@ describe.each(['slack', 'linear'] as const)('%s repository selection', platform 
             createdOnPlatform: platform,
           })
         );
-        expect(resolveGitHubRepositoryForOwner).not.toHaveBeenCalled();
       }
     }
   );

@@ -27,6 +27,7 @@ import type {
   AgentStatus,
   QuestionState,
   PermissionState,
+  UnreadablePermissionState,
   ServiceStateSnapshot,
   SuggestionAction,
   SuggestionState,
@@ -135,6 +136,8 @@ type ServiceState = {
   clearPreparationAttempts(): void;
   getQuestion(): QuestionState | null;
   getPermission(): PermissionState | null;
+  /** Pending permission requests this app could not read, oldest first. */
+  getUnreadablePermissions(): readonly UnreadablePermissionState[];
   getSuggestion(): SuggestionState | null;
   getSessionInfo(): SessionInfo | null;
   getPendingMessages(): ReadonlyMap<string, MessageDeliveryState>;
@@ -199,6 +202,7 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
   let sessionInfo: SessionInfo | null = null;
   let questions: readonly QuestionState[] = [];
   let permissions: readonly PermissionState[] = [];
+  let unreadablePermissions: readonly UnreadablePermissionState[] = [];
   let suggestion: SuggestionState | null = null;
   const pendingMessages = new Map<string, MessageDeliveryState>();
   let activeMessageId: string | null = null;
@@ -436,12 +440,26 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       metadata,
       always,
     });
+    // A readable request supersedes an unreadable notice for the same id.
+    unreadablePermissions = unreadablePermissions.filter(entry => entry.requestId !== requestId);
     config.onPermissionAsked?.(requestId, permissionType, patterns, metadata, always);
+    notify();
+  }
+
+  function processPermissionUnreadable(requestId: string): void {
+    // The scope could not be read, so no consent card may stand for this id: a
+    // card already shown for it would describe a scope the app no longer holds.
+    if (permissions.some(entry => entry.requestId === requestId)) {
+      permissions = permissions.filter(entry => entry.requestId !== requestId);
+      config.onPermissionResolved?.(requestId);
+    }
+    unreadablePermissions = upsertByRequestId(unreadablePermissions, { requestId });
     notify();
   }
 
   function processPermissionResolved(requestId: string): void {
     permissions = permissions.filter(entry => entry.requestId !== requestId);
+    unreadablePermissions = unreadablePermissions.filter(entry => entry.requestId !== requestId);
     config.onPermissionResolved?.(requestId);
     notify();
   }
@@ -907,12 +925,16 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
   function clearPendingInteractions(): void {
     const clearedQuestions = questions;
     const clearedPermissions = permissions;
+    const clearedUnreadablePermissions = unreadablePermissions;
     const clearedSuggestion = suggestion;
     questions = [];
     permissions = [];
+    unreadablePermissions = [];
     suggestion = null;
     for (const entry of clearedQuestions) config.onQuestionResolved?.(entry.requestId);
     for (const entry of clearedPermissions) config.onPermissionResolved?.(entry.requestId);
+    for (const entry of clearedUnreadablePermissions)
+      config.onPermissionResolved?.(entry.requestId);
     if (clearedSuggestion) config.onSuggestionResolved?.(clearedSuggestion.requestId);
   }
 
@@ -1004,6 +1026,9 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
         break;
       case 'permission.replied':
         processPermissionResolved(event.requestId);
+        break;
+      case 'permission.unreadable':
+        processPermissionUnreadable(event.requestId);
         break;
       case 'suggestion.shown':
         processSuggestionShown(event);
@@ -1152,6 +1177,7 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
     },
     getQuestion: () => questions[0] ?? null,
     getPermission: () => permissions[0] ?? null,
+    getUnreadablePermissions: () => unreadablePermissions,
     getSuggestion: () => suggestion,
     getSessionInfo: () => sessionInfo,
     getPendingMessages: () => pendingMessages,
@@ -1185,6 +1211,7 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       sessionInfo,
       question: questions[0] ?? null,
       permission: permissions[0] ?? null,
+      unreadablePermissions,
       suggestion,
       pendingMessages,
     }),
@@ -1224,6 +1251,7 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       sessionInfo = null;
       questions = [];
       permissions = [];
+      unreadablePermissions = [];
       suggestion = null;
       pendingMessages.clear();
       activeMessageId = null;

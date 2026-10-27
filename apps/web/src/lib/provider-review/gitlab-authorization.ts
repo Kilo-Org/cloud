@@ -29,6 +29,7 @@ import {
   normalizeGitLabInstanceUrl,
 } from '@/lib/integrations/platforms/gitlab/instance-url';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { providerReviewErrorToTrpcError } from './error-mapping';
 
 /**
  * The account that owns the GitLab integration. `userId` is the acting user
@@ -212,8 +213,36 @@ export type GitLabProjectAccess = {
   instanceUrl: string;
   /** The integration's repository full path, matched case-insensitively. */
   projectPath: string;
+  /** The integration the credential belongs to. */
+  integrationId: string;
+  /** The matched repository's provider id from that integration's cache. */
+  repositoryId: number;
   owner: GitLabReviewOwner;
 };
+
+/**
+ * Map one GitLab failure onto the router's error states. Classification is
+ * owner-aware first (a connection-level 403 is a reconnect, not the reader's
+ * permission), then every surface answers the kind with the shared code. A
+ * TRPCError is already an intentional refusal (invalid URL, closed or draft
+ * merge request) and passes through unchanged.
+ */
+export function gitlabReviewErrorToTrpcError(error: unknown, owner: GitLabReviewOwner): TRPCError {
+  if (error instanceof TRPCError) return error;
+  return providerReviewErrorToTrpcError(classifyGitLabErrorForOwner(error, owner));
+}
+
+/**
+ * The review-layer owner for a Kilo owner plus the acting user whose
+ * credential the token broker releases. Organization-owned connections keep
+ * the organization as the owner and name the acting user separately, so the
+ * broker can release the organization's credential for that user.
+ */
+export function gitlabReviewOwnerFor(owner: Owner, actingUserId: string): GitLabReviewOwner {
+  return owner.type === 'org'
+    ? { type: 'organization', organizationId: owner.id, userId: actingUserId }
+    : { type: 'user', userId: actingUserId };
+}
 
 function ownerToDbOwner(owner: GitLabReviewOwner): Owner {
   return owner.type === 'user'
@@ -326,15 +355,24 @@ export async function authorizeProject(
     repo => repo.full_name.toLowerCase() === requested.toLowerCase()
   );
   if (!match) {
+    // The repository list is the project's authorization scope, so this refusal
+    // names the one remedy that restores it.
     throw new GitLabReviewError(
       'not_found',
-      'This project is not part of your connected GitLab repositories.'
+      'This project is not in your connected GitLab repositories. Refresh the repository list on the GitLab integration and try again.'
     );
   }
 
   try {
     const accessToken = await getValidGitLabToken(integration, actorFor(owner));
-    return { accessToken, instanceUrl, projectPath: match.full_name, owner };
+    return {
+      accessToken,
+      instanceUrl,
+      projectPath: match.full_name,
+      integrationId: integration.id,
+      repositoryId: match.id,
+      owner,
+    };
   } catch (error) {
     throw classifyGitLabErrorForOwner(error, owner);
   }

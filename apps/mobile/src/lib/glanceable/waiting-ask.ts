@@ -27,13 +27,6 @@ export type WaitingAsk = {
   kiloSessionId: string;
   /** 'permission' | 'question' — the tray row's status. */
   status: string;
-  /**
-   * ISO 8601 status time of the ask's row, the raise's own identity
-   * (`statusUpdatedAt ?? status`), so the ack an Approve writes names exactly
-   * the raise it answered. Absent on rows that never carried one, and on a
-   * record mirrored by a build that did not store it.
-   */
-  statusUpdatedAt?: string;
   /** True when the row came from the cloud-agent control plane. */
   isCloudAgent: boolean;
   /**
@@ -44,6 +37,20 @@ export type WaitingAsk = {
   organizationId: string | null;
   userId: string;
   recordedAt: number;
+  /**
+   * The selected row's status time, the ask's identity beside the session and
+   * status: a changed wait carries a new time, so a binding is never carried
+   * onto a different request. Absent on rows that never carried one, and on a
+   * record mirrored by a build that did not store it.
+   */
+  statusUpdatedAt?: string | null;
+  /**
+   * The pending permission id this ask's surface names, or null while the ask
+   * has no binding (a record made before the control-plane read lands, a read
+   * that failed, or a mirror written by a release without bindings). Approve is
+   * offered only with one, and an answer is sent only for it.
+   */
+  boundPermissionId: string | null;
 };
 
 /**
@@ -70,12 +77,16 @@ const WAITING_ASK_KEY = 'glanceable-waiting-ask';
 const waitingAskSchema = z.object({
   kiloSessionId: z.string().min(1),
   status: z.string(),
-  statusUpdatedAt: z.string().optional(),
   isCloudAgent: z.boolean(),
   scopeKey: z.string().min(1),
   organizationId: z.string().nullable(),
   userId: z.string(),
   recordedAt: z.number(),
+  // A mirror a release without bindings wrote carries neither key: it parses,
+  // and it reads as an ask with no identity time and no binding, so Approve
+  // stays hidden until a live select binds it.
+  statusUpdatedAt: z.string().nullable().optional(),
+  boundPermissionId: z.string().nullable().default(null),
 });
 
 /**
@@ -138,7 +149,6 @@ export function selectWaitingAsk(
   return {
     kiloSessionId: chosen.id,
     status: chosen.status,
-    statusUpdatedAt: chosen.statusUpdatedAt,
     isCloudAgent: chosen.connectionId === CLOUD_AGENT_CONNECTION_ID,
     // The snapshot's own scope key, so a sink can fence the ask against the
     // surface it belongs to without re-deriving the hash.
@@ -146,6 +156,10 @@ export function selectWaitingAsk(
     organizationId: ctx.organizationId,
     userId: ctx.userId,
     recordedAt: now,
+    statusUpdatedAt: chosen.statusUpdatedAt,
+    // Selection is pure: the answer path's binding comes from the control-plane
+    // read the recording step runs, never from the trace.
+    boundPermissionId: null,
   };
 }
 

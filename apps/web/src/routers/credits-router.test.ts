@@ -155,6 +155,7 @@ describe('creditsRouter.getMobileStoreProducts', () => {
         amountUsd: product.amountUsd,
         appleProductId: product.appleProductId,
         googleProductId: product.googleProductId,
+        creditExpiryPolicy: 'never',
       }))
     );
     expect(result.products.map(product => product.amountUsd)).toEqual([10, 50, 100, 500]);

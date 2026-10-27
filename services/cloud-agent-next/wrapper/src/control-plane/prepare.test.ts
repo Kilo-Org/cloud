@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
 import { profileConfigPath } from './runtime-profile.js';
 import { describe, expect, it, spyOn } from 'bun:test';
 import { createHash } from 'node:crypto';
@@ -17,7 +18,7 @@ import type {
 import { controlPlaneWrapperFrameSchema } from '../../../src/shared/control-plane-protocol.js';
 import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
-import type { ExecResult, ProcessOptions, ProcessOutputStream } from '../utils.js';
+import type { ExecResult, ProcessOptions, ProcessOutputStream, ProcessSpawn } from '../utils.js';
 import * as processUtils from '../utils.js';
 import { createPreparationManager, type PrepareRuntimePort } from './prepare.js';
 import type { WorkspaceStamp } from './workspace-stamp.js';
@@ -667,6 +668,8 @@ function createHarness(
     beforeWorkspace?: () => Promise<void>;
     releaseCleanupDeadlineMs?: number;
     runtimes?: PrepareRuntimePort;
+    runSkillInstall?: typeof processUtils.runProcess;
+    spawnSetup?: ProcessSpawn;
   } = {}
 ): Harness {
   const frames: ControlPlaneWrapperFrame[] = [];
@@ -801,6 +804,8 @@ function createHarness(
     log: message => logs.push(message),
     onNativeDiagnostic: (event, fields) => nativeDiagnostics.push({ event, fields }),
     runtimes,
+    runSkillInstall: options.runSkillInstall,
+    spawnSetup: options.spawnSetup,
     inheritedEnv: {},
     homeRoots: homeRootsFor(options.homeRoot ?? '/tmp/prepare-test-homes'),
     allocationId: 'alloc-current',
@@ -2168,8 +2173,7 @@ describe('createPreparationManager', () => {
     await harness.manager.prepare(spec, credentials);
 
     expect(harness.ensureCalls()).toBe(1);
-    const remote = harness.gitCalls.find(args => args[0] === 'remote');
-    expect(remote?.[3]).toContain('git-2');
+    expect(harness.gitCalls).toEqual([]);
     expect(harness.installCalls).toHaveLength(1);
     expect(harness.installCalls[0]!.env.KILOCODE_TOKEN).toBe('kilo-token-2');
     expect(lastFrame(harness.frames)).toEqual({
@@ -2195,10 +2199,7 @@ describe('createPreparationManager', () => {
     };
     await harness.manager.installCredentials(credentials);
 
-    const remote = harness.gitCalls.find(args => args[0] === 'remote');
-    expect(remote?.[1]).toBe('set-url');
-    expect(remote?.[3]).toContain('git-2');
-    expect(remote?.[3]).not.toContain('git-1');
+    expect(harness.gitCalls).toEqual([]);
     expect(harness.installCalls).toHaveLength(1);
     expect(harness.installCalls[0]!.key).toBe(spec.sessionId);
     expect(harness.installCalls[0]!.env.KILOCODE_TOKEN).toBe('kilo-token-2');
@@ -2208,25 +2209,18 @@ describe('createPreparationManager', () => {
     expect(harness.manager.isPrepared(spec.sessionId)).toBe(false);
   });
 
-  it('records refreshed Kilo environment before awaiting Git credential maintenance', async () => {
+  it('records refreshed Kilo environment before writing the renewed Git record', async () => {
     const harness = createHarness();
     const spec = routeSpec({ git: { url: 'https://github.com/acme/repo.git', token: 'git-1' } });
     await harness.manager.prepare(spec);
-    const gitStarted = Promise.withResolvers<void>();
-    const finishGit = Promise.withResolvers<ExecResult>();
-    harness.setGit(async () => {
-      gitStarted.resolve();
-      return finishGit.promise;
-    });
-    const installing = harness.manager.installCredentials({
+    harness.gitCalls.length = 0;
+    await harness.manager.installCredentials({
       sessionId: spec.sessionId,
       kilo: { token: 'kilo-token-2' },
       git: { token: 'git-2' },
     });
-    await gitStarted.promise;
     expect(harness.installCalls[0]?.env.KILOCODE_TOKEN).toBe('kilo-token-2');
-    finishGit.resolve(result(0));
-    await installing;
+    expect(harness.gitCalls).toEqual([]);
   });
 
   it('prefers the runtime-proxy handle and facade targets over the spec alias', async () => {
@@ -2552,7 +2546,7 @@ describe('adopting an environment snapshot', () => {
 
     expect(harness.gitCalls.some(args => args[0] === 'clone')).toBe(false);
     const setUrl = harness.gitCalls.find(args => args[0] === 'remote' && args[1] === 'set-url');
-    expect(setUrl?.[3]).toContain('git-1');
+    expect(setUrl?.[3]).toBe(REPO);
     expect(gitKinds(harness.gitCalls).slice(0, 7)).toEqual([
       'remote set-url',
       'fetch',
@@ -2742,7 +2736,7 @@ describe('adopting an environment snapshot', () => {
     expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'cloned' });
   });
 
-  it('does nothing for a workspace this allocation already prepared', async () => {
+  it('reuses a prepared workspace without network or setup work', async () => {
     const harness = createHarness(FAST_TIMERS, { hasGit: true });
     const prepared = { allocationId: 'alloc-current', commit: 'abc' };
     harness.setStamp(prepared);
@@ -2750,7 +2744,9 @@ describe('adopting an environment snapshot', () => {
 
     await harness.manager.prepare(spec);
 
-    expect(harness.gitCalls).toEqual([]);
+    expect(harness.gitCalls.some(args => ['clone', 'fetch', 'checkout'].includes(args[0]!))).toBe(
+      false
+    );
     expect(progressSteps(harness.frames)).toEqual(['kilo_runtime', 'kilo_session']);
     expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'same' });
     expect(harness.stamp()).toEqual(prepared);
@@ -2766,6 +2762,95 @@ describe('adopting an environment snapshot', () => {
     expect(harness.gitCalls.some(args => args[0] === 'checkout')).toBe(true);
     expect(harness.stamp()?.allocationId).toBe('alloc-current');
     expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'cloned' });
+  });
+});
+
+function recordPath(root: string, spec: ControlPlaneRouteSpec): string {
+  const home = directoryHome(spec.directory, homeRootsFor(root).directory);
+  return path.join(home, '.local/share/kilo/cloud-agent/git-credentials');
+}
+
+describe('workspace origin normalization', () => {
+  it.each(['unstamped', 'same'] as const)('prepares the canonical origin: %s', async stamp => {
+    const harness = createHarness(FAST_TIMERS, { hasGit: true });
+    if (stamp === 'same') harness.setStamp({ allocationId: 'alloc-current', commit: 'abc' });
+    harness.setGit(args => {
+      if (args[0] === 'remote' && args[1] === 'get-url') {
+        return {
+          stdout: 'https://x-access-token:stale@github.com/acme/repo.git\n',
+          stderr: '',
+          exitCode: 0,
+        };
+      }
+      return result(0);
+    });
+
+    await harness.manager.prepare(
+      routeSpec({ git: { url: REPO, token: 'git-1', platform: 'github' } })
+    );
+
+    expect(harness.gitCalls).toContainEqual(['remote', 'set-url', 'origin', REPO]);
+    for (const args of harness.gitCalls) {
+      if (args[0] !== 'remote') continue;
+      expect(args.join(' ')).not.toContain('@');
+    }
+    expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.ready' });
+  });
+});
+
+describe('workspace Git credentials', () => {
+  it('clones with the credential-free URL and records the token for the helper', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-git-credentials-'));
+    try {
+      const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+      const spec = routeSpec({
+        git: { url: 'https://github.com/acme/repo.git', token: 'git-1', platform: 'github' },
+      });
+
+      await harness.manager.prepare(spec);
+
+      const clone = harness.gitCalls.find(args => args[0] === 'clone');
+      expect(clone).toContain('https://github.com/acme/repo.git');
+      for (const args of harness.gitCalls) expect(args.join(' ')).not.toContain('git-1');
+      const recordPathForSpec = recordPath(root, spec);
+      expect(await fs.readFile(recordPathForSpec, 'utf8')).toBe(
+        'protocol=https\nhost=github.com\nusername=x-access-token\npassword=git-1\n'
+      );
+      expect((await fs.stat(recordPathForSpec)).mode & 0o777).toBe(0o600);
+      expect(harness.ensureInputs[0]?.env.GIT_CONFIG_COUNT).toBe('2');
+      expect(harness.ensureInputs[0]?.env.GIT_CONFIG_KEY_0).toBe('credential.helper');
+      expect(harness.ensureInputs[0]?.env.GIT_CONFIG_VALUE_0).toBe(
+        '/opt/kilo-cloud/kilo-git-credential'
+      );
+      expect(harness.ensureInputs[0]?.env.GIT_TERMINAL_PROMPT).toBe('0');
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rewrites the record on a credential renewal without touching origin', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-git-credentials-'));
+    try {
+      const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+      const spec = routeSpec({
+        git: { url: 'https://github.com/acme/repo.git', token: 'git-1', platform: 'github' },
+      });
+      await harness.manager.prepare(spec);
+      harness.gitCalls.length = 0;
+
+      await harness.manager.installCredentials({
+        sessionId: spec.sessionId,
+        git: { token: 'git-2', platform: 'github' },
+        kilo: { token: 'kilo-token-2' },
+      });
+
+      expect(harness.gitCalls).toEqual([]);
+      expect(await fs.readFile(recordPath(root, spec), 'utf8')).toBe(
+        'protocol=https\nhost=github.com\nusername=x-access-token\npassword=git-2\n'
+      );
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 });
 
@@ -2833,6 +2918,145 @@ describe('control-plane runtime profiles', () => {
     expect(JSON.parse(harness.installCalls[0].env.KILO_CONFIG_CONTENT).permission).toMatchObject(
       permission
     );
+  });
+
+  it('runs skills.sh installation through the setup process spawn', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-skills-spawn-'));
+    let spawns = 0;
+    try {
+      const harness = createHarness(FAST_TIMERS, {
+        homeRoot: root,
+        spawnSetup: (command, args, options) => {
+          spawns++;
+          expect(command).toBe('pnpm');
+          expect(args).toContain('skills@1.7.4');
+          expect(options.detached).toBe(true);
+          expect(options.env?.KILOCODE_TOKEN).toBeUndefined();
+          return spawn(
+            process.execPath,
+            [
+              '-e',
+              `const fs = require('node:fs');
+               const path = require('node:path');
+               const dir = path.join(process.env.HOME, '.agents/skills/find-skills');
+               fs.mkdirSync(dir, { recursive: true });
+               fs.writeFileSync(path.join(dir, 'SKILL.md'), '# Find skills');`,
+            ],
+            options
+          );
+        },
+      });
+      await harness.manager.prepare(
+        routeSpec({ runtimeSkills: [{ name: 'find-skills', source: 'vercel-labs/skills' }] })
+      );
+      expect(spawns).toBe(1);
+      expect(harness.frames.at(-1)?.type).toBe('session.ready');
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('installs skills.sh references before Kilo starts and reports progress', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-skills-sh-'));
+    try {
+      const harness = createHarness(FAST_TIMERS, {
+        homeRoot: root,
+        runSkillInstall: async (_command, args, options) => {
+          expect(args).toContain('vercel-labs/skills');
+          const installed = path.join(String(options?.env?.HOME), '.agents/skills/find-skills');
+          await fs.mkdir(installed, { recursive: true });
+          await fs.writeFile(path.join(installed, 'SKILL.md'), '# Find skills');
+          return result(0);
+        },
+        beforeEnsure: async () => {
+          const home = harness.ensureInputs[0].env.HOME;
+          expect(
+            await fs.readFile(path.join(home, '.kilocode/skills/find-skills/SKILL.md'), 'utf8')
+          ).toBe('# Find skills');
+        },
+      });
+      await harness.manager.prepare(
+        routeSpec({ runtimeSkills: [{ name: 'find-skills', source: 'vercel-labs/skills' }] })
+      );
+      expect(
+        harness.frames.some(
+          frame =>
+            frame.type === 'session.progress' &&
+            frame.detail?.includes('Installing skills.sh skill')
+        )
+      ).toBe(true);
+      expect(harness.frames.at(-1)?.type).toBe('session.ready');
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('fails setup after bounded skill installation attempts without starting Kilo', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-skills-sh-'));
+    let attempts = 0;
+    try {
+      const harness = createHarness(FAST_TIMERS, {
+        homeRoot: root,
+        runSkillInstall: async () => {
+          attempts++;
+          return result(1);
+        },
+      });
+      await harness.manager.prepare(
+        routeSpec({ runtimeSkills: [{ name: 'missing', source: 'owner/repo' }] })
+      );
+      expect(attempts).toBe(2);
+      expect(harness.ensureCalls()).toBe(0);
+      expect(harness.frames.at(-1)).toMatchObject({
+        type: 'session.failed',
+        step: 'setup',
+        subtype: 'setup_command_failed',
+      });
+      expect(
+        harness.frames.some(
+          frame =>
+            frame.type === 'session.progress' &&
+            frame.detail?.includes('Failed to install skills.sh skill owner/repo@missing')
+        )
+      ).toBe(true);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('aborts skill installation on release without retrying or starting Kilo', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-skills-sh-'));
+    const started = Promise.withResolvers<void>();
+    let attempts = 0;
+    try {
+      const harness = createHarness(FAST_TIMERS, {
+        homeRoot: root,
+        runSkillInstall: async (_command, _args, options) => {
+          attempts++;
+          started.resolve();
+          await new Promise<void>(resolve =>
+            options?.signal?.addEventListener('abort', () => resolve(), { once: true })
+          );
+          return result(124);
+        },
+      });
+      const spec = routeSpec({
+        runtimeSkills: [{ name: 'find-skills', source: 'vercel-labs/skills' }],
+      });
+      const preparing = harness.manager.prepare(spec);
+      await started.promise;
+      harness.manager.release(spec.sessionId);
+      await preparing;
+      expect(attempts).toBe(1);
+      expect(harness.ensureCalls()).toBe(0);
+      expect(
+        harness.frames.some(
+          frame => frame.type === 'session.failed' || frame.type === 'session.ready'
+        )
+      ).toBe(false);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 
   it('materializes skills, agents and commands before Kilo starts and retains them through credential refresh', async () => {
@@ -3419,27 +3643,37 @@ describe('credentials buffered during prepare', () => {
     ).toBe(true);
   });
 
-  it('still updates the Git remote when the proxy handle is unchanged', async () => {
+  it('refreshes the Git record when the proxy handle is unchanged, leaving origin alone', async () => {
     // Regression guard for the prepare-side effect: an unchanged handle must
-    // still reach the runtime and refresh the Git remote. The "no restart
+    // still reach the runtime and refresh the Git credential. The "no restart
     // marker" half of the contract is covered by the real-runtime test
     // `does not roll for a repeated or stale proxy handle but latches a pending one`.
-    const harness = createHarness();
-    const spec = routeSpec({ git: { url: 'https://github.com/acme/repo.git', token: 'git-1' } });
-    const handle = proxyHandle(EXP_NOW);
-    await harness.manager.prepare(spec, credentialsFor(spec, handle));
-    harness.gitCalls.length = 0;
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-git-renewal-'));
+    try {
+      const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+      const spec = routeSpec({
+        git: { url: 'https://github.com/acme/repo.git', token: 'git-1', platform: 'github' },
+      });
+      const handle = proxyHandle(EXP_NOW);
+      await harness.manager.prepare(spec, credentialsFor(spec, handle));
+      harness.gitCalls.length = 0;
 
-    await harness.manager.installCredentials({
-      sessionId: spec.sessionId,
-      git: { token: 'git-2' },
-      kilo: { token: 'alias' },
-      proxy: { handle, targets: specTargets(spec) },
-    });
+      await harness.manager.installCredentials({
+        sessionId: spec.sessionId,
+        git: { token: 'git-2', platform: 'github' },
+        kilo: { token: 'alias' },
+        proxy: { handle, targets: specTargets(spec) },
+      });
 
-    expect(harness.installCalls).toHaveLength(1);
-    expect(harness.installCalls[0]?.env.KILOCODE_TOKEN).toBe(handle);
-    expect(harness.gitCalls.some(args => args[0] === 'remote' && args[1] === 'set-url')).toBe(true);
+      expect(harness.installCalls).toHaveLength(1);
+      expect(harness.installCalls[0]?.env.KILOCODE_TOKEN).toBe(handle);
+      expect(harness.gitCalls).toEqual([]);
+      expect(await fs.readFile(recordPath(root, spec), 'utf8')).toBe(
+        'protocol=https\nhost=github.com\nusername=x-access-token\npassword=git-2\n'
+      );
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 });
 

@@ -458,7 +458,7 @@ function WorktreeGroupRow({
           </>
         ) : (
           <>
-            <Tooltip>
+            <Tooltip delayDuration={400}>
               <TooltipTrigger asChild>
                 <button
                   ref={openButtonRef}
@@ -482,7 +482,12 @@ function WorktreeGroupRow({
                 </button>
               </TooltipTrigger>
               {!isLoadingDetails && (
-                <TooltipContent side="right" className="max-w-xs break-words">
+                <TooltipContent
+                  side="top"
+                  align="start"
+                  sideOffset={8}
+                  className="max-w-xs break-words"
+                >
                   {label}
                 </TooltipContent>
               )}

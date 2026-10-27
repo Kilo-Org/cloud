@@ -265,18 +265,8 @@ export const organizationsRouter = createTRPCRouter({
         organization.next_credit_expiration_at &&
         new Date() >= new Date(organization.next_credit_expiration_at)
       ) {
-        const expiryResult = await processOrganizationExpirations(
-          {
-            id: input.organizationId,
-            microdollars_used: organization.microdollars_used,
-            next_credit_expiration_at: organization.next_credit_expiration_at,
-            total_microdollars_acquired: organization.total_microdollars_acquired,
-          },
-          new Date()
-        );
-        if (expiryResult) {
-          organization = (await getOrganizationById(input.organizationId)) ?? organization;
-        }
+        const expiryResult = await processOrganizationExpirations(input.organizationId, new Date());
+        organization = { ...organization, ...expiryResult };
       }
 
       return {
@@ -320,18 +310,12 @@ export const organizationsRouter = createTRPCRouter({
         organization.next_credit_expiration_at &&
         new Date() >= new Date(organization.next_credit_expiration_at)
       ) {
-        const expiryResult = await processOrganizationExpirations(
-          {
-            id: organizationId,
-            microdollars_used: organization.microdollars_used,
-            next_credit_expiration_at: organization.next_credit_expiration_at,
-            total_microdollars_acquired: organization.total_microdollars_acquired,
-          },
-          new Date()
-        );
-        if (expiryResult) {
-          organization = (await getOrganizationById(organizationId)) ?? organization;
+        await processOrganizationExpirations(organizationId, new Date());
+        const refreshedOrganization = await getOrganizationById(organizationId);
+        if (!refreshedOrganization) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
         }
+        organization = refreshedOrganization;
       }
 
       const [members, ssoPolicy, childOrganizations] = await Promise.all([

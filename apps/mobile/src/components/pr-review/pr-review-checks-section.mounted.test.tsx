@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ExternalLink } from '@/components/ui/icons';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
-import { ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
+import { ProviderPrScopeProvider, ProviderPrWebUrlProvider } from '@/lib/pr-review/provider-pr-ref';
 import { openExternalUrl } from '@/lib/external-link';
 import { PrReviewChecksSection } from './pr-review-checks-section';
 
@@ -293,7 +293,10 @@ describe('PrReviewChecksSection view-on-provider link', () => {
     organizationId: null,
   };
 
-  function mountEmpty(scope?: { ref: typeof gitlabScope.ref; organizationId: string | null }) {
+  function mountEmpty(
+    scope?: { ref: typeof gitlabScope.ref; organizationId: string | null },
+    serverWebUrl: string | null = 'https://github.com/group/sub/repo/pull/12'
+  ) {
     const previousData = query.data;
     query.data = {
       checkRuns: [],
@@ -307,7 +310,13 @@ describe('PrReviewChecksSection view-on-provider link', () => {
     };
     act(() => {
       renderer.current = TestRenderer.create(
-        scope ? <ProviderPrScopeProvider value={scope}>{section}</ProviderPrScopeProvider> : section
+        <ProviderPrWebUrlProvider value={serverWebUrl}>
+          {scope ? (
+            <ProviderPrScopeProvider value={scope}>{section}</ProviderPrScopeProvider>
+          ) : (
+            section
+          )}
+        </ProviderPrWebUrlProvider>
       );
     });
     const created = renderer.current;
@@ -350,13 +359,49 @@ describe('PrReviewChecksSection view-on-provider link', () => {
   });
 
   it('labels the same link "merge request" on a GitLab scope', () => {
-    const { renderer, restore } = mountEmpty(gitlabScope);
+    const { renderer, restore } = mountEmpty(
+      gitlabScope,
+      'https://gitlab.example.com/group/sub/repo/-/merge_requests/12'
+    );
     pressViewButton(renderer);
 
     expect(openExternalUrl).toHaveBeenCalledWith(
       'https://gitlab.example.com/group/sub/repo/-/merge_requests/12',
       { label: 'prReview.terms.mergeRequest' }
     );
+    act(() => {
+      renderer.unmount();
+    });
+    restore();
+  });
+
+  it('opens the merge request URL the read resolved', () => {
+    // The MR is served from the instance the read answered with, so the link
+    // must open that URL.
+    const { renderer, restore } = mountEmpty(
+      {
+        ref: { ...gitlabScope.ref, instanceHint: 'https://gitlab.staging.example' },
+        organizationId: null,
+      },
+      'https://gitlab.example.com/group/sub/repo/-/merge_requests/12'
+    );
+    pressViewButton(renderer);
+
+    expect(openExternalUrl).toHaveBeenCalledWith(
+      'https://gitlab.example.com/group/sub/repo/-/merge_requests/12',
+      { label: 'prReview.terms.mergeRequest' }
+    );
+    act(() => {
+      renderer.unmount();
+    });
+    restore();
+  });
+
+  it('renders no link until the screen publishes the loaded MR URL', () => {
+    const { renderer, restore } = mountEmpty(gitlabScope, null);
+
+    expect(renderer.root.findAllByType('Button' as never)).toHaveLength(0);
+
     act(() => {
       renderer.unmount();
     });

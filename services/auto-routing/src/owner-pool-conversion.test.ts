@@ -245,6 +245,12 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
       consecutiveFailed: 0,
       notPosted: [],
     });
+    expect(console.log).toHaveBeenCalledWith(
+      expect.stringContaining('"readFailedOwners":["user:u4"]')
+    );
+    expect(console.log).toHaveBeenCalledWith(
+      expect.stringContaining('"invalidPoolOwners":["user:u5"]')
+    );
     expect([...marked.keys()]).toEqual([withMode, withoutMode]);
     expect(dbFrom).toHaveBeenCalledWith(kilocode_users);
     expect(dbLimit).toHaveBeenCalledWith(5);
@@ -442,6 +448,9 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
         needsAttention: [],
         outcomes: NO_OUTCOMES,
       });
+      expect(console.log).toHaveBeenCalledWith(
+        expect.stringContaining('"notPostedOwners":["user:u1"]')
+      );
       expect(marked.size).toBe(0);
     }
   );
@@ -805,6 +814,9 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
 
     await expect(response.json()).resolves.toMatchObject({ invalidMode: ['user:u1'] });
     expect(webRequests()[0]?.conversions[0]?.mode).toBe('cost_per_accuracy');
+    expect(console.log).toHaveBeenCalledWith(
+      expect.stringContaining('"invalidModeOwners":["user:u1"]')
+    );
   });
 
   it('lists owners whose settled marker could not be stored', async () => {
@@ -829,6 +841,9 @@ describe('POST /admin/owner-pool-conversion/scan', () => {
     await expect(response.json()).resolves.toMatchObject({
       needsAttention: ['mark_failed user:u1'],
     });
+    expect(console.log).toHaveBeenCalledWith(
+      expect.stringContaining('"needsAttentionOwners":["mark_failed user:u1"]')
+    );
   });
 
   it('does not report a lost failure marker, since the owner is already listed as failed', async () => {

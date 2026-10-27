@@ -227,7 +227,6 @@
     "hideBalance": "Hunaia te toenga",
     "showBalance": "Whakaaturia te toenga",
     "balanceHidden": "Kua huna te toenga",
-    "bonusCreditsExpiring": "Ka mōnehu ā te {{date}} ngā moni {{amount}}.",
     "signOutTitle": "Takiputa?",
     "signOutMessage": "Me takiuru anō koe kia uru ki tō wāhi mahi.",
     "deleteAccountTitle": "Mukua te pūkete?",
@@ -876,6 +875,18 @@
       "securityFindingsUnavailable": "Whakahohehia te Kaiāwhina haumarutanga Kilo i tētahi whānuitanga kia whiwhi ai i ngā kitenga haumarutanga.",
       "spendAlertsSubtitle": "ngā whitinga paepae me ngā pikinga ia hāora",
       "spendAlertsToggle": "Kāwai matohi whakapaunga"
+    },
+    "history": {
+      "title": "Hītori whakamōhiotanga",
+      "subtitle": "Ngā whakamōhiotanga i riro i tēnei pūkete",
+      "bannerBody": "Kua weto ngā pānui pana mō tēnei taputapu, nō reira kāore e tae mai he pānui hou ki konei.",
+      "bannerAction": "Ngā tautuhinga whakamōhiotanga",
+      "emptyTitle": "Kāore anō he whakamōhiotanga",
+      "emptyCategoryTitle": "Kāore he whakamōhiotanga i tēnei kāwai",
+      "emptyBody": "Ka puta mai ki konei ngā whakamōhiotanga ka riro i tēnei pūkete. Ka tiakina mō {{days}} rā.",
+      "capped": "E whakaatu ana i ngā whakamōhiotanga tino hou.",
+      "loadError": "Kāore i taea te uta i te hītori whakamōhiotanga.",
+      "openFailed": "Kāore tēnei whakamōhiotanga e taea te whakatuwhera i tētahi wāhi ināianei."
     },
     "action": {
       "openSession": "Whakatuwheratia te wātū"
@@ -2592,7 +2603,9 @@
       "retrying": "Kei te whakamātau anō…",
       "retryDeny": "Whakamātau anō ki te whakakāhoretia",
       "retryAllowOnce": "Whakamātau anō ki te whakaaetia mō tēnei wā anake",
-      "retryAlwaysAllow": "Whakamātau anō ki te whakaaetia i ngā wā katoa"
+      "retryAlwaysAllow": "Whakamātau anō ki te whakaaetia i ngā wā katoa",
+      "unreadableTitle": "Kāore i taea te pānui te tono whakaaetanga",
+      "unreadableBody": "E tatari ana te māngai ki tētahi whakataunga whakaaetanga kāore e taea e tēnei taupānga te whakaatu. Whakahōuhia te taupānga, te CLI rānei, whakautua rānei te tono ki te CLI kia haere tonu ai."
     },
     "questionCard": {
       "title": "E hiahia ana te māngai ki tō whakautu",
@@ -2984,8 +2997,9 @@
     "unavailableDevice": "Kāore e wātea ana te tāuru reo i tēnei pūrere.",
     "unavailableLanguage": "Kāore e wātea ana te tāuru reo mō tēnei reo o te pūrere.",
     "languageNotInstalledTitle": "Kāore anō te tāuru reo mō {{language}} kia rite",
-    "languageNotInstalledMessage": "Kāore ngā kōnae kōrero kore-ipurangi mō {{language}} kua tāutitia ki tēnei waea. Tikiake, kātahi ka whakamātau anō i te tāuru reo.",
+    "languageNotInstalledMessage": "Kāore anō ngā kōnae kōrero kore-ipurangi mō {{language}} kia tāruatia, ā, kua whakakorehia te tukatuka ipurangi. Hei whakamahi i te tāuru reo, tāruatia ngā kōnae, whakahohea anō rānei te tukatuka ipurangi.",
     "downloadOfflineModel": "Tikiake",
+    "useOnlineTranscription": "Tukua te tukatuka ipurangi",
     "offlineModelDownloadScheduled": "Ka tikiaketia ngā kōnae kōrero kore-ipurangi ki te papamuri. Whakamātau anō i te tāuru reo ā muri atu.",
     "listeningStopped": "Kua mutu te whakarongo.",
     "transcribing": "E tuhi ana...",
@@ -3159,7 +3173,7 @@
     "creditActivity": {
       "emptyDescription": "Ka puta ki konei ngā hokonga, te whakamahinga me ngā whakatikatika moni tōmua o tēnei rōpū i te wā e mahia ana.",
       "emptyTitle": "Kāore he tauwhitinga moni tōmua",
-      "expires": "Ka mōnehu ā te {{date}}",
+      "expiresUtc": "Ka mōnehu ā te {{date}} (UTC)",
       "title": "Ngā tauwhitinga moni tōmua",
       "transactionFallback": "Tauwhitinga moni tōmua",
       "category": {
@@ -3840,6 +3854,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Ka pupuri tonu ngā uara e whakaaturia ana hei •••• i tō rātou muna kua tiakina; whakakapihia tētahi uara kia hurihia ai. E hiahiatia ana ngā uara katoa ina hurihia te raina whakahau",
+      "headersHint": "Ka pupuri tonu ngā uara e whakaaturia ana hei •••• i tō rātou muna kua tiakina; whakakapihia tētahi uara kia hurihia ai. E hiahiatia ana ngā uara katoa ina hurihia te URL",
       "nameRequired": "Whakauruhia he ingoa tūmau",
       "nameInvalid": "Ka taea e te ingoa te whakamahi i nga reta ASCII, nga nama, nga tohu raro (_), me nga tohu (-) anake, ki te 100 pūāhua iti iho rānei",
       "commandRequired": "Whakauruhia he whakahau",
@@ -3938,6 +3954,10 @@
   "credits": {
     "title": "Hoko whiwhinga",
     "description": "He hokonga kotahi ngā whiwhinga ka tāpirihia ki tō toenga Kilo hei whakahaere i ngā wātū whakawaehere AI i te Taupānga Kilo. Ka utu te toa i tō pūkete, ā, ka tāpirihia ngā whiwhinga i muri i te whakamanatanga a te toa i te utu.",
+    "nextExpiry": "Ka mōnehu ā te {{date}} (UTC) ngā whiwhinga {{amount}}. Ka whakamahia tuatahitia ngā whiwhinga ka mōnehu tuatahi.",
+    "appStoreExpiry": "Kāore e mōnehu ngā whiwhinga i hokona mā te App Store.",
+    "playOneYearExpiry": "Ka mōnehu ēnei whiwhinga kotahi tau maramataka i muri i te hokonga.",
+    "playNonexpiring": "Kāore e mōnehu ēnei whiwhinga.",
     "packLabel": "Tāpirihia {{amount}} whiwhinga",
     "priceUnavailable": "Kāore te utu e wātea",
     "purchased": "Kua tāpirihia ngā whiwhinga ki tō toenga.",
@@ -4076,6 +4096,10 @@
     "generate": "Waihanga whakarāpopototanga",
     "retrySummary": "Whakamātau anō i te whakarāpopototanga utu",
     "sources": "Ngā taunakitanga me ngā taonga",
+    "sessionsShown_one": "E whakaatu ana i te {{shown}} o te {{total}} hohe",
+    "sessionsShown_other": "E whakaatu ana i ngā {{shown}} o ngā {{total}} hohe",
+    "itemsShown_one": "E whakaatu ana i te {{shown}} o te {{total}} tūemi",
+    "itemsShown_other": "E whakaatu ana i ngā {{shown}} o ngā {{total}} tūemi",
     "timezone": "Rohe wā pūrongo",
     "deviceTimezone": "Whakamahia te rohe wā o te pūrere",
     "timezoneHint": "Rohe wā IANA, hei tauira Europe/Berlin. Ka pā ngā panonitanga hōtaka ki ngā pūrongo kei te heke mai.",

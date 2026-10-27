@@ -12,6 +12,7 @@ it.each([undefined, 'all'])(
   async diagnostics => {
     const calls: unknown[] = [];
     let statuses: (number | 'recorded' | 'duplicate')[] = [];
+    let mixedStatus: number | undefined;
     let heldFirst: ReturnType<typeof Promise.withResolvers<void>> | undefined;
     let active = 0;
     let peak = 0;
@@ -22,7 +23,12 @@ it.each([undefined, 'all'])(
       calls.push(event);
       peak = Math.max(peak, ++active);
       response.once('finish', () => active--);
-      const status = statuses.shift();
+      const status =
+        mixedStatus === undefined
+          ? statuses.shift()
+          : event.core.id.endsWith('3300')
+            ? 'recorded'
+            : mixedStatus;
       if (heldFirst && event.core.id.endsWith('3300')) await heldFirst.promise;
       if (typeof status === 'number') {
         response.writeHead(status, { 'x-sensitive-header': 'synthetic-private-header' });
@@ -64,8 +70,7 @@ it.each([undefined, 'all'])(
           compatibility_date: service.compatibility_date,
           compatibility_flags: service.compatibility_flags,
           vars: {
-            USAGE_INGEST_MODE: 'processing',
-            USAGE_INGEST_PARALLELISM: '2',
+            ...service.vars,
             ...(diagnostics === undefined ? {} : { USAGE_INGEST_DIAGNOSTICS: diagnostics }),
             USAGE_WRITER_URL: `http://127.0.0.1:${address.port}/api/internal/usage/record`,
             USAGE_WRITER_SECRET: 'synthetic-writer-secret',
@@ -100,6 +105,28 @@ it.each([undefined, 'all'])(
         attempts: 2,
         body,
       }));
+      for (const status of [400, 429, 503]) {
+        mixedStatus = status;
+        heldFirst = Promise.withResolvers<void>();
+        const priorCalls = calls.length;
+        let finished = false;
+        const work = entrypoint.queue('local-usage', messages.slice(0, 2)).then(result => {
+          finished = true;
+          return result;
+        });
+        await vi.waitFor(() => expect(calls).toHaveLength(priorCalls + 2));
+        expect(finished).toBe(false);
+        expect(peak).toBe(2);
+        heldFirst.resolve();
+        heldFirst = undefined;
+        const result = await work;
+        expect(result.outcome).toBe(status === 400 ? 'ok' : 'exception');
+        expect(result.ackAll).toBe(false);
+        expect(result.explicitAcks).toEqual(['queue-0']);
+        expect(result.retryMessages.map(message => message.msgId)).toEqual(['queue-1']);
+        expect(calls.slice(-2)).toEqual(events.slice(0, 2));
+      }
+      mixedStatus = undefined;
       for (const status of [429, 503]) {
         statuses = ['recorded', status, 400, 'duplicate'];
         heldFirst = Promise.withResolvers<void>();
@@ -136,7 +163,7 @@ it.each([undefined, 'all'])(
         expect(result.explicitAcks).toEqual([]);
         expect(result.retryMessages.map(message => message.msgId)).toEqual(['queue-0']);
       }
-      expect(calls).toHaveLength(16);
+      expect(calls).toHaveLength(22);
       const serialized = JSON.stringify(logs);
       expect(serialized).toContain('usage_ingest_processing');
       expect(serialized).toContain('writer_overloaded');

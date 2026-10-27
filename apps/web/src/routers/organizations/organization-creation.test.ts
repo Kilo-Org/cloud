@@ -12,6 +12,7 @@ import {
   createOrganization,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { createChildOrganization } from '@/lib/organizations/organization-hierarchy';
+import { MAX_ORGANIZATIONS_PER_USER } from '@kilocode/web-shared/lib/organizations/organization-creation-limit';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { createCallerForUser } from '@/routers/test-utils';
 
@@ -24,11 +25,11 @@ describe('organization creation limit', () => {
     jest.clearAllMocks();
   });
 
-  test('allows five organizations and rejects a sixth without creating a Stripe customer', async () => {
+  test('allows the organization limit and rejects one more without creating a Stripe customer', async () => {
     const user = await insertTestUser({ id: `oauth/quota-${crypto.randomUUID()}` });
     const caller = await createCallerForUser(user.id);
 
-    for (let index = 0; index < 5; index++) {
+    for (let index = 0; index < MAX_ORGANIZATIONS_PER_USER; index++) {
       await caller.organizations.create({ name: `Organization ${index}`, autoAddCreator: true });
     }
 
@@ -39,12 +40,14 @@ describe('organization creation limit', () => {
     const persisted = await db.query.organizations.findMany({
       where: eq(organizations.created_by_kilo_user_id, user.id),
     });
-    expect(persisted).toHaveLength(5);
+    expect(persisted).toHaveLength(MAX_ORGANIZATIONS_PER_USER);
     const audits = await db.query.organization_audit_logs.findMany({
       where: eq(organization_audit_logs.actor_id, user.id),
     });
-    expect(audits).toHaveLength(5);
-    expect(getOrCreateStripeCustomerIdForOrganization).toHaveBeenCalledTimes(5);
+    expect(audits).toHaveLength(MAX_ORGANIZATIONS_PER_USER);
+    expect(getOrCreateStripeCustomerIdForOrganization).toHaveBeenCalledTimes(
+      MAX_ORGANIZATIONS_PER_USER
+    );
   });
 
   test.each([undefined, false])(
@@ -53,7 +56,7 @@ describe('organization creation limit', () => {
       const user = await insertTestUser();
       const caller = await createCallerForUser(user.id);
 
-      for (let index = 0; index < 5; index++) {
+      for (let index = 0; index < MAX_ORGANIZATIONS_PER_USER; index++) {
         await caller.organizations.create({ name: `Unassigned ${index}`, autoAddCreator });
       }
 
@@ -66,7 +69,9 @@ describe('organization creation limit', () => {
         where: eq(organization_memberships.kilo_user_id, user.id),
       });
       expect(memberships).toHaveLength(0);
-      expect(getOrCreateStripeCustomerIdForOrganization).toHaveBeenCalledTimes(5);
+      expect(getOrCreateStripeCustomerIdForOrganization).toHaveBeenCalledTimes(
+        MAX_ORGANIZATIONS_PER_USER
+      );
     }
   );
 
@@ -75,7 +80,7 @@ describe('organization creation limit', () => {
     const parent = await createOrganization('Parent', user.id);
     const caller = await createCallerForUser(user.id);
 
-    for (let index = 0; index < 4; index++) {
+    for (let index = 0; index < MAX_ORGANIZATIONS_PER_USER - 1; index++) {
       await caller.organizations.createChild({ organizationId: parent.id, name: `Child ${index}` });
     }
 
@@ -89,19 +94,21 @@ describe('organization creation limit', () => {
     const children = await db.query.organizations.findMany({
       where: eq(organizations.parent_organization_id, parent.id),
     });
-    expect(children).toHaveLength(4);
+    expect(children).toHaveLength(MAX_ORGANIZATIONS_PER_USER - 1);
     expect(children.every(child => child.created_by_kilo_user_id === null)).toBe(true);
     const memberships = await db.query.organization_memberships.findMany({
       where: eq(organization_memberships.kilo_user_id, user.id),
     });
     expect(memberships).toHaveLength(1);
-    expect(getOrCreateStripeCustomerIdForOrganization).toHaveBeenCalledTimes(4);
+    expect(getOrCreateStripeCustomerIdForOrganization).toHaveBeenCalledTimes(
+      MAX_ORGANIZATIONS_PER_USER - 1
+    );
   });
 
   test('blocks further self-service creation for an existing account above the limit', async () => {
     const user = await insertTestUser();
     const parent = await createTestOrganization('Existing oversized parent', user.id, 0);
-    for (let index = 0; index < 5; index++) {
+    for (let index = 0; index < MAX_ORGANIZATIONS_PER_USER; index++) {
       await createTestOrganization(`Existing oversized ${index}`, user.id, 0);
     }
 
@@ -124,8 +131,8 @@ describe('organization creation limit', () => {
     const memberships = await db.query.organization_memberships.findMany({
       where: eq(organization_memberships.kilo_user_id, user.id),
     });
-    expect(persisted).toHaveLength(6);
-    expect(memberships).toHaveLength(6);
+    expect(persisted).toHaveLength(MAX_ORGANIZATIONS_PER_USER + 1);
+    expect(memberships).toHaveLength(MAX_ORGANIZATIONS_PER_USER + 1);
     expect(getOrCreateStripeCustomerIdForOrganization).not.toHaveBeenCalled();
   });
 
@@ -134,7 +141,7 @@ describe('organization creation limit', () => {
     const admin = await insertTestUser();
     const parent = await createOrganization('Inherited Parent', owner.id);
     await addUserToOrganization(parent.id, admin.id, 'admin');
-    for (let index = 0; index < 4; index++) {
+    for (let index = 0; index < MAX_ORGANIZATIONS_PER_USER - 1; index++) {
       await createChildOrganization(`Existing Child ${index}`, parent.id);
     }
 
@@ -157,19 +164,19 @@ describe('organization creation limit', () => {
     const admin = await insertTestUser();
     const parent = await createOrganization('Shared Parent', owner.id);
     await addUserToOrganization(parent.id, admin.id, 'admin');
-    for (let index = 0; index < 3; index++) {
+    for (let index = 0; index < MAX_ORGANIZATIONS_PER_USER - 2; index++) {
       await createChildOrganization(`Shared Existing ${index}`, parent.id);
     }
 
     const ownerCaller = await createCallerForUser(owner.id);
     const adminCaller = await createCallerForUser(admin.id);
     await ownerCaller.organizations.create({
-      name: 'Owner fifth organization',
+      name: 'Owner organization at the limit',
       autoAddCreator: true,
     });
     await adminCaller.organizations.createChild({
       organizationId: parent.id,
-      name: 'Admin fifth organization',
+      name: 'Admin organization at the limit',
     });
 
     const ownerOrganizations = await db.query.organizations.findMany({
@@ -178,7 +185,7 @@ describe('organization creation limit', () => {
         eq(organizations.parent_organization_id, parent.id)
       ),
     });
-    expect(ownerOrganizations).toHaveLength(6);
+    expect(ownerOrganizations).toHaveLength(MAX_ORGANIZATIONS_PER_USER + 1);
     await expect(
       ownerCaller.organizations.create({ name: 'Owner over inherited limit' })
     ).rejects.toMatchObject({ code: 'TOO_MANY_REQUESTS' });
@@ -196,7 +203,7 @@ describe('organization creation limit', () => {
     const user = await insertTestUser();
     const parent = await createOrganization('Concurrent Parent', user.id);
     const caller = await createCallerForUser(user.id);
-    for (let index = 0; index < 3; index++) {
+    for (let index = 0; index < MAX_ORGANIZATIONS_PER_USER - 2; index++) {
       await caller.organizations.createChild({
         organizationId: parent.id,
         name: `Existing ${index}`,
@@ -230,7 +237,7 @@ describe('organization creation limit', () => {
         eq(organizations.parent_organization_id, parent.id)
       ),
     });
-    expect(persisted).toHaveLength(5);
+    expect(persisted).toHaveLength(MAX_ORGANIZATIONS_PER_USER);
     expect(getOrCreateStripeCustomerIdForOrganization).toHaveBeenCalledTimes(1);
   });
 
@@ -239,7 +246,7 @@ describe('organization creation limit', () => {
       google_user_email: `external-${crypto.randomUUID()}@notkilocode.ai`,
     });
     const caller = await createCallerForUser(user.id);
-    for (let index = 0; index < 5; index++) {
+    for (let index = 0; index < MAX_ORGANIZATIONS_PER_USER; index++) {
       await createOrganization(`External ${index}`, user.id);
     }
 
@@ -257,21 +264,21 @@ describe('organization creation limit', () => {
         google_user_email: `staff-${crypto.randomUUID()}@${domain}`,
       });
       const caller = await createCallerForUser(user.id);
-      for (let index = 0; index < 6; index++) {
+      for (let index = 0; index < MAX_ORGANIZATIONS_PER_USER + 1; index++) {
         await caller.organizations.create({ name: `Staff ${index}`, autoAddCreator: true });
       }
 
       const persisted = await db.query.organizations.findMany({
         where: eq(organizations.created_by_kilo_user_id, user.id),
       });
-      expect(persisted).toHaveLength(6);
+      expect(persisted).toHaveLength(MAX_ORGANIZATIONS_PER_USER + 1);
     }
   );
 
   test('preserves trusted admin creation above the self-service limit', async () => {
     const user = await insertTestUser({ is_admin: true });
     const parent = await createOrganization('Admin Parent', user.id);
-    for (let index = 0; index < 4; index++) {
+    for (let index = 0; index < MAX_ORGANIZATIONS_PER_USER - 1; index++) {
       await createOrganization(`Admin Existing ${index}`, user.id);
     }
     const caller = await createCallerForUser(user.id);
@@ -316,7 +323,7 @@ describe('organization creation limit', () => {
   test('does not count deleted organizations against the existing active-organization limit', async () => {
     const user = await insertTestUser();
     const caller = await createCallerForUser(user.id);
-    for (let index = 0; index < 5; index++) {
+    for (let index = 0; index < MAX_ORGANIZATIONS_PER_USER; index++) {
       await createOrganization(`Deleted ${index}`, user.id);
     }
     await db

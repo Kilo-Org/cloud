@@ -325,6 +325,14 @@ repository.
 
 ### Watch PR (Observation-Only Pilot)
 
+Implementation status: lifecycle controls and activity are backend/API and MCP
+capabilities. Client watch controls and confirmation described below remain
+planned; the current client only shows passive PR hover-card observation counts.
+Watch PR admission is best-effort: observer errors do not fail the enclosing
+webhook. Only successfully persisted state survives; bounded Redis CI receipts
+are not a complete recovery mechanism. Exact recovery limits are documented in
+`docs/plans/cloud-agent-watch-pr.md`.
+
 1. An eligible verified GitHub PR MUST offer an accessible watch control without
    requiring hover. Enabling a watch MUST require a writable grouped Cloud Agent
    worktree, current repository access, an open same-repository PR, and pilot

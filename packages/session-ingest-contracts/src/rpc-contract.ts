@@ -385,9 +385,52 @@ export function validateCloudAgentRootSessionsCursor(cursor: string): boolean {
   }
 }
 
+export const cloudAgentWorkspacesCursorSchema = z
+  .object({
+    version: z.literal(1),
+    updatedAt: cloudAgentRootSessionsCursorTimestampSchema,
+    workspaceId: cloudAgentWorktreeIdSchema,
+  })
+  .strict();
+export type CloudAgentWorkspacesCursor = z.infer<typeof cloudAgentWorkspacesCursorSchema>;
+
+export function encodeCloudAgentWorkspacesCursor(
+  cursor: Omit<CloudAgentWorkspacesCursor, 'version'>
+): string {
+  const parsed = cloudAgentWorkspacesCursorSchema.parse({ version: 1, ...cursor });
+  return encodeBase64Url(JSON.stringify(parsed));
+}
+
+export function decodeCloudAgentWorkspacesCursor(cursor: string): CloudAgentWorkspacesCursor {
+  if (!/^[A-Za-z0-9_-]{1,256}$/.test(cursor)) {
+    throw new Error('Invalid Cloud Agent workspaces cursor');
+  }
+  const base64 = cursor.replace(/-/g, '+').replace(/_/g, '/');
+  const paddingLength = (4 - (base64.length % 4)) % 4;
+  const binary = atob(base64 + '='.repeat(paddingLength));
+  const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
+  const parsed = cloudAgentWorkspacesCursorSchema.parse(
+    JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes))
+  );
+  if (encodeBase64Url(JSON.stringify(parsed)) !== cursor) {
+    throw new Error('Invalid Cloud Agent workspaces cursor');
+  }
+  return parsed;
+}
+
+export function validateCloudAgentWorkspacesCursor(cursor: string): boolean {
+  try {
+    decodeCloudAgentWorkspacesCursor(cursor);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export const listCloudAgentRootSessionsSchema = z
   .object({
     kiloUserId: z.string().min(1),
+    workspaceId: cloudAgentWorktreeIdSchema.optional(),
     limit: z.number().int().min(1).max(100).optional().default(100),
     cursor: z.string().min(1).max(256).optional(),
     start: z.number().int().nonnegative().max(8_640_000_000_000_000).optional(),
@@ -406,6 +449,7 @@ export type ListCloudAgentRootSessionsParams = z.input<typeof listCloudAgentRoot
 export type CloudAgentRootSessionSummary = {
   kiloSessionId: string;
   cloudAgentSessionId: string;
+  workspaceId: CloudAgentWorktreeId | null;
   userId: string;
   organizationId: string | null;
   title: string | null;
@@ -420,6 +464,73 @@ export type CloudAgentRootSessionsPage = {
   items: CloudAgentRootSessionSummary[];
   nextCursor: string | null;
 };
+
+export const listCloudAgentWorkspacesSchema = z
+  .object({
+    kiloUserId: z.string().min(1),
+    workspaceId: cloudAgentWorktreeIdSchema.optional(),
+    limit: z.number().int().min(1).max(50).optional().default(50),
+    sessionLimit: z.number().int().min(1).max(100).optional().default(10),
+    cursor: z.string().min(1).max(256).optional(),
+    repositoryUrl: z.string().min(1).max(2048).optional(),
+  })
+  .strict()
+  .superRefine((params, ctx) => {
+    if (params.cursor !== undefined && !validateCloudAgentWorkspacesCursor(params.cursor)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['cursor'],
+        message: 'cursor is not a valid Cloud Agent workspaces cursor',
+      });
+    }
+  });
+export type ListCloudAgentWorkspacesParams = z.input<typeof listCloudAgentWorkspacesSchema>;
+
+export const getCloudAgentWorkspaceSchema = z
+  .object({
+    kiloUserId: z.string().min(1),
+    workspaceId: cloudAgentWorktreeIdSchema,
+    sessionLimit: z.number().int().min(1).max(100).optional().default(100),
+    sessionCursor: z.string().min(1).max(256).optional(),
+  })
+  .strict()
+  .superRefine((params, ctx) => {
+    if (
+      params.sessionCursor !== undefined &&
+      !validateCloudAgentRootSessionsCursor(params.sessionCursor)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['sessionCursor'],
+        message: 'sessionCursor is not a valid Cloud Agent root sessions cursor',
+      });
+    }
+  });
+export type GetCloudAgentWorkspaceParams = z.input<typeof getCloudAgentWorkspaceSchema>;
+
+export type CloudAgentWorkspaceSummary = {
+  workspaceId: CloudAgentWorktreeId;
+  userId: string;
+  organizationId: string | null;
+  name: string | null;
+  repositoryProvider: 'github' | 'gitlab' | 'bitbucket' | 'git' | null;
+  gitUrl: string | null;
+  gitBranch: string | null;
+  profileId: string | null;
+  deletionState: 'active' | 'deleting' | 'deleted';
+  created: number;
+  updated: number;
+  lastActivity: number;
+  sessions: CloudAgentRootSessionSummary[];
+  nextSessionCursor: string | null;
+};
+
+export type CloudAgentWorkspacesPage = {
+  items: CloudAgentWorkspaceSummary[];
+  nextCursor: string | null;
+};
+
+export type GetCloudAgentWorkspaceResult = CloudAgentWorkspaceSummary | null;
 
 export const sdkApiErrorSchema = z.object({
   name: z.literal('APIError'),
@@ -902,9 +1013,52 @@ export const persistedKiloSdkMessageHistorySchema = z.preprocess(
 );
 export type KiloSdkMessageHistory = z.infer<typeof kiloSdkMessageHistorySchema>;
 
+/**
+ * Longest message identity, in the bytes its JSON serialization contributes to
+ * an encoded cursor, that the cursor may carry. Escapes count: a `"` in the id
+ * is two bytes once serialized. The wire length below is derived from this.
+ */
+export const MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES = 64;
+
+const utf8Encoder = new TextEncoder();
+
+/**
+ * True when a message identity fits the cursor id length. Ingest uses the same
+ * rule so every stored identity can be encoded back into a cursor.
+ */
+export function fitsKiloSdkMessagesCursorId(id: string): boolean {
+  return (
+    utf8Encoder.encode(JSON.stringify(id).slice(1, -1)).length <=
+    MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES
+  );
+}
+
+/**
+ * Worst-case JSON envelope of a valid cursor: the empty id plus the longest
+ * decimal a non-negative finite double serializes to (`1.7976931348623157e+308`).
+ */
+const MAX_KILO_SDK_MESSAGES_CURSOR_ENVELOPE_BYTES = '{"id":"","time":1.7976931348623157e+308}'
+  .length;
+
+/**
+ * Longest encoded cursor a valid cursor can produce, counting base64 padding.
+ * Request schemas cap the wire value at this length and the decoder rejects
+ * anything longer before it allocates or parses the decoded payload.
+ */
+export const MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH =
+  4 *
+  Math.ceil(
+    (MAX_KILO_SDK_MESSAGES_CURSOR_ENVELOPE_BYTES + MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES) / 3
+  );
+
+/** Base64 and base64url alphabets, plus the optional trailing padding. */
+const KILO_SDK_MESSAGES_CURSOR_WIRE_PATTERN = /^[A-Za-z0-9+/_-]+={0,2}$/;
+
 export const kiloSdkMessagesLegacyCursorSchema = z
   .object({
-    id: messageIdSchema,
+    id: messageIdSchema.refine(fitsKiloSdkMessagesCursorId, {
+      message: 'message cursor ids must fit the cursor id byte limit',
+    }),
     time: z.number().nonnegative(),
   })
   .strict();
@@ -913,9 +1067,8 @@ export type KiloSdkMessagesLegacyCursor = z.infer<typeof kiloSdkMessagesLegacyCu
 export const kiloSdkMessagesCursorSchema = kiloSdkMessagesLegacyCursorSchema;
 export type KiloSdkMessagesCursor = KiloSdkMessagesLegacyCursor;
 
-export function encodeKiloSdkMessagesCursor(cursor: KiloSdkMessagesCursor): string {
-  const parsed = kiloSdkMessagesCursorSchema.parse(cursor);
-  const bytes = new TextEncoder().encode(JSON.stringify(parsed));
+function serializeKiloSdkMessagesCursor(cursor: KiloSdkMessagesCursor): string {
+  const bytes = utf8Encoder.encode(JSON.stringify(cursor));
   let binary = '';
   for (const byte of bytes) {
     binary += String.fromCharCode(byte);
@@ -923,7 +1076,27 @@ export function encodeKiloSdkMessagesCursor(cursor: KiloSdkMessagesCursor): stri
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
 }
 
+export function encodeKiloSdkMessagesCursor(cursor: KiloSdkMessagesCursor): string {
+  return serializeKiloSdkMessagesCursor(kiloSdkMessagesCursorSchema.parse(cursor));
+}
+
+/**
+ * Encodes a cursor when it satisfies the contract, and returns `null` when it
+ * does not. History reads use this so a stored identity outside the contract
+ * ends the page instead of failing it.
+ */
+export function tryEncodeKiloSdkMessagesCursor(cursor: KiloSdkMessagesCursor): string | null {
+  const parsed = kiloSdkMessagesCursorSchema.safeParse(cursor);
+  return parsed.success ? serializeKiloSdkMessagesCursor(parsed.data) : null;
+}
+
 export function decodeKiloSdkMessagesCursor(cursor: string): KiloSdkMessagesCursor {
+  if (
+    cursor.length > MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH ||
+    !KILO_SDK_MESSAGES_CURSOR_WIRE_PATTERN.test(cursor)
+  ) {
+    throw new Error('message cursor is not valid');
+  }
   const base64 = cursor.replace(/-/g, '+').replace(/_/g, '/');
   const paddingLength = (4 - (base64.length % 4)) % 4;
   const binary = atob(base64 + '='.repeat(paddingLength));
@@ -943,7 +1116,7 @@ export function validateKiloSdkMessagesCursor(cursor: string): boolean {
 export const getCloudAgentRootSessionMessagesSchema = resolveCloudAgentRootSessionSchema
   .extend({
     limit: z.number().int().nonnegative().max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE).optional(),
-    before: z.string().min(1).optional(),
+    before: z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).optional(),
   })
   .superRefine((params, ctx) => {
     if (params.before !== undefined && (params.limit === undefined || params.limit === 0)) {
@@ -985,7 +1158,9 @@ export type GetCloudAgentRootSessionMessagesResult = CloudAgentRootSessionMessag
  * Unlike the legacy `getCloudAgentRootSessionMessagesSchema`, this generic
  * endpoint is always bounded, so `limit: 0` is rejected at the schema level.
  * `before` requires a positive `limit`; the default guarantees this unless
- * the caller explicitly supplies a non-positive `limit`.
+ * the caller explicitly supplies a non-positive `limit`. `before` is capped at
+ * `MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH` so an oversized value never reaches
+ * the decoder.
  */
 export const getSessionMessagesSchema = z
   .object({
@@ -997,7 +1172,7 @@ export const getSessionMessagesSchema = z
       .positive()
       .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
       .default(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE),
-    before: z.string().min(1).optional(),
+    before: z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).optional(),
   })
   .superRefine((params, ctx) => {
     if (params.before === undefined) return;
@@ -1045,6 +1220,12 @@ export type SessionIngestRpcMethods = {
   listCloudAgentRootSessions: (
     params: ListCloudAgentRootSessionsParams
   ) => Promise<CloudAgentRootSessionsPage>;
+  listCloudAgentWorkspaces: (
+    params: ListCloudAgentWorkspacesParams
+  ) => Promise<CloudAgentWorkspacesPage>;
+  getCloudAgentWorkspace: (
+    params: GetCloudAgentWorkspaceParams
+  ) => Promise<GetCloudAgentWorkspaceResult>;
   getCloudAgentRootSessionMessages: (
     params: GetCloudAgentRootSessionMessagesParams
   ) => Promise<GetCloudAgentRootSessionMessagesResult>;

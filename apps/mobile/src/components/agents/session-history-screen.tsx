@@ -2,10 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Keyboard, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useTranslation } from 'react-i18next';
-import { type Href, useFocusEffect, useNavigation, useRouter } from 'expo-router';
+import { useFocusEffect, useNavigation } from 'expo-router';
 
 import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
-import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import { AgentSessionListContent } from '@/components/agents/session-list-content';
 import { SessionListHeaderActions } from '@/components/agents/session-list-header-actions';
 import { selectSessionListIsLoading } from '@/components/agents/session-list-loading';
@@ -13,6 +12,7 @@ import { selectShowSearchBusy } from '@/components/agents/session-list-search-bu
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { useAgentSessionListData } from '@/components/agents/use-agent-session-list-data';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
+import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
 import { useSessionSearchInput } from '@/components/agents/use-session-search-input';
 import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
@@ -32,7 +32,6 @@ import { useOrganization } from '@/lib/organization-context';
 export function SessionHistoryScreen() {
   const { t } = useTranslation();
   const navigation = useNavigation();
-  const router = useRouter();
 
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
   const {
@@ -154,13 +153,14 @@ export function SessionHistoryScreen() {
   }, [navigation, refetchOutsidePull]);
 
   const navigateToSession = useAgentSessionNavigator();
+  const { openNewSession } = useNewSessionNavigator();
 
   // The empty history's next step is a real session, in the current
   // organization: the same destination the Agents tab's "New session" action
   // opens, so history never dead-ends at a message.
   const handleCreateSession = useCallback(() => {
-    router.push(getNewAgentSessionPath(organizationId) as Href);
-  }, [router, organizationId]);
+    openNewSession(organizationId);
+  }, [openNewSession, organizationId]);
 
   const handleEndReached = useCallback(() => {
     if (shouldLoadMoreSessions(paging)) {

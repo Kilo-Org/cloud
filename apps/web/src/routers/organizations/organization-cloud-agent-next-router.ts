@@ -29,7 +29,9 @@ import {
   getGitLabInstanceUrlForOrganization,
   buildGitLabCloneUrl,
   fetchGitLabRepositoriesForOrganization,
+  validateGitLabRepoAccessForOrganization,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
+import { captureException } from '@sentry/nextjs';
 import { orderRepositoriesByUsage } from '@/lib/cloud-agent/order-repositories';
 import {
   listProviderRepositoryBranches,
@@ -70,13 +72,9 @@ import {
   baseCreatePreviewNextSchema,
   baseCreatePreviewNextOutputSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
-  cloudAgentGetImageUploadUrlSchema,
   cloudAgentReleasePendingUploadsSchema,
 } from '../cloud-agent-next-schemas';
-import {
-  generateCloudAgentAttachmentUploadUrl,
-  generateImageUploadUrl,
-} from '@/lib/r2/cloud-agent-attachments';
+import { generateCloudAgentAttachmentUploadUrl } from '@/lib/r2/cloud-agent-attachments';
 import {
   linkAttachmentsForDispatch,
   releasePendingUploads,
@@ -195,10 +193,6 @@ const InterruptSessionInput = baseInterruptSessionNextSchema.extend({
 });
 
 const CancelQueuedMessageInput = baseCancelQueuedMessageNextSchema.extend({
-  organizationId: z.uuid(),
-});
-
-const ImageUploadUrlInput = cloudAgentGetImageUploadUrlSchema.extend({
   organizationId: z.uuid(),
 });
 
@@ -343,7 +337,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         publicRepoUrl,
         organizationId,
         attachments,
-        images,
         ...restInput
       } = input;
 
@@ -360,6 +353,34 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       };
 
       if (gitlabProject) {
+        let projectAvailable: boolean;
+        try {
+          projectAvailable = await validateGitLabRepoAccessForOrganization(
+            organizationId,
+            ctx.user.id,
+            gitlabProject
+          );
+        } catch (error) {
+          captureException(error, {
+            tags: {
+              component: 'cloud-agent-next-router',
+              op: 'organization-gitlab-project-resolution',
+            },
+          });
+          throw new TRPCError({
+            code: 'SERVICE_UNAVAILABLE',
+            message:
+              "Could not verify access to that GitLab project. Check this organization's GitLab connection and try again.",
+          });
+        }
+        if (!projectAvailable) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message:
+              "That GitLab project is not available through this organization's GitLab integration.",
+          });
+        }
+
         const instanceUrl = await getGitLabInstanceUrlForOrganization(organizationId);
         const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
         gitParams = { gitUrl, platform: PLATFORM.GITLAB };
@@ -403,14 +424,13 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         // New-session flows call prepareSession without a follow-up
         // sendMessage, so the attachment rows must be linked before prepare
         // can accept the session; otherwise the reaper deletes new-session
-        // objects. Only ATTACHMENT rows are admitted (images are never
-        // admitted; only generateCloudAgentAttachmentUploadUrl admits).
+        // objects.
         await linkAttachmentsForDispatch(ctx.user.id, attachments);
 
         return await client.prepareSession({
           ...restInput,
           ...gitParams,
-          attachments: attachments ?? images,
+          attachments,
           createdOnPlatform: 'cloud-agent-web',
           githubAccessPurpose: 'agent',
           kilocodeOrganizationId: organizationId,
@@ -529,9 +549,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         // Link the attachment rows before the worker can accept the turn: the
         // link is what keeps their objects out of the abandoned-upload reaper,
         // and once the worker has answered there is no ledger work left that
-        // could report an accepted send as failed. Only ATTACHMENT rows are
-        // admitted (images are never admitted; only
-        // generateCloudAgentAttachmentUploadUrl admits).
+        // could report an accepted send as failed.
         linkedObjectKeys = await linkAttachmentsForDispatch(ctx.user.id, attachments);
       } catch (error) {
         rethrowCloudAgentError(error);
@@ -543,7 +561,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           payload: input.payload,
           autoCommit: input.autoCommit,
           messageId: input.messageId,
-          attachments: attachments ?? input.images,
+          attachments,
         });
       } catch (error) {
         // A send can fail after the worker accepted the turn, so only the rows
@@ -764,21 +782,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       } catch (error) {
         rethrowAsTerminalError(error);
       }
-    }),
-
-  /**
-   * Generate a presigned URL for uploading an image attachment.
-   */
-  getImageUploadUrl: organizationMemberMutationProcedure
-    .input(ImageUploadUrlInput)
-    .mutation(async ({ ctx, input }) => {
-      return generateImageUploadUrl({
-        userId: ctx.user.id,
-        messageUuid: input.messageUuid,
-        imageId: input.imageId,
-        contentType: input.contentType,
-        contentLength: input.contentLength,
-      });
     }),
 
   /**

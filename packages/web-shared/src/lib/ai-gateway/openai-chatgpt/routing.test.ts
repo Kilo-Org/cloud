@@ -8,6 +8,18 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store', () => ({
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/served-models', () => ({
   isOpenAiModelServed: jest.fn().mockResolvedValue(true),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => {
+  const aliasTargets: Record<string, string> = {
+    '~openai/gpt-luna-latest': 'openai/gpt-5.6-luna',
+    '~openai/gpt-oss-latest': 'openai/gpt-oss-120b',
+    '~anthropic/claude-sonnet-latest': 'anthropic/claude-sonnet-5',
+  };
+  return {
+    resolveOpenRouterModelAlias: jest.fn(
+      async (modelId: string) => aliasTargets[modelId] ?? modelId
+    ),
+  };
+});
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/refresh', () => ({
   resolveOpenAiChatGptAccessToken: jest.fn(),
   OPENAI_CHATGPT_RECONNECT_MESSAGE: 'Your ChatGPT connection has expired. Reconnect to continue.',
@@ -428,6 +440,49 @@ describe('Kilo-exclusive aliases', () => {
   });
 });
 
+describe('latest-model aliases', () => {
+  const ALIAS = '~openai/gpt-luna-latest';
+
+  function aliasInput(modelId: string): OpenAiChatGptRoutingInput {
+    return routingInput({ request: responsesRequest(modelId), requestedModel: modelId });
+  }
+
+  it('is eligible when the alias targets a served OpenAI model', async () => {
+    await expect(isOpenAiChatGptEligible(aliasInput(ALIAS))).resolves.toBe(true);
+    expect(isOpenAiModelServed).toHaveBeenCalledWith(PARTNER_KEY, 'gpt-5.6-luna');
+  });
+
+  it.each(['~openai/gpt-oss-latest', '~anthropic/claude-sonnet-latest', '~openai/unknown-latest'])(
+    'is not eligible for %s',
+    async modelId => {
+      await expect(isOpenAiChatGptEligible(aliasInput(modelId))).resolves.toBe(false);
+      expect(isOpenAiModelServed).not.toHaveBeenCalled();
+    }
+  );
+
+  it('is not eligible when the project does not serve the alias target', async () => {
+    jest.mocked(isOpenAiModelServed).mockResolvedValue(false);
+
+    await expect(isOpenAiChatGptEligible(aliasInput(ALIAS))).resolves.toBe(false);
+  });
+
+  it('sends the alias target upstream', async () => {
+    const result = await checkOpenAiChatGptByok(aliasInput(ALIAS));
+    if (result?.kind !== 'provider') throw new Error('expected an openai-chatgpt provider');
+    const body: GatewayResponsesRequest = { model: ALIAS, input: 'hello' };
+
+    await transformResponsesRequest(result.provider, body);
+
+    expect(body.model).toBe('gpt-5.6-luna');
+  });
+
+  it('tags the alias BYOK-available when its target is served', async () => {
+    await expect(
+      getOpenAiChatGptByokModelIds(USER_OWNER, [ALIAS, '~anthropic/claude-sonnet-latest'])
+    ).resolves.toEqual(new Set([ALIAS]));
+  });
+});
+
 describe('checkOpenAiChatGptByok', () => {
   it('builds a stateless responses provider carrying the delegated token', async () => {
     const result = await checkOpenAiChatGptByok(routingInput());
@@ -661,7 +716,7 @@ describe('checkOpenAiChatGptByok', () => {
   });
 
   it('builds no provider without the deployment partner key', () => {
-    expect(buildOpenAiChatGptProvider('', DELEGATED_TOKEN)).toBeNull();
+    expect(buildOpenAiChatGptProvider('', DELEGATED_TOKEN, 'gpt-5-nano')).toBeNull();
   });
 
   it('returns no provider for an ineligible request without reading the connection', async () => {

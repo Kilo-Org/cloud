@@ -36,6 +36,7 @@ import { userHasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/cust
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { removePaidServerFeatures } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
 import {
   getLocalFakeLlmProvider,
   getLocalFakeTranscriptionProvider,
@@ -166,23 +167,40 @@ async function resolveCustomLlmProvider(
   }
 
   const { definition } = customLlm;
+  const provider = buildDirectProvider(
+    'custom',
+    [
+      definition.opencode_settings?.ai_sdk_provider === 'anthropic'
+        ? 'messages'
+        : definition.opencode_settings?.ai_sdk_provider === 'openai'
+          ? 'responses'
+          : 'chat_completions',
+    ],
+    definition,
+    await resolveCustomLlmAuth(credentials)
+  );
+  const isPublic = isPublicCustomLlm(definition);
   return {
     kind: 'provider',
-    provider: buildDirectProvider(
-      'custom',
-      [
-        definition.opencode_settings?.ai_sdk_provider === 'anthropic'
-          ? 'messages'
-          : definition.opencode_settings?.ai_sdk_provider === 'openai'
-            ? 'responses'
-            : 'chat_completions',
-      ],
-      definition,
-      await resolveCustomLlmAuth(credentials)
-    ),
+    provider: isPublic ? withoutPaidServerFeatures(provider) : provider,
     userByok: null,
     isFree: true,
-    bypassAccessCheck: !isPublicCustomLlm(definition),
+    bypassAccessCheck: !isPublic,
+  };
+}
+
+/**
+ * A public custom LLM serves anyone for free on Kilo's credential, so like other
+ * free models it drops paid server features before the definition's own
+ * `extra_body` applies. Private custom LLMs keep them.
+ */
+function withoutPaidServerFeatures(provider: Provider): Provider {
+  return {
+    ...provider,
+    async transformRequest(context) {
+      removePaidServerFeatures(provider, context.model, context.request, context.kilo_user_id);
+      await provider.transformRequest(context);
+    },
   };
 }
 

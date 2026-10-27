@@ -15,6 +15,7 @@ import {
   parseAppActionPayload,
 } from './app-action-contract';
 import { setPendingAppAction } from './pending-app-action';
+import { preflightStartAgent } from './start-agent-preflight';
 
 /** The `StartAgent` request without its discriminant: what `start-agent.ts` takes. */
 type StartAgentInput = Omit<Extract<AppActionRequest, { action: 'StartAgent' }>, 'action'>;
@@ -110,6 +111,10 @@ export async function dispatchAppActionRequest(
   deps: AppActionDispatcherDeps = defaultDeps
 ): Promise<AppActionResult> {
   if (request.action === 'StartAgent') {
+    const preflight = preflightStartAgent(request);
+    if (!preflight.ok) {
+      return preflight.result;
+    }
     const result = await runStartAgent(request, deps);
     if (result.ok && result.sessionId !== undefined) {
       // The move the in-app create makes through `replaceWithAgentSession`
@@ -160,8 +165,15 @@ async function runStartAgent(
   let confirmed = false;
   try {
     confirmed = await deps.confirmStart(input);
-  } catch {
-    // A confirmation that could not be shown is a refusal: nothing runs.
+  } catch (error) {
+    await captureAppActionError(error, 'confirm_start_agent');
+    return {
+      ok: false,
+      action: 'StartAgent',
+      retryable: true,
+      code: 'start-failed',
+      message: i18n.t('agentChat.session.serviceUnavailable'),
+    };
   }
   if (!confirmed) {
     return startCancelledResult();

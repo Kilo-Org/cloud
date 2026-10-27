@@ -98,5 +98,6 @@ exist as an org-scoped mirror under `organizations`, for example
 - `user`
 - `userExports`
 - `userFeedback`
+- `vercelCompute`
 - `webhookTriggers`
 - `workspaceFolders`

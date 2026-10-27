@@ -136,6 +136,7 @@ import type {
   KiloClawScheduledActionNotificationChannel,
   KiloClawScheduledActionNotificationKind,
   DirectByokModel,
+  ByokApiKeySettings,
 } from './schema-types';
 import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-pricing-catalog';
 import type {
@@ -146,6 +147,9 @@ import type {
   OrganizationSettings,
   AuditLogAction,
   EncryptedData,
+  ByocCredentialEnvelope,
+  ByocSetupStatus,
+  ByocUpgradeStatus,
   AuthProviderId,
   PlatformRepository,
   IntegrationPermissions,
@@ -352,6 +356,12 @@ export const credit_transactions = pgTable(
     amount_microdollars: bigint({ mode: 'number' }).notNull(),
     expiration_baseline_microdollars_used: bigint({ mode: 'number' }),
     original_baseline_microdollars_used: bigint({ mode: 'number' }),
+    consumed_microdollars: bigint({ mode: 'number' }).notNull().default(0),
+    retired_microdollars: bigint({ mode: 'number' }).notNull().default(0),
+    paid_credit_policy: text(),
+    credit_source: text(),
+    source_transaction_id: uuid(),
+    refund_principal_microdollars: bigint({ mode: 'number' }),
     is_free: boolean().notNull(),
     description: text(),
     original_transaction_id: uuid(), // Links expiration records to their original credit transaction
@@ -377,6 +387,9 @@ export const credit_transactions = pgTable(
       table.coinbase_credit_block_id
     ),
     index('IDX_credit_transactions_organization_id').on(table.organization_id),
+    index('IDX_credit_transactions_source_transaction_id')
+      .on(table.source_transaction_id)
+      .concurrently(),
     uniqueIndex('IDX_credit_transactions_unique_category')
       .on(table.kilo_user_id, table.credit_category)
       .where(sql`${table.check_category_uniqueness} = TRUE`),
@@ -510,6 +523,10 @@ export const kilocode_users = pgTable(
   table => [
     unique('UQ_b1afacbcf43f2c7c4cb9f7e7faa').on(table.google_user_email),
     index('IDX_kilocode_users_signup_ip_created_at').on(table.signup_ip, table.created_at),
+    index('IDX_kilocode_users_next_credit_expiration_at')
+      .on(table.next_credit_expiration_at)
+      .where(sql`${table.next_credit_expiration_at} IS NOT NULL`)
+      .concurrently(),
     index('IDX_kilocode_users_blocked_at').on(table.blocked_at),
     index('IDX_kilocode_users_blocked_by_kilo_user_id').on(table.blocked_by_kilo_user_id),
     // Prevent empty strings
@@ -2806,6 +2823,9 @@ export const microdollar_usage_metadata = pgTable(
     auto_model_id: integer(),
     reasoning_setting_id: integer(),
     market_cost: bigint({ mode: 'number' }),
+    // Microdollars charged on top of BYOK inference, such as server tools, plugins
+    // and PDF parsing, excluding OpenRouter's BYOK fee. Null when not reported separately.
+    non_inference_cost: bigint({ mode: 'number' }),
     is_free: boolean(),
     abuse_delay: integer(),
     abuse_downgraded_from: text(),
@@ -3302,6 +3322,10 @@ export const organizations = pgTable(
     ),
     index('IDX_organizations_sso_domain').on(table.sso_domain),
     index('IDX_organizations_parent_organization_id').on(table.parent_organization_id),
+    index('IDX_organizations_next_credit_expiration_at')
+      .on(table.next_credit_expiration_at)
+      .where(sql`${table.next_credit_expiration_at} IS NOT NULL`)
+      .concurrently(),
     uniqueIndex('UQ_organizations_live_sales_demo_per_owner')
       .on(table.created_by_kilo_user_id)
       .where(
@@ -3800,6 +3824,68 @@ export const organization_memberships = pgTable(
 );
 
 export type OrganizationMembership = typeof organization_memberships.$inferSelect;
+
+export const byoc_connections = pgTable(
+  'byoc_connections',
+  {
+    id: idPrimaryKeyColumn,
+    provider: text().notNull(),
+    organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    user_id: text(),
+    credentials_encrypted: jsonb().$type<ByocCredentialEnvelope>().notNull(),
+    config: jsonb().$type<Record<string, unknown>>().notNull(),
+    runtime: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    setup_status: text().$type<ByocSetupStatus>().notNull().default('pending'),
+    setup_step: text(),
+    setup_error: text(),
+    build_generation: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`),
+    upgrade_status: text().$type<ByocUpgradeStatus>(),
+    upgrade_step: text(),
+    upgrade_error: text(),
+    setup_started_at: timestamp({ withTimezone: true, mode: 'string' }),
+    setup_completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_byoc_connections_organization_provider')
+      .on(table.organization_id, table.provider)
+      .where(sql`${table.organization_id} IS NOT NULL`),
+    uniqueIndex('UQ_byoc_connections_user_provider')
+      .on(table.user_id, table.provider)
+      .where(sql`${table.user_id} IS NOT NULL`),
+    check(
+      'byoc_connections_owner_check',
+      sql`(${table.organization_id} IS NOT NULL AND ${table.user_id} IS NULL) OR (${table.organization_id} IS NULL AND ${table.user_id} IS NOT NULL)`
+    ),
+    check('byoc_connections_provider_check', sql`length(trim(${table.provider})) > 0`),
+    check('byoc_connections_config_check', sql`jsonb_typeof(${table.config}) = 'object'`),
+    check('byoc_connections_runtime_check', sql`jsonb_typeof(${table.runtime}) = 'object'`),
+    check(
+      'byoc_connections_status_check',
+      sql`${table.setup_status} IN ('pending', 'building', 'ready', 'failed')`
+    ),
+    check(
+      'byoc_connections_ready_fields_check',
+      sql`${table.setup_status} <> 'ready' OR ${table.setup_completed_at} IS NOT NULL`
+    ),
+    check(
+      'byoc_connections_upgrade_status_check',
+      sql`${table.upgrade_status} IS NULL OR ${table.upgrade_status} IN ('pending', 'building', 'failed')`
+    ),
+  ]
+);
+
+export type ByocConnection = typeof byoc_connections.$inferSelect;
+export type NewByocConnection = typeof byoc_connections.$inferInsert;
 
 export const organization_groups = pgTable(
   'organization_groups',
@@ -6866,6 +6952,7 @@ export const byok_api_keys = pgTable(
     encrypted_api_key: jsonb().$type<EncryptedData>().notNull(),
     management_source: text().$type<BYOKManagementSource>().notNull().default('user'),
     is_enabled: boolean().default(true).notNull(),
+    settings: jsonb().$type<ByokApiKeySettings>().default({}).notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()

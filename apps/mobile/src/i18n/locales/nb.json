@@ -227,7 +227,6 @@
     "hideBalance": "Skjul saldo",
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
-    "bonusCreditsExpiring": "{{amount}} i kreditter utløper {{date}}.",
     "signOutTitle": "Logge ut?",
     "signOutMessage": "Du må logge inn igjen for å få tilgang til arbeidsområdet ditt.",
     "deleteAccountTitle": "Slette kontoen?",
@@ -2592,7 +2591,9 @@
       "retrying": "Prøver på nytt…",
       "retryDeny": "Prøv å nekte på nytt",
       "retryAllowOnce": "Prøv å tillate én gang på nytt",
-      "retryAlwaysAllow": "Prøv å tillate alltid på nytt"
+      "retryAlwaysAllow": "Prøv å tillate alltid på nytt",
+      "unreadableTitle": "Tillatelsesforespørselen kunne ikke leses",
+      "unreadableBody": "Agenten venter på en tillatelsesbeslutning som denne appen ikke kan vise. Oppdater appen eller CLI, eller svar på forespørselen i CLI for å fortsette."
     },
     "questionCard": {
       "title": "Agenten trenger svar",
@@ -2984,8 +2985,9 @@
     "unavailableDevice": "Diktering er ikke tilgjengelig på denne enheten.",
     "unavailableLanguage": "Diktering er ikke tilgjengelig for språket som er valgt på enheten.",
     "languageNotInstalledTitle": "Diktering for {{language}} er ikke klar ennå",
-    "languageNotInstalledMessage": "De frakoblede talefilene for {{language}} er ikke installert på denne telefonen. Last dem ned, og prøv diktering igjen.",
+    "languageNotInstalledMessage": "De frakoblede talefilene for {{language}} er ikke installert, og transkripsjon på nettet er slått av. Last ned filene, eller slå på transkripsjon på nettet igjen, for å bruke taleinndata.",
     "downloadOfflineModel": "Last ned",
+    "useOnlineTranscription": "Tillat transkripsjon på nettet",
     "offlineModelDownloadScheduled": "De frakoblede talefilene lastes ned i bakgrunnen. Prøv diktering igjen senere.",
     "listeningStopped": "Dikteringen har stoppet.",
     "transcribing": "Transkriberer...",
@@ -3159,7 +3161,7 @@
     "creditActivity": {
       "emptyDescription": "Kjøp, forbruk og justeringer av kreditter for denne organisasjonen vises her etter hvert.",
       "emptyTitle": "Ingen kredittbevegelser",
-      "expires": "Utløper {{date}}",
+      "expiresUtc": "Utløper {{date}} (UTC)",
       "title": "Kredittbevegelser",
       "transactionFallback": "Kreditttransaksjon",
       "category": {
@@ -3746,6 +3748,7 @@
     "title": "Profiler",
     "entrySubtitle": "Gjenbruk miljøinnstillinger på tvers av økter",
     "newProfile": "Ny profil",
+    "openHint": "Åpner profilen",
     "emptyTitle": "Ingen profiler ennå",
     "emptyDescription": "Opprett en profil for å gjenbruke miljøvariabler, oppsettkommandoer og ferdigheter på tvers av økter.",
     "loadFailed": "Kunne ikke laste inn profiler",
@@ -3839,6 +3842,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Verdier som vises som •••• beholder den lagrede hemmeligheten; erstatt en verdi for å rotere den. Hvis du endrer kommandolinjen, må alle verdier angis på nytt",
+      "headersHint": "Verdier som vises som •••• beholder den lagrede hemmeligheten; erstatt en verdi for å rotere den. Hvis du endrer URL-en, må alle verdier angis på nytt",
       "nameRequired": "Skriv inn et servernavn",
       "nameInvalid": "Navn kan bare bruke ASCII-bokstaver, tall, understreker og bindestreker, med høyst 100 tegn",
       "commandRequired": "Skriv inn en kommando",
@@ -3937,6 +3942,10 @@
   "credits": {
     "title": "Kjøp kreditter",
     "description": "Kreditter er et engangskjøp som legges til Kilo-saldoen din for å kjøre AI-kodeøkter i Kilo App. Butikken belaster kontoen din, og kredittene legges til etter at butikken bekrefter betalingen.",
+    "nextExpiry": "{{amount}} i kreditter utløper {{date}} (UTC). Kreditter med tidligst utløpsdato brukes først.",
+    "appStoreExpiry": "Kreditter kjøpt via App Store utløper ikke.",
+    "playOneYearExpiry": "Disse kredittene utløper ett kalenderår etter kjøpet.",
+    "playNonexpiring": "Disse kredittene utløper ikke.",
     "packLabel": "Legg til {{amount}} i kreditter",
     "priceUnavailable": "Prisen er ikke tilgjengelig",
     "purchased": "Kreditter er lagt til saldoen din.",
@@ -3977,11 +3986,13 @@
       "namePlaceholder": "Feil, ideer, utgivelse…",
       "emoji": "Emoji",
       "mode": "Modus",
-      "defaultsHint": "Økter som startes fra denne listen, bruker disse standardverdiene."
+      "defaultsHint": "Økter som startes fra denne listen, bruker disse standardverdiene.",
+      "saveFailed": "Kunne ikke lagre listen. Sjekk tilkoblingen og prøv igjen."
     },
     "list": {
       "addPlaceholder": "Legg inn et gjøremål",
       "add": "Legg til gjøremål",
+      "addFailed": "Kunne ikke legge til gjøremålet. Sjekk tilkoblingen og prøv igjen.",
       "empty": "Ingen gjøremål ennå",
       "setDefaults": "Angi kodelager, modus og modell",
       "completed_one": "Fullført ({{count}})",
@@ -4018,7 +4029,9 @@
       "startNewSession": "Start ny økt",
       "startNewSessionHint": "Langtrykk for å starte en ny økt.",
       "linkSession": "Koble til økt",
-      "linkFailed": "Kunne ikke koble økten til gjøremålet."
+      "linkFailed": "Kunne ikke koble økten til gjøremålet.",
+      "moveToAnotherTodo": "Flytt til et annet gjøremål",
+      "startRefreshFailed": "Økten startet, men listen ble ikke oppdatert."
     },
     "linkSession": {
       "title": "Koble til en økt",
@@ -4027,6 +4040,7 @@
     },
     "upNext": "Neste",
     "sessionTodo": "Gjøremål: {{title}}",
+    "openTodoHint": "Åpner gjøremålet.",
     "linkToTodo": "Koble til gjøremål",
     "candidates": {
       "empty": "Ingen åpne gjøremål"

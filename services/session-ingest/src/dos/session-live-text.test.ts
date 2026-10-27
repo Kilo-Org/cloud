@@ -88,12 +88,16 @@ describe('sessionLiveText', () => {
       // the absent-segmenter branch once the module has cached its segmenter.
       const { sessionLiveText: withoutSegmenter } =
         await import('@kilocode/session-ingest-contracts/session-live-summary');
-      // The fallback keeps a code unit boundary, so it can leave the surrogate
-      // pair whole while still stopping between a flag's two indicators.
-      expect(sessionLiveText('ab🇷🇸cd', 5)).toBe('ab…');
+      // The fallback keeps a code unit boundary, so it can stop between a flag's
+      // two indicators, while it never splits a surrogate pair.
       expect(withoutSegmenter('ab🇷🇸cd', 5)).toBe('ab🇷…');
-      // It never splits a surrogate pair either.
       expect(withoutSegmenter('ab😀cd', 4)).toBe('ab…');
+      vi.stubGlobal('Intl', actual);
+      vi.resetModules();
+      // The same fresh module with segmentation in place drops the whole flag.
+      const { sessionLiveText: withSegmenter } =
+        await import('@kilocode/session-ingest-contracts/session-live-summary');
+      expect(withSegmenter('ab🇷🇸cd', 5)).toBe('ab…');
     } finally {
       vi.stubGlobal('Intl', actual);
       vi.resetModules();

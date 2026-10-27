@@ -368,9 +368,7 @@ describe('ActiveAgentsDeadlineReceiver', () => {
 
   it('stores the deadline before it arms the alarm', () => {
     const replace = body(DEADLINE, 'private fun replace(');
-    expect(replace.indexOf('if (!editor.commit())')).toBeLessThan(
-      replace.indexOf('AlarmManager')
-    );
+    expect(replace.indexOf('if (!editor.commit())')).toBeLessThan(replace.indexOf('AlarmManager'));
     expect(replace).toContain('if (deadline <= System.currentTimeMillis())');
   });
 });

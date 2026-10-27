@@ -1,4 +1,4 @@
-import type { ChatEvent } from './normalizer';
+import type { ChatEvent, ChatEventVersion } from './normalizer';
 import type { SessionSnapshot, SessionSnapshotPage, SessionSnapshotPageOutcome } from './types';
 import { partSettledAt } from './part-utils';
 import type { TransportSink } from './transport';
@@ -26,26 +26,32 @@ export function snapshotPageFromSnapshot(snapshot: SessionSnapshot): SessionSnap
  */
 export function replayStoredMessages(
   messages: SessionSnapshot['messages'],
-  emit: (event: ChatEvent) => void
+  emit: (event: ChatEvent) => void,
+  version?: ChatEventVersion
 ): void {
   for (const msg of messages) {
-    emit({ type: 'message.updated', info: msg.info });
+    emit({ type: 'message.updated', info: msg.info, ...(version ? { version } : {}) });
 
     for (const part of msg.parts) {
       const settledAt = partSettledAt(part);
       emit({
         type: 'message.part.updated',
         part,
+        ...(version ? { version } : {}),
         ...(settledAt === undefined ? {} : { time: settledAt }),
       });
     }
   }
 }
 
-export function replaySnapshotPage(sink: TransportSink, page: SessionSnapshotPage): void {
+export function replaySnapshotPage(
+  sink: TransportSink,
+  page: SessionSnapshotPage,
+  version?: ChatEventVersion
+): void {
   sink.onServiceEvent({ type: 'session.created', info: page.info });
 
-  replayStoredMessages(page.messages, event => sink.onChatEvent(event));
+  replayStoredMessages(page.messages, event => sink.onChatEvent(event), version);
 }
 
 export function replaySnapshot(sink: TransportSink, snapshot: SessionSnapshot): void {

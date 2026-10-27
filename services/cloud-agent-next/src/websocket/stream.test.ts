@@ -36,6 +36,10 @@ function makeFakeEventQueries(events: StoredEvent[]): EventQueries {
     *iterateByFilters(filters: Omit<EventQueryFilters, 'limit'>) {
       for (const e of events) {
         if (filters.fromId !== undefined && e.id <= filters.fromId) continue;
+        if (filters.afterCursor !== undefined && (e.mutation_cursor ?? 0) <= filters.afterCursor)
+          continue;
+        if (filters.throughCursor !== undefined && (e.mutation_cursor ?? 0) > filters.throughCursor)
+          continue;
         if (filters.eventTypes?.length && !filters.eventTypes.includes(e.stream_event_type))
           continue;
         if (filters.executionIds?.length && !filters.executionIds.includes(e.execution_id))
@@ -124,6 +128,50 @@ function parseSentMessages(webSocket: { sentMessages: string[] }): SentStreamMes
 }
 
 describe('stream handler replayEvents', () => {
+  it('preserves legacy fromId replay on cursor-enabled sessions', async () => {
+    const rows = [
+      { ...makeEvent(9), mutation_cursor: 20 },
+      { ...makeEvent(2), mutation_cursor: 21 },
+      { ...makeEvent(12), mutation_cursor: 22 },
+    ];
+    const queries = makeFakeEventQueries(rows);
+    const iterate = vi.spyOn(queries, 'iterateByFilters');
+    const handler = createStreamHandler(makeFakeState(), queries, SESSION_ID, {
+      getUpdateCursor: () => 22,
+    });
+    const ws = makeFakeWebSocket();
+    expect(await handler.replayEvents(ws, { sessionId: SESSION_ID, fromId: 9 })).toBe(true);
+    expect(parseSentMessages(ws).map(event => event.eventId)).toEqual([12]);
+    expect(iterate.mock.calls[0][0]).toMatchObject({ fromId: 9 });
+    expect(iterate.mock.calls[0][0].afterCursor).toBeUndefined();
+  });
+
+  it('replays newer mutations of older row identities in cursor order', async () => {
+    const rows = [
+      { ...makeEvent(9), mutation_cursor: 20 },
+      { ...makeEvent(2), mutation_cursor: 21 },
+      { ...makeEvent(12), mutation_cursor: 22 },
+    ];
+    const handler = createStreamHandler(makeFakeState(), makeFakeEventQueries(rows), SESSION_ID, {
+      getUpdateCursor: () => 22,
+    });
+    const ws = makeFakeWebSocket();
+    expect(
+      await handler.replayEvents(ws, { sessionId: SESSION_ID, fromId: 9, afterCursor: 20 })
+    ).toBe(true);
+    expect(ws.sentMessages.map(message => JSON.parse(message))).toMatchObject([
+      { eventId: 2, cursor: 21 },
+      { eventId: 12, cursor: 22 },
+    ]);
+  });
+
+  it('retains persisted cursor when formatting mutable rows', () => {
+    expect(formatStreamEvent({ ...makeEvent(2), mutation_cursor: 77 }, SESSION_ID)).toMatchObject({
+      eventId: 2,
+      cursor: 77,
+    });
+  });
+
   it('sends all events when total size is within byte budget', async () => {
     const events = [makeEvent(1), makeEvent(2), makeEvent(3)];
     const eq = makeFakeEventQueries(events);

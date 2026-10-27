@@ -157,6 +157,7 @@ describe('native durable attachment', () => {
       pendingInteractions?: { questions: unknown[]; permissions: unknown[] };
       clearSessionInMemoryState: () => void;
       preparationRecorders: Map<string, unknown>;
+      historyHydrations: Map<string, Promise<void>>;
     };
     Object.assign(session, {
       initialized: Promise.resolve(),
@@ -176,6 +177,7 @@ describe('native durable attachment', () => {
       }),
       deriveSessionStatus: () => ({ type: 'idle' }),
       preparationRecorders: new Map(),
+      historyHydrations: new Map(),
     });
     return session;
   }

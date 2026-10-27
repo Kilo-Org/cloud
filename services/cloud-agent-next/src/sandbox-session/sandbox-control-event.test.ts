@@ -66,28 +66,50 @@ describe('session event public projection', () => {
           },
         },
         expected: 'Assistant request was rate limited',
+        sdkError: {
+          name: 'APIError',
+          data: {
+            message: 'Assistant request was rate limited',
+            statusCode: 429,
+            isRetryable: true,
+          },
+        },
       },
       {
         error: { name: 'APIError', data: { message: '[BYOK] fixture', statusCode: 400 } },
         expected:
           '[BYOK] Your provider rejected the request. Check your provider account and settings.',
+        sdkError: {
+          name: 'UnknownError',
+          data: {
+            message:
+              '[BYOK] Your provider rejected the request. Check your provider account and settings.',
+          },
+        },
       },
       {
         error: { name: 'MessageAbortedError' },
         expected: 'The message was interrupted by the user',
+        sdkError: {
+          name: 'MessageAbortedError',
+          data: { message: 'The message was interrupted by the user' },
+        },
       },
       {
         error: { name: 'FixtureError', data: { message: 'fixture-detail' } },
         expected: 'Assistant request failed',
+        sdkError: { name: 'UnknownError', data: { message: 'Assistant request failed' } },
       },
-    ])('renders the shared public failure message %#', ({ error, expected }) => {
+    ])('renders the shared public failure message %#', ({ error, expected, sdkError }) => {
       const payload = { type: carrier.type, properties: carrier.properties(error) };
       const original = structuredClone(payload);
       const { live, stored } = deliver(payload);
       const expectedEvent = {
         type: carrier.type,
         event: carrier.type,
-        properties: carrier.properties(expected),
+        properties: carrier.properties(
+          carrier.type === 'message.part.updated' ? sdkError : expected
+        ),
       };
       expect(live).toEqual(expectedEvent);
       expect(stored).toEqual(expectedEvent);

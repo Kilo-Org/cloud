@@ -4,10 +4,12 @@
 
 | Environment | Worker | Source / DLQ | Mode and capacity |
 |---|---|---|---|
-| Production (top-level) | `usage-ingest` | `usage-ingest-processing-eu` / `usage-ingest-processing-dlq-eu` | Receipt, batch1/cap1 |
+| Production (top-level) | `usage-ingest` | `usage-ingest-processing-eu` / `usage-ingest-processing-dlq-eu` | Processing, batch2/parallelism2/cap200 (up to 400 writer calls) |
 | Staging | `usage-ingest-staging` | `usage-ingest-processing-staging-eu` / `usage-ingest-processing-dlq-staging-eu` | Processing, batch2/parallelism2/cap200 (at most400 writer calls) |
 
-Production remains receipt-only at batch1/cap1; staging policy is unchanged.
+Production uses batch2/parallelism2/cap200; staging policy is unchanged.
+Complete the production merge gate below before merge, deployment or cohort exposure. Receipt mode at batch1/cap1 belongs
+to the preceding EU plumbing prerequisite, which must be deployed and verified first.
 **Merging this change arms an automatic production queue cutover.** The production
 workflow runs every 20 minutes and selects eligible CI-green main: it will create or
 reuse the EU pair, detach the old consumer if present and deploy the new bindings. Do not
@@ -25,7 +27,10 @@ If these prerequisites cannot be completed before merge, production deployments
 must be **explicitly held before merge** and kept held until the same authorization,
 deployed selector/shadow removal, publisher pause and reconciliation/drain
 conditions are verified. This document does not pause deployments or publishers.
-Receipt mode and a selector that is OFF do not hold the deployment workflow.
+A selector that is OFF does not hold the deployment workflow or stop the consumer.
+Verify the authenticated Frankfurt writer credential before merge: deployed
+processing consumes queued events regardless of gateway exposure. Missing writer
+configuration retries; it never ACKs events as receipts.
 Keep publishers paused through cutover and post-deployment verification below.
 
 ## Automatic deployment preparation

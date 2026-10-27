@@ -20,7 +20,8 @@ writer endpoint and queue policy for both runs.
 Apply server environment settings through the gateway deployment. Queue-only is
 enabled by the existing staging controls for this recipe; production SFO selection
 uses separate `USAGE_QUEUE_SFO_EXPOSURE` (`0`–`1`) and optional
-`USAGE_QUEUE_SFO_USER_IDS` controls and is not activated here. Disabling queue-only
+`USAGE_QUEUE_SFO_USER_IDS` controls and [rollout gates](eu-queues.md#production-merge-gate),
+and is not activated here. Disabling queue-only
 keeps new events on direct accounting. Background shadow publication has been
 removed; reconcile and drain any historically accepted shadow events before
 switching a consumer to processing. Queue-only never falls back to a gateway billing writer. Count
@@ -99,8 +100,10 @@ Consumer `usage_ingest_processing` events additionally expose:
   Staging uses batch size 2 and parallelism 2, allowing two messages to start
   concurrently. `USAGE_INGEST_PARALLELISM=1` keeps batch size 2 but processes it
   serially, so the second message's value includes waiting for the first message
-  to settle. Production keeps batch size 1 and receipt mode by default; receipt
-  logs are not processing/persistence completions.
+  to settle. Production uses batch size 2, two writer slots
+  and invocation cap 200 (up to 400 concurrent writer calls). Its deployment and activation are subject to the
+  [production readiness gates](eu-queues.md#production-merge-gate); this staging recipe
+  does not activate it. An ACK follows a matching recorded/duplicate writer response only.
 - `event_age_ms`: creation through consumer outcome logging, including writer wait.
 - `delivery_attempts`, categorical `reason`, and `queue_action`: diagnose retries;
   `retry` does not confirm DLQ storage.
@@ -116,7 +119,7 @@ message's own processing start; keep those boundaries separate.
 
 Use the queue's backlog and DLQ monitoring to observe growth, exhaustion and drain
 time. A quiet database alongside an increasing backlog is not equivalent throughput.
-Do not count publisher acceptance or receipt-mode discard as completed persistence.
+Do not count publisher acceptance as completed persistence.
 
 ## Collect database impact over the same windows
 

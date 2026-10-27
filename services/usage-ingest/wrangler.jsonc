@@ -9,7 +9,11 @@
   "workers_dev": false,
   "preview_urls": false,
   "observability": { "enabled": true },
-  "vars": { "USAGE_INGEST_MODE": "receipt" },
+  // Production merge/deployment prerequisites: eu-queues.md.
+  "vars": {
+    "USAGE_INGEST_PARALLELISM": "2",
+    "USAGE_WRITER_URL": "https://app.kilo.ai/api/internal/usage/record",
+  },
   "queues": {
     "producers": [
       { "binding": "USAGE_INGEST_QUEUE", "queue": "usage-ingest-processing-eu" },
@@ -19,11 +23,11 @@
     "consumers": [
       {
         "queue": "usage-ingest-processing-eu",
-        "max_batch_size": 1,
+        "max_batch_size": 2,
         "max_batch_timeout": 0,
         "max_retries": 3,
         "retry_delay": 60,
-        "max_concurrency": 1,
+        "max_concurrency": 200,
         "dead_letter_queue": "usage-ingest-processing-dlq-eu",
       },
     ],
@@ -33,7 +37,6 @@
       "name": "usage-ingest-staging",
       "workers_dev": true,
       "vars": {
-        "USAGE_INGEST_MODE": "processing",
         "USAGE_INGEST_DIAGNOSTICS": "all",
         "USAGE_INGEST_PARALLELISM": "2",
         "USAGE_WRITER_URL": "https://staging-app.kilo.ai/api/internal/usage/record",

@@ -3,28 +3,20 @@
 Authenticated `POST /usage` validates the existing usage request contract and
 publishes it to `USAGE_INGEST_QUEUE`, preserving the supplied usage ID. A 202 means
 queue acceptance after `send` resolves, not consumer completion. The same Worker
-consumes usage events as receipts by default, or writes them through the existing
-Frankfurt writer in opt-in processing mode. `USAGE_INGEST_MODE` selects consumer
-behavior; receipt mode does not persist billing. Acknowledged events are removed
-from the queue.
+always processes queued events through the existing Frankfurt writer. Only a
+matching recorded/duplicate writer response permits ACK; invalid events and
+missing writer configuration retry and can exhaust into the DLQ.
 
 The gateway's `USAGE_QUEUE_ONLY_ENABLED` launch switch selects queued accounting
 for staging or for the production SFO cohort controlled by
 `USAGE_QUEUE_SFO_EXPOSURE` (`0`–`1`) and optional `USAGE_QUEUE_SFO_USER_IDS`.
 Unselected events keep direct accounting or the existing SFO handoff. Background
 shadow publication and its flag have been removed. Reconcile and drain historically
-accepted shadow events before switching a consumer to processing; this change
-does not remove old messages.
-Keep production selection off until the processing consumer is independently verified.
+accepted shadow events before deploying processing; this change does not remove
+old messages. Keep production selection off until the processing consumer is
+independently verified. Selection being off does not stop processing of queued
+events. Follow the [production merge gates](eu-queues.md#production-merge-gate).
 
-In receipt mode, receipts contain only the validated usage ID, queue message ID, delivery attempt
-count, and non-negative event age in milliseconds. Malformed messages log an
-`invalid` receipt without body/schema details and are acknowledged and discarded.
-Acknowledgement follows a successful console call. If validation or logging throws,
-unacknowledged messages use three retries with a 60-second retry delay, then move
-to the environment's dead-letter queue (DLQ). Logs can repeat on redelivery. The DLQ only
-receives exhausted failures: malformed events that were acknowledged do not reach
-it.
 
 The wire schema comes from `@kilocode/usage-contracts` through its package export.
 That package depends only on Zod at runtime; the Worker does not depend on
@@ -41,29 +33,24 @@ Unrelated paths return 404; other methods on `/usage` return 405.
 | Production (top-level config) | `usage-ingest` | `usage-ingest-processing-eu` | `usage-ingest-processing-dlq-eu` |
 | Staging (`env.staging`) | `usage-ingest-staging` | `usage-ingest-processing-staging-eu` | `usage-ingest-processing-dlq-staging-eu` |
 
-Each environment connects only its EU pair. Production stays receipt-only at batch1/cap1;
+Each environment connects only its EU pair. Production uses batch2/parallelism2/cap200 (up to 400 writer calls);
 staging keeps one consumer capped at200, batch size2. Old global queues remain intact
 for a paused/drained routing rollback. See [EU preparation and cutover](eu-queues.md).
 
-## Processing mode
+## Processing
 
-Production commits `USAGE_INGEST_MODE=receipt`; staging commits `processing` with
-`https://staging-app.kilo.ai/api/internal/usage/record` as its Frankfurt writer URL.
-An absent mode also uses receipt behavior. Processing validates and writes events
-through a bounded number of slots per consumer invocation, preserving the supplied usage ID and validated fields.
-`USAGE_INGEST_PARALLELISM=2` opts into two concurrent writes; absent, `1`, or
-unrecognized values use one. Staging opts into two, production retains receipt
-mode. Every slot is awaited before the invocation returns or rejects. Each
-validated recorded/duplicate response ACKs only its own message; unavailable or
-invalid events retry individually. Unexpected processing exceptions retry that
-message, continue later messages, and reject only after all slots settle.
-Successful dispositions survive another message's failure. Receipt behavior is
-unchanged. Concurrent invocations are capped by each queue's `max_concurrency`.
+Production writes to `https://app.kilo.ai/api/internal/usage/record`; staging uses
+`https://staging-app.kilo.ai/api/internal/usage/record`. Both use direct HTTP and
+`USAGE_INGEST_PARALLELISM=2`: at most two concurrent writes per invocation. Absent
+or unrecognized parallelism uses one slot; there is no receipt fallback.
+Every slot settles before the invocation returns or rejects. Only the successful
+message is ACKed; an unavailable/invalid message retries individually. Successful
+ACKs survive peer failure. Concurrent invocations are bounded by the queue cap.
 
 Processing uses `@kilocode/worker-utils/usage-writer-client` for the existing
 Frankfurt `/api/internal/usage/record` endpoint. Only a matching `recorded` or
 `duplicate` acknowledgement removes an event. Invalid events, missing writer
-configuration, unknown modes, and unavailable writes retry under the queue policy,
+configuration and unavailable writes retry under the queue policy,
 then reach the DLQ. Processing logs contain the usage ID when valid, queue message
 ID, delivery attempt count, and categorical outcome/reason.
 
@@ -79,15 +66,13 @@ the concurrency cap; no particular scale-down amount or timing is guaranteed.
 See [consumer concurrency](https://developers.cloudflare.com/queues/configuration/consumer-concurrency/)
 and [explicit ACK/retry behavior](https://developers.cloudflare.com/queues/configuration/batching-retries/).
 
-Both `usage_ingest_receipt` and `usage_ingest_processing` include an explicit
-`level` and `queue_action` (`ack` or `retry`). Receipts (including discarded invalid
-bodies) and recorded/duplicate processing outcomes use `console.info`; retryable
-processing outcomes use `console.warn`. The action describes the next queue call,
-not confirmed DLQ storage or a billing write for a receipt.
+`usage_ingest_processing` includes an explicit `level` and `queue_action` (`ack`
+or `retry`). Recorded/duplicate outcomes use `console.info`; retries use
+`console.warn`. The action describes the next queue call, not confirmed DLQ storage.
 
 Processing `writer_duration_ms` is the rounded monotonic elapsed time around the
 awaited writer attempt, including HTTP response validation. It is omitted for
-invalid modes, invalid events, and missing writer configuration, where no write
+invalid events and missing writer configuration, where no write
 is attempted. `event_age_ms` is the non-negative age of validated `core.created_at`
 at the outcome log, including writer wait in processing mode; it is omitted for
 invalid events. Clock skew is clamped to zero. No bodies, prompts, credentials,
@@ -113,8 +98,8 @@ it as a Worker secret; store the writer credential and bypass as Worker secrets.
 
 The writer secret is separate from `USAGE_INGEST_PUBLISH_SECRET`. Configure writer
 secrets with `wrangler secret put <name>` (add `--env staging` for staging), or use
-the service's ignored `.dev.vars` locally. Writer settings are optional in receipt
-mode.
+the service's ignored `.dev.vars` locally. Writer credentials are required for
+successful processing; missing configuration retries instead of discarding usage.
 
 The shared helper makes one attempt with a 160-second timeout. HTTP 200
 `not_recorded`, malformed or mismatched acknowledgements, redirects, and transport
@@ -178,7 +163,7 @@ Every emitted completion includes its actual `sample_rate`.
 staging target. Otherwise `VERCEL_TARGET_ENV=staging` or a nonproduction
 `VERCEL_ENV` keeps full logging, even with `NODE_ENV=production`. Without that
 deployment metadata, `NODE_ENV=production` uses production sampling; local/test
-defaults keep full logging. Existing consumer outcome/receipt/retry logs remain
+defaults keep full logging. Existing consumer outcome/retry logs remain
 at 100%, and the existing slow-plus-1% phase diagnostics are unchanged.
 
 With a nonzero sampling rate, estimate completion attempt counts by outcome using
@@ -196,14 +181,13 @@ reconcile against persisted usage rows when exact completeness matters.
 
 ## Queue policy
 
-The current single staging source queue uses batch size 2 and at most two writer
-calls per invocation. Production retains its original receipt policy:
+Both environments use batch size 2 and at most two writer slots per invocation:
 
 | Consumer setting | Value | Purpose |
 |---|---|---|
-| `max_batch_size` | Production: `1`; staging: `2` | Maximum messages delivered per invocation. |
+| `max_batch_size` | `2` in both environments | Maximum messages delivered per invocation. |
 | `max_batch_timeout` | `0` seconds | No intentional wait to fill a batch. |
-| `max_concurrency` | Production: `1`; staging: `200` | With parallelism 2, staging allows at most `200 × 2 = 400` concurrent writer calls. |
+| `max_concurrency` | `200` in both environments | Parallelism 2 allows at most `200 × 2 = 400` concurrent queue writer calls per environment. |
 | `max_retries` | `3` | Initial delivery plus up to three retries. |
 | `retry_delay` | `60` seconds | Space failed deliveries by one minute rather than retrying immediately. |
 | `dead_letter_queue` | Environment-specific name above | Retain exhausted failures separately from the source queue. |
@@ -212,7 +196,8 @@ calls per invocation. Production retains its original receipt policy:
 
 Staging uses the single EU queue `usage-ingest-processing-staging-eu`
 and its EU DLQ `usage-ingest-processing-dlq-staging-eu`. It allows at most 400 concurrent writer calls with batch 2,
-parallelism 2 and invocation cap 200. Production remains receipt-only at cap 1.
+parallelism 2 and invocation cap 200. Production selects processing at cap 200
+with batch 2 and two slots, subject to the [production merge gates](eu-queues.md#production-merge-gate).
 
 `USAGE_INGEST_PARALLELISM` is the simple serial/parallel experiment control:
 
@@ -254,7 +239,11 @@ writer route, retry delay/budget and per-message dispositions.
 ## Deploy
 
 The existing `.github/workflows/deploy-workers.yml` discovers this service for
-production and staging deployments. To deploy it individually, dispatch that
+production and staging deployments. Production's scheduled workflow can deploy
+merged changes automatically; deployment authorization and all
+[production prerequisites](eu-queues.md#production-merge-gate)
+must be satisfied before merge. There is no guaranteed manual deployment window.
+To deploy it individually when separately authorized, dispatch that
 workflow with `worker: services/usage-ingest` and `target_environment: production`
 or `staging`.
 
@@ -263,10 +252,10 @@ It reads queue names from `wrangler.jsonc`, creates missing resources with
 explicit `jurisdiction: "eu"`, and verifies/reuses existing EU resources.
 Unknown jurisdiction or lookup/API errors stop deployment. Both consumer upload
 attempts disable Wrangler's global auto-provisioning for EU selections. Staging
-continues direct HTTP to its writer; production stays receipt-only. The preparation step also detaches the obsolete
+continues direct HTTP to its writer; production also uses its direct Frankfurt writer. The preparation step also detaches the obsolete
 environment consumer before Wrangler attaches the selected source; it preserves both queue pairs.
 See [deployment-driven cutover and routing rollback](eu-queues.md).
-Production uses its EU pair while retaining receipt mode, batch1/cap1 and retry policy.
+Production uses its EU pair with batch2/parallelism2/cap200 and the existing retry policy.
 Historical global production revisions retain normal provisioning; see the helper capability notes in [EU setup](eu-queues.md).
 `USAGE_INGEST_QUEUE` binds the source and `USAGE_INGEST_DLQ` binds its matching DLQ;
 only the source has a consumer. Exhausted failures route to that DLQ.
@@ -289,7 +278,7 @@ to the hostname shown for `usage-ingest-staging` and use that as the gateway's
 `USAGE_INGEST_URL`. Requests require the dedicated publisher secret above.
 Production keeps `workers_dev: false`; no custom routes or preview URLs are
 configured. The consumer is attached to each environment's producer queue.
-Publishing and receipt handling require no database access. See
+The Worker has no direct database connection; the authenticated writer owns persistence. See
 [Wrangler automatic provisioning](https://developers.cloudflare.com/workers/wrangler/configuration/#automatic-provisioning).
 
 ## Retention
@@ -324,7 +313,7 @@ The dry runs build and show bindings without creating queues or deploying a Work
 For local HTTP testing, put a synthetic `USAGE_INGEST_PUBLISH_SECRET` in this
 service's ignored `.dev.vars`, then run `pnpm --filter cloudflare-usage-ingest dev`.
 The queue is simulated locally and delivered to the shipped `queue()` handler in
-the same Worker. Runtime tests cover HTTP publishing, receipt consumption, and opt-in processing
+the same Worker. Runtime tests cover HTTP publishing, missing-configuration retries, and processing
 in both environments.
 
 ## Direct usage writer

@@ -4,8 +4,8 @@ import { enkryptGuardrailRejectionResponse } from './responses';
 const block = { action: 'block', message: 'Blocked: prompt injection.' } as const;
 
 describe('enkryptGuardrailRejectionResponse', () => {
-  it('sends an allowed request upstream', () => {
-    expect(enkryptGuardrailRejectionResponse('chat_completions', { action: 'allow' })).toBeNull();
+  it.each(['skip', 'allow'] as const)('sends the request upstream on %s', action => {
+    expect(enkryptGuardrailRejectionResponse('chat_completions', { action })).toBeNull();
   });
 
   it.each(['chat_completions', 'responses'] as const)(

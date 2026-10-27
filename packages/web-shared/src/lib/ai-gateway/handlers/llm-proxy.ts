@@ -1095,9 +1095,21 @@ export async function handleLlmProxyRequest(
   const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
   if (bouncerRejection) return bouncerRejection;
   if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
+  const guardrailWaitStartedAt = performance.now();
+  const guardrailVerdict = await enkryptGuardrailVerdictPromise;
+  if (guardrailVerdict.action !== 'skip') {
+    const guardrailWaitEndedAt = performance.now();
+    console.debug('[enkrypt-guardrail] verdict awaited', {
+      organization_id: organizationId,
+      session_id: taskId ?? sessionHeader ?? null,
+      action: guardrailVerdict.action,
+      waited_ms: Math.round(guardrailWaitEndedAt - guardrailWaitStartedAt),
+      request_elapsed_ms: Math.round(guardrailWaitEndedAt - requestStartedAt),
+    });
+  }
   const guardrailRejection = enkryptGuardrailRejectionResponse(
     requestBodyParsed.kind,
-    await enkryptGuardrailVerdictPromise
+    guardrailVerdict
   );
   if (guardrailRejection) return guardrailRejection;
   const requestCostBalance = requestCostLimit !== null ? await balanceAndSettingsPromise : null;

@@ -41,7 +41,7 @@ export function enkryptGuardrailRejectionResponse(
   kind: GatewayChatApiKind,
   verdict: EnkryptGuardrailVerdict
 ): NextResponse | null {
-  if (verdict.action === 'allow') return null;
+  if (verdict.action === 'skip' || verdict.action === 'allow') return null;
   if (verdict.action === 'block') {
     return NextResponse.json(
       apiErrorBody(

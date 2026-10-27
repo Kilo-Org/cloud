@@ -3497,6 +3497,32 @@ describe('Enkrypt input guardrail', () => {
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
   });
 
+  it('logs how long the request waited for the verdict only when the guardrail is on', async () => {
+    const debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => {});
+    enkryptAnswers({ summary: { injection_attack: 0, pii: 0 }, result_message: null });
+
+    setOrganization({ enkrypt_input_guardrail: { enabled: false } });
+    await handleLlmProxyRequest(makeRequest(makeBody()));
+    setOrganization({ enkrypt_input_guardrail: { enabled: true } });
+    await handleLlmProxyRequest(makeRequest(makeBody()));
+
+    const waitLogs = debugSpy.mock.calls.filter(
+      ([message]) => message === '[enkrypt-guardrail] verdict awaited'
+    );
+    debugSpy.mockRestore();
+    expect(waitLogs).toEqual([
+      [
+        '[enkrypt-guardrail] verdict awaited',
+        expect.objectContaining({
+          organization_id: 'org-1',
+          action: 'allow',
+          waited_ms: expect.any(Number),
+          request_elapsed_ms: expect.any(Number),
+        }),
+      ],
+    ]);
+  });
+
   it.each([
     [
       '/chat/completions',

@@ -53,7 +53,9 @@ export type EnkryptGuardrailScan = {
   config: EnkryptInputGuardrailConfig;
 };
 
+/** `skip`: the organization has no guardrail, so nothing was scanned. */
 export type EnkryptGuardrailVerdict =
+  | { action: 'skip' }
   | { action: 'allow' }
   | { action: 'block'; message: string }
   | { action: 'unavailable' };

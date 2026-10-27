@@ -11,7 +11,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
 import { ENKRYPT_API_KEY } from '@kilocode/web-shared/lib/config.server';
 
-const notScanned: EnkryptGuardrailScanResult = { verdict: { action: 'allow' }, charges: [] };
+const notScanned: EnkryptGuardrailScanResult = { verdict: { action: 'skip' }, charges: [] };
 
 /**
  * Starts the organization's input guardrail scan; await the verdict immediately before the

@@ -141,7 +141,7 @@ async function showApproving(ask: WaitingAsk): Promise<void> {
  * process cannot exit with the update still in flight.
  */
 export async function handleApproveTask(input?: unknown): Promise<void> {
-  // A swiped session notification is an Unfollow (spec "Android: actions" 3):
+  // A swiped session notification is an Unfollow (spec "Android: actions" 4):
   // the receiver already cancelled the card; this stops following the session
   // and deletes its server row. Never throws: the worker completes from the
   // task's finish, and a rejection would leave the row behind with no retry.
@@ -194,7 +194,9 @@ export async function handleApproveTask(input?: unknown): Promise<void> {
     }
     await showApproving(ask);
     const result = await runGlanceableApprove({ now: () => Date.now() });
-    askEnded = result.kind === 'approved' || result.kind === 'gone';
+    // A replaced request ends nothing: the session still waits on the live one,
+    // so the republish must keep its row instead of skipping it.
+    askEnded = result.kind === 'approved' || (result.kind === 'gone' && result.replaced !== true);
     if (result.kind === 'gone') {
       // Answered elsewhere or no longer pending: dropping the record drops Approve.
       recordWaitingAsk(null);

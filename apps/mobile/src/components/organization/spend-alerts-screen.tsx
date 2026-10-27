@@ -8,7 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, Switch, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 
 import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PermissionDenied } from '@/components/organization/permission-denied';
@@ -21,6 +21,7 @@ import {
   parseMultiplier,
   parseThreshold,
   thresholdError,
+  thresholdPlaceholder,
   toWindowHours,
 } from '@/components/organization/spend-alert-validators';
 import { QueryError } from '@/components/query-error';
@@ -33,6 +34,7 @@ import { FormField } from '@/components/ui/form-field';
 import { KvRow } from '@/components/ui/kv-row';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatList, formatMoney, formatNumber } from '@/lib/format';
@@ -42,7 +44,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
 
 /** The Notifications screen owns the push gate the channel rows point at. */
-const NOTIFICATIONS_HREF = '/(app)/(tabs)/(3_profile)/notifications' as Href;
+const NOTIFICATIONS_HREF = '/(app)/notifications' as Href;
 
 const WINDOW_LABEL_KEYS = {
   '24': 'spendAlerts.window24h',
@@ -475,7 +477,7 @@ function SpendAlertsForm({
             <FormField
               label={t('spendAlerts.limitLabel')}
               required={thresholdEnabled}
-              placeholder="25.00"
+              placeholder={thresholdPlaceholder()}
               keyboardType="decimal-pad"
               defaultValue={thresholdRef.current || undefined}
               validate={thresholdEnabled ? thresholdError : undefined}

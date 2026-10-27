@@ -1,24 +1,37 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Switch, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { ModelSelector } from '@/components/agents/model-selector';
 import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { type BriefingPreferences } from '@/lib/agent-briefing';
 import { briefingMoney } from '@/lib/agent-briefing-format';
 import {
   briefingEstimateUnavailableKey,
-  parseBriefingSafeguards,
+  parseBriefingSafeguardInput,
 } from '@/lib/agent-briefing-state';
+import { formatNumber } from '@/lib/format';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useTRPC } from '@/lib/trpc';
 
 type ContextPreference = BriefingPreferences['contexts'][number];
+
+/**
+ * Six decimals cover a whole second (1/60 min) and a single microdollar. No
+ * grouping, so the value the field shows parses back without an ambiguous
+ * group separator.
+ */
+const SAFEGUARD_INPUT_FORMAT: Intl.NumberFormatOptions = {
+  maximumFractionDigits: 6,
+  useGrouping: false,
+};
 
 export function BriefingContextSettings({
   preference,
@@ -31,11 +44,16 @@ export function BriefingContextSettings({
   const trpc = useTRPC();
   const client = useQueryClient();
   const offline = useOfflineBannerState();
+  const locale = i18n.resolvedLanguage ?? i18n.language;
   const organizationId = preference.context.organizationId ?? undefined;
   const catalog = useAvailableModels(organizationId);
   const [model, setModel] = useState(preference.model);
-  const duration = useRef(String(preference.maxDurationSeconds / 60));
-  const spend = useRef(String(preference.maxSpendMicrodollars / 1_000_000));
+  const duration = useRef(
+    formatNumber(preference.maxDurationSeconds / 60, locale, SAFEGUARD_INPUT_FORMAT)
+  );
+  const spend = useRef(
+    formatNumber(preference.maxSpendMicrodollars / 1_000_000, locale, SAFEGUARD_INPUT_FORMAT)
+  );
   const [limits, setLimits] = useState({
     maxDurationSeconds: preference.maxDurationSeconds,
     maxSpendMicrodollars: preference.maxSpendMicrodollars,
@@ -83,6 +101,9 @@ export function BriefingContextSettings({
         );
         return { previous };
       },
+      onSuccess: () => {
+        announcingToast.success(t('agentBriefing.saved'));
+      },
       onError: (_error, _input, context) => {
         for (const [key, value] of context?.previous ?? []) {
           client.setQueryData(key, value);
@@ -95,7 +116,7 @@ export function BriefingContextSettings({
     })
   );
   const updateLimits = () => {
-    const next = parseBriefingSafeguards(Number(duration.current), Number(spend.current));
+    const next = parseBriefingSafeguardInput(duration.current, spend.current, locale);
     setValid(next !== null);
     if (next !== null) {
       setLimits(next);
@@ -147,7 +168,11 @@ export function BriefingContextSettings({
         <Switch
           value={preference.aiEnabled}
           disabled={offline || update.isPending}
-          accessibilityLabel={t('agentBriefing.contextSettings', { context: contextName })}
+          accessibilityLabel={t('agentBriefing.aiOptIn')}
+          accessibilityState={{
+            checked: preference.aiEnabled,
+            disabled: offline || update.isPending,
+          }}
           onValueChange={next => {
             if (next) {
               void enable();

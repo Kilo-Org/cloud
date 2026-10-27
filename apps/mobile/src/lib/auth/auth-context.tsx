@@ -71,6 +71,7 @@ import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-owners
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
 import { clearLastRoute } from '@/lib/last-route';
 import { clearLastOpenedSession } from '@/lib/last-opened-session';
+import { clearLoginDrafts } from '@/lib/login-draft';
 import { clearLauncherSurfaces } from '@/lib/native-launcher-surfaces';
 import { resetPurchaseErrorToastDedup } from '@/lib/credits/use-store-credit-purchase';
 import {
@@ -113,6 +114,7 @@ import { beginAuthenticatedOwner, markRestoredAuthenticatedOwner } from '@/lib/c
 // warning level with the stable read fingerprint).
 export const preloadedAuthToken = readStoredValue(AUTH_TOKEN_KEY);
 const preloadedRefreshToken = readStoredValue(REFRESH_TOKEN_KEY);
+let authPreloadAvailable = true;
 // A keychain failure at process start rejects these before any consumer can
 // await them, and the runtime would report that as an unhandled rejection
 // before AuthProvider even mounts. Observe it here; the bootstrap read below
@@ -263,7 +265,12 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             // began while the exchange was in flight has not bumped the epoch
             // yet, so the exchange's own epoch checks pass — the sign-out flag
             // must stop this publish, exactly like the one below.
-            if (pair && isCurrentAuthEpoch(epoch) && !isSignedOutReference.current) {
+            if (
+              pair &&
+              isCurrentAuthEpoch(epoch) &&
+              !isSignedOutReference.current &&
+              !isSignOutActive()
+            ) {
               markRestoredAuthenticatedOwner();
               setToken(pair.token);
               setCurrentDeepLinkUserId(readUserIdFromToken(pair.token));
@@ -292,7 +299,11 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // without it a success landing mid-teardown republishes the stored
           // credentials (owner, React state, deep-link binding) that sign-out
           // is tearing down.
-          if (!isCurrentAuthEpoch(epoch) || isSignedOutReference.current) {
+          // The sign-out flag is module-scoped, so a provider remount starts
+          // with a fresh ref while the teardown is still before its own fence:
+          // both must stop this publish, or the remounted tree stays signed in
+          // after the teardown finishes.
+          if (!isCurrentAuthEpoch(epoch) || isSignedOutReference.current || isSignOutActive()) {
             return;
           }
           // A same-session refresh replaced the stored pair while the reads
@@ -361,7 +372,14 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
   );
 
   useEffect(() => {
-    void load({ token: preloadedAuthToken, refresh: preloadedRefreshToken });
+    // Android can recreate the activity without restarting JavaScript. Later provider mounts
+    // and root-boundary Retry remounts must read current credentials rather than the snapshot
+    // from before sign-in or a credential change.
+    const preload = authPreloadAvailable
+      ? { token: preloadedAuthToken, refresh: preloadedRefreshToken }
+      : undefined;
+    authPreloadAvailable = false;
+    void load(preload);
   }, [load]);
 
   const retryRestore = useCallback(() => {
@@ -450,6 +468,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // A direct account switch must not keep the prior account's session
         // state: trusted hosts, image confirms, media caches, temp copies.
         clearSessionScopedState();
+        // The sign-in form's drafts belong to the attempt that just succeeded,
+        // whatever provider finished it; a later signed-out screen must not
+        // prefill the previous attempt's address or SSO banner.
+        clearLoginDrafts();
       });
     },
     []

@@ -1,4 +1,4 @@
-import { createElement } from 'react';
+import { createElement, type ReactNode, type Ref } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { McpFormSheet } from '@/components/profiles/mcp-form-sheet';
@@ -10,9 +10,31 @@ const h = vi.hoisted(() => ({
   onClose: vi.fn(),
   onSave: vi.fn(),
   confirm: vi.fn(),
+  scrollTo: vi.fn(),
 }));
 
-vi.mock('react-native', () => ({ View: 'View', ScrollView: 'ScrollView', Switch: 'Switch' }));
+// A mock factory is hoisted above this file's imports, so React comes in through a
+// dynamic import there (the pattern this suite's harness already relies on). The
+// stub exposes `scrollTo`, which a refused Save drives, so tests can observe it.
+vi.mock('react-native', async () => {
+  const {
+    createElement: createMockElement,
+    forwardRef,
+    useImperativeHandle,
+  } = await import('react');
+  return {
+    Platform: { OS: 'ios' },
+    View: 'View',
+    Switch: 'Switch',
+    ScrollView: forwardRef(function ScrollViewStub(
+      props: { children?: ReactNode },
+      ref: Ref<{ scrollTo: typeof h.scrollTo }>
+    ) {
+      useImperativeHandle(ref, () => ({ scrollTo: h.scrollTo }));
+      return createMockElement('ScrollView', props, props.children);
+    }),
+  };
+});
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
@@ -84,6 +106,33 @@ function pressCancel(root: ReactTestInstance): void {
   });
 }
 
+/** A host stub's layout prop, read from the renderer's untyped props. */
+type ContainerLayout = (event: { nativeEvent: { layout: { y: number } } }) => void;
+
+/** Register a field block's offset the way the scroll view reports it after layout. */
+function layoutField(root: ReactTestInstance, label: string, y: number): void {
+  const field = findAll(root, 'FormField').find(node => node.props.label === label);
+  if (!field) {
+    throw new Error(`field ${label} was not rendered`);
+  }
+  const handler: unknown = field.props.containerOnLayout ?? field.parent?.props.onLayout;
+  if (typeof handler !== 'function') {
+    throw new TypeError(`field ${label} has no layout handler`);
+  }
+  // Checked to be a function above; the stub props carry no call signature.
+  const onLayout = handler as ContainerLayout;
+  act(() => {
+    onLayout({ nativeEvent: { layout: { y } } });
+  });
+}
+
+function pressDone(root: ReactTestInstance): void {
+  const onDone = voidHandler(findOne(root, 'SheetHeader').props.onDone);
+  act(() => {
+    onDone();
+  });
+}
+
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
 function mountSheet() {
   return renderWithProviders(
@@ -136,6 +185,39 @@ describe('McpFormSheet dismissal', () => {
       cancelLabel: i18n.t('common.keepEditing'),
     });
     expect(h.onClose).not.toHaveBeenCalled();
+
+    unmount();
+  });
+});
+
+describe('McpFormSheet refused save', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('scrolls to the name field when it is missing', async () => {
+    const { renderer, unmount } = await mountSheet();
+    layoutField(renderer.root, 'Server name', 420);
+
+    pressDone(renderer.root);
+
+    expect(h.scrollTo).toHaveBeenCalledWith({ y: 408, animated: true });
+    expect(h.onSave).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('scrolls to a bad config to the config field', async () => {
+    const { renderer, unmount } = await mountSheet();
+    changeText(renderer.root, 'Server name', 'notes');
+    changeText(renderer.root, 'Command line', 'node server.js');
+    changeText(renderer.root, 'Environment (JSON)', '{"key":}');
+    layoutField(renderer.root, 'Environment (JSON)', 780);
+
+    pressDone(renderer.root);
+
+    expect(h.scrollTo).toHaveBeenCalledWith({ y: 768, animated: true });
+    expect(h.onSave).not.toHaveBeenCalled();
 
     unmount();
   });

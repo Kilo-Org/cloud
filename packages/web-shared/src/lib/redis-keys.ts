@@ -42,6 +42,9 @@ export const nonTrialEnterpriseRedisKey = (organizationId: string) =>
 export const botIdentityRedisKey = (platform: string, teamId: string, userId: string) =>
   redisKey(`identity:${platform}:${teamId}:${userId}`);
 
+export const discordGatewayMessageRedisKey = (botUserId: string, messageId: string) =>
+  redisKey(`discord:gateway-message:${botUserId}:${messageId}`);
+
 export const gitLabOAuthCredentialsRedisKey = (credentialRef: string) =>
   redisKey(`auth-credentials:gitlab:${credentialRef}`);
 

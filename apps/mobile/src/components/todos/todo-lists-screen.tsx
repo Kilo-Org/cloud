@@ -14,11 +14,14 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { TodoListRow } from '@/components/todos/todo-list-row';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
-import { ChevronDown, ChevronRight, ListTodo, Plus } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { IconButton } from '@/components/ui/icon-button';
+import { ChevronDown, ListTodo, Plus } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useTodoListMutations, useTodoLists } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { todoListPath, todoListSettingsPath } from '@/lib/todos/todo-routes';
 import { type TodoList } from '@/lib/todos/todo-types';
 import { useTRPC } from '@/lib/trpc';
@@ -43,7 +46,7 @@ function ListRowsSkeleton() {
  * The Agents tab's To-dos view: the context's lists, drag to reorder, swipe
  * to archive or delete, with the archived ones collapsed at the bottom.
  */
-export function TodoListsScreen({ segmentControl }: Readonly<{ segmentControl: ReactNode }>) {
+export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }>) {
   const { t } = useTranslation();
   const router = useRouter();
   const colors = useThemeColors();
@@ -138,7 +141,7 @@ export function TodoListsScreen({ segmentControl }: Readonly<{ segmentControl: R
         title={t('todos.lists.empty')}
         placement="top"
         action={
-          <Button variant="outline" onPress={openNewList}>
+          <Button className={STATE_ACTION_CLASS} variant="outline" onPress={openNewList}>
             <Text>{t('todos.lists.newList')}</Text>
           </Button>
         }
@@ -179,7 +182,7 @@ export function TodoListsScreen({ segmentControl }: Readonly<{ segmentControl: R
             {showArchived ? (
               <ChevronDown size={16} color={colors.mutedForeground} />
             ) : (
-              <ChevronRight size={16} color={colors.mutedForeground} />
+              <DirectionalChevronRight size={16} color={colors.mutedForeground} />
             )}
             <Text variant="eyebrow">
               {t('todos.lists.archived', { count: archivedLists.length })}
@@ -211,19 +214,13 @@ export function TodoListsScreen({ segmentControl }: Readonly<{ segmentControl: R
         className="px-[22px]"
         headerRight={
           context.isReady ? (
-            <Pressable
-              onPress={openNewList}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel={t('todos.lists.newList')}
-              className="size-11 items-center justify-center active:opacity-70"
-            >
+            <IconButton onPress={openNewList} accessibilityLabel={t('todos.lists.newList')}>
               <Plus size={22} color={colors.foreground} />
-            </Pressable>
+            </IconButton>
           ) : undefined
         }
       />
-      {segmentControl}
+      {tabHeader}
       <TabScreenScrollView>{body}</TabScreenScrollView>
       {dialog}
     </View>

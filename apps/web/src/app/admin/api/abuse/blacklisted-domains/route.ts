@@ -14,10 +14,8 @@ export async function GET() {
   try {
     const BLACKLIST_DOMAINS = await getBlacklistedDomains();
 
-    // Get counts for each blacklisted domain
     const domainCounts = await Promise.all(
       BLACKLIST_DOMAINS.map(async domain => {
-        // Build conditions for both @domain and .domain patterns
         const conditions = or(
           sql`lower(${kilocode_users.google_user_email}) LIKE ${`%@${domain.toLowerCase()}`}`,
           sql`lower(${kilocode_users.google_user_email}) LIKE ${`%.${domain.toLowerCase()}`}`
@@ -32,7 +30,6 @@ export async function GET() {
       })
     );
 
-    // Sort by blocked count descending
     domainCounts.sort((a, b) => b.blockedCount - a.blockedCount);
 
     return NextResponse.json({

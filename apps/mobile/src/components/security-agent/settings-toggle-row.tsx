@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics';
-import { Switch, View } from 'react-native';
+import { View } from 'react-native';
 
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 
 /**

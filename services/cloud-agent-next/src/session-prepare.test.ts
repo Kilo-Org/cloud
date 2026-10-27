@@ -18,6 +18,7 @@ const {
   organizationMembershipLimitMock,
   assertKiloModelAvailableMock,
   getSandboxAllocationCandidatesMock,
+  loadEnvironmentForSessionMock,
 } = vi.hoisted(() => ({
   generateSessionIdMock: vi.fn(() => 'workspace_12345678-1234-1234-1234-123456789abc'),
   selectControlPlaneSandboxMock: vi.fn(),
@@ -27,6 +28,8 @@ const {
   organizationMembershipLimitMock: vi.fn(),
   assertKiloModelAvailableMock: vi.fn(),
   getSandboxAllocationCandidatesMock: vi.fn(),
+  // Approved origins look up the repository environment; these tests have none.
+  loadEnvironmentForSessionMock: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('@kilocode/cloud-agent-profile', async importActual => {
@@ -35,6 +38,7 @@ vi.mock('@kilocode/cloud-agent-profile', async importActual => {
     ...actual,
     mergeProfileConfiguration: mergeProfileConfigurationMock,
     getSandboxAllocationCandidates: getSandboxAllocationCandidatesMock,
+    loadEnvironmentForSession: loadEnvironmentForSessionMock,
   };
 });
 
@@ -739,8 +743,9 @@ describe('prepareSession endpoint', () => {
 
   it('registers full lazy-prep metadata in one DO call', async () => {
     selectControlPlaneSandboxMock.mockResolvedValueOnce({
-      kind: 'isolated',
-      sandboxId: 'crv-abcdef',
+      sandboxKind: 'code-review',
+      provider: 'cloudflare',
+      sandboxId: 'sbx-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     });
     const doStub = createMockDOStub();
     const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
@@ -822,7 +827,7 @@ describe('prepareSession endpoint', () => {
           finalization: { autoCommit: true, condenseOnComplete: true, gateThreshold: 'warning' },
           callback: { target: { url: 'https://example.com/callback' } },
           workspace: expect.objectContaining({
-            sandboxId: 'crv-abcdef',
+            sandboxId: 'sbx-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
             sandboxProvider: 'cloudflare',
             shallow: true,
             credentialContainment: {
@@ -1082,9 +1087,9 @@ describe('prepareSession endpoint', () => {
     );
   });
 
-  it('auto-initiates through grouped creation with canonicalized legacy initial attachments', async () => {
+  it('auto-initiates through grouped creation with canonical initial attachments', async () => {
     const initialMessageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
-    const images = {
+    const attachments = {
       path: '123e4567-e89b-12d3-a456-426614174000',
       files: ['123e4567-e89b-12d3-a456-426614174001.png'],
     };
@@ -1099,7 +1104,7 @@ describe('prepareSession endpoint', () => {
 
     await caller.prepareSession({
       prompt: 'Inspect the screenshot',
-      images,
+      attachments,
       initialMessageId,
       mode: 'code',
       model: 'claude-3',
@@ -1114,7 +1119,7 @@ describe('prepareSession endpoint', () => {
             turn: expect.objectContaining({
               type: 'prompt',
               prompt: 'Inspect the screenshot',
-              attachments: images,
+              attachments,
             }),
             id: initialMessageId,
           }),
@@ -2145,7 +2150,7 @@ describe('start endpoint', () => {
     ).rejects.toThrow('metadata invalid');
   });
 
-  it('forwards Vercel enrollment configuration and persists only the selected identity', async () => {
+  it('ignores retired platform Vercel enrollment configuration', async () => {
     const doStub = createMockDOStub();
     const context = createInternalApiContext({ doStub });
     Object.assign(context.env, {
@@ -2186,7 +2191,7 @@ describe('start endpoint', () => {
         metadata: expect.objectContaining({
           workspace: expect.objectContaining({
             sandboxId: expect.stringMatching(/^sbx-/),
-            sandboxProvider: 'vercel',
+            sandboxProvider: 'cloudflare-containers',
           }),
         }),
       })

@@ -13,6 +13,7 @@ import { MAX_ORGANIZATION_GROUPS } from '@kilocode/db/schema-types';
 import {
   OrganizationGroupPoliciesSchema,
   OrganizationGroupPolicySchema,
+  ORGANIZATION_GROUPS_ENTERPRISE_ONLY_MESSAGE,
   type OrganizationGroupPolicies,
   type OrganizationGroupPolicy,
   type OrganizationGroupPolicyType,
@@ -76,13 +77,13 @@ async function assertEnterpriseOrganization(
   if (organization.plan !== 'enterprise') {
     throw new TRPCError({
       code: 'FORBIDDEN',
-      message: 'Groups are available to Enterprise organizations.',
+      message: ORGANIZATION_GROUPS_ENTERPRISE_ONLY_MESSAGE,
     });
   }
   return organization;
 }
 
-async function acquireOrganizationPolicyLock(tx: DrizzleTransaction, organizationId: string) {
+export async function lockOrganizationGroupPolicy(tx: DrizzleTransaction, organizationId: string) {
   await tx.execute(sql`
     SELECT pg_catalog.pg_advisory_xact_lock(
       pg_catalog.hashtextextended(${`organization-group-policy:${organizationId}`}, 0)
@@ -137,7 +138,7 @@ export async function bumpOrganizationGroupPolicyRevision(
   organizationId: string,
   actorUserId: string | null
 ) {
-  await acquireOrganizationPolicyLock(tx, organizationId);
+  await lockOrganizationGroupPolicy(tx, organizationId);
   const existing = await getSettingsRow(organizationId, tx);
   return await writeOrganizationGroupPolicyRevision(tx, organizationId, actorUserId, existing);
 }
@@ -173,7 +174,7 @@ export async function withOrganizationGroupPolicyMutation<T>(
   }) => Promise<T>
 ): Promise<{ result: T; policyRevision: number }> {
   return await db.transaction(async tx => {
-    await acquireOrganizationPolicyLock(tx, organizationId);
+    await lockOrganizationGroupPolicy(tx, organizationId);
     const organization = await assertEnterpriseOrganization(organizationId, tx);
     const existingSettings = await getSettingsRow(organizationId, tx);
     const currentSettings = existingSettings

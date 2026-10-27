@@ -240,6 +240,35 @@
     ],
     "searchBlob": "agentBriefing.list List existing agent briefing reports for the user, optionally filtered by personal or organization scope with pagination. agentbriefing list scope organizationid cursor limit currentonly scope organizationId cursor limit currentOnly"
   },
+  "agentBriefing.oneOffDrafts": {
+    "path": "agentBriefing.oneOffDrafts",
+    "kind": "query",
+    "summary": "List resumable, unconfirmed agent briefs, including preparation progress and failures. Use the cursor to retrieve older drafts.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "cursor": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "limit": {
+          "default": 20,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    },
+    "tags": [
+      "agentbriefing",
+      "oneoffdrafts",
+      "cursor",
+      "limit"
+    ],
+    "searchBlob": "agentBriefing.oneOffDrafts List resumable, unconfirmed agent briefs, including preparation progress and failures. Use the cursor to retrieve older drafts. agentbriefing oneoffdrafts cursor limit cursor limit"
+  },
   "agentBriefing.oneOffPreferences": {
     "path": "agentBriefing.oneOffPreferences",
     "kind": "query",
@@ -267,6 +296,31 @@
       "language"
     ],
     "searchBlob": "agentBriefing.oneOffPreferences Get the saved timezone and language preferences used when generating a one-off agent activity briefing for a custom date range. agentbriefing oneoffpreferences timezone language timezone language"
+  },
+  "agentBriefing.oneOffPreparation": {
+    "path": "agentBriefing.oneOffPreparation",
+    "kind": "query",
+    "summary": "Check background brief preparation and retrieve its report and cost estimate when ready. Paid generation still requires confirmation in the app.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "reportId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "reportId"
+      ]
+    },
+    "tags": [
+      "agentbriefing",
+      "oneoffpreparation",
+      "reportid"
+    ],
+    "searchBlob": "agentBriefing.oneOffPreparation Check background brief preparation and retrieve its report and cost estimate when ready. Paid generation still requires confirmation in the app. agentbriefing oneoffpreparation reportid reportId"
   },
   "agentBriefing.preferences": {
     "path": "agentBriefing.preferences",
@@ -379,6 +433,65 @@
       "reportid"
     ],
     "searchBlob": "agentBriefing.read Mark an agent briefing report as read for the current user. agentbriefing read reportid reportId"
+  },
+  "agentBriefing.startOneOffPreparation": {
+    "path": "agentBriefing.startOneOffPreparation",
+    "kind": "mutation",
+    "summary": "Prepare a historical agent brief in the background for a selected period and context. Preparation does not publish a report or authorize a paid summary.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "startAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "endAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "language": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 35
+        }
+      },
+      "required": [
+        "requestId",
+        "startAt",
+        "endAt",
+        "timezone",
+        "language"
+      ]
+    },
+    "tags": [
+      "agentbriefing",
+      "startoneoffpreparation",
+      "requestid",
+      "organizationid",
+      "startat",
+      "endat",
+      "timezone",
+      "language"
+    ],
+    "searchBlob": "agentBriefing.startOneOffPreparation Prepare a historical agent brief in the background for a selected period and context. Preparation does not publish a report or authorize a paid summary. agentbriefing startoneoffpreparation requestid organizationid startat endat timezone language requestId organizationId startAt endAt timezone language"
   },
   "agentBriefing.updatePreferences": {
     "path": "agentBriefing.updatePreferences",
@@ -2076,6 +2189,7 @@
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         },
         "orderedIds": {
+          "maxItems": 50,
           "type": "array",
           "items": {
             "type": "string",
@@ -4737,7 +4851,8 @@
         },
         "cursor": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "maxLength": 140
         }
       },
       "required": [
@@ -5595,56 +5710,6 @@
     ],
     "searchBlob": "cloudAgentNext.getAttachmentUploadUrl Get a presigned URL to upload a file attachment for a cloud agent message. cloudagentnext getattachmentuploadurl messageuuid attachmentid contenttype contentlength extension messageUuid attachmentId contentType contentLength extension"
   },
-  "cloudAgentNext.getImageUploadUrl": {
-    "path": "cloudAgentNext.getImageUploadUrl",
-    "kind": "mutation",
-    "summary": "Get a presigned URL to upload an image for a cloud agent message.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "messageUuid": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "imageId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "contentType": {
-          "type": "string",
-          "enum": [
-            "image/png",
-            "image/jpeg",
-            "image/webp",
-            "image/gif"
-          ]
-        },
-        "contentLength": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "maximum": 5242880
-        }
-      },
-      "required": [
-        "messageUuid",
-        "imageId",
-        "contentType",
-        "contentLength"
-      ]
-    },
-    "tags": [
-      "cloudagentnext",
-      "getimageuploadurl",
-      "messageuuid",
-      "imageid",
-      "contenttype",
-      "contentlength"
-    ],
-    "searchBlob": "cloudAgentNext.getImageUploadUrl Get a presigned URL to upload an image for a cloud agent message. cloudagentnext getimageuploadurl messageuuid imageid contenttype contentlength messageUuid imageId contentType contentLength"
-  },
   "cloudAgentNext.getMessageResult": {
     "path": "cloudAgentNext.getMessageResult",
     "kind": "query",
@@ -5937,43 +6002,6 @@
     ],
     "searchBlob": "cloudAgentNext.interruptSession Stop a running cloud agent session and cancel its active work. cloudagentnext interruptsession sessionid sessionId"
   },
-  "cloudAgentNext.linkPendingUploads": {
-    "path": "cloudAgentNext.linkPendingUploads",
-    "kind": "mutation",
-    "summary": "Mark uploaded files as attached so they are kept and sent with the message.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "messageUuid": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "objectKeys": {
-          "minItems": 1,
-          "maxItems": 5,
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 1024
-          }
-        }
-      },
-      "required": [
-        "messageUuid",
-        "objectKeys"
-      ]
-    },
-    "tags": [
-      "cloudagentnext",
-      "linkpendinguploads",
-      "messageuuid",
-      "objectkeys"
-    ],
-    "searchBlob": "cloudAgentNext.linkPendingUploads Mark uploaded files as attached so they are kept and sent with the message. cloudagentnext linkpendinguploads messageuuid objectkeys messageUuid objectKeys"
-  },
   "cloudAgentNext.listGitHubRepositories": {
     "path": "cloudAgentNext.listGitHubRepositories",
     "kind": "query",
@@ -6140,10 +6168,7 @@
                             },
                             "account": {
                               "type": "string",
-                              "enum": [
-                                "kilo",
-                                "byoc"
-                              ]
+                              "const": "byoc"
                             }
                           },
                           "required": [
@@ -6236,7 +6261,8 @@
                     },
                     "prompt": {
                       "type": "string",
-                      "minLength": 1
+                      "minLength": 1,
+                      "maxLength": 100000
                     },
                     "mode": {
                       "type": "string",
@@ -6274,7 +6300,8 @@
                     },
                     "arguments": {
                       "default": "",
-                      "type": "string"
+                      "type": "string",
+                      "maxLength": 100000
                     }
                   },
                   "required": [
@@ -6394,7 +6421,7 @@
               "type": "array",
               "items": {
                 "type": "string",
-                "maxLength": 500
+                "maxLength": 16000
               }
             },
             "mcpServers": {
@@ -6750,29 +6777,6 @@
                 "files"
               ]
             },
-            "images": {
-              "type": "object",
-              "properties": {
-                "path": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                },
-                "files": {
-                  "minItems": 1,
-                  "maxItems": 5,
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|webp|gif)$"
-                  }
-                }
-              },
-              "required": [
-                "path",
-                "files"
-              ]
-            },
             "devcontainer": {
               "type": "boolean"
             }
@@ -6855,10 +6859,7 @@
                             },
                             "account": {
                               "type": "string",
-                              "enum": [
-                                "kilo",
-                                "byoc"
-                              ]
+                              "const": "byoc"
                             }
                           },
                           "required": [
@@ -7050,7 +7051,7 @@
               "type": "array",
               "items": {
                 "type": "string",
-                "maxLength": 500
+                "maxLength": 16000
               }
             },
             "mcpServers": {
@@ -7398,29 +7399,6 @@
                   "type": "array",
                   "items": {
                     "type": "string"
-                  }
-                }
-              },
-              "required": [
-                "path",
-                "files"
-              ]
-            },
-            "images": {
-              "type": "object",
-              "properties": {
-                "path": {
-                  "type": "string",
-                  "format": "uuid",
-                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                },
-                "files": {
-                  "minItems": 1,
-                  "maxItems": 5,
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|webp|gif)$"
                   }
                 }
               },
@@ -7669,7 +7647,8 @@
                 },
                 "arguments": {
                   "default": "",
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 100000
                 }
               },
               "required": [
@@ -7687,15 +7666,8 @@
           "type": "boolean"
         },
         "messageId": {
-          "anyOf": [
-            {
-              "type": "string",
-              "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string",
+          "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
         },
         "attachments": {
           "type": "object",
@@ -7718,34 +7690,12 @@
             "path",
             "files"
           ]
-        },
-        "images": {
-          "type": "object",
-          "properties": {
-            "path": {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            },
-            "files": {
-              "minItems": 1,
-              "maxItems": 5,
-              "type": "array",
-              "items": {
-                "type": "string",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|webp|gif)$"
-              }
-            }
-          },
-          "required": [
-            "path",
-            "files"
-          ]
         }
       },
       "required": [
         "cloudAgentSessionId",
-        "payload"
+        "payload",
+        "messageId"
       ]
     },
     "tags": [
@@ -7756,10 +7706,9 @@
       "expectedworktreeid",
       "autocommit",
       "messageid",
-      "attachments",
-      "images"
+      "attachments"
     ],
-    "searchBlob": "cloudAgentNext.sendMessage Send a follow-up prompt, command, or attachment to an existing cloud agent session. cloudagentnext sendmessage cloudagentsessionid payload expectedworktreeid autocommit messageid attachments images cloudAgentSessionId payload expectedWorktreeId autoCommit messageId attachments images"
+    "searchBlob": "cloudAgentNext.sendMessage Send a follow-up prompt, command, or attachment to an existing cloud agent session. cloudagentnext sendmessage cloudagentsessionid payload expectedworktreeid autocommit messageid attachments cloudAgentSessionId payload expectedWorktreeId autoCommit messageId attachments"
   },
   "cloudAgentNextFeedback.create": {
     "path": "cloudAgentNextFeedback.create",
@@ -7774,8 +7723,7 @@
           "pattern": "^(agent|workspace)_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
         },
         "kilo_session_id": {
-          "type": "string",
-          "pattern": "^ses_[A-Za-z0-9]{26}$"
+          "type": "string"
         },
         "session_type": {
           "type": "string",
@@ -8057,6 +8005,619 @@
     ],
     "searchBlob": "cloudAgentSettings.setRepositorySettings Save Cloud Agent sandbox settings for a specific repository, setting or clearing its assigned profile and allocation. cloudagentsettings setrepositorysettings organizationid repofullname platform profileid allocation organizationId repoFullName platform profileId allocation"
   },
+  "cloudEnvironments.build": {
+    "path": "cloudEnvironments.build",
+    "kind": "mutation",
+    "summary": "Start or trigger a new build of a cloud environment at a specific revision, returning the request result. Use to launch a build for an environment.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "environmentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "expectedRevision": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "environmentId",
+        "expectedRevision",
+        "requestId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "build",
+      "organizationid",
+      "environmentid",
+      "expectedrevision",
+      "requestid"
+    ],
+    "searchBlob": "cloudEnvironments.build Start or trigger a new build of a cloud environment at a specific revision, returning the request result. Use to launch a build for an environment. cloudenvironments build organizationid environmentid expectedrevision requestid organizationId environmentId expectedRevision requestId"
+  },
+  "cloudEnvironments.buildLogs": {
+    "path": "cloudEnvironments.buildLogs",
+    "kind": "query",
+    "summary": "Fetch the log output of a specific cloud environment build, paginated by cursor, for viewing build output and debugging build failures.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "environmentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "buildId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "cursor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "environmentId",
+        "buildId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "buildlogs",
+      "organizationid",
+      "environmentid",
+      "buildid",
+      "cursor"
+    ],
+    "searchBlob": "cloudEnvironments.buildLogs Fetch the log output of a specific cloud environment build, paginated by cursor, for viewing build output and debugging build failures. cloudenvironments buildlogs organizationid environmentid buildid cursor organizationId environmentId buildId cursor"
+  },
+  "cloudEnvironments.buildStatus": {
+    "path": "cloudEnvironments.buildStatus",
+    "kind": "query",
+    "summary": "Check the current status of a cloud environment's build, such as whether it is queued, running, succeeded, or failed. Use to poll build progress for an environment.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "environmentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "environmentId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "buildstatus",
+      "organizationid",
+      "environmentid"
+    ],
+    "searchBlob": "cloudEnvironments.buildStatus Check the current status of a cloud environment's build, such as whether it is queued, running, succeeded, or failed. Use to poll build progress for an environment. cloudenvironments buildstatus organizationid environmentid organizationId environmentId"
+  },
+  "cloudEnvironments.cancelBuild": {
+    "path": "cloudEnvironments.cancelBuild",
+    "kind": "mutation",
+    "summary": "Cancel a running or queued build of a cloud environment by build ID. Use to stop or abort an in-progress environment build.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "environmentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "buildId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "environmentId",
+        "buildId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "cancelbuild",
+      "organizationid",
+      "environmentid",
+      "buildid"
+    ],
+    "searchBlob": "cloudEnvironments.cancelBuild Cancel a running or queued build of a cloud environment by build ID. Use to stop or abort an in-progress environment build. cloudenvironments cancelbuild organizationid environmentid buildid organizationId environmentId buildId"
+  },
+  "cloudEnvironments.create": {
+    "path": "cloudEnvironments.create",
+    "kind": "mutation",
+    "summary": "Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can have only one.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "repository": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string",
+                  "const": "github"
+                },
+                "fullName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "platform",
+                "fullName"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string",
+                  "const": "gitlab"
+                },
+                "projectPath": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "platform",
+                "projectPath"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string",
+                  "const": "bitbucket"
+                },
+                "fullName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "workspaceUuid": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "repositoryUuid": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "platform",
+                "fullName",
+                "workspaceUuid",
+                "repositoryUuid"
+              ]
+            }
+          ]
+        },
+        "plainVars": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 128,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "secrets": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 128,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 8192
+          }
+        },
+        "commands": {
+          "maxItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000
+          }
+        },
+        "sandboxAllocation": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "cloudflare-single",
+                "cloudflare-shared",
+                "cloudflare-containers-standard-3",
+                "cloudflare-containers-standard-4",
+                "vercel-small",
+                "vercel-large"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "repository"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "create",
+      "organizationid",
+      "name",
+      "repository",
+      "plainvars",
+      "secrets",
+      "commands",
+      "sandboxallocation"
+    ],
+    "searchBlob": "cloudEnvironments.create Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can have only one. cloudenvironments create organizationid name repository plainvars secrets commands sandboxallocation organizationId name repository plainVars secrets commands sandboxAllocation"
+  },
+  "cloudEnvironments.delete": {
+    "path": "cloudEnvironments.delete",
+    "kind": "mutation",
+    "summary": "Delete a Cloud Agent repository environment. New sessions in the repository then start without it.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "environmentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "environmentId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "delete",
+      "organizationid",
+      "environmentid"
+    ],
+    "searchBlob": "cloudEnvironments.delete Delete a Cloud Agent repository environment. New sessions in the repository then start without it. cloudenvironments delete organizationid environmentid organizationId environmentId"
+  },
+  "cloudEnvironments.get": {
+    "path": "cloudEnvironments.get",
+    "kind": "query",
+    "summary": "Get one Cloud Agent repository environment with its setup commands, plain variables, secret names, and sandbox size.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "environmentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "environmentId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "get",
+      "organizationid",
+      "environmentid"
+    ],
+    "searchBlob": "cloudEnvironments.get Get one Cloud Agent repository environment with its setup commands, plain variables, secret names, and sandbox size. cloudenvironments get organizationid environmentid organizationId environmentId"
+  },
+  "cloudEnvironments.list": {
+    "path": "cloudEnvironments.list",
+    "kind": "query",
+    "summary": "List the Cloud Agent repository environment for one repository, with setup command, variable, secret, and sandbox size details.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "repository": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string",
+                  "const": "github"
+                },
+                "fullName": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "platform",
+                "fullName"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string",
+                  "const": "gitlab"
+                },
+                "projectPath": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                }
+              },
+              "required": [
+                "platform",
+                "projectPath"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "platform": {
+                  "type": "string",
+                  "const": "bitbucket"
+                },
+                "workspaceUuid": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "repositoryUuid": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                }
+              },
+              "required": [
+                "platform",
+                "workspaceUuid",
+                "repositoryUuid"
+              ]
+            }
+          ]
+        }
+      },
+      "required": [
+        "repository"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "list",
+      "organizationid",
+      "repository"
+    ],
+    "searchBlob": "cloudEnvironments.list List the Cloud Agent repository environment for one repository, with setup command, variable, secret, and sandbox size details. cloudenvironments list organizationid repository organizationId repository"
+  },
+  "cloudEnvironments.listAll": {
+    "path": "cloudEnvironments.listAll",
+    "kind": "query",
+    "summary": "List every Cloud Agent repository environment for the user or organization, across all repositories.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "cloudenvironments",
+      "listall",
+      "organizationid"
+    ],
+    "searchBlob": "cloudEnvironments.listAll List every Cloud Agent repository environment for the user or organization, across all repositories. cloudenvironments listall organizationid organizationId"
+  },
+  "cloudEnvironments.update": {
+    "path": "cloudEnvironments.update",
+    "kind": "mutation",
+    "summary": "Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "environmentId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "plainVars": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "maxLength": 128,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "secrets": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "value": {
+                    "type": "string",
+                    "maxLength": 8192
+                  }
+                },
+                "required": [
+                  "key",
+                  "value"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  },
+                  "delete": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "key",
+                  "delete"
+                ]
+              }
+            ]
+          }
+        },
+        "commands": {
+          "maxItems": 1,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 16000
+          }
+        },
+        "sandboxAllocation": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "cloudflare-single",
+                "cloudflare-shared",
+                "cloudflare-containers-standard-3",
+                "cloudflare-containers-standard-4",
+                "vercel-small",
+                "vercel-large"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "environmentId"
+      ]
+    },
+    "tags": [
+      "cloudenvironments",
+      "update",
+      "organizationid",
+      "environmentid",
+      "name",
+      "plainvars",
+      "secrets",
+      "commands",
+      "sandboxallocation"
+    ],
+    "searchBlob": "cloudEnvironments.update Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size. cloudenvironments update organizationid environmentid name plainvars secrets commands sandboxallocation organizationId environmentId name plainVars secrets commands sandboxAllocation"
+  },
   "codeIndexing.delete": {
     "path": "codeIndexing.delete",
     "kind": "mutation",
@@ -8272,31 +8833,6 @@
       "overrideuser"
     ],
     "searchBlob": "codeIndexing.getProjectFiles List indexed files within a project with pagination, search, and branch filtering, showing per-file chunk count, size, branches, line counts, and percentage of AI-generated lines. codeindexing getprojectfiles organizationid projectid gitbranch filesearch page pagesize overrideuser organizationId projectId gitBranch fileSearch page pageSize overrideUser"
-  },
-  "codeIndexing.getRecentSearches": {
-    "path": "codeIndexing.getRecentSearches",
-    "kind": "query",
-    "summary": "List the most recent code-indexing search queries made by members of an organization, with timestamps, project, and result counts.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "organizationId"
-      ]
-    },
-    "tags": [
-      "codeindexing",
-      "getrecentsearches",
-      "organizationid"
-    ],
-    "searchBlob": "codeIndexing.getRecentSearches List the most recent code-indexing search queries made by members of an organization, with timestamps, project, and result counts. codeindexing getrecentsearches organizationid organizationId"
   },
   "codeIndexing.search": {
     "path": "codeIndexing.search",
@@ -8968,12 +9504,21 @@
     "path": "credits.getMobileStoreProducts",
     "kind": "query",
     "summary": "List the one-off credit packs the mobile app can sell, with the account token and the App Store and Google Play product id for each preset amount.",
-    "inputSchema": {},
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "supportsCreditExpiry": {
+          "type": "boolean"
+        }
+      }
+    },
     "tags": [
       "credits",
-      "getmobilestoreproducts"
+      "getmobilestoreproducts",
+      "supportscreditexpiry"
     ],
-    "searchBlob": "credits.getMobileStoreProducts List the one-off credit packs the mobile app can sell, with the account token and the App Store and Google Play product id for each preset amount. credits getmobilestoreproducts"
+    "searchBlob": "credits.getMobileStoreProducts List the one-off credit packs the mobile app can sell, with the account token and the App Store and Google Play product id for each preset amount. credits getmobilestoreproducts supportscreditexpiry supportsCreditExpiry"
   },
   "debug.badInputError": {
     "path": "debug.badInputError",
@@ -14883,6 +15428,7 @@
               "organization.mode.create",
               "organization.mode.update",
               "organization.mode.delete",
+              "organization.webhook_trigger.update",
               "organization.group.create",
               "organization.group.update",
               "organization.group.delete",
@@ -15943,64 +16489,6 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.getAttachmentUploadUrl Get a presigned URL to upload a file attachment for a cloud agent message. Use to attach a file. organizations cloudagentnext getattachmentuploadurl organizationid messageuuid attachmentid contenttype contentlength extension organizationId messageUuid attachmentId contentType contentLength extension"
   },
-  "organizations.cloudAgentNext.getImageUploadUrl": {
-    "path": "organizations.cloudAgentNext.getImageUploadUrl",
-    "kind": "mutation",
-    "summary": "Get a presigned URL to upload an image for a cloud agent message. Use to attach an image.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "messageUuid": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "imageId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "contentType": {
-          "type": "string",
-          "enum": [
-            "image/png",
-            "image/jpeg",
-            "image/webp",
-            "image/gif"
-          ]
-        },
-        "contentLength": {
-          "type": "integer",
-          "exclusiveMinimum": 0,
-          "maximum": 5242880
-        }
-      },
-      "required": [
-        "organizationId",
-        "messageUuid",
-        "imageId",
-        "contentType",
-        "contentLength"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "cloudagentnext",
-      "getimageuploadurl",
-      "organizationid",
-      "messageuuid",
-      "imageid",
-      "contenttype",
-      "contentlength"
-    ],
-    "searchBlob": "organizations.cloudAgentNext.getImageUploadUrl Get a presigned URL to upload an image for a cloud agent message. Use to attach an image. organizations cloudagentnext getimageuploadurl organizationid messageuuid imageid contenttype contentlength organizationId messageUuid imageId contentType contentLength"
-  },
   "organizations.cloudAgentNext.getMessageResult": {
     "path": "organizations.cloudAgentNext.getMessageResult",
     "kind": "query",
@@ -16388,51 +16876,6 @@
     ],
     "searchBlob": "organizations.cloudAgentNext.interruptSession Stop a running cloud agent session. Use to cancel the agent's current work. organizations cloudagentnext interruptsession organizationid sessionid organizationId sessionId"
   },
-  "organizations.cloudAgentNext.linkPendingUploads": {
-    "path": "organizations.cloudAgentNext.linkPendingUploads",
-    "kind": "mutation",
-    "summary": "Link previously uploaded files to a cloud agent message so they are kept. Use to attach uploaded files.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "messageUuid": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "objectKeys": {
-          "minItems": 1,
-          "maxItems": 5,
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 1024
-          }
-        }
-      },
-      "required": [
-        "organizationId",
-        "messageUuid",
-        "objectKeys"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "cloudagentnext",
-      "linkpendinguploads",
-      "organizationid",
-      "messageuuid",
-      "objectkeys"
-    ],
-    "searchBlob": "organizations.cloudAgentNext.linkPendingUploads Link previously uploaded files to a cloud agent message so they are kept. Use to attach uploaded files. organizations cloudagentnext linkpendinguploads organizationid messageuuid objectkeys organizationId messageUuid objectKeys"
-  },
   "organizations.cloudAgentNext.listBitbucketRepositories": {
     "path": "organizations.cloudAgentNext.listBitbucketRepositories",
     "kind": "query",
@@ -16695,10 +17138,7 @@
                                 },
                                 "account": {
                                   "type": "string",
-                                  "enum": [
-                                    "kilo",
-                                    "byoc"
-                                  ]
+                                  "const": "byoc"
                                 }
                               },
                               "required": [
@@ -16791,7 +17231,8 @@
                         },
                         "prompt": {
                           "type": "string",
-                          "minLength": 1
+                          "minLength": 1,
+                          "maxLength": 100000
                         },
                         "mode": {
                           "type": "string",
@@ -16829,7 +17270,8 @@
                         },
                         "arguments": {
                           "default": "",
-                          "type": "string"
+                          "type": "string",
+                          "maxLength": 100000
                         }
                       },
                       "required": [
@@ -16949,7 +17391,7 @@
                   "type": "array",
                   "items": {
                     "type": "string",
-                    "maxLength": 500
+                    "maxLength": 16000
                   }
                 },
                 "mcpServers": {
@@ -17305,29 +17747,6 @@
                     "files"
                   ]
                 },
-                "images": {
-                  "type": "object",
-                  "properties": {
-                    "path": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                    },
-                    "files": {
-                      "minItems": 1,
-                      "maxItems": 5,
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|webp|gif)$"
-                      }
-                    }
-                  },
-                  "required": [
-                    "path",
-                    "files"
-                  ]
-                },
                 "devcontainer": {
                   "type": "boolean"
                 }
@@ -17416,10 +17835,7 @@
                                 },
                                 "account": {
                                   "type": "string",
-                                  "enum": [
-                                    "kilo",
-                                    "byoc"
-                                  ]
+                                  "const": "byoc"
                                 }
                               },
                               "required": [
@@ -17611,7 +18027,7 @@
                   "type": "array",
                   "items": {
                     "type": "string",
-                    "maxLength": 500
+                    "maxLength": 16000
                   }
                 },
                 "mcpServers": {
@@ -17959,29 +18375,6 @@
                       "type": "array",
                       "items": {
                         "type": "string"
-                      }
-                    }
-                  },
-                  "required": [
-                    "path",
-                    "files"
-                  ]
-                },
-                "images": {
-                  "type": "object",
-                  "properties": {
-                    "path": {
-                      "type": "string",
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                    },
-                    "files": {
-                      "minItems": 1,
-                      "maxItems": 5,
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|webp|gif)$"
                       }
                     }
                   },
@@ -18297,7 +18690,8 @@
                 },
                 "arguments": {
                   "default": "",
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 100000
                 }
               },
               "required": [
@@ -18315,15 +18709,8 @@
           "type": "boolean"
         },
         "messageId": {
-          "anyOf": [
-            {
-              "type": "string",
-              "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "type": "string",
+          "pattern": "^msg_[0-9a-f]{12}[0-9A-Za-z]{14}$"
         },
         "attachments": {
           "type": "object",
@@ -18346,35 +18733,13 @@
             "path",
             "files"
           ]
-        },
-        "images": {
-          "type": "object",
-          "properties": {
-            "path": {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            },
-            "files": {
-              "minItems": 1,
-              "maxItems": 5,
-              "type": "array",
-              "items": {
-                "type": "string",
-                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:png|jpg|webp|gif)$"
-              }
-            }
-          },
-          "required": [
-            "path",
-            "files"
-          ]
         }
       },
       "required": [
         "organizationId",
         "cloudAgentSessionId",
-        "payload"
+        "payload",
+        "messageId"
       ]
     },
     "tags": [
@@ -18387,10 +18752,9 @@
       "expectedworktreeid",
       "autocommit",
       "messageid",
-      "attachments",
-      "images"
+      "attachments"
     ],
-    "searchBlob": "organizations.cloudAgentNext.sendMessage Send a prompt or command to a running cloud agent session. Use to continue the conversation with the agent. organizations cloudagentnext sendmessage organizationid cloudagentsessionid payload expectedworktreeid autocommit messageid attachments images organizationId cloudAgentSessionId payload expectedWorktreeId autoCommit messageId attachments images"
+    "searchBlob": "organizations.cloudAgentNext.sendMessage Send a prompt or command to a running cloud agent session. Use to continue the conversation with the agent. organizations cloudagentnext sendmessage organizationid cloudagentsessionid payload expectedworktreeid autocommit messageid attachments organizationId cloudAgentSessionId payload expectedWorktreeId autoCommit messageId attachments"
   },
   "organizations.create": {
     "path": "organizations.create",
@@ -27288,6 +27652,58 @@
     ],
     "searchBlob": "organizations.usageStats Get an organization's usage totals (cost, requests, tokens) over the last 30 days. organizations usagestats organizationid organizationId"
   },
+  "organizations.vercelCompute.getEnrollment": {
+    "path": "organizations.vercelCompute.getEnrollment",
+    "kind": "query",
+    "summary": "Get the organization's BYOC Vercel compute enrollment state, including whether the organization is enrolled.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "vercelcompute",
+      "getenrollment",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.vercelCompute.getEnrollment Get the organization's BYOC Vercel compute enrollment state, including whether the organization is enrolled. organizations vercelcompute getenrollment organizationid organizationId"
+  },
+  "organizations.vercelCompute.getStatus": {
+    "path": "organizations.vercelCompute.getStatus",
+    "kind": "query",
+    "summary": "Get the organization's BYOC Vercel compute status: setup progress, setup and upgrade errors, runtime build and snapshot identity, and whether a newer runtime is available.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "vercelcompute",
+      "getstatus",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.vercelCompute.getStatus Get the organization's BYOC Vercel compute status: setup progress, setup and upgrade errors, runtime build and snapshot identity, and whether a newer runtime is available. organizations vercelcompute getstatus organizationid organizationId"
+  },
   "organizations.withMembers": {
     "path": "organizations.withMembers",
     "kind": "query",
@@ -32417,75 +32833,99 @@
           ]
         },
         "features": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "models": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "modes": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "userIds": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "providers": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "projects": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedFeatures": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedModels": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedModes": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedUserIds": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedProviders": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedProjects": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "dimension": {
@@ -32643,75 +33083,99 @@
           ]
         },
         "features": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "models": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "modes": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "userIds": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "providers": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "projects": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedFeatures": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedModels": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedModes": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedUserIds": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedProviders": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedProjects": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         }
       },
@@ -32813,75 +33277,99 @@
           ]
         },
         "features": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "models": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "modes": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "userIds": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "providers": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "projects": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedFeatures": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedModels": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedModes": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedUserIds": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedProviders": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedProjects": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "groupBy": {
@@ -33007,75 +33495,99 @@
           ]
         },
         "features": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "models": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "modes": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "userIds": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "providers": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "projects": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedFeatures": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedModels": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedModes": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedUserIds": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedProviders": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "excludedProjects": {
+          "maxItems": 500,
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "maxLength": 256
           }
         },
         "metric": {
@@ -33354,6 +33866,11 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       },
       "required": [
@@ -33363,9 +33880,10 @@
     "tags": [
       "user",
       "getcreditpurchaseconfirmation",
-      "transactionid"
+      "transactionid",
+      "organizationid"
     ],
-    "searchBlob": "user.getCreditPurchaseConfirmation Get confirmation details for a specific personal credit purchase transaction by ID, including amount and purchase time. user getcreditpurchaseconfirmation transactionid transactionId"
+    "searchBlob": "user.getCreditPurchaseConfirmation Get confirmation details for a specific personal credit purchase transaction by ID, including amount and purchase time. user getcreditpurchaseconfirmation transactionid organizationid transactionId organizationId"
   },
   "user.getCreditPurchaseHistory": {
     "path": "user.getCreditPurchaseHistory",
@@ -33380,15 +33898,21 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 9007199254740991
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       }
     },
     "tags": [
       "user",
       "getcreditpurchasehistory",
-      "cursor"
+      "cursor",
+      "organizationid"
     ],
-    "searchBlob": "user.getCreditPurchaseHistory Fetch a paginated history of the user's personal credit purchases and automatic top-ups with amounts and dates. user getcreditpurchasehistory cursor cursor"
+    "searchBlob": "user.getCreditPurchaseHistory Fetch a paginated history of the user's personal credit purchases and automatic top-ups with amounts and dates. user getcreditpurchasehistory cursor organizationid cursor organizationId"
   },
   "user.getCreditPurchaseReceipt": {
     "path": "user.getCreditPurchaseReceipt",
@@ -33402,6 +33926,11 @@
           "type": "string",
           "format": "uuid",
           "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       },
       "required": [
@@ -33411,9 +33940,10 @@
     "tags": [
       "user",
       "getcreditpurchasereceipt",
-      "transactionid"
+      "transactionid",
+      "organizationid"
     ],
-    "searchBlob": "user.getCreditPurchaseReceipt Get the receipt URL for a Stripe credit purchase. user getcreditpurchasereceipt transactionid transactionId"
+    "searchBlob": "user.getCreditPurchaseReceipt Get the receipt URL for a Stripe credit purchase. user getcreditpurchasereceipt transactionid organizationid transactionId organizationId"
   },
   "user.getDiscordGuildStatus": {
     "path": "user.getDiscordGuildStatus",
@@ -33448,6 +33978,40 @@
     ],
     "searchBlob": "user.getMyPushTokens List all push notification tokens registered for the current user across platforms, with their locale. user getmypushtokens"
   },
+  "user.getNotificationHistory": {
+    "path": "user.getNotificationHistory",
+    "kind": "query",
+    "summary": "List the signed-in user's past notifications, optionally filtered by category, with pagination for older entries.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "category": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "cursor": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    },
+    "tags": [
+      "user",
+      "getnotificationhistory",
+      "category",
+      "cursor",
+      "limit"
+    ],
+    "searchBlob": "user.getNotificationHistory List the signed-in user's past notifications, optionally filtered by category, with pagination for older entries. user getnotificationhistory category cursor limit category cursor limit"
+  },
   "user.getNotificationPreferences": {
     "path": "user.getNotificationPreferences",
     "kind": "query",
@@ -33458,6 +34022,17 @@
       "getnotificationpreferences"
     ],
     "searchBlob": "user.getNotificationPreferences Get the current user's notification preferences for push notifications, chat messages, balance alerts, security findings, and more. user getnotificationpreferences"
+  },
+  "user.getPaidCreditPolicy": {
+    "path": "user.getPaidCreditPolicy",
+    "kind": "query",
+    "summary": "Check whether paid credits and Kilo Pass credits currently expire after one year, returning the current policy and its effective date so an agent can tell if expiry rules are active for users.",
+    "inputSchema": {},
+    "tags": [
+      "user",
+      "getpaidcreditpolicy"
+    ],
+    "searchBlob": "user.getPaidCreditPolicy Check whether paid credits and Kilo Pass credits currently expire after one year, returning the current policy and its effective date so an agent can tell if expiry rules are active for users. user getpaidcreditpolicy"
   },
   "user.getPasskeys": {
     "path": "user.getPasskeys",
@@ -34304,6 +34879,28 @@
     ],
     "searchBlob": "userFeedback.create Submit user feedback or a bug report to the Kilo team along with context about the app area and source it came from. userfeedback create feedback_text feedback_for feedback_batch source context_json feedback_text feedback_for feedback_batch source context_json"
   },
+  "vercelCompute.getEnrollment": {
+    "path": "vercelCompute.getEnrollment",
+    "kind": "query",
+    "summary": "Check whether an organization is enrolled in customer-paid Vercel compute (bring your own Vercel account) and can use the integration.",
+    "inputSchema": {},
+    "tags": [
+      "vercelcompute",
+      "getenrollment"
+    ],
+    "searchBlob": "vercelCompute.getEnrollment Check whether an organization is enrolled in customer-paid Vercel compute (bring your own Vercel account) and can use the integration. vercelcompute getenrollment"
+  },
+  "vercelCompute.getStatus": {
+    "path": "vercelCompute.getStatus",
+    "kind": "query",
+    "summary": "Get the current Vercel compute setup status for an organization, including setup progress, errors, connected team and project, runtime version, and whether a runtime upgrade is available.",
+    "inputSchema": {},
+    "tags": [
+      "vercelcompute",
+      "getstatus"
+    ],
+    "searchBlob": "vercelCompute.getStatus Get the current Vercel compute setup status for an organization, including setup progress, errors, connected team and project, runtime version, and whether a runtime upgrade is available. vercelcompute getstatus"
+  },
   "webhookTriggers.capabilities": {
     "path": "webhookTriggers.capabilities",
     "kind": "query",
@@ -34403,9 +35000,24 @@
           ]
         },
         "profileId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "bodySchema": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
         },
         "promptTemplate": {
           "type": "string",
@@ -34472,6 +35084,7 @@
       "variant",
       "sandboxallocation",
       "profileid",
+      "bodyschema",
       "prompttemplate",
       "autocommit",
       "condenseoncomplete",
@@ -34480,7 +35093,7 @@
       "cronexpression",
       "crontimezone"
     ],
-    "searchBlob": "webhookTriggers.create Create a new webhook or scheduled trigger that runs a Cloud Agent or KiloClaw Chat on an incoming request or cron schedule. Use this to set up an automation that fires when a GitHub event or webhook arrives. webhooktriggers create triggerid organizationid runascreator targettype kiloclawinstanceid githubrepo mode model variant sandboxallocation profileid prompttemplate autocommit condenseoncomplete webhookauth activationmode cronexpression crontimezone triggerId organizationId runAsCreator targetType kiloclawInstanceId githubRepo mode model variant sandboxAllocation profileId promptTemplate autoCommit condenseOnComplete webhookAuth activationMode cronExpression cronTimezone"
+    "searchBlob": "webhookTriggers.create Create a new webhook or scheduled trigger that runs a Cloud Agent or KiloClaw Chat on an incoming request or cron schedule. Use this to set up an automation that fires when a GitHub event or webhook arrives. webhooktriggers create triggerid organizationid runascreator targettype kiloclawinstanceid githubrepo mode model variant sandboxallocation profileid bodyschema prompttemplate autocommit condenseoncomplete webhookauth activationmode cronexpression crontimezone triggerId organizationId runAsCreator targetType kiloclawInstanceId githubRepo mode model variant sandboxAllocation profileId bodySchema promptTemplate autoCommit condenseOnComplete webhookAuth activationMode cronExpression cronTimezone"
   },
   "webhookTriggers.delete": {
     "path": "webhookTriggers.delete",
@@ -34766,9 +35379,24 @@
           "maxLength": 10000
         },
         "profileId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "bodySchema": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ]
         },
         "autoCommit": {
           "type": [
@@ -34836,6 +35464,7 @@
       "sandboxallocation",
       "prompttemplate",
       "profileid",
+      "bodyschema",
       "autocommit",
       "condenseoncomplete",
       "isactive",
@@ -34843,7 +35472,7 @@
       "cronexpression",
       "crontimezone"
     ],
-    "searchBlob": "webhookTriggers.update Update an existing trigger's settings, such as its model, prompt template, profile, active state, webhook authentication, or cron schedule. Use this to change or disable a trigger. webhooktriggers update triggerid organizationid mode model variant sandboxallocation prompttemplate profileid autocommit condenseoncomplete isactive webhookauth cronexpression crontimezone triggerId organizationId mode model variant sandboxAllocation promptTemplate profileId autoCommit condenseOnComplete isActive webhookAuth cronExpression cronTimezone"
+    "searchBlob": "webhookTriggers.update Update an existing trigger's settings, such as its model, prompt template, profile, active state, webhook authentication, or cron schedule. Use this to change or disable a trigger. webhooktriggers update triggerid organizationid mode model variant sandboxallocation prompttemplate profileid bodyschema autocommit condenseoncomplete isactive webhookauth cronexpression crontimezone triggerId organizationId mode model variant sandboxAllocation promptTemplate profileId bodySchema autoCommit condenseOnComplete isActive webhookAuth cronExpression cronTimezone"
   },
   "workspaceFolders.create": {
     "path": "workspaceFolders.create",

@@ -1,40 +1,54 @@
-import { useLocalSearchParams } from 'expo-router';
+import { type Href, useNavigation } from 'expo-router';
 import { FolderGit2 } from '@/components/ui/icons';
-import { type ReactNode } from 'react';
-import { View } from 'react-native';
+import { type ReactNode, useCallback, useEffect, useRef } from 'react';
+import { AppState, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner-native';
 
 import { CenteredState } from '@/components/centered-state';
+import { RepositorySyncFooter } from '@/components/code-reviewer/repository-sync-footer';
 import { EmptyState } from '@/components/empty-state';
+import { InvalidRouteState } from '@/components/invalid-route-state';
 import { QueryError } from '@/components/query-error';
 import { RepoToggleRow } from '@/components/repo-toggle-row';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { RadioGroup } from '@/components/ui/radio-group';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
-import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
-import { readTrpcErrorField } from '@/lib/trpc-error';
-import { trpcClient } from '@/lib/trpc';
 import {
-  PERSONAL_SCOPE,
   useBitbucketReadiness,
   useGitHubRepositories,
   useGitLabRepositories,
   useReviewConfig,
   useSaveReviewConfig,
 } from '@/lib/hooks/use-code-reviewer';
+import { useManageRepositoryAccess } from '@/lib/hooks/use-code-reviewer-manage-access';
+import {
+  type SyncedRepoPlatform,
+  useReviewerRepositoriesResync,
+} from '@/lib/hooks/use-code-reviewer-repo-sync';
 import { useRepoSelectionToggle } from '@/lib/hooks/use-code-reviewer-repo-selection';
-import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
+import { useNowTicker } from '@/lib/hooks/use-now-ticker';
+import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
+import { getBitbucketIntegrationUrl } from '@/lib/integration-urls';
+import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 export default function ReposRoute() {
-  const { scope, platform } = useLocalSearchParams<{ scope: string; platform: ReviewerPlatform }>();
+  const params = useReviewerRouteParams();
+  if (!params) {
+    return <InvalidRouteState backTo={'/(app)/code-reviewer' as Href} />;
+  }
+  return <ReposScreen scope={params.scope} platform={params.platform} />;
+}
+
+function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const { data } = useReviewConfig(scope, platform);
   const save = useSaveReviewConfig(scope, platform);
   const toggleRepo = useRepoSelectionToggle(scope, platform);
@@ -58,6 +72,9 @@ export default function ReposRoute() {
       isError: githubRepos.isError,
       isFetching: githubRepos.isFetching,
       refetch: () => void githubRepos.refetch(),
+      // The cached snapshot's sync time still answers the "how old is this
+      // list" question, so a read that did not force a provider call shows it.
+      syncedAt: githubRepos.data?.syncedAt ?? null,
       rows: githubRepos.data?.repositories ?? [],
     },
     gitlab: {
@@ -65,6 +82,7 @@ export default function ReposRoute() {
       isError: gitlabRepos.isError,
       isFetching: gitlabRepos.isFetching,
       refetch: () => void gitlabRepos.refetch(),
+      syncedAt: gitlabRepos.data?.syncedAt ?? null,
       rows: gitlabRepos.data?.repositories ?? [],
     },
     bitbucket: {
@@ -72,6 +90,8 @@ export default function ReposRoute() {
       isError: bitbucketReadiness.isError,
       isFetching: bitbucketReadiness.isFetching,
       refetch: () => void bitbucketReadiness.refetch(),
+      // Bitbucket's workspace snapshot carries no sync timestamp.
+      syncedAt: null,
       rows: bitbucketRepos,
     },
   };
@@ -81,6 +101,7 @@ export default function ReposRoute() {
     isFetching: reposFetching,
     refetch: refetchRepos,
     rows: repoRows,
+    syncedAt,
   } = reposByPlatform[platform];
   const selectedIds = data?.selectedRepositoryIds ?? [];
   const configDisabled = data == null;
@@ -88,28 +109,79 @@ export default function ReposRoute() {
     platform === 'bitbucket' && bitbucketReadiness.data?.repositoryCache.status !== 'available';
   const confirmedEmpty =
     !reposLoading && !reposError && !bitbucketNotReady && repoRows.length === 0;
-  const orgScope = scope === PERSONAL_SCOPE ? undefined : scope;
-  // oxlint-disable-next-line anti-slop/no-known-value-widening -- deliberately partial (bitbucket has no entry); lookup must accept the full ReviewerPlatform key set
-  const manageRepoAccessLabelByPlatform: Partial<Record<ReviewerPlatform, string>> = {
-    github: t('codeReviewer.repos.repositoryAccess'),
-    gitlab: t('codeReviewer.repos.repositoryAccess'),
+  const resyncPlatform: SyncedRepoPlatform = platform === 'gitlab' ? 'gitlab' : 'github';
+  const { resync, resyncing } = useReviewerRepositoriesResync(scope, resyncPlatform);
+  const openManageAccess = useManageRepositoryAccess(scope, platform);
+  // Set when the user leaves for the provider's settings page: the return trip
+  // is the moment installation access may have widened, so it forces a sync.
+  const pendingAccessChange = useRef(false);
+  const navigation = useNavigation();
+  const flushPendingSync = useCallback(() => {
+    if (!pendingAccessChange.current) {
+      return;
+    }
+    pendingAccessChange.current = false;
+    void resync();
+  }, [resync]);
+  const manageAccess = openManageAccess
+    ? () => {
+        pendingAccessChange.current = true;
+        // Two return signals reach here and only the first one syncs: the
+        // awaited browser dismissal (the only one iOS reports, because its
+        // settings page opens in-app) and the next foreground (Android).
+        void (async () => {
+          try {
+            await openManageAccess();
+          } finally {
+            flushPendingSync();
+          }
+        })();
+      }
+    : undefined;
+  const refreshing = platform === 'bitbucket' ? reposFetching : resyncing;
+  const refreshRepositories = () => {
+    if (platform === 'bitbucket') {
+      refetchRepos();
+      return;
+    }
+    void resync();
   };
-  const manageRepoAccessLabel = manageRepoAccessLabelByPlatform[platform];
+  // The label is relative, so it must be derived from a clock the render
+  // traces: a live `Date.now()` read inside render is memoized with unchanged
+  // props and the on-screen text freezes at its first value.
+  const now = useNowTicker(10_000);
+  const syncedLabel = syncedAt
+    ? t('securityAgent.dashboard.lastSynced', {
+        time: timeAgo(parseTimestamp(syncedAt), undefined, now),
+      })
+    : null;
   const emptyStateCopyByPlatform = {
     github: {
       title: t('codeReviewer.repos.installGithubApp'),
       description: t('codeReviewer.repos.installGithubAppDescription'),
     },
     gitlab: {
-      title: t('codeReviewer.repos.noRepositoriesFound'),
+      title: t('common.noRepositoriesFound'),
       description: t('codeReviewer.repos.gitlabNoRepositoriesDescription'),
     },
     bitbucket: {
-      title: t('codeReviewer.repos.noRepositoriesFound'),
+      title: t('common.noRepositoriesFound'),
       description: t('codeReviewer.repos.bitbucketNoRepositoriesDescription'),
     },
   } satisfies Record<ReviewerPlatform, { title: string; description: string }>;
   const emptyStateCopy = emptyStateCopyByPlatform[platform];
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState !== 'active' || !navigation.isFocused()) {
+        return;
+      }
+      flushPendingSync();
+    });
+    return () => {
+      subscription.remove();
+    };
+  }, [flushPendingSync, navigation]);
 
   const setMode = (nextMode: 'all' | 'selected') => {
     save.mutate({ repositorySelectionMode: nextMode });
@@ -156,44 +228,8 @@ export default function ReposRoute() {
         title={emptyStateCopy.title}
         description={emptyStateCopy.description}
         action={
-          manageRepoAccessLabel ? (
-            <Button
-              variant="outline"
-              onPress={() => {
-                void (async () => {
-                  if (platform === 'github') {
-                    try {
-                      const { token } = await trpcClient.githubApps.mintInstallState.mutate({
-                        organizationId: orgScope ?? undefined,
-                        returnTo: '/cloud/sessions',
-                      });
-                      await openExternalUrl(
-                        getGitHubIntegrationUrl(WEB_BASE_URL, orgScope, token),
-                        { label: t('codeReviewer.repos.repositoryAccess') }
-                      );
-                    } catch (error) {
-                      // A non-multi-installation organization that already has
-                      // an active GitHub App connection rejects the mint, so a
-                      // pre-minted token cannot exist. The settings page still
-                      // works without one: it mints its own state for the
-                      // signed-in web user.
-                      const code = readTrpcErrorField(error, 'code');
-                      if (code === 'FORBIDDEN' && orgScope) {
-                        await openExternalUrl(getGitHubIntegrationUrl(WEB_BASE_URL, orgScope), {
-                          label: t('codeReviewer.repos.repositoryAccess'),
-                        });
-                        return;
-                      }
-                      toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
-                    }
-                  } else if (platform === 'gitlab') {
-                    await openExternalUrl(getGitLabIntegrationUrl(WEB_BASE_URL, orgScope), {
-                      label: t('codeReviewer.repos.repositoryAccess'),
-                    });
-                  }
-                })();
-              }}
-            >
+          manageAccess ? (
+            <Button className={STATE_ACTION_CLASS} variant="outline" onPress={manageAccess}>
               <Text>{t('codeReviewer.repos.manageAccess')}</Text>
             </Button>
           ) : undefined
@@ -202,13 +238,22 @@ export default function ReposRoute() {
     );
   }
 
+  const showRepositoryFooter =
+    !reposLoading && !reposError && !bitbucketNotReady && repoRows.length > 0;
+
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('common.repositories')} />
       {fullBodyState ? (
         repoState
       ) : (
-        <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName="px-6 pt-4"
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={refreshRepositories} />
+          }
+        >
           {capabilities.selectionModePicker && (
             <RadioGroup label={t('common.repositories')}>
               {(['all', 'selected'] as const).map(option => (
@@ -256,6 +301,15 @@ export default function ReposRoute() {
                   }}
                 />
               ))}
+
+              {showRepositoryFooter && (
+                <RepositorySyncFooter
+                  syncedLabel={syncedLabel}
+                  refreshing={refreshing}
+                  onRefresh={refreshRepositories}
+                  manageAccess={manageAccess}
+                />
+              )}
             </View>
           )}
         </TabScreenScrollView>

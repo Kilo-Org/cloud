@@ -15,7 +15,7 @@ import { TodoQuickAdd } from '@/components/todos/todo-quick-add';
 import { useStartTodo } from '@/components/todos/use-start-todo';
 import { useTodoListDefaultsSummary } from '@/components/todos/use-todo-list-defaults-summary';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
-import { ChevronDown, ChevronRight, Settings2 } from '@/components/ui/icons';
+import { ChevronDown, Settings2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
@@ -26,6 +26,7 @@ import {
 } from '@/lib/hooks/use-todos';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
+import { selectTodoQueryErrorView, type TodoQueryErrorView } from '@/lib/todos/todo-query-error';
 import { todoItemPath, todoListSettingsPath } from '@/lib/todos/todo-routes';
 import { type TodoItem, type TodoList } from '@/lib/todos/todo-types';
 
@@ -57,7 +58,7 @@ function ListDefaultsLine({ list, onPress }: Readonly<{ list: TodoList; onPress:
       className="mx-4 mb-1 min-h-11 flex-row items-center gap-2 py-2 active:opacity-70"
     >
       <Settings2 size={16} color={colors.mutedForeground} />
-      <Text className="min-w-0 flex-1 text-sm leading-5 text-ink2">
+      <Text className="min-w-0 flex-1 text-sm leading-[1.25rem] text-ink2">
         {summary ?? t('todos.list.setDefaults')}
       </Text>
       <DirectionalChevronRight size={16} color={colors.mutedForeground} />
@@ -148,11 +149,15 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
   if (items.isPending || (lists.isPending && !list)) {
     body = <TodoRowsSkeleton />;
   } else if (items.isError || notFound) {
+    // A list the caller's collection no longer names is missing, not denied.
+    const errorView: TodoQueryErrorView = notFound
+      ? { variant: 'not-found', showRetry: false }
+      : selectTodoQueryErrorView(items.error);
     body = (
       <QueryError
-        variant={notFound || items.error?.data?.code === 'NOT_FOUND' ? 'not-found' : 'server'}
+        variant={errorView.variant}
         placement="top"
-        onRetry={notFound ? undefined : () => void items.refetch()}
+        onRetry={errorView.showRetry ? () => void items.refetch() : undefined}
         isRetrying={items.isFetching}
       />
     );
@@ -160,8 +165,8 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
     body = (
       <>
         <TodoQuickAdd
-          onAdd={todoTitle => {
-            create.mutate({ listId, title: todoTitle });
+          onAdd={async todoTitle => {
+            await create.mutateAsync({ listId, title: todoTitle });
           }}
         />
         {openItems.length === 0 && doneItems.length === 0 ? (
@@ -208,7 +213,7 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
             {showCompleted ? (
               <ChevronDown size={16} color={colors.mutedForeground} />
             ) : (
-              <ChevronRight size={16} color={colors.mutedForeground} />
+              <DirectionalChevronRight size={16} color={colors.mutedForeground} />
             )}
             <Text variant="eyebrow">{t('todos.list.completed', { count: doneItems.length })}</Text>
           </Pressable>
@@ -236,12 +241,16 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={title}
+        // The list name is user prose, not a UI label, so it keeps a second
+        // line for a natural break; the shared one-line default only suits
+        // fixed labels.
+        titleNumberOfLines={2}
         reserveTitleSpace
         backFallback={LISTS_HREF}
         {...(list
           ? {
               onTitlePress: openSettings,
-              onTitlePressAccessibilityLabel: t('todos.listSettings.title'),
+              onTitlePressAccessibilityHint: t('todos.listSettings.title'),
             }
           : {})}
       />

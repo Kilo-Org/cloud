@@ -18,6 +18,7 @@ const CURRENT_KILO_PASS_TIER_19_MONTHLY_PRICE_ID =
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import type * as creditsModule from '@kilocode/web-shared/lib/credits';
 import type * as organizationBillingModule from '@/lib/organizations/organization-billing';
+import type * as bouncerClientModule from '@kilocode/web-shared/lib/bouncer/client';
 
 // Allow spying on processTopUp / processTopupForOrganization inside stripe.ts.
 // The mock delegates to the real implementation by default so existing tests are unaffected.
@@ -53,6 +54,25 @@ jest.mock(
   }),
   { virtual: true }
 );
+// The webhook's inline bouncer steps are stubbed at the HTTP boundary: delivery fails by default
+// (the row stays queued) and the charge gate answers "unavailable" (fail open). Tests that state an
+// outcome override these.
+jest.mock('@kilocode/web-shared/lib/bouncer/client', () => {
+  const actual = jest.requireActual<typeof bouncerClientModule>(
+    '@kilocode/web-shared/lib/bouncer/client'
+  );
+  return {
+    __esModule: true,
+    ...actual,
+    deliverCreditEventWireBody: jest.fn(async () => ({
+      delivered: false,
+      permanent: false,
+      status: null,
+      error: 'TypeError',
+    })),
+    chargeDecide: jest.fn(async () => null),
+  };
+});
 
 import {
   type StripeTopupMetadata,
@@ -65,6 +85,7 @@ import {
   getStripeSeatsCheckoutUrl,
 } from '@/lib/stripe';
 import { client } from '@kilocode/web-shared/lib/stripe-client';
+import { chargeDecide, deliverCreditEventWireBody } from '@kilocode/web-shared/lib/bouncer/client';
 import * as kiloPassOrgStripe from '@/lib/kilo-pass-org/stripe-adapter';
 import {
   type ServiceFeeAssessmentRecord,
@@ -2890,6 +2911,55 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
     listCheckoutSessionsSpy?.mockRestore();
   });
 
+  test.each([
+    { organization: false, terms: undefined },
+    { organization: false, terms: 'legacy' },
+    { organization: false, terms: 'one_year' },
+    { organization: true, terms: undefined },
+    { organization: true, terms: 'legacy' },
+    { organization: true, terms: 'one_year' },
+  ])(
+    'settles captured $terms paid policy for organization=$organization',
+    async ({ organization, terms }) => {
+      const user = await insertTestUser();
+      const org = organization
+        ? await createOrganization(`Org-policy-${crypto.randomUUID()}`, user.id)
+        : null;
+      const chargeId = `ch_policy_${crypto.randomUUID()}`;
+      const paymentIntentId = `pi_policy_${crypto.randomUUID()}`;
+      const charge = {
+        ...makeCharge({ id: chargeId, amount: 10_500, customer: user.stripe_customer_id }),
+        created: new Date('2028-02-29T09:00:00.000Z').getTime() / 1000,
+      };
+      await handleSuccessfulChargeWithPayment(
+        charge,
+        makePaymentIntent({
+          id: paymentIntentId,
+          metadata: withTopUpPrincipalMetadata(
+            {
+              type: 'stripe-checkout-topup',
+              kiloUserId: user.id,
+              ...(org ? { organizationId: org.id } : {}),
+              ...(terms ? { paid_credit_policy: terms } : {}),
+            },
+            10_000
+          ),
+        })
+      );
+      const credit = await db.query.credit_transactions.findFirst({
+        where: eq(credit_transactions.stripe_payment_id, org ? paymentIntentId : chargeId),
+      });
+      expect(credit).toMatchObject({
+        amount_microdollars: 100_000_000,
+        credit_source: 'stripe',
+        paid_credit_policy: terms === 'one_year' ? 'one_year' : 'legacy',
+      });
+      expect(credit?.expiry_date ? new Date(credit.expiry_date).toISOString() : null).toBe(
+        terms === 'one_year' ? '2029-02-28T09:00:00.000Z' : null
+      );
+    }
+  );
+
   test('both organizationId and kiloUserId: processes organization top-up; uses kiloUserId', async () => {
     const user = await insertTestUser();
     const org = await createOrganization('Org-Both', user.id);
@@ -2965,7 +3035,16 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
       org.id,
       amountInCents,
       { type: 'stripe', stripe_payment_id: paymentIntentId },
-      { isAutoTopUp: true, serviceFeeCents: 0, grossPaidCents: amountInCents }
+      {
+        isAutoTopUp: true,
+        serviceFeeCents: 0,
+        grossPaidCents: amountInCents,
+        paidCredit: {
+          source: 'stripe',
+          terms: 'legacy',
+          purchasedAt: new Date(SERVICE_FEE_ACTIVATION_UNIX_SECONDS * 1000),
+        },
+      }
     );
   });
 
@@ -3444,7 +3523,16 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
         org.id,
         5000,
         { type: 'stripe', stripe_payment_id: orgChargeId },
-        { isAutoTopUp: true, serviceFeeCents: 0, grossPaidCents: 5000 }
+        {
+          isAutoTopUp: true,
+          serviceFeeCents: 0,
+          grossPaidCents: 5000,
+          paidCredit: {
+            source: 'stripe',
+            terms: 'legacy',
+            purchasedAt: new Date((SERVICE_FEE_ACTIVATION_UNIX_SECONDS - 1) * 1000),
+          },
+        }
       );
     } finally {
       processOrgTopUpMock.mockRestore();
@@ -3487,7 +3575,16 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
         org.id,
         principalMinor,
         { type: 'stripe', stripe_payment_id: paymentIntentId },
-        { isAutoTopUp: false, serviceFeeCents: 0, grossPaidCents: grossPaidMinor }
+        {
+          isAutoTopUp: false,
+          serviceFeeCents: 0,
+          grossPaidCents: grossPaidMinor,
+          paidCredit: {
+            source: 'stripe',
+            terms: 'legacy',
+            purchasedAt: new Date(SERVICE_FEE_ACTIVATION_UNIX_SECONDS * 1000),
+          },
+        }
       );
     } finally {
       processOrgTopUpMock.mockRestore();
@@ -3529,7 +3626,16 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
         expect.objectContaining({ id: user.id }),
         principalMinor,
         { type: 'stripe', stripe_payment_id: invoiceChargeId },
-        { isAutoTopUp: true, serviceFeeCents: 0, grossPaidCents: grossPaidMinor }
+        {
+          isAutoTopUp: true,
+          serviceFeeCents: 0,
+          grossPaidCents: grossPaidMinor,
+          paidCredit: {
+            source: 'stripe',
+            terms: 'legacy',
+            purchasedAt: new Date(SERVICE_FEE_ACTIVATION_UNIX_SECONDS * 1000),
+          },
+        }
       );
     } finally {
       processTopUpMock.mockRestore();
@@ -5280,10 +5386,10 @@ describe('processStripePaymentEventHook bouncer credit events', () => {
   });
 
   test('a bouncer failure does not fail the webhook', async () => {
-    // Stripe retries a failed webhook, and later work in the delivery would be skipped. The
-    // webhook performs no bouncer HTTP call: it commits the event to the durable outbox, so a
+    // Stripe retries a failed webhook, and later work in the delivery would be skipped. The event
+    // is committed to the durable outbox first, and the inline delivery is best-effort, so a
     // bouncer outage can only delay delivery (the cron drainer retries) and never fails the
-    // webhook. The row is still `pending` here precisely because no inline delivery happened.
+    // webhook. The row is back to `pending` here after the failed inline attempt.
     const charge = sampleStripeCharge({
       id: 'ch_bouncer_down',
       customer: testUser.stripe_customer_id,
@@ -5531,5 +5637,164 @@ describe('getStripeSeatsCheckoutUrl bouncer charge.attempted', () => {
       })
     );
     createSpy.mockRestore();
+  });
+});
+
+describe('processStripePaymentEventHook bouncer decline gate', () => {
+  let testUser: User;
+  const mockDeliver = jest.mocked(deliverCreditEventWireBody);
+  const mockChargeDecide = jest.mocked(chargeDecide);
+  let listSpy: jest.SpiedFunction<typeof client.checkout.sessions.list>;
+  let expireSpy: jest.SpiedFunction<typeof client.checkout.sessions.expire>;
+
+  const failedPaymentIntentEvent = (chargeId: string, paymentIntentId: string) =>
+    ({
+      ...baseStripeEvent(),
+      id: `evt_gate_${paymentIntentId}`,
+      type: 'payment_intent.payment_failed',
+      data: {
+        object: {
+          id: paymentIntentId,
+          customer: testUser.stripe_customer_id,
+          latest_charge: chargeId,
+          metadata: { kiloUserId: testUser.id },
+        },
+      },
+    }) as unknown as Stripe.Event;
+
+  beforeEach(async () => {
+    jest.restoreAllMocks();
+    await cleanupDbForTest();
+    testUser = await insertTestUser();
+    mockDeliver.mockReset();
+    mockDeliver.mockResolvedValue({ delivered: true, status: 204 });
+    mockChargeDecide.mockReset();
+    jest
+      .spyOn(client.charges, 'retrieve')
+      .mockImplementation(async chargeId =>
+        sampleStripeChargeResponse(sampleStripeCharge({ id: String(chargeId) }))
+      );
+    listSpy = jest.spyOn(client.checkout.sessions, 'list').mockResolvedValue({
+      object: 'list',
+      data: [{ id: 'cs_gate_open', status: 'open' }],
+      has_more: false,
+      url: '/v1/checkout/sessions',
+    } as unknown as Stripe.Response<Stripe.ApiList<Stripe.Checkout.Session>>);
+    expireSpy = jest.spyOn(client.checkout.sessions, 'expire').mockResolvedValue({
+      id: 'cs_gate_open',
+      object: 'checkout.session',
+      status: 'expired',
+    } as unknown as Stripe.Response<Stripe.Checkout.Session>);
+  });
+
+  test('an enforced failure verdict expires the open checkout session of the customer', async () => {
+    mockChargeDecide.mockResolvedValue({
+      enforced: true,
+      code: 'charge_blocked',
+      flags: [{ name: 'card_testing', decision: 'block', enforced: true, until: null }],
+    });
+
+    await processStripePaymentEventHook(failedPaymentIntentEvent('ch_gate_stop', 'pi_gate_stop'));
+
+    expect(mockChargeDecide).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stage: 'failure',
+        accountId: `user:${testUser.id}`,
+        requestId: 'ch_gate_stop',
+      })
+    );
+    expect(listSpy).toHaveBeenCalledWith(
+      { customer: testUser.stripe_customer_id, status: 'open', limit: 10 },
+      expect.objectContaining({ timeout: 5_000 })
+    );
+    expect(expireSpy).toHaveBeenCalledWith(
+      'cs_gate_open',
+      expect.objectContaining({ timeout: 5_000 })
+    );
+  });
+
+  test('an enforced decline expires an open subscription-mode session', async () => {
+    mockChargeDecide.mockResolvedValue({ enforced: true, code: 'charge_blocked', flags: [] });
+    listSpy.mockResolvedValue({
+      object: 'list',
+      // A `mode: 'subscription'` session carries no payment intent; only the customer finds it.
+      data: [
+        { id: 'cs_gate_kilo_pass', mode: 'subscription', status: 'open', payment_intent: null },
+        { id: 'cs_gate_closed_pass', mode: 'subscription', status: 'complete' },
+      ],
+      has_more: false,
+      url: '/v1/checkout/sessions',
+    } as unknown as Stripe.Response<Stripe.ApiList<Stripe.Checkout.Session>>);
+
+    await processStripePaymentEventHook(failedPaymentIntentEvent('ch_gate_sub', 'pi_gate_sub'));
+
+    expect(listSpy).toHaveBeenCalledWith(
+      { customer: testUser.stripe_customer_id, status: 'open', limit: 10 },
+      expect.objectContaining({ timeout: 5_000 })
+    );
+    expect(expireSpy).toHaveBeenCalledTimes(1);
+    expect(expireSpy).toHaveBeenCalledWith(
+      'cs_gate_kilo_pass',
+      expect.objectContaining({ timeout: 5_000 })
+    );
+  });
+
+  test('one session that fails to expire does not keep the other open sessions alive', async () => {
+    mockChargeDecide.mockResolvedValue({ enforced: true, code: 'charge_blocked', flags: [] });
+    listSpy.mockResolvedValue({
+      object: 'list',
+      data: [
+        { id: 'cs_gate_closed_meanwhile', status: 'open' },
+        { id: 'cs_gate_second', status: 'open' },
+      ],
+      has_more: false,
+      url: '/v1/checkout/sessions',
+    } as unknown as Stripe.Response<Stripe.ApiList<Stripe.Checkout.Session>>);
+    expireSpy.mockImplementation(async id => {
+      if (id === 'cs_gate_closed_meanwhile') throw new Error('session is not open');
+      return {
+        id,
+        object: 'checkout.session',
+        status: 'expired',
+      } as unknown as Stripe.Response<Stripe.Checkout.Session>;
+    });
+
+    await processStripePaymentEventHook(failedPaymentIntentEvent('ch_gate_two', 'pi_gate_two'));
+
+    expect(expireSpy).toHaveBeenCalledWith(
+      'cs_gate_second',
+      expect.objectContaining({ timeout: 5_000 })
+    );
+  });
+
+  test('a failed immediate delivery leaves the open checkout session alone', async () => {
+    mockDeliver.mockResolvedValue({
+      delivered: false,
+      permanent: false,
+      status: 503,
+      error: 'http_503',
+    });
+    mockChargeDecide.mockResolvedValue({
+      enforced: true,
+      code: 'charge_blocked',
+      flags: [],
+    });
+
+    await processStripePaymentEventHook(failedPaymentIntentEvent('ch_gate_retry', 'pi_gate_retry'));
+
+    expect(mockChargeDecide).not.toHaveBeenCalled();
+    expect(expireSpy).not.toHaveBeenCalled();
+    const rows = await db.select().from(bouncer_credit_event_outbox);
+    expect(rows[0]?.status).toBe('pending');
+  });
+
+  test('a verdict that is not enforced leaves the open checkout session alone', async () => {
+    mockChargeDecide.mockResolvedValue({ enforced: false, flags: [] });
+
+    await processStripePaymentEventHook(failedPaymentIntentEvent('ch_gate_allow', 'pi_gate_allow'));
+
+    expect(mockChargeDecide).toHaveBeenCalledTimes(1);
+    expect(listSpy).not.toHaveBeenCalled();
+    expect(expireSpy).not.toHaveBeenCalled();
   });
 });

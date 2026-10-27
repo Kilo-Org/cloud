@@ -2,9 +2,10 @@ import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { BriefingScorecard } from './briefing-card';
+import { BriefingFilterControls } from './briefing-filter-controls';
 import { BriefingPeriodLabel } from './briefing-period-label';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -19,6 +20,7 @@ import {
 } from '@/lib/agent-briefing';
 import { briefingAccessDenied } from '@/lib/agent-briefing-state';
 import { useBriefingListFilters } from '@/lib/hooks/use-briefing-list-filters';
+import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useTRPC } from '@/lib/trpc';
@@ -53,6 +55,7 @@ export function BriefingListScreen() {
     enabled: access.enabled,
     refetchInterval: history ? false : 30_000,
   });
+  const [refreshing, onRefresh] = useManualRefresh(query.refetch, t('common.couldNotRefresh'));
   useBriefingInvalidation(query.error);
   const reports = briefingAccessDenied(query.error)
     ? []
@@ -108,64 +111,13 @@ export function BriefingListScreen() {
         >
           <Text>{t('agentBriefing.create')}</Text>
         </Button>
-        <View className="flex-row flex-wrap gap-2">
-          <Button
-            variant={!history ? 'secondary' : 'ghost'}
-            size="sm"
-            onPress={() => {
-              setHistory(false);
-            }}
-          >
-            <Text>{t('agentBriefing.available')}</Text>
-          </Button>
-          <Button
-            variant={history ? 'secondary' : 'ghost'}
-            size="sm"
-            onPress={() => {
-              setHistory(true);
-            }}
-          >
-            <Text>{t('agentBriefing.history')}</Text>
-          </Button>
-        </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerClassName="gap-2"
-        >
-          <Button
-            variant={organizationId === undefined ? 'secondary' : 'ghost'}
-            size="sm"
-            onPress={() => {
-              setOrganizationId(undefined);
-            }}
-          >
-            <Text>{t('common.all')}</Text>
-          </Button>
-          <Button
-            variant={organizationId === null ? 'secondary' : 'ghost'}
-            size="sm"
-            onPress={() => {
-              setOrganizationId(null);
-            }}
-          >
-            <Text>{t('common.personal')}</Text>
-          </Button>
-          {memberships.data
-            ?.filter(org => access.canRead(org.organizationId))
-            .map(org => (
-              <Button
-                key={org.organizationId}
-                variant={organizationId === org.organizationId ? 'secondary' : 'ghost'}
-                size="sm"
-                onPress={() => {
-                  setOrganizationId(org.organizationId);
-                }}
-              >
-                <Text>{org.organizationName}</Text>
-              </Button>
-            ))}
-        </ScrollView>
+        <BriefingFilterControls
+          history={history}
+          onSelectHistory={setHistory}
+          organizationId={organizationId}
+          organizations={memberships.data?.filter(org => access.canRead(org.organizationId)) ?? []}
+          onSelectOrganization={setOrganizationId}
+        />
         <Text className="text-xs text-muted-foreground">
           {t(history ? 'agentBriefing.historyHint' : 'agentBriefing.allContexts')}
         </Text>
@@ -193,10 +145,8 @@ export function BriefingListScreen() {
         <FlashList
           data={reports}
           keyExtractor={report => report.id}
-          refreshing={query.isRefetching}
-          onRefresh={() => {
-            void query.refetch();
-          }}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
           onEndReached={() => {
             // Once the next page has failed, auto-loading re-fires on every
             // content-size change (the footer grows/shrinks as the fetch flips

@@ -35,6 +35,7 @@ import {
   questionRepliedDataSchema,
   questionRejectedDataSchema,
   permissionAskedDataSchema,
+  permissionAskedIdentitySchema,
   permissionRepliedDataSchema,
   suggestionShownDataSchema,
   suggestionAcceptedDataSchema,
@@ -101,6 +102,16 @@ export type ServiceEvent =
       patterns: string[];
       metadata: Record<string, unknown>;
       always: string[];
+    }
+  | {
+      /**
+       * A permission request is waiting that this app cannot read: its scope
+       * did not parse, so no consent card can be offered for it. The request is
+       * still pending for the CLI, so the user is told it exists rather than
+       * seeing it vanish.
+       */
+      type: 'permission.unreadable';
+      requestId: string;
     }
   | { type: 'permission.replied'; requestId: string }
   | {
@@ -468,15 +479,23 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
 
     case 'permission.asked': {
       const r = permissionAskedDataSchema.safeParse(data);
-      if (!r.success) return null;
-      return {
-        type: 'permission.asked',
-        requestId: r.data.id,
-        permission: r.data.permission,
-        patterns: r.data.patterns,
-        metadata: r.data.metadata,
-        always: r.data.always,
-      };
+      if (r.success) {
+        return {
+          type: 'permission.asked',
+          requestId: r.data.id,
+          permission: r.data.permission,
+          patterns: r.data.patterns,
+          metadata: r.data.metadata,
+          always: r.data.always,
+        };
+      }
+      // A request whose scope does not parse cannot be offered as a decision:
+      // forwarding an empty scope would describe settings the app never read.
+      // It is not dropped either, because the CLI keeps waiting for an answer
+      // the app would otherwise never mention.
+      const identity = permissionAskedIdentitySchema.safeParse(data);
+      if (!identity.success) return null;
+      return { type: 'permission.unreadable', requestId: identity.data.id };
     }
 
     case 'permission.replied': {
@@ -733,9 +752,10 @@ export function normalize(raw: CloudAgentEvent): NormalizedEvent | null {
   if (raw.streamEventType === 'connected' && event?.type === 'connected') {
     return { ...event, cloudSessionId: raw.sessionId };
   }
-  return event?.type === 'autocommit_completed' &&
-    event.commitHash &&
-    /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(event.commitHash)
+  // Only a completion that carries a storable commit hash gets the envelope
+  // timestamp the commit record is anchored to. The schema already dropped a
+  // hash that could not be stored, so its presence is the whole test.
+  return event?.type === 'autocommit_completed' && event.commitHash !== undefined
     ? { ...event, timestamp: raw.timestamp }
     : event;
 }

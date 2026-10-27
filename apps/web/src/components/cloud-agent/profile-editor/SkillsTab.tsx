@@ -18,9 +18,10 @@ type Props = {
   profileId: string;
   organizationId: string | undefined;
   skills: ProfileSkill[];
+  readOnly?: boolean;
 };
 
-export function SkillsTab({ profileId, organizationId, skills }: Props) {
+export function SkillsTab({ profileId, organizationId, skills, readOnly = false }: Props) {
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [dragDepth, setDragDepth] = useState(0);
@@ -84,17 +85,17 @@ export function SkillsTab({ profileId, organizationId, skills }: Props) {
         isDragging && 'border-primary bg-primary/5 border-2 border-dashed'
       )}
       onDragEnter={event => {
-        if (!dragHasZip(event)) return;
+        if (readOnly || !dragHasZip(event)) return;
         event.preventDefault();
         setDragDepth(d => d + 1);
       }}
       onDragLeave={() => setDragDepth(d => Math.max(0, d - 1))}
       onDragOver={event => {
-        if (!dragHasZip(event)) return;
+        if (readOnly || !dragHasZip(event)) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = 'copy';
       }}
-      onDrop={handleDrop}
+      onDrop={readOnly ? undefined : handleDrop}
     >
       {skills.map(skill =>
         editingId === skill.id ? (
@@ -112,6 +113,7 @@ export function SkillsTab({ profileId, organizationId, skills }: Props) {
             skill={skill}
             profileId={profileId}
             organizationId={organizationId}
+            readOnly={readOnly}
             onEdit={() => {
               setEditingId(skill.id);
               setIsAdding(false);
@@ -128,18 +130,20 @@ export function SkillsTab({ profileId, organizationId, skills }: Props) {
           onDone={() => setIsAdding(false)}
         />
       ) : (
-        <Button
-          variant="outline"
-          className="h-11 w-full border-dashed"
-          onClick={() => {
-            setIsAdding(true);
-            setEditingId(null);
-          }}
-          disabled={importing}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add skill manually (or drop a .zip)
-        </Button>
+        !readOnly && (
+          <Button
+            variant="outline"
+            className="h-11 w-full border-dashed"
+            onClick={() => {
+              setIsAdding(true);
+              setEditingId(null);
+            }}
+            disabled={importing}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add skill manually (or drop a .zip)
+          </Button>
+        )
       )}
 
       <p className="text-muted-foreground text-center text-xs">
@@ -200,11 +204,13 @@ function SkillRow({
   skill,
   profileId,
   organizationId,
+  readOnly = false,
   onEdit,
 }: {
   skill: ProfileSkill;
   profileId: string;
   organizationId: string | undefined;
+  readOnly?: boolean;
   onEdit: () => void;
 }) {
   const { deleteSkill } = useProfileMutations({ organizationId });
@@ -237,35 +243,39 @@ function SkillRow({
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7"
-            onClick={onEdit}
-            disabled={deleting}
-            aria-label="Edit skill"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </Button>
-          <InlineDeleteConfirmation
-            onDelete={async () => {
-              setDeleting(true);
-              try {
-                await deleteSkill.mutateAsync({
-                  profileId,
-                  organizationId,
-                  skillId: skill.id,
-                });
-                toast.success(`Skill "${skill.name}" deleted`);
-              } catch (error) {
-                console.error('Failed to delete skill:', error);
-                toast.error('Failed to delete skill');
-              } finally {
-                setDeleting(false);
-              }
-            }}
-            isLoading={deleting}
-          />
+          {!readOnly && (
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7"
+                onClick={onEdit}
+                disabled={deleting}
+                aria-label="Edit skill"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+              <InlineDeleteConfirmation
+                onDelete={async () => {
+                  setDeleting(true);
+                  try {
+                    await deleteSkill.mutateAsync({
+                      profileId,
+                      organizationId,
+                      skillId: skill.id,
+                    });
+                    toast.success(`Skill "${skill.name}" deleted`);
+                  } catch (error) {
+                    console.error('Failed to delete skill:', error);
+                    toast.error('Failed to delete skill');
+                  } finally {
+                    setDeleting(false);
+                  }
+                }}
+                isLoading={deleting}
+              />
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
+import { PREPARATION_OUTPUT_MAX_LENGTH, PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
 import { sortRemoteModelCatalogProviders } from './remote-model-order';
 import type { KiloSessionId, SlashCommandCatalogStatus } from './types';
 
@@ -375,6 +376,31 @@ export const REMOTE_COMMAND_MAX_STRING_LENGTH = 2_000;
 export const REMOTE_COMMAND_MAX_HINTS = 32;
 export const REMOTE_COMMAND_CATALOG_MAX_SERIALIZED_BYTES = 512 * 1024;
 
+export const PREPARATION_MAX_MESSAGE_LENGTH = 16_384;
+export const PREPARATION_MAX_DETAIL_LENGTH = 16_384;
+export const PREPARATION_MAX_SETUP_LOG_ENTRIES = 100;
+export const PREPARATION_MAX_ATTEMPTS = 10;
+export const PREPARATION_MAX_STEPS = 100;
+
+/** Most message IDs a `session.queue.changed` snapshot may carry. */
+export const SESSION_QUEUE_MAX_IDS = 1_000;
+/** Most questions a `question.asked` event may carry. */
+export const SESSION_QUESTION_MAX_QUESTIONS = 32;
+
+/**
+ * A snapshot's retained tail carries the same byte budget the client applies
+ * when it trims step output. The character maximum is a cheap first pass: a
+ * string can never encode to fewer bytes than it has characters, so anything
+ * rejected there would fail the byte check too.
+ */
+const preparationOutputTailSchema = z
+  .string()
+  .max(PREPARATION_OUTPUT_TAIL_MAX_BYTES)
+  .refine(
+    value => new TextEncoder().encode(value).byteLength <= PREPARATION_OUTPUT_TAIL_MAX_BYTES,
+    { message: `Output tail cannot exceed ${PREPARATION_OUTPUT_TAIL_MAX_BYTES} UTF-8 bytes` }
+  );
+
 const remoteCommandStringSchema = z.string().max(REMOTE_COMMAND_MAX_STRING_LENGTH);
 const remoteSlashCommandInfoSchema = z
   .object({
@@ -679,13 +705,66 @@ export const kilocodePayloadSchema = z.object({
 });
 export type KilocodePayload = z.infer<typeof kilocodePayloadSchema>;
 
-export const messageUpdatedDataSchema = z.object({
-  info: z.object({ id: z.string(), sessionID: z.string() }).passthrough(),
-});
+/**
+ * The time a message carries on the wire: `created` on every message, and the
+ * assistant's `completed` once the turn finishes. Both the transcript's
+ * timestamp and the streaming check read it, so a payload without a readable
+ * `created` has nothing to render.
+ */
+const wireMessageTimeSchema = z
+  .object({ created: z.number(), completed: z.number().optional() })
+  .passthrough();
+
+/**
+ * The message fields this SDK reads, at the single validation boundary: the
+ * identity, the `role` consumers branch on, and the `time` they render. The
+ * generated `Message` union declares all three, but only this schema makes them
+ * true for a payload that arrives from the wire or a replay.
+ *
+ * Mirrored for the history/replay shape in `sessionSnapshotSchema`.
+ */
+const wireMessageInfoSchema = z
+  .object({ id: z.string(), sessionID: z.string(), role: z.string().min(1) })
+  .passthrough()
+  .refine(info => wireMessageTimeSchema.safeParse(info['time']).success, {
+    message: 'a message requires a time with a numeric created',
+    path: ['time'],
+  });
+
+export const messageUpdatedDataSchema = z.object({ info: wireMessageInfoSchema });
 export type MessageUpdatedData = z.infer<typeof messageUpdatedDataSchema>;
 
+/**
+ * The shape of a part as it arrives from the wire or a replay, before the SDK
+ * reads anything off it. Validates the part's identity for every type, and for
+ * a `tool` part additionally requires a `state` object carrying a non-empty
+ * string `status` — the one field every reader of a tool part needs
+ * (`part-utils.ts` ranks `state.status`, the transcript renders the completed
+ * output). A part without a usable state has nothing to show, so it is rejected
+ * at this boundary.
+ *
+ * The state is validated for its identity only, not its contents: attachments
+ * stay unchecked here (`part-utils.ts` filters the non-conforming entries at the
+ * chat-processor seam) because dropping the whole part over one bad attachment
+ * entry would lose a tool call the transcript can still render.
+ *
+ * Mirrored for the history/replay shape in `sessionSnapshotSchema`.
+ */
+const wireMessagePartSchema = z
+  .object({ id: z.string(), sessionID: z.string(), messageID: z.string() })
+  .passthrough()
+  .refine(
+    part =>
+      part['type'] !== 'tool' ||
+      z
+        .object({ status: z.string().min(1) })
+        .passthrough()
+        .safeParse(part['state']).success,
+    { message: 'a tool part requires a state with a non-empty string status', path: ['state'] }
+  );
+
 export const messagePartUpdatedDataSchema = z.object({
-  part: z.object({ id: z.string(), sessionID: z.string(), messageID: z.string() }).passthrough(),
+  part: wireMessagePartSchema,
   time: z.number().optional(),
 });
 export type MessagePartUpdatedData = z.infer<typeof messagePartUpdatedDataSchema>;
@@ -759,7 +838,7 @@ export type SessionTurnCloseData = z.infer<typeof sessionTurnCloseDataSchema>;
 export const sessionQueueChangedDataSchema = z
   .object({
     sessionID: z.string(),
-    queued: z.array(z.string()),
+    queued: z.array(z.string()).max(SESSION_QUEUE_MAX_IDS),
   })
   .passthrough();
 export type SessionQueueChangedData = z.infer<typeof sessionQueueChangedDataSchema>;
@@ -804,17 +883,22 @@ function toQuestionInfo(parsed: z.infer<typeof questionInfoSchema>): QuestionInf
  * run of entries that match `QuestionInfo` and stop at the first entry that
  * does not, so a rendered question keeps its CLI index instead of every later
  * answer sliding onto the wrong question. No usable entry means the payload
- * carries no questions the client can render.
+ * carries no questions the client can render. A list longer than
+ * `SESSION_QUESTION_MAX_QUESTIONS` fails the field, which the caller catches to
+ * `undefined`.
  */
-const questionListSchema = z.array(z.unknown()).transform((entries): QuestionInfo[] | undefined => {
-  const questions: QuestionInfo[] = [];
-  for (const entry of entries) {
-    const parsed = questionInfoSchema.safeParse(entry);
-    if (!parsed.success) break;
-    questions.push(toQuestionInfo(parsed.data));
-  }
-  return questions.length > 0 ? questions : entries.length > 0 ? undefined : [];
-});
+const questionListSchema = z
+  .array(z.unknown())
+  .max(SESSION_QUESTION_MAX_QUESTIONS)
+  .transform((entries): QuestionInfo[] | undefined => {
+    const questions: QuestionInfo[] = [];
+    for (const entry of entries) {
+      const parsed = questionInfoSchema.safeParse(entry);
+      if (!parsed.success) break;
+      questions.push(toQuestionInfo(parsed.data));
+    }
+    return questions.length > 0 ? questions : entries.length > 0 ? undefined : [];
+  });
 
 export const questionAskedDataSchema = z.object({
   id: z.string(),
@@ -833,15 +917,37 @@ export const questionRejectedDataSchema = z.object({
 });
 export type QuestionRejectedData = z.infer<typeof questionRejectedDataSchema>;
 
+/**
+ * A permission request as it arrives from the wire or a pending-interaction
+ * replay. `id` and `permission` identify the request; `patterns`, `metadata`
+ * and `always` are the scope the consent surface shows before an allow
+ * decision, so each is required and kept only when it parses. A request whose
+ * scope is not the declared shape fails here and is never forwarded with an
+ * empty or partial scope — an approval must never be offered for a scope the
+ * app could not read.
+ */
 export const permissionAskedDataSchema = z.object({
   id: z.string().min(1),
   permission: z.string(),
   tool: z.object({ callID: z.string() }).optional(),
-  patterns: z.array(z.string()).catch([]),
-  metadata: z.record(z.string(), z.unknown()).catch({}),
-  always: z.array(z.string()).catch([]),
+  patterns: z.array(z.string()),
+  metadata: z.record(z.string(), z.unknown()),
+  always: z.array(z.string()),
 });
 export type PermissionAskedData = z.infer<typeof permissionAskedDataSchema>;
+
+/**
+ * The part of a permission request that still identifies it when its scope does
+ * not parse. The consent surface cannot offer a decision for such a request,
+ * but the user must learn that one is waiting, so the event boundary forwards
+ * this identity instead of dropping the request silently. A payload with no
+ * readable `id` has nothing to key the notice to and no `permission.replied`
+ * that could clear it, so it is still dropped.
+ */
+export const permissionAskedIdentitySchema = z.object({
+  id: z.string().min(1),
+});
+export type PermissionAskedIdentity = z.infer<typeof permissionAskedIdentitySchema>;
 
 export const permissionRepliedDataSchema = z.object({
   requestID: z.string(),
@@ -910,12 +1016,12 @@ const preparationStepSchema = z.object({
   parentStepId: z.string().optional(),
   completedAt: z.number().optional(),
   revision: z.number(),
-  latestDetail: z.string().optional(),
+  latestDetail: z.string().max(PREPARATION_MAX_DETAIL_LENGTH).optional(),
   safeError: z.string().optional(),
   command: z.string().optional(),
   commandIndex: z.number().optional(),
   commandCount: z.number().optional(),
-  outputTail: z.string().optional(),
+  outputTail: preparationOutputTailSchema.optional(),
   outputTruncated: z.boolean().optional(),
   exitCode: z.number().optional(),
 });
@@ -933,7 +1039,7 @@ const preparationAttemptSchema = z.object({
 export const preparingDataSchema = z
   .object({
     step: z.string(),
-    message: z.string(),
+    message: z.string().max(PREPARATION_MAX_MESSAGE_LENGTH),
     branch: z.string().optional(),
     version: z.literal(2).optional(),
     attemptId: z.string().optional(),
@@ -961,8 +1067,8 @@ export const preparingDataSchema = z
     command: z.string().optional(),
     commandIndex: z.number().optional(),
     commandCount: z.number().optional(),
-    detail: z.string().optional(),
-    output: z.string().optional(),
+    detail: z.string().max(PREPARATION_MAX_DETAIL_LENGTH).optional(),
+    output: z.string().max(PREPARATION_OUTPUT_MAX_LENGTH).optional(),
     safeError: z.string().optional(),
     exitCode: z.number().optional(),
     attempt: preparationAttemptSchema.optional(),
@@ -980,7 +1086,13 @@ export type AutocommitStartedData = z.infer<typeof autocommitStartedDataSchema>;
 const commitPushStatusSchema = z.enum(['pushed', 'failed', 'not_attempted', 'unknown']);
 const maxCommitMessageBytes = 16 * 1024;
 
-export const sessionCommitDataSchema = z.object({
+/**
+ * The commit record, declared once. `sessionCommitDataSchema` is the strict
+ * record the SDK stores; `autocommitCompletedDataSchema` carries the same
+ * fields on the wire, so a new field reaches both paths instead of needing two
+ * synchronized declarations.
+ */
+const commitRecordShape = {
   commitHash: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/),
   commitMessage: z
     .string()
@@ -991,19 +1103,27 @@ export const sessionCommitDataSchema = z.object({
   committedAt: z.iso.datetime({ offset: true }),
   pushStatus: commitPushStatusSchema,
   commitMessageTruncated: z.literal(true).optional(),
-});
+};
+
+export const sessionCommitDataSchema = z.object(commitRecordShape);
 
 export const autocommitCompletedDataSchema = z.object({
-  messageId: z.string(),
+  messageId: commitRecordShape.messageId,
   success: z.boolean().catch(false),
   message: z.string().optional(),
   skipped: z.boolean().optional(),
-  commitHash: z.string().optional(),
-  commitMessage: z.string().optional(),
-  userMessageId: z.string().optional().catch(undefined),
-  committedAt: sessionCommitDataSchema.shape.committedAt.optional().catch(undefined),
-  pushStatus: commitPushStatusSchema.optional().catch(undefined),
-  commitMessageTruncated: z.boolean().optional().catch(undefined),
+  // The commit half of the event: every field in `commitRecordShape` is
+  // required on a stored record, so a completion that has no commit (skipped,
+  // failed, metadata unavailable) omits them. A value that could not be stored
+  // is dropped by `.catch` instead of failing the event — the completion notice
+  // and the commit count must not depend on metadata quality, and storage still
+  // decides with `sessionCommitDataSchema` from the same definitions.
+  commitHash: commitRecordShape.commitHash.optional().catch(undefined),
+  commitMessage: commitRecordShape.commitMessage.optional().catch(undefined),
+  userMessageId: commitRecordShape.userMessageId.optional().catch(undefined),
+  committedAt: commitRecordShape.committedAt.optional().catch(undefined),
+  pushStatus: commitRecordShape.pushStatus.optional().catch(undefined),
+  commitMessageTruncated: commitRecordShape.commitMessageTruncated.optional().catch(undefined),
 });
 export type AutocommitCompletedData = z.infer<typeof autocommitCompletedDataSchema>;
 
@@ -1029,7 +1149,7 @@ export const slashCommandInfoSchema = z.object({
   agent: z.string().optional(),
   model: z.string().optional(),
   source: z.enum(['command', 'mcp', 'skill']).optional(),
-  hints: z.array(z.string()).default([]),
+  hints: z.array(z.string()).max(REMOTE_COMMAND_MAX_HINTS).default([]),
   subtask: z.boolean().optional(),
 });
 export type SlashCommandInfo = z.infer<typeof slashCommandInfoSchema>;
@@ -1040,7 +1160,7 @@ export const slashCommandCatalogStatusSchema: z.ZodType<SlashCommandCatalogStatu
 });
 
 export const commandsAvailableDataSchema = z.object({
-  commands: z.array(slashCommandInfoSchema),
+  commands: z.array(slashCommandInfoSchema).max(REMOTE_COMMAND_MAX_COMMANDS),
   // The notice is a nicety and the catalog is essential, so a malformed status
   // is dropped instead of failing the whole event and losing the catalog.
   catalogStatus: slashCommandCatalogStatusSchema.optional().catch(undefined),
@@ -1089,8 +1209,8 @@ export const sessionSnapshotSchema = z.object({
   info: z.object({ id: z.unknown() }).passthrough(),
   messages: z.array(
     z.object({
-      info: z.object({ id: z.string() }).passthrough(),
-      parts: z.array(z.object({ id: z.string() }).passthrough()),
+      info: wireMessageInfoSchema,
+      parts: z.array(wireMessagePartSchema),
     })
   ),
 });

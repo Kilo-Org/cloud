@@ -71,7 +71,7 @@ export function RecommendedRow({
         fileId={model.fileId}
         name={model.name}
         snapshot={snapshot}
-        downloadLabel={t('modelChat.catalog.downloadModelA11y', { name: displayName })}
+        downloadDetail={displayName}
         onDownload={
           fit === 'noStorage'
             ? undefined
@@ -106,7 +106,7 @@ export function ModelRow({
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const colors = useThemeColors();
-  const smallest = useHfSmallestDownload(model.id);
+  const smallest = useHfSmallestDownload(model.id, model.parameters);
   const sizeBytes = smallest.data ?? undefined;
   const fit = sizeBytes === undefined ? undefined : deviceFit(sizeBytes, budget);
   if (fitsOnly) {

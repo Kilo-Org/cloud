@@ -197,6 +197,14 @@ vi.mock('@/components/agents/message-text-select-sheet', () => ({
 vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
   useIsFocused: () => true,
+  usePreventRemove: vi.fn(),
+  useNavigation: () => ({
+    getState: () => ({
+      index: 1,
+      routes: [{ name: '(tabs)' }, { name: 'agent-chat/[session-id]' }],
+    }),
+    addListener: () => () => undefined,
+  }),
   useRouter: () => ({ replace: vi.fn(), setParams: vi.fn() }),
 }));
 
@@ -604,6 +612,7 @@ function makeManager() {
       activeSuggestion: { value: null },
       pendingQuestions: { value: [] },
       pendingPermissions: { value: [] },
+      unreadablePermissions: { value: [] },
       totalCost: { value: null },
       childMessages: { value: () => new Map() },
       childSessionHydrationState: { value: () => ({ status: 'idle' }) },

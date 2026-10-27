@@ -4,11 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 
-import { BriefingCreateReview } from './briefing-create-review';
 import { BriefingPeriodPicker } from './briefing-period-picker';
+import { BriefingDrafts } from './briefing-drafts';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { Check } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { BRIEFING_PATH, useBriefingAccess, useBriefingPreferences } from '@/lib/agent-briefing';
@@ -20,6 +21,7 @@ import {
 } from '@/lib/agent-briefing-period';
 import { useCreateBriefing } from '@/lib/hooks/use-create-briefing';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 const PRESETS = [
   { value: 'last24Hours', key: 'agentBriefing.last24Hours' },
@@ -38,6 +40,7 @@ export function BriefingCreateScreen() {
   const preferences = useBriefingPreferences(true);
   const offline = useOfflineBannerState();
   const creation = useCreateBriefing();
+  const colors = useThemeColors();
   const [organizationId, setOrganizationId] = useState<string | null | undefined>(
     context === 'personal' ? null : context
   );
@@ -52,6 +55,7 @@ export function BriefingCreateScreen() {
   const timezone = preferences.data?.timezone;
   const contexts =
     preferences.data?.contexts.filter(item => access.canRead(item.context.organizationId)) ?? [];
+  const statusNotice = offline ? t('agentBriefing.createOffline') : creation.error;
   const selected = contexts.find(item => item.context.organizationId === organizationId);
   const configuration = JSON.stringify([
     timezone,
@@ -68,10 +72,11 @@ export function BriefingCreateScreen() {
       creation.reset();
     }
   }, [configuration, creation]);
-  const busy = creation.preparing || creation.creating;
+  const starting = creation.preparing && creation.draft === null;
+  const busy = starting || creation.creating;
   const periodError = preset === 'custom' ? briefingPeriodError(custom, Date.now()) : null;
 
-  const review = () => {
+  const review = async () => {
     if (!timezone || !selected || offline) {
       return;
     }
@@ -82,20 +87,15 @@ export function BriefingCreateScreen() {
       toast.error(t(invalid ?? 'agentBriefing.invalidPeriod'));
       return;
     }
-    void creation.prepare({
+    const draft = await creation.prepare({
       ...period,
       organizationId: organizationId ?? undefined,
       timezone,
       language,
     });
-  };
-  const confirm = async () => {
-    if (!selected || !timezone || offline) {
-      return;
-    }
-    const report = await creation.create();
-    if (report) {
-      router.replace(`${BRIEFING_PATH}/${report.id}` as Href);
+    if (draft) {
+      router.push(`${BRIEFING_PATH}/prepare/${draft.id}` as Href);
+      creation.reset();
     }
   };
 
@@ -134,6 +134,7 @@ export function BriefingCreateScreen() {
     <View className="flex-1 bg-background">
       {header}
       <ScrollView automaticallyAdjustKeyboardInsets contentContainerClassName="gap-5 p-4 pb-12">
+        <BriefingDrafts />
         <View className="gap-2">
           <Text className="font-semibold">{t('agentBriefing.chooseContext')}</Text>
           <View className="flex-row flex-wrap gap-2">
@@ -142,12 +143,21 @@ export function BriefingCreateScreen() {
                 key={item.context.id}
                 size="sm"
                 variant={organizationId === item.context.organizationId ? 'secondary' : 'outline'}
+                className={
+                  organizationId === item.context.organizationId
+                    ? 'border border-primary'
+                    : undefined
+                }
+                accessibilityState={{ selected: organizationId === item.context.organizationId }}
                 disabled={busy}
                 onPress={() => {
                   creation.reset();
                   setOrganizationId(item.context.organizationId);
                 }}
               >
+                {organizationId === item.context.organizationId ? (
+                  <Check size={14} color={colors.primary} />
+                ) : null}
                 <Text>
                   {item.context.organizationId === null ? t('common.personal') : item.context.name}
                 </Text>
@@ -170,12 +180,15 @@ export function BriefingCreateScreen() {
                 key={item.value}
                 size="sm"
                 variant={preset === item.value ? 'secondary' : 'outline'}
+                className={preset === item.value ? 'border border-primary' : undefined}
+                accessibilityState={{ selected: preset === item.value }}
                 disabled={busy}
                 onPress={() => {
                   creation.reset();
                   setPreset(item.value);
                 }}
               >
+                {preset === item.value ? <Check size={14} color={colors.primary} /> : null}
                 <Text>{t(item.key)}</Text>
               </Button>
             ))}
@@ -194,32 +207,16 @@ export function BriefingCreateScreen() {
           <Text className="text-xs text-muted-foreground">{t('agentBriefing.periodHint')}</Text>
           {periodError ? <Text className="text-sm text-destructive">{t(periodError)}</Text> : null}
         </View>
-        {offline ? (
-          <Text className="text-sm text-destructive">{t('agentBriefing.createOffline')}</Text>
-        ) : null}
-        {creation.error ? <Text className="text-sm text-destructive">{creation.error}</Text> : null}
-        {creation.prepared && selected && timezone ? (
-          <BriefingCreateReview
-            prepared={creation.prepared}
-            disabled={offline || busy}
-            creating={creation.creating}
-            onCreate={() => {
-              void confirm();
-            }}
-            onReviewAgain={() => {
-              creation.reset();
-              review();
-            }}
-          />
-        ) : (
-          <Button
-            disabled={offline || !selected || !timezone || Boolean(periodError)}
-            loading={creation.preparing}
-            onPress={review}
-          >
-            <Text>{t('agentBriefing.reviewBriefing')}</Text>
-          </Button>
-        )}
+        <Button
+          disabled={offline || busy || !selected || !timezone || Boolean(periodError)}
+          loading={starting}
+          onPress={review}
+        >
+          <Text>{t('agentBriefing.reviewBriefing')}</Text>
+        </Button>
+        <View className="min-h-[20px]">
+          {statusNotice ? <Text className="text-sm text-destructive">{statusNotice}</Text> : null}
+        </View>
       </ScrollView>
     </View>
   );

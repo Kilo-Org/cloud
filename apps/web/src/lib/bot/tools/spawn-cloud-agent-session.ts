@@ -10,6 +10,8 @@ import {
   getGitLabInstanceUrlForOrganization,
   getGitLabInstanceUrlForUser,
   buildGitLabCloneUrl,
+  validateGitLabRepoAccessForOrganization,
+  validateGitLabRepoAccessForUser,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
@@ -24,6 +26,7 @@ import z from 'zod';
 import { getBotUserId } from '@/lib/bot-users/bot-user-service';
 import { resolveGitHubRepositoryForOwner } from '@/lib/slack-bot/github-repository-context';
 import { getGitHubIntegrationById } from '@/lib/integrations/db/platform-integrations';
+import { authorizeGitHubRepository } from '@/lib/bot/github-repository-permission';
 
 /**
  * Derive a per-request callback token so the dedicated callback HMAC secret
@@ -77,7 +80,7 @@ export const spawnCloudAgentInputSchema = z.object({
     ),
 });
 
-type SpawnCloudAgentInput = z.infer<typeof spawnCloudAgentInputSchema>;
+export type SpawnCloudAgentInput = z.infer<typeof spawnCloudAgentInputSchema>;
 
 /**
  * Spawn a Cloud Agent session and collect the results.
@@ -96,6 +99,10 @@ export default async function spawnCloudAgentSession(
     chatPlatform?: string;
     currentStep?: number;
     attachments?: CloudAgentAttachments;
+    /** GitHub login of the account that triggered this bot run. */
+    actorLogin?: string;
+    /** Repository of the conversation the bot was mentioned in. */
+    threadRepository?: string | null;
   }
 ): Promise<SpawnCloudAgentResult> {
   console.log('[KiloBot] spawnCloudAgentSession called with args:', JSON.stringify(args, null, 2));
@@ -124,6 +131,18 @@ export default async function spawnCloudAgentSession(
     return { response: 'Error: You must specify either a githubRepo or a gitlabProject.' };
   }
 
+  if (args.githubRepo) {
+    const targetAuthorization = await authorizeGitHubRepository({
+      platformIntegration,
+      repository: args.githubRepo,
+      threadRepository: options?.threadRepository,
+      actorLogin: options?.actorLogin,
+    });
+    if (!targetAuthorization.allowed) {
+      return { response: targetAuthorization.markdown };
+    }
+  }
+
   let prompt = args.prompt;
 
   // Append PR/MR signature to the prompt if available
@@ -140,6 +159,35 @@ export default async function spawnCloudAgentSession(
     if (!gitLabActorUserId) {
       return { response: 'Error: No acting user is configured for this GitLab organization.' };
     }
+
+    // Resolve the project through the account's GitLab connection first, as
+    // the GitHub branch of this tool does.
+    let projectResolved: boolean;
+    try {
+      projectResolved =
+        owner.type === 'org'
+          ? await validateGitLabRepoAccessForOrganization(
+              owner.id,
+              gitLabActorUserId,
+              args.gitlabProject
+            )
+          : await validateGitLabRepoAccessForUser(owner.id, args.gitlabProject);
+    } catch (error) {
+      captureException(error, {
+        tags: { component: 'kilo-bot', op: 'spawn-cloud-agent-session-gitlab-project' },
+        extra: { botRequestId, ownerType: owner.type },
+      });
+      return {
+        response: 'Error: Could not verify access to that GitLab project. Please try again.',
+      };
+    }
+    if (!projectResolved) {
+      return {
+        response:
+          "Error: That GitLab project is not available through this account's GitLab integration.",
+      };
+    }
+
     // GitLab path: get token + instance URL, build clone URL, use gitUrl/gitToken
     const gitlabToken =
       owner.type === 'org'

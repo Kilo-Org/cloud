@@ -12,4 +12,8 @@ describe('parseTimestamp', () => {
       '2026-03-16T15:21:40.957Z'
     );
   });
+  it('returns an invalid date for a missing timestamp instead of throwing', () => {
+    expect(Number.isNaN(parseTimestamp(null).getTime())).toBe(true);
+    expect(Number.isNaN(parseTimestamp(undefined).getTime())).toBe(true);
+  });
 });

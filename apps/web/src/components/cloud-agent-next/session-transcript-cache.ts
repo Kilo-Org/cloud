@@ -61,5 +61,10 @@ export function createWebSessionTranscriptCache(queryClient: QueryClient, scope:
         }
       });
     },
+    // Drop this provider's page for a session the server answered as not
+    // available.
+    invalidate: (sessionId: KiloSessionId): void => {
+      queryClient.removeQueries({ queryKey: transcriptCacheKey(scope, sessionId), exact: true });
+    },
   };
 }

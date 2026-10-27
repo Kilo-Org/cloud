@@ -27,6 +27,7 @@ import {
   type StandalonePermission,
   type StoredMessage,
   type ToolPart,
+  type UnreadablePermissionState,
 } from '@kilocode/cloud-agent-sdk';
 import { cloudAgentId, kiloId, stubTextPart } from '@kilocode/cloud-agent-sdk/test-helpers';
 
@@ -43,12 +44,14 @@ import {
 } from '@/components/agents/exit-remote-session-with-feedback';
 import { RemoteSessionExitFailure } from '@/components/agents/remote-session-exit-failure';
 import { PermissionCard } from '@/components/agents/permission-card';
+import { PermissionUnreadableNotice } from '@/components/agents/permission-unreadable-notice';
 import { setSessionAutoApproveEnabled } from '@/components/agents/session-auto-approve';
 import {
   isSessionGoalCollapsed,
   setSessionGoalCollapsed,
 } from '@/components/agents/session-goal-collapse';
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
+import { AGENT_SESSION_NAV_GUARD_MS } from '@/components/agents/agent-session-nav-guard';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SESSION_TITLE_MAX_LENGTH } from '@/components/agents/session-detail-rename-state';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
@@ -175,6 +178,14 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
   useIsFocused: () => true,
+  usePreventRemove: vi.fn(),
+  useNavigation: () => ({
+    getState: () => ({
+      index: 1,
+      routes: [{ name: '(tabs)' }, { name: 'agent-chat/[session-id]' }],
+    }),
+    addListener: () => () => undefined,
+  }),
   useRouter: () => ({
     canGoBack: () => navigationRoutes.length > 1,
     back: () => {
@@ -1126,12 +1137,14 @@ describe('SessionDetailContent display scope', () => {
       header.findAll(node => node.props.accessibilityHint === i18n.t('profile.selectAccount'))
     ).toHaveLength(0);
     expect(header.findByProps({ accessibilityLabel: i18n.t('common.goBack') })).toBeDefined();
-    const { onPress } = header.findByProps({
-      accessibilityLabel: i18n.t('agentChat.session.renameAccessibility', {
+    const rename = header.findByProps({
+      accessibilityLabel: `Root ${ROOT_ID}`,
+      accessibilityHint: i18n.t('agentChat.session.renameAccessibility', {
         title: `Root ${ROOT_ID}`,
       }),
-    }).props as { onPress: () => void };
-    act(onPress);
+    });
+    expect(rename.props.accessibilityLabel).toBe(`Root ${ROOT_ID}`);
+    act(rename.props.onPress as () => void);
     expect(openRenameModal).toHaveBeenCalledOnce();
     pressHeaderBack(renderer);
     expect(navigationRoutes).toEqual(['/(app)/(tabs)/(2_agents)/']);
@@ -1177,7 +1190,7 @@ describe('session detail active-profile indicator', () => {
     act(() => {
       (chip.props.onPress as () => void)();
     });
-    expect(navigationRoutes.at(-1)).toBe('/(app)/(tabs)/(3_profile)/profiles/p1');
+    expect(navigationRoutes.at(-1)).toBe('/(app)/profile-management/p1');
   });
 
   it.each(['user', 'organization'] as const)(
@@ -1202,7 +1215,7 @@ describe('session detail active-profile indicator', () => {
         (chip.props.onPress as () => void)();
       });
       expect(navigationRoutes.at(-1)).toBe(
-        `/(app)/(tabs)/(3_profile)/profiles/p1${ownerType === 'organization' ? '?organizationId=org-a' : ''}`
+        `/(app)/profile-management/p1${ownerType === 'organization' ? '?organizationId=org-a' : ''}`
       );
     }
   );
@@ -1230,7 +1243,7 @@ describe('session detail active-profile indicator', () => {
     act(() => {
       (chip.props.onPress as () => void)();
     });
-    expect(navigationRoutes.at(-1)).toBe('/(app)/(tabs)/(3_profile)/profiles/p-recorded');
+    expect(navigationRoutes.at(-1)).toBe('/(app)/profile-management/p-recorded');
   });
 
   it('falls back to the effective default only when the session recorded no profile', async () => {
@@ -2344,6 +2357,51 @@ describe('session detail per-session auto-approve', () => {
   });
 });
 
+describe('session detail unreadable permission notice', () => {
+  const waiting: readonly UnreadablePermissionState[] = [{ requestId: 'perm-1' }];
+  const none: readonly UnreadablePermissionState[] = [];
+
+  /** An answerable session, so the composer claim is about the notice, not read-only mode. */
+  function makeAnswerable(view: Awaited<ReturnType<typeof mountDetails>>): void {
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.canSend, true);
+    });
+  }
+
+  it('explains the waiting request and leaves the composer usable', async () => {
+    const view = await mountDetails([]);
+    makeAnswerable(view);
+    act(() => {
+      view.store.set(view.manager.atoms.unreadablePermissions, waiting);
+    });
+
+    expect(view.renderer.root.findAllByType(PermissionUnreadableNotice)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(PermissionCard)).toHaveLength(0);
+    expect(renderedText(view.renderer.root)).toContain(
+      'The agent is waiting for a permission decision this app cannot show.'
+    );
+
+    const composer = view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'));
+    expect(composer).toHaveLength(1);
+    expect(composer[0]?.parent?.parent?.props.className ?? '').not.toContain('hidden');
+    expect(composer[0]?.parent?.parent?.props.accessibilityElementsHidden).toBe(false);
+  });
+
+  it('renders nothing once the request is answered', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set(view.manager.atoms.unreadablePermissions, waiting);
+    });
+    act(() => {
+      view.store.set(view.manager.atoms.unreadablePermissions, none);
+    });
+
+    expect(view.renderer.root.findAllByType(PermissionUnreadableNotice)).toHaveLength(0);
+  });
+});
+
 describe.each([true, false])('session detail return with history=%s', hasHistory => {
   beforeEach(() => {
     if (hasHistory) {
@@ -2719,6 +2777,23 @@ describe('session detail zero-render transcript guard (mobile-app e2-open)', () 
     const message = assistantMessage(id);
     return { info: { ...message.info, sessionID: ROOT_ID }, parts: [] };
   }
+
+  it('shows the empty state instead of an empty user bubble for a stored session', async () => {
+    // A stored session opened read-only has no live writer. A user message whose
+    // parts never reached session ingest rendered as an empty bubble under a time
+    // marker (stored-session finding); the row must not exist at all.
+    const phantom: StoredMessage = {
+      info: { ...userMessage('msg-phantom').info, sessionID: ROOT_ID },
+      parts: [],
+    };
+    const view = await mountDetails([phantom]);
+
+    expect(messageLists(view.renderer)).toHaveLength(0);
+    expect(view.renderer.root.findByType(EmptyState).props).toMatchObject({
+      title: i18n.t('agentChat.session.emptyTitle'),
+    });
+    expect(view.requestedIds()).toEqual([ROOT_ID]);
+  });
 
   it('shows the empty state instead of a zero-item list when no stored message renders', async () => {
     const view = await mountDetails([blankAssistantMessage('msg-blank')]);
@@ -3998,6 +4073,36 @@ describe('session detail read-only composer', () => {
       i18n.t('agentChat.session.continueInNewSession')
     );
   });
+
+  it('opens the new-session composer once on a repeated continue press', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    const continueControl = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') &&
+        node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+    );
+    const now = Date.now();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
+    onTestFinished(() => {
+      nowSpy.mockRestore();
+    });
+
+    act(() => {
+      (continueControl.props.onPress as () => void)();
+      (continueControl.props.onPress as () => void)();
+    });
+    expect(
+      navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
+    ).toHaveLength(1);
+
+    nowSpy.mockReturnValue(now + AGENT_SESSION_NAV_GUARD_MS);
+    act(() => {
+      (continueControl.props.onPress as () => void)();
+    });
+    expect(
+      navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
+    ).toHaveLength(2);
+  });
 });
 
 describe('session detail composer placeholder (explorer session-detail)', () => {
@@ -4144,25 +4249,49 @@ describe('session detail duplicate failure state', () => {
     expect(labels).toContain(i18n.t('agentChat.messageBubble.copyToComposer'));
   });
 
-  it('keeps the footer line when the transcript drops the failed row it names', async () => {
-    // A failed assistant row whose parts render nothing is dropped by
-    // `mergeSessionTranscript`; it owns no row, so the footer is the failure's
-    // only surface and must not be suppressed by it.
-    const dropped = rootFailedAssistantMessage('partial reply');
-    dropped.parts = [];
-    const view = await mountDetails([rootUserMessage('please refactor'), dropped]);
-    act(() => {
-      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
-        view.manager.atoms.statusIndicator,
-        { type: 'error', message: 'simulated error', timestamp: 0 }
+  it.each([false, true])(
+    'keeps a response that failed before producing content recoverable after reopen (condensed: %s)',
+    async condensed => {
+      goalMountOptions.resolvedType = 'cloud-agent';
+      sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+      condensePreference.value = condensed;
+      const prompt = 'أجب بكلمة جاهز. لا تستخدم الأدوات.';
+      const failed = rootFailedAssistantMessage('');
+      failed.parts = [];
+      const view = await mountDetails([rootUserMessage(prompt), failed]);
+
+      expect(renderedText(view.renderer.root)).toContain(
+        i18n.t('agentChat.messageFailure.assistantTitle')
       );
-    });
-    const nodes = indicatorNodes(view);
-    expect(nodes).toHaveLength(1);
-    expect(nodes[0]?.props).toMatchObject({
-      indicator: { message: 'simulated error' },
-    });
-  });
+      expect(indicatorNodes(view)).toHaveLength(0);
+      const retry = view.renderer.root.find(
+        node =>
+          Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+      );
+      act(() => {
+        (retry.props.onPress as () => void)();
+      });
+      await waitFor(
+        () =>
+          view.store.get(view.manager.atoms.messagesList).filter(row => row.info.role === 'user')
+            .length === 2
+      );
+      const prompts = view.store
+        .get(view.manager.atoms.messagesList)
+        .filter(row => row.info.role === 'user')
+        .map(row =>
+          row.parts
+            .filter(part => part.type === 'text')
+            .map(part => part.text)
+            .join('')
+        );
+      expect(prompts).toEqual([prompt, prompt]);
+      expect(
+        view.store.get(view.manager.atoms.messagesList).find(row => row.info.id === ASSISTANT_ID)
+          ?.info
+      ).toMatchObject({ role: 'assistant', error: { name: 'APIError' } });
+    }
+  );
 
   it('draws the fixed footer on an opaque, non-absolute surface above the transcript', async () => {
     // Explorer `session-working` showed the fixed footer line printed over the

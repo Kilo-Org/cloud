@@ -1,5 +1,6 @@
 import { type ListRenderItem } from '@shopify/flash-list';
 import { type RemoteModelState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import { type Href, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
@@ -20,6 +21,7 @@ import { useSessionModelOptions } from '@/lib/hooks/use-session-model-options';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { useChat, useChatList, useChatPlace } from '@/lib/chat/use-chat';
+import { CHAT_UNAVAILABLE_KEY } from '@/lib/chat/state';
 import { asMessages } from '@/lib/chat/turns';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getChatBackendsHasLoaded, useChatBackends } from '@/lib/chat/backend-store';
@@ -66,6 +68,7 @@ type ChatScreenProps = {
 
 export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const { t } = useTranslation();
+  const router = useRouter();
   const { organizationId } = useOrganization();
   const place = useChatPlace();
   const { state, send, stop, retry } = useChat(place, opened);
@@ -156,7 +159,9 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
             }
           },
         },
-      ]
+      ],
+      // Android back dismisses, which equals Cancel: the model stays as is.
+      { cancelable: true }
     );
   };
 
@@ -196,7 +201,10 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
       } catch (error) {
         Alert.alert(
           t('modelChat.backends.title'),
-          error instanceof Error ? error.message : t('modelChat.backends.invalidTarget')
+          error instanceof Error ? error.message : t('modelChat.backends.invalidTarget'),
+          // Android back dismisses the error; the composer keeps the draft.
+          undefined,
+          { cancelable: true }
         );
         throw error;
       }
@@ -265,8 +273,13 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
           status={state.status}
           messages={messages}
           failureKey={state.failureKey}
-          retryable={!actions.hasUnanswered}
+          // A chat that is not one this place may read is not one this place can
+          // retry into: entering it again settles the same state.
+          retryable={!actions.hasUnanswered && state.failureKey !== CHAT_UNAVAILABLE_KEY}
           onRetry={() => void retry()}
+          onAddCredits={() => {
+            router.push('/(app)/credits' as Href);
+          }}
           onSend={handleSend}
           composerControlRef={actions.composerControlRef}
           onStop={handleStop}
@@ -297,7 +310,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
           />
         }
         headerRight={
-          <View className="flex-row items-center">
+          <View className="flex-row items-center gap-2">
             <SessionContextMetrics {...details.metrics} />
             <BackendSettingsControl selectedModel={model} onSelectModel={selectProviderModel} />
             <Pressable

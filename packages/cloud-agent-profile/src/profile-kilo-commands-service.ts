@@ -1,9 +1,10 @@
 import type { WorkerDb } from '@kilocode/db';
 import {
   agent_environment_profile_kilo_commands,
+  agent_environment_profiles,
   type AgentEnvironmentProfileKiloCommand,
 } from '@kilocode/db/schema';
-import { and, eq, count, asc } from 'drizzle-orm';
+import { and, eq, count, asc, inArray, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { ProfileOwner, ProfileKiloCommandResponse } from './types';
 import { verifyProfileOwnership } from './profile-utils';
@@ -14,6 +15,7 @@ import {
   MAX_KILO_COMMAND_DESCRIPTION_LENGTH,
   BUILTIN_COMMAND_NAMES,
   kiloCommandNameSchema,
+  kiloCommandReorderIdsSchema,
   kiloCommandCreateInputSchema,
   kiloCommandUpdateInputSchema,
   type KiloCommandCreateInput,
@@ -27,10 +29,13 @@ export {
   MAX_KILO_COMMAND_DESCRIPTION_LENGTH,
   BUILTIN_COMMAND_NAMES,
   kiloCommandNameSchema,
+  kiloCommandReorderIdsSchema,
   kiloCommandCreateInputSchema,
   kiloCommandUpdateInputSchema,
 };
 export type { KiloCommandCreateInput, KiloCommandUpdateInput };
+
+type KiloCommandWriteTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
 
 function toResponse(row: AgentEnvironmentProfileKiloCommand): ProfileKiloCommandResponse {
   return {
@@ -48,8 +53,11 @@ function toResponse(row: AgentEnvironmentProfileKiloCommand): ProfileKiloCommand
   };
 }
 
-async function assertCommandLimit(db: WorkerDb, profileId: string): Promise<void> {
-  const [row] = await db
+async function assertCommandLimit(
+  tx: KiloCommandWriteTransaction,
+  profileId: string
+): Promise<void> {
+  const [row] = await tx
     .select({ n: count() })
     .from(agent_environment_profile_kilo_commands)
     .where(eq(agent_environment_profile_kilo_commands.profile_id, profileId));
@@ -104,22 +112,33 @@ export async function createKiloCommand(
   owner: ProfileOwner
 ): Promise<{ id: string }> {
   await verifyProfileOwnership(db, profileId, owner);
-  await assertCommandLimit(db, profileId);
 
-  const [row] = await db
-    .insert(agent_environment_profile_kilo_commands)
-    .values({
-      profile_id: profileId,
-      name: input.name,
-      description: input.description ?? null,
-      template: input.template,
-      agent: input.agent ?? null,
-      model: input.model ?? null,
-      subtask: input.subtask ?? false,
-    })
-    .returning({ id: agent_environment_profile_kilo_commands.id });
+  return await db.transaction(async tx => {
+    // Lock the owning profile row so the cap count and the insert are one
+    // serialized unit, keeping concurrent creates within the per-profile cap.
+    await tx
+      .select({ id: agent_environment_profiles.id })
+      .from(agent_environment_profiles)
+      .where(eq(agent_environment_profiles.id, profileId))
+      .for('update');
 
-  return { id: row.id };
+    await assertCommandLimit(tx, profileId);
+
+    const [row] = await tx
+      .insert(agent_environment_profile_kilo_commands)
+      .values({
+        profile_id: profileId,
+        name: input.name,
+        description: input.description ?? null,
+        template: input.template,
+        agent: input.agent ?? null,
+        model: input.model ?? null,
+        subtask: input.subtask ?? false,
+      })
+      .returning({ id: agent_environment_profile_kilo_commands.id });
+
+    return { id: row.id };
+  });
 }
 
 export async function updateKiloCommand(
@@ -184,18 +203,51 @@ export async function reorderKiloCommands(
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, owner);
 
+  if (orderedIds.length > MAX_PROFILE_KILO_COMMANDS) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: `At most ${MAX_PROFILE_KILO_COMMANDS} commands can be reordered`,
+    });
+  }
+  if (new Set(orderedIds).size !== orderedIds.length) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'Command IDs must be unique' });
+  }
+  if (orderedIds.length === 0) {
+    return;
+  }
+
   await db.transaction(async tx => {
-    for (let i = 0; i < orderedIds.length; i++) {
-      await tx
-        .update(agent_environment_profile_kilo_commands)
-        .set({ sort_order: i })
-        .where(
-          and(
-            eq(agent_environment_profile_kilo_commands.id, orderedIds[i]),
-            eq(agent_environment_profile_kilo_commands.profile_id, profileId)
-          )
-        );
+    const rows = await tx
+      .select({ id: agent_environment_profile_kilo_commands.id })
+      .from(agent_environment_profile_kilo_commands)
+      .where(
+        and(
+          eq(agent_environment_profile_kilo_commands.profile_id, profileId),
+          inArray(agent_environment_profile_kilo_commands.id, orderedIds)
+        )
+      );
+    const ownedIds = new Set(rows.map(row => row.id));
+    if (orderedIds.some(id => !ownedIds.has(id))) {
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: 'Command order changed. Refresh and try again.',
+      });
     }
+
+    await tx
+      .update(agent_environment_profile_kilo_commands)
+      .set({
+        sort_order: sql`CASE ${agent_environment_profile_kilo_commands.id} ${sql.join(
+          orderedIds.map((id, position) => sql`WHEN ${id}::uuid THEN ${position}::integer`),
+          sql` `
+        )} END`,
+      })
+      .where(
+        and(
+          eq(agent_environment_profile_kilo_commands.profile_id, profileId),
+          inArray(agent_environment_profile_kilo_commands.id, orderedIds)
+        )
+      );
   });
 }
 

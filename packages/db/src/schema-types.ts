@@ -896,6 +896,9 @@ export const AdminActionAuditAction = z.enum([
   'organization.gitlab_webhook_secret.rotate',
   'organization.bitbucket.update',
   'organization.webhook_session.share',
+  'credit_campaign.create',
+  'credit_campaign.update',
+  'credit_campaign.set_active',
 ]);
 
 export type AdminActionAuditAction = z.infer<typeof AdminActionAuditAction>;
@@ -1272,6 +1275,7 @@ export const AuditLogAction = z.enum([
   'organization.mode.create', // ✅
   'organization.mode.update', // ✅
   'organization.mode.delete', // ✅
+  'organization.webhook_trigger.update',
   'organization.group.create',
   'organization.group.update',
   'organization.group.delete',
@@ -1295,6 +1299,48 @@ export type EncryptedData = {
   data: string;
   authTag: string;
 };
+
+/**
+ * RSA + AES envelope stored for secrets that are encrypted by the web app
+ * and decrypted by a Worker. Kept structural here so the schema package does
+ * not need to depend on the runtime encryption implementation.
+ */
+export type ByocCredentialEnvelope = {
+  scheme: string;
+  version: 1;
+  keyId: string;
+  ciphertext: {
+    encryptedData: string;
+    encryptedDEK: string;
+    algorithm: 'rsa-aes-256-gcm';
+    version: 1;
+  };
+};
+
+export type VercelComputeCredentialEnvelope = ByocCredentialEnvelope & {
+  scheme: 'byoc-vercel-credential-rsa-aes-256-gcm';
+};
+
+export type ByocSetupStatus = 'pending' | 'building' | 'ready' | 'failed';
+export type ByocUpgradeStatus = 'pending' | 'building' | 'failed';
+export type VercelComputeSetupStatus = ByocSetupStatus;
+export type VercelComputeUpgradeStatus = ByocUpgradeStatus;
+
+export type VercelComputeTokenScope = 'team' | 'project';
+
+export type VercelComputeSetupStep =
+  | 'validating_access'
+  | 'create_builder'
+  | 'install_system_dependencies'
+  | 'install_node_dependencies'
+  | 'upload_runtime_artifacts'
+  | 'verify_runtime_artifacts'
+  | 'snapshot_builder'
+  | 'create_validator'
+  | 'launch_validator_wrapper'
+  | 'verify_validator_call_home'
+  | 'stop_validator'
+  | 'confirm_terminal';
 
 // --- AuthProviderId ---
 
@@ -2176,6 +2222,17 @@ export const ReasoningOptionSchema = z.discriminatedUnion('type', [
 
 export type ReasoningOption = z.infer<typeof ReasoningOptionSchema>;
 
+/**
+ * Per-key BYOK settings. Every field is optional so new settings need no backfill.
+ * `serve_catalog_models` (catalog mode): a direct BYOK key that serves only Kilo catalog model
+ * ids, so organization model policies apply to it.
+ */
+export const ByokApiKeySettingsSchema = z.object({
+  serve_catalog_models: z.boolean().optional(),
+});
+
+export type ByokApiKeySettings = z.infer<typeof ByokApiKeySettingsSchema>;
+
 export const DirectByokModelFlagSchema = z.enum(['recommended', 'vision', 'reasoning']);
 
 export type DirectByokModelFlag = z.infer<typeof DirectByokModelFlagSchema>;
@@ -2183,10 +2240,13 @@ export type DirectByokModelFlag = z.infer<typeof DirectByokModelFlagSchema>;
 export const DirectByokModelSchema = z.object({
   id: z.string(),
   name: z.string(),
+  description: z.string().optional(),
   flags: z.array(DirectByokModelFlagSchema).readonly().optional(),
   context_length: z.number(),
   max_completion_tokens: z.number(),
   reasoning_options: z.array(ReasoningOptionSchema).optional(),
+  /** The OpenRouter catalog model ID that models.dev identifies as the same model. */
+  catalog_model_id: z.string().optional(),
 });
 
 export const DirectByokModelArraySchema = z.array(DirectByokModelSchema);
@@ -2222,7 +2282,10 @@ export type CustomLlmMetadata = z.infer<typeof CustomLlmMetadataSchema>;
 
 export const ReasoningDetailsTransform = {
   GeminiThought: 'gemini-thought',
+  /** The upstream sends reasoning as a DeepSeek-style `reasoning_content` string. */
   ReasoningContent: 'reasoning-content',
+  /** The upstream sends reasoning as a plain `reasoning` string, without `reasoning_details`. */
+  Reasoning: 'reasoning',
 } as const;
 
 export const ReasoningDetailsTransformSchema = z.enum(ReasoningDetailsTransform);
@@ -2314,16 +2377,6 @@ export const CustomLlmCredentialsSchema = z.discriminatedUnion('type', [
 
 export type CustomLlmCredentials = z.infer<typeof CustomLlmCredentialsSchema>;
 
-export const CustomLlmDefinitionSchema = z.object({
-  ...CustomLlmMetadataSchema.shape,
-  ...CustomLlmApiConfigSchema.shape,
-  display_name: z.string(),
-  organization_ids: z.array(z.uuid()),
-  group_ids: z.array(z.uuid()).optional(),
-});
-
-export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
-
 export const GatewayModelIdSchema = z
   .string()
   .trim()
@@ -2339,6 +2392,51 @@ export const CustomLlmPublicIdSchema = GatewayModelIdSchema.refine(
 ).refine(id => !RESERVED_CUSTOM_LLM_PUBLIC_ID_PREFIXES.some(prefix => id.startsWith(prefix)), {
   message: `public_id must not start with ${RESERVED_CUSTOM_LLM_PUBLIC_ID_PREFIXES.join(', ')}`,
 });
+
+export const CustomLlmInferenceProviderSlugSchema = z
+  .string()
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'must be a lowercase provider slug such as "acme-ai"');
+
+/**
+ * Makes a custom LLM available to every user, including anonymous ones. Like
+ * every custom LLM it is free; unlike private ones it is subject to
+ * organization provider allow lists.
+ */
+export const CustomLlmPublicSchema = z.object({
+  /** Provider slugs the upstream may serve this model from. They are listed in
+   * the models-by-provider snapshot and enforced against provider allow lists.
+   * A slug that OpenRouter does not know becomes a synthesized provider. */
+  inference_providers: z.array(CustomLlmInferenceProviderSlugSchema).min(1),
+  /** Shown in model pickers instead of the private custom LLM disclaimer. */
+  description: z.string().trim().min(1),
+});
+
+export type CustomLlmPublic = z.infer<typeof CustomLlmPublicSchema>;
+
+export const CustomLlmDefinitionSchema = z
+  .object({
+    ...CustomLlmMetadataSchema.shape,
+    ...CustomLlmApiConfigSchema.shape,
+    display_name: z.string(),
+    /** Without organization or group grants, a private custom LLM is stored but reachable by nobody. */
+    organization_ids: z.array(z.uuid()).optional(),
+    group_ids: z.array(z.uuid()).optional(),
+    public: CustomLlmPublicSchema.optional(),
+  })
+  .superRefine((definition, ctx) => {
+    if (!definition.public) return;
+    for (const key of ['organization_ids', 'group_ids'] as const) {
+      if (definition[key] !== undefined) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [key],
+          message: `${key} must not be set when public is set`,
+        });
+      }
+    }
+  });
+
+export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 
 export const AutoFreeModelSchema = z.object({
   model: GatewayModelIdSchema,

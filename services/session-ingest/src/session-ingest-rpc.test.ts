@@ -75,6 +75,7 @@ import {
   cloudAgentWorktreeIdSchema,
   messageIdSchema,
   partIdSchema,
+  validateCloudAgentRootSessionsCursor,
   validateKiloSdkMessagesCursor,
 } from '@kilocode/session-ingest-contracts';
 import { desc, gte, isNotNull, lt, or, sql, SQL } from 'drizzle-orm';
@@ -2161,6 +2162,45 @@ describe('Kilo SDK message cursor codec', () => {
         before,
       }).success
     ).toBe(true);
+  });
+});
+
+describe('Cloud Agent root sessions cursor codec', () => {
+  const updatedAt = '2026-05-28 09:13:37.651263+00';
+  const cursor = { version: 1, updatedAt, sessionId: sdkSessionInfoFixture.id } as const;
+
+  it('round-trips a canonical cursor', () => {
+    const encoded = encodeCloudAgentRootSessionsCursor({
+      updatedAt,
+      sessionId: cursor.sessionId,
+    });
+
+    expect(decodeCloudAgentRootSessionsCursor(encoded)).toEqual(cursor);
+    expect(validateCloudAgentRootSessionsCursor(encoded)).toBe(true);
+  });
+
+  it('rejects values outside the base64url charset', () => {
+    expect(validateCloudAgentRootSessionsCursor('abc+def')).toBe(false);
+    expect(validateCloudAgentRootSessionsCursor('abc/def')).toBe(false);
+  });
+
+  it('rejects a non-canonical encoding of an otherwise valid payload', () => {
+    const spaced = `{"version":1, "updatedAt":${JSON.stringify(updatedAt)},"sessionId":${JSON.stringify(
+      cursor.sessionId
+    )}}`;
+    const nonCanonical = btoa(spaced).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+
+    expect(validateCloudAgentRootSessionsCursor(nonCanonical)).toBe(false);
+    expect(() => decodeCloudAgentRootSessionsCursor(nonCanonical)).toThrow(/cursor/);
+  });
+
+  it('rejects bytes that are not valid UTF-8', () => {
+    const invalidUtf8 = btoa(String.fromCharCode(0xff, 0xfe))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+
+    expect(validateCloudAgentRootSessionsCursor(invalidUtf8)).toBe(false);
   });
 });
 

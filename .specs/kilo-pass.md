@@ -343,6 +343,7 @@ Rules 51-55 protect against rapid cross-account reuse of a recently first-used c
     restriction nor the matched claimant. Missing refund evidence or provider failure MUST be reported but MUST NOT
     reverse the block or grant benefits. Duplicate-card audit evidence, errors, logs, email, and operational context MUST
     NOT contain the raw card fingerprint.
+    A concurrent cancellation conflict MUST count as success only after Stripe confirms the exact subscription has ended.
 
 ### Scheduled Changes (Stripe)
 
@@ -351,9 +352,10 @@ Rules 51-55 protect against rapid cross-account reuse of a recently first-used c
 57. Downgrades, cadence changes, and monthly tier upgrades MUST take effect at current billing-cycle end. A yearly tier
     upgrade MUST take effect at the next monthly issue instant.
 58. When a yearly subscription upgrades tier, invoice handling SHOULD issue remaining prior-tier base credits for
-    unelapsed months of the prepaid year. The normal path derives elapsed months from the prior paid yearly invoice. If
-    no matching prior invoice is found, current code falls back to the effective instant minus 12 months and MAY
-    overcount.
+    unelapsed months of the prepaid year. The normal path derives elapsed months from the prior paid yearly invoice.
+    The lookup MUST identify the matching yearly product line, ignoring fees and prorations that precede it.
+    If the embedded line list is incomplete, the lookup MUST read the provider's remaining pages.
+    Without a matching prior period, the fallback MUST NOT grant unproven remaining credits.
 59. Tracked schedule release MUST soft-delete the row before Stripe release. If Stripe release fails, it MUST restore
     the row, append a failed audit entry, and rethrow.
 60. If scheduled-change creation fails after Stripe schedule creation, cleanup MUST attempt to release the new provider

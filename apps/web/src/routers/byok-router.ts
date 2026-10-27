@@ -45,7 +45,7 @@ import {
 import { isDirectCloudByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import { parseAwsBedrockCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/aws-bedrock';
 import { parseGcpVertexCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/gcp-vertex';
-import { isDirectCloudByokAvailable } from '@/lib/byok/direct-cloud-byok';
+import { isExperimentalByokEnabled } from '@/lib/byok/experimental-byok';
 
 const GENERIC_TEST_FAILURE_MESSAGE = 'API key test failed. Check the credential and try again.';
 const MANAGED_KEY_READ_ONLY_MESSAGE =
@@ -100,7 +100,7 @@ function rejectUnavailableDirectCloudProvider(
   providerId: string,
   organizationId: string | null | undefined
 ) {
-  if (isDirectCloudByokProviderId(providerId) && !isDirectCloudByokAvailable(organizationId)) {
+  if (isDirectCloudByokProviderId(providerId) && !isExperimentalByokEnabled(organizationId)) {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: `Provider ${providerId} is not available yet.`,
@@ -181,15 +181,15 @@ export const byokRouter = createTRPCRouter({
     .output(z.record(z.string(), z.array(z.string())))
     .query(fetchSupportedModels),
 
-  /** Whether keys for the direct Amazon Bedrock and Google Vertex AI providers can be added. */
-  directCloudByokAvailable: baseProcedure
+  /** Whether keys for experimental BYOK providers, currently direct Amazon Bedrock and Google Vertex AI, can be added. */
+  experimentalByokEnabled: baseProcedure
     .input(ListBYOKKeysInputSchema)
     .output(z.boolean())
     .query(async ({ input, ctx }) => {
       if (input.organizationId) {
         await ensureOrganizationAccess(ctx, input.organizationId);
       }
-      return isDirectCloudByokAvailable(input.organizationId);
+      return isExperimentalByokEnabled(input.organizationId);
     }),
 
   list: baseProcedure

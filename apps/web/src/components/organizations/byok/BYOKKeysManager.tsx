@@ -240,11 +240,11 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   );
 
   const { data: supportedModels } = useQuery(trpc.byok.listSupportedModels.queryOptions());
-  const { data: directCloudByokAvailable = false } = useQuery(
-    trpc.byok.directCloudByokAvailable.queryOptions(listQueryInput)
+  const { data: experimentalByokEnabled = false } = useQuery(
+    trpc.byok.experimentalByokEnabled.queryOptions(listQueryInput)
   );
   const addableProviders = ADD_BYOK_PROVIDERS.filter(
-    provider => directCloudByokAvailable || !isDirectCloudByokProviderId(provider.id)
+    provider => experimentalByokEnabled || !isDirectCloudByokProviderId(provider.id)
   );
   const showsCodingPlanKey =
     !organizationId && (keys?.some(key => key.management_source === 'coding_plan') ?? false);

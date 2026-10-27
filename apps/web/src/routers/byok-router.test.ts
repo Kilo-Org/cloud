@@ -775,7 +775,7 @@ describe('BYOK Router', () => {
     test('creates direct Bedrock and Vertex keys outside production', async () => {
       const caller = await createCallerForUser(ownerUser.id);
 
-      await expect(caller.byok.directCloudByokAvailable({})).resolves.toBe(true);
+      await expect(caller.byok.experimentalByokEnabled({})).resolves.toBe(true);
       await expect(
         caller.byok.create({
           provider_id: 'aws-bedrock',
@@ -811,9 +811,9 @@ describe('BYOK Router', () => {
       process.env.VERCEL_TARGET_ENV = 'production';
       const caller = await createCallerForUser(ownerUser.id);
 
-      await expect(caller.byok.directCloudByokAvailable({})).resolves.toBe(false);
+      await expect(caller.byok.experimentalByokEnabled({})).resolves.toBe(false);
       await expect(
-        caller.byok.directCloudByokAvailable({ organizationId: organizationA.id })
+        caller.byok.experimentalByokEnabled({ organizationId: organizationA.id })
       ).resolves.toBe(false);
       await expect(
         caller.byok.create({

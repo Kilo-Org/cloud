@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from '@jest/globals';
 import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
-import { isDirectCloudByokAvailable } from './direct-cloud-byok';
+import { isExperimentalByokEnabled } from './experimental-byok';
 
-describe('isDirectCloudByokAvailable', () => {
+describe('isExperimentalByokEnabled', () => {
   const originalTargetEnv = process.env.VERCEL_TARGET_ENV;
 
   afterEach(() => {
@@ -16,16 +16,16 @@ describe('isDirectCloudByokAvailable', () => {
       if (targetEnv === undefined) delete process.env.VERCEL_TARGET_ENV;
       else process.env.VERCEL_TARGET_ENV = targetEnv;
 
-      expect(isDirectCloudByokAvailable(undefined)).toBe(true);
-      expect(isDirectCloudByokAvailable('00000000-0000-4000-8000-000000000001')).toBe(true);
+      expect(isExperimentalByokEnabled(undefined)).toBe(true);
+      expect(isExperimentalByokEnabled('00000000-0000-4000-8000-000000000001')).toBe(true);
     }
   );
 
   test('is available only to the Kilo organization in production', () => {
     process.env.VERCEL_TARGET_ENV = 'production';
 
-    expect(isDirectCloudByokAvailable(KILO_ORGANIZATION_ID)).toBe(true);
-    expect(isDirectCloudByokAvailable('00000000-0000-4000-8000-000000000001')).toBe(false);
-    expect(isDirectCloudByokAvailable(undefined)).toBe(false);
+    expect(isExperimentalByokEnabled(KILO_ORGANIZATION_ID)).toBe(true);
+    expect(isExperimentalByokEnabled('00000000-0000-4000-8000-000000000001')).toBe(false);
+    expect(isExperimentalByokEnabled(undefined)).toBe(false);
   });
 });

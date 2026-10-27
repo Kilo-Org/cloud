@@ -4,25 +4,25 @@ import { unstable_readConfig } from 'wrangler';
 
 const config = fileURLToPath(new URL('../wrangler.jsonc', import.meta.url).href);
 
-it('keeps production receipt-only with its original queue policy', () => {
+it('keeps production receipt-only at batch1/cap1 on its EU queue', () => {
   const production = unstable_readConfig({ config });
   expect(production.services).toEqual([]);
   expect(production.queues.producers).toEqual([
-    { binding: 'USAGE_INGEST_QUEUE', queue: 'usage-ingest-processing' },
-    { binding: 'USAGE_INGEST_DLQ', queue: 'usage-ingest-processing-dlq' },
+    { binding: 'USAGE_INGEST_QUEUE', queue: 'usage-ingest-processing-eu' },
+    { binding: 'USAGE_INGEST_DLQ', queue: 'usage-ingest-processing-dlq-eu' },
   ]);
   expect(production.vars.USAGE_INGEST_MODE).toBe('receipt');
   expect(production.vars.USAGE_INGEST_PARALLELISM).toBeUndefined();
   expect(production.vars.USAGE_INGEST_DIAGNOSTICS).toBeUndefined();
   expect(production.queues.consumers).toEqual([
     {
-      queue: 'usage-ingest-processing',
+      queue: 'usage-ingest-processing-eu',
       max_batch_size: 1,
       max_batch_timeout: 0,
       max_concurrency: 1,
       max_retries: 3,
       retry_delay: 60,
-      dead_letter_queue: 'usage-ingest-processing-dlq',
+      dead_letter_queue: 'usage-ingest-processing-dlq-eu',
     },
   ]);
 });

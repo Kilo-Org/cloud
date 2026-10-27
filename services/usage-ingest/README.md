@@ -15,6 +15,7 @@ Unselected events keep direct accounting or the existing SFO handoff. Background
 shadow publication and its flag have been removed. Reconcile and drain historically
 accepted shadow events before switching a consumer to processing; this change
 does not remove old messages.
+Keep production selection off until the processing consumer is independently verified.
 
 In receipt mode, receipts contain only the validated usage ID, queue message ID, delivery attempt
 count, and non-negative event age in milliseconds. Malformed messages log an
@@ -37,11 +38,12 @@ Unrelated paths return 404; other methods on `/usage` return 405.
 
 | Environment | Worker | Producer and consumer queue | DLQ (no consumer) |
 |---|---|---|---|
-| Production (top-level config) | `usage-ingest` | `usage-ingest-processing` | `usage-ingest-processing-dlq` |
+| Production (top-level config) | `usage-ingest` | `usage-ingest-processing-eu` | `usage-ingest-processing-dlq-eu` |
 | Staging (`env.staging`) | `usage-ingest-staging` | `usage-ingest-processing-staging-eu` | `usage-ingest-processing-dlq-staging-eu` |
 
-Staging connects only this EU pair and one consumer capped at 200, batch size 2.
-The old global pair remains disconnected. See the [one-time EU setup](eu-queues.md).
+Each environment connects only its EU pair. Production stays receipt-only at batch1/cap1;
+staging keeps one consumer capped at200, batch size2. Old global queues remain intact
+for a paused/drained routing rollback. See [EU preparation and cutover](eu-queues.md).
 
 ## Processing mode
 
@@ -256,15 +258,16 @@ production and staging deployments. To deploy it individually, dispatch that
 workflow with `worker: services/usage-ingest` and `target_environment: production`
 or `staging`.
 
-Normal staging CI has one queue preparation step before any Worker upload.
+Normal production and staging CI prepare their selected EU queues before Worker upload.
 It reads queue names from `wrangler.jsonc`, creates missing resources with
 explicit `jurisdiction: "eu"`, and verifies/reuses existing EU resources.
-Unknown jurisdiction or lookup/API errors stop deployment. The consumer then
-deploys with direct HTTP to the staging writer; both consumer upload attempts
-disable Wrangler's global auto-provisioning for EU selections. The preparation step also detaches the obsolete
-staging consumer before Wrangler attaches the selected source; it preserves both queue pairs.
+Unknown jurisdiction or lookup/API errors stop deployment. Both consumer upload
+attempts disable Wrangler's global auto-provisioning for EU selections. Staging
+continues direct HTTP to its writer; production stays receipt-only. The preparation step also detaches the obsolete
+environment consumer before Wrangler attaches the selected source; it preserves both queue pairs.
 See [deployment-driven cutover and routing rollback](eu-queues.md).
-Production keeps automatic provisioning and its original names/policy.
+Production uses its EU pair while retaining receipt mode, batch1/cap1 and retry policy.
+Historical global production revisions retain normal provisioning; see the helper capability notes in [EU setup](eu-queues.md).
 `USAGE_INGEST_QUEUE` binds the source and `USAGE_INGEST_DLQ` binds its matching DLQ;
 only the source has a consumer. Exhausted failures route to that DLQ.
 
@@ -276,8 +279,9 @@ account in `wrangler.jsonc`:
 pnpm --filter cloudflare-usage-ingest queues:prepare
 pnpm --filter cloudflare-usage-ingest exec wrangler deploy --env staging --experimental-provision=false
 
-# Production
-pnpm --filter cloudflare-usage-ingest exec wrangler deploy
+# Production: same preparation entrypoint with explicit environment.
+pnpm --filter cloudflare-usage-ingest exec node scripts/provision-queues.mjs production
+pnpm --filter cloudflare-usage-ingest exec wrangler deploy --experimental-provision=false
 ```
 
 Staging enables its public `workers.dev` URL. After deployment, append `/usage`

@@ -44,7 +44,7 @@ const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDB
 
 const USER_ID = 'user_123';
 const OTHER_USER_ID = 'user_other';
-const ORG_ID = 'org_123';
+const ORG_ID = '11111111-1111-4111-8111-111111111111';
 const WORKER_URL = 'https://control.test';
 const SECRET = env.NEXTAUTH_SECRET as string;
 
@@ -213,7 +213,10 @@ async function createSession(input: {
       turn: { type: 'prompt', prompt: 'hello' },
       agent: { mode: 'code', model: 'test/model' },
     },
-    sandboxSelection: { provider: 'vercel' },
+    sandboxSelection: {
+      provider: 'vercel',
+      byoc: { organizationId: ORG_ID, credentialId: '22222222-2222-4222-8222-222222222222' },
+    },
     ...(input.seal ? { runtimeAuthorizationSeal: input.seal } : {}),
   });
   return sessionStub;

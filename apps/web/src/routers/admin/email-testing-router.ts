@@ -11,6 +11,7 @@ import {
   subjects,
   creditsVars,
   buildCreditsTopUpCreditsRowSection,
+  buildCreditsTopUpExpirySection,
   buildCreditsTopUpReceiptSection,
   buildCreditsTopUpServiceFeeSection,
   RawHtml,
@@ -23,6 +24,8 @@ import * as z from 'zod';
 import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
 import { recordAdminAction } from '@/lib/admin/admin-action-audit';
 import { format } from 'date-fns';
+import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
+import { addCalendarYearUtc } from '@kilocode/web-shared/lib/paidCreditPolicy';
 
 const templateNames = Object.keys(subjects) as [TemplateName, ...TemplateName[]];
 
@@ -242,6 +245,11 @@ export function fixtureTemplateVars(template: TemplateName): Record<string, stri
           hasServiceFee: false,
         }),
         purchase_date: formatDate(new Date()),
+        credit_expiry_section: buildCreditsTopUpExpirySection(
+          getPaidCreditTerms('stripe') === 'one_year'
+            ? new Date(addCalendarYearUtc(new Date()))
+            : null
+        ),
         credits_url: `${NEXTAUTH_URL}/credits`,
         receipt_section: buildCreditsTopUpReceiptSection('https://pay.stripe.com/receipts/test'),
       };

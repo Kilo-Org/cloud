@@ -1,9 +1,10 @@
 import { env, runInDurableObject } from 'cloudflare:test';
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   decodeKiloSdkMessagesCursor,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES,
   MAX_SESSION_DIFF_READ_BYTES,
   getSessionShareExpiresAt,
   sessionShareDurationSchema,
@@ -783,6 +784,400 @@ describe('SessionIngestDO integration', () => {
     });
   });
 
+  describe('part identity layouts', () => {
+    const message = (sessionId: string) => ({
+      id: 'msg_a',
+      sessionID: sessionId,
+      role: 'user' as const,
+      time: { created: 100 },
+    });
+    const part = (sessionId: string, text: string) => ({
+      id: 'prt_1',
+      sessionID: sessionId,
+      messageID: 'msg_a',
+      type: 'text' as const,
+      text,
+    });
+
+    it('stores a part under its own identity next to its message', async () => {
+      const sessionId = 'ses_part_layout_store_0000001';
+      const stub = getStub(kiloUserId, sessionId);
+      await stub.ingest(
+        [
+          { type: 'message', data: message(sessionId) },
+          { type: 'part', data: part(sessionId, 'hello') },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      const rows = await runInDurableObject(stub, async (_instance, state) =>
+        state.storage.sql
+          .exec<{ item_id: string; item_type: string }>(
+            'SELECT item_id, item_type FROM ingest_items ORDER BY item_id'
+          )
+          .toArray()
+      );
+      expect(rows).toEqual([
+        { item_id: 'message/msg_a', item_type: 'message' },
+        { item_id: 'part/msg_a/prt_1', item_type: 'part' },
+      ]);
+    });
+
+    it('returns an older-layout part row with its message', async () => {
+      const sessionId = 'ses_part_layout_previous_0001';
+      const stub = getStub(kiloUserId, sessionId);
+      await stub.ingest([{ type: 'message', data: message(sessionId) }], kiloUserId, sessionId, 1);
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+          'msg_a/prt_1',
+          'part',
+          JSON.stringify(part(sessionId, 'stored earlier')),
+          1000
+        );
+      });
+
+      await expect(stub.readKiloSdkMessages({ limit: 1 })).resolves.toEqual({
+        messages: [{ info: message(sessionId), parts: [part(sessionId, 'stored earlier')] }],
+        nextCursor: null,
+        omittedItemCount: 0,
+      });
+
+      const exported = JSON.parse(await stub.getAllStream().then(s => new Response(s).text())) as {
+        messages: Array<{ parts: Array<{ id: string }> }>;
+      };
+      expect(exported.messages.flatMap(entry => entry.parts.map(p => p.id))).toEqual(['prt_1']);
+    });
+
+    it('keeps one stored row per part', async () => {
+      const sessionId = 'ses_part_layout_converge_001';
+      const stub = getStub(kiloUserId, sessionId);
+      await stub.ingest([{ type: 'message', data: message(sessionId) }], kiloUserId, sessionId, 1);
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+          'msg_a/prt_1',
+          'part',
+          JSON.stringify(part(sessionId, 'stale')),
+          1000
+        );
+      });
+      await stub.ingest(
+        [{ type: 'part', data: part(sessionId, 'fresh') }],
+        kiloUserId,
+        sessionId,
+        1,
+        2000
+      );
+
+      const rows = await runInDurableObject(stub, async (_instance, state) =>
+        state.storage.sql
+          .exec<{ item_id: string }>(
+            'SELECT item_id FROM ingest_items WHERE item_type = ? ORDER BY item_id',
+            'part'
+          )
+          .toArray()
+      );
+      expect(rows).toEqual([{ item_id: 'part/msg_a/prt_1' }]);
+      await expect(stub.readKiloSdkMessages({ limit: 1 })).resolves.toEqual({
+        messages: [{ info: message(sessionId), parts: [part(sessionId, 'fresh')] }],
+        nextCursor: null,
+        omittedItemCount: 0,
+      });
+    });
+
+    it('deletes the previous-layout body when the stored row is replaced', async () => {
+      const sessionId = 'ses_part_layout_body_00000001';
+      const stub = getStub(kiloUserId, sessionId);
+      const previousKey = `items/${kiloUserId}/${sessionId}/msg_a/prt_1/earlier`;
+      await stub.ingest([{ type: 'message', data: message(sessionId) }], kiloUserId, sessionId, 1);
+      try {
+        await env.SESSION_INGEST_R2.put(previousKey, '{}');
+        await runInDurableObject(stub, async (_instance, state) => {
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data, item_data_r2_key, ingested_at) ' +
+              'VALUES (?, ?, ?, ?, ?)',
+            'msg_a/prt_1',
+            'part',
+            '{}',
+            previousKey,
+            1000
+          );
+        });
+
+        await stub.ingest(
+          [{ type: 'part', data: part(sessionId, 'fresh') }],
+          kiloUserId,
+          sessionId,
+          1,
+          2000
+        );
+
+        const rows = await runInDurableObject(stub, async (_instance, state) =>
+          state.storage.sql
+            .exec<{ item_id: string; item_data_r2_key: string | null }>(
+              'SELECT item_id, item_data_r2_key FROM ingest_items WHERE item_type = ?',
+              'part'
+            )
+            .toArray()
+        );
+        expect(rows).toEqual([{ item_id: 'part/msg_a/prt_1', item_data_r2_key: null }]);
+        await vi.waitFor(async () => {
+          await expect(env.SESSION_INGEST_R2.head(previousKey)).resolves.toBeNull();
+        });
+      } finally {
+        await env.SESSION_INGEST_R2.delete(previousKey);
+      }
+    });
+
+    it('preserves the most recent part value across persisted layouts', async () => {
+      const sessionId = 'ses_part_layout_delayed_0000001';
+      const stub = getStub(kiloUserId, sessionId);
+      const stagedKey = `items/${kiloUserId}/${sessionId}/part/prt_1/delayed`;
+      await stub.ingest([{ type: 'message', data: message(sessionId) }], kiloUserId, sessionId, 1);
+      try {
+        await runInDurableObject(stub, async (_instance, state) => {
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+            'msg_a/prt_1',
+            'part',
+            JSON.stringify(part(sessionId, 'stored later')),
+            2000
+          );
+        });
+        await env.SESSION_INGEST_R2.put(stagedKey, '{}');
+
+        await stub.ingest(
+          [{ type: 'part', data: part(sessionId, 'delivered late') }],
+          kiloUserId,
+          sessionId,
+          1,
+          1000,
+          { 'part/msg_a/prt_1': stagedKey }
+        );
+
+        const rows = await runInDurableObject(stub, async (_instance, state) =>
+          state.storage.sql
+            .exec<{ item_id: string }>(
+              'SELECT item_id FROM ingest_items WHERE item_type = ? ORDER BY item_id',
+              'part'
+            )
+            .toArray()
+        );
+        expect(rows).toEqual([{ item_id: 'msg_a/prt_1' }]);
+
+        await expect(stub.readKiloSdkMessages({ limit: 1 })).resolves.toEqual({
+          messages: [{ info: message(sessionId), parts: [part(sessionId, 'stored later')] }],
+          nextCursor: null,
+          omittedItemCount: 0,
+        });
+
+        const exported = JSON.parse(
+          await stub.getAllStream().then(s => new Response(s).text())
+        ) as {
+          messages: Array<{ info: { id: string }; parts: Array<{ text: string }> }>;
+        };
+        expect(
+          exported.messages.map(entry => [entry.info.id, entry.parts.map(row => row.text)])
+        ).toEqual([['msg_a', ['stored later']]]);
+
+        await vi.waitFor(async () => {
+          await expect(env.SESSION_INGEST_R2.head(stagedKey)).resolves.toBeNull();
+        });
+      } finally {
+        await env.SESSION_INGEST_R2.delete(stagedKey);
+      }
+    });
+
+    it('stores a part under the part root for every message id', async () => {
+      const sessionId = 'ses_part_layout_root_0000001';
+      const stub = getStub(kiloUserId, sessionId);
+      await stub.ingest(
+        [{ type: 'message', data: { ...message(sessionId), id: 'msg_a' } }],
+        kiloUserId,
+        sessionId,
+        1
+      );
+      await stub.ingest(
+        [
+          {
+            type: 'part',
+            data: { id: 'msg_a', messageID: 'message', type: 'text', text: 'own' },
+          },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      const rows = await runInDurableObject(stub, async (_instance, state) =>
+        state.storage.sql
+          .exec<{ item_id: string; item_type: string; item_data: string }>(
+            'SELECT item_id, item_type, item_data FROM ingest_items ORDER BY item_id'
+          )
+          .toArray()
+      );
+      expect(rows).toEqual([
+        {
+          item_id: 'message/msg_a',
+          item_type: 'message',
+          item_data: JSON.stringify(message(sessionId)),
+        },
+        {
+          item_id: 'part/message/msg_a',
+          item_type: 'part',
+          item_data: JSON.stringify({
+            id: 'msg_a',
+            messageID: 'message',
+            type: 'text',
+            text: 'own',
+          }),
+        },
+      ]);
+    });
+
+    it('exports parts stored under both layouts', async () => {
+      const sessionId = 'ses_part_layout_both_0000001';
+      const stub = getStub(kiloUserId, sessionId);
+      await stub.ingest([{ type: 'message', data: message(sessionId) }], kiloUserId, sessionId, 1);
+      await runInDurableObject(stub, async (_instance, state) => {
+        for (let index = 0; index < 12; index += 1) {
+          const id = `prt_previous_${String(index).padStart(2, '0')}`;
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+            `msg_a/${id}`,
+            'part',
+            JSON.stringify({
+              id,
+              sessionID: sessionId,
+              messageID: 'msg_a',
+              type: 'text',
+              text: id,
+            }),
+            1000 + index
+          );
+        }
+      });
+      await stub.ingest(
+        Array.from({ length: 12 }, (_unused, index) => {
+          const id = `prt_current_${String(index).padStart(2, '0')}`;
+          return {
+            type: 'part' as const,
+            data: { id, sessionID: sessionId, messageID: 'msg_a', type: 'text', text: id },
+          };
+        }),
+        kiloUserId,
+        sessionId,
+        1,
+        5000
+      );
+
+      const exported = JSON.parse(await stub.getAllStream().then(s => new Response(s).text())) as {
+        messages: Array<{ parts: Array<{ id: string }> }>;
+      };
+      expect(exported.messages.flatMap(entry => entry.parts.map(part => part.id))).toEqual([
+        ...Array.from(
+          { length: 12 },
+          (_unused, index) => `prt_previous_${String(index).padStart(2, '0')}`
+        ),
+        ...Array.from(
+          { length: 12 },
+          (_unused, index) => `prt_current_${String(index).padStart(2, '0')}`
+        ),
+      ]);
+
+      const read = await stub.readKiloSdkMessages({});
+      if ('kind' in read) throw new Error(`unexpected read failure: ${read.kind}`);
+      expect(read.messages[0]?.parts).toHaveLength(24);
+    });
+
+    it("exports a message's own parts when the ranges share a prefix", async () => {
+      const sessionId = 'ses_part_layout_overlap_000001';
+      const stub = getStub(kiloUserId, sessionId);
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+          'message/part',
+          'message',
+          JSON.stringify({ id: 'part', time: { created: 1 } }),
+          1000
+        );
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+          'part/prt_legacy',
+          'part',
+          JSON.stringify({ id: 'prt_legacy', messageID: 'part', type: 'text', text: 'own' }),
+          1001
+        );
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+          'part/msg_other/prt_other',
+          'part',
+          JSON.stringify({ id: 'prt_other', messageID: 'msg_other', type: 'text', text: 'other' }),
+          1002
+        );
+      });
+
+      const exported = JSON.parse(await stub.getAllStream().then(s => new Response(s).text())) as {
+        messages: Array<{ info: { id: string }; parts: Array<{ id: string }> }>;
+      };
+      expect(
+        exported.messages.map(entry => [entry.info.id, entry.parts.map(part => part.id)])
+      ).toEqual([['part', ['prt_legacy']]]);
+    });
+
+    it('exports only parts persisted before the shared boundary in either layout', async () => {
+      const sessionId = 'ses_part_layout_shared_0000001';
+      const publicId = '33333333-3333-4333-8333-333333333333';
+      const stub = getStub(kiloUserId, sessionId);
+      await stub.ingest(
+        [
+          { type: 'message', data: message(sessionId) },
+          { type: 'part', data: part(sessionId, 'kept') },
+        ],
+        kiloUserId,
+        sessionId,
+        1,
+        1000
+      );
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+          'msg_a/prt_legacy',
+          'part',
+          JSON.stringify({ ...part(sessionId, 'kept earlier'), id: 'prt_legacy' }),
+          1000
+        );
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+          'msg_a/prt_legacy_late',
+          'part',
+          JSON.stringify({ ...part(sessionId, 'later'), id: 'prt_legacy_late' }),
+          3000
+        );
+      });
+      await stub.captureShareInfo(publicId);
+      await stub.ingest(
+        [{ type: 'part', data: { ...part(sessionId, 'later'), id: 'prt_2' } }],
+        kiloUserId,
+        sessionId,
+        1,
+        3000
+      );
+
+      const shared = JSON.parse(
+        await stub
+          .getSharedSessionStream({ publicId, ingestedBeforeMs: 2000 })
+          .then(s => new Response(s).text())
+      ) as { messages: Array<{ parts: Array<{ id: string }> }> };
+      expect(shared.messages.map(entry => entry.parts.map(partRow => partRow.id))).toEqual([
+        ['prt_1', 'prt_legacy'],
+      ]);
+    });
+  });
+
   describe('SDK session snapshot reads', () => {
     it('distinguishes pending snapshots from exact materialized SDK sessions', async () => {
       const sessionId = 'ses_sdk_snapshot_00000000001';
@@ -1211,7 +1606,7 @@ describe('SessionIngestDO integration', () => {
         sessionId,
         1,
         1000,
-        { 'msg_user_01/prt_user_01': `items/${sessionId}/part/missing` }
+        { 'part/msg_user_01/prt_user_01': `items/${sessionId}/part/missing` }
       );
 
       expect(await stub.readKiloSdkMessages({ limit: 1 })).toEqual({
@@ -1255,6 +1650,44 @@ describe('SessionIngestDO integration', () => {
 
       const earlier = await stub.readKiloSdkMessages({ limit: 2, before: latest.nextCursor });
       expect(earlier.messages.map(message => message.info.id)).toEqual(['msg_100', 'msg_200']);
+      expect(earlier.nextCursor).toBeNull();
+    });
+
+    it('omits a message identity outside the cursor contract from a bounded page', async () => {
+      const sessionId = 'ses_sdk_page_cursor_fit_0001';
+      const stub = getStub(kiloUserId, sessionId);
+      const longId = `msg${'z'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES)}`;
+      const message = (id: string, created: number) => ({
+        id,
+        sessionID: sessionId,
+        role: 'user' as const,
+        time: { created },
+        agent: 'build',
+        model: { providerID: 'provider', modelID: 'model' },
+      });
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        for (const info of [
+          message('msg_1_old', 100),
+          message('msg_2_mid', 200),
+          message(longId, 300),
+        ]) {
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data) VALUES (?, ?, ?)',
+            `message/${info.id}`,
+            'message',
+            JSON.stringify(info)
+          );
+        }
+      });
+
+      const latest = await stub.readKiloSdkMessages({ limit: 1 });
+      expect(latest.messages.map(entry => entry.info.id)).toEqual(['msg_2_mid']);
+      expect(latest.omittedItemCount).toBe(1);
+      expect(latest.nextCursor).toBeTruthy();
+
+      const earlier = await stub.readKiloSdkMessages({ limit: 1, before: latest.nextCursor! });
+      expect(earlier.messages.map(entry => entry.info.id)).toEqual(['msg_1_old']);
       expect(earlier.nextCursor).toBeNull();
     });
 
@@ -2142,7 +2575,7 @@ describe('SessionIngestDO integration', () => {
         1
       );
       await stub.ingest([{ type: 'part', data: oversizedPart }], kiloUserId, sessionId, 1, 1000, {
-        [`${info.id}/${oversizedPart.id}`]: oversizedKey,
+        [`part/${info.id}/${oversizedPart.id}`]: oversizedKey,
       });
 
       await env.SESSION_INGEST_R2.put(
@@ -2191,7 +2624,7 @@ describe('SessionIngestDO integration', () => {
         sessionId,
         1,
         1000,
-        { [`${info.id}/${part.id}`]: key }
+        { [`part/${info.id}/${part.id}`]: key }
       );
 
       await expect(stub.readKiloSdkMessages({ limit: 1 })).resolves.toEqual({

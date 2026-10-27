@@ -139,3 +139,103 @@ it('propagates caller cancellation to the outbound writer request', async () => 
   expect(signal?.aborted).toBe(true);
   expect(timeout).toHaveBeenCalledExactlyOnceWith(USAGE_WRITER_TIMEOUT_MS);
 });
+
+it.each([200, 307, 429, 503, 'throws'])(
+  'correlates relay timing without changing response/transport outcome (%s)',
+  async status => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const clock = vi.spyOn(performance, 'now').mockReturnValue(20);
+    vi.spyOn(Date, 'now').mockReturnValue(1000);
+    const failure = new Error('sensitive-transport-error');
+    const response = typeof status === 'number' ? new Response(null, { status }) : undefined;
+    const fetch = vi.fn().mockImplementation(async () => {
+      clock.mockReturnValue(67);
+      if (!response) throw failure;
+      return response;
+    });
+    vi.stubGlobal('fetch', fetch);
+    const work = relay.fetch(
+      new Request(target, {
+        method: 'POST',
+        headers: {
+          'x-usage-id': usage.core.id,
+          'x-internal-api-key': 'sensitive-writer',
+          'x-vercel-protection-bypass': 'sensitive-bypass',
+          cookie: 'sensitive-cookie',
+        },
+        body: JSON.stringify(usage),
+      }),
+      { ...relayEnv, USAGE_INGEST_DIAGNOSTICS: 'all' }
+    );
+    if (response) expect(await work).toBe(response);
+    else await expect(work).rejects.toBe(failure);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(fetch.mock.calls[0][0]).toBe(target);
+    expect(fetch.mock.calls[0][1].headers.get('x-usage-id')).toBe(usage.core.id);
+    expect(info).toHaveBeenCalledExactlyOnceWith(
+      JSON.stringify({
+        level: 'info',
+        event: 'usage_ingest_relay_forward',
+        usage_id: usage.core.id,
+        relay_entry_at_ms: 1000,
+        before_forward_at_ms: 1000,
+        after_forward_at_ms: 1000,
+        forward_duration_ms: 47,
+        outcome: response ? 'response' : 'request_failed',
+        ...(response ? { writer_status: status } : {}),
+      })
+    );
+    for (const value of [
+      'sensitive-',
+      usage.metadata.user_prompt_prefix,
+      usage.core.kilo_user_id,
+      target,
+    ]) {
+      expect(JSON.stringify(info.mock.calls)).not.toContain(value);
+    }
+  }
+);
+
+it.each([undefined, 'not-a-uuid', 'private@example.test', 'x'.repeat(1000)])(
+  'does not forward or log an invalid correlation marker (%s)',
+  async marker => {
+    const fetch = vi.fn().mockResolvedValue(new Response());
+    vi.stubGlobal('fetch', fetch);
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    await relay.fetch(
+      new Request(target, {
+        method: 'POST',
+        headers: {
+          'x-internal-api-key': 'synthetic-key',
+          ...(marker ? { 'x-usage-id': marker } : {}),
+        },
+      }),
+      { ...relayEnv, USAGE_INGEST_DIAGNOSTICS: 'all' }
+    );
+    expect(fetch.mock.calls[0][1].headers.has('x-usage-id')).toBe(false);
+    expect(info).not.toHaveBeenCalled();
+  }
+);
+
+it('leaves relay correlation off by default and ignores log sink failures when enabled', async () => {
+  const fetch = vi.fn().mockImplementation(() => Promise.resolve(new Response()));
+  vi.stubGlobal('fetch', fetch);
+  const info = vi.spyOn(console, 'info').mockImplementation(() => {
+    throw new Error('sink');
+  });
+  const request = () =>
+    new Request(target, {
+      method: 'POST',
+      headers: {
+        'x-internal-api-key': 'synthetic-key',
+        'x-usage-id': usage.core.id,
+      },
+    });
+  expect((await relay.fetch(request(), relayEnv)).status).toBe(200);
+  expect(info).not.toHaveBeenCalled();
+  expect(fetch.mock.calls[0][1].headers.has('x-usage-id')).toBe(false);
+  expect(
+    (await relay.fetch(request(), { ...relayEnv, USAGE_INGEST_DIAGNOSTICS: 'all' })).status
+  ).toBe(200);
+  expect(fetch).toHaveBeenCalledTimes(2);
+});

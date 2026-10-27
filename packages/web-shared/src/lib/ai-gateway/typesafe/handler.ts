@@ -100,7 +100,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
   }
 
   const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
-    await getBalanceAndOrgSettings(organizationId, user, readDb);
+    await getBalanceAndOrgSettings(organizationId, user, readDb, 'usage');
   if (!canSpendPaidUsage(balance)) {
     return creditsBlockedResponse({ user, balance, organizationId, balanceLimitedByUserAllowance });
   }

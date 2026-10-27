@@ -883,6 +883,7 @@
     "copied",
     "deleted",
     "dismissed",
+    "edit",
     "open",
     "open pull request",
     "remediation blocked",

@@ -23,6 +23,7 @@ import {
   organization_groups,
   organization_group_memberships,
   organization_group_policy_settings,
+  byoc_connections,
   organization_invitations,
   organization_recommendation_dismissals,
   security_audit_log,
@@ -84,6 +85,7 @@ import {
   agent_environment_profile_mcp_servers,
   agent_environment_profile_skills,
   cloud_agent_sandbox_allocation_settings,
+  cloud_agent_environments,
   deleted_user_email_tombstones,
   impact_attribution_touches,
   impact_advocate_participants,
@@ -184,6 +186,7 @@ import {
   SecurityFindingNotificationStatus,
   UserDeletionCloudSubjectResolution,
   UserDeletionRequestStatus,
+  type VercelComputeCredentialEnvelope,
 } from '@kilocode/db/schema-types';
 
 import type * as StripeClient from '@kilocode/web-shared/lib/stripe-client';
@@ -326,6 +329,7 @@ describe('User', () => {
     await db.delete(agent_environment_profile_skills);
     await db.delete(agent_environment_profile_mcp_servers);
     await db.delete(cloud_agent_webhook_triggers);
+    await db.delete(cloud_agent_environments);
     await db.delete(agent_environment_profiles);
     await db.delete(github_branch_pull_requests);
     await db.delete(code_review_memory_proposals);
@@ -335,6 +339,7 @@ describe('User', () => {
     await db.delete(platform_access_token_credentials);
     await db.delete(platform_integrations);
     await db.delete(github_app_installations);
+    await db.delete(byoc_connections);
     await db.delete(organizations);
     await db.delete(cli_sessions_v2);
     await db.delete(kilocode_users);
@@ -2330,6 +2335,93 @@ describe('User', () => {
           )
       ).toHaveLength(1);
     });
+
+    it('deletes all personal BYOC connections while preserving organization connections', async () => {
+      const user = await insertTestUser({ id: 'oauth/google/vercel-credential-owner' });
+      const organizationOwner = await insertTestUser();
+      const organization = await createTestOrganization(
+        'Vercel Credential Cleanup Org',
+        organizationOwner.id,
+        0
+      );
+      await db.insert(organization_memberships).values({
+        organization_id: organization.id,
+        kilo_user_id: user.id,
+        role: 'member',
+      });
+
+      const tokenEncrypted = {
+        scheme: 'byoc-vercel-credential-rsa-aes-256-gcm',
+        version: 1,
+        keyId: 'test-key',
+        ciphertext: {
+          encryptedData: 'encrypted-data',
+          encryptedDEK: 'encrypted-dek',
+          algorithm: 'rsa-aes-256-gcm',
+          version: 1,
+        },
+      } satisfies VercelComputeCredentialEnvelope;
+      const personalCredentialId = randomUUID();
+      const organizationCredentialId = randomUUID();
+      const otherPersonalId = randomUUID();
+      await db.insert(byoc_connections).values([
+        {
+          id: personalCredentialId,
+          organization_id: null,
+          user_id: user.id,
+          provider: 'vercel',
+          credentials_encrypted: tokenEncrypted,
+          config: { token_scope: 'team', team_id: 'team_personal', project_id: 'prj_personal' },
+        },
+        {
+          id: organizationCredentialId,
+          organization_id: organization.id,
+          user_id: null,
+          provider: 'vercel',
+          credentials_encrypted: tokenEncrypted,
+          config: {
+            token_scope: 'team',
+            team_id: 'team_organization',
+            project_id: 'prj_organization',
+          },
+        },
+        {
+          id: otherPersonalId,
+          user_id: user.id,
+          provider: 'another-provider',
+          credentials_encrypted: tokenEncrypted,
+          config: { region: 'test-region' },
+        },
+      ]);
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+      expect(
+        await db
+          .select()
+          .from(byoc_connections)
+          .where(eq(byoc_connections.id, personalCredentialId))
+      ).toHaveLength(0);
+      expect(
+        await db.query.byoc_connections.findFirst({
+          where: eq(byoc_connections.id, otherPersonalId),
+        })
+      ).toBeUndefined();
+      expect(
+        await db
+          .select()
+          .from(byoc_connections)
+          .where(eq(byoc_connections.id, organizationCredentialId))
+      ).toEqual([
+        expect.objectContaining({
+          id: organizationCredentialId,
+          organization_id: organization.id,
+          user_id: null,
+          provider: 'vercel',
+          credentials_encrypted: tokenEncrypted,
+        }),
+      ]);
+    });
   });
 
   describe('softDeleteUser', () => {
@@ -2689,6 +2781,46 @@ describe('User', () => {
           .from(cloud_agent_pending_uploads)
           .where(eq(cloud_agent_pending_uploads.id, otherPending.id))
       ).toHaveLength(1);
+    });
+
+    it('preserves attachment cleanup work until completion', async () => {
+      const user = await insertTestUser();
+      const id = crypto.randomUUID();
+      await db.insert(cloud_agent_pending_uploads).values({
+        id,
+        kilo_user_id: user.id,
+        object_key: `${user.id}/cloud-agent/${crypto.randomUUID()}.bin`,
+        message_uuid: crypto.randomUUID(),
+        attachment_id: crypto.randomUUID(),
+        byte_size: 42,
+        status: 'linked',
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      });
+      mockR2Send.mockRejectedValue(new Error('R2 unavailable'));
+      try {
+        await expect(softDeleteUser(user.id)).rejects.toThrow(
+          'Cloud Agent attachment cleanup incomplete'
+        );
+        expect(
+          await db
+            .select({
+              id: cloud_agent_pending_uploads.id,
+              status: cloud_agent_pending_uploads.status,
+            })
+            .from(cloud_agent_pending_uploads)
+            .where(eq(cloud_agent_pending_uploads.id, id))
+        ).toEqual([{ id, status: 'pending' }]);
+      } finally {
+        mockR2Send.mockResolvedValue({});
+      }
+
+      await softDeleteUser(user.id);
+      expect(
+        await db
+          .select({ id: cloud_agent_pending_uploads.id })
+          .from(cloud_agent_pending_uploads)
+          .where(eq(cloud_agent_pending_uploads.id, id))
+      ).toEqual([]);
     });
 
     it('deletes user data export state and dependent multipart and outbox rows', async () => {
@@ -5459,6 +5591,40 @@ describe('User', () => {
         .from(agent_environment_profile_skills)
         .where(eq(agent_environment_profile_skills.profile_id, profile.id));
       expect(skills).toHaveLength(0);
+    });
+
+    it('deletes user-owned repository environments without touching another owner', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+
+      await db.insert(cloud_agent_environments).values([
+        {
+          owned_by_user_id: user.id,
+          name: 'mine',
+          platform: 'github',
+          repo_full_name: 'acme/widgets',
+        },
+        {
+          owned_by_user_id: otherUser.id,
+          name: 'theirs',
+          platform: 'github',
+          repo_full_name: 'acme/widgets',
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      const environments = await db
+        .select()
+        .from(cloud_agent_environments)
+        .where(eq(cloud_agent_environments.owned_by_user_id, otherUser.id));
+      expect(environments.map(environment => environment.name)).toEqual(['theirs']);
+
+      const deletedUserEnvironments = await db
+        .select()
+        .from(cloud_agent_environments)
+        .where(eq(cloud_agent_environments.owned_by_user_id, user.id));
+      expect(deletedUserEnvironments).toHaveLength(0);
     });
 
     it('should nullify user_feedback FK', async () => {

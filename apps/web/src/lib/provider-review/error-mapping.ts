@@ -26,6 +26,10 @@ export function providerReviewErrorToTrpcError(error: ProviderReviewError): TRPC
       return new TRPCError({ code: 'CONFLICT', message: error.message, cause: error });
     case 'bad_request':
       return new TRPCError({ code: 'BAD_REQUEST', message: error.message, cause: error });
+    case 'too_large':
+      // The file is outside the review read budget, so no retry helps; the
+      // distinct code lets the caller tell it from a malformed request.
+      return new TRPCError({ code: 'PAYLOAD_TOO_LARGE', message: error.message, cause: error });
     case 'retryable':
       // A provider-side or network failure to retry, never a 500.
       return new TRPCError({ code: 'BAD_GATEWAY', message: error.message, cause: error });

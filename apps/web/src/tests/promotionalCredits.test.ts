@@ -1,5 +1,6 @@
-import { describe, it, expect } from '@jest/globals';
+import { describe, it, expect, jest, afterEach } from '@jest/globals';
 import {
+  GRANT_MSG_UNEXPECTED_FAILURE,
   grantCreditForCategory,
   grantCreditForCategoryConfig,
   redeemSelfServicePromoCode,
@@ -12,9 +13,14 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq, desc } from 'drizzle-orm';
 import { millisecondsInDay, millisecondsInHour } from 'date-fns/constants';
 import { assertNoError } from '@kilocode/web-shared/lib/maybe-result';
+import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 
 describe('grantCreditForCategory', () => {
   const mockUser: User = defineTestUser({});
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it('should refuse user redemption while the kill switch is off', async () => {
     const result = await redeemSelfServicePromoCode(mockUser, 'pull_request');
@@ -33,7 +39,7 @@ describe('grantCreditForCategory', () => {
   });
 
   it('should successfully grant credits for valid category', async () => {
-    const result = await grantCreditForCategory(mockUser, {
+    const result = await grantCreditForCategory(await insertTestUser(), {
       credit_category: 'vibeday',
       counts_as_selfservice: false,
     });
@@ -52,7 +58,7 @@ describe('grantCreditForCategory', () => {
   });
 
   it('should grant custom category with amount', async () => {
-    const result = await grantCreditForCategory(mockUser, {
+    const result = await grantCreditForCategory(await insertTestUser(), {
       credit_category: 'custom',
       amount_usd: 25,
       counts_as_selfservice: false,
@@ -60,6 +66,50 @@ describe('grantCreditForCategory', () => {
 
     expect(result.success).toBe(true);
     expect(result.message).toContain('Successfully added');
+  });
+
+  it('returns a fixed message when the grant throws', async () => {
+    const user = await insertTestUser();
+    const thrown = new Error('sensitive-internal-detail');
+    jest.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(() => {
+      throw thrown;
+    });
+    const captureException = jest.fn();
+    jest.doMock('@sentry/nextjs', () => ({
+      captureException,
+      captureMessage: jest.fn(),
+    }));
+
+    const config: PromoCreditCategoryConfig = {
+      credit_category: 'unexpected-failure',
+      amount_usd: 10,
+    };
+
+    await jest.isolateModulesAsync(async () => {
+      const { grantCreditForCategoryConfig: isolatedGrant } =
+        await import('@kilocode/web-shared/lib/promotionalCredits');
+
+      const result = await isolatedGrant(
+        { organization: null, user },
+        { credit_category: 'unexpected-failure', counts_as_selfservice: false },
+        config
+      );
+
+      expect(result.success).toBe(false);
+      expect(result.message).toBe(GRANT_MSG_UNEXPECTED_FAILURE);
+      expect(result.message).not.toContain('sensitive-internal-detail');
+    });
+
+    expect(captureException).toHaveBeenCalledWith(thrown, {
+      tags: { source: 'promotional_credits_grant' },
+      extra: {
+        credit_category: 'unexpected-failure',
+        kilo_user_id: user.id,
+        organization_id: null,
+      },
+    });
+
+    jest.dontMock('@sentry/nextjs');
   });
 
   it('stores an explicitly provided creator and leaves omitted creators null', async () => {
@@ -101,6 +151,35 @@ describe('grantCreditForCategory', () => {
         },
       ])
     );
+  });
+
+  it('checks grant requirements before opening the grant transaction', async () => {
+    const owner = await insertTestUser();
+    const organization = await createOrganization(
+      `promo-requirement-${crypto.randomUUID()}`,
+      owner.id
+    );
+    const transaction = jest.spyOn(db, 'transaction');
+    let transactionsOpenedDuringRequirement: number | undefined;
+    try {
+      const result = await grantCreditForCategoryConfig(
+        { organization, user: owner },
+        { credit_category: 'ORG_REQUIREMENT_OUTSIDE_TX', counts_as_selfservice: false },
+        {
+          credit_category: 'ORG_REQUIREMENT_OUTSIDE_TX',
+          amount_usd: 5,
+          organization_requirement: async () => {
+            transactionsOpenedDuringRequirement = transaction.mock.calls.length;
+            return { success: true };
+          },
+        }
+      );
+      assertNoError(result);
+      expect(transactionsOpenedDuringRequirement).toBe(0);
+      expect(transaction).toHaveBeenCalledTimes(1);
+    } finally {
+      transaction.mockRestore();
+    }
   });
 
   it('should grant valid self-serviceable promo codes', async () => {
@@ -437,5 +516,193 @@ describe('grantCreditForCategory', () => {
     const expiryDate = new Date(creditTransaction[0].expiry_date!);
     const expectedExpiry = new Date(beforeTime.getTime() + 2 * millisecondsInDay);
     expect(expiryDate.getTime()).toBeCloseTo(expectedExpiry.getTime(), -3); // Within 1000ms
+  });
+
+  it('applies total_redemptions_allowed', async () => {
+    const cap = 3;
+    const attempts = 10;
+    const promoConfig: PromoCreditCategoryConfig = {
+      credit_category: 'PARALLEL_CAP_TEST',
+      amount_usd: 10,
+      total_redemptions_allowed: cap,
+    };
+
+    const users = await Promise.all(Array.from({ length: attempts }, () => insertTestUser()));
+
+    const results = await Promise.all(
+      users.map(user =>
+        grantCreditForCategoryConfig(
+          { organization: null, user },
+          { credit_category: 'PARALLEL_CAP_TEST', counts_as_selfservice: false },
+          promoConfig
+        )
+      )
+    );
+
+    const succeeded = results.filter(r => r.success);
+    expect(succeeded.length).toBe(cap);
+
+    const rows = await db
+      .select({ id: credit_transactions.id })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.credit_category, 'PARALLEL_CAP_TEST'));
+    expect(rows.length).toBe(cap);
+  });
+
+  it('reconciles expired lots and repays refund debt once for competing capped grants', async () => {
+    const expiredAt = new Date(Date.now() - millisecondsInDay).toISOString();
+    const user = await insertTestUser({
+      total_microdollars_acquired: 5_000_000,
+      microdollars_used: 10_000_000,
+      next_credit_expiration_at: expiredAt,
+    });
+    const sourceId = crypto.randomUUID();
+    const refundId = crypto.randomUUID();
+    const expiredId = crypto.randomUUID();
+    await db.insert(credit_transactions).values([
+      {
+        id: sourceId,
+        kilo_user_id: user.id,
+        amount_microdollars: 10_000_000,
+        consumed_microdollars: 10_000_000,
+        is_free: false,
+        expiration_baseline_microdollars_used: 0,
+        original_baseline_microdollars_used: 0,
+      },
+      {
+        id: refundId,
+        kilo_user_id: user.id,
+        source_transaction_id: sourceId,
+        amount_microdollars: -10_000_000,
+        refund_principal_microdollars: -10_000_000,
+        is_free: false,
+      },
+      {
+        id: expiredId,
+        kilo_user_id: user.id,
+        amount_microdollars: 5_000_000,
+        is_free: true,
+        expiry_date: expiredAt,
+        expiration_baseline_microdollars_used: 10_000_000,
+        original_baseline_microdollars_used: 10_000_000,
+      },
+    ]);
+    const category = `CAPPED_REFUND_REPAYMENT_${crypto.randomUUID()}`;
+    const results = await Promise.all(
+      Array.from({ length: 2 }, () =>
+        grantCreditForCategoryConfig(
+          { organization: null, user },
+          { credit_category: category, counts_as_selfservice: false },
+          { credit_category: category, amount_usd: 10, total_redemptions_allowed: 1 }
+        )
+      )
+    );
+    const succeeded = results.filter(result => result.success);
+    expect(succeeded).toHaveLength(1);
+    expect(results.filter(result => !result.success)[0]?.message).toContain('redemption limit');
+    const grant = assertNoError(succeeded[0]);
+    const rows = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    expect(rows.filter(row => row.credit_category === category)).toHaveLength(1);
+    expect(rows.find(row => row.id === grant.credit_transaction_id)).toMatchObject({
+      expiration_baseline_microdollars_used: 0,
+      original_baseline_microdollars_used: 10_000_000,
+    });
+    expect(rows.filter(row => row.original_transaction_id === expiredId)).toEqual([
+      expect.objectContaining({ amount_microdollars: -5_000_000 }),
+    ]);
+    expect(rows.filter(row => row.credit_category === `refund_debt_absorbed:${refundId}`)).toEqual([
+      expect.objectContaining({
+        source_transaction_id: grant.credit_transaction_id,
+        amount_microdollars: 0,
+        consumed_microdollars: 10_000_000,
+      }),
+    ]);
+    const [current] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, user.id));
+    expect(current).toMatchObject({
+      total_microdollars_acquired: 10_000_000,
+      microdollars_used: 10_000_000,
+      next_credit_expiration_at: null,
+    });
+  });
+
+  it('applies total_redemptions_allowed when the caller supplies the transaction', async () => {
+    const cap = 2;
+    const attempts = 6;
+    const promoConfig: PromoCreditCategoryConfig = {
+      credit_category: 'CALLER_TX_CAP_TEST',
+      amount_usd: 10,
+      total_redemptions_allowed: cap,
+    };
+
+    const users = await Promise.all(Array.from({ length: attempts }, () => insertTestUser()));
+
+    // Each grant runs in its own caller-owned transaction; the cap applies
+    // across concurrent transactions.
+    const results = await Promise.all(
+      users.map(user =>
+        db.transaction(tx =>
+          grantCreditForCategoryConfig(
+            { organization: null, user },
+            {
+              credit_category: 'CALLER_TX_CAP_TEST',
+              counts_as_selfservice: false,
+              dbOrTx: tx,
+            },
+            promoConfig
+          )
+        )
+      )
+    );
+
+    const succeeded = results.filter(r => r.success);
+    expect(succeeded.length).toBe(cap);
+
+    const rows = await db
+      .select({ id: credit_transactions.id })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.credit_category, 'CALLER_TX_CAP_TEST'));
+    expect(rows.length).toBe(cap);
+  });
+
+  it('returns a failure result when the redemption count is unavailable', async () => {
+    const user = await insertTestUser();
+    const promoConfig: PromoCreditCategoryConfig = {
+      credit_category: 'COUNT_QUERY_TEST',
+      amount_usd: 10,
+      total_redemptions_allowed: 5,
+    };
+
+    const result = await db.transaction(async tx => {
+      const failing = new Proxy(tx, {
+        get(target, prop, receiver) {
+          if (prop === 'select') {
+            return () => {
+              throw new Error('select unavailable');
+            };
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+      return grantCreditForCategoryConfig(
+        { organization: null, user },
+        {
+          credit_category: 'COUNT_QUERY_TEST',
+          counts_as_selfservice: false,
+          dbOrTx: failing as never,
+        },
+        promoConfig
+      );
+    });
+
+    expect(result.success).toBe(false);
+
+    const rows = await db
+      .select({ id: credit_transactions.id })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.credit_category, 'COUNT_QUERY_TEST'));
+    expect(rows).toHaveLength(0);
   });
 });

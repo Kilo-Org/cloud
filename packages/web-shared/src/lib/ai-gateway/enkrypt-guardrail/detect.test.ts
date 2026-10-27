@@ -171,17 +171,35 @@ describe('scanTurnDelta', () => {
     expect(dependencies.fetch).not.toHaveBeenCalled();
   });
 
-  it('truncates the scanned text to the scan limit', async () => {
-    const dependencies = deps(async () => detectResponse({ summary: {} }));
+  describe('a turn above the scan limit', () => {
+    const text = 'a'.repeat(ENKRYPT_MAX_SCAN_CHARACTERS + 1);
 
-    await scanTurnDelta(
-      makeScan({ text: 'a'.repeat(ENKRYPT_MAX_SCAN_CHARACTERS + 10) }),
-      dependencies
-    );
+    it('is sent unscanned when failing open, never truncated', async () => {
+      const dependencies = deps(async () => detectResponse({ summary: {} }));
 
-    const [[, init]] = fetchCalls(dependencies);
-    const body: unknown = JSON.parse(String(init.body));
-    expect(body).toMatchObject({ text: 'a'.repeat(ENKRYPT_MAX_SCAN_CHARACTERS) });
+      const result = await scanTurnDelta(makeScan({ text }), dependencies);
+
+      expect(result).toEqual({ verdict: { action: 'allow' }, charges: [] });
+      expect(dependencies.fetch).not.toHaveBeenCalled();
+    });
+
+    it('is rejected without a retry hint when failing closed', async () => {
+      const dependencies = deps(async () => detectResponse({ summary: {} }));
+
+      const result = await scanTurnDelta(
+        makeScan({ text, config: { ...config, failMode: 'closed' } }),
+        dependencies
+      );
+
+      expect(result).toEqual({
+        verdict: {
+          action: 'block',
+          message: expect.stringContaining('cannot scan more than 500,000 characters'),
+        },
+        charges: [],
+      });
+      expect(dependencies.fetch).not.toHaveBeenCalled();
+    });
   });
 
   it('retries one transient failure and charges both calls', async () => {

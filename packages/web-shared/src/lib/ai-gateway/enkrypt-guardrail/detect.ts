@@ -14,10 +14,15 @@ export const ENKRYPT_GUARDRAIL_TIMEOUT_MS = 3_000;
 
 const MAX_ATTEMPTS = 2;
 
-/** `injection_attack` bills per 1,024 characters up to 25 units; this keeps a scan bounded. */
-export const ENKRYPT_MAX_SCAN_CHARACTERS = 100_000;
+/**
+ * A larger turn is not sent to Enkrypt. It is never truncated: the model would still read the
+ * unscanned remainder, which is where an injected instruction in a large file read would sit.
+ */
+export const ENKRYPT_MAX_SCAN_CHARACTERS = 500_000;
 
 const MAX_BLOCK_MESSAGE_LENGTH = 500;
+
+const TURN_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot scan more than ${ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US')} characters of new messages and tool results at once, so this request was not sent. Reduce the size of the latest tool output or message and retry.`;
 
 /**
  * Enkrypt only blocks on block-type detectors, which answer with a block message in
@@ -190,8 +195,7 @@ export async function scanTurnDelta(
   scan: EnkryptGuardrailScan,
   deps: EnkryptDetectDependencies
 ): Promise<EnkryptGuardrailScanResult> {
-  const truncated = scan.text.length > ENKRYPT_MAX_SCAN_CHARACTERS;
-  const text = truncated ? scan.text.slice(0, ENKRYPT_MAX_SCAN_CHARACTERS) : scan.text;
+  const { text } = scan;
   if (text.length === 0) return { verdict: { action: 'allow' }, charges: [] };
 
   const logFields = {
@@ -201,8 +205,16 @@ export async function scanTurnDelta(
     api_kind: scan.apiKind,
     detectors_enabled: Object.keys(scan.config.detectors),
     scanned_characters: text.length,
-    truncated,
   };
+
+  if (text.length > ENKRYPT_MAX_SCAN_CHARACTERS) {
+    // Retrying cannot shrink the turn, so failing closed rejects it for good with the reason.
+    return failedVerdict(scan, [], logFields, {
+      error: 'turn_too_large',
+      latencyMs: 0,
+      closedVerdict: { action: 'block', message: TURN_TOO_LARGE_MESSAGE },
+    });
+  }
 
   const apiKey = deps.apiKey;
   if (!apiKey) {
@@ -272,9 +284,10 @@ function failedVerdict(
   scan: EnkryptGuardrailScan,
   charges: EnkryptGuardrailCharge[],
   logFields: Record<string, unknown>,
-  failure: { error: string; latencyMs: number }
+  failure: { error: string; latencyMs: number; closedVerdict?: EnkryptGuardrailVerdict }
 ): EnkryptGuardrailScanResult {
   const failClosed = scan.config.failMode === 'closed';
+  const closedVerdict = failure.closedVerdict ?? { action: 'unavailable' };
   logFailure('[enkrypt-guardrail] decision', {
     ...logFields,
     decision: failClosed ? 'error_fail_closed' : 'error_fail_open',
@@ -284,7 +297,7 @@ function failedVerdict(
     credits_cost: totalCredits(charges),
   });
   return {
-    verdict: failClosed ? { action: 'unavailable' } : { action: 'allow' },
+    verdict: failClosed ? closedVerdict : { action: 'allow' },
     charges,
   };
 }

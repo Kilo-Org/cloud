@@ -3307,6 +3307,241 @@ describe('SessionIngestRPC hosted workspace catalog', () => {
     expect(tombstoneQuery.params).toEqual(expect.arrayContaining([workspaceId, 'usr_owner']));
     expect(getSessionIngestDO).not.toHaveBeenCalled();
   });
+
+  it('reports stored activity and journal progress for an active workspace', async () => {
+    const workspaceId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const timestamp = '2026-05-28 09:13:37.651263+00';
+    const workspaceRow: WorkspaceRow = {
+      workspaceId,
+      userId: 'usr_owner',
+      organizationId: null,
+      name: null,
+      gitUrl: null,
+      gitBranch: null,
+      profileId: null,
+      deletionStartedAt: null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      lastActivityAt: timestamp,
+    };
+    const { db, whereConditions } = makeWorkspaceDbFakes([
+      [workspaceRow],
+      [],
+      [
+        {
+          kiloSessionId: sdkSessionInfoFixture.id,
+          cloudAgentSessionId: 'workspace_00000000-0000-4000-8000-000000000000',
+          workspaceId,
+          userId: 'usr_owner',
+          organizationId: null,
+          title: 'Root',
+          gitUrl: null,
+          gitBranch: null,
+          profileId: null,
+          createdOnPlatform: 'cloud-agent-web',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          rank: 1,
+        },
+      ],
+      [
+        {
+          deletionStartedAt: null,
+          deletionCompletedAt: null,
+          deletionManifest: null,
+          runtimeLocations: [],
+          deletedSessionIds: null,
+        },
+      ],
+      [{ activeSessionCount: 2 }],
+    ]);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getCloudAgentWorkspaceStatus({ kiloUserId: 'usr_owner', workspaceId })
+    ).resolves.toEqual({
+      workspaceId,
+      userId: 'usr_owner',
+      organizationId: null,
+      deletionState: 'active',
+      activeSessionCount: 2,
+      deletion: {
+        started: false,
+        completed: false,
+        startedAt: null,
+        phase: 'not_started',
+        sessionCount: 0,
+        runtimeLocationCount: 0,
+        completedRuntimeLocationCount: 0,
+        remainingRuntimeLocationCount: 0,
+        deletedSessionIds: [],
+      },
+    });
+    const activityQuery = new PgDialect().sqlToQuery(whereConditions.at(-1)!);
+    expect(activityQuery.sql).toContain('"cli_sessions_v2"."kilo_user_id" = $');
+    expect(activityQuery.sql).toContain('"cli_sessions_v2"."cloud_agent_worktree_id" = $');
+    expect(activityQuery.sql).toContain(
+      '"cli_sessions_v2"."cloud_agent_session_scope_id" is not null'
+    );
+    expect(activityQuery.params).toEqual(expect.arrayContaining([workspaceId, 'usr_owner']));
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+  });
+
+  it('reuses a caller-authorized workspace without repeating the catalog query', async () => {
+    const workspaceId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const { db, builders } = makeWorkspaceDbFakes([
+      [
+        {
+          deletionStartedAt: null,
+          deletionCompletedAt: null,
+          deletionManifest: null,
+          runtimeLocations: [],
+          deletedSessionIds: null,
+        },
+      ],
+      [{ activeSessionCount: 1 }],
+    ]);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getCloudAgentWorkspaceStatus({
+        kiloUserId: 'usr_owner',
+        workspaceId,
+        authorizedWorkspace: {
+          userId: 'usr_owner',
+          organizationId: null,
+          deletionState: 'active',
+        },
+      })
+    ).resolves.toMatchObject({ workspaceId, activeSessionCount: 1 });
+    expect(builders).toHaveLength(2);
+  });
+
+  it('reports incomplete journal progress without touching a deleted workspace twice', async () => {
+    const workspaceId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const timestamp = '2026-05-28 09:13:37.651263+00';
+    const workspaceRow: WorkspaceRow = {
+      workspaceId,
+      userId: 'usr_owner',
+      organizationId: null,
+      name: null,
+      gitUrl: null,
+      gitBranch: null,
+      profileId: null,
+      deletionStartedAt: timestamp,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      lastActivityAt: timestamp,
+    };
+    const { db } = makeWorkspaceDbFakes([
+      [workspaceRow],
+      [],
+      [],
+      [
+        {
+          deletionStartedAt: timestamp,
+          deletionCompletedAt: null,
+          deletionManifest: {
+            version: 1,
+            sessions: [
+              {
+                sessionId: sdkSessionInfoFixture.id,
+                cloudAgentSessionId: 'workspace_00000000-0000-4000-8000-000000000000',
+              },
+              { sessionId: 'ses_22222222222222222222222222', cloudAgentSessionId: null },
+            ],
+            completedRuntimeLocations: [
+              { sandboxId: 'usr-original-route', provider: 'cloudflare' },
+            ],
+          },
+          runtimeLocations: [
+            { sandboxId: 'usr-original-route', provider: 'cloudflare' },
+            { sandboxId: 'usr-pending-route', provider: 'cloudflare' },
+          ],
+          deletedSessionIds: null,
+        },
+      ],
+      [{ activeSessionCount: 0 }],
+    ]);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getCloudAgentWorkspaceStatus({ kiloUserId: 'usr_owner', workspaceId })
+    ).resolves.toMatchObject({
+      deletionState: 'deleting',
+      activeSessionCount: 0,
+      deletion: {
+        started: true,
+        completed: false,
+        startedAt: new Date(timestamp).getTime(),
+        phase: 'runtime_cleanup',
+        sessionCount: 2,
+        runtimeLocationCount: 2,
+        completedRuntimeLocationCount: 1,
+        remainingRuntimeLocationCount: 1,
+        deletedSessionIds: [],
+      },
+    });
+  });
+
+  it('reports a completed tombstone without counting stored sessions', async () => {
+    const workspaceId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const timestamp = '2026-05-28 09:13:37.651263+00';
+    const { db } = makeWorkspaceDbFakes([
+      [],
+      [
+        {
+          workspaceId,
+          userId: 'usr_owner',
+          organizationId: null,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+      ],
+      [
+        {
+          deletionStartedAt: timestamp,
+          deletionCompletedAt: timestamp,
+          deletionManifest: null,
+          runtimeLocations: [],
+          deletedSessionIds: [sdkSessionInfoFixture.id],
+        },
+      ],
+    ]);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getCloudAgentWorkspaceStatus({ kiloUserId: 'usr_owner', workspaceId })
+    ).resolves.toEqual({
+      workspaceId,
+      userId: 'usr_owner',
+      organizationId: null,
+      deletionState: 'deleted',
+      activeSessionCount: 0,
+      deletion: {
+        started: true,
+        completed: true,
+        startedAt: new Date(timestamp).getTime(),
+        phase: 'completed',
+        sessionCount: 1,
+        runtimeLocationCount: 0,
+        completedRuntimeLocationCount: 0,
+        remainingRuntimeLocationCount: 0,
+        deletedSessionIds: [sdkSessionInfoFixture.id],
+      },
+    });
+  });
+
+  it('returns null for an unknown or foreign workspace', async () => {
+    const workspaceId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const { db } = makeWorkspaceDbFakes([[], []]);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getCloudAgentWorkspaceStatus({ kiloUserId: 'usr_owner', workspaceId })
+    ).resolves.toBeNull();
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+  });
 });
 
 describe('SessionIngestRPC.getSessionMessages (authorized generic history)', () => {

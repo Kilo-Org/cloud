@@ -21,6 +21,7 @@ import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import {
   forceDestroyControlPlaneSandbox,
   parseSandboxBillingInput,
+  SANDBOX_USAGE_SKUS,
   type SandboxBillingInput,
 } from '../../container-usage-context.js';
 import { resolveSecret } from '../../auth.js';
@@ -292,6 +293,7 @@ import { projectAllocationStatusSnapshot } from './status-snapshot.js';
 import { createSandboxNotificationDispatcher, type SandboxNotification } from './notifications.js';
 import { resolvePreviewTarget, type PreviewTargetResult } from './preview-target.js';
 import type { SandboxStatusSnapshot } from '../../shared/sandbox-status.js';
+import type { WorkspaceBillingProjection } from '../../shared/workspace-runtime-status.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
 import {
   createSharedWorktreeChanges,
@@ -823,6 +825,37 @@ export class SandboxControlV2 extends DurableObject<Env> {
         observedAt: Date.now(),
         inactivityTimeoutMs: this.sandboxIdleTimeoutMs(allocation),
       });
+    });
+  }
+
+  /**
+   * Passive workspace billing projection (workspace status). Reads the stored
+   * provider pin and the provider's read-only billing runtime status. It never
+   * admits work, starts the container or opens a metered interval.
+   */
+  async getWorkspaceBillingProjection(): Promise<WorkspaceBillingProjection | null> {
+    await this.initialized;
+    return this.enqueue(async () => {
+      const pin = this.providerPin;
+      if (pin === null) return null;
+      let projection: Awaited<ReturnType<NonNullable<ProviderAdapter['getBillingProjection']>>>;
+      try {
+        projection = await this.provider.getBillingProjection?.();
+      } catch {
+        projection = undefined;
+      }
+      const context = projection?.context;
+      const enforcementRequested = pin.billing?.enforcementRequested === true;
+      return {
+        payer: context?.subject ?? pin.billing?.subject ?? null,
+        actor: context?.actor ?? pin.billing?.actor ?? null,
+        onBehalfOf: context?.onBehalfOf ?? pin.billing?.onBehalfOf ?? null,
+        sku: projection === undefined ? null : SANDBOX_USAGE_SKUS[projection.sandboxClassName],
+        blocked: projection?.blocked ?? (enforcementRequested ? null : false),
+        enforcementRequested,
+        intervalStartedAt: context?.startEpochMs ?? null,
+        meterInstanceId: pin.billing?.sandboxId ?? null,
+      };
     });
   }
 
@@ -5097,6 +5130,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       case 'cloudflare':
         return createCloudflareProviderAdapter({
           sandboxId: allocationName,
+          billingContainment: this.credentialContainmentEnabled(),
           getSandbox: (id, options) =>
             getSandbox(this.sandboxNamespace(pin, id, options.containment), id),
           destroy: (id, options) =>

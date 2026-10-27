@@ -168,7 +168,9 @@ export type SandboxIdlePolicy = 'interactive' | 'unattended';
  */
 export function sandboxIdlePolicyForOrigins(origins: readonly unknown[]): SandboxIdlePolicy {
   return origins.length === 0 ||
-    origins.some(origin => origin === 'cloud-agent-web' || origin === 'desktop')
+    origins.some(
+      origin => origin === 'cloud-agent-web' || origin === 'desktop' || origin === 'agent-manager'
+    )
     ? 'interactive'
     : 'unattended';
 }

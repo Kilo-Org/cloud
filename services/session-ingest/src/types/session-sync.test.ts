@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES } from '@kilocode/session-ingest-contracts';
+
 import { SessionItemSchema } from './session-sync';
 
 describe('SessionItemSchema agent_notification validation', () => {
@@ -328,19 +330,18 @@ describe('SessionItemSchema storage key identity', () => {
     ).toBe(false);
   });
 
-  it('accepts a message ID at the cursor ID byte limit', () => {
+  it('accepts a message ID at the cursor id byte limit', () => {
+    // Message ids become history cursor ids, so the cursor contract, not the
+    // 256-byte storage segment cap, is what a message id has to satisfy.
+    const idAtCursorLimit = `msg_${'a'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES - 4)}`;
     expect(
-      SessionItemSchema.safeParse({ type: 'message', data: { id: `msg_${'a'.repeat(60)}` } })
-        .success
+      SessionItemSchema.safeParse({ type: 'message', data: { id: idAtCursorLimit } }).success
     ).toBe(true);
-  });
-
-  it('rejects a message ID over the cursor ID byte limit', () => {
     expect(
-      SessionItemSchema.safeParse({ type: 'message', data: { id: `msg_${'a'.repeat(61)}` } })
-        .success
+      SessionItemSchema.safeParse({ type: 'message', data: { id: `${idAtCursorLimit}a` } }).success
     ).toBe(false);
   });
+
   it('rejects a part ID or part message ID over 256 characters before persistence', () => {
     expect(
       SessionItemSchema.safeParse({

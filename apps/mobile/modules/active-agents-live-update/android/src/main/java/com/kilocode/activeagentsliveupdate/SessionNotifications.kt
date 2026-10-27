@@ -316,6 +316,7 @@ internal object SessionNotifications {
 /** One followed session's notification, as the JS side maps it. */
 class SessionNotificationCard : Record {
   @Field var sessionId: String = ""
+  @Field var userId: String? = null
   @Field var organizationId: String? = null
   @Field var title: String = ""
   @Field var text: String = ""
@@ -336,6 +337,9 @@ class SessionNotificationCard : Record {
 
   fun toJson(): JSONObject = JSONObject().apply {
     put("sessionId", sessionId)
+    // Kept so a restore can place the card in the account it was followed in;
+    // never drawn (spec "Android: privacy").
+    put("userId", userId ?: "")
     put("organizationId", organizationId ?: "")
     put("title", title)
     put("text", text)
@@ -357,6 +361,7 @@ class SessionNotificationCard : Record {
 
   /** Read the shape `toJson` writes; the readable half of the persisted pair. */
   fun fillFromJson(json: JSONObject) {
+    userId = optionalString(json, "userId")
     organizationId = optionalString(json, "organizationId")
     subText = optionalString(json, "subText")
     expandedText = optionalString(json, "expandedText")

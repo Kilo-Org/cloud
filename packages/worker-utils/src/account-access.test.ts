@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   blacklistedDomainsFromConfig,
+  blockedSignupTldsFromConfig,
   canSpendPaidUsage,
   isApiTokenPepperCurrent,
   isEmailBlacklistedByDomain,
@@ -104,5 +105,27 @@ describe('account access rules', () => {
     expect(blacklistedDomainsFromConfig(config(['spam.com']), ['env.com'])).toEqual(['spam.com']);
     expect(blacklistedDomainsFromConfig(config([]), ['env.com'])).toEqual(['env.com']);
     expect(blacklistedDomainsFromConfig(null, ['env.com'])).toEqual(['env.com']);
+  });
+
+  it('reads signup TLDs from the admin config and distinguishes empty from absent', () => {
+    const config = (blocked_signup_tlds?: string[]) =>
+      JSON.stringify({
+        domains: [],
+        ...(blocked_signup_tlds === undefined ? {} : { blocked_signup_tlds }),
+        updated_at: null,
+        updated_by: null,
+        updated_by_email: null,
+      });
+    expect(blockedSignupTldsFromConfig(config(['asia']), ['shop', 'top'])).toEqual(['asia']);
+    expect(blockedSignupTldsFromConfig(config([]), ['shop', 'top'])).toEqual([]);
+    expect(blockedSignupTldsFromConfig(config(), ['shop', 'top'])).toEqual(['shop', 'top']);
+    expect(blockedSignupTldsFromConfig(null, ['shop', 'top'])).toEqual(['shop', 'top']);
+  });
+
+  it('matches a bare TLD entry against every address on that TLD', () => {
+    expect(isEmailBlacklistedByDomain('user@example.asia', ['asia'])).toBe(true);
+    // A host equal to the entry also matches; only off-boundary suffixes do not.
+    expect(isEmailBlacklistedByDomain('user@asia', ['asia'])).toBe(true);
+    expect(isEmailBlacklistedByDomain('user@notasia.com', ['asia'])).toBe(false);
   });
 });

@@ -18,6 +18,24 @@ This document lists all environment variables used in the Kilo Code cloud monore
 
 Manage shared web env var additions and rotations with `pnpm web:env set <VARIABLE>`. The helper coordinates tracked root and `apps/web` dotenv defaults, the `kilocode-app` and `kilocode-ai-gateway` Vercel deployments, and 1Password storage for sensitive Production values. `pnpm web:env copy` fills a new project from an existing one. See `DEVELOPMENT.md` for the full workflow.
 
+### Code review health monitor
+
+`CODE_REVIEW_HEALTH_SECRET` is a dedicated server-only monitor credential. `[SECRET]`
+The monitor must send `Authorization: Bearer <configured value>`. An unset or empty
+value disables access. Each running instance shares its cached health response
+across authorized callers for 60 seconds; simultaneous refreshes share one evaluation.
+
+Apply `packages/db/src/migrations/0307_review_window_index.sql` before deploying
+the application.
+For initial deployment or rotation, the owner runs
+`pnpm web:env set CODE_REVIEW_HEALTH_SECRET`, supplies a newly generated secret, and
+coordinates the application deployment with the external monitor's header update.
+Verify the monitor after the deployment and header update. Only one configured
+secret is accepted; deployment and monitor configuration must agree.
+Keep credentials out of tracked defaults. For local monitor development, generate
+a separate value with `openssl rand -base64 32` and set it in the local environment;
+ordinary local startup does not require this credential.
+
 ### Configuration & Constant URLs
 
 - `APP_URL_OVERRIDE` - Optional base application URL override in any environment; used in `packages/web-shared/src/lib/constants.ts` and `next.config.mjs`. When unset, Vercel's `staging` target uses `https://staging-app.kilo.ai`, production uses `https://app.kilo.ai`, and local development uses `PORT`. [SERVER]
@@ -28,6 +46,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `DEBUG_SHOW_DEV_UI` - Enables dev-only UI elements (debug panels, admin buttons); checked in `packages/web-shared/src/lib/constants.ts` and `apps/web/src/app/(app)/profile/page.tsx`. [SERVER]
 - `TRPC_TIMING_LOGGING` - Enables tRPC timing logs in development; checked in `packages/web-shared/src/lib/trpc/init.ts`. [SERVER]
 - `TRPC_TIMING_SAMPLE_RATE` - Sample rate (`0`-`1`) for non-mobile request timing lines; mobile clients are always logged. Defaults to `0.01` when unset or malformed; read in `packages/web-shared/src/lib/observability/request-timing.ts`. [SERVER]
+- `USAGE_RECORD_COMPLETION_SAMPLE_RATE` - Production success sample rate (`0`-`1`) for shared gateway/HTTP writer `usage_record_completion` logs; defaults to `1` (100%) when unset, blank, malformed or out of range. `0` disables recorded/duplicate completion logs; `1` logs every success. Not-recorded/errors and nonproduction completions always log. Set consistently on gateway and HTTP writer apps and redeploy to change it; read in `packages/web-shared/src/lib/ai-gateway/usage-record-diagnostics.ts`. [SERVER]
 - `JEST_MAX_WORKERS` - Limits max worker threads for Jest; read in `apps/web/jest.config.ts`. [SERVER]
 - `JEST_SILENT` - When `false`, shows verbose Jest output; read in `apps/web/jest.config.ts` and `apps/web/.env.test`. [SERVER]
 - `JEST_WORKER_ID` - Set by Jest to identify the current worker thread; used by db connection pooling and libraries to handle worker-specific state. [SERVER]
@@ -399,6 +418,7 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `IMPACT_ADVOCATE_TENANT_ALIAS` - Impact.com Advocate tenant alias. [SERVER]
 - `IMPACT_ADVOCATE_API_BASE_URL` - Impact.com Advocate API base URL. Defaults to `https://app.referralsaasquatch.com`. [SERVER]
 - `IMPACT_CAMPAIGN_ID` - Impact.com campaign ID for event tracking. [SERVER]
+
 ### Cloudflare Analytics
 
 - `CLOUDFLARE_ACCOUNT_ID` - Cloudflare account ID used as the GraphQL `accountTag` for Containers Analytics queries and admin dashboard deep links; used in `packages/web-shared/src/lib/config.server.ts` and `apps/web/src/lib/cloudflare/container-usage-analytics.ts`. [SERVER]

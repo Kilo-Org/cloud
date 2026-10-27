@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server';
-import { NextResponse } from 'next/server';
+import type { NextResponse } from 'next/server';
 import { parseModelValidationRequest } from './model-validation-request';
 import { handleTRPCRequest } from '@kilocode/web-shared/lib/organizations/organization-settings-route-handler';
 

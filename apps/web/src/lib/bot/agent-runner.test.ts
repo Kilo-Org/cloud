@@ -86,6 +86,8 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   getGitHubIntegrationById: (...args: unknown[]) => mockGetGitHubIntegrationById(...args),
 }));
 jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
+  validateGitLabRepoAccessForOrganization: jest.fn(async () => true),
+  validateGitLabRepoAccessForUser: jest.fn(async () => true),
   getGitLabTokenForOrganization: jest.fn(),
   getGitLabTokenForUser: jest.fn(),
   getGitLabInstanceUrlForOrganization: jest.fn(),

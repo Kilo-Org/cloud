@@ -8,6 +8,7 @@ import { createAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import { resetCustomLlmCacheForTest } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { User } from '@kilocode/db/schema';
+import { qwen36_plus_stealth_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   customLlmDefinition,
   deleteCustomLlmForTest,
@@ -52,6 +53,11 @@ describe('getProvider with public custom LLMs', () => {
       encryptedApiKey
     );
     await insertCustomLlmForTest(
+      qwen36_plus_stealth_model.public_id,
+      publicCustomLlmDefinition(['acme']),
+      encryptedApiKey
+    );
+    await insertCustomLlmForTest(
       'acme/private-model',
       customLlmDefinition({ organization_ids: [ORG_ID] }),
       encryptedApiKey
@@ -62,6 +68,7 @@ describe('getProvider with public custom LLMs', () => {
     await deleteCustomLlmForTest('acme/public-model');
     await deleteCustomLlmForTest('acme/public-web-model');
     await deleteCustomLlmForTest('acme/private-model');
+    await deleteCustomLlmForTest(qwen36_plus_stealth_model.public_id);
   });
 
   afterEach(() => {
@@ -78,6 +85,39 @@ describe('getProvider with public custom LLMs', () => {
       kind: 'provider',
       provider: { id: 'custom', apiUrl: 'https://upstream.example.com/v1', apiKey: 'sk-upstream' },
       bypassAccessCheck: false,
+    });
+  });
+
+  test('routes a Kilo-exclusive id to the public custom LLM that claims it', async () => {
+    const requestedModel = qwen36_plus_stealth_model.public_id;
+    const input = providerInput(requestedModel, user, undefined);
+    const maxTokens = qwen36_plus_stealth_model.max_completion_tokens + 1;
+    const request: GatewayRequest = {
+      kind: 'chat_completions',
+      body: { ...input.request.body, max_tokens: maxTokens, service_tier: 'priority' },
+    };
+    const result = await getProvider({ ...input, request });
+    if (result.kind !== 'provider') throw new Error(`Expected a provider, got ${result.kind}`);
+    expect(result.provider.id).toBe('custom');
+
+    await applyProviderSpecificLogic(
+      result.provider,
+      requestedModel,
+      request,
+      {},
+      result.userByok,
+      EmptyFraudDetectionHeaders,
+      user.id,
+      null,
+      null,
+      null,
+      false
+    );
+
+    expect(request.body).toMatchObject({
+      model: 'upstream-model',
+      max_tokens: maxTokens,
+      service_tier: 'priority',
     });
   });
 

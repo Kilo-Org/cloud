@@ -510,22 +510,105 @@ describe('adminCustomLlmRouter', () => {
       });
     });
 
-    it('rejects a Kilo-exclusive model id', async () => {
+    describe('Kilo-exclusive model ids', () => {
       const exclusiveModelId = kiloExclusiveModels.find(
         model => !model.public_id.includes(':')
       )?.public_id;
       if (!exclusiveModelId) throw new Error('Expected a Kilo-exclusive id without a variant');
-      const caller = await createCallerForUser(admin.id);
 
-      await expect(
-        caller.admin.customLlm.upsert({
+      it('rejects a private custom LLM', async () => {
+        const caller = await createCallerForUser(admin.id);
+
+        await expect(
+          caller.admin.customLlm.upsert({
+            public_id: exclusiveModelId,
+            definition: validDefinition,
+            credentials,
+          })
+        ).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: expect.stringContaining('only a public custom LLM'),
+        });
+      });
+
+      it('accepts a public custom LLM', async () => {
+        const caller = await createCallerForUser(admin.id);
+
+        const result = await caller.admin.customLlm.upsert({
           public_id: exclusiveModelId,
+          definition: publicDefinition,
+          credentials,
+        });
+
+        expect(result.public_id).toBe(exclusiveModelId);
+      });
+
+      it('rejects making the custom LLM private later', async () => {
+        const caller = await createCallerForUser(admin.id);
+        await caller.admin.customLlm.upsert({
+          public_id: exclusiveModelId,
+          definition: publicDefinition,
+          credentials,
+        });
+
+        await expect(
+          caller.admin.customLlm.upsert({
+            public_id: exclusiveModelId,
+            definition: validDefinition,
+          })
+        ).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: expect.stringContaining('only a public custom LLM'),
+        });
+      });
+
+      it('accepts a free Kilo-exclusive id for a public custom LLM', async () => {
+        const [template] = kiloExclusiveModels;
+        if (!template) throw new Error('Expected a Kilo-exclusive model');
+        const freeExclusive = { ...template, public_id: 'stealth/free-exclusive', pricing: null };
+        kiloExclusiveModels.push(freeExclusive);
+        try {
+          const caller = await createCallerForUser(admin.id);
+
+          const result = await caller.admin.customLlm.upsert({
+            public_id: freeExclusive.public_id,
+            definition: publicDefinition,
+            credentials,
+          });
+
+          expect(result.public_id).toBe(freeExclusive.public_id);
+        } finally {
+          kiloExclusiveModels.splice(kiloExclusiveModels.indexOf(freeExclusive), 1);
+        }
+      });
+
+      it('applies the same rule to the copy target', async () => {
+        const caller = await createCallerForUser(admin.id);
+        await caller.admin.customLlm.upsert({
+          public_id: 'acme/private-source',
           definition: validDefinition,
           credentials,
-        })
-      ).rejects.toMatchObject({
-        code: 'BAD_REQUEST',
-        message: expect.stringContaining('Kilo-exclusive'),
+        });
+        await caller.admin.customLlm.upsert({
+          public_id: 'acme/public-source',
+          definition: publicDefinition,
+          credentials,
+        });
+
+        await expect(
+          caller.admin.customLlm.copy({
+            source_public_id: 'acme/private-source',
+            public_id: exclusiveModelId,
+            display_name: 'Copy',
+          })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+        await expect(
+          caller.admin.customLlm.copy({
+            source_public_id: 'acme/public-source',
+            public_id: exclusiveModelId,
+            display_name: 'Copy',
+          })
+        ).resolves.toMatchObject({ public_id: exclusiveModelId });
       });
     });
 

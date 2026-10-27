@@ -45,6 +45,7 @@ import {
   isKiloExclusiveFreeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { getOpenRouterModelsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { getCustomLlmsById } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   getOrganizationAutoRoute,
   isOrganizationAutoTargetModel,
@@ -88,9 +89,14 @@ async function getEligibleAutoFreeModels(
   const configuredModels = await getConfiguredAutoFreeModels();
   if (!configuredModels) return [AUTO_FREE_FALLBACK_MODEL];
 
-  const openRouterModels = await getOpenRouterModelsFromDatabase();
+  const [openRouterModels, customLlmsById] = await Promise.all([
+    getOpenRouterModelsFromDatabase(),
+    getCustomLlmsById(),
+  ]);
   const eligibleModels = configuredModels.filter(({ model }) => {
     if (!isAutoFreeEligibleModelId(model)) return false;
+    // A custom LLM may claim a Kilo-exclusive id, and custom LLMs are never kilo-auto/free candidates.
+    if (customLlmsById.has(model.toLowerCase())) return false;
     if (isKiloExclusiveFreeModel(model)) {
       const kiloModel = findKiloExclusiveModel(model);
       return (

@@ -197,6 +197,10 @@ async function enhancedModelList(models: OpenRouterModel[]) {
   const publicCustomLlmModels = publicCustomLlms.map(({ public_id, definition }) =>
     convertCustomLlmToCatalogModel(public_id, definition)
   );
+  // A custom LLM may claim a Kilo-exclusive id to replace it, and routing serves the custom LLM.
+  const unclaimedExclusiveModels = kiloExclusiveModels.filter(
+    model => !customLlmsById.has(model.public_id.toLowerCase())
+  );
   const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
   const summaries = await getTerminalBenchSummaries();
   const catalogModels = models
@@ -224,7 +228,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
       };
     })
     .concat(
-      kiloExclusiveModels
+      unclaimedExclusiveModels
         .filter(m => !unavailableModelIds.has(m.public_id))
         .map(model => convertFromKiloExclusiveModel(model))
     )
@@ -233,7 +237,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
     // Public custom LLMs are complete as defined; id-based pricing, PDF, and
     // protocol guesses below would describe a model routing does not serve.
     .concat(publicCustomLlmModels);
-  const exclusiveById = new Map(kiloExclusiveModels.map(entry => [entry.public_id, entry]));
+  const exclusiveById = new Map(unclaimedExclusiveModels.map(entry => [entry.public_id, entry]));
   const providerLookupId = (model: OpenRouterModel) =>
     exclusiveById.get(model.id)?.internal_id ?? model.alias_target ?? model.id;
   const indexedProviders = await getProviderSlugsForModels(catalogModels.map(providerLookupId));

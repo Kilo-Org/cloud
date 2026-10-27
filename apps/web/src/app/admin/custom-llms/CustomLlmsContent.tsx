@@ -616,8 +616,8 @@ export function CustomLlmsContent() {
                 Public ID may only contain lowercase letters, digits, and <code>. / -</code>. It
                 must not start with <code>kilo/</code>, <code>kilo-auto/</code>,{' '}
                 <code>kilocode/</code>, or a direct BYOK provider prefix, and must not be an
-                OpenRouter or Kilo-exclusive model or a free model ID such as{' '}
-                <code>stealth/…-alpha</code>.
+                OpenRouter model or a free model ID such as <code>stealth/…-alpha</code>. A public
+                custom LLM may use a Kilo-exclusive model ID to replace that model.
               </p>
               <p className="text-muted-foreground mt-1 text-xs">
                 Custom LLMs are always free for users. To make the model available to every user,

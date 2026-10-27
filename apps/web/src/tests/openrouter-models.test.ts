@@ -541,6 +541,43 @@ describe('GET /api/v1/models', () => {
     );
   });
 
+  test('lists a public custom LLM instead of the Kilo-exclusive model whose id it claims', async () => {
+    mockAuth = { user: null, organizationId: null };
+    const exclusiveId = qwen36_plus_stealth_model.public_id;
+    jest.mocked(getCustomLlmsById).mockResolvedValue(
+      new Map([
+        [
+          exclusiveId,
+          {
+            public_id: exclusiveId,
+            encrypted_api_key: null,
+            definition: {
+              display_name: 'Replacement model',
+              context_length: 1000,
+              max_completion_tokens: 100,
+              base_url: 'https://upstream.example.com/v1',
+              public: { inference_providers: ['acme'], description: 'Replacement' },
+            },
+          },
+        ],
+      ])
+    );
+    global.fetch = jest
+      .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
+      .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+
+    const response = await GET(createTestRequest('/api/openrouter/models'));
+    const responseData = OpenRouterModelsResponseSchema.parse(await response.json());
+
+    const sameIdModels = responseData.data.filter(item => item.id === exclusiveId);
+    expect(sameIdModels).toHaveLength(1);
+    expect(sameIdModels[0]).toMatchObject({
+      name: 'Replacement model',
+      isFree: true,
+      inference_provider_ids: ['acme'],
+    });
+  });
+
   test('omits the Enkrypt field when no score is available', async () => {
     global.fetch = jest
       .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()

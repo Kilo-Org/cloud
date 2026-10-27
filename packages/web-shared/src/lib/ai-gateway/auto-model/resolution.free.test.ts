@@ -11,6 +11,11 @@ import { getConfiguredAutoFreeModels } from '@kilocode/web-shared/lib/ai-gateway
 import type * as AutoFreeConfigModule from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
 import type * as ExclusiveModelsModule from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+  publicCustomLlmDefinition,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config', () => ({
   ...jest.requireActual<typeof AutoFreeConfigModule>(
@@ -81,6 +86,20 @@ describe('getAutoFreeCandidates', () => {
       );
     }
   );
+
+  it('skips a Kilo-exclusive id that a custom LLM claims', async () => {
+    await insertCustomLlmForTest(
+      gemma_4_26b_a4b_it_free_model.public_id,
+      publicCustomLlmDefinition(['acme'])
+    );
+    try {
+      expect(await getAutoFreeCandidates(null)).not.toContain(
+        gemma_4_26b_a4b_it_free_model.public_id
+      );
+    } finally {
+      await deleteCustomLlmForTest(gemma_4_26b_a4b_it_free_model.public_id);
+    }
+  });
 
   it('filters using the model provider capabilities', async () => {
     restrictGemmaToChatCompletions();

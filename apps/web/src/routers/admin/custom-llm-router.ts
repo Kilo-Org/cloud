@@ -5,6 +5,7 @@ import {
   CustomLlmCredentialsSchema,
   CustomLlmDefinitionSchema,
   CustomLlmPublicIdSchema,
+  type CustomLlmDefinition,
   type EncryptedData,
 } from '@kilocode/db/schema-types';
 import { and, asc, eq, ne, sql } from 'drizzle-orm';
@@ -24,11 +25,24 @@ function badRequest(message: string): never {
 }
 
 /**
- * Routing resolves custom LLMs before any other upstream, so a new id must not
- * hide an OpenRouter, Kilo-exclusive or direct BYOK model. Existing rows keep
- * their id, so this only runs when an id is claimed.
+ * A public custom LLM may take over a Kilo-exclusive id, so a model can move to
+ * a custom LLM before its built-in definition is removed. A private one would
+ * hide the model from everyone without access.
  */
-async function assertPublicIdIsClaimable(publicId: string) {
+function assertKiloExclusiveIdStaysPublic(publicId: string, definition: CustomLlmDefinition) {
+  if (isKiloExclusiveModel(publicId) && !definition.public) {
+    badRequest(
+      `public_id "${publicId}" is a Kilo-exclusive model, so only a public custom LLM may use it`
+    );
+  }
+}
+
+/**
+ * Routing resolves custom LLMs before any other upstream, so a new id must not
+ * hide an OpenRouter or direct BYOK model. Existing rows keep their id, so this
+ * only runs when an id is claimed.
+ */
+async function assertPublicIdIsClaimable(publicId: string, definition: CustomLlmDefinition) {
   const parsedPublicId = CustomLlmPublicIdSchema.safeParse(publicId);
   if (!parsedPublicId.success) {
     badRequest(parsedPublicId.error.issues.map(issue => issue.message).join('; '));
@@ -40,12 +54,10 @@ async function assertPublicIdIsClaimable(publicId: string) {
   if (directByokProvider) {
     badRequest(`public_id must not use the direct BYOK prefix "${directByokProvider}/"`);
   }
-  if (isKiloExclusiveModel(modelId)) {
-    badRequest(`public_id "${modelId}" is a Kilo-exclusive model`);
-  }
+  assertKiloExclusiveIdStaysPublic(modelId, definition);
   // Anonymous callers may request free model ids, so a private custom LLM with
   // one would answer them differently from an unknown id.
-  if (isFreeModelExcludingCustomLlms(modelId)) {
+  if (!isKiloExclusiveModel(modelId) && isFreeModelExcludingCustomLlms(modelId)) {
     badRequest(`public_id "${modelId}" matches a built-in free model id`);
   }
   if (Object.hasOwn(await getOpenRouterModelsMetadataFromDatabase(), modelId)) {
@@ -100,8 +112,10 @@ export const adminCustomLlmRouter = createTRPCRouter({
       where: eq(custom_llm2.public_id, input.public_id),
     });
 
-    if (!existing) {
-      await assertPublicIdIsClaimable(input.public_id);
+    if (existing) {
+      assertKiloExclusiveIdStaysPublic(input.public_id, input.definition);
+    } else {
+      await assertPublicIdIsClaimable(input.public_id, input.definition);
     }
 
     let encrypted_api_key: EncryptedData | undefined = undefined;
@@ -165,7 +179,7 @@ export const adminCustomLlmRouter = createTRPCRouter({
         message: `Custom LLM with public_id "${input.source_public_id}" not found`,
       });
     }
-    await assertPublicIdIsClaimable(input.public_id);
+    await assertPublicIdIsClaimable(input.public_id, source.definition);
 
     const [inserted] = await db
       .insert(custom_llm2)

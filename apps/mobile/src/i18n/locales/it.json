@@ -2052,7 +2052,9 @@
       "retrying": "Nuovo tentativo…",
       "retryDeny": "Riprova a negare",
       "retryAllowOnce": "Riprova a consentire una volta",
-      "retryAlwaysAllow": "Riprova a consentire sempre"
+      "retryAlwaysAllow": "Riprova a consentire sempre",
+      "unreadableTitle": "Impossibile leggere la richiesta di autorizzazione",
+      "unreadableBody": "L'agente è in attesa di una decisione di autorizzazione che questa app non può mostrare. Aggiorna l'app o la CLI, oppure rispondi alla richiesta nella CLI per continuare."
     },
     "questionCard": {
       "title": "Richiesta dell'agente",
@@ -2483,8 +2485,9 @@
     "unavailableDevice": "La dettatura non è disponibile su questo dispositivo.",
     "unavailableLanguage": "La dettatura non è disponibile per la lingua del dispositivo.",
     "languageNotInstalledTitle": "La dettatura per {{language}} non è ancora pronta",
-    "languageNotInstalledMessage": "I file vocali offline per {{language}} non sono installati su questo telefono. Scaricali, poi riprova con la dettatura.",
+    "languageNotInstalledMessage": "I file vocali offline per {{language}} non sono installati e la trascrizione online è disattivata. Scarica i file o riattiva la trascrizione online per usare la dettatura.",
     "downloadOfflineModel": "Scarica",
+    "useOnlineTranscription": "Consenti trascrizione online",
     "offlineModelDownloadScheduled": "I file vocali offline verranno scaricati in background. Riprova con la dettatura più tardi.",
     "listeningStopped": "Ascolto interrotto.",
     "transcribing": "Trascrizione in corso…",

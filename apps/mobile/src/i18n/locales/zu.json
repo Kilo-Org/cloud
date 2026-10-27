@@ -2591,7 +2591,9 @@
       "retrying": "Kuzanywa futhi…",
       "retryDeny": "Zama ukwenqaba futhi",
       "retryAllowOnce": "Zama ukuvumela kanye futhi",
-      "retryAlwaysAllow": "Zama ukuvumela njalo futhi"
+      "retryAlwaysAllow": "Zama ukuvumela njalo futhi",
+      "unreadableTitle": "Isicelo semvume asikwazile ukufundwa",
+      "unreadableBody": "I-agent ilinde isinqumo semvume esingakwazi ukusibonisa kule app. Buyekeza i-app noma i-CLI, noma uphendule isicelo ku-CLI ukuze uqhubeke."
     },
     "questionCard": {
       "title": "Umenzeli udinga impendulo",
@@ -2983,8 +2985,9 @@
     "unavailableDevice": "Ukufaka ngezwi akutholakali kule divayisi.",
     "unavailableLanguage": "Ukufaka ngezwi akutholakali kulolu limi lwedivayisi.",
     "languageNotInstalledTitle": "Ukufaka ngezwi kwe-{{language}} akalungile okwamanje",
-    "languageNotInstalledMessage": "Amafayela okukhuluma e-offline e-{{language}} awafakwanga kule foni. Landa la mafayela, bese uzame futhi ukufaka ngezwi.",
+    "languageNotInstalledMessage": "Amafayela okukhuluma e-offline e-{{language}} awafakiwe, futhi ukuguqulwa kwezwi libe umbhalo nge-inthanethi kucishiwe. Faka lamafayela noma uvule kabusha ukuguqulwa nge-inthanethi ukuze ukwazi ukusebenzisa ukufaka ngezwi.",
     "downloadOfflineModel": "Landa",
+    "useOnlineTranscription": "Vumela ukucutshungulwa nge-inthanethi",
     "offlineModelDownloadScheduled": "Amafayela okukhuluma e-offline azolandwa ngemuva. Zama futhi ukufaka ngezwi kamuva.",
     "listeningStopped": "Ukulalela kumisiwe.",
     "transcribing": "Kuguqulwa ibe umbhalo...",

@@ -2627,7 +2627,9 @@
       "retrying": "Tornant-ho a provar…",
       "retryDeny": "Torna a provar de denegar",
       "retryAllowOnce": "Torna a provar de permetre-ho una vegada",
-      "retryAlwaysAllow": "Torna a provar de permetre-ho sempre"
+      "retryAlwaysAllow": "Torna a provar de permetre-ho sempre",
+      "unreadableTitle": "No s'ha pogut llegir la sol·licitud de permís",
+      "unreadableBody": "L'agent està esperant una decisió de permís que aquesta aplicació no pot mostrar. Actualitzeu l'aplicació o el CLI, o responeu la sol·licitud al CLI per continuar."
     },
     "questionCard": {
       "title": "L'agent necessita una resposta",
@@ -3026,8 +3028,9 @@
     "unavailableDevice": "El dictat no està disponible en aquest dispositiu.",
     "unavailableLanguage": "El dictat no està disponible per a l'idioma d'aquest dispositiu.",
     "languageNotInstalledTitle": "El dictat per a {{language}} encara no està a punt",
-    "languageNotInstalledMessage": "Els fitxers de veu fora de línia de {{language}} no estan instal·lats en aquest telèfon. Baixa'ls i torna-ho a provar amb el dictat.",
+    "languageNotInstalledMessage": "Els fitxers de veu fora de línia del {{language}} no estan instal·lats i la transcripció en línia està desactivada. Baixa els fitxers o torna a activar la transcripció en línia per utilitzar el dictat per veu.",
     "downloadOfflineModel": "Baixa",
+    "useOnlineTranscription": "Permet la transcripció en línia",
     "offlineModelDownloadScheduled": "Els fitxers de veu fora de línia es baixaran en segon pla. Torna a provar el dictat més tard.",
     "listeningStopped": "S'ha deixat d'escoltar.",
     "transcribing": "S'està transcrivint…",

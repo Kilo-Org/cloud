@@ -2591,7 +2591,9 @@
       "retrying": "Uuesti proovimine…",
       "retryDeny": "Proovi keelamist uuesti",
       "retryAllowOnce": "Proovi lubamist üks kord uuesti",
-      "retryAlwaysAllow": "Proovi lubamist alati uuesti"
+      "retryAlwaysAllow": "Proovi lubamist alati uuesti",
+      "unreadableTitle": "Lubamistaotlust ei saanud lugeda",
+      "unreadableBody": "Agent ootab luba puudutavat otsust, mida see rakendus ei saa näidata. Uuenda rakendust või CLI-t või vasta taotlusele CLI-s, et jätkata."
     },
     "questionCard": {
       "title": "Agent vajab vastust",
@@ -2983,8 +2985,9 @@
     "unavailableDevice": "Häälsisestus pole sellel seadmel saadaval.",
     "unavailableLanguage": "Häälsisestus pole selle seadme keele puhul saadaval.",
     "languageNotInstalledTitle": "Häälsisestus keele {{language}} jaoks pole veel valmis",
-    "languageNotInstalledMessage": "Keele {{language}} võrguühenduseta kõnefailid pole selles telefonis installitud. Laadi need alla ja proovi häälsisestust uuesti.",
+    "languageNotInstalledMessage": "Keele {{language}} võrguühenduseta kõnefailid pole paigaldatud ja veebipõhine transkriptsioon on välja lülitatud. Laadi kõnefailid alla või lülita veebipõhine transkriptsioon uuesti sisse, et häälsisestust kasutada.",
     "downloadOfflineModel": "Laadi alla",
+    "useOnlineTranscription": "Luba veebipõhine transkriptsioon",
     "offlineModelDownloadScheduled": "Võrguühenduseta kõnefailid laaditakse taustal alla. Proovi häälsisestust hiljem uuesti.",
     "listeningStopped": "Kuulamine peatus.",
     "transcribing": "Kõnetuvastus...",

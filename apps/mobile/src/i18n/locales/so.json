@@ -2591,7 +2591,9 @@
       "retrying": "Mar kale ayaa la isku dayayaa…",
       "retryDeny": "Mar kale isku day inaad diiddo",
       "retryAllowOnce": "Mar kale isku day inaad oggolaato hal mar",
-      "retryAlwaysAllow": "Mar kale isku day inaad had iyo jeer oggolaato"
+      "retryAlwaysAllow": "Mar kale isku day inaad had iyo jeer oggolaato",
+      "unreadableTitle": "Codsi oggolaansho lama akhriyi karin",
+      "unreadableBody": "Wakiilka ayaa sugaya go'aan oggolaansho oo abkani ma muujin karo. Cusboonaysii abka ama CLI, ama ka jawaab codsiga CLI si aad u sii socoto."
     },
     "questionCard": {
       "title": "Wakiilku wuxuu u baahan yahay jawaab",
@@ -2983,8 +2985,9 @@
     "unavailableDevice": "Gelinta codka lagama heli karo qalabkan.",
     "unavailableLanguage": "Gelinta codka looma heli karo luqadda qalabkan.",
     "languageNotInstalledTitle": "Gelinta codka ee {{language}} weli ma diyaarna",
-    "languageNotInstalledMessage": "Faylasha hadalka khadka la'aanta ee {{language}} lama rakibin telefoonkan. Soo deji iyaga, ka dibna markale isku day gelinta codka.",
+    "languageNotInstalledMessage": "Faylasha hadalka khadka la'aanta ee {{language}} lama soo dejiyin, halka qoraalka internetka la demiyay. Soo deji faylasha ama dib u shido qoraalka internetka si aad u isticmaasho gelinta codka.",
     "downloadOfflineModel": "Soo deji",
+    "useOnlineTranscription": "Oggolow qoraalka internetka",
     "offlineModelDownloadScheduled": "Faylasha hadalka khadka la'aanta waxay soo deji doonaan gadaasha. Markale isku day gelinta codka goor dambe.",
     "listeningStopped": "Dhageysigu wuu joogsaday.",
     "transcribing": "Qoraal u beddelidda...",

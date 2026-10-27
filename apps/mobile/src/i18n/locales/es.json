@@ -2084,7 +2084,9 @@
       "retrying": "Reintentando…",
       "retryDeny": "Volver a intentar denegar",
       "retryAllowOnce": "Volver a intentar permitir una vez",
-      "retryAlwaysAllow": "Volver a intentar permitir siempre"
+      "retryAlwaysAllow": "Volver a intentar permitir siempre",
+      "unreadableTitle": "No se pudo leer la solicitud de permiso",
+      "unreadableBody": "El agente está esperando una decisión de permiso que esta aplicación no puede mostrar. Actualiza la aplicación o la CLI, o responde a la solicitud en la CLI para continuar."
     },
     "questionCard": {
       "title": "El agente necesita una respuesta",
@@ -2483,8 +2485,9 @@
     "unavailableDevice": "El dictado no está disponible en este dispositivo.",
     "unavailableLanguage": "El dictado no está disponible en el idioma de este dispositivo.",
     "languageNotInstalledTitle": "El dictado para {{language}} aún no está listo",
-    "languageNotInstalledMessage": "Los archivos de voz sin conexión de {{language}} no están instalados en este teléfono. Descárgalos y vuelve a intentar el dictado.",
+    "languageNotInstalledMessage": "Los archivos de voz sin conexión de {{language}} no están instalados y la transcripción en línea está desactivada. Descarga los archivos o vuelve a activar la transcripción en línea para usar el dictado.",
     "downloadOfflineModel": "Descargar",
+    "useOnlineTranscription": "Permitir transcripción en línea",
     "offlineModelDownloadScheduled": "Los archivos de voz sin conexión se descargarán en segundo plano. Vuelve a probar el dictado más tarde.",
     "listeningStopped": "Se ha detenido la escucha.",
     "transcribing": "Transcribiendo...",

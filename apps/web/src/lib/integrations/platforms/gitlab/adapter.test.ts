@@ -14,6 +14,7 @@ import {
   exchangeGitLabOAuthCode,
   validateGitLabInstance,
   validatePersonalAccessToken,
+  validateProjectAccessToken,
   createProjectWebhook,
   createProjectAccessToken,
   deleteProjectWebhook,
@@ -1355,6 +1356,101 @@ describe('webhook and project access token refusals', () => {
     expect(refusal).toBeInstanceOf(expectedError);
     expect(refusal).toMatchObject({ statusCode: 403, projectId: 123 });
     expect((refusal as Error).message).toContain('Requires Maintainer role or higher');
+  });
+});
+
+describe('validateProjectAccessToken', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('reports the token valid only after an authenticated response', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
+
+    const result = await validateProjectAccessToken('glpat-project-token');
+
+    expect(result).toEqual({ status: 'valid' });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a revoked token as unauthorized', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+
+    const result = await validateProjectAccessToken('glpat-project-token');
+
+    expect(result).toEqual({ status: 'invalid', reason: 'unauthorized', httpStatus: 401 });
+  });
+
+  it('reports a denied token as forbidden', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 403 });
+
+    const result = await validateProjectAccessToken('glpat-project-token');
+
+    expect(result).toEqual({ status: 'invalid', reason: 'forbidden', httpStatus: 403 });
+  });
+
+  it('leaves a server error unverified instead of usable', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
+
+    const result = await validateProjectAccessToken('glpat-project-token');
+
+    expect(result).toEqual({ status: 'unverified', reason: 'http-error', httpStatus: 500 });
+  });
+
+  it('leaves a transport failure unverified', async () => {
+    mockFetch.mockRejectedValueOnce(new TypeError('fetch failed'));
+
+    const result = await validateProjectAccessToken('glpat-project-token');
+
+    expect(result).toEqual({ status: 'unverified', reason: 'transport' });
+  });
+
+  it('leaves an unusable instance URL unverified without probing', async () => {
+    const result = await validateProjectAccessToken(
+      'glpat-project-token',
+      'http://gitlab.example.com'
+    );
+
+    expect(result).toEqual({ status: 'unverified', reason: 'instance-url' });
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('reports a blocked resolution target as an instance URL problem', async () => {
+    mockLookup.mockResolvedValue([{ address: '10.0.0.5', family: 4 }]);
+
+    const result = await validateProjectAccessToken(
+      'glpat-project-token',
+      'https://gitlab.example.com'
+    );
+
+    expect(result).toEqual({ status: 'unverified', reason: 'instance-url' });
+    expect(mockHttpsRequest).not.toHaveBeenCalled();
+  });
+
+  it('keeps a temporary resolution failure retryable', async () => {
+    mockLookup.mockRejectedValue(new Error('EAI_AGAIN'));
+
+    const result = await validateProjectAccessToken(
+      'glpat-project-token',
+      'https://gitlab.example.com'
+    );
+
+    expect(result).toEqual({ status: 'unverified', reason: 'transport' });
+  });
+
+  it('reports a nonexistent host as an instance URL problem', async () => {
+    mockLookup.mockRejectedValue(
+      Object.assign(new Error('getaddrinfo ENOTFOUND'), {
+        code: 'ENOTFOUND',
+      })
+    );
+
+    const result = await validateProjectAccessToken(
+      'glpat-project-token',
+      'https://gitlab.example.com'
+    );
+
+    expect(result).toEqual({ status: 'unverified', reason: 'instance-url' });
   });
 });
 

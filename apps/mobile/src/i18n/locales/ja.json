@@ -2067,7 +2067,9 @@
       "retrying": "再試行中…",
       "retryDeny": "拒否を再試行",
       "retryAllowOnce": "1回だけ許可を再試行",
-      "retryAlwaysAllow": "常に許可を再試行"
+      "retryAlwaysAllow": "常に許可を再試行",
+      "unreadableTitle": "許可のリクエストを読み取れませんでした",
+      "unreadableBody": "エージェントは許可の判断を待っていますが、このアプリではそのリクエストを表示できません。アプリまたはCLIを更新するか、CLIでリクエストに回答して続行してください。"
     },
     "questionCard": {
       "title": "エージェントからの質問",
@@ -2459,8 +2461,9 @@
     "unavailableDevice": "このデバイスでは音声入力は利用できません。",
     "unavailableLanguage": "このデバイスの言語では音声入力は利用できません。",
     "languageNotInstalledTitle": "{{language}}の音声入力の準備がまだできていません",
-    "languageNotInstalledMessage": "{{language}}のオフライン音声ファイルがこのスマートフォンにインストールされていません。ダウンロードしてから、音声入力をもう一度お試しください。",
+    "languageNotInstalledMessage": "{{language}}のオフライン音声ファイルがインストールされておらず、オンラインでの文字起こしもオフになっています。ファイルをダウンロードするか、オンラインでの文字起こしをオンに戻すと、音声入力をご利用いただけます。",
     "downloadOfflineModel": "ダウンロード",
+    "useOnlineTranscription": "オンライン文字起こしを許可",
     "offlineModelDownloadScheduled": "オフライン音声ファイルはバックグラウンドでダウンロードされます。しばらくしてから、音声入力をもう一度お試しください。",
     "listeningStopped": "聞き取りを停止しました。",
     "transcribing": "文字起こし中…",

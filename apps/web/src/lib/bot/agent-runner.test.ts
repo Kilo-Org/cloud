@@ -231,6 +231,8 @@ beforeEach(() => {
   jest.mocked(validateGitLabRepoAccessForUser).mockResolvedValue(true);
   jest.mocked(getGitLabTokenForOrganization).mockResolvedValue('gitlab-token');
   jest.mocked(getGitLabTokenForUser).mockResolvedValue('gitlab-token');
+  jest.mocked(validateGitLabRepoAccessForOrganization).mockResolvedValue(true);
+  jest.mocked(validateGitLabRepoAccessForUser).mockResolvedValue(true);
   jest.mocked(getGitLabInstanceUrlForOrganization).mockResolvedValue('https://gitlab.com');
   jest.mocked(buildGitLabCloneUrl).mockReturnValue(`https://gitlab.com/${gitlabProject}.git`);
 });

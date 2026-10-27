@@ -2663,7 +2663,9 @@
       "retrying": "Skúša sa znova…",
       "retryDeny": "Skúsiť zamietnuť znova",
       "retryAllowOnce": "Skúsiť povoliť tentoraz znova",
-      "retryAlwaysAllow": "Skúsiť vždy povoliť znova"
+      "retryAlwaysAllow": "Skúsiť vždy povoliť znova",
+      "unreadableTitle": "Žiadosť o povolenie sa nepodarilo prečítať",
+      "unreadableBody": "Agent čaká na rozhodnutie o povolení, ktoré táto aplikácia nedokáže zobraziť. Aktualizujte aplikáciu alebo CLI, prípadne odpovedzte na žiadosť v CLI, aby ste mohli pokračovať."
     },
     "questionCard": {
       "title": "Agent potrebuje odpoveď",
@@ -3069,8 +3071,9 @@
     "unavailableDevice": "Hlasový vstup nie je na tomto zariadení dostupný.",
     "unavailableLanguage": "Hlasový vstup nie je dostupný pre jazyk nastavený v tomto zariadení.",
     "languageNotInstalledTitle": "Hlasový vstup pre jazyk {{language}} zatiaľ nie je pripravený",
-    "languageNotInstalledMessage": "Offline súbory reči pre jazyk {{language}} nie sú v tomto telefóne nainštalované. Stiahnite ich a potom skúste hlasový vstup znova.",
+    "languageNotInstalledMessage": "Offline súbory reči pre {{language}} nie sú nainštalované a online prepis je vypnutý. Stiahnite súbory alebo znova zapnite online prepis, aby hlasový vstup fungoval.",
     "downloadOfflineModel": "Stiahnuť",
+    "useOnlineTranscription": "Povoliť online prepis",
     "offlineModelDownloadScheduled": "Offline súbory reči sa stiahnu na pozadí. Skúste hlasový vstup znova neskôr.",
     "listeningStopped": "Počúvanie sa skončilo.",
     "transcribing": "Prepisuje sa…",

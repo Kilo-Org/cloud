@@ -752,6 +752,120 @@ describe('useVoiceInput integration', () => {
         expect(mockController.start).not.toHaveBeenCalled();
       });
 
+      it('offers the online transcription choice beside the download when German has no on-device model and consent is declined', async () => {
+        const { actions } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(true);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('declined');
+        platformMock.OS = 'android';
+        localizationMock.getLocales.mockReturnValue([{ languageTag: 'de-DE' }]);
+        getSupportedLocalesMock.mockResolvedValue({
+          locales: ['de-DE', 'en-US'],
+          installedLocales: ['en-US'],
+        });
+        await i18n.changeLanguage('de');
+
+        await actions.toggle();
+
+        const buttons = alertMock.alert.mock.calls[0]?.[2] as
+          | { text: string; style?: string; onPress?: () => void }[]
+          | undefined;
+        expect(buttons?.map(button => button.text)).toEqual([
+          i18n.t('common.notNow'),
+          i18n.t('voiceInput.useOnlineTranscription'),
+          i18n.t('voiceInput.downloadOfflineModel'),
+        ]);
+        expect(buttons?.[0]?.style).toBe('cancel');
+        expect(mockController.start).not.toHaveBeenCalled();
+        expect(triggerOfflineModelDownloadMock).not.toHaveBeenCalled();
+      });
+
+      it('raises the online disclosure from the missing-model alert and starts network recognition on Allow', async () => {
+        const { actions } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(true);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('declined');
+        voiceNetworkConsentMock.writeVoiceNetworkConsent.mockResolvedValue(true);
+        platformMock.OS = 'android';
+        localizationMock.getLocales.mockReturnValue([{ languageTag: 'de-DE' }]);
+        getSupportedLocalesMock.mockResolvedValue({
+          locales: ['de-DE', 'en-US'],
+          installedLocales: ['en-US'],
+        });
+        await i18n.changeLanguage('de');
+
+        await actions.toggle();
+
+        const missingModelButtons = alertMock.alert.mock.calls[0]?.[2] as
+          | { text: string; onPress?: () => void }[]
+          | undefined;
+        const onlineChoice = missingModelButtons?.find(
+          button => button.text === i18n.t('voiceInput.useOnlineTranscription')
+        );
+        onlineChoice?.onPress?.();
+        await flushPendingTasks();
+
+        // The disclosure asks; nothing has started or been recorded yet.
+        expect(voiceNetworkConsentMock.writeVoiceNetworkConsent).not.toHaveBeenCalled();
+        expect(mockController.start).not.toHaveBeenCalled();
+        expect(alertMock.alert).toHaveBeenCalledTimes(2);
+        expect(alertMock.alert.mock.calls[1]?.[0]).toBe(i18n.t('voiceInput.onlineTitle'));
+
+        const disclosureButtons = alertMock.alert.mock.calls[1]?.[2] as
+          | { text: string; onPress?: () => void }[]
+          | undefined;
+        const allow = disclosureButtons?.find(button => button.text === i18n.t('voiceInput.allow'));
+        allow?.onPress?.();
+        await flushPendingTasks();
+
+        expect(voiceNetworkConsentMock.writeVoiceNetworkConsent).toHaveBeenCalledWith(
+          'user-1',
+          'granted'
+        );
+        expect(mockController.start).toHaveBeenCalledTimes(1);
+        expect(mockController.start.mock.calls[0]?.[0]?.requiresOnDeviceRecognition).toBe(false);
+        expect(mockController.start.mock.calls[0]?.[0]?.languageTag).toBe('de-DE');
+        expect(triggerOfflineModelDownloadMock).not.toHaveBeenCalled();
+      });
+
+      it('keeps the refusal and starts nothing when the missing-model alert keeps online transcription off', async () => {
+        const { actions } = buildActions({ userId: 'user-1' });
+        mockController.setSnapshot(idleSnapshot());
+        mockController.supportsOnDevice.mockReturnValue(true);
+        voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('declined');
+        platformMock.OS = 'android';
+        localizationMock.getLocales.mockReturnValue([{ languageTag: 'de-DE' }]);
+        getSupportedLocalesMock.mockResolvedValue({
+          locales: ['de-DE', 'en-US'],
+          installedLocales: ['en-US'],
+        });
+        await i18n.changeLanguage('de');
+
+        await actions.toggle();
+
+        const missingModelButtons = alertMock.alert.mock.calls[0]?.[2] as
+          | { text: string; onPress?: () => void }[]
+          | undefined;
+        const onlineChoice = missingModelButtons?.find(
+          button => button.text === i18n.t('voiceInput.useOnlineTranscription')
+        );
+        onlineChoice?.onPress?.();
+        await flushPendingTasks();
+
+        const disclosureButtons = alertMock.alert.mock.calls[1]?.[2] as
+          | { text: string; onPress?: () => void }[]
+          | undefined;
+        const notNow = disclosureButtons?.find(button => button.text === i18n.t('common.notNow'));
+        notNow?.onPress?.();
+        await flushPendingTasks();
+
+        expect(voiceNetworkConsentMock.writeVoiceNetworkConsent).toHaveBeenCalledWith(
+          'user-1',
+          'declined'
+        );
+        expect(mockController.start).not.toHaveBeenCalled();
+      });
+
       it('offers the same download remediation on iOS as on Android when the offline model is missing', async () => {
         const { actions } = buildActions({ userId: 'user-1' });
         mockController.setSnapshot(idleSnapshot());

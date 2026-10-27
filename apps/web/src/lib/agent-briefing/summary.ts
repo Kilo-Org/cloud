@@ -27,6 +27,7 @@ import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/cust
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
 import {
+  applyTieredPricingRates,
   textPricingRates,
   type TextPricingRates,
 } from '@kilocode/web-shared/lib/ai-gateway/request-cost-limit';
@@ -222,10 +223,12 @@ export function briefingPrompt(row: BriefingReportRow, language: string): string
  * batch variant, or one missing from a populated model snapshot - is refused as
  * not allowed, so a quote is never issued for a model the picker never offers.
  * The entries the picker builds from code win over a catalog row with the same
- * id and keep their own price, as the picker does.
+ * id and keep their own price, as the picker does. Exclusive and custom pricing
+ * tiers are selected at the input token bound, as gateway admission does.
  */
 async function briefingPriceRates(
-  model: string
+  model: string,
+  inputTokensBound: number
 ): Promise<TextPricingRates & { reasoning: boolean }> {
   const extra = pickerExtraModel(model);
   const [endpointsMetadata, preferredProviderOrderConfig, customPricingConfig] = await Promise.all([
@@ -257,14 +260,19 @@ async function briefingPriceRates(
   let rates: TextPricingRates[];
   try {
     rates = [entry, ...(targetExtra ? [targetExtra] : target ? [target] : [])].map(item =>
-      textPricingRates(
-        applyCustomPricingToPricing(
-          customPricingConfig,
-          item.id,
-          item === extra || item === targetExtra
-            ? item.pricing
-            : pickerModelPricing(item, endpointsMetadata, preferredProviderOrderConfig)
-        )
+      applyTieredPricingRates(
+        item.id,
+        textPricingRates(
+          applyCustomPricingToPricing(
+            customPricingConfig,
+            item.id,
+            item === extra || item === targetExtra
+              ? item.pricing
+              : pickerModelPricing(item, endpointsMetadata, preferredProviderOrderConfig)
+          )
+        ),
+        customPricingConfig,
+        inputTokensBound
       )
     );
   } catch {
@@ -284,8 +292,11 @@ export async function briefingPriceBound(
   maxSpendMicrodollars: number
 ) {
   if (Buffer.byteLength(prompt, 'utf8') > MAX_INPUT_BYTES) throw new Error('input_too_large');
-  const { inputRate, outputRate, requestCost, reasoning } = await briefingPriceRates(model);
   const inputTokensBound = Buffer.byteLength(prompt, 'utf8') + 4096;
+  const { inputRate, outputRate, requestCost, reasoning } = await briefingPriceRates(
+    model,
+    inputTokensBound
+  );
   const inputCost = Math.ceil((inputTokensBound * inputRate + requestCost) * 1_000_000);
   const available = maxSpendMicrodollars - inputCost;
   const outputCeiling = reasoning ? REASONING_MAX_OUTPUT_TOKENS : MAX_OUTPUT_TOKENS;

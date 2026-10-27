@@ -91,7 +91,26 @@ function pickerRequestPrice(
     model.id,
     extra ? model.pricing : pickerModelPricing(model, models, preferredProviderOrderConfig)
   );
-  let rates = textPricingRates(pickerPricing);
+  return applyTieredPricingRates(
+    modelId,
+    textPricingRates(pickerPricing),
+    customPricingConfig,
+    inputTokenCeiling
+  );
+}
+
+/**
+ * Replaces picker rates with the Kilo-exclusive and custom pricing tiers that
+ * apply at `inputTokenCeiling`, as billing selects them; fallback-only tiers
+ * can only raise the rates.
+ */
+export function applyTieredPricingRates(
+  modelId: string,
+  pickerRates: TextPricingRates,
+  customPricingConfig: CustomPricingConfig,
+  inputTokenCeiling: number
+): TextPricingRates {
+  let rates = pickerRates;
   const exclusivePricing = findKiloExclusiveModel(modelId)?.pricing;
   const customPricing = getCustomPricing(customPricingConfig, modelId);
   const exclusiveTier = exclusivePricing

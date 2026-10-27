@@ -1,9 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import * as z from 'zod';
+import { parseModelValidationRequest } from './model-validation-request';
 import { handleTRPCRequest } from '@kilocode/web-shared/lib/organizations/organization-settings-route-handler';
-
-const BodySchema = z.object({ modelId: z.string().trim().min(1) });
 
 type ValidationResult = { valid: true } | { valid: false; reason: 'unavailable' };
 
@@ -11,19 +9,9 @@ export async function handleOrganizationModelValidationRequest(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ): Promise<NextResponse<{ error: string; message?: string } | ValidationResult>> {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
-
-  const bodyResult = BodySchema.safeParse(body);
+  const bodyResult = await parseModelValidationRequest(request);
   if (!bodyResult.success) {
-    return NextResponse.json(
-      { error: 'Invalid request body', details: z.treeifyError(bodyResult.error) },
-      { status: 400 }
-    );
+    return bodyResult.response;
   }
 
   const organizationId = (await params).id;

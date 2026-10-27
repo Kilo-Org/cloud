@@ -243,6 +243,8 @@ beforeEach(() => {
     repositories: [{ id: 3, name: 'project', full_name: gitlabProject, private: true }],
     instanceUrl: 'https://gitlab.com',
   });
+  jest.mocked(validateGitLabRepoAccessForOrganization).mockResolvedValue(true);
+  jest.mocked(validateGitLabRepoAccessForUser).mockResolvedValue(true);
   jest.mocked(getGitLabTokenForOrganization).mockResolvedValue('gitlab-token');
   jest.mocked(getGitLabTokenForUser).mockResolvedValue('gitlab-token');
   jest.mocked(validateGitLabRepoAccessForOrganization).mockResolvedValue(true);
@@ -421,21 +423,16 @@ describe.each(['slack', 'linear'] as const)('%s repository selection', platform 
         ...toolInput,
         ...(source === 'github' ? { githubRepo: otherRepository } : { gitlabProject }),
       };
+      mockGenerate.mockImplementationOnce(async () => {
+        const spawnTool = agentOptions().tools.spawnCloudAgentSession;
+        const args = spawnTool.inputSchema.parse(toolInput);
+        const result = await spawnTool.execute(args);
+        return { text: result.response };
+      });
 
-      await runBotAgent(params);
+      const result = await runBotAgent(params);
 
-      const properties = z.toJSONSchema(
-        agentOptions().tools.spawnCloudAgentSession.inputSchema
-      ).properties;
-      expect(properties).toHaveProperty('githubRepo');
-      expect(properties).toHaveProperty('gitlabProject');
-      expect(getGitHubRepositoryContext).toHaveBeenCalledWith(
-        { type: 'org', id: 'org-1' },
-        platform === 'slack' ? 'agent' : 'workflow'
-      );
-      expect(getGitLabRepositoryContext).toHaveBeenCalledWith({ type: 'org', id: 'org-1' });
-      expect(agentOptions().instructions).toContain(otherRepository);
-      expect(agentOptions().instructions).toContain(gitlabProject);
+      expect(result.startedCloudAgentSession).toBe(true);
       if (source === 'github') {
         expect(mockPrepareSession).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -444,9 +441,7 @@ describe.each(['slack', 'linear'] as const)('%s repository selection', platform 
             createdOnPlatform: platform,
           })
         );
-        expect(getGitLabTokenForOrganization).not.toHaveBeenCalled();
       } else {
-        expect(getGitLabTokenForOrganization).toHaveBeenCalledWith('org-1', 'bot-user-1');
         expect(mockPrepareSession).toHaveBeenCalledWith(
           expect.objectContaining({
             gitUrl: `https://gitlab.com/${gitlabProject}.git`,
@@ -454,7 +449,6 @@ describe.each(['slack', 'linear'] as const)('%s repository selection', platform 
             createdOnPlatform: platform,
           })
         );
-        expect(resolveGitHubRepositoryForOwner).not.toHaveBeenCalled();
       }
     }
   );

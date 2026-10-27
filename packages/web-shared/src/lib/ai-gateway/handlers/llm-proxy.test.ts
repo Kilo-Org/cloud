@@ -3467,7 +3467,7 @@ describe('Enkrypt input guardrail', () => {
   };
 
   it('makes no Enkrypt call for an organization without the guardrail', async () => {
-    setOrganization({ enkrypt_input_guardrail: { enabled: false } });
+    setOrganization({ enkrypt: { input_guardrail: { enabled: false } } });
     fetchSpy.mockImplementation(async () => Response.json({}));
 
     const response = await handleLlmProxyRequest(makeRequest(makeBody()));
@@ -3478,7 +3478,7 @@ describe('Enkrypt input guardrail', () => {
   });
 
   it('scans the turn and sends an allowed request upstream', async () => {
-    setOrganization({ enkrypt_input_guardrail: { enabled: true } });
+    setOrganization({ enkrypt: { input_guardrail: { enabled: true } } });
     enkryptAnswers({ summary: { injection_attack: 0, pii: 0 }, result_message: null });
 
     const response = await handleLlmProxyRequest(
@@ -3501,9 +3501,9 @@ describe('Enkrypt input guardrail', () => {
     const debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => {});
     enkryptAnswers({ summary: { injection_attack: 0, pii: 0 }, result_message: null });
 
-    setOrganization({ enkrypt_input_guardrail: { enabled: false } });
+    setOrganization({ enkrypt: { input_guardrail: { enabled: false } } });
     await handleLlmProxyRequest(makeRequest(makeBody()));
-    setOrganization({ enkrypt_input_guardrail: { enabled: true } });
+    setOrganization({ enkrypt: { input_guardrail: { enabled: true } } });
     await handleLlmProxyRequest(makeRequest(makeBody()));
 
     const waitLogs = debugSpy.mock.calls.filter(
@@ -3585,7 +3585,7 @@ describe('Enkrypt input guardrail', () => {
   ])(
     'blocks a flagged tool result on %s before the upstream request',
     async (path, input, body) => {
-      setOrganization({ enkrypt_input_guardrail: { enabled: true } });
+      setOrganization({ enkrypt: { input_guardrail: { enabled: true } } });
       enkryptAnswers(injection);
 
       const response = await handleLlmProxyRequest(
@@ -3602,7 +3602,7 @@ describe('Enkrypt input guardrail', () => {
   );
 
   it('sends the request when Enkrypt fails and the organization fails open', async () => {
-    setOrganization({ enkrypt_input_guardrail: { enabled: true } });
+    setOrganization({ enkrypt: { input_guardrail: { enabled: true } } });
     enkryptAnswers({ detail: 'unavailable' }, 503);
 
     const response = await handleLlmProxyRequest(makeRequest(makeBody()));
@@ -3612,7 +3612,7 @@ describe('Enkrypt input guardrail', () => {
   });
 
   it('rejects the request when Enkrypt fails and the organization fails closed', async () => {
-    setOrganization({ enkrypt_input_guardrail: { enabled: true, fail_mode: 'closed' } });
+    setOrganization({ enkrypt: { input_guardrail: { enabled: true, fail_mode: 'closed' } } });
     enkryptAnswers({ detail: 'unavailable' }, 503);
 
     const response = await handleLlmProxyRequest(makeRequest(makeBody()));

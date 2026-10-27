@@ -52,7 +52,7 @@ export function resolveEnkryptInputGuardrail(
   organizationId: string,
   settings: OrganizationSettings | undefined
 ): EnkryptInputGuardrailConfig | null {
-  const raw: unknown = settings?.enkrypt_input_guardrail;
+  const raw: unknown = settings?.enkrypt?.input_guardrail;
   if (raw === undefined) return null;
   const parsed = EnkryptInputGuardrailSettingsSchema.safeParse(raw);
   if (!parsed.success) {

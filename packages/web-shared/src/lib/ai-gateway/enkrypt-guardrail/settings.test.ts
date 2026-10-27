@@ -12,21 +12,22 @@ describe('resolveEnkryptInputGuardrail', () => {
   it.each([
     ['no settings', undefined],
     ['no guardrail setting', { data_collection: 'deny' }],
-    ['a disabled guardrail', { enkrypt_input_guardrail: { enabled: false } }],
+    ['an Enkrypt setting without a guardrail', { enkrypt: {} }],
+    ['a disabled guardrail', { enkrypt: { input_guardrail: { enabled: false } } }],
     [
       'no enabled detector',
-      { enkrypt_input_guardrail: { enabled: true, detectors: { injection_attack: false } } },
+      { enkrypt: { input_guardrail: { enabled: true, detectors: { injection_attack: false } } } },
     ],
     [
       'an invalid guardrail',
-      { enkrypt_input_guardrail: { enabled: 'yes' } } as unknown as OrganizationSettings,
+      { enkrypt: { input_guardrail: { enabled: 'yes' } } } as unknown as OrganizationSettings,
     ],
   ] satisfies [string, OrganizationSettings | undefined][])('is off for %s', (_name, settings) => {
     expect(resolve(settings)).toBeNull();
   });
 
   it('defaults to injection and secrets detection, failing open', () => {
-    expect(resolve({ enkrypt_input_guardrail: { enabled: true } })).toEqual({
+    expect(resolve({ enkrypt: { input_guardrail: { enabled: true } } })).toEqual({
       failMode: 'open',
       detectors: {
         injection_attack: { enabled: true, need_explanation: false },
@@ -38,10 +39,12 @@ describe('resolveEnkryptInputGuardrail', () => {
   it('enables only the configured detectors', () => {
     expect(
       resolve({
-        enkrypt_input_guardrail: {
-          enabled: true,
-          fail_mode: 'closed',
-          detectors: { toxicity: true, nsfw: true, pii_entities: ['pii', 'pii'] },
+        enkrypt: {
+          input_guardrail: {
+            enabled: true,
+            fail_mode: 'closed',
+            detectors: { toxicity: true, nsfw: true, pii_entities: ['pii', 'pii'] },
+          },
         },
       })
     ).toEqual({

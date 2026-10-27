@@ -1075,6 +1075,10 @@ export const EnkryptInputGuardrailSettingsSchema = z.object({
 
 export type EnkryptInputGuardrailSettings = z.infer<typeof EnkryptInputGuardrailSettingsSchema>;
 
+export const OrganizationEnkryptSettingsSchema = z.object({
+  input_guardrail: EnkryptInputGuardrailSettingsSchema.optional(),
+});
+
 const OrganizationSettingsSchema = z.object({
   provider_allow_list: z.array(z.string()).optional(),
 
@@ -1115,7 +1119,7 @@ const OrganizationSettingsSchema = z.object({
   // Seeded usage microdollars written by the sales demo populate step. Used to
   // separate seeded usage from real spend when computing the ledger entry.
   sales_demo_seeded_microdollars: z.number().optional(),
-  enkrypt_input_guardrail: EnkryptInputGuardrailSettingsSchema.optional(),
+  enkrypt: OrganizationEnkryptSettingsSchema.optional(),
 });
 
 export type OrganizationSettings = z.infer<typeof OrganizationSettingsSchema>;

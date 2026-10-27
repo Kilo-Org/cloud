@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { i18n } from '@/i18n';
 import {
   knownServerErrorMessage,
-  CHILD_ORGANIZATION_PARENT_MEMBER_INVITE_MESSAGE,
   ORGANIZATION_MEMBER_EXISTS_MESSAGE,
   ORGANIZATION_PENDING_INVITATION_MESSAGE,
   ORGANIZATION_TRIAL_EXPIRED_MESSAGE,
@@ -25,11 +24,6 @@ describe('knownServerErrorMessage', () => {
     expect(knownServerErrorMessage(makeError('CONFLICT', ORGANIZATION_MEMBER_EXISTS_MESSAGE))).toBe(
       i18n.t('organization.inviteMember.alreadyMember')
     );
-    expect(
-      knownServerErrorMessage(
-        makeError('PRECONDITION_FAILED', CHILD_ORGANIZATION_PARENT_MEMBER_INVITE_MESSAGE)
-      )
-    ).toBe(i18n.t('organization.inviteMember.parentMemberRequired'));
     expect(
       knownServerErrorMessage(makeError('CONFLICT', ORGANIZATION_PENDING_INVITATION_MESSAGE))
     ).toBe(i18n.t('organization.inviteMember.pendingInvitation'));

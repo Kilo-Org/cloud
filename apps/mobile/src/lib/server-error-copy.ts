@@ -26,10 +26,6 @@ export const ORGANIZATION_TRIAL_EXPIRED_MESSAGE = 'Organization trial has expire
 export const ORGANIZATION_MEMBER_EXISTS_MESSAGE =
   'This user is already a member of this organization';
 
-/** `organizations.members.invite`: a child org invited someone outside its parent. */
-export const CHILD_ORGANIZATION_PARENT_MEMBER_INVITE_MESSAGE =
-  'Child organizations can only invite people who are already members of the parent organization.';
-
 /** `organizations.members.invite`: an invitation for the address is outstanding. */
 export const ORGANIZATION_PENDING_INVITATION_MESSAGE =
   'This email already has a pending invitation';
@@ -70,9 +66,6 @@ function copyKeyFor(message: string): string | undefined {
     }
     case ORGANIZATION_MEMBER_EXISTS_MESSAGE: {
       return 'organization.inviteMember.alreadyMember';
-    }
-    case CHILD_ORGANIZATION_PARENT_MEMBER_INVITE_MESSAGE: {
-      return 'organization.inviteMember.parentMemberRequired';
     }
     case ORGANIZATION_PENDING_INVITATION_MESSAGE: {
       return 'organization.inviteMember.pendingInvitation';

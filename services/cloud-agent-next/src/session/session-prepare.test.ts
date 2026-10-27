@@ -5324,6 +5324,19 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     );
   });
 
+  it('does not bind the fingerprint to an allocation resolved after admission', async () => {
+    const request = {
+      ...originalRequest(),
+      options: { ...ORIGINAL_OPTIONS, createdOnPlatform: 'cloud-agent-web' },
+    };
+    expect(
+      await sessionCreateIntentFingerprint({
+        ...request,
+        savedSandboxAllocation: 'cloudflare-shared',
+      })
+    ).toBe(await sessionCreateIntentFingerprint(request));
+  });
+
   it('binds interactive origin and authenticated lineage to creation intent', async () => {
     const request = originalRequest();
     const original = await sessionCreateIntentFingerprint(request);

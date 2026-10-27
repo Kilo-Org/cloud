@@ -1808,7 +1808,6 @@ export async function sessionCreateIntentFingerprint(
           };
   return sha256Hex(
     canonicalJson({
-      allowSubagentSessions: allowsSubagentSessions(input) ? true : undefined,
       parentCloudAgentSessionId: input.parentCloudAgentSessionId,
       initialTurn,
       // Undefined for creates without a proposed ID, so their fingerprint is unchanged.

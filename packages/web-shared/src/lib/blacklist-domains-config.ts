@@ -2,13 +2,13 @@ import 'server-only';
 import * as z from 'zod';
 import { captureException } from '@sentry/nextjs';
 import {
-  blacklistedDomainsFromConfig,
+  refreshBlacklistedDomains,
   type BlacklistDomainsConfigSchema,
+  type BlacklistedDomainsSnapshot,
 } from '@kilocode/worker-utils/account-access';
 import { redisClient } from '@kilocode/web-shared/lib/redis';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
-import { BLACKLIST_DOMAINS_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export type BlacklistDomainsConfig = z.infer<typeof BlacklistDomainsConfigSchema>;
@@ -34,6 +34,8 @@ function getEnvFallbackDomains(): string[] {
     : [];
 }
 
+let snapshot: BlacklistedDomainsSnapshot | null = null;
+
 /**
  * Reads the operator-maintained list from Redis. Throws when the read or the stored payload
  * is unusable, after reporting it: createCachedFetch then keeps serving the last list it read
@@ -41,10 +43,13 @@ function getEnvFallbackDomains(): string[] {
  */
 async function readBlacklistedDomains(): Promise<string[]> {
   try {
-    return blacklistedDomainsFromConfig(
-      await redisClient.get<string>(BLACKLIST_DOMAINS_REDIS_KEY),
-      getEnvFallbackDomains()
+    snapshot = await refreshBlacklistedDomains(
+      key => redisClient.get<string>(key),
+      snapshot,
+      getEnvFallbackDomains(),
+      Date.now()
     );
+    return snapshot.domains;
   } catch (error) {
     errorExceptInTest('[blacklist-domains] Failed to read the blacklisted domains:', error);
     captureException(error, { tags: { source: 'blacklist_domains_config' } });

@@ -1,4 +1,8 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
+import {
+  BLACKLIST_DOMAINS_REDIS_KEY,
+  BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY,
+} from '@kilocode/web-shared/lib/redis-keys';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/redis', () => ({ redisClient: { get: jest.fn() } }));
@@ -54,6 +58,31 @@ describe('getBlacklistedDomains', () => {
 
     await expect(getBlacklistedDomains()).resolves.toEqual(['spam.example']);
     expect(captureException).not.toHaveBeenCalled();
+  });
+
+  test('rechecks only the updated_at key while the list is unchanged', async () => {
+    const { getBlacklistedDomains, redisGet } = await loadGetBlacklistedDomains();
+    const updatedAt = '2026-10-22T13:30:00.000Z';
+    redisGet.mockImplementation(async key =>
+      key === BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY
+        ? updatedAt
+        : JSON.stringify({
+            domains: ['spam.example'],
+            updated_at: updatedAt,
+            updated_by: null,
+            updated_by_email: null,
+          })
+    );
+
+    const first = await getBlacklistedDomains();
+    clock.mockReturnValue(TTL_MS + 1);
+    const second = await getBlacklistedDomains();
+
+    expect(second).toBe(first);
+    expect(redisGet.mock.calls.map(([key]) => key)).toEqual([
+      BLACKLIST_DOMAINS_REDIS_KEY,
+      BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY,
+    ]);
   });
 
   test('keeps the last domains read when a later read fails, and reports it once', async () => {

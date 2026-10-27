@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
-  blacklistedDomainsFromConfig,
+  BLACKLISTED_DOMAINS_REDIS_KEY,
+  BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY,
   canSpendPaidUsage,
   isApiTokenPepperCurrent,
   isEmailBlacklistedByDomain,
   organizationMemberBalance,
+  refreshBlacklistedDomains,
   requestOrganizationId,
 } from './account-access';
 
@@ -97,12 +99,108 @@ describe('account access rules', () => {
     expect(isEmailBlacklistedByDomain('spam.com', ['spam.com'])).toBe(false);
     expect(isEmailBlacklistedByDomain('a.spam.com', ['spam.com'])).toBe(true);
   });
+});
 
-  it('reads blocked domains from the admin config and falls back when it is empty', () => {
-    const config = (domains: string[]) =>
-      JSON.stringify({ domains, updated_at: null, updated_by: null, updated_by_email: null });
-    expect(blacklistedDomainsFromConfig(config(['spam.com']), ['env.com'])).toEqual(['spam.com']);
-    expect(blacklistedDomainsFromConfig(config([]), ['env.com'])).toEqual(['env.com']);
-    expect(blacklistedDomainsFromConfig(null, ['env.com'])).toEqual(['env.com']);
+describe('refreshBlacklistedDomains', () => {
+  const FULL_READ_INTERVAL_MS = 10 * 60_000;
+
+  function fakeRedis(entries: Record<string, string>) {
+    const reads: string[] = [];
+    return {
+      reads,
+      store: entries,
+      get: async (key: string) => {
+        reads.push(key);
+        return entries[key] ?? null;
+      },
+    };
+  }
+
+  function storeList(
+    redis: ReturnType<typeof fakeRedis>,
+    domains: string[],
+    updatedAt: string | null,
+    { writeUpdatedAtKey = true } = {}
+  ) {
+    redis.store[BLACKLISTED_DOMAINS_REDIS_KEY] = JSON.stringify({
+      domains,
+      updated_at: updatedAt,
+      updated_by: null,
+      updated_by_email: null,
+    });
+    if (writeUpdatedAtKey && updatedAt) {
+      redis.store[BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY] = updatedAt;
+    }
+  }
+
+  it('reads the stored list and falls back when it is empty or missing', async () => {
+    const redis = fakeRedis({});
+    expect((await refreshBlacklistedDomains(redis.get, null, ['env.com'], 0)).domains).toEqual([
+      'env.com',
+    ]);
+
+    storeList(redis, [], 't1');
+    expect((await refreshBlacklistedDomains(redis.get, null, ['env.com'], 0)).domains).toEqual([
+      'env.com',
+    ]);
+
+    storeList(redis, ['spam.com'], 't2');
+    expect(await refreshBlacklistedDomains(redis.get, null, ['env.com'], 0)).toEqual({
+      domains: ['spam.com'],
+      updatedAt: 't2',
+      fullReadAt: 0,
+    });
+  });
+
+  it('keeps the previous snapshot without downloading the list while updated_at is unchanged', async () => {
+    const redis = fakeRedis({});
+    storeList(redis, ['spam.com'], 't1');
+    const first = await refreshBlacklistedDomains(redis.get, null, [], 0);
+    redis.reads.length = 0;
+
+    const second = await refreshBlacklistedDomains(redis.get, first, [], 60_000);
+
+    expect(second).toBe(first);
+    expect(redis.reads).toEqual([BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY]);
+  });
+
+  it('downloads the list once updated_at changes', async () => {
+    const redis = fakeRedis({});
+    storeList(redis, ['spam.com'], 't1');
+    const first = await refreshBlacklistedDomains(redis.get, null, [], 0);
+    storeList(redis, ['spam.com', 'junk.org'], 't2');
+
+    const second = await refreshBlacklistedDomains(redis.get, first, [], 60_000);
+
+    expect(second).toEqual({
+      domains: ['spam.com', 'junk.org'],
+      updatedAt: 't2',
+      fullReadAt: 60_000,
+    });
+  });
+
+  it('downloads the list every time when the updated_at key was never written', async () => {
+    const redis = fakeRedis({});
+    storeList(redis, ['spam.com'], 't1', { writeUpdatedAtKey: false });
+    const first = await refreshBlacklistedDomains(redis.get, null, [], 0);
+    storeList(redis, ['junk.org'], 't2', { writeUpdatedAtKey: false });
+
+    expect((await refreshBlacklistedDomains(redis.get, first, [], 60_000)).domains).toEqual([
+      'junk.org',
+    ]);
+  });
+
+  it('downloads the list after the full-read interval even when updated_at is unchanged', async () => {
+    const redis = fakeRedis({});
+    storeList(redis, ['spam.com'], 't1');
+    const first = await refreshBlacklistedDomains(redis.get, null, [], 0);
+    storeList(redis, ['junk.org'], 't1');
+
+    expect(await refreshBlacklistedDomains(redis.get, first, [], FULL_READ_INTERVAL_MS - 1)).toBe(
+      first
+    );
+    expect(
+      (await refreshBlacklistedDomains(redis.get, first, [], FULL_READ_INTERVAL_MS)).domains
+    ).toEqual(['junk.org']);
   });
 });

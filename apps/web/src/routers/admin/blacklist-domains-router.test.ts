@@ -9,7 +9,7 @@ jest.mock('@/lib/abuse/block-blacklisted-domains', () => {
 jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: {
     get: jest.fn(),
-    set: jest.fn(),
+    mset: jest.fn(),
   },
 }));
 
@@ -23,7 +23,10 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { computeBlacklistStats, isDomainOnBlacklist } from './blacklist-domains-router';
 import { backfillBlockBlacklistedDomainsBatch } from '@/lib/abuse/block-blacklisted-domains';
 import type { BlockBlacklistedDomainsBackfillResponse } from '@/lib/abuse/block-blacklisted-domains';
-import { BLACKLIST_DOMAINS_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
+import {
+  BLACKLIST_DOMAINS_REDIS_KEY,
+  BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY,
+} from '@kilocode/web-shared/lib/redis-keys';
 import type { User } from '@kilocode/db/schema';
 
 type BackfillBatch = (params: {
@@ -36,7 +39,7 @@ const actualBackfillModule = jest.requireActual<{
 }>('@/lib/abuse/block-blacklisted-domains');
 const mockedBackfill = jest.mocked(backfillBlockBlacklistedDomainsBatch);
 const mockedRedisGet = jest.mocked(redisClient.get);
-const mockedRedisSet = jest.mocked(redisClient.set);
+const mockedRedisMset = jest.mocked(redisClient.mset);
 
 let admin: User;
 
@@ -44,8 +47,8 @@ beforeEach(async () => {
   await cleanupDbForTest();
   mockedRedisGet.mockReset();
   mockedRedisGet.mockResolvedValue(null);
-  mockedRedisSet.mockReset();
-  mockedRedisSet.mockResolvedValue('OK');
+  mockedRedisMset.mockReset();
+  mockedRedisMset.mockResolvedValue('OK');
   mockedBackfill.mockReset();
   mockedBackfill.mockImplementation(actualBackfillModule.backfillBlockBlacklistedDomainsBatch);
   admin = await insertTestUser({
@@ -412,10 +415,11 @@ describe('admin.blacklistDomains.set', () => {
 
     expect(result.domains).toEqual(['mailinator.com']);
     expect(result.backfill).toEqual({ blocked: 1, remaining: false, failed: false });
-    expect(mockedRedisSet).toHaveBeenCalledWith(
-      BLACKLIST_DOMAINS_REDIS_KEY,
-      expect.stringContaining('mailinator.com')
-    );
+    expect(mockedRedisMset).toHaveBeenCalledWith({
+      [BLACKLIST_DOMAINS_REDIS_KEY]: expect.stringContaining('mailinator.com'),
+      [BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY]: result.updated_at,
+    });
+    expect(result.updated_at).toEqual(expect.any(String));
 
     const rows = await db
       .select({
@@ -475,7 +479,7 @@ describe('admin.blacklistDomains.set', () => {
 
     expect(result.domains).toEqual(['mailinator.com']);
     expect(result.backfill).toEqual({ blocked: 0, remaining: false, failed: true });
-    expect(mockedRedisSet).toHaveBeenCalled();
+    expect(mockedRedisMset).toHaveBeenCalled();
   });
 
   it('does not backfill the whole list when the previous config cannot be read', async () => {
@@ -487,6 +491,6 @@ describe('admin.blacklistDomains.set', () => {
     expect(result.domains).toEqual(['mailinator.com']);
     expect(result.backfill).toEqual({ blocked: 0, remaining: false, failed: true });
     expect(mockedBackfill).not.toHaveBeenCalled();
-    expect(mockedRedisSet).toHaveBeenCalled();
+    expect(mockedRedisMset).toHaveBeenCalled();
   });
 });

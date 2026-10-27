@@ -5,8 +5,8 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { formatError, getCachedSecret } from '@kilocode/worker-utils';
 import {
-  BLACKLISTED_DOMAINS_REDIS_KEY,
-  blacklistedDomainsFromConfig,
+  refreshBlacklistedDomains,
+  type BlacklistedDomainsSnapshot,
 } from '@kilocode/worker-utils/account-access';
 import * as z from 'zod';
 
@@ -21,7 +21,7 @@ type GatewayPolicyEnv = Pick<Env, 'INTERNAL_API_SECRET_PROD' | 'KILO_AI_GATEWAY_
 type BlacklistEnv = Pick<Env, 'UPSTASH_REDIS_REST_URL' | 'UPSTASH_REDIS_REST_TOKEN'>;
 
 const deniedModelsCache = new Map<string, { expiresAt: number; value: Promise<string[] | null> }>();
-let blacklistedDomains: { expiresAt: number; value: string[] } | null = null;
+let blacklistedDomains: { expiresAt: number; snapshot: BlacklistedDomainsSnapshot } | null = null;
 
 export function clearOrganizationPolicyCache(): void {
   deniedModelsCache.clear();
@@ -117,7 +117,7 @@ export async function deniedOrganizationModelIds(
 
 const UpstashGetResponseSchema = z.object({ result: z.string().nullable() });
 
-async function readBlacklistedDomainsConfig(env: BlacklistEnv): Promise<string | null> {
+async function readRedisKey(env: BlacklistEnv, key: string): Promise<string | null> {
   const [url, token] = await Promise.all([
     getCachedSecret(env.UPSTASH_REDIS_REST_URL, 'UPSTASH_REDIS_REST_URL'),
     getCachedSecret(env.UPSTASH_REDIS_REST_TOKEN, 'UPSTASH_REDIS_REST_TOKEN'),
@@ -126,7 +126,7 @@ async function readBlacklistedDomainsConfig(env: BlacklistEnv): Promise<string |
   const res = await fetch(url, {
     method: 'POST',
     headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-    body: JSON.stringify(['GET', BLACKLISTED_DOMAINS_REDIS_KEY]),
+    body: JSON.stringify(['GET', key]),
     signal: AbortSignal.timeout(LOOKUP_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`upstash responded ${res.status}`);
@@ -138,11 +138,18 @@ async function readBlacklistedDomainsConfig(env: BlacklistEnv): Promise<string |
 // one. The gateway's BLACKLIST_DOMAINS fallback is a Vercel env var this worker does not have.
 export async function getBlacklistedDomains(env: BlacklistEnv): Promise<string[] | null> {
   const now = Date.now();
-  if (blacklistedDomains && blacklistedDomains.expiresAt > now) return blacklistedDomains.value;
+  if (blacklistedDomains && blacklistedDomains.expiresAt > now) {
+    return blacklistedDomains.snapshot.domains;
+  }
   try {
-    const value = blacklistedDomainsFromConfig(await readBlacklistedDomainsConfig(env), []);
-    blacklistedDomains = { expiresAt: now + POLICY_CACHE_TTL_MS, value };
-    return value;
+    const snapshot = await refreshBlacklistedDomains(
+      key => readRedisKey(env, key),
+      blacklistedDomains?.snapshot ?? null,
+      [],
+      now
+    );
+    blacklistedDomains = { expiresAt: now + POLICY_CACHE_TTL_MS, snapshot };
+    return snapshot.domains;
   } catch (error) {
     console.warn(
       JSON.stringify({
@@ -150,6 +157,6 @@ export async function getBlacklistedDomains(env: BlacklistEnv): Promise<string[]
         ...formatError(error),
       })
     );
-    return blacklistedDomains?.value ?? null;
+    return blacklistedDomains?.snapshot.domains ?? null;
   }
 }

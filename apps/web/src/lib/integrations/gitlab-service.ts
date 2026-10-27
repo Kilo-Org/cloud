@@ -25,6 +25,7 @@ import {
   validateProjectAccessToken,
   validatePersonalAccessToken,
   type GitLabProjectAccessToken,
+  type GitLabProjectAccessTokenValidation,
   type GitLabPATValidationResult,
   GitLabAuthenticationError,
   GitLabProjectAccessTokenPermissionError,
@@ -575,6 +576,28 @@ async function getStoredProjectCredential(integrationId: string, projectId: stri
   };
 }
 
+async function validateStoredProjectAccessToken(
+  token: string,
+  instanceUrl: string
+): Promise<GitLabProjectAccessTokenValidation> {
+  const first = await validateProjectAccessToken(token, instanceUrl);
+  if (first.status !== 'unverified') {
+    return first;
+  }
+
+  // A rejected instance URL is a stored configuration problem: repeating the
+  // probe cannot change the answer.
+  if (first.reason === 'instance-url') {
+    return first;
+  }
+
+  logExceptInTest('[validateStoredProjectAccessToken] Retrying unconfirmed token probe', {
+    reason: first.reason,
+    status: first.httpStatus,
+  });
+  return validateProjectAccessToken(token, instanceUrl);
+}
+
 /**
  * Gets or creates a Project Access Token for a GitLab project
  *
@@ -583,6 +606,9 @@ async function getStoredProjectCredential(integrationId: string, projectId: stri
  * 2. If exists and not expiring soon, returns it
  * 3. If exists but expiring soon, rotates it
  * 4. If doesn't exist, creates a new one
+ *
+ * Validation is best effort for transient provider failures; explicit denials
+ * require replacement. Invalid instance configuration is reported to the caller.
  *
  * @param integration - The GitLab integration record
  * @param projectId - GitLab project ID
@@ -607,9 +633,24 @@ export async function getOrCreateProjectAccessToken(
     if (!isExpiringSoon) {
       // Validate the token is still valid on GitLab (might have been manually revoked)
       const projectToken = await getValidGitLabProjectAccessToken(integration, projectIdStr, actor);
-      const isValid = await validateProjectAccessToken(projectToken, instanceUrl);
+      const validation = await validateStoredProjectAccessToken(projectToken, instanceUrl);
 
-      if (isValid) {
+      if (validation.status === 'unverified') {
+        logExceptInTest('[getOrCreateProjectAccessToken] Token health is unconfirmed', {
+          projectId,
+          tokenId: storedCredential.tokenId,
+          reason: validation.reason,
+          status: validation.httpStatus,
+        });
+        if (validation.reason === 'instance-url') {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'GitLab instance URL is invalid.',
+          });
+        }
+      }
+
+      if (validation.status !== 'invalid') {
         logExceptInTest('[getOrCreateProjectAccessToken] Using existing token', {
           projectId,
           tokenId: storedCredential.tokenId,
@@ -618,11 +659,16 @@ export async function getOrCreateProjectAccessToken(
         return projectToken;
       }
 
-      // Token is invalid (revoked), remove from storage and create a new one
-      logExceptInTest('[getOrCreateProjectAccessToken] Stored token is invalid, creating new one', {
-        projectId,
-        tokenId: storedCredential.tokenId,
-      });
+      // Token is denied or revoked, remove from storage and create a new one
+      logExceptInTest(
+        '[getOrCreateProjectAccessToken] Stored token is unusable, creating new one',
+        {
+          projectId,
+          tokenId: storedCredential.tokenId,
+          reason: validation.reason,
+          status: validation.httpStatus,
+        }
+      );
 
       // Remove the invalid token from storage and skip to creating a new one
       await removeInvalidStoredToken(integration.id, projectIdStr, storedCredential);

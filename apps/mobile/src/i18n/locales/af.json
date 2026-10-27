@@ -227,7 +227,6 @@
     "hideBalance": "Versteek saldo",
     "showBalance": "Wys saldo",
     "balanceHidden": "Saldo versteek",
-    "bonusCreditsExpiring": "Krediete ter waarde van {{amount}} verval op {{date}}.",
     "signOutTitle": "Teken uit?",
     "signOutMessage": "Jy sal weer moet aanmeld om toegang tot jou werkruimte te kry.",
     "deleteAccountTitle": "Skrap rekening?",
@@ -2592,7 +2591,9 @@
       "retrying": "Probeer weer…",
       "retryDeny": "Probeer weer weier",
       "retryAllowOnce": "Probeer weer laat een keer toe",
-      "retryAlwaysAllow": "Probeer weer laat altyd toe"
+      "retryAlwaysAllow": "Probeer weer laat altyd toe",
+      "unreadableTitle": "Toestemmingsversoek kon nie gelees word nie",
+      "unreadableBody": "Die agent wag op 'n toestemmingsbeslissing wat hierdie app nie kan wys nie. Dateer die app of die CLI op, of beantwoord die versoek in die CLI om voort te gaan."
     },
     "questionCard": {
       "title": "Agent benodig insette",
@@ -2984,8 +2985,9 @@
     "unavailableDevice": "Steminvoer is nie op hierdie toestel beskikbaar nie.",
     "unavailableLanguage": "Steminvoer is nie vir die toestel se taal beskikbaar nie.",
     "languageNotInstalledTitle": "Steminvoer vir {{language}} is nog nie gereed nie",
-    "languageNotInstalledMessage": "Die vanlyn-spraaklêers vir {{language}} is nie op hierdie foon geïnstalleer nie. Laai hulle af en probeer steminvoer weer.",
+    "languageNotInstalledMessage": "Die vanlyn-spraaklêers vir {{language}} is nie geïnstalleer nie, en aanlyn transkripsie is afgeskakel. Laai die lêers af, of skakel aanlyn transkripsie weer aan, om steminvoer te gebruik.",
     "downloadOfflineModel": "Laai af",
+    "useOnlineTranscription": "Laat aanlyn transkripsie toe",
     "offlineModelDownloadScheduled": "Die vanlyn-spraaklêers sal op die agtergrond afgelaai word. Probeer steminvoer later weer.",
     "listeningStopped": "Die toestel luister nie meer nie.",
     "transcribing": "Transkribeer...",
@@ -3159,7 +3161,7 @@
     "creditActivity": {
       "emptyDescription": "Aankope, gebruik en kredietaanpassings vir hierdie organisasie sal hier verskyn namate dit plaasvind.",
       "emptyTitle": "Geen kredietaktiwiteit nie",
-      "expires": "Verval op {{date}}",
+      "expiresUtc": "Verval op {{date}} (UTC)",
       "title": "Kredietaktiwiteit",
       "transactionFallback": "Krediettransaksie",
       "category": {
@@ -3840,6 +3842,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Waardes wat as •••• vertoon word, behou hul gestoorde geheim; vervang 'n waarde om dit te roteer. Wanneer die opdragreël verander word, word elke waarde weer vereis",
+      "headersHint": "Waardes wat as •••• vertoon word, behou hul gestoorde geheim; vervang 'n waarde om dit te roteer. Wanneer die URL verander word, word elke waarde weer vereis",
       "nameRequired": "Voer 'n bedienernaam in",
       "nameInvalid": "Naam kan slegs ASCII-letters, syfers, onderstrepe en strepe tot 100 karakters gebruik",
       "commandRequired": "Voer 'n opdrag in",
@@ -3938,6 +3942,10 @@
   "credits": {
     "title": "Koop krediete",
     "description": "Krediete is 'n eenmalige aankoop wat by jou Kilo-saldo gevoeg word om AI-koderingsessies in Kilo App te laat loop. Die winkel hef jou rekening en krediete word bygevoeg nadat die winkel betaling bevestig.",
+    "nextExpiry": "{{amount}} aan krediete verval op {{date}} (UTC). Krediete met die vroegste vervaldatum word eerste gebruik.",
+    "appStoreExpiry": "Krediete wat deur die App Store gekoop is, verval nie.",
+    "playOneYearExpiry": "Hierdie krediete verval een kalenderjaar na aankoop.",
+    "playNonexpiring": "Hierdie krediete verval nie.",
     "packLabel": "Voeg {{amount}} se krediete by",
     "priceUnavailable": "Prys nie beskikbaar nie",
     "purchased": "Krediete is by jou saldo gevoeg.",
@@ -4022,6 +4030,7 @@
       "startNewSessionHint": "Druk lank om 'n nuwe sessie te begin.",
       "linkSession": "Koppel sessie",
       "linkFailed": "Kon nie die sessie aan die taak koppel nie",
+      "moveToAnotherTodo": "Skuif na 'n ander taak",
       "startRefreshFailed": "Die sessie het begin, maar hierdie lys is nie opgedateer nie."
     },
     "linkSession": {
@@ -4031,6 +4040,7 @@
     },
     "upNext": "Volgende",
     "sessionTodo": "Taak: {{title}}",
+    "openTodoHint": "Maak die taak oop.",
     "linkToTodo": "Koppel aan taak",
     "candidates": {
       "empty": "Geen oop take nie"

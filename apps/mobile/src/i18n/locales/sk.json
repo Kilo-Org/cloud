@@ -227,7 +227,6 @@
     "hideBalance": "Skryť zostatok",
     "showBalance": "Zobraziť zostatok",
     "balanceHidden": "Zostatok je skrytý",
-    "bonusCreditsExpiring": "Platnosť kreditov v hodnote {{amount}} sa skončí {{date}}.",
     "signOutTitle": "Odhlásiť sa?",
     "signOutMessage": "Na prístup do svojho pracovného priestoru sa budeš musieť znova prihlásiť.",
     "deleteAccountTitle": "Odstrániť účet?",
@@ -2664,7 +2663,9 @@
       "retrying": "Skúša sa znova…",
       "retryDeny": "Skúsiť zamietnuť znova",
       "retryAllowOnce": "Skúsiť povoliť tentoraz znova",
-      "retryAlwaysAllow": "Skúsiť vždy povoliť znova"
+      "retryAlwaysAllow": "Skúsiť vždy povoliť znova",
+      "unreadableTitle": "Žiadosť o povolenie sa nepodarilo prečítať",
+      "unreadableBody": "Agent čaká na rozhodnutie o povolení, ktoré táto aplikácia nedokáže zobraziť. Aktualizujte aplikáciu alebo CLI, prípadne odpovedzte na žiadosť v CLI, aby ste mohli pokračovať."
     },
     "questionCard": {
       "title": "Agent potrebuje odpoveď",
@@ -3070,8 +3071,9 @@
     "unavailableDevice": "Hlasový vstup nie je na tomto zariadení dostupný.",
     "unavailableLanguage": "Hlasový vstup nie je dostupný pre jazyk nastavený v tomto zariadení.",
     "languageNotInstalledTitle": "Hlasový vstup pre jazyk {{language}} zatiaľ nie je pripravený",
-    "languageNotInstalledMessage": "Offline súbory reči pre jazyk {{language}} nie sú v tomto telefóne nainštalované. Stiahnite ich a potom skúste hlasový vstup znova.",
+    "languageNotInstalledMessage": "Offline súbory reči pre {{language}} nie sú nainštalované a online prepis je vypnutý. Stiahnite súbory alebo znova zapnite online prepis, aby hlasový vstup fungoval.",
     "downloadOfflineModel": "Stiahnuť",
+    "useOnlineTranscription": "Povoliť online prepis",
     "offlineModelDownloadScheduled": "Offline súbory reči sa stiahnu na pozadí. Skúste hlasový vstup znova neskôr.",
     "listeningStopped": "Počúvanie sa skončilo.",
     "transcribing": "Prepisuje sa…",
@@ -3247,7 +3249,7 @@
     "creditActivity": {
       "emptyDescription": "Tu sa budú priebežne zobrazovať nákupy, spotreba a úpravy kreditov tejto organizácie.",
       "emptyTitle": "Žiadne pohyby kreditov",
-      "expires": "Platnosť končí {{date}}",
+      "expiresUtc": "Platnosť končí {{date}} (UTC)",
       "title": "Pohyby kreditov",
       "transactionFallback": "Kreditná transakcia",
       "category": {
@@ -3942,6 +3944,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Hodnoty zobrazené ako •••• si zachovávajú uloženú tajnú hodnotu; nahradením hodnoty ju obnovíte. Pri zmene príkazového riadka je potrebné znova zadať všetky hodnoty",
+      "headersHint": "Hodnoty zobrazené ako •••• si zachovávajú uloženú tajnú hodnotu; nahradením hodnoty ju obnovíte. Pri zmene URL je potrebné znova zadať všetky hodnoty",
       "nameRequired": "Zadajte názov servera",
       "nameInvalid": "Názov môže používať iba písmená ASCII, čísla, podčiarkovníky a pomlčky, maximálne 100 znakov",
       "commandRequired": "Zadajte príkaz",
@@ -4040,6 +4044,10 @@
   "credits": {
     "title": "Kúpiť kredity",
     "description": "Kredity sú jednorazový nákup pridaný do vášho zostatku Kilo na spúšťanie AI programovacích relácií v aplikácii Kilo. Obchod vám strhne platbu z účtu a kredity sa pripíšu po potvrdení platby obchodom.",
+    "nextExpiry": "Platnosť kreditov v hodnote {{amount}} sa skončí {{date}} (UTC). Najprv sa čerpajú kredity s najskorším koncom platnosti.",
+    "appStoreExpiry": "Kredity zakúpené cez App Store nestrácajú platnosť.",
+    "playOneYearExpiry": "Platnosť týchto kreditov sa skončí jeden kalendárny rok po nákupe.",
+    "playNonexpiring": "Tieto kredity nestrácajú platnosť.",
     "packLabel": "Pridať {{amount}} v kreditoch",
     "priceUnavailable": "Cena nie je k dispozícii",
     "purchased": "Kredity boli pridané do vášho zostatku.",
@@ -4132,6 +4140,7 @@
       "startNewSessionHint": "Dlhým stlačením začnete novú reláciu.",
       "linkSession": "Prepojiť reláciu",
       "linkFailed": "Reláciu sa nepodarilo prepojiť s úlohou",
+      "moveToAnotherTodo": "Presunúť do inej úlohy",
       "startRefreshFailed": "Relácia sa spustila, ale tento zoznam sa neaktualizoval."
     },
     "linkSession": {
@@ -4141,6 +4150,7 @@
     },
     "upNext": "Ďalej",
     "sessionTodo": "Úloha: {{title}}",
+    "openTodoHint": "Otvorí úlohu.",
     "linkToTodo": "Prepojiť s úlohou",
     "candidates": {
       "empty": "Žiadne otvorené úlohy"

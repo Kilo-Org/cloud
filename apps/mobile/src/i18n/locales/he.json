@@ -227,7 +227,6 @@
     "hideBalance": "הסתר יתרה",
     "showBalance": "הצג יתרה",
     "balanceHidden": "היתרה מוסתרת",
-    "bonusCreditsExpiring": "תוקפם של קרדיטים בסך {{amount}} יפוג ב-{{date}}.",
     "signOutTitle": "להתנתק?",
     "signOutMessage": "כדי לגשת לסביבת העבודה שלך, צריך להתחבר שוב.",
     "deleteAccountTitle": "למחוק את החשבון?",
@@ -2085,7 +2084,9 @@
       "retrying": "מנסה שוב…",
       "retryDeny": "ניסיון דחייה נוסף",
       "retryAllowOnce": "ניסיון הרשאה חד-פעמית נוסף",
-      "retryAlwaysAllow": "ניסיון הרשאה קבועה נוסף"
+      "retryAlwaysAllow": "ניסיון הרשאה קבועה נוסף",
+      "unreadableTitle": "לא ניתן לקרוא את בקשת ההרשאה",
+      "unreadableBody": "הסוכן ממתין להחלטת הרשאה שאין באפשרות האפליקציה הזו להציג. יש לעדכן את האפליקציה או את ה-CLI, או להשיב לבקשה ב-CLI כדי להמשיך."
     },
     "questionCard": {
       "title": "הסוכן ממתין לתשובה",
@@ -2484,8 +2485,9 @@
     "unavailableDevice": "ההכתבה אינה זמינה במכשיר הזה.",
     "unavailableLanguage": "ההכתבה אינה זמינה בשפה שהוגדרה במכשיר הזה.",
     "languageNotInstalledTitle": "ההכתבה עבור {{language}} עדיין לא מוכנה",
-    "languageNotInstalledMessage": "קובצי הדיבור הלא מקוונים עבור {{language}} לא מותקנים בטלפון הזה. הורד אותם ואז נסה שוב להשתמש בהכתבה.",
+    "languageNotInstalledMessage": "קובצי הדיבור הלא מקוונים עבור {{language}} לא מותקנים, והתמלול המקוון כבוי. הורד את הקבצים או הפעל מחדש את התמלול המקוון כדי להשתמש בהכתבה.",
     "downloadOfflineModel": "הורדה",
+    "useOnlineTranscription": "אפשר תמלול מקוון",
     "offlineModelDownloadScheduled": "קובצי הדיבור הלא מקוונים יורדו ברקע. נסה שוב להשתמש בהכתבה מאוחר יותר.",
     "listeningStopped": "ההאזנה הופסקה.",
     "transcribing": "בתמלול...",
@@ -3195,7 +3197,7 @@
     "creditActivity": {
       "emptyDescription": "כאן יופיעו רכישות, שימוש ועדכוני יתרת קרדיטים של הארגון, עם ביצועם.",
       "emptyTitle": "אין תנועות בקרדיטים",
-      "expires": "בתוקף עד {{date}}",
+      "expiresUtc": "בתוקף עד {{date}} (UTC)",
       "title": "תנועות בקרדיטים",
       "transactionFallback": "תנועה בקרדיטים",
       "category": {
@@ -3891,6 +3893,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "ערכים המוצגים כ-•••• שומרים על הסוד השמור שלהם; החלפת ערך תבצע רוטציה שלו. שינוי שורת הפקודה מחייב הזנה מחדש של כל הערכים",
+      "headersHint": "ערכים המוצגים כ-•••• שומרים על הסוד השמור שלהם; החלפת ערך תבצע רוטציה שלו. שינוי כתובת האתר מחייב הזנה מחדש של כל הערכים",
       "nameRequired": "הזן שם שרת",
       "nameInvalid": "השם יכול להשתמש רק באותיות באנגלית (ASCII), מספרים, קווים תחתונים ומקפים, עד 100 תווים",
       "commandRequired": "הזן פקודה",
@@ -3989,6 +3993,10 @@
   "credits": {
     "title": "קניית קרדיטים",
     "description": "קרדיטים הם רכישה חד-פעמית שמתווספת ליתרת ה-Kilo שלך להרצת מפגשי קידוד בינה מלאכותית ב-Kilo App. החנות מחייבת את החשבון שלך והקרדיטים מתווספים לאחר שהחנות מאשרת את התשלום.",
+    "nextExpiry": "תוקפם של קרדיטים בסך {{amount}} יפוג ב-{{date}} (UTC). קרדיטים שתוקפם יפוג ראשון מנוצלים קודם.",
+    "appStoreExpiry": "קרדיטים שנרכשו דרך App Store אינם פגים.",
+    "playOneYearExpiry": "תוקפם של קרדיטים אלה יפוג שנה קלנדרית אחת לאחר הרכישה.",
+    "playNonexpiring": "קרדיטים אלה אינם פגים.",
     "packLabel": "הוספת {{amount}} בקרדיטים",
     "priceUnavailable": "המחיר אינו זמין",
     "purchased": "הקרדיטים נוספו ליתרה שלך.",
@@ -4077,6 +4085,7 @@
       "startNewSessionHint": "לחץ לחיצה ארוכה כדי להתחיל סשן חדש.",
       "linkSession": "קישור סשן",
       "linkFailed": "לא הצלחנו לקשר את הסשן למשימה",
+      "moveToAnotherTodo": "העבר למשימה אחרת",
       "startRefreshFailed": "הסשן התחיל, אבל הרשימה לא עודכנה."
     },
     "linkSession": {
@@ -4086,6 +4095,7 @@
     },
     "upNext": "הבא בתור",
     "sessionTodo": "משימה: {{title}}",
+    "openTodoHint": "פותח את המשימה.",
     "linkToTodo": "קישור למשימה",
     "candidates": {
       "empty": "אין משימות פתוחות"

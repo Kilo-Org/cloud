@@ -10,6 +10,7 @@ import {
   parseMultiplier,
   parseThreshold,
   thresholdError,
+  thresholdPlaceholder,
   toWindowHours,
 } from '@/components/organization/spend-alert-validators';
 import { i18n } from '@/i18n';
@@ -129,5 +130,20 @@ describe('toWindowHours', () => {
     expect(toWindowHours(24)).toBe(24);
     expect(toWindowHours(168)).toBe(168);
     expect(toWindowHours(720)).toBe(720);
+  });
+});
+
+describe('thresholdPlaceholder', () => {
+  it('writes the sample amount in the active language and reads it back', async () => {
+    await i18n.changeLanguage('en');
+    expect(thresholdPlaceholder()).toBe('25.00');
+    expect(parseThreshold(thresholdPlaceholder())).toBe(25);
+    await i18n.changeLanguage('de');
+    try {
+      expect(thresholdPlaceholder()).toBe('25,00');
+      expect(parseThreshold(thresholdPlaceholder())).toBe(25);
+    } finally {
+      await i18n.changeLanguage('en');
+    }
   });
 });

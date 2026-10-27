@@ -166,6 +166,15 @@ export type PermissionState = {
   always: string[];
 };
 
+/**
+ * A permission request that is still pending for the CLI while this app cannot
+ * read its scope. No consent card can be offered for it, so the surfaces show a
+ * notice that names the request and points the user at the CLI.
+ */
+export type UnreadablePermissionState = {
+  requestId: string;
+};
+
 export type SuggestionAction = {
   label: string;
   description?: string | undefined;
@@ -278,6 +287,8 @@ export type ServiceStateSnapshot = {
   sessionInfo: SessionInfo | null;
   question: QuestionState | null;
   permission: PermissionState | null;
+  /** Pending permission requests this app could not read, oldest first. */
+  unreadablePermissions: readonly UnreadablePermissionState[];
   suggestion: SuggestionState | null;
   pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
 };

@@ -227,7 +227,6 @@
     "hideBalance": "Sakrij saldo",
     "showBalance": "Prikaži saldo",
     "balanceHidden": "Saldo je sakriven",
-    "bonusCreditsExpiring": "Krediti u iznosu od {{amount}} istječu {{date}}.",
     "signOutTitle": "Odjaviti se?",
     "signOutMessage": "Za pristup svom radnom prostoru morat ćeš se ponovo prijaviti.",
     "deleteAccountTitle": "Obrisati nalog?",
@@ -2628,7 +2627,9 @@
       "retrying": "Ponovni pokušaj…",
       "retryDeny": "Pokušaj ponovo odbiti",
       "retryAllowOnce": "Pokušaj ponovo dozvoliti jednom",
-      "retryAlwaysAllow": "Pokušaj ponovo uvijek dozvoliti"
+      "retryAlwaysAllow": "Pokušaj ponovo uvijek dozvoliti",
+      "unreadableTitle": "Zahtjev za dozvolu nije moguće pročitati",
+      "unreadableBody": "Agent čeka odluku o dozvoli koju ova aplikacija ne može prikazati. Ažurirajte aplikaciju ili CLI, ili odgovorite na zahtjev u CLI-ju da biste nastavili."
     },
     "questionCard": {
       "title": "Agent traži odgovor",
@@ -3027,8 +3028,9 @@
     "unavailableDevice": "Glasovni unos nije dostupan na ovom uređaju.",
     "unavailableLanguage": "Glasovni unos nije dostupan za jezik ovog uređaja.",
     "languageNotInstalledTitle": "Glasovni unos za {{language}} još nije spreman",
-    "languageNotInstalledMessage": "Vanmrežne datoteke govora za {{language}} nisu instalirane na ovom telefonu. Preuzmi ih, a zatim pokušaj glasovni unos ponovo.",
+    "languageNotInstalledMessage": "Vanmrežne datoteke govora za {{language}} nisu instalirane, a pretvaranje govora u tekst putem interneta je isključeno. Preuzmi datoteke ili ponovo omogući obradu govora putem interneta da bi glasovni unos radio.",
     "downloadOfflineModel": "Preuzmi",
+    "useOnlineTranscription": "Dozvoli pretvaranje putem interneta",
     "offlineModelDownloadScheduled": "Vanmrežne datoteke govora bit će preuzete u pozadini. Pokušaj glasovni unos ponovo kasnije.",
     "listeningStopped": "Slušanje je zaustavljeno.",
     "transcribing": "Transkribiram...",
@@ -3203,7 +3205,7 @@
     "creditActivity": {
       "emptyDescription": "Ovdje će se prikazivati kupovine, potrošnja i korekcije kredita ove organizacije.",
       "emptyTitle": "Nema prometa kredita",
-      "expires": "Istječe {{date}}",
+      "expiresUtc": "Istječe {{date}} (UTC)",
       "title": "Promet kredita",
       "transactionFallback": "Transakcija kredita",
       "category": {
@@ -3891,6 +3893,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Vrijednosti prikazane kao •••• čuvaju svoju pohranjenu tajnu; zamijenite vrijednost da biste je rotirali. Promjena komandne linije zahtijeva ponovni unos svih vrijednosti",
+      "headersHint": "Vrijednosti prikazane kao •••• čuvaju svoju pohranjenu tajnu; zamijenite vrijednost da biste je rotirali. Promjena URL-a zahtijeva ponovni unos svih vrijednosti",
       "nameRequired": "Unesite ime servera",
       "nameInvalid": "Ime može koristiti samo ASCII slova, brojeve, donje crte i crtice, najviše 100 znakova",
       "commandRequired": "Unesite komandu",
@@ -3989,6 +3993,10 @@
   "credits": {
     "title": "Kupi kredite",
     "description": "Krediti su jednokratna kupovina koja se dodaje na tvoj Kilo saldo za pokretanje AI sesija kodiranja u Kilo App. Trgovina naplaćuje tvoj račun, a krediti se dodaju nakon što trgovina potvrdi plaćanje.",
+    "nextExpiry": "Krediti u iznosu od {{amount}} istječu {{date}} (UTC). Prvo se koriste krediti s najranijim rokom isteka.",
+    "appStoreExpiry": "Krediti kupljeni putem App Storea ne istječu.",
+    "playOneYearExpiry": "Ovi krediti istječu jednu kalendarsku godinu nakon kupovine.",
+    "playNonexpiring": "Ovi krediti ne istječu.",
     "packLabel": "Dodaj {{amount}} kredita",
     "priceUnavailable": "Cijena nije dostupna",
     "purchased": "Krediti su dodani na tvoj saldo.",
@@ -4077,6 +4085,7 @@
       "startNewSessionHint": "Dugo pritisni da započneš novu sesiju.",
       "linkSession": "Poveži sesiju",
       "linkFailed": "Povezivanje sesije sa zadatkom nije uspjelo",
+      "moveToAnotherTodo": "Premjesti na drugi zadatak",
       "startRefreshFailed": "Sesija je pokrenuta, ali se ova lista nije ažurirala."
     },
     "linkSession": {
@@ -4086,6 +4095,7 @@
     },
     "upNext": "Sljedeće na redu",
     "sessionTodo": "Zadatak: {{title}}",
+    "openTodoHint": "Otvara zadatak.",
     "linkToTodo": "Poveži sa zadatkom",
     "candidates": {
       "empty": "Nema otvorenih zadataka"

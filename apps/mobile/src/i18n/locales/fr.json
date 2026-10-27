@@ -227,7 +227,6 @@
     "hideBalance": "Masquer le solde",
     "showBalance": "Afficher le solde",
     "balanceHidden": "Solde masqué",
-    "bonusCreditsExpiring": "{{amount}} de crédits expirent le {{date}}.",
     "signOutTitle": "Se déconnecter ?",
     "signOutMessage": "Vous devrez vous reconnecter pour accéder à votre espace de travail.",
     "deleteAccountTitle": "Supprimer le compte ?",
@@ -1984,7 +1983,9 @@
       "retrying": "Nouvel essai…",
       "retryDeny": "Réessayer de refuser",
       "retryAllowOnce": "Réessayer d'autoriser une fois",
-      "retryAlwaysAllow": "Réessayer de toujours autoriser"
+      "retryAlwaysAllow": "Réessayer de toujours autoriser",
+      "unreadableTitle": "Impossible de lire la demande d'autorisation",
+      "unreadableBody": "L'agent attend une décision d'autorisation que cette application ne peut pas afficher. Mettez à jour l'application ou le CLI, ou répondez à la demande dans le CLI pour continuer."
     },
     "questionCard": {
       "title": "Réponse attendue par l'agent",
@@ -2411,8 +2412,9 @@
     "unavailableDevice": "La saisie vocale n'est pas disponible sur cet appareil.",
     "unavailableLanguage": "La saisie vocale n'est pas disponible pour la langue de cet appareil.",
     "languageNotInstalledTitle": "La saisie vocale pour {{language}} n'est pas prête",
-    "languageNotInstalledMessage": "Les fichiers de reconnaissance vocale hors ligne pour {{language}} ne sont pas installés sur ce téléphone. Téléchargez-les, puis réessayez la saisie vocale.",
+    "languageNotInstalledMessage": "Les fichiers de reconnaissance vocale hors ligne pour {{language}} ne sont pas installés et la transcription en ligne est désactivée. Téléchargez les fichiers ou réactivez la transcription en ligne pour utiliser la saisie vocale.",
     "downloadOfflineModel": "Télécharger",
+    "useOnlineTranscription": "Autoriser la transcription en ligne",
     "offlineModelDownloadScheduled": "Les fichiers de reconnaissance vocale hors ligne seront téléchargés en arrière-plan. Réessayez la saisie vocale plus tard.",
     "listeningStopped": "Écoute arrêtée.",
     "transcribing": "Transcription en cours…",
@@ -3195,7 +3197,7 @@
     "creditActivity": {
       "emptyDescription": "Les achats, la consommation et les ajustements de crédits de cette organisation apparaîtront ici au fur et à mesure.",
       "emptyTitle": "Aucun mouvement de crédits",
-      "expires": "Expire le {{date}}",
+      "expiresUtc": "Expire le {{date}} (UTC)",
       "title": "Mouvements de crédits",
       "transactionFallback": "Mouvement de crédits",
       "category": {
@@ -3891,6 +3893,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Les valeurs affichées sous la forme •••• conservent leur secret stocké ; remplacez une valeur pour le renouveler. La modification de la ligne de commande exige à nouveau toutes les valeurs",
+      "headersHint": "Les valeurs affichées sous la forme •••• conservent leur secret stocké ; remplacez une valeur pour le renouveler. La modification de l'URL exige à nouveau toutes les valeurs",
       "nameRequired": "Entrez un nom de serveur",
       "nameInvalid": "Le nom ne peut utiliser que des lettres ASCII, des chiffres, des traits de soulignement et des tirets, jusqu'à 100 caractères.",
       "commandRequired": "Entrez une commande",
@@ -3989,6 +3993,10 @@
   "credits": {
     "title": "Acheter des crédits",
     "description": "Les crédits sont un achat unique ajouté à votre solde Kilo pour lancer des sessions de codage IA dans Kilo App. La boutique débite votre compte et les crédits sont ajoutés après confirmation du paiement par la boutique.",
+    "nextExpiry": "{{amount}} de crédits expirent le {{date}} (UTC). Les crédits dont l'expiration est la plus proche sont utilisés en premier.",
+    "appStoreExpiry": "Les crédits achetés via l'App Store n'expirent pas.",
+    "playOneYearExpiry": "Ces crédits expirent une année civile après l'achat.",
+    "playNonexpiring": "Ces crédits n'expirent pas.",
     "packLabel": "Ajouter {{amount}} en crédits",
     "priceUnavailable": "Prix indisponible",
     "purchased": "Des crédits ont été ajoutés à votre solde.",
@@ -4077,6 +4085,7 @@
       "startNewSessionHint": "Appuyez longuement pour démarrer une nouvelle session.",
       "linkSession": "Lier une session",
       "linkFailed": "Impossible de lier la session à la tâche",
+      "moveToAnotherTodo": "Déplacer vers une autre tâche",
       "startRefreshFailed": "La session a démarré, mais cette liste ne s’est pas mise à jour."
     },
     "linkSession": {
@@ -4086,6 +4095,7 @@
     },
     "upNext": "À suivre",
     "sessionTodo": "Tâche : {{title}}",
+    "openTodoHint": "Ouvre la tâche.",
     "linkToTodo": "Lier à une tâche",
     "candidates": {
       "empty": "Aucune tâche à faire"

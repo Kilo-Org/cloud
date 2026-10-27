@@ -227,7 +227,6 @@
     "hideBalance": "Nascondi saldo",
     "showBalance": "Mostra saldo",
     "balanceHidden": "Saldo nascosto",
-    "bonusCreditsExpiring": "{{amount}} di crediti scadono il {{date}}.",
     "signOutTitle": "Uscire?",
     "signOutMessage": "Per tornare al tuo spazio di lavoro, dovrai effettuare di nuovo l'accesso.",
     "deleteAccountTitle": "Eliminare l'account?",
@@ -2053,7 +2052,9 @@
       "retrying": "Nuovo tentativo…",
       "retryDeny": "Riprova a negare",
       "retryAllowOnce": "Riprova a consentire una volta",
-      "retryAlwaysAllow": "Riprova a consentire sempre"
+      "retryAlwaysAllow": "Riprova a consentire sempre",
+      "unreadableTitle": "Impossibile leggere la richiesta di autorizzazione",
+      "unreadableBody": "L'agente è in attesa di una decisione di autorizzazione che questa app non può mostrare. Aggiorna l'app o la CLI, oppure rispondi alla richiesta nella CLI per continuare."
     },
     "questionCard": {
       "title": "Richiesta dell'agente",
@@ -2484,8 +2485,9 @@
     "unavailableDevice": "La dettatura non è disponibile su questo dispositivo.",
     "unavailableLanguage": "La dettatura non è disponibile per la lingua del dispositivo.",
     "languageNotInstalledTitle": "La dettatura per {{language}} non è ancora pronta",
-    "languageNotInstalledMessage": "I file vocali offline per {{language}} non sono installati su questo telefono. Scaricali, poi riprova con la dettatura.",
+    "languageNotInstalledMessage": "I file vocali offline per {{language}} non sono installati e la trascrizione online è disattivata. Scarica i file o riattiva la trascrizione online per usare la dettatura.",
     "downloadOfflineModel": "Scarica",
+    "useOnlineTranscription": "Consenti trascrizione online",
     "offlineModelDownloadScheduled": "I file vocali offline verranno scaricati in background. Riprova con la dettatura più tardi.",
     "listeningStopped": "Ascolto interrotto.",
     "transcribing": "Trascrizione in corso…",
@@ -3195,7 +3197,7 @@
     "creditActivity": {
       "emptyDescription": "Qui vedrai gli acquisti, i consumi e le rettifiche dei crediti dell'organizzazione man mano che avvengono.",
       "emptyTitle": "Nessun movimento dei crediti",
-      "expires": "Scade il {{date}}",
+      "expiresUtc": "Scade il {{date}} (UTC)",
       "title": "Movimenti dei crediti",
       "transactionFallback": "Movimento dei crediti",
       "category": {
@@ -3891,6 +3893,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "I valori mostrati come •••• conservano il segreto archiviato; sostituisci un valore per ruotarlo. Modificare la riga di comando richiede nuovamente tutti i valori",
+      "headersHint": "I valori mostrati come •••• conservano il segreto archiviato; sostituisci un valore per ruotarlo. Modificare l'URL richiede nuovamente tutti i valori",
       "nameRequired": "Immettere un nome server",
       "nameInvalid": "Il nome può contenere solo lettere ASCII, numeri, trattini bassi e trattini, fino a 100 caratteri",
       "commandRequired": "Inserisci un comando",
@@ -3989,6 +3993,10 @@
   "credits": {
     "title": "Acquista crediti",
     "description": "I crediti sono un acquisto una tantum che viene aggiunto al tuo saldo Kilo per eseguire sessioni di coding AI in Kilo App. Lo store addebita il tuo account e i crediti vengono aggiunti dopo che lo store conferma il pagamento.",
+    "nextExpiry": "{{amount}} di crediti scadono il {{date}} (UTC). I crediti con la scadenza più vicina vengono usati per primi.",
+    "appStoreExpiry": "I crediti acquistati tramite l'App Store non scadono.",
+    "playOneYearExpiry": "Questi crediti scadono un anno solare dopo l'acquisto.",
+    "playNonexpiring": "Questi crediti non scadono.",
     "packLabel": "Aggiungi {{amount}} in crediti",
     "priceUnavailable": "Prezzo non disponibile",
     "purchased": "I crediti sono stati aggiunti al tuo saldo.",
@@ -4077,6 +4085,7 @@
       "startNewSessionHint": "Tieni premuto per avviare una nuova sessione.",
       "linkSession": "Collega sessione",
       "linkFailed": "Impossibile collegare la sessione all'attività",
+      "moveToAnotherTodo": "Sposta in un'altra attività",
       "startRefreshFailed": "La sessione è stata avviata, ma questo elenco non è stato aggiornato."
     },
     "linkSession": {
@@ -4086,6 +4095,7 @@
     },
     "upNext": "Prossimo",
     "sessionTodo": "Attività: {{title}}",
+    "openTodoHint": "Apre l'attività.",
     "linkToTodo": "Collega all'attività",
     "candidates": {
       "empty": "Nessuna attività aperta"

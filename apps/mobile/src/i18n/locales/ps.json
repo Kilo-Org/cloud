@@ -227,7 +227,6 @@
     "hideBalance": "بیلانس پټ کړه",
     "showBalance": "بیلانس ښکاره کړه",
     "balanceHidden": "بیلانس پټ دی",
-    "bonusCreditsExpiring": "د {{amount}} کریډیټ موده په {{date}} پای ته رسېږي.",
     "signOutTitle": "له حسابه ووځم؟",
     "signOutMessage": "خپل کاري ځای ته د لاسرسي لپاره به بیا ننوتلو ته اړتیا ولرئ.",
     "deleteAccountTitle": "حساب ړنګ کړم؟",
@@ -2592,7 +2591,9 @@
       "retrying": "بیا هڅه روانه ده…",
       "retryDeny": "د رد بیا هڅه وکړئ",
       "retryAllowOnce": "د یو ځل اجازې بیا هڅه وکړئ",
-      "retryAlwaysAllow": "د تل اجازې بیا هڅه وکړئ"
+      "retryAlwaysAllow": "د تل اجازې بیا هڅه وکړئ",
+      "unreadableTitle": "د اجازې غوښتنه ونه لوستل شوه",
+      "unreadableBody": "اجنټ د اجازې د پرېکړې په تمه دی چې دا اپلیکیشن یې ښودلی نشي. اپلیکیشن یا CLI تازه کړئ، یا د دوام لپاره په CLI کې غوښتنې ته ځواب ورکړئ."
     },
     "questionCard": {
       "title": "ایجنټ ځواب ته اړتیا لري",
@@ -2984,8 +2985,9 @@
     "unavailableDevice": "په دې وسیله غږیز لیکل ممکن نه دي.",
     "unavailableLanguage": "د دې وسیلې په ژبه غږیز لیکل ممکن نه دي.",
     "languageNotInstalledTitle": "د {{language}} لپاره غږیز لیکل تر اوسه چمتو نه دی",
-    "languageNotInstalledMessage": "د {{language}} آفلاین وینا فایلونه پر دې تلیفون نصب شوي نه دي. هغوی ښکته کړئ، بیا د غږیز لیکلو هڅه وکړئ.",
+    "languageNotInstalledMessage": "د {{language}} آفلاین وینا فایلونه نه دي نصب شوي او انلاین لیکنه بندې ده. د غږیز لیکلو د کارولو لپاره یا دا فایلونه ښکته کړئ، یا انلاین لیکنه بیا روشن کړئ.",
     "downloadOfflineModel": "ښکته کول",
+    "useOnlineTranscription": "انلاین لیکنې ته اجازه ورکړئ",
     "offlineModelDownloadScheduled": "آفلاین وینا فایلونه به شالید کې ښکته شي. وروسته بیا د غږیز لیکلو هڅه وکړئ.",
     "listeningStopped": "اورېدل ودرېدل.",
     "transcribing": "متن ته اړول کېږي...",
@@ -3159,7 +3161,7 @@
     "creditActivity": {
       "emptyDescription": "د دې سازمان پېرودونه، کارونه او د کریډیټ سمونونه به د ترسره کېدو پر مهال دلته ښکاره شي.",
       "emptyTitle": "د کریډیټ هېڅ فعالیت نشته",
-      "expires": "په {{date}} پای ته رسېږي",
+      "expiresUtc": "په {{date}} (UTC) پای ته رسېږي",
       "title": "د کریډیټ فعالیت",
       "transactionFallback": "د کریډیټ راکړه ورکړه",
       "category": {
@@ -3840,6 +3842,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "هغه ارزښتونه چې •••• ښودل شوي خپل زیرمه شوی پټ ساتي؛ د بدلولو لپاره ارزښت تبدیل کړئ. د کمانډ کرښې بدلول بیا هر ارزښت ته اړتیا لري",
+      "headersHint": "هغه ارزښتونه چې •••• ښودل شوي خپل زیرمه شوی پټ ساتي؛ د بدلولو لپاره ارزښت تبدیل کړئ. د URL بدلول بیا هر ارزښت ته اړتیا لري",
       "nameRequired": "د سرور نوم دننه کړئ",
       "nameInvalid": "نوم کولی شي یوازې د ASCII توري، عددونه، انډر سکورونه او ډشونه وکاروي، تر 100 توري پورې",
       "commandRequired": "یو کمانډ دننه کړئ",
@@ -3938,6 +3942,10 @@
   "credits": {
     "title": "کریډیټ وپېرئ",
     "description": "کریډیټ یو ځل پېرود دی چې ستاسو Kilo توازن ته د Kilo App کې د AI کوډ کولو غونډو چلولو لپاره زیاتېږي. پلورنځی ستاسو له حساب څخه پیسې اخلي او کریډیټ وروسته له هغه زیاتېږي چې پلورنځی تادیه تایید کړي.",
+    "nextExpiry": "د {{amount}} کریډیټ موده په {{date}} (UTC) پای ته رسېږي. هغه کریډیټونه چې موده یې تر ټولو وړاندې پای ته رسېږي، لومړی کارول کېږي.",
+    "appStoreExpiry": "د App Store له لارې پېرل شوي کریډیټونه نه ختمېږي.",
+    "playOneYearExpiry": "د دې کریډیټونو موده د پېرلو څخه یو تقویمي کال وروسته پای ته رسېږي.",
+    "playNonexpiring": "د دې کریډیټونو موده نه ختمېږي.",
     "packLabel": "د {{amount}} په ارزښت کریډیټونه زیات کړئ",
     "priceUnavailable": "بیه شتون نلري",
     "purchased": "کریډیټونه ستاسو توازن ته زیات شول.",
@@ -4022,6 +4030,7 @@
       "startNewSessionHint": "د نوي سیشن پیل لپاره اوږد کېک کړئ.",
       "linkSession": "ناسته ونښلوئ",
       "linkFailed": "ناسته له دندې سره ونښلول نه شوه",
+      "moveToAnotherTodo": "بلې دندې ته ولیږدوئ",
       "startRefreshFailed": "ناستې پیل شوه، خو دا لېست نه دی تازه شوی."
     },
     "linkSession": {
@@ -4031,6 +4040,7 @@
     },
     "upNext": "بل",
     "sessionTodo": "دنده: {{title}}",
+    "openTodoHint": "دنده پرانیزي.",
     "linkToTodo": "له دندې سره ونښلوئ",
     "candidates": {
       "empty": "هېڅ پرانیستې دنده نشته"

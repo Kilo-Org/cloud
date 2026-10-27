@@ -18,6 +18,7 @@ import {
   exchangeGitLabOAuthCode,
   validateGitLabInstance,
   validatePersonalAccessToken,
+  validateProjectAccessToken,
   createProjectWebhook,
   createMRNote,
   createProjectAccessToken,
@@ -26,6 +27,8 @@ import {
   fetchGitLabBranches,
   fetchGitLabRootTextFileAtRef,
   fetchGitLabRepositorySize,
+  findKiloReviewNote,
+  hasMRNoteWithMarker,
   GitLabAuthenticationError,
   GitLabProjectAccessTokenPermissionError,
   GitLabWebhookPermissionError,
@@ -33,8 +36,8 @@ import {
   getMRHeadCommit,
   listProjectAccessTokens,
   listProjectWebhooks,
-  revokeProjectAccessToken,
   rotateProjectAccessToken,
+  revokeProjectAccessToken,
   updateProjectWebhook,
   fetchMRInlineComments,
 } from './adapter';
@@ -1137,6 +1140,219 @@ describe('provider failure content', () => {
     });
   });
 });
+
+const TOKEN_USER = {
+  id: 42,
+  username: 'kilo-review-bot',
+  name: 'Kilo Review Bot',
+  email: 'bot@example.com',
+  avatar_url: 'https://gitlab.com/avatar/42',
+  web_url: 'https://gitlab.com/kilo-review-bot',
+};
+
+function mockTokenUser() {
+  mockFetch.mockImplementationOnce((_url: string) =>
+    Promise.resolve({
+      ok: true,
+      json: async () => TOKEN_USER,
+      headers: { get: () => null },
+    })
+  );
+}
+
+type TestNote = {
+  id: number;
+  body: string;
+  author: { id: number; username: string; name: string };
+  created_at: string;
+  updated_at: string;
+  system: boolean;
+  noteable_id: number;
+  noteable_type: string;
+  noteable_iid: number;
+  resolvable: boolean;
+};
+
+function makeNote(overrides: {
+  id: number;
+  body: string;
+  authorId: number;
+  system?: boolean;
+  updated_at?: string;
+}): TestNote {
+  return {
+    id: overrides.id,
+    body: overrides.body,
+    author: {
+      id: overrides.authorId,
+      username: overrides.authorId === 42 ? 'kilo-review-bot' : 'someone-else',
+      name: overrides.authorId === 42 ? 'Kilo Review Bot' : 'Someone Else',
+    },
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: overrides.updated_at ?? '2026-01-02T00:00:00Z',
+    system: overrides.system ?? false,
+    noteable_id: 1,
+    noteable_type: 'MergeRequest',
+    noteable_iid: 7,
+    resolvable: false,
+  };
+}
+
+function mockNotePage(notes: TestNote[]) {
+  mockFetch.mockImplementationOnce((_url: string) =>
+    Promise.resolve({
+      ok: true,
+      json: async () => notes,
+      headers: { get: () => null },
+    })
+  );
+}
+
+function mockNotePageOf(notes: TestNote[], totalPages: number) {
+  mockFetch.mockImplementationOnce((_url: string) =>
+    Promise.resolve({
+      ok: true,
+      json: async () => notes,
+      headers: {
+        get: (name: string) => (name.toLowerCase() === 'x-total-pages' ? String(totalPages) : null),
+      },
+    })
+  );
+}
+
+describe('findKiloReviewNote', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('returns the latest note carrying the marker when it is authored by the token user', async () => {
+    mockTokenUser();
+    mockNotePage([
+      makeNote({
+        id: 11,
+        body: 'review text <!-- kilo-review -->',
+        authorId: 42,
+        updated_at: '2026-01-02T00:00:00Z',
+      }),
+      makeNote({
+        id: 12,
+        body: 'newer review text <!-- kilo-review -->',
+        authorId: 42,
+        updated_at: '2026-01-03T00:00:00Z',
+      }),
+    ]);
+
+    const result = await findKiloReviewNote('test-token', 'group/project', 7);
+
+    expect(result).toEqual({ noteId: 12, body: 'newer review text <!-- kilo-review -->' });
+  });
+
+  it('ignores a note carrying the marker when a different account authored it', async () => {
+    mockTokenUser();
+    mockNotePage([makeNote({ id: 13, body: 'stranger text <!-- kilo-review -->', authorId: 77 })]);
+
+    const result = await findKiloReviewNote('test-token', 'group/project', 7);
+
+    expect(result).toBeNull();
+  });
+
+  it('still returns the token user note when a stranger note also carries the marker', async () => {
+    mockTokenUser();
+    mockNotePage([
+      makeNote({ id: 13, body: 'stranger text <!-- kilo-review -->', authorId: 77 }),
+      makeNote({ id: 14, body: 'bot text <!-- kilo-review -->', authorId: 42 }),
+    ]);
+
+    const result = await findKiloReviewNote('test-token', 'group/project', 7);
+
+    expect(result).toEqual({ noteId: 14, body: 'bot text <!-- kilo-review -->' });
+  });
+
+  it('ignores system notes regardless of author', async () => {
+    mockTokenUser();
+    mockNotePage([
+      makeNote({ id: 15, body: 'system <!-- kilo-review -->', authorId: 42, system: true }),
+    ]);
+
+    const result = await findKiloReviewNote('test-token', 'group/project', 7);
+
+    expect(result).toBeNull();
+  });
+
+  it('propagates identity lookup failures', async () => {
+    mockFetch.mockImplementationOnce((_url: string) =>
+      Promise.resolve({
+        ok: false,
+        status: 500,
+        text: async () => 'Server error',
+        headers: { get: () => null },
+      })
+    );
+
+    await expect(findKiloReviewNote('test-token', 'group/project', 7)).rejects.toThrow(
+      'GitLab user fetch failed: 500'
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the author check on a later notes page', async () => {
+    mockTokenUser();
+    mockNotePageOf(
+      [makeNote({ id: 16, body: 'stranger text <!-- kilo-review -->', authorId: 77 })],
+      2
+    );
+    mockNotePage([makeNote({ id: 17, body: 'bot text <!-- kilo-review -->', authorId: 42 })]);
+
+    const result = await findKiloReviewNote('test-token', 'group/project', 7);
+
+    expect(result).toEqual({ noteId: 17, body: 'bot text <!-- kilo-review -->' });
+  });
+});
+
+describe('hasMRNoteWithMarker', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('reports the marker when a token-user note carries it', async () => {
+    mockTokenUser();
+    mockNotePage([makeNote({ id: 21, body: 'notice <!-- billing-notice -->', authorId: 42 })]);
+
+    await expect(
+      hasMRNoteWithMarker('test-token', 'group/project', 7, '<!-- billing-notice -->')
+    ).resolves.toBe(true);
+  });
+
+  it('reports no marker when a different account authored the matching note', async () => {
+    mockTokenUser();
+    mockNotePage([makeNote({ id: 22, body: 'notice <!-- billing-notice -->', authorId: 77 })]);
+
+    await expect(
+      hasMRNoteWithMarker('test-token', 'group/project', 7, '<!-- billing-notice -->')
+    ).resolves.toBe(false);
+  });
+
+  it('reports the marker for a token-user note on a later page', async () => {
+    mockTokenUser();
+    mockNotePageOf([makeNote({ id: 23, body: 'notice <!-- billing-notice -->', authorId: 77 })], 2);
+    mockNotePage([makeNote({ id: 24, body: 'notice <!-- billing-notice -->', authorId: 42 })]);
+
+    await expect(
+      hasMRNoteWithMarker('test-token', 'group/project', 7, '<!-- billing-notice -->')
+    ).resolves.toBe(true);
+  });
+
+  it('reports no marker when only other accounts carry it across pages', async () => {
+    mockTokenUser();
+    mockNotePageOf([makeNote({ id: 25, body: 'notice <!-- billing-notice -->', authorId: 77 })], 2);
+    mockNotePage([makeNote({ id: 26, body: 'notice <!-- billing-notice -->', authorId: 88 })]);
+
+    await expect(
+      hasMRNoteWithMarker('test-token', 'group/project', 7, '<!-- billing-notice -->')
+    ).resolves.toBe(false);
+  });
+});
+
 function discussionWithNote(input: {
   discussionId: string;
   noteId: number;
@@ -1169,7 +1385,6 @@ function discussionWithNote(input: {
     ],
   };
 }
-
 describe('webhook and project access token refusals', () => {
   const webhookOperations = [
     ['listProjectWebhooks', () => listProjectWebhooks('token', 123)],
@@ -1233,6 +1448,101 @@ describe('webhook and project access token refusals', () => {
     expect(refusal).toBeInstanceOf(expectedError);
     expect(refusal).toMatchObject({ statusCode: 403, projectId: 123 });
     expect((refusal as Error).message).toContain('Requires Maintainer role or higher');
+  });
+});
+
+describe('validateProjectAccessToken', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('reports the token valid only after an authenticated response', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200 });
+
+    const result = await validateProjectAccessToken('glpat-project-token');
+
+    expect(result).toEqual({ status: 'valid' });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a revoked token as unauthorized', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+
+    const result = await validateProjectAccessToken('glpat-project-token');
+
+    expect(result).toEqual({ status: 'invalid', reason: 'unauthorized', httpStatus: 401 });
+  });
+
+  it('reports a denied token as forbidden', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 403 });
+
+    const result = await validateProjectAccessToken('glpat-project-token');
+
+    expect(result).toEqual({ status: 'invalid', reason: 'forbidden', httpStatus: 403 });
+  });
+
+  it('leaves a server error unverified instead of usable', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
+
+    const result = await validateProjectAccessToken('glpat-project-token');
+
+    expect(result).toEqual({ status: 'unverified', reason: 'http-error', httpStatus: 500 });
+  });
+
+  it('leaves a transport failure unverified', async () => {
+    mockFetch.mockRejectedValueOnce(new TypeError('fetch failed'));
+
+    const result = await validateProjectAccessToken('glpat-project-token');
+
+    expect(result).toEqual({ status: 'unverified', reason: 'transport' });
+  });
+
+  it('leaves an unusable instance URL unverified without probing', async () => {
+    const result = await validateProjectAccessToken(
+      'glpat-project-token',
+      'http://gitlab.example.com'
+    );
+
+    expect(result).toEqual({ status: 'unverified', reason: 'instance-url' });
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('reports a blocked resolution target as an instance URL problem', async () => {
+    mockLookup.mockResolvedValue([{ address: '10.0.0.5', family: 4 }]);
+
+    const result = await validateProjectAccessToken(
+      'glpat-project-token',
+      'https://gitlab.example.com'
+    );
+
+    expect(result).toEqual({ status: 'unverified', reason: 'instance-url' });
+    expect(mockHttpsRequest).not.toHaveBeenCalled();
+  });
+
+  it('keeps a temporary resolution failure retryable', async () => {
+    mockLookup.mockRejectedValue(new Error('EAI_AGAIN'));
+
+    const result = await validateProjectAccessToken(
+      'glpat-project-token',
+      'https://gitlab.example.com'
+    );
+
+    expect(result).toEqual({ status: 'unverified', reason: 'transport' });
+  });
+
+  it('reports a nonexistent host as an instance URL problem', async () => {
+    mockLookup.mockRejectedValue(
+      Object.assign(new Error('getaddrinfo ENOTFOUND'), {
+        code: 'ENOTFOUND',
+      })
+    );
+
+    const result = await validateProjectAccessToken(
+      'glpat-project-token',
+      'https://gitlab.example.com'
+    );
+
+    expect(result).toEqual({ status: 'unverified', reason: 'instance-url' });
   });
 });
 

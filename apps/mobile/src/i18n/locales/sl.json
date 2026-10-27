@@ -227,7 +227,6 @@
     "hideBalance": "Skrij stanje",
     "showBalance": "Prikaži stanje",
     "balanceHidden": "Stanje je skrito",
-    "bonusCreditsExpiring": "Veljavnost kreditov v vrednosti {{amount}} poteče {{date}}.",
     "signOutTitle": "Želiš se odjaviti?",
     "signOutMessage": "Za dostop do delovnega prostora se moraš znova prijaviti.",
     "deleteAccountTitle": "Želiš izbrisati račun?",
@@ -2664,7 +2663,9 @@
       "retrying": "Ponovni poskus…",
       "retryDeny": "Znova zavrni",
       "retryAllowOnce": "Znova dovoli enkrat",
-      "retryAlwaysAllow": "Znova vedno dovoli"
+      "retryAlwaysAllow": "Znova vedno dovoli",
+      "unreadableTitle": "Zahteve za dovoljenje ni bilo mogoče prebrati",
+      "unreadableBody": "Agent čaka na odločitev o dovoljenju, ki je ta aplikacija ne more prikazati. Posodobite aplikacijo ali CLI ali pa na zahtevo odgovorite v CLI, da nadaljujete."
     },
     "questionCard": {
       "title": "Agent potrebuje tvoj odgovor",
@@ -3070,8 +3071,9 @@
     "unavailableDevice": "Glasovni vnos na tej napravi ni na voljo.",
     "unavailableLanguage": "Glasovni vnos ni na voljo za jezik, nastavljen v napravi.",
     "languageNotInstalledTitle": "Glasovni vnos za {{language}} še ni pripravljen",
-    "languageNotInstalledMessage": "Datoteke govora za delo brez povezave za {{language}} niso nameščene na tem telefonu. Prenesi jih, nato poskusi glasovni vnos znova.",
+    "languageNotInstalledMessage": "Datoteke govora za delo brez povezave za {{language}} niso nameščene, obdelava govora na spletu pa je izklopljena. Prenesi datoteke ali znova omogoči obdelavo govora na spletu, da boš lahko uporabil glasovni vnos.",
     "downloadOfflineModel": "Prenesi",
+    "useOnlineTranscription": "Dovoli obdelavo na spletu",
     "offlineModelDownloadScheduled": "Datoteke govora za delo brez povezave bodo prenesene v ozadju. Poskusi glasovni vnos znova pozneje.",
     "listeningStopped": "Poslušanje je ustavljeno.",
     "transcribing": "Prepisovanje...",
@@ -3247,7 +3249,7 @@
     "creditActivity": {
       "emptyDescription": "Tukaj se sproti prikazujejo nakupi, poraba in prilagoditve kreditov te organizacije.",
       "emptyTitle": "Ni transakcij s krediti",
-      "expires": "Poteče {{date}}",
+      "expiresUtc": "Poteče {{date}} (UTC)",
       "title": "Transakcije s krediti",
       "transactionFallback": "Transakcija s krediti",
       "category": {
@@ -3942,6 +3944,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Vrednosti, prikazane kot ••••, obdržijo shranjeno skrivnost; zamenjajte vrednost, da jo rotirate. Sprememba ukazne vrstice znova zahteva vse vrednosti",
+      "headersHint": "Vrednosti, prikazane kot ••••, obdržijo shranjeno skrivnost; zamenjajte vrednost, da jo rotirate. Sprememba URL-ja znova zahteva vse vrednosti",
       "nameRequired": "Vnesite ime strežnika",
       "nameInvalid": "Ime lahko uporablja samo ASCII črke, številke, podčrtaje in pomišljaje, največ 100 znakov",
       "commandRequired": "Vnesite ukaz",
@@ -4040,6 +4044,10 @@
   "credits": {
     "title": "Kupi kredite",
     "description": "Krediti so enkraten nakup, ki se doda tvojemu Kilo stanju za izvajanje sej kodiranja z umetno inteligenco v aplikaciji Kilo. Trgovina obremeni tvoj račun in krediti se dodajo, ko trgovina potrdi plačilo.",
+    "nextExpiry": "Veljavnost kreditov v vrednosti {{amount}} poteče {{date}} (UTC). Najprej se porabijo krediti z najzgodnejšim potekom veljavnosti.",
+    "appStoreExpiry": "Krediti, kupljeni prek trgovine App Store, ne potečejo.",
+    "playOneYearExpiry": "Ti krediti potečejo eno koledarsko leto po nakupu.",
+    "playNonexpiring": "Ti krediti ne potečejo.",
     "packLabel": "Dodaj {{amount}} kreditov",
     "priceUnavailable": "Cena ni na voljo",
     "purchased": "Krediti so bili dodani tvojemu stanju.",
@@ -4132,6 +4140,7 @@
       "startNewSessionHint": "Za novo sejo pridržite.",
       "linkSession": "Poveži sejo",
       "linkFailed": "Seje ni bilo mogoče povezati z nalogo",
+      "moveToAnotherTodo": "Premakni v drugo nalogo",
       "startRefreshFailed": "Seja se je začela, vendar se ta seznam ni posodobil."
     },
     "linkSession": {
@@ -4141,6 +4150,7 @@
     },
     "upNext": "Naslednje",
     "sessionTodo": "Naloga: {{title}}",
+    "openTodoHint": "Odpre nalogo.",
     "linkToTodo": "Poveži z nalogo",
     "candidates": {
       "empty": "Ni odprtih nalog"

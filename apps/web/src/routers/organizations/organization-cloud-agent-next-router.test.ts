@@ -199,6 +199,12 @@ const mockFetchGitLabRepositoriesForOrganization = jest.fn<
     instanceUrl?: string;
   }>
 >();
+const mockValidateGitLabRepoAccessForOrganization =
+  jest.fn<(organizationId: string, actorUserId: string, projectPath: string) => Promise<boolean>>();
+const mockGetGitLabInstanceUrlForOrganization =
+  jest.fn<(organizationId: string) => Promise<string>>();
+const mockBuildGitLabCloneUrl = jest.fn<(projectPath: string, instanceUrl: string) => string>();
+const mockCaptureException = jest.fn();
 const mockOrderRepositoriesByUsage =
   jest.fn<
     <T extends { fullName: string }>(params: {
@@ -264,9 +270,15 @@ jest.mock('@/lib/cloud-agent/github-integration-resolution', () => ({
 }));
 
 jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
-  buildGitLabCloneUrl: jest.fn(),
+  buildGitLabCloneUrl: mockBuildGitLabCloneUrl,
   fetchGitLabRepositoriesForOrganization: mockFetchGitLabRepositoriesForOrganization,
-  getGitLabInstanceUrlForOrganization: jest.fn(),
+  getGitLabInstanceUrlForOrganization: mockGetGitLabInstanceUrlForOrganization,
+  validateGitLabRepoAccessForOrganization: mockValidateGitLabRepoAccessForOrganization,
+}));
+
+jest.mock('@sentry/nextjs', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@sentry/nextjs'),
+  captureException: mockCaptureException,
 }));
 
 jest.mock('@/lib/cloud-agent/order-repositories', () => ({
@@ -1694,7 +1706,7 @@ describe('organizationCloudAgentNextRouter.getSandboxSelectionOptions', () => {
   it('authorizes membership and forwards the organization with the caller token', async () => {
     const capabilities: SandboxSelectionCapabilities = {
       enabled: true,
-      defaultDestination: { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
+      defaultDestination: { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'default' },
       options: [
         { allocation: getSandboxAllocationRequest('cloudflare-single') },
         {
@@ -1775,7 +1787,7 @@ describe('organizationCloudAgentNextRouter.getSandboxSelectionOptions', () => {
       options: [
         {
           allocation: {
-            provider: { id: 'vercel', account: 'kilo' },
+            provider: { id: 'vercel', account: 'byoc' },
             instanceType: 'medium' as 'small',
           },
         },
@@ -1918,6 +1930,85 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
     expect(mockPrepareSession).toHaveBeenCalledWith(
       expect.not.objectContaining({ githubIntegrationId: expect.anything() })
     );
+  });
+
+  describe('GitLab project resolution', () => {
+    const gitlabInput = {
+      organizationId: ORGANIZATION_ID,
+      prompt: 'Test prompt',
+      mode: 'code',
+      model: 'kilo/test-model',
+      gitlabProject: 'acme/repo',
+    };
+
+    it('prepares a session for a project the organization connection covers', async () => {
+      mockValidateGitLabRepoAccessForOrganization.mockResolvedValue(true);
+      mockGetGitLabInstanceUrlForOrganization.mockResolvedValue('https://gitlab.com');
+      mockBuildGitLabCloneUrl.mockReturnValue('https://gitlab.com/acme/repo.git');
+      const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+
+      await caller.prepareSession(gitlabInput);
+
+      expect(mockValidateGitLabRepoAccessForOrganization).toHaveBeenCalledWith(
+        ORGANIZATION_ID,
+        'member-user',
+        'acme/repo'
+      );
+      expect(mockBuildGitLabCloneUrl).toHaveBeenCalledWith('acme/repo', 'https://gitlab.com');
+      expect(mockPrepareSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          gitUrl: 'https://gitlab.com/acme/repo.git',
+          platform: 'gitlab',
+          kilocodeOrganizationId: ORGANIZATION_ID,
+        })
+      );
+    });
+    it("prepares a session using the organization's GitLab instance", async () => {
+      mockValidateGitLabRepoAccessForOrganization.mockResolvedValue(true);
+      mockGetGitLabInstanceUrlForOrganization.mockResolvedValue('https://gitlab.example.test');
+      mockBuildGitLabCloneUrl.mockReturnValue('https://gitlab.example.test/acme/repo.git');
+      const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+
+      await caller.prepareSession(gitlabInput);
+
+      expect(mockGetGitLabInstanceUrlForOrganization).toHaveBeenCalledWith(ORGANIZATION_ID);
+      expect(mockBuildGitLabCloneUrl).toHaveBeenCalledWith(
+        'acme/repo',
+        'https://gitlab.example.test'
+      );
+      expect(mockPrepareSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          gitUrl: 'https://gitlab.example.test/acme/repo.git',
+          platform: 'gitlab',
+          kilocodeOrganizationId: ORGANIZATION_ID,
+        })
+      );
+    });
+
+    it('refuses a project the connection does not cover and prepares no session', async () => {
+      mockValidateGitLabRepoAccessForOrganization.mockResolvedValue(false);
+      const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+
+      await expect(caller.prepareSession(gitlabInput)).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+      });
+
+      expect(mockBuildGitLabCloneUrl).not.toHaveBeenCalled();
+      expect(mockPrepareSession).not.toHaveBeenCalled();
+    });
+
+    it('answers a retryable error when the project lookup cannot complete', async () => {
+      mockValidateGitLabRepoAccessForOrganization.mockRejectedValue(new Error('cache offline'));
+      const caller = createCaller({ user: { id: 'member-user', is_admin: false } as User });
+
+      await expect(caller.prepareSession(gitlabInput)).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+      });
+
+      expect(mockCaptureException).toHaveBeenCalled();
+      expect(mockBuildGitLabCloneUrl).not.toHaveBeenCalled();
+      expect(mockPrepareSession).not.toHaveBeenCalled();
+    });
   });
 
   it.each(SELECTABLE_SANDBOX_ALLOCATIONS)(

@@ -227,7 +227,6 @@
     "hideBalance": "Slėpti likutį",
     "showBalance": "Rodyti likutį",
     "balanceHidden": "Likutis paslėptas",
-    "bonusCreditsExpiring": "Kreditai ({{amount}}) galioja iki {{date}}.",
     "signOutTitle": "Atsijungti?",
     "signOutMessage": "Kad galėtum pasiekti savo darbo sritį, turėsi prisijungti iš naujo.",
     "deleteAccountTitle": "Ištrinti paskyrą?",
@@ -2664,7 +2663,9 @@
       "retrying": "Bandoma iš naujo…",
       "retryDeny": "Bandyti neleisti iš naujo",
       "retryAllowOnce": "Bandyti leisti vieną kartą iš naujo",
-      "retryAlwaysAllow": "Bandyti visada leisti iš naujo"
+      "retryAlwaysAllow": "Bandyti visada leisti iš naujo",
+      "unreadableTitle": "Nepavyko nuskaityti leidimo užklausos",
+      "unreadableBody": "Agentas laukia sprendimo dėl leidimo, kurio ši programa negali parodyti. Atnaujinkite programą arba CLI arba atsakykite į užklausą CLI, kad galėtumėte tęsti."
     },
     "questionCard": {
       "title": "Agentui reikia atsakymo",
@@ -3070,8 +3071,9 @@
     "unavailableDevice": "Balso įvestis šiame įrenginyje nepasiekiama.",
     "unavailableLanguage": "Balso įvestis nepalaiko pasirinktos įrenginio kalbos.",
     "languageNotInstalledTitle": "Balso įvestis {{language}} kalbai dar neparengta",
-    "languageNotInstalledMessage": "{{language}} kalbos neprisijungus veikiantys kalbos failai šiame telefone nėra įdiegti. Atsisiųsk juos ir vėl pabandyk balso įvestį.",
+    "languageNotInstalledMessage": "Neįdiegti {{language}} kalbai skirti neprisijungus veikiantys kalbos failai, o transkripcija internetu išjungta. Atsisiųsk šiuos failus arba vėl įjunk transkripciją internetu, kad veiktų balso įvedimas.",
     "downloadOfflineModel": "Atsisiųsti",
+    "useOnlineTranscription": "Leisti transkripciją internetu",
     "offlineModelDownloadScheduled": "Neprisijungus veikiantys kalbos failai bus atsisiunčiami fone. Pabandyk balso įvestį vėliau.",
     "listeningStopped": "Klausymasis sustabdytas.",
     "transcribing": "Transkribuojama...",
@@ -3247,7 +3249,7 @@
     "creditActivity": {
       "emptyDescription": "Čia bus rodomi šios organizacijos kreditų pirkimai, naudojimas ir koregavimai.",
       "emptyTitle": "Kreditų operacijų nėra",
-      "expires": "Baigia galioti {{date}}",
+      "expiresUtc": "Baigia galioti {{date}} (UTC)",
       "title": "Kreditų operacijos",
       "transactionFallback": "Kreditų operacija",
       "category": {
@@ -3942,6 +3944,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Reikšmės, rodomos kaip ••••, išlaiko savo saugomą paslaptį; pakeiskite reikšmę, kad ją rotuotumėte. Pakeitus komandinę eilutę, visos reikšmės vėl yra būtinos",
+      "headersHint": "Reikšmės, rodomos kaip ••••, išlaiko savo saugomą paslaptį; pakeiskite reikšmę, kad ją rotuotumėte. Pakeitus URL, visos reikšmės vėl yra būtinos",
       "nameRequired": "Įveskite serverio pavadinimą",
       "nameInvalid": "Varde gali būti naudojamos tik ASCII raidės, skaičiai, apatiniai brūkšniai ir brūkšniai, iki 100 simbolių",
       "commandRequired": "Įveskite komandą",
@@ -4040,6 +4044,10 @@
   "credits": {
     "title": "Pirkti kreditus",
     "description": "Kreditai yra vienkartinis pirkinys, pridedamas prie jūsų Kilo balanso AI kodavimo sesijoms Kilo programoje vykdyti. Parduotuvė nuskaito lėšas iš jūsų paskyros, o kreditai pridedami po to, kai parduotuvė patvirtina mokėjimą.",
+    "nextExpiry": "Kreditai ({{amount}}) baigia galioti {{date}} (UTC). Pirmiausia naudojami anksčiausiai baigiantys galioti kreditai.",
+    "appStoreExpiry": "Per App Store įsigyti kreditai nenustoja galioti.",
+    "playOneYearExpiry": "Šie kreditai nustoja galioti praėjus vieniems kalendoriniams metams po pirkimo.",
+    "playNonexpiring": "Šie kreditai nenustoja galioti.",
     "packLabel": "Pridėti {{amount}} kreditų",
     "priceUnavailable": "Kaina neprieinama",
     "purchased": "Kreditai pridėti prie jūsų balanso.",
@@ -4132,6 +4140,7 @@
       "startNewSessionHint": "Paspauskite ir palaikykite, kad pradėtumėte naują sesiją.",
       "linkSession": "Susieti sesiją",
       "linkFailed": "Sesijos susieti su užduotimi nepavyko",
+      "moveToAnotherTodo": "Perkelti į kitą užduotį",
       "startRefreshFailed": "Sesija prasidėjo, bet šis sąrašas neatsinaujino."
     },
     "linkSession": {
@@ -4141,6 +4150,7 @@
     },
     "upNext": "Toliau",
     "sessionTodo": "Užduotis: {{title}}",
+    "openTodoHint": "Atidaro užduotį.",
     "linkToTodo": "Susieti su užduotimi",
     "candidates": {
       "empty": "Nėra atvirų užduočių"

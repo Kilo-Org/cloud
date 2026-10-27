@@ -179,7 +179,8 @@ function buildRedirectRequestInit(
 
 export function fetchGitLabBoundToAddress(
   { url, address, family }: GitLabResolvedUrl & { address: string },
-  init?: RequestInit
+  init?: RequestInit,
+  maxResponseBytes = MAX_GITLAB_RESPONSE_BYTES
 ): Promise<Response> {
   const request = url.protocol === 'https:' ? https.request : http.request;
   const headers = headersInitToRecord(init?.headers);
@@ -208,7 +209,7 @@ export function fetchGitLabBoundToAddress(
         response.on('data', chunk => {
           const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
           responseBytes += buffer.byteLength;
-          if (responseBytes > MAX_GITLAB_RESPONSE_BYTES) {
+          if (responseBytes > maxResponseBytes) {
             const error = new Error('GitLab response exceeded size limit');
             response.destroy(error);
             req.destroy(error);
@@ -1190,6 +1191,13 @@ export async function fetchGitLabMergeRequest(params: {
 
 /**
  * Looks for the <!-- kilo-review --> marker in MR notes.
+ *
+ * Only notes authored by the GitLab account that owns the access token are
+ * candidates, so the note Kilo reuses is always one it can attribute to its
+ * own posting identity. The identity follows the credential in use: when a
+ * project token is replaced, the next lookup matches notes from the new
+ * identity and the pipeline composes a fresh summary note; later lookups
+ * update that note as usual.
  */
 export async function findKiloReviewNote(
   accessToken: string,
@@ -1197,6 +1205,7 @@ export async function findKiloReviewNote(
   mrIid: number,
   instanceUrl: string = DEFAULT_GITLAB_URL
 ): Promise<{ noteId: number; body: string } | null> {
+  const tokenUser = await fetchGitLabUser(accessToken, instanceUrl);
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
@@ -1240,7 +1249,9 @@ export async function findKiloReviewNote(
     totalNotes: notes.length,
   });
 
-  const markedNotes = notes.filter(n => n.body?.includes('<!-- kilo-review -->') && !n.system);
+  const markedNotes = notes.filter(
+    n => n.body?.includes('<!-- kilo-review -->') && !n.system && n.author.id === tokenUser.id
+  );
 
   if (markedNotes.length > 0) {
     const latestNote = markedNotes.sort((a, b) => {
@@ -1352,6 +1363,7 @@ export async function createMRNote(
 
 /**
  * Checks whether a note containing the given marker already exists on a GitLab MR.
+ * Only notes authored by the GitLab account that owns the access token count.
  * Paginates through all notes (consistent with findKiloReviewNote).
  */
 export async function hasMRNoteWithMarker(
@@ -1361,6 +1373,7 @@ export async function hasMRNoteWithMarker(
   marker: string,
   instanceUrl: string = DEFAULT_GITLAB_URL
 ): Promise<boolean> {
+  const tokenUser = await fetchGitLabUser(accessToken, instanceUrl);
   const encodedProjectId =
     typeof projectId === 'string' ? encodeURIComponent(projectId) : projectId;
 
@@ -1393,8 +1406,8 @@ export async function hasMRNoteWithMarker(
       throw new Error(`GitLab MR notes fetch failed: ${response.status}`);
     }
 
-    const notes = (await response.json()) as Array<{ body: string }>;
-    if (notes.some(n => n.body?.includes(marker))) {
+    const notes = (await response.json()) as Array<{ body: string; author: { id: number } }>;
+    if (notes.some(n => n.body?.includes(marker) && n.author.id === tokenUser.id)) {
       return true;
     }
 
@@ -2329,50 +2342,73 @@ export function isProjectAccessTokenExpiringSoon(
   return daysUntilExpiry <= withinDays;
 }
 
+export type GitLabProjectAccessTokenValidation =
+  | { status: 'valid' }
+  | { status: 'invalid'; reason: 'unauthorized' | 'forbidden'; httpStatus: number }
+  | {
+      status: 'unverified';
+      reason: 'instance-url' | 'transport' | 'http-error';
+      httpStatus?: number;
+    };
+
 /**
  * Checks whether a stored token is still valid on GitLab
  * (e.g., it might have been manually revoked by the user).
+ *
+ * Reports the authenticated probe outcome for the caller's credential policy.
  */
 export async function validateProjectAccessToken(
   token: string,
   instanceUrl: string = DEFAULT_GITLAB_URL
-): Promise<boolean> {
+): Promise<GitLabProjectAccessTokenValidation> {
+  let userUrl: string;
   try {
-    const response = await fetchGitLab(buildGitLabUrl(instanceUrl, '/api/v4/user'), {
+    userUrl = buildGitLabUrl(instanceUrl, '/api/v4/user');
+  } catch (error) {
+    logExceptInTest('[validateProjectAccessToken] Invalid GitLab instance URL', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { status: 'unverified', reason: 'instance-url' };
+  }
+
+  let response: Response;
+  try {
+    response = await fetchGitLab(userUrl, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
-
-    if (response.ok) {
-      logExceptInTest('[validateProjectAccessToken] Token is valid');
-      return true;
-    }
-
-    if (response.status === 401) {
-      logExceptInTest('[validateProjectAccessToken] Token is invalid (401)');
-      return false;
-    }
-
-    // Other errors - log but assume token might still be valid
-    logExceptInTest('[validateProjectAccessToken] Unexpected response', {
-      status: response.status,
-    });
-    return true;
   } catch (error) {
-    if (error instanceof GitLabInstanceUrlError) {
-      logExceptInTest('[validateProjectAccessToken] Invalid GitLab instance URL', {
-        error: error.message,
-      });
-      return false;
-    }
-
-    // Network errors - assume token might still be valid
-    logExceptInTest('[validateProjectAccessToken] Error validating token', {
+    logExceptInTest('[validateProjectAccessToken] Token validation request failed', {
       error: error instanceof Error ? error.message : String(error),
     });
-    return true;
+    // A rejected URL is stored configuration and stays rejected; temporary name
+    // resolution failures and transport errors can clear on their own.
+    if (error instanceof GitLabInstanceUrlError && !error.transient) {
+      return { status: 'unverified', reason: 'instance-url' };
+    }
+    return { status: 'unverified', reason: 'transport' };
   }
+
+  if (response.ok) {
+    logExceptInTest('[validateProjectAccessToken] Token is valid');
+    return { status: 'valid' };
+  }
+
+  if (response.status === 401) {
+    logExceptInTest('[validateProjectAccessToken] Token is invalid (401)');
+    return { status: 'invalid', reason: 'unauthorized', httpStatus: 401 };
+  }
+
+  if (response.status === 403) {
+    logExceptInTest('[validateProjectAccessToken] Token is denied (403)');
+    return { status: 'invalid', reason: 'forbidden', httpStatus: 403 };
+  }
+
+  logExceptInTest('[validateProjectAccessToken] Token health is unconfirmed', {
+    status: response.status,
+  });
+  return { status: 'unverified', reason: 'http-error', httpStatus: response.status };
 }
 
 /**

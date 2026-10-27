@@ -227,7 +227,6 @@
     "hideBalance": "Ɓoye ragowar kuɗi",
     "showBalance": "Nuna ragowar kuɗi",
     "balanceHidden": "An ɓoye ragowar kuɗi",
-    "bonusCreditsExpiring": "Kuɗin amfani {{amount}} za su ƙare {{date}}.",
     "signOutTitle": "Fita?",
     "signOutMessage": "Za ka buƙaci sake shiga don samun damar wurin aikinka.",
     "deleteAccountTitle": "Share asusu?",
@@ -2592,7 +2591,9 @@
       "retrying": "Ana sake gwadawa…",
       "retryDeny": "Sake gwada ƙi",
       "retryAllowOnce": "Sake gwada ba da izini sau ɗaya",
-      "retryAlwaysAllow": "Sake gwada ba da izini koyaushe"
+      "retryAlwaysAllow": "Sake gwada ba da izini koyaushe",
+      "unreadableTitle": "Ba a iya karanta buƙatar izini",
+      "unreadableBody": "Wakilin yana jiran shawarar izini da wannan manhajar ba za ta iya nunawa ba. Sabunta manhajar ko CLI, ko kuma amsa buƙatar a cikin CLI domin ci gaba."
     },
     "questionCard": {
       "title": "Wakili yana buƙatar bayani",
@@ -2984,8 +2985,9 @@
     "unavailableDevice": "Ba a iya shigar da rubutu ta murya a wannan na'urar.",
     "unavailableLanguage": "Ba a iya shigar da rubutu ta murya da harshen wannan na'urar.",
     "languageNotInstalledTitle": "Shigar da rubutu ta murya na {{language}} ba ta shirya ba tukuna",
-    "languageNotInstalledMessage": "Fayilolin magana na offline na {{language}} ba a shigar da su a wayar ba. Sauke su, sannan sake gwada shigar da rubutu ta murya.",
+    "languageNotInstalledMessage": "Fayilolin magana na offline na {{language}} ba a saka su ba, kuma an kashe rubutu ta intanet. Ka sauke fayilolin ko ka sake kunna rubutu ta intanet, don ka iya amfani da shigar da rubutu ta murya.",
     "downloadOfflineModel": "Sauke",
+    "useOnlineTranscription": "Ƙaddamar da rubutun intanet",
     "offlineModelDownloadScheduled": "Za a sauke fayilolin magana na offline a bango. Gwada shigar da rubutu ta murya daga baya.",
     "listeningStopped": "An dakatar da sauraro.",
     "transcribing": "Ana mayar da magana rubutu...",
@@ -3159,7 +3161,7 @@
     "creditActivity": {
       "emptyDescription": "Sayayya, amfani da kuɗi, da gyaran kuɗin amfani na wannan ƙungiyar za su bayyana a nan yayin da suke faruwa.",
       "emptyTitle": "Babu ma'amalar kuɗin amfani",
-      "expires": "Zai ƙare {{date}}",
+      "expiresUtc": "Zai ƙare {{date}} (UTC)",
       "title": "Ma'amalolin kuɗin amfani",
       "transactionFallback": "Ma'amalar kuɗin amfani",
       "category": {
@@ -3840,6 +3842,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Ƙimomin da aka nuna a matsayin •••• suna riƙe sirrin da aka adana; maye gurbin ƙima don canza sirrin. Canza layin umarni yana buƙatar sake shigar da kowane ƙima",
+      "headersHint": "Ƙimomin da aka nuna a matsayin •••• suna riƙe sirrin da aka adana; maye gurbin ƙima don canza sirrin. Canza URL yana buƙatar sake shigar da kowane ƙima",
       "nameRequired": "Shigar da sunan uwar garke",
       "nameInvalid": "Sunan zai iya amfani da haruffan ASCII kawai, lambobi, ƙararraki, da dashes, har zuwa haruffa 100",
       "commandRequired": "Shigar da umarni",
@@ -3938,6 +3942,10 @@
   "credits": {
     "title": "Sayi kuɗin amfani",
     "description": "Kuɗin amfani saye ne na lokaci ɗaya da ake ƙarawa a ma'aunin Kilo naka don gudanar da zaman shirye-shiryen AI a cikin Kilo App. Shagon yana cajin asusunka kuma ana ƙara kuɗin amfani bayan shagon ya tabbatar da biyan kuɗi.",
+    "nextExpiry": "Kuɗin amfani {{amount}} za su ƙare {{date}} (UTC). Ana fara amfani da kuɗin amfani da za su fi saurin ƙarewa.",
+    "appStoreExpiry": "Kuɗin amfani da aka saya ta App Store ba sa ƙarewa.",
+    "playOneYearExpiry": "Waɗannan kuɗin amfani za su ƙare shekara ɗaya ta kalanda bayan saya.",
+    "playNonexpiring": "Waɗannan kuɗin amfani ba sa ƙarewa.",
     "packLabel": "Ƙara kuɗin amfani na {{amount}}",
     "priceUnavailable": "Farashi ba ya nan",
     "purchased": "An ƙara kuɗin amfani a ma'auninka.",
@@ -4022,6 +4030,7 @@
       "startNewSessionHint": "Riƙe dogon lokaci don fara sabon zama.",
       "linkSession": "Haɗa zama",
       "linkFailed": "An kasa haɗa zaman da aikin",
+      "moveToAnotherTodo": "Kai zuwa wani aiki",
       "startRefreshFailed": "Zaman ya fara, amma wannan jerin bai sabunta ba."
     },
     "linkSession": {
@@ -4031,6 +4040,7 @@
     },
     "upNext": "Na gaba",
     "sessionTodo": "Aiki: {{title}}",
+    "openTodoHint": "Yana buɗe aiki.",
     "linkToTodo": "Haɗa da aiki",
     "candidates": {
       "empty": "Babu buɗaɗɗen ayyuka"

@@ -1,3 +1,4 @@
+import { sessionDisplayLine } from '@kilocode/session-ingest-contracts/session-live-summary';
 import { z } from 'zod';
 import {
   buildGlanceableSnapshot,
@@ -139,9 +140,7 @@ function isoTime(value: string | undefined | null): string | null {
 }
 
 function safeTitle(value: string | undefined | null): string {
-  const title = (value ?? '')
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+  const title = sessionDisplayLine(value ?? '')
     .replace(NON_PRINTING_TITLE_CHARACTERS, '')
     .trim();
   const bounded = title.slice(0, HOME_WIDGET_TITLE_LIMIT);

@@ -7,18 +7,9 @@ import {
   type GitHubAppType,
 } from '@/lib/integrations/platforms/github/adapter';
 import type { PullRequestReviewCommentPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
+import { isKiloGitHubBotLogin } from '@/lib/code-reviews/kilo-bot-logins';
 import { recordReplyFeedbackEvent, type ReviewMemoryOwner } from './db';
 import { isReviewMemoryEnabled } from './settings';
-
-export const KILO_GITHUB_BOT_LOGINS: ReadonlySet<string> = new Set([
-  'kilo-code',
-  'kilo-code[bot]',
-  'kilo-code-bot',
-  'kilo-code-bot[bot]',
-  'kilo-code-review-bot',
-  'kilo-code-review-bot[bot]',
-  'kilocode[bot]',
-]);
 
 export const REVIEW_MEMORY_FEEDBACK_EXCERPT_MAX_LENGTH = 2_000;
 const REVIEW_MEMORY_PERMISSION_CACHE_TTL_MS = 30 * 60_000;
@@ -30,10 +21,6 @@ type RepositoryPermissionCacheEntry = {
 
 const repositoryPermissionCache = new Map<string, RepositoryPermissionCacheEntry>();
 const repositoryPermissionInFlight = new Map<string, Promise<CollaboratorPermission | null>>();
-
-export function isLikelyKiloBotActor(login: string | undefined): boolean {
-  return KILO_GITHUB_BOT_LOGINS.has(login?.toLowerCase() ?? '');
-}
 
 export type FetchParentReviewComment = (input: {
   installationId: string;
@@ -63,7 +50,7 @@ export async function handleGitHubReviewCommentReply(input: {
   const parentCommentId = input.payload.comment.in_reply_to_id ?? null;
   if (!parentCommentId) return { recorded: false, reason: 'not-review-comment-reply' };
 
-  if (isLikelyKiloBotActor(input.payload.comment.user.login)) {
+  if (isKiloGitHubBotLogin(input.payload.comment.user.login)) {
     return { recorded: false, reason: 'bot-authored-comment' };
   }
 
@@ -91,7 +78,7 @@ export async function handleGitHubReviewCommentReply(input: {
   });
 
   if (!parent) return { recorded: false, reason: 'parent-comment-not-found' };
-  if (!isLikelyKiloBotActor(parent.userLogin ?? undefined)) {
+  if (!isKiloGitHubBotLogin(parent.userLogin ?? undefined)) {
     return { recorded: false, reason: 'not-kilo-comment' };
   }
 

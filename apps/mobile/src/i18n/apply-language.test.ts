@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   prewarmIntl: vi.fn(),
   setLanguagePreferenceAsync: vi.fn(),
   writeLanguageReturnTarget: vi.fn(),
+  writeDirectionAttemptAsync: vi.fn(),
   renameAndroidNotificationChannels: vi.fn(),
   registerNeedsInputCategories: vi.fn(),
 }));
@@ -22,6 +23,9 @@ vi.mock('@/i18n/rtl', () => ({
 }));
 vi.mock('@/i18n/return-target', () => ({
   writeLanguageReturnTarget: mocks.writeLanguageReturnTarget,
+}));
+vi.mock('@/i18n/direction-attempt', () => ({
+  writeDirectionAttemptAsync: mocks.writeDirectionAttemptAsync,
 }));
 vi.mock('@/lib/hooks/use-language-preference', () => ({
   setLanguagePreferenceAsync: mocks.setLanguagePreferenceAsync,
@@ -55,6 +59,7 @@ describe('applyLanguagePreference — needs-input category re-registration', () 
     mocks.registerNeedsInputCategories.mockReset().mockResolvedValue(undefined);
     mocks.reloadAppAsync.mockReset().mockResolvedValue(undefined);
     mocks.writeLanguageReturnTarget.mockReset().mockResolvedValue(undefined);
+    mocks.writeDirectionAttemptAsync.mockReset().mockResolvedValue(true);
     mocks.syncRtl.mockReset().mockReturnValue(false);
     mocks.i18nManager.isRTL = false;
     mocks.i18nManager.forceRTL.mockReset();
@@ -96,10 +101,28 @@ describe('applyLanguagePreference — needs-input category re-registration', () 
       kind: 'restarting-rtl',
     });
 
+    // The relaunch is recorded before it starts, so the cold start it comes
+    // back to knows the direction was already attempted for this language.
+    expect(mocks.writeDirectionAttemptAsync).toHaveBeenCalledWith('ar');
+
     // The reload tears this JS context down; the relaunched app registers the
     // categories in prepareLanguage after applying the stored language.
     expect(mocks.registerNeedsInputCategories).not.toHaveBeenCalled();
     expect(mocks.renameAndroidNotificationChannels).not.toHaveBeenCalled();
+  });
+
+  it('skips the relaunch when the attempt record cannot be written', async () => {
+    mocks.syncRtl.mockReturnValue(true);
+    mocks.writeDirectionAttemptAsync.mockResolvedValue(false);
+
+    await expect(applyLanguagePreference('ar', 'ar', 'login')).resolves.toEqual({
+      kind: 'restart-skipped',
+    });
+
+    // Without the record a relaunch that did not take the direction would
+    // repeat on every launch, so neither the direction nor the reload runs.
+    expect(mocks.syncRtl).not.toHaveBeenCalled();
+    expect(mocks.reloadAppAsync).not.toHaveBeenCalled();
   });
 
   it('registers nothing when the catalog fails to load', async () => {

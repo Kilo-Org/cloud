@@ -20,7 +20,9 @@ const userId = 'oauth/synthetic-user';
 function stateWithPayload(payload: string): string {
   return createOAuthState(
     `github-user-authorization:${Buffer.from(payload).toString('base64url')}`,
-    userId
+    userId,
+    undefined,
+    { provider: 'github' }
   );
 }
 
@@ -86,8 +88,24 @@ describe('GitHub user authorization state', () => {
 
   test('validates the flow before touching storage', async () => {
     await expect(
-      consumeGitHubUserAuthorizationState(createOAuthState('other-flow', userId), userId)
+      consumeGitHubUserAuthorizationState(
+        createOAuthState('other-flow', userId, undefined, { provider: 'github' }),
+        userId
+      )
     ).resolves.toEqual({
+      status: 'invalid',
+      reason: 'flow_mismatch',
+    });
+    expect(mockedRedisGetDel).not.toHaveBeenCalled();
+  });
+
+  test('rejects a state minted for another provider before touching storage', async () => {
+    const created = await createGitHubUserAuthorizationState(userId);
+    const [payload] = created.state.split('.');
+    const forged = createOAuthState(`github-user-authorization:${payload}`, userId, undefined, {
+      provider: 'bitbucket',
+    });
+    await expect(consumeGitHubUserAuthorizationState(forged, userId)).resolves.toEqual({
       status: 'invalid',
       reason: 'flow_mismatch',
     });

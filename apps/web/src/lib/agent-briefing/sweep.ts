@@ -20,6 +20,7 @@ import {
 } from './store';
 import { briefingWindow, nextBriefingTime, type BriefingWindow } from './schedule';
 import { reconcileBriefingCharge, runBriefingSummary } from './summary';
+import { generatePendingOneOffBriefingPreparations } from './preparation';
 
 async function freezeBriefingContexts(userId: string, window: BriefingWindow, timezone: string) {
   for (const context of await briefingContexts(userId)) {
@@ -374,10 +375,21 @@ export async function generatePendingAgentBriefings() {
     )
     .orderBy(asc(agent_briefing_reports.updated_at))
     .limit(10);
-  const results = await Promise.allSettled(reports.map(report => runBriefingSummary(report.id)));
+  const [results, preparations] = await Promise.all([
+    Promise.allSettled(reports.map(report => runBriefingSummary(report.id))),
+    generatePendingOneOffBriefingPreparations().catch(error => {
+      console.error('Agent briefing preparation scheduler rejected', error);
+      return null;
+    }),
+  ]);
   const rejected = results.filter(result => result.status === 'rejected').length;
   if (rejected > 0) console.error('Agent briefing summary jobs rejected', { rejected });
-  return { attempted: reports.length, fulfilled: results.length - rejected, rejected };
+  return {
+    attempted: reports.length,
+    fulfilled: results.length - rejected,
+    rejected,
+    preparations,
+  };
 }
 
 async function getScheduledTimezone(userId: string) {

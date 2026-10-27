@@ -1,4 +1,3 @@
-import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
@@ -12,12 +11,13 @@ import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanim
 
 import { AddCreditsButton, AddCreditsRow } from '@/components/add-credits-row';
 import { useContextPicker } from '@/components/context-control';
+import { CreditExpiryNote } from '@/components/credits/credit-expiry-note';
 import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subscription-card';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
-import { formatDate, formatMoney } from '@/lib/format';
+import { formatMoney } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -25,7 +25,7 @@ import { isMoneyRole, type OrgListEntry } from '@/lib/hooks/use-organization-que
 import { isNarrowLayout } from '@/lib/narrow-layout';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
-import { cn, parseTimestamp } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 const HIDDEN_BALANCE = '*****';
 
@@ -133,23 +133,6 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const showBalanceSkeleton =
     (balanceLoading || balancePending || balancePlaceholder || !hideBalanceLoaded) &&
     !balanceFailed;
-  const now = Date.now();
-  // Read the block list defensively: the persisted query cache can restore an
-  // entry written before this field existed, and that payload must leave the
-  // expiring row empty rather than throw out of the Profile render.
-  const expiringBlocks =
-    // eslint-disable-next-line typescript/no-unnecessary-condition -- the static type cannot see a restored cache entry from an older payload
-    creditData?.creditBlocks?.filter(
-      b => b.expiry_date !== null && parseTimestamp(b.expiry_date).getTime() > now
-    ) ?? [];
-  const expiringTotal = fromMicrodollars(
-    expiringBlocks.reduce((sum, b) => sum + b.balance_mUsd, 0)
-  );
-  const earliestExpiry = expiringBlocks
-    .map(b => b.expiry_date)
-    .filter((d): d is string => d !== null)
-    // eslint-disable-next-line unicorn/no-array-sort -- toSorted() is not available in Hermes
-    .sort((a, b) => parseTimestamp(a).getTime() - parseTimestamp(b).getTime())[0];
 
   const selectedLabel = selectedOrgId
     ? (orgs?.find(o => o.organizationId === selectedOrgId)?.organizationName ??
@@ -302,17 +285,9 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
                   <Skeleton className="mt-1 h-3 w-48 rounded bg-muted-soft" />
                 </Animated.View>
               ) : (
-                expiringTotal > 0 &&
-                earliestExpiry != null && (
-                  <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
-                    <Text className="text-xs text-muted-foreground">
-                      {t('profile.bonusCreditsExpiring', {
-                        amount: formatMoney(expiringTotal, i18n.language),
-                        date: formatDate(parseTimestamp(earliestExpiry), i18n.language),
-                      })}
-                    </Text>
-                  </Animated.View>
-                )
+                <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
+                  <CreditExpiryNote creditBlocks={creditData?.creditBlocks ?? []} />
+                </Animated.View>
               ))}
           </Animated.View>
           <View className="max-w-full flex-row flex-wrap items-center gap-2">

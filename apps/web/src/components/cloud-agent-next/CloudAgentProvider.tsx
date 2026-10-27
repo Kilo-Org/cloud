@@ -100,7 +100,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
       payload: input.payload,
       autoCommit: true,
       messageId: input.messageId,
-      attachments: input.attachments ?? input.images,
+      attachments: input.attachments,
       expectedWorktreeId: input.expectedWorktreeId
         ? cloudAgentWorktreeIdSchema.parse(input.expectedWorktreeId)
         : undefined,
@@ -219,6 +219,7 @@ export function CloudAgentProvider({ children, organizationId }: CloudAgentProvi
       fetchSnapshotPage: (id, options) => fetchWebSessionSnapshotPage(trpcClient, id, options),
       readCachedSnapshotPage: transcriptCache.read,
       writeCachedSnapshotPage: transcriptCache.write,
+      invalidateCachedSnapshotPage: transcriptCache.invalidate,
 
       userWebConnection: sharedConnection,
 

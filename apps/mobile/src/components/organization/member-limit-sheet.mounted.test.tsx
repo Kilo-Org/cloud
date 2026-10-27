@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
+import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 import { act, type TestRenderer } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { InviteMemberSheet } from './invite-member-sheet';
@@ -36,9 +37,10 @@ const query = vi.hoisted(() => ({
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back: vi.fn() }),
-  useFocusEffect: (effect: () => void): void => {
-    effect();
-  },
+  // None of these surfaces needs a focus effect to run, and the invite sheet
+  // resets its form on every focus after mount, so running one per render
+  // would loop.
+  useFocusEffect: () => undefined,
 }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('react-native', () => ({
@@ -96,7 +98,7 @@ const mutations = vi.hoisted(() => {
   return {
     updateMember,
     current: {
-      invite: { isPending: false, isError: false, mutate: vi.fn() },
+      invite: { isPending: false, isError: false, mutate: vi.fn(), reset: vi.fn() },
       updateMember,
     },
   };
@@ -234,6 +236,40 @@ const rangeMessage = i18n.t('organization.memberLimit.rangeError', {
 });
 const blankWithoutLimitMessage = i18n.t('organization.memberLimit.blankWithoutLimitError', {
   max: formatNumber(2000, i18n.language),
+});
+
+describe('MemberLimitSheet error copy', () => {
+  function accessibleStatusMessages(renderer: TestRenderer.ReactTestRenderer): (string | null)[] {
+    return renderer.root
+      .findAll(node => String(node.type) === 'AccessibleStatus')
+      .map(node => propsOf(node).message as string | null);
+  }
+
+  it('explains a lapsed organization plan instead of echoing the server sentence', async () => {
+    updateMember.isError = true;
+    updateMember.error = Object.assign(new Error(ORGANIZATION_TRIAL_EXPIRED_MESSAGE), {
+      data: { code: 'FORBIDDEN', message: ORGANIZATION_TRIAL_EXPIRED_MESSAGE },
+    });
+    const { renderer, unmount } = await mountLimitForm(1200);
+
+    const messages = accessibleStatusMessages(renderer);
+    expect(messages).toContain(i18n.t('common.organizationTrialEnded'));
+    expect(messages).not.toContain(ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
+    unmount();
+  });
+
+  it('never shows an unexplained server sentence', async () => {
+    updateMember.isError = true;
+    updateMember.error = Object.assign(new Error('Failed to update user role'), {
+      data: { code: 'NOT_FOUND', message: 'Failed to update user role' },
+    });
+    const { renderer, unmount } = await mountLimitForm(1200);
+
+    const messages = accessibleStatusMessages(renderer);
+    expect(messages).toContain(i18n.t('common.couldNotSaveSetting'));
+    expect(messages).not.toContain('Failed to update user role');
+    unmount();
+  });
 });
 
 describe('MemberLimitSheet validation', () => {

@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 import { Plus, Loader2, Eye, EyeOff, Lock, Trash2, Key } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { EnvironmentSnapshotNotice } from '@/components/cloud-agent-next/EnvironmentSnapshotNotice';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { InlineDeleteConfirmation } from '@/components/ui/inline-delete-confirmation';
@@ -22,6 +23,7 @@ type VarsTabProps = {
   mutations:
     | ReturnType<typeof useProfileMutations>
     | ReturnType<typeof useCombinedProfileMutations>;
+  readOnly?: boolean;
 };
 
 type DraftVar = { id: string; key: string; value: string; isSecret: boolean; showValue: boolean };
@@ -37,7 +39,13 @@ const makeDraft = (partial?: Partial<DraftVar>): DraftVar => ({
 
 const cleanKey = (raw: string) => raw.toUpperCase().replace(/[^A-Z0-9_]/g, '_');
 
-export function VarsTab({ profileId, organizationId, vars, mutations }: VarsTabProps) {
+export function VarsTab({
+  profileId,
+  organizationId,
+  vars,
+  mutations,
+  readOnly = false,
+}: VarsTabProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [drafts, setDrafts] = useState<DraftVar[]>([]);
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -180,6 +188,7 @@ export function VarsTab({ profileId, organizationId, vars, mutations }: VarsTabP
         <Key className="text-muted-foreground h-3.5 w-3.5" />
         <span className="text-xs font-medium">Environment Variables</span>
       </div>
+      <EnvironmentSnapshotNotice />
 
       {vars.map(varItem => (
         <div
@@ -246,23 +255,27 @@ export function VarsTab({ profileId, organizationId, vars, mutations }: VarsTabP
                 )}
               </div>
               <div className="flex shrink-0 gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7"
-                  onClick={() => {
-                    setEditingKey(varItem.key);
-                    setEditingValue(varItem.isSecret ? '' : varItem.value);
-                    setShowEditValue(!varItem.isSecret);
-                  }}
-                  disabled={deletingKey === varItem.key}
-                >
-                  Edit
-                </Button>
-                <InlineDeleteConfirmation
-                  onDelete={() => handleDelete(varItem.key)}
-                  isLoading={deletingKey === varItem.key}
-                />
+                {!readOnly && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7"
+                      onClick={() => {
+                        setEditingKey(varItem.key);
+                        setEditingValue(varItem.isSecret ? '' : varItem.value);
+                        setShowEditValue(!varItem.isSecret);
+                      }}
+                      disabled={deletingKey === varItem.key}
+                    >
+                      Edit
+                    </Button>
+                    <InlineDeleteConfirmation
+                      onDelete={() => handleDelete(varItem.key)}
+                      isLoading={deletingKey === varItem.key}
+                    />
+                  </>
+                )}
               </div>
             </div>
           )}
@@ -381,10 +394,12 @@ export function VarsTab({ profileId, organizationId, vars, mutations }: VarsTabP
           </div>
         </div>
       ) : (
-        <Button variant="outline" className="h-11 w-full border-dashed" onClick={startAdding}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Variable
-        </Button>
+        !readOnly && (
+          <Button variant="outline" className="h-11 w-full border-dashed" onClick={startAdding}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Variable
+          </Button>
+        )
       )}
 
       {vars.length === 0 && !isAdding && (

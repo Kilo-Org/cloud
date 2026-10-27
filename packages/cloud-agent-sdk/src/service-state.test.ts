@@ -1045,6 +1045,40 @@ describe('createServiceState', () => {
       ]);
     });
 
+    it('clearPreparationAttempts empties the rows and a new attempt starts fresh', () => {
+      const state = createServiceState(makeConfig());
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+        revision: 1,
+        timestamp: 1_000,
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+        action: 'attempt_started',
+      });
+      expect(state.getPreparationAttempts()).toHaveLength(1);
+
+      state.clearPreparationAttempts();
+
+      expect(state.getPreparationAttempts()).toEqual([]);
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-2',
+        triggerMessageId: 'message-2',
+        revision: 1,
+        timestamp: 2_000,
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+        action: 'attempt_started',
+      });
+      expect(state.getPreparationAttempts()).toEqual([
+        expect.objectContaining({ id: 'attempt-2', status: 'running' }),
+      ]);
+    });
+
     it.each([
       {
         terminalAction: 'attempt_completed' as const,
@@ -2556,6 +2590,96 @@ describe('createServiceState', () => {
       state.process({ type: 'permission.replied', requestId: 'perm-1' });
 
       expect(onPermissionResolved).toHaveBeenCalledWith('perm-1');
+    });
+  });
+
+  describe('permission.unreadable', () => {
+    it('tracks a request whose scope could not be read', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'permission.unreadable', requestId: 'perm-1' });
+
+      expect(state.getUnreadablePermissions()).toEqual([{ requestId: 'perm-1' }]);
+      expect(state.snapshot().unreadablePermissions).toEqual([{ requestId: 'perm-1' }]);
+      expect(state.getPermission()).toBeNull();
+    });
+
+    it('keeps one notice per request id', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'permission.unreadable', requestId: 'perm-1' });
+      state.process({ type: 'permission.unreadable', requestId: 'perm-1' });
+      state.process({ type: 'permission.unreadable', requestId: 'perm-2' });
+
+      expect(state.getUnreadablePermissions()).toEqual([
+        { requestId: 'perm-1' },
+        { requestId: 'perm-2' },
+      ]);
+    });
+
+    it('clears the notice on permission.replied', () => {
+      const onPermissionResolved = jest.fn();
+      const state = createServiceState(makeConfig({ onPermissionResolved }));
+
+      state.process({ type: 'permission.unreadable', requestId: 'perm-1' });
+      state.process({ type: 'permission.replied', requestId: 'perm-1' });
+
+      expect(state.getUnreadablePermissions()).toEqual([]);
+      expect(onPermissionResolved).toHaveBeenCalledWith('perm-1');
+    });
+
+    it('drops the notice when a readable request for the same id arrives', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'permission.unreadable', requestId: 'perm-1' });
+      state.process({
+        type: 'permission.asked',
+        requestId: 'perm-1',
+        permission: 'file-edit',
+        patterns: ['**/*'],
+        metadata: {},
+        always: [],
+      });
+
+      expect(state.getUnreadablePermissions()).toEqual([]);
+      expect(state.getPermission()?.requestId).toBe('perm-1');
+    });
+
+    it('replaces a readable card when the same request arrives unreadable', () => {
+      const onPermissionResolved = jest.fn();
+      const state = createServiceState(makeConfig({ onPermissionResolved }));
+
+      state.process({
+        type: 'permission.asked',
+        requestId: 'perm-1',
+        permission: 'file-edit',
+        patterns: ['**/*'],
+        metadata: {},
+        always: [],
+      });
+      state.process({ type: 'permission.unreadable', requestId: 'perm-1' });
+
+      expect(state.getPermission()).toBeNull();
+      expect(state.getUnreadablePermissions()).toEqual([{ requestId: 'perm-1' }]);
+      expect(onPermissionResolved).toHaveBeenCalledWith('perm-1');
+    });
+
+    it('clears the notice when the session reconnects', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'permission.unreadable', requestId: 'perm-1' });
+      state.process({ type: 'connected', sessionStatus: { type: 'idle' } });
+
+      expect(state.getUnreadablePermissions()).toEqual([]);
+    });
+
+    it('clears the notice on reset', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'permission.unreadable', requestId: 'perm-1' });
+      state.reset();
+
+      expect(state.getUnreadablePermissions()).toEqual([]);
     });
   });
 

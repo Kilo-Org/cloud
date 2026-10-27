@@ -105,6 +105,11 @@ const recordFailure = vi.hoisted(() => ({ next: false }));
 let continuesWith: readonly string[] = [];
 /** Every session whose scope was closed, so a leaked one can be told from one released. */
 const released: string[] = [];
+/**
+ * Holds a scope's close open, so a test can open the same chat again while the
+ * close still runs, which is the moment the ordering is about.
+ */
+let closing: Promise<void> | undefined = undefined;
 
 /**
  * The Kilo MCP connection, faked the way the plugin is: what is under test is
@@ -124,11 +129,15 @@ const mcp = vi.hoisted(() => ({
 }));
 
 vi.mock('./local-models', () => ({ localModelProvider: () => undefined }));
-const backendState = vi.hoisted(() => ({ profiles: [] as StoredChatBackend[] }));
+const backendState = vi.hoisted(() => ({ profiles: [] as StoredChatBackend[], failNext: false }));
 vi.mock('./backend-store', () => ({
   listChatBackends: () => backendState.profiles,
   waitForChatBackends: async () => {
     await Promise.resolve();
+    if (backendState.failNext) {
+      backendState.failNext = false;
+      throw new Error('the backends could not be read');
+    }
   },
 }));
 
@@ -206,7 +215,8 @@ const handleFor = (id: string) => {
 /** Opens a session that is released when the scope holding it closes. */
 const openInScope = (id: string) =>
   Effect.acquireRelease(Effect.succeed(handleFor(id)), () =>
-    Effect.sync(() => {
+    Effect.promise(async () => {
+      await closing;
       released.push(id);
     })
   );
@@ -229,6 +239,7 @@ vi.mock('@kilocode/harness-sdk', () => {
       return Effect.succeed(handleFor('s1'));
     },
     continueSession: (id: string) => {
+      continued.push(id);
       if (failOpenFor === id) {
         return openInScope(id).pipe(Effect.andThen(Effect.fail(new Error('no such session'))));
       }
@@ -349,6 +360,34 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
     storedQuestions.delete(`${scope}:${key}`);
   },
 }));
+/**
+ * The scope recorded for each chat, which is what the store's `chats` row holds.
+ * A start writes it and a move carries it to the session the chat moved onto.
+ */
+const scopes = vi.hoisted(() => {
+  const held = new Map<string, string>();
+  return {
+    of: (sessionId: string) => held.get(sessionId) ?? null,
+    record: (sessionId: string, scope: string) => {
+      if (!held.has(sessionId)) {
+        held.set(sessionId, scope);
+      }
+    },
+    move: (from: string, to: string) => {
+      const scope = held.get(from);
+      held.delete(from);
+      if (scope !== undefined) {
+        held.set(to, scope);
+      }
+    },
+    clear: () => {
+      held.clear();
+    },
+  };
+});
+/** Every session a reopen asked the SDK for, so an open that never ran is told. */
+let continued: string[] = [];
+
 vi.mock('./store', () => ({
   forgetSession: (_database: unknown, sessionId: string) => {
     if (failForgetFor === sessionId) {
@@ -361,8 +400,15 @@ vi.mock('./store', () => ({
   moveChat: (_database: unknown, move: { readonly from: string; readonly to: string }) => {
     recorded.set(move.to, recorded.get(move.from));
     recorded.delete(move.from);
+    scopes.move(move.from, move.to);
   },
-  rememberChat: () => undefined,
+  rememberChat: (
+    _database: unknown,
+    chat: { readonly sessionId: string; readonly scope: string; readonly at: number }
+  ) => {
+    scopes.record(chat.sessionId, chat.scope);
+  },
+  scopeOfChat: (_database: unknown, sessionId: string) => scopes.of(sessionId),
   touchChat: () => undefined,
   toolsOfSession: () => storedTools,
   NO_RECORD: { createdAt: null, updatedAt: null, usage: {}, prompted: 0, effort: null },
@@ -403,6 +449,23 @@ const waitingWords = (sessionId: string) => snapshotOf(sessionId).waiting.map(on
 
 const place = { chatScope: 'me:personal', org: { kind: 'personal' } } as const;
 
+/** Where another account's chats are. */
+const otherAccount = { chatScope: 'other:personal', org: { kind: 'personal' } } as const;
+
+/** Where the same person's chats are while another organization is selected. */
+const otherOrganization = {
+  chatScope: 'me:org-1',
+  org: { kind: 'organization', id: 'org-1' },
+} as const;
+
+/**
+ * Records a chat row the way starting one does, so a test can hand the open an
+ * id that was recorded somewhere else.
+ */
+const storedChat = (sessionId: string, at: { readonly chatScope: string }) => {
+  scopes.record(sessionId, at.chatScope);
+};
+
 /** The settings tools a chat is opened with while the group switch is on. */
 const SETTINGS = ['settings_list', 'settings_set'];
 
@@ -429,6 +492,7 @@ beforeEach(async () => {
   }
   asked.length = 0;
   released.length = 0;
+  closing = undefined;
   finish = undefined;
   emitEvent = undefined;
   storedHistory = undefined;
@@ -444,6 +508,8 @@ beforeEach(async () => {
   openedWith = undefined;
   storedTools = null;
   recorded.clear();
+  scopes.clear();
+  continued = [];
   recordFailure.next = false;
   settingsSwitch.enabled = true;
   mcp.tools.length = 0;
@@ -452,6 +518,7 @@ beforeEach(async () => {
   remote.offered.length = 0;
   continuesWith = [];
   backendState.profiles = [];
+  backendState.failNext = false;
   opened = await startChat(place, { model: 'kilo/one', effort: null });
   await settled();
   /* Cleared after the chat above, so a test counts only its own discoveries. */
@@ -608,6 +675,7 @@ describe('the Kilo MCP tools a chat is opened with', () => {
   it('opens a stored chat whose tool names no longer resolve, on the names now held', async () => {
     mcp.tools.push(discovered);
     missingToolsFor = 'stale';
+    storedChat('stale', place);
 
     await enterChat(place, 'stale');
     await settled();
@@ -989,6 +1057,7 @@ describe('a chat that moved', () => {
 describe('a chat that could not be opened', () => {
   it('settles idle with the reason instead of staying on opening', async () => {
     failOpenFor = 'missing';
+    storedChat('missing', place);
 
     await enterChat(place, 'missing');
 
@@ -998,6 +1067,7 @@ describe('a chat that could not be opened', () => {
 
   it('closes the scope it opened rather than leaking the session', async () => {
     failOpenFor = 'missing';
+    storedChat('missing', place);
 
     await enterChat(place, 'missing');
 
@@ -1008,6 +1078,7 @@ describe('a chat that could not be opened', () => {
 
   it('closes the scope when the history cannot be read', async () => {
     failHistoryFor = 'unreadable';
+    storedChat('unreadable', place);
 
     await enterChat(place, 'unreadable');
 
@@ -1017,6 +1088,7 @@ describe('a chat that could not be opened', () => {
 
   it('clears the safe failure once a later entry opens the chat', async () => {
     failHistoryFor = 'flaky';
+    storedChat('flaky', place);
     await enterChat(place, 'flaky');
     expect(snapshotOf('flaky').failureKey).toBe('common.somethingWentWrong');
 
@@ -1024,6 +1096,200 @@ describe('a chat that could not be opened', () => {
     await enterChat(place, 'flaky');
 
     expect(snapshotOf('flaky')).toMatchObject({ status: 'idle', failureKey: null, turns: [TURN] });
+  });
+});
+
+describe('opening a chat where it was recorded', () => {
+  it('does not open another account’s chat, and sends nothing into it', async () => {
+    await releaseChat(opened);
+
+    await enterChat(otherAccount, opened);
+
+    expect(snapshotOf(opened)).toMatchObject({
+      status: 'idle',
+      turns: [],
+      failureKey: 'queryError.notFoundDescription',
+    });
+    expect(continued).not.toContain(opened);
+
+    await say(opened, { text: 'into it', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    expect(asked).toEqual([]);
+  });
+
+  it('opens that chat from the place that recorded it', async () => {
+    await releaseChat(opened);
+
+    await enterChat(place, opened);
+    await settled();
+
+    expect(continued).toContain(opened);
+    expect(snapshotOf(opened)).toMatchObject({ status: 'idle', turns: [TURN], failureKey: null });
+  });
+
+  it('finishes a close before reopening the chat from its own place', async () => {
+    /* The chat this run starts has no scope of its own to close, so it is let
+       go and opened from the store first: the one that continues is the chat
+       whose close a test can hold open. */
+    await releaseChat(opened);
+    await enterChat(place, opened);
+    continued = [];
+    released.length = 0;
+
+    const gate = Promise.withResolvers<undefined>();
+    closing = gate.promise;
+
+    const foreign = enterChat(otherAccount, opened);
+    await settled();
+    expect(released).not.toContain(opened);
+
+    const reopening = enterChat(place, opened);
+    await settled();
+    expect(continued).not.toContain(opened);
+
+    gate.resolve(undefined);
+    await Promise.all([foreign, reopening]);
+    await settled();
+
+    expect(released).toContain(opened);
+    expect(continued).toContain(opened);
+    expect(snapshotOf(opened)).toMatchObject({ status: 'idle', turns: [TURN], failureKey: null });
+  });
+
+  it('leaves a chat a tool retry moved while the chat was being let go', async () => {
+    /* The retry reads the chat, then waits on the server. The chat is let go
+       from another place in that wait, and the retry lands on the session it
+       moved onto after the chat has left the live ones. */
+    /* The chat this run starts carries no scope of its own, so it is opened
+       from the store first: the one that continues is the chat whose close a
+       test can hold open. */
+    await releaseChat(opened);
+    await enterChat(place, opened);
+    continued = [];
+    released.length = 0;
+
+    mcp.tools.push({ definition: { name: 'mcp_kilo_read-file' } });
+    const server = Promise.withResolvers<undefined>();
+    mcp.ensure.mockImplementationOnce(async () => {
+      await server.promise;
+      return { status: 'ready' as const, tools: mcp.tools };
+    });
+    const retrying = retryKiloMcp(opened);
+    await settled();
+
+    const gate = Promise.withResolvers<undefined>();
+    closing = gate.promise;
+    const foreign = enterChat(otherAccount, opened);
+    await settled();
+
+    server.resolve(undefined);
+    await settled();
+    const carried = snapshotOf(opened).sessionId;
+    expect(carried).toBe('s2');
+
+    gate.resolve(undefined);
+    await Promise.all([foreign, retrying]);
+    await settled();
+
+    /* The let-go id settles for itself and says nothing about the chat that
+       carried on: that one is live, and it keeps its transcript. */
+    expect(snapshotOf(carried)).toMatchObject({
+      status: 'idle',
+      turns: [TURN],
+      failureKey: null,
+    });
+    await releaseChat(carried);
+  });
+
+  it('keeps an organization’s chat out of the personal place', async () => {
+    storedChat('org-chat', otherOrganization);
+
+    await enterChat(place, 'org-chat');
+    await settled();
+
+    expect(snapshotOf('org-chat')).toMatchObject({
+      status: 'idle',
+      turns: [],
+      failureKey: 'queryError.notFoundDescription',
+    });
+
+    await enterChat(otherOrganization, 'org-chat');
+    await settled();
+
+    expect(continued).toContain('org-chat');
+    expect(snapshotOf('org-chat')).toMatchObject({ turns: [TURN], failureKey: null });
+    await releaseChat('org-chat');
+  });
+
+  it('opens a chat a model switch moved, on the id it moved to', async () => {
+    await say(opened, { text: 'first', images: [] }, { model: 'kilo/two', effort: null });
+    await settled();
+    finish?.();
+    await settled();
+
+    const carried = snapshotOf(opened).sessionId;
+    expect(carried).toBe('s2');
+    await releaseChat(carried);
+
+    await enterChat(place, carried);
+    await settled();
+
+    expect(snapshotOf(carried)).toMatchObject({ status: 'idle', turns: [TURN], failureKey: null });
+  });
+
+  it('ends a chat another place left running instead of handing it over', async () => {
+    /* The chat is live, started in `place` before this test. Entering it from
+       another place ends it there: the answer it was on stops, and no question
+       reaches its session from here. */
+    await enterChat(otherAccount, opened);
+    await settled();
+
+    expect(snapshotOf(opened)).toMatchObject({
+      status: 'idle',
+      turns: [],
+      failureKey: 'queryError.notFoundDescription',
+    });
+
+    await say(opened, { text: 'into it', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    expect(asked).toEqual([]);
+
+    /* Nothing is held for it any more, so its own place opens it again from
+       the store rather than finding the session this place would have kept. */
+    await enterChat(place, opened);
+    await settled();
+    expect(continued).toContain(opened);
+  });
+
+  it('settles the state even when the chat cannot be ended', async () => {
+    /* Ending it closes the scope that writes the conversation down, and that
+       close can fail. The chat is let go either way: nothing of it is drawn
+       here, and no question asked here reaches its session. */
+    backendState.failNext = true;
+
+    await enterChat(otherAccount, opened);
+    await settled();
+
+    expect(snapshotOf(opened)).toMatchObject({
+      status: 'idle',
+      turns: [],
+      failureKey: 'queryError.notFoundDescription',
+    });
+
+    await say(opened, { text: 'into it', images: [] }, { model: 'kilo/one', effort: null });
+    await settled();
+    expect(asked).toEqual([]);
+  });
+
+  it('does not open an id the store never recorded', async () => {
+    await enterChat(place, 'unrecorded');
+
+    expect(continued).not.toContain('unrecorded');
+    expect(snapshotOf('unrecorded')).toMatchObject({
+      status: 'idle',
+      turns: [],
+      failureKey: 'queryError.notFoundDescription',
+    });
   });
 });
 
@@ -1063,6 +1329,7 @@ describe('a question asked before the session has opened', () => {
 
     /* No await: this is a person typing while the screen is still opening the
        chat, which is exactly the window the question used to be dropped in. */
+    storedChat('later', place);
     const entering = enterChat(place, 'later');
     await say('later', { text: 'typed early', images: [] }, { model: 'kilo/one', effort: null });
     await entering;
@@ -1135,6 +1402,7 @@ describe('the effort a chat asks with', () => {
   it('reopens a stored chat with the effort it was opened with', async () => {
     await releaseChat(opened);
     storedEffort = 'medium';
+    storedChat('stored', place);
 
     await enterChat(place, 'stored');
 
@@ -1687,6 +1955,7 @@ describe('remote servers after a restart', () => {
     const fresh = await import('./registry');
     remote.offered.push(ALPHA);
     continuesWith = ['mcp_alpha_read'];
+    storedChat('s9', place);
 
     await fresh.enterChat(place, 's9');
 

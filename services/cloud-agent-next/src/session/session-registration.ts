@@ -1,3 +1,4 @@
+import { byocVercelOwnerFields } from '../byoc/vercel-owner.js';
 /**
  * Session creation helpers for the grouped `start` path and retained split
  * `prepareSession` path.
@@ -61,6 +62,16 @@ import {
   type CredentialContainment,
   type SessionMetadata,
 } from '../persistence/session-metadata.js';
+import {
+  bindingFromLegacyProvider,
+  SandboxProviderBindingSchema,
+  type SandboxProviderBinding,
+} from '../sandbox-provider-binding.js';
+import {
+  fetchByocVercelEnrollment,
+  fetchByocVercelEnrollmentForUser,
+  ByocCredentialMissingError,
+} from '../byoc/vercel-credential-resolver.js';
 import { logger } from '../logger.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { getSandboxSessionStub, type SessionStub } from '../sandbox-session/session-stub.js';
@@ -174,6 +185,7 @@ export type SessionRegistrationResult = {
   sandboxProvider: SandboxSelection['provider'];
   worktreeId?: CloudAgentWorktreeId;
   sandboxAllocation?: SandboxAllocation;
+  sandboxProviderBinding: SandboxProviderBinding;
   /**
    * Canonical initial turn reserved for a later split initiation request.
    * Omitted for a clone-only create, which has no synthetic initial turn.
@@ -786,6 +798,7 @@ async function allocateNewSession(
   let sandboxId: SandboxId;
   let sandboxKind: SandboxKind | undefined;
   let sandboxProvider: SandboxSelection['provider'] = 'cloudflare';
+  let sandboxProviderBinding: SandboxProviderBinding = { kind: 'cloudflare' };
   try {
     const decision = await selectControlPlaneSandbox({
       env: ctx.env,
@@ -799,6 +812,33 @@ async function allocateNewSession(
     sandboxId = decision.sandboxId;
     sandboxKind = decision.sandboxKind;
     sandboxProvider = decision.provider;
+    if (sandboxProvider === 'vercel') {
+      let enrollment: Awaited<ReturnType<typeof fetchByocVercelEnrollment>>;
+      try {
+        enrollment =
+          orgId !== undefined
+            ? await fetchByocVercelEnrollment(ctx.env, orgId)
+            : await fetchByocVercelEnrollmentForUser(ctx.env, ctx.userId);
+      } catch (error) {
+        if (error instanceof ByocCredentialMissingError) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'byoc_vercel_not_ready' });
+        }
+        throw error;
+      }
+      if (enrollment.setupStatus !== 'ready') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'byoc_vercel_not_ready' });
+      }
+      sandboxProviderBinding = {
+        kind: 'vercel',
+        source: {
+          kind: 'byoc',
+          ...byocVercelOwnerFields(enrollment),
+          credentialId: enrollment.credentialId,
+        },
+      };
+    } else {
+      sandboxProviderBinding = bindingFromLegacyProvider(sandboxProvider);
+    }
   } catch (error) {
     await recordPostSetupFailure(() =>
       recordCloudAgentSessionFailure(
@@ -833,6 +873,7 @@ async function allocateNewSession(
       await recordOperationProgress(ledger.db, ledger.rowId, {
         sandboxId,
         sandboxProvider,
+        sandboxProviderBinding,
         ...(sandboxKind ? { sandboxKind } : {}),
       });
     } catch (error) {
@@ -945,6 +986,7 @@ async function allocateNewSession(
     sandboxProvider,
     ...(worktreeId ? { worktreeId } : {}),
     ...(sandboxAllocation ? { sandboxAllocation } : {}),
+    sandboxProviderBinding,
     initialTurn,
     credentialContainment,
     rollbackCliSession: async () => {
@@ -990,6 +1032,7 @@ function rebuildRecordedSessionAllocation(
   const initialMessageId = canonical.initialMessageId;
   const sandboxId = canonical.sandboxId;
   const sandboxProvider = canonical.sandboxProvider;
+  const sandboxProviderBinding = canonical.sandboxProviderBinding;
   // A legacy prefixed key recorded no kind; a placed key never rebuilds without one.
   const recordedKind = sandboxKindSchema.optional().safeParse(canonical.sandboxKind);
   if (
@@ -1065,6 +1108,16 @@ function rebuildRecordedSessionAllocation(
   assertEgressPolicyAllocation(input, { sandboxProvider: recordedProvider.data, sandboxKind });
   const cloneFromKiloSessionId = input.clone?.cloneFromKiloSessionId;
 
+  const parsedBinding = SandboxProviderBindingSchema.safeParse(
+    sandboxProviderBinding === undefined
+      ? bindingFromLegacyProvider(recordedProvider.data)
+      : sandboxProviderBinding
+  );
+  if (!parsedBinding.success || parsedBinding.data.kind !== recordedProvider.data) {
+    throw creationInProgressError();
+  }
+  const normalizedBinding = parsedBinding.data;
+
   return {
     cloudAgentSessionId,
     kiloSessionId,
@@ -1073,6 +1126,7 @@ function rebuildRecordedSessionAllocation(
     sandboxProvider: recordedProvider.data,
     ...(worktreeId ? { worktreeId } : {}),
     ...(recorded.data ? { sandboxAllocation: recorded.data } : {}),
+    sandboxProviderBinding: normalizedBinding,
     initialTurn,
     credentialContainment: computeCredentialContainment(cloudAgentSessionId, input, ctx.env),
     rollbackCliSession: async () => {
@@ -1150,6 +1204,7 @@ function buildSessionRegistrationCommand(
     },
     repository: input.repository,
     profile: input.profile?.resolved,
+    ...(input.environment ? { environment: input.environment } : {}),
     finalization: input.finalization,
     callback: input.options?.callbackTarget ? { target: input.options.callbackTarget } : undefined,
     workspace: {
@@ -1160,6 +1215,7 @@ function buildSessionRegistrationCommand(
         ? { egressAllowlist: egressAllowlistSchema.parse(input.runtime.egressAllowlist ?? []) }
         : {}),
       ...(allocation.sandboxAllocation ? { sandboxAllocation: allocation.sandboxAllocation } : {}),
+      sandboxProviderBinding: allocation.sandboxProviderBinding,
       shallow: input.options?.shallow,
       ...(allocation.worktreeId
         ? {
@@ -1391,6 +1447,7 @@ async function registerAndAdmitInitialTurn(
     sandboxId: allocation.sandboxId,
     sandboxProvider: allocation.sandboxProvider,
     ...(allocation.sandboxAllocation ? { sandboxAllocation: allocation.sandboxAllocation } : {}),
+    sandboxProviderBinding: allocation.sandboxProviderBinding,
     admission,
   };
   if (ledger) {

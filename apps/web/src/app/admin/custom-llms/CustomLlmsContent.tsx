@@ -461,6 +461,11 @@ export function CustomLlmsContent() {
                 <TableCell className="font-mono text-sm">{item.public_id}</TableCell>
                 <TableCell>{item.definition.display_name}</TableCell>
                 <TableCell>
+                  {item.shadowedByKiloExclusiveModel && (
+                    <Badge variant="beta" className="mr-2">
+                      Kilo-exclusive model serves this ID
+                    </Badge>
+                  )}
                   {item.definition.public ? (
                     <Badge variant="new">
                       <Globe />
@@ -616,8 +621,18 @@ export function CustomLlmsContent() {
                 Public ID may only contain lowercase letters, digits, and <code>. / -</code>. It
                 must not start with <code>kilo/</code>, <code>kilo-auto/</code>,{' '}
                 <code>kilocode/</code>, or a direct BYOK provider prefix, and must not be an
-                OpenRouter or Kilo-exclusive model or a free model ID such as{' '}
-                <code>stealth/…-alpha</code>.
+                OpenRouter model or a free model ID such as <code>stealth/…-alpha</code>. A
+                Kilo-exclusive model ID may be used to replace that model, as long as it has no{' '}
+                <code>:</code> variant: the Kilo-exclusive model keeps serving it until its
+                definition is removed from the code.
+              </p>
+              <p className="text-muted-foreground mt-1 text-xs">
+                Set <code>api_kinds</code> to a subset of <code>chat_completions</code>,{' '}
+                <code>messages</code>, and <code>responses</code> when the upstream serves several
+                APIs. It must include the API clients use, which{' '}
+                <code>opencode_settings.ai_sdk_provider</code> picks: Messages for{' '}
+                <code>anthropic</code>, Responses for <code>openai</code>, and Chat Completions
+                otherwise. Without it, only that API is served.
               </p>
               <p className="text-muted-foreground mt-1 text-xs">
                 Custom LLMs are always free for users. To make the model available to every user,

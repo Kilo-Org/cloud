@@ -1,5 +1,5 @@
 import { describe, expect, test, jest } from '@jest/globals';
-import type Stripe from 'stripe';
+import Stripe from 'stripe';
 
 import {
   markServiceFeeAssessmentCharged,
@@ -230,6 +230,8 @@ function invoiceLine(
     pretax_credit_amounts: null,
     pricing: null,
     quantity: 1,
+    quantity_decimal: Stripe.Decimal.from(1),
+    subtotal: amount,
     subscription: null,
     taxes: null,
   } as Stripe.InvoiceLineItem;
@@ -249,13 +251,14 @@ function creditNoteLine(
     discount_amounts: [],
     invoice_line_item: invoiceLineItem,
     livemode: false,
+    metadata: {},
     pretax_credit_amounts: [],
     quantity: 1,
     tax_rates: [],
     taxes: null,
     type: 'invoice_line_item',
     unit_amount: amount,
-    unit_amount_decimal: String(amount),
+    unit_amount_decimal: Stripe.Decimal.from(amount),
   } as Stripe.CreditNoteLineItem;
 }
 
@@ -705,6 +708,147 @@ describe('observeServiceFeeChargeRefunded', () => {
       refundedProductMinor: 2_000,
       refundedFeeMinor: 100,
     });
+  });
+
+  test('preserves Stripe resource receivers across paginated refund and credit-note observations', async () => {
+    const store = createMemoryRefundStore();
+    await persistSettledAssessment(store, {
+      stripeChargeId: CHARGE_ID,
+      stripePaymentIntentId: PAYMENT_INTENT_ID,
+      stripeInvoiceId: INVOICE_ID,
+    });
+    const firstProduct = creditNoteLine('cnli_first_product', PRODUCT_LINE_ID, 2_000);
+    const firstFee = creditNoteLine('cnli_first_fee', FEE_LINE_ID, 100);
+    const secondProduct = creditNoteLine('cnli_second_product', PRODUCT_LINE_ID, 3_000);
+    const secondFee = creditNoteLine('cnli_second_fee', FEE_LINE_ID, 150);
+    const firstNote = creditNote({
+      id: 'cn_first_page',
+      lines: [firstProduct],
+      hasMore: true,
+    });
+    const secondNote = creditNote({
+      id: 'cn_second_page',
+      lines: [secondProduct],
+      hasMore: true,
+    });
+    const noteLines = new Map<string, [Stripe.CreditNoteLineItem, Stripe.CreditNoteLineItem]>([
+      [firstNote.id, [firstProduct, firstFee]],
+      [secondNote.id, [secondProduct, secondFee]],
+    ]);
+    const creditNotes: NonNullable<ServiceFeeRefundStripeClient['creditNotes']> = {
+      async list(params) {
+        if (this !== creditNotes) throw new Error('creditNotes.list lost its resource receiver');
+        expect(params.invoice).toBe(INVOICE_ID);
+        if (params.starting_after === undefined) {
+          return { data: [firstNote], has_more: true };
+        }
+        if (params.starting_after === firstNote.id) {
+          return { data: [secondNote], has_more: false };
+        }
+        throw new Error(`unexpected credit-note cursor ${params.starting_after}`);
+      },
+      async listLineItems(id, params) {
+        if (this !== creditNotes) {
+          throw new Error('creditNotes.listLineItems lost its resource receiver');
+        }
+        const lines = noteLines.get(id);
+        if (!lines) throw new Error(`unexpected credit note ${id}`);
+        const [product, fee] = lines;
+        if (params?.starting_after === undefined) {
+          return { data: [product], has_more: true };
+        }
+        if (params.starting_after === product.id) {
+          return { data: [fee], has_more: false };
+        }
+        throw new Error(`unexpected credit-note line cursor ${params.starting_after}`);
+      },
+    };
+    const invoices: NonNullable<ServiceFeeRefundStripeClient['invoices']> = {
+      async listLineItems(id, params) {
+        if (this !== invoices) throw new Error('invoices.listLineItems lost its resource receiver');
+        expect(id).toBe(INVOICE_ID);
+        if (params?.starting_after === undefined) {
+          return {
+            data: [invoiceLine(PRODUCT_LINE_ID, 10_000, false)],
+            has_more: true,
+          };
+        }
+        if (params.starting_after === PRODUCT_LINE_ID) {
+          return { data: [invoiceLine(FEE_LINE_ID, 500, true)], has_more: false };
+        }
+        throw new Error(`unexpected invoice-line cursor ${params.starting_after}`);
+      },
+    };
+    const firstRefund = refund({ id: 're_first_page', amount: 2_100 });
+    const secondRefund = refund({ id: 're_second_page', amount: 3_150 });
+    const stripe = {
+      creditNotes,
+      invoices,
+      refunds: {
+        ...createStripeMock().refunds,
+        list: jest.fn(
+          async (params: Parameters<ServiceFeeRefundStripeClient['refunds']['list']>[0]) => {
+            expect(params.charge).toBe(CHARGE_ID);
+            if (params.starting_after === undefined) {
+              return { data: [firstRefund], has_more: true };
+            }
+            if (params.starting_after === firstRefund.id) {
+              return { data: [secondRefund], has_more: false };
+            }
+            throw new Error(`unexpected refund cursor ${params.starting_after}`);
+          }
+        ),
+      },
+    };
+    const partialCharge = charge({
+      amount_refunded: 5_250,
+      refunds: { data: [firstRefund], has_more: true },
+    });
+    const sendAlert = jest.fn(
+      async (_input: UnresolvedServiceFeeRefundAllocationAlertInput) => undefined
+    );
+    const observation = {
+      store,
+      charge: partialCharge,
+      stripe,
+      now: ACTIVATION,
+      deps: { sendAlert },
+    };
+
+    const result = await observeServiceFeeChargeRefunded(observation);
+
+    expect(result).toMatchObject({
+      status: 'allocated',
+      refundedProductMinor: 5_000,
+      refundedFeeMinor: 250,
+      refundedGrossMinor: 5_250,
+      createdStripeRefund: false,
+    });
+    expect(result.assessment).toMatchObject({
+      outcome: 'charged',
+      refundedProductMinor: 5_000,
+      refundedFeeMinor: 250,
+      refundedGrossMinor: 5_250,
+      stripeInvoiceFeeLineItemId: null,
+      metadata: {},
+    });
+    const persisted = await store.findByAssessmentKey(ASSESSMENT_KEY);
+    expect(persisted).toEqual(result.assessment);
+    expect(stripe.refunds.list).toHaveBeenCalledTimes(2);
+
+    const refundReplay = await observeServiceFeeChargeRefunded(observation);
+    expect(refundReplay).toEqual(result);
+    expect(stripe.refunds.list).toHaveBeenCalledTimes(4);
+    const creditNoteReplay = await observeServiceFeeCreditNote({
+      store,
+      creditNote: secondNote,
+      stripe,
+      now: ACTIVATION,
+    });
+    expect(creditNoteReplay).toEqual(result);
+    expect(await store.findByAssessmentKey(ASSESSMENT_KEY)).toEqual(persisted);
+    expect(sendAlert).not.toHaveBeenCalled();
+    expect(stripe.refunds.create).not.toHaveBeenCalled();
   });
 
   test('classifies a fee line by its backing InvoiceItem when line metadata is absent', async () => {

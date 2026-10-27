@@ -27,6 +27,16 @@ export type RewriteChatCompletionsResponseParams = RewriteResponseParams & {
   responseTransforms: ProviderResponseTransforms | null;
 };
 
+/**
+ * Mistral omits `type` on tool calls. The AI SDK rejects a tool call that
+ * starts (has an `id`) without `type: "function"`.
+ */
+function addMissingToolCallType(toolCall: { id?: string | null; type?: string | null }) {
+  if (typeof toolCall.id === 'string' && (toolCall.type === undefined || toolCall.type === null)) {
+    toolCall.type = 'function';
+  }
+}
+
 export async function rewriteModelResponse_ChatCompletions({
   response,
   usageContext,
@@ -85,6 +95,9 @@ export async function rewriteModelResponse_ChatCompletions({
       // Some APIs set null here, which @openrouter/ai-sdk-provider rejects in non-streaming responses
       if (choice.message?.tool_calls === null) {
         delete choice.message.tool_calls;
+      }
+      for (const toolCall of choice.message?.tool_calls ?? []) {
+        addMissingToolCallType(toolCall);
       }
       applyReasoningDetailsResponseTransform(responseTransforms, choice.message);
     }
@@ -156,6 +169,7 @@ export async function rewriteModelResponse_ChatCompletions({
               if (toolCall.type === null) {
                 delete toolCall.type;
               }
+              addMissingToolCallType(toolCall);
             }
             applyReasoningDetailsResponseTransform(responseTransforms, delta);
           }

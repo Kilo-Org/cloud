@@ -28,8 +28,12 @@ import {
   usePrReviewInboxBack,
   usePrReviewInboxHardwareBack,
 } from '@/lib/pr-review/pr-review-inbox-back';
-import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
-import { providerPrTriple, providerPrWebUrl } from '@/lib/pr-review/provider-pr-ref';
+import { selectOverviewWebUrl, useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
+import {
+  providerPrTriple,
+  providerPrWebUrl,
+  ProviderPrWebUrlProvider,
+} from '@/lib/pr-review/provider-pr-ref';
 import { markRecentPrFailed, upsertRecentPr } from '@/lib/pr-review/recent-prs';
 
 const REVIEW_SUBMIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/review-submit' as const;
@@ -182,9 +186,14 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
     void markRecentPrFailed(recentIdentity);
   }, [pr.isError, recentIdentity]);
 
-  // Share the provider's public URL via the native share sheet. Without an
-  // instance hint a GitLab ref has no public URL, so Share stays disabled.
-  const webUrl = providerPrWebUrl(queries.ref);
+  // Share the provider's public URL via the native share sheet. The URL is
+  // the provider's own: GitHub and Bitbucket name constant hosts, and a
+  // GitLab link names the instance the server resolved for the loaded PR/MR,
+  // so it is read off that answer. Share is disabled while there is no URL.
+  const webUrl = providerPrWebUrl({
+    ref: queries.ref,
+    serverWebUrl: selectOverviewWebUrl(pr.data),
+  });
   const sharePullRequest = useCallback(() => {
     if (!webUrl) {
       return;
@@ -349,7 +358,7 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
           />
         </View>
       ) : null}
-      {body}
+      <ProviderPrWebUrlProvider value={webUrl}>{body}</ProviderPrWebUrlProvider>
     </View>
   );
 }

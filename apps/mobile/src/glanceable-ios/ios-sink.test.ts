@@ -1126,6 +1126,8 @@ describe('iosSink Approve gate', () => {
     organizationId: null,
     userId: 'u1',
     recordedAt: NOW,
+    statusUpdatedAt: null,
+    boundPermissionId: 'perm_1',
     ...overrides,
   });
 
@@ -1144,8 +1146,13 @@ describe('iosSink Approve gate', () => {
     iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 2), CTX);
     expect(mockState.updated.at(-1)).toMatchObject({ canApprove: false });
 
-    recordWaitingAsk(null);
+    // An ask with no bound request has no request to answer.
+    recordWaitingAsk(recordedAsk({ boundPermissionId: null }));
     iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 3), CTX);
+    expect(mockState.updated.at(-1)).toMatchObject({ canApprove: false });
+
+    recordWaitingAsk(null);
+    iosSink.startOrUpdate(snapshotFor([{ status: 'permission' }], 4), CTX);
     expect(mockState.updated.at(-1)).toMatchObject({ canApprove: false });
   });
 
@@ -1172,6 +1179,8 @@ describe('iosSink approve-failed notice', () => {
     organizationId: null,
     userId: 'u1',
     recordedAt: NOW,
+    statusUpdatedAt: null,
+    boundPermissionId: 'perm_1',
     ...overrides,
   });
 

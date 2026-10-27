@@ -404,6 +404,7 @@ export function createControlPlaneConnection(
           protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
           heartbeatAck: true,
           redactsNamedSecrets: true,
+          installsSkillsSh: true,
         })
       )
         return;

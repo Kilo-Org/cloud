@@ -125,7 +125,6 @@ async function convertOwnerPool(
     return result('failed');
   }
 }
-
 export async function convertOwnerPools(
   request: OwnerPoolConversionRequest
 ): Promise<OwnerPoolConversionResponse> {

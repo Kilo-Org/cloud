@@ -34,6 +34,7 @@ type SessionNotificationCard = Parameters<typeof postSessionCard>[0];
 
 const CARD: SessionNotificationCard = {
   sessionId: 'session-1',
+  userId: 'user-1',
   organizationId: 'org-1',
   title: 'Migrate the billing webhooks',
   text: 'Working',
@@ -115,6 +116,19 @@ describe('session notification bridge', () => {
 
     expect(getStoredSessionCards()).toEqual([
       { sessionId: 'session-1', organizationId: null, approvalKey: null },
+    ]);
+  });
+
+  it('reads a record written before the card kept its account, with no account', () => {
+    // Such a card cannot be placed in a scope, so the restore cancels it: the
+    // record must parse rather than disappear, so that decision is made where
+    // the scope is known.
+    mocks.getSessionCards.mockReturnValue(
+      JSON.stringify([{ sessionId: 'session-1', organizationId: 'org-1', approvalKey: '' }])
+    );
+
+    expect(getStoredSessionCards()).toEqual([
+      { sessionId: 'session-1', userId: undefined, organizationId: 'org-1', approvalKey: null },
     ]);
   });
 

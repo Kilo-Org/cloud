@@ -33,13 +33,14 @@ import {
   type ProviderPolicyFilter,
 } from '@/components/organizations/providers-and-models/useProvidersAndModelsAllowListsState';
 import { usePreferredModels } from '@/components/shared/usePreferredModels';
-import { AutoRoutingModeCard } from '@/components/auto-routing/AutoRoutingModeCard';
 import { CustomRoutersCard } from '@/components/auto-routing/CustomRoutersCard';
+import { AutoRoutingModeCard } from '@/components/auto-routing/AutoRoutingModeCard';
 import {
   modelRetainsPrompts,
   modelTrains,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { getOfferingPricing } from '@/components/organizations/providers-and-models/offeringPricing';
+import { useCustomPricingConfig } from '@/components/organizations/providers-and-models/useCustomPricingConfig';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 
 type Props = {
@@ -122,6 +123,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
   });
 
   const preferredModels = usePreferredModels();
+  const customPricingConfig = useCustomPricingConfig();
   const preferredIndexByModelId = useMemo(() => {
     const index = new Map<string, number>();
     for (let i = 0; i < preferredModels.length; i++) {
@@ -286,13 +288,17 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         providerIconUrl: provider.icon?.url ? normalizeProviderIconUrl(provider.icon.url) : null,
         trains: modelTrains(model, provider.dataPolicy.training),
         retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
-        ...getOfferingPricing(getSnapshotModelVariantId(model), model.endpoint.pricing),
+        ...getOfferingPricing(
+          customPricingConfig,
+          getSnapshotModelVariantId(model),
+          model.endpoint.pricing
+        ),
       });
     }
 
     offerings.sort((a, b) => a.providerDisplayName.localeCompare(b.providerDisplayName));
     return offerings;
-  }, [infoModel, openRouterProviders]);
+  }, [customPricingConfig, infoModel, openRouterProviders]);
 
   const enabledModelCountByProviderSlug = useMemo(() => {
     const map = new Map<string, number>();
@@ -427,7 +433,11 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         modelName: model.name,
         preferredIndex: preferredIndexByModelId.get(normalizedModelId),
         sourceIndex,
-        ...getOfferingPricing(getSnapshotModelVariantId(model), model.endpoint.pricing),
+        ...getOfferingPricing(
+          customPricingConfig,
+          getSnapshotModelVariantId(model),
+          model.endpoint.pricing
+        ),
         trains: modelTrains(model, provider.dataPolicy.training),
         retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
       });
@@ -436,7 +446,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     rows.sort(compareRecommendedThenSourceIndex);
 
     return rows;
-  }, [infoProvider, openRouterProviders, preferredIndexByModelId]);
+  }, [customPricingConfig, infoProvider, openRouterProviders, preferredIndexByModelId]);
 
   // NOTE: returns must happen after all hooks above, otherwise React will error
   // with "Rendered more hooks than during the previous render" as data loads.

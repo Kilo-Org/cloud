@@ -5,6 +5,8 @@ import {
   CUSTOM_ROUTER_STATUS_PATH,
   CUSTOM_ROUTER_TABLE_PATH,
   CustomRouterBenchmarkContextSchema,
+  PLATFORM_MEASUREMENTS_PATH,
+  PlatformMeasurementsResponseSchema,
   type AutoRouter,
   DEFAULT_AUTO_ROUTER,
   DEFAULT_BENCHMARK_DECIDER_MODEL_IDS,
@@ -36,6 +38,7 @@ import { assembleCustomRoutingTable } from './custom-routing-table';
 import { assembleCustomRouterTable, lookupCustomRouterStatuses } from './custom-routers';
 import {
   lookupProfileStatuses,
+  listReadyPlatformMeasurements,
   ProfileConfigMissingError,
   ProfileQuotaExceededError,
   ProfileValidationError,
@@ -108,6 +111,23 @@ export function registerAdminRoutes(app: Hono<HonoEnv>): void {
       config,
       policySettings: config ? resolvePolicySettings(config) : null,
     });
+  });
+
+  app.get(PLATFORM_MEASUREMENTS_PATH, async c => {
+    const baseRouter = requestRouter(c);
+    const pairs = await listReadyPlatformMeasurements(c.env.BENCH_DB, baseRouter);
+    const models = new Map<string, (string | null)[]>();
+    for (const pair of pairs) {
+      const variants = models.get(pair.model);
+      if (variants) variants.push(pair.variant);
+      else models.set(pair.model, [pair.variant]);
+    }
+    return c.json(
+      PlatformMeasurementsResponseSchema.parse({
+        baseRouter,
+        models: [...models].map(([model, variants]) => ({ model, variants })),
+      })
+    );
   });
 
   app.put(

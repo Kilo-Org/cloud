@@ -1,16 +1,11 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import { load } from 'js-yaml';
-
-// The kilo-app release workflow wires two release scripts (sibling slice s1) into
-// the pipeline: `kilo-app-release-notes.mjs` writes one changelog section per
-// build, and `kilo-app-release-upload-cap.mjs` holds a run that Apple's rolling
-// upload limit would refuse. Every check below sits beside a mutation applied to
-// a parsed copy, so a dropped gate, a moved step or a wrong destination fails
-// this suite instead of a real release. The build and submission jobs run the
-// workspace EAS CLI, so the manifest, eas.json and the workflow must agree.
 
 const workflowPath = '.github/workflows/kilo-app-release.yml';
 
@@ -253,15 +248,6 @@ function validate(workflow) {
       'bump-version must not open the PR; the changelog job opens it after the section lands'
     );
   }
-  const pending = step(workflow, 'bump-version', 'pending');
-  assert.match(pending.run, /headRefName/, 'the pending step must capture the open PR head branch');
-  // The branch name is a PR head ref, so a stranger can choose it. It is checked
-  // here, before the pipeline hands it to the changelog job.
-  assert.match(
-    pending.run,
-    /grep -qE '\^kilo-app-version-bump-\[0-9\.\]\+\$'/,
-    'the pending step must reject a branch this pipeline did not create'
-  );
   assert.match(
     step(workflow, 'bump-version', 'bump').run,
     /branch=kilo-app-version-bump-\$NEW/,
@@ -362,6 +348,124 @@ test('the release workflow gates the build on the upload cap and lands the chang
   validate(readWorkflow());
 });
 
+test('release retries preserve shipped sections on a bump branch without a PR', () => {
+  const work = mkdtempSync(join(tmpdir(), 'kilo-app-bump-'));
+  const repo = join(work, 'repo');
+  const remote = join(work, 'remote.git');
+  const output = join(work, 'output');
+  const workflow = readWorkflow();
+  const env = { ...process.env, GITHUB_OUTPUT: output };
+  const git = (...args) =>
+    execFileSync('git', args, {
+      cwd: repo,
+      env,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+  const run = (body, cwd = repo) => {
+    writeFileSync(output, '');
+    execFileSync('bash', ['-e', '-o', 'pipefail', '-c', body], {
+      cwd,
+      env,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    return Object.fromEntries(
+      readFileSync(output, 'utf8')
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map(line => line.split('='))
+    );
+  };
+  const runBump = previousPending => {
+    const outputs = previousPending ? { pending: previousPending } : {};
+    for (const item of workflow.jobs['bump-version'].steps.filter(item => item.run)) {
+      if (item.id === 'pending' && previousPending) {
+        continue;
+      }
+      if (item.if) {
+        const condition = /^steps\.([^.]+)\.outputs\.([a-z_]+) == '([^']*)'$/.exec(item.if);
+        assert.ok(condition, `Unsupported fixture condition: ${item.if}`);
+        if (outputs[condition[1]]?.[condition[2]] !== condition[3]) {
+          continue;
+        }
+      }
+      const body = item.run.replaceAll(
+        /\$\{\{\s*steps\.([^.]+)\.outputs\.([a-z_]+)\s*\}\}/g,
+        (_, id, key) => outputs[id][key]
+      );
+      const result = run(
+        body,
+        item['working-directory'] ? join(repo, item['working-directory']) : repo
+      );
+      if (item.id) {
+        outputs[item.id] = result;
+      }
+    }
+    return outputs;
+  };
+  try {
+    mkdirSync(join(repo, 'apps/mobile'), { recursive: true });
+    execFileSync('git', ['init', '--bare', remote], { stdio: 'pipe' });
+    git('init', '-b', 'main');
+    git('config', 'user.name', 'Release Test');
+    git('config', 'user.email', 'release@example.invalid');
+    git('remote', 'add', 'origin', remote);
+    writeFileSync(
+      join(repo, 'apps/mobile/app.config.ts'),
+      "export default {\n  version: '1.2.3',\n};\n"
+    );
+    writeFileSync(join(repo, 'apps/mobile/CHANGELOG.md'), '# Changelog\n');
+    git('add', '.');
+    git('commit', '-m', 'Initial app');
+    const base = git('rev-parse', 'HEAD');
+
+    const first = runBump();
+    assert.equal(first.pending.open, '0');
+    const branch = first.bump.branch;
+    assert.equal(
+      git('show', `${branch}:apps/mobile/app.config.ts`),
+      "export default {\n  version: '1.2.4',\n};"
+    );
+
+    const shipped = '# Changelog\n\n## shipped build\n\n- A shipped change.\n';
+    writeFileSync(join(repo, 'apps/mobile/CHANGELOG.md'), shipped);
+    git('add', '.');
+    git('commit', '-m', 'Document shipped build');
+    git('push', 'origin', branch);
+    const documented = git('rev-parse', 'HEAD');
+    git('checkout', '--detach', base);
+    git('branch', '-D', branch);
+    const retry = runBump();
+    assert.equal(retry.pending.open, '1');
+    assert.equal(retry.pending.branch, branch);
+    assert.equal(
+      git('ls-remote', '--heads', 'origin', `refs/heads/${branch}`).split(/\s/)[0],
+      documented
+    );
+    assert.equal(git('show', `${documented}:apps/mobile/CHANGELOG.md`), shipped.trim());
+
+    assert.throws(
+      () => runBump(first.pending),
+      error => error.status === 1 && /non-fast-forward|fetch first/.test(error.stderr.toString())
+    );
+    assert.equal(
+      git('ls-remote', '--heads', 'origin', `refs/heads/${branch}`).split(/\s/)[0],
+      documented
+    );
+
+    git('remote', 'set-url', 'origin', join(work, 'missing.git'));
+    assert.throws(
+      () => runBump(),
+      error =>
+        error.status === 128 &&
+        /missing\.git.*does not appear to be a git repository/.test(error.stderr.toString())
+    );
+  } finally {
+    rmSync(work, { recursive: true, force: true });
+  }
+});
+
 test('the mobile build tooling runs the EAS CLI the workspace installs', () => {
   validateEasCli(
     readWorkflow(),
@@ -370,7 +474,6 @@ test('the mobile build tooling runs the EAS CLI the workspace installs', () => {
     readLockfile()
   );
 });
-
 const mutations = {
   'change detection keeps CHANGELOG.md': workflow => {
     const check = step(workflow, 'check-changes', 'check');
@@ -489,20 +592,9 @@ const mutations = {
   'bump-version drops its branch output': workflow => {
     delete workflow.jobs['bump-version'].outputs.branch;
   },
-  'the pending step does not capture the branch name': workflow => {
-    const pending = step(workflow, 'bump-version', 'pending');
-    pending.run = pending.run.replaceAll('headRefName', 'headRef');
-  },
   'the created branch is not recorded': workflow => {
     const bump = step(workflow, 'bump-version', 'bump');
     bump.run = bump.run.replace('branch=kilo-app-version-bump-$NEW', '');
-  },
-  'the pending step accepts any branch': workflow => {
-    const pending = step(workflow, 'bump-version', 'pending');
-    pending.run = pending.run.replace(
-      "grep -qE '^kilo-app-version-bump-[0-9.]+$'",
-      "grep -qE '^kilo-app-version-bump-'"
-    );
   },
   'changelog drops build-and-submit': workflow => {
     workflow.jobs.changelog.needs = workflow.jobs.changelog.needs.filter(

@@ -20,7 +20,6 @@
  * them are exempt.
  */
 
-import { subHours } from 'date-fns';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, organizations, type User } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
@@ -75,7 +74,7 @@ async function loadEffectiveBalanceMicrodollars(params: {
   owner: Owner;
   user: User;
 }): Promise<number> {
-  const expireBefore = subHours(new Date(), Math.random());
+  const expireBefore = new Date();
 
   if (params.owner.type === 'org') {
     const row = await findOrganizationMemberBalanceRow(
@@ -86,34 +85,19 @@ async function loadEffectiveBalanceMicrodollars(params: {
     );
     if (!row) return 0;
 
-    let totalMicrodollarsAcquired = row.total_microdollars_acquired;
+    let currentRow = row;
     if (row.next_credit_expiration_at && expireBefore >= new Date(row.next_credit_expiration_at)) {
-      const expiryResult = await processOrganizationExpirations(
-        {
-          id: params.owner.id,
-          microdollars_used: row.microdollars_used,
-          next_credit_expiration_at: row.next_credit_expiration_at,
-          total_microdollars_acquired: totalMicrodollarsAcquired,
-        },
-        expireBefore
-      );
-      if (expiryResult) {
-        totalMicrodollarsAcquired = expiryResult.total_microdollars_acquired;
-      }
+      const expiryResult = await processOrganizationExpirations(params.owner.id, expireBefore);
+      currentRow = { ...row, ...expiryResult };
     }
 
-    return organizationMemberBalance({
-      ...row,
-      total_microdollars_acquired: totalMicrodollarsAcquired,
-    }).balanceMicrodollars;
+    return organizationMemberBalance(currentRow).balanceMicrodollars;
   }
 
   let user = params.user;
   if (user.next_credit_expiration_at && expireBefore >= new Date(user.next_credit_expiration_at)) {
-    const result = await processLocalExpirations(user, expireBefore);
-    if (result) {
-      user = { ...user, ...result };
-    }
+    const result = await processLocalExpirations(user.id, expireBefore);
+    user = { ...user, ...result };
   }
 
   return accountBalanceMicrodollars(user);

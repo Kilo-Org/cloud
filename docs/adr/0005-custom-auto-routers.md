@@ -2,9 +2,9 @@
 
 ## Status
 
-Accepted. Supersedes [ADR 0003: Efficient Model Pools](./0003-efficient-model-pools.md) at the
-cutover described below. Amends [ADR 0002](./0002-auto-routing-efficient.md) invariant 5 for
-custom routers only.
+Accepted and in effect. Supersedes [ADR 0003: Efficient Model Pools](./0003-efficient-model-pools.md)
+since the cutover described below. Amends [ADR 0002](./0002-auto-routing-efficient.md) invariant 5
+for custom routers only.
 
 ## Context
 
@@ -80,6 +80,9 @@ The entry key is `gateway:<model>` or `client:<provider>/<model>`. The CLI regis
 entries from its own configuration (`kilo auto router add`). The web editor manages gateway
 entries and can remove client entries.
 
+Pool updates must include `defaultEntryKey`, even when the selected default does not change.
+The web editor sends both fields when it changes the pool.
+
 Write requests carry an explicit entry budget: model IDs up to 200 characters, provider IDs up to
 100, at most 20 variants of up to 100 characters, at most 10 input modalities of up to 50
 characters, context lengths up to 10,000,000, per-million-token prices that are finite and at most
@@ -90,6 +93,30 @@ the worker keeps serving them.
 The serving worker reads definitions through its existing Hyperdrive binding with an isolate
 cache. The web app owns create, update, and delete.
 
+## Linked entries
+
+Gateway and client entries can explicitly set `measuredAs` to a platform model ID whose
+measurements they reuse. The entry keeps its own serving identity, capabilities, variants,
+and owner pricing. A link is a live reference, not a copied measurement or a new benchmark
+profile. The CLI may `suggestMeasuredAs`, but the owner must confirm the suggestion before
+it becomes an explicit `measuredAs`; model-name similarity never creates an implicit link.
+
+Saving a new or changed link requires an existing ready platform measurement for the selected
+base router. The web service validates the merged definition inside the owner's advisory lock
+using the platform measurements list. Unchanged links with the same entry key are exempt when
+the base router is unchanged; changing the base router revalidates every link. Linked gateway
+entries do not enter platform benchmark admission. Once saved, a link serves the newest ready
+measurement, including stale measurements and measurements whose model has since disappeared
+from the gateway catalog.
+
+Variants match by exact same name; the default variant matches only `null`. There is no
+cross-variant fallback. Unmatched variants remain client-measured rather than inheriting a
+different platform variant. Accuracy and latency come from the referenced measurement. Cost
+is repriced using the measurement's token means (input, cached input/cache read, output, and
+reasoning) and the entry's own pricing: client pricing supplied by the owner, or its own
+model-catalog pricing for a direct-BYOK gateway entry. Null client pricing means $0. Older
+summaries without token means use a blended-price ratio to scale measured cost.
+
 ## Measurements
 
 The benchmark worker stays the only writer of measurements and routing tables.
@@ -97,6 +124,7 @@ The benchmark worker stays the only writer of measurements and routing tables.
 | Entry | Who runs the eval | Who pays inference | Stored as |
 |---|---|---|---|
 | Gateway model that the platform key can serve | Platform container | Platform | Global `benchmark_profiles`, keyed by base router |
+| Linked gateway or client entry | No new eval; live platform measurement | No new inference | Referenced global measurement, repriced for the entry |
 | Any other entry, including Kilo-stored direct-BYOK IDs | Owner's CLI | Owner | Owner-scoped client profiles |
 
 - Platform-paid admission is limited to 20 new models per base router per owner per rolling 24
@@ -265,6 +293,10 @@ The scanner requires `CLOUDFLARE_API_TOKEN` and `INTERNAL_API_SECRET`.
 Retain every report. Resolve unreadable, invalid, unmatched, missing-owner, collision, and
 router-cap findings before declaring the cohort complete. Interrupted writes retain a recovery
 fence; retry the conversion rather than clearing the fence manually.
+If a scan response is lost, recover owner keys from the structured
+`auto_routing_owner_pool_conversion_scan` event's `readFailedOwners`, `invalidPoolOwners`,
+`invalidModeOwners`, `needsAttentionOwners`, and `notPostedOwners` arrays before declaring the
+run clean; a retry can skip owners already marked converted.
 `--limit` controls the page size, not the total number of owners.
 
 Set `CUTOVER_AT` to a future timestamp with an explicit timezone.
@@ -286,6 +318,24 @@ successful targets. Resolve unknown delivery outcomes against provider records w
 `--reconcile-target` and `--reconcile-outcome`; use `--help` for the exact recovery procedure.
 Do not discard a used plan or remove its lock until the prior sender has stopped.
 A changed cutover date requires a separately reviewed update campaign, not an ordinary retry.
+If cutover passes during sending, the script stops before the next recipient and returns the
+saved partial summary with a nonzero exit status. Pending recipients stay pending; sent and
+unknown outcomes retain their history. Do not send an expired advance notice. Preserve the
+original campaign for reconciliation, and review a future campaign containing only pending or
+provider-confirmed `not_sent` recipients. Explicitly exclude sent and unknown targets; copying
+the entire original cohort into a new directory would notify successful recipients again.
+
+### Cutover verification
+
+- Verify a mode-only owner and an owner with a converted pool.
+- Save each platform mode, restart the worker, and read the saved mode again.
+- Clear the organization override and verify personal-mode inheritance.
+- Clear the personal mode and verify the default.
+- Verify Efficient selects from the platform table despite a retained legacy pool.
+- Edit a non-default custom-router member without changing the default member.
+- Reload the settings page and verify the custom pool, mode, and benchmark difficulty.
+- During tooling retirement, reuse the persisted namespace and verify these settings again.
+- Confirm the retired conversion endpoint returns not found while mode reads and writes remain available.
 
 ## Invariants
 
@@ -295,8 +345,9 @@ A changed cutover date requires a separately reviewed update campaign, not an or
 4. Client measurements are owner-scoped and never affect another owner's routing.
 5. Platform routers require exact engine identity; custom routers serve the newest measurement
    and flag it stale.
-6. The platform pays only for inference that the platform key serves. The owner pays for client
-   inference, judged grading of client outputs, and classification.
+6. The platform pays only for inference that the platform key serves. Linking an entry never
+   starts new platform inference. The owner pays for client inference, judged grading of client
+   outputs, and classification.
 
 ## Consequences
 

@@ -338,6 +338,7 @@ This tool returns an acknowledgement immediately. The final Cloud Agent result w
               currentStep,
               attachments: params.attachments,
               ...(thinkingEffort ? { variant: thinkingEffort } : {}),
+              payerUserId: params.user.id,
               actorLogin: params.actorLogin,
               threadRepository: getGitHubRepositoryFullNameFromThread(params.thread.id),
             }

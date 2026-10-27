@@ -247,10 +247,7 @@ describe('Organization Usage Functions', () => {
     test('processes a credit that expired before the cut-off and reports the reduced balance', async () => {
       const { owner, organization } = await createOrganizationWithDueCredit();
 
-      const result = await getBalanceForOrganizationUser(organization.id, owner.id, {
-        now,
-        expiryJitterHours: 0,
-      });
+      const result = await getBalanceForOrganizationUser(organization.id, owner.id, { now });
       await drainAfterCallbacks();
 
       expect(result.balance).toBe(0);

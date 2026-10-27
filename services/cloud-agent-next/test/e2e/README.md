@@ -384,6 +384,42 @@ the HTTP group and start a fresh launcher session with
 `E2E_INTERNAL_API_SECRET` exported (the same value the driver uses), and never
 type the secret into a logged pane command.
 
+## Local Kilo Integration
+
+`e2e:local-kilo` tests the complete path through a separate local `kilo serve`:
+
+```text
+test driver -> local Kilo -> local Cloud Agent stack -> sandbox runtime
+```
+
+Start the `cloud-agent` group first. Use an existing funded local account and a
+Kilo source checkout with its locked dependencies installed. Select the Bun
+version in that checkout's `packageManager` field.
+
+```bash
+pnpm --filter cloud-agent-next run e2e:local-kilo \
+  --kilo-repo /path/to/kilocode \
+  --bun /path/to/pinned/bun \
+  --email your-local-test-account@example.com
+```
+
+The driver discovers ports with `dev:status`, validates local database ownership,
+and creates an owned profile and workspace. It launches Kilo with a separate
+`HOME`, all XDG directories, local-only service origins, and an in-memory local
+credential. It does not change normal Kilo authentication or load project config.
+
+Coverage includes workspace listing, creation and idempotent replay, workspace
+detail, a second session in that workspace, preparation and sandbox status SSE,
+native snapshot/fence/live delivery, and two follow-up turns with persisted
+transcript checks. Every acceptance operation goes through local Kilo. Direct
+stack access is limited to fixture setup, health, fake-model gates, and cleanup.
+
+The model is `kilo/fake-deterministic`; the sandbox, wrapper, Kilo processes,
+Durable Objects, and database are real. The public Git fixture needs network access.
+Reports and redacted traces are stored under `dev/logs/local-kilo-*`; `--out`
+selects a new evidence directory. Cleanup removes only this run's workspace,
+profile, attachments, and local Kilo process.
+
 ## Deployed profile (`E2E_PROFILE=deployed`)
 
 The deployed profile drives a real deployed Cloudflare stack instead of the

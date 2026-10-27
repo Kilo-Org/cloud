@@ -1,3 +1,4 @@
+import { MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES } from '@kilocode/session-ingest-contracts';
 import { describe, expect, it } from 'vitest';
 
 import { SessionItemSchema } from './session-sync';
@@ -328,17 +329,24 @@ describe('SessionItemSchema storage key identity', () => {
     ).toBe(false);
   });
 
-  it('rejects a message ID over 256 characters before persistence', () => {
+  // Message ids are re-emitted as history cursors, so they share the cursor id limit.
+  const messageIdOfLength = (length: number) => `msg_${'a'.repeat(length - 'msg_'.length)}`;
+
+  it('rejects a message ID over the cursor id limit before persistence', () => {
     expect(
-      SessionItemSchema.safeParse({ type: 'message', data: { id: `msg_${'a'.repeat(256)}` } })
-        .success
+      SessionItemSchema.safeParse({
+        type: 'message',
+        data: { id: messageIdOfLength(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES + 1) },
+      }).success
     ).toBe(false);
   });
 
-  it('accepts a message ID exactly 256 characters', () => {
+  it('accepts a message ID exactly at the cursor id limit', () => {
     expect(
-      SessionItemSchema.safeParse({ type: 'message', data: { id: `msg_${'a'.repeat(252)}` } })
-        .success
+      SessionItemSchema.safeParse({
+        type: 'message',
+        data: { id: messageIdOfLength(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES) },
+      }).success
     ).toBe(true);
   });
 

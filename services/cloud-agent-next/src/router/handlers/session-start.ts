@@ -68,7 +68,6 @@ function startInputToSessionCreateRequest(
   const repository = repositoryInputToSessionRepository(input.repository);
 
   return {
-    allowSubagentSessions: input.allowSubagentSessions ?? false,
     initialTurn: {
       type: 'prompt',
       id: input.message.id,

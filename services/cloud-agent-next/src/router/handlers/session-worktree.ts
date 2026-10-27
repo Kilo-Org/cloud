@@ -54,6 +54,7 @@ import {
 import type { TRPCContext } from '../../types.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { generateKiloSessionId } from '../../utils/kilo-session-id.js';
+import { isInteractiveSessionOrigin } from '../../shared/control-plane-permission.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
 import { protectedProcedure } from '../auth.js';
 import { resolveSecret } from '../../auth.js';
@@ -318,7 +319,6 @@ async function loadSourceMetadata(
     (requirements.requireSourceScopeId !== undefined &&
       ownership.cloudAgentSessionScopeId !== requirements.requireSourceScopeId) ||
     metadata.identity.botId !== undefined ||
-    metadata.allowSubagentSessions === true ||
     metadata.devcontainer !== undefined ||
     workspace.devcontainerRequested === true ||
     workspace.worktreeId !== worktreeId ||
@@ -661,6 +661,15 @@ async function assertNewDestinationRuntimeIsolation(ctx: TRPCContext): Promise<v
   if (await requiresRuntimeAuthorization(ctx)) assertRuntimeIsolationAdmission(ctx.env);
 }
 
+function allowsSubagentSessionsForWorktree(source: WorktreeSource): boolean {
+  return (
+    isInteractiveSessionOrigin(source.metadata.identity.createdOnPlatform) &&
+    source.workspace.sandboxAllocation !== 'cloudflare-shared' &&
+    source.workspace.sandboxKind !== 'shared' &&
+    source.workspace.sandboxRoute?.kind !== 'shared'
+  );
+}
+
 function sourceWorktreeBranchName(source: WorktreeSource): string {
   return (
     source.workspace.branchName ??
@@ -702,6 +711,8 @@ function buildRegistrationInput(
   // message. `workspace` is the resolved worktree placement.
   const metadata: SessionMetadata = {
     metadataSchemaVersion: 2,
+    allowSubagentSessions:
+      allowsSubagentSessionsForWorktree(source) && runtimeAuthorization !== undefined,
     identity: { ...source.metadata.identity, sessionId: progress.cloudAgentSessionId },
     auth: {
       ...source.metadata.auth,

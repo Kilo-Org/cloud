@@ -49,7 +49,7 @@ describe('device-sessions', () => {
 
   beforeEach(async () => {
     mockIsEmailBlacklistedByDomainAsync.mockResolvedValue(false);
-    mockIsBlockedTLD.mockReturnValue(false);
+    mockIsBlockedTLD.mockResolvedValue(false);
     mockGetWorkOSOrganization.mockResolvedValue(null);
 
     await db.insert(kilocode_users).values({

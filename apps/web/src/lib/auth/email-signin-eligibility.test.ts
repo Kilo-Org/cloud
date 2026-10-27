@@ -120,7 +120,7 @@ describe('checkEmailSignInEligibility send budgets', () => {
     jest.clearAllMocks();
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
     mockIsEmailBlacklistedByDomainAsync.mockResolvedValue(false);
-    mockIsBlockedTLD.mockReturnValue(false);
+    mockIsBlockedTLD.mockResolvedValue(false);
     mockFindUserByNormalizedEmail.mockResolvedValue(undefined);
     mockResolveSsoAuthorityForDomain.mockImplementation(async domain => ({
       status: 'not_required',

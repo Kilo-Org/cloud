@@ -325,9 +325,11 @@ describe('POST /api/fim/completions', () => {
   });
 
   it.each([
-    ['mistralai/codestral-2508', true],
-    ['inception/mercury-edit-2', false],
-  ])('does not send stream_options for %s with stream %s', async (model, stream) => {
+    ['inception/mercury-edit-2', true, { include_usage: true }],
+    ['mistralai/codestral-2508', true, { include_usage: true }],
+    ['inception/mercury-edit-2', false, undefined],
+    ['mistralai/codestral-2508', false, undefined],
+  ])('sets stream_options for %s with stream %s', async (model, stream, expected) => {
     setOrganizationAuth();
     mockedFetch.mockResolvedValue(makeUpstreamResponse());
 
@@ -335,7 +337,7 @@ describe('POST /api/fim/completions', () => {
     await handleFimCompletionsRequest(makeRequest(model, stream) as never);
 
     const [, init] = mockedFetch.mock.calls[0];
-    expect(JSON.parse(init?.body as string)).not.toHaveProperty('stream_options');
+    expect(JSON.parse(init?.body as string).stream_options).toEqual(expected);
   });
 
   it.each<OrganizationSettings | undefined>([

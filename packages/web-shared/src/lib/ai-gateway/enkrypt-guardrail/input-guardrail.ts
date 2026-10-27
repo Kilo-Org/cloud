@@ -1,7 +1,10 @@
 import 'server-only';
 
 import { after } from 'next/server';
-import { recordEnkryptGuardrailCharge } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/charges';
+import {
+  enkryptCreditsToMicrodollars,
+  recordEnkryptGuardrailCharge,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/charges';
 import {
   ENKRYPT_GUARDRAIL_TIMEOUT_MS,
   scanTurnDelta,
@@ -34,15 +37,25 @@ export function startEnkryptInputGuardrail(
           })
         : notScanned
     )
-    .catch(() => notScanned);
+    .catch((error: unknown) => {
+      console.error('[enkrypt-guardrail] scan failed unexpectedly; request not scanned', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return notScanned;
+    });
   after(async () => {
     const { charges } = await result;
     await Promise.all(
       charges.map(charge =>
         recordEnkryptGuardrailCharge(charge).catch((error: unknown) => {
-          console.error('[enkrypt-guardrail] failed to record charge', {
+          console.error('[enkrypt-guardrail] failed to record charge; charge dropped', {
             organization_id: charge.organizationId,
+            kilo_user_id: charge.kiloUserId,
             session_id: charge.sessionId,
+            api_kind: charge.apiKind,
+            decision: charge.decision,
+            credits_cost: charge.creditsCost,
+            charged_microdollars: enkryptCreditsToMicrodollars(charge.creditsCost),
             error: error instanceof Error ? error.message : String(error),
           });
         })

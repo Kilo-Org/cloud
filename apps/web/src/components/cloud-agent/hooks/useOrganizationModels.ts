@@ -11,11 +11,8 @@ import type { ModelOption } from '@/components/shared/ModelCombobox';
 import type { OrganizationModelAudience } from '@kilocode/app-shared/organizations';
 
 type UseOrganizationModelsReturn = {
-  /** Models formatted for the ModelCombobox component */
   modelOptions: ModelOption[];
-  /** Whether models are still loading */
   isLoadingModels: boolean;
-  /** The organization's default model */
   defaultModel: string | undefined;
 };
 
@@ -31,7 +28,6 @@ export function useOrganizationModels(
   organizationId?: string,
   audience: OrganizationModelAudience = 'member'
 ): UseOrganizationModelsReturn {
-  // Fetch models for the model selector
   const { data: openRouterModels, isLoading: isLoadingOpenRouter } = useModelSelectorList(
     organizationId,
     true,
@@ -40,7 +36,6 @@ export function useOrganizationModels(
 
   const { data: defaultsData } = useOrganizationDefaults(organizationId);
 
-  // Format models for the combobox
   const modelOptions = useMemo<ModelOption[]>(() => {
     return (
       openRouterModels?.data.map(model => ({

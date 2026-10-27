@@ -126,6 +126,10 @@ export function createCloudflareContainersProviderAdapter(deps: {
       if (ref === null || decodeOwnedProviderRef(ref) === null) return false;
       return deps.getContainer(deps.logicalSandboxId).isBillingBlocked();
     },
+    async getBillingProjection(ref) {
+      if (ref === null || decodeOwnedProviderRef(ref) === null) return undefined;
+      return deps.getContainer(deps.logicalSandboxId).getBillingRuntimeStatus();
+    },
     describeRuntime(ref) {
       const parsed = decodeOwnedProviderRef(ref);
       if (parsed === null) return undefined;

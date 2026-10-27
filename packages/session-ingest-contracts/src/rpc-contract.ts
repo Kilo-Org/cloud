@@ -532,6 +532,40 @@ export type CloudAgentWorkspacesPage = {
 
 export type GetCloudAgentWorkspaceResult = CloudAgentWorkspaceSummary | null;
 
+export const getCloudAgentWorkspaceStatusSchema = z
+  .object({
+    kiloUserId: z.string().min(1),
+    workspaceId: cloudAgentWorktreeIdSchema,
+  })
+  .strict();
+export type GetCloudAgentWorkspaceStatusParams = z.input<typeof getCloudAgentWorkspaceStatusSchema>;
+
+/**
+ * Passive, workspace-keyed lifecycle projection. Every value is read from
+ * stored catalog/journal rows or the non-idle stored turn status of a hosted
+ * root session; computing it allocates no compute, prepares no runtime and
+ * opens no billing interval.
+ */
+export type CloudAgentWorkspaceStatus = {
+  workspaceId: CloudAgentWorktreeId;
+  userId: string;
+  organizationId: string | null;
+  deletionState: 'active' | 'deleting' | 'deleted';
+  /** Hosted root sessions whose stored turn status is not idle. */
+  activeRootSessionCount: number;
+  deletion: {
+    started: boolean;
+    completed: boolean;
+    startedAt: number | null;
+    /** Sessions the journal manifest will remove, including descendants. */
+    sessionCount: number;
+    runtimeLocationCount: number;
+    /** Populated only by a completed tombstone. */
+    deletedSessionIds: string[];
+  };
+};
+export type GetCloudAgentWorkspaceStatusResult = CloudAgentWorkspaceStatus | null;
+
 export const sdkApiErrorSchema = z.object({
   name: z.literal('APIError'),
   data: z.object({
@@ -1226,6 +1260,9 @@ export type SessionIngestRpcMethods = {
   getCloudAgentWorkspace: (
     params: GetCloudAgentWorkspaceParams
   ) => Promise<GetCloudAgentWorkspaceResult>;
+  getCloudAgentWorkspaceStatus: (
+    params: GetCloudAgentWorkspaceStatusParams
+  ) => Promise<GetCloudAgentWorkspaceStatusResult>;
   getCloudAgentRootSessionMessages: (
     params: GetCloudAgentRootSessionMessagesParams
   ) => Promise<GetCloudAgentRootSessionMessagesResult>;

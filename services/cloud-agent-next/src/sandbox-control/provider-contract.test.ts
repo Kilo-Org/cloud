@@ -152,6 +152,22 @@ function cloudflareHarness(): ContractHarness {
       state.billingReads += 1;
       return state.billingBlocked;
     },
+    getBillingRuntimeStatus: async () => {
+      state.billingReads += 1;
+      return {
+        sandboxClassName: 'Sandbox',
+        running: state.running,
+        blocked: state.billingBlocked,
+        context: {
+          service: 'cloud-agent',
+          instanceId: SANDBOX,
+          sku: 'cloud-agent-standard-2026-07',
+          subject: { type: 'user', id: 'user-1' },
+          actor: { type: 'user', id: 'user-1' },
+          startEpochMs: 1,
+        },
+      };
+    },
     ensureBillingAdmission: () => state.admission(),
     configureBilling: async () => {},
     setOutboundHandler: async () => {},
@@ -226,6 +242,22 @@ function containersHarness(
     isBillingBlocked: async () => {
       state.billingReads += 1;
       return state.billingBlocked;
+    },
+    getBillingRuntimeStatus: async () => {
+      state.billingReads += 1;
+      return {
+        sandboxClassName: 'SandboxContainersStandard3',
+        running: state.observation.running,
+        blocked: state.billingBlocked,
+        context: {
+          service: 'cloud-agent',
+          instanceId: SANDBOX,
+          sku: 'cloud-agent-containers-standard-3-2026-09',
+          subject: { type: 'user', id: 'user-1' },
+          actor: { type: 'user', id: 'user-1' },
+          startEpochMs: 1,
+        },
+      };
     },
     ensureBillingAdmission: () => state.admission(),
     configureBilling: async () => {},
@@ -639,6 +671,45 @@ describe('provider-specific contract differences', () => {
     await expect(harness.adapter.isBillingBlocked?.(null)).resolves.toBe(false);
     expect(harness.billingReads?.()).toBe(reads);
   });
+
+  it.each([
+    ['cloudflare', cloudflareHarness, 'cloud-agent-standard-2026-07'],
+    ['cloudflare-containers', containersHarness, 'cloud-agent-containers-standard-3-2026-09'],
+  ] as const)(
+    'projects stored %s billing state without admitting or starting compute',
+    async (_name, factory, sku) => {
+      const harness = factory();
+      const ref = await harness.create();
+      const reads = harness.billingReads?.() ?? 0;
+      const leases = harness.leaseCalls();
+      const launches = harness.launchInputs?.().length ?? 0;
+
+      await expect(harness.adapter.getBillingProjection?.(ref)).resolves.toMatchObject({
+        blocked: false,
+        sandboxClassName: expect.any(String),
+        context: {
+          sku,
+          subject: { type: 'user', id: 'user-1' },
+          actor: { type: 'user', id: 'user-1' },
+          startEpochMs: 1,
+        },
+      });
+      harness.billingBlock?.(true);
+      await expect(harness.adapter.getBillingProjection?.(ref)).resolves.toMatchObject({
+        blocked: true,
+      });
+      expect(harness.billingReads?.()).toBe(reads + 2);
+      expect(harness.leaseCalls()).toBe(leases);
+      expect(harness.launchInputs?.().length ?? 0).toBe(launches);
+
+      const afterReads = harness.billingReads?.();
+      await expect(
+        harness.adapter.getBillingProjection?.(harness.foreignRef())
+      ).resolves.toBeUndefined();
+      await expect(harness.adapter.getBillingProjection?.(null)).resolves.toBeUndefined();
+      expect(harness.billingReads?.()).toBe(afterReads);
+    }
+  );
 
   it('runs the trusted downloaded installer as root on Vercel', async () => {
     const harness = vercelHarness();

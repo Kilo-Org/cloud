@@ -1,4 +1,4 @@
-import type { SandboxBillingInput } from '../container-usage-context.js';
+import type { SandboxBillingInput, SandboxClassName } from '../container-usage-context.js';
 import type { CloudAgentRunContainer } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { SessionCredentialGrant } from './session-credentials.js';
 import {
@@ -9,6 +9,7 @@ import { CODE_REVIEW_CONTAINERS_INSTANCE } from '../sandbox-containers/instance-
 import { z } from 'zod';
 import { AgentSandboxUnavailableError } from '../agent-sandbox/protocol.js';
 import type { CredentialContainmentRequirements } from './credential-containment.js';
+import type { BillingContext } from '@kilocode/container-usage';
 
 export type ProviderCreationCause =
   | 'insufficient_credits'
@@ -114,6 +115,17 @@ export type ProviderLaunchResult = {
   snapshotFailed?: true;
 };
 
+/**
+ * Read-only billing state of one allocation. It is projected from stored
+ * sandbox state; producing or reading it never admits work, starts a container
+ * or opens a billing interval.
+ */
+export type ProviderBillingProjection = {
+  sandboxClassName: SandboxClassName;
+  blocked: boolean;
+  context?: BillingContext;
+};
+
 /** The first process that a provider runs in a new or restored sandbox. */
 export type ProviderStartupCommand = {
   argv: readonly string[];
@@ -130,6 +142,12 @@ export type ProviderAdapter = {
    * then keeps its own check.
    */
   isBillingBlocked?(ref: string | null): Promise<boolean>;
+  /**
+   * Read the stored billing projection for one allocation without admitting
+   * work or starting a container. A provider without readable billing state
+   * omits this; callers then report no rate instead of inventing one.
+   */
+  getBillingProjection?(ref: string | null): Promise<ProviderBillingProjection | undefined>;
   create(intent: ProviderCreateIntent): Promise<{ providerRef: string } | { unresolved: true }>;
   launch(
     ref: string,

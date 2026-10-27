@@ -4,6 +4,7 @@ import { withTimeout } from '@kilocode/worker-utils';
 import {
   configureSandboxBillingInput,
   ensureSandboxBillingAdmissionInput,
+  getSandboxBillingRuntimeStatus,
   isSandboxBillingBlocked,
   isSandboxContainerRunning,
   parseSandboxBillingInput,
@@ -131,6 +132,13 @@ export function createCloudflareProviderAdapter(deps: {
       const parsed = ref === null ? null : decodeCloudflareProviderRef(ref);
       if (parsed?.sandboxId !== deps.sandboxId) return false;
       return isSandboxBillingBlocked(deps.getSandbox(parsed.sandboxId, parsed));
+    },
+    async getBillingProjection(ref) {
+      const parsed = decodeOwnedProviderRef(ref);
+      if (!parsed) return undefined;
+      return getSandboxBillingRuntimeStatus(
+        deps.getSandbox(parsed.sandboxId, { containment: parsed.containment })
+      );
     },
     describeRuntime(ref) {
       const parsed = decodeCloudflareProviderRef(ref);

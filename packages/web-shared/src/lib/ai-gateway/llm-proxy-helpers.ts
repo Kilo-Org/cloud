@@ -987,19 +987,24 @@ export type MistralFimCompletion = {
   }>;
 };
 
-export type MistralFimStreamChunk = {
+/**
+ * A streamed FIM chunk. Mistral sends the text in `delta.content` and usage in
+ * its final chunk. Inception sends the text in `text`, and usage only in an extra
+ * final chunk with no choices when the request sets `stream_options.include_usage`.
+ */
+type FimStreamChunk = {
   id: string;
-  object: 'fim.completion.chunk';
   model: string;
   created: number;
   choices: Array<{
     index: number;
-    delta: {
+    delta?: {
       content?: string;
     };
+    text?: string;
     finish_reason: string | null;
   }>;
-  usage?: FimUsage; // Only present in final chunk
+  usage?: FimUsage;
 };
 
 function computeInceptionFimMicrodollarCost(usage: FimUsage): number {
@@ -1084,13 +1089,14 @@ async function parseMistralFimUsageFromStream(
     if (event.data === '[DONE]') return;
 
     try {
-      const json = JSON.parse(event.data) as MistralFimStreamChunk;
+      const json = JSON.parse(event.data) as FimStreamChunk;
 
       model = json.model ?? model;
       messageId = json.id ?? messageId;
-      usage = json.usage ?? usage; // Usage comes in final chunk
+      usage = json.usage ?? usage;
 
-      const contentDelta = json.choices?.[0]?.delta?.content;
+      const choice = json.choices?.[0];
+      const contentDelta = choice?.delta?.content ?? choice?.text;
       if (contentDelta) {
         responseContent += contentDelta;
       }

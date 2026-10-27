@@ -305,7 +305,14 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     op: 'http.client',
   });
 
-  const bodyForUpstream = { ...requestBody, model: upstreamModel };
+  const bodyForUpstream = {
+    ...requestBody,
+    model: upstreamModel,
+    // Inception reports usage in a stream only when asked; Mistral always does.
+    ...(fimProvider === 'inception' && requestBody.stream
+      ? { stream_options: { include_usage: true } }
+      : {}),
+  };
 
   // Make upstream request to the resolved provider
   const proxyRes = await fetch(upstreamUrl, {

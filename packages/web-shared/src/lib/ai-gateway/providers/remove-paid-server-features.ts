@@ -5,7 +5,7 @@ import type {
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 
 // Plugins OpenRouter does not bill separately. Every other plugin id, including
-// ids added later, is removed from free requests.
+// ids added later, is removed.
 const FREE_PLUGIN_IDS: ReadonlySet<string> = new Set(['response-healing', 'context-compression']);
 
 // Without a configured engine, OpenRouter parses PDFs with Mistral OCR, billed
@@ -31,11 +31,12 @@ function getServerToolType(tool: unknown): string | null {
 }
 
 /**
- * OpenRouter bills plugins (web search, PDF parsing with OCR) and server tools
- * (`openrouter:*` and their aliases such as `web_search_20250305`) to the
- * gateway's account, even when the model itself is free. Free requests,
- * which include every anonymous request, keep only free plugins and tools the
- * client executes itself.
+ * Gateways bill plugins (web search, PDF parsing with OCR) and server tools
+ * (`openrouter:*`, `vercel:*`, and aliases such as `web_search_20250305`) to
+ * Kilo's account, even when the model itself is free or inference is billed to
+ * the user's own key. Requests Kilo does not charge for, free-model and
+ * user-BYOK requests, keep only free plugins and tools the client executes
+ * itself.
  */
 export function removePaidServerFeatures(
   provider: Provider,
@@ -83,11 +84,14 @@ export function removePaidServerFeatures(
   if (removedPlugins.length === 0 && removedToolTypes.length === 0) {
     return;
   }
-  console.warn('[applyProviderSpecificLogic] Removed paid server features from free request', {
-    userId,
-    model: requestedModel,
-    requestKind: requestToMutate.kind,
-    removedPlugins,
-    removedToolTypes,
-  });
+  console.warn(
+    '[applyProviderSpecificLogic] Removed paid server features from free or BYOK request',
+    {
+      userId,
+      model: requestedModel,
+      requestKind: requestToMutate.kind,
+      removedPlugins,
+      removedToolTypes,
+    }
+  );
 }

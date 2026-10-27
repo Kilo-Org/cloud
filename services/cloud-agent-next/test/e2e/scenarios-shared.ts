@@ -44,6 +44,7 @@ import { CONTINUITY_SHARED_SCENARIOS } from './scenarios-shared-continuity.js';
 import { MICRO_SHARED_SCENARIOS } from './scenarios-shared-micro.js';
 import { QUEUE_SHARED_SCENARIOS } from './scenarios-shared-queue.js';
 import { WORKTREE_SHARED_SCENARIOS } from './scenarios-shared-worktrees.js';
+import { HOSTED_WORKSPACE_SCENARIOS } from './scenarios-hosted-workspace.js';
 import { CONVERSATION_SHARED_SCENARIOS } from './scenarios-shared-conversations.js';
 import { LOAD_SHARED_SCENARIOS } from './scenarios-shared-load.js';
 import { FAULT_SHARED_SCENARIOS } from './scenarios-shared-faults.js';
@@ -927,6 +928,7 @@ export const SHARED_SCENARIOS: Record<string, SharedScenario> = {
   // The longest realistic flows run last so a short-scenario failure surfaces
   // before a long cold boot is paid.
   ...WORKTREE_SHARED_SCENARIOS,
+  ...HOSTED_WORKSPACE_SCENARIOS,
   ...LOAD_SHARED_SCENARIOS,
   ...CONVERSATION_SHARED_SCENARIOS,
   ...FAULT_SHARED_SCENARIOS,

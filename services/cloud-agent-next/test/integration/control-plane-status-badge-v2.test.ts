@@ -153,12 +153,11 @@ async function patchAllocation(
 }
 
 /** Creates an owned sandbox with a provider pin but no wrapper connection. */
-async function startOwnedSandbox(): Promise<{
+async function startOwnedSandbox(provider = createFakeProvider()): Promise<{
   sandboxId: string;
   sandbox: DurableObjectStub<SandboxControlV2>;
 }> {
   const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
-  const provider = createFakeProvider();
   const sandbox = await injectProvider(sandboxId, provider);
   const sessionId = newSessionId();
   await sessions.getByName(sessionDoName(USER_ID, sessionId)).createSessionWithInitialAdmission({
@@ -268,6 +267,41 @@ describe('sandbox status badge projection (B10)', () => {
     expect(active.estimatedSleepAt as number).toBeGreaterThan(Date.now());
   });
 
+  it('projects stored billing without admitting or starting another allocation', async () => {
+    const provider = createFakeProvider();
+    let projectionCalls = 0;
+    provider.adapter.getBillingProjection = async () => {
+      projectionCalls += 1;
+      return {
+        sandboxClassName: 'SandboxContainersStandard3' as const,
+        blocked: true,
+        context: {
+          service: 'cloud-agent',
+          instanceId: 'instance',
+          sku: 'cloud-agent-containers-standard-3-2026-09',
+          subject: { type: 'user' as const, id: USER_ID },
+          actor: { type: 'user' as const, id: USER_ID },
+          startEpochMs: 17,
+        },
+      };
+    };
+    const { sandbox } = await startOwnedSandbox(provider);
+    const launches = provider.launchEnvs.length;
+
+    await expect(sandbox.getWorkspaceBillingProjection()).resolves.toEqual({
+      payer: { type: 'user', id: USER_ID },
+      actor: { type: 'user', id: USER_ID },
+      onBehalfOf: null,
+      sku: 'cloud-agent-containers-standard-3-2026-09',
+      blocked: true,
+      enforcementRequested: false,
+      intervalStartedAt: 17,
+      meterInstanceId: null,
+    });
+    expect(projectionCalls).toBe(1);
+    expect(provider.launchEnvs).toHaveLength(launches);
+  });
+
   it('returns the Sandbox DO snapshot through the Session DO RPC', async () => {
     const sessionId = newSessionId();
     const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
@@ -312,6 +346,57 @@ describe('sandbox status badge projection (B10)', () => {
       detailCode: 'status_unavailable',
       inactivityTimeoutMs: null,
     });
+  });
+
+  it('composes the passive workspace runtime status without preparing a route', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const stub = sessions.getByName(sessionId);
+    const peer = new FakeSandboxPeer();
+    const expected = {
+      status: 'sleeping' as const,
+      provider: 'Cloudflare Containers' as const,
+      observedAt: 42,
+      detailCode: 'sandbox_stopped' as const,
+      inactivityTimeoutMs: 600_000,
+      estimatedSleepAt: null,
+    };
+    peer.statusSnapshot = expected;
+    peer.billingProjection = {
+      payer: { type: 'user', id: USER_ID },
+      actor: { type: 'user', id: USER_ID },
+      onBehalfOf: null,
+      sku: 'cloud-agent-standard-2026-07',
+      blocked: false,
+      enforcementRequested: true,
+      intervalStartedAt: null,
+      meterInstanceId: 'sbx-meter',
+    };
+    await stub.registerSession({
+      sandboxId,
+      spec: {
+        sessionId,
+        kiloSessionId: kiloSessionId(),
+        directory: `/workspace/${sessionId}`,
+        attemptId: `${sessionId}-requested`,
+      },
+      credentials: {
+        userId: USER_ID,
+        kiloSessionId: kiloSessionId(),
+        kiloToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
+        orgId: ORG_ID,
+        repository: { type: 'github', repo: 'acme/widgets' },
+        scopeId: sessionId,
+      },
+    });
+    await installPeer(stub, peer);
+
+    await expect(stub.getWorkspaceRuntimeStatus()).resolves.toEqual({
+      sandbox: expected,
+      billing: peer.billingProjection,
+    });
+    expect(peer.prepareCalls).toEqual([]);
+    expect(peer.deliverCalls).toEqual([]);
   });
 });
 

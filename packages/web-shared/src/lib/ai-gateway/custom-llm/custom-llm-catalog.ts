@@ -10,6 +10,16 @@ export type CustomLlm = {
   encrypted_api_key: CustomLlm2['encrypted_api_key'];
 };
 
+export type PublicCustomLlmDefinition = CustomLlmDefinition & {
+  public: NonNullable<CustomLlmDefinition['public']>;
+};
+
+export function isPublicCustomLlm(
+  definition: CustomLlmDefinition
+): definition is PublicCustomLlmDefinition {
+  return definition.public !== undefined;
+}
+
 export function parseCustomLlmRows(rows: readonly CustomLlm2[]): CustomLlm[] {
   return rows.flatMap(row => {
     const parsed = CustomLlmDefinitionSchema.safeParse(row.definition);
@@ -119,10 +129,20 @@ export function resetCustomLlmCacheForTest() {
   lastFailureAt = null;
 }
 
+/** A custom LLM for the id, or null when there is none or the catalog is unavailable. */
 export async function findCustomLlm(modelId: string): Promise<CustomLlm | null> {
   return (await getCustomLlmsById()).get(modelId.trim().toLowerCase()) ?? null;
 }
 
 export async function isCustomLlm(modelId: string): Promise<boolean> {
   return (await findCustomLlm(modelId)) !== null;
+}
+
+/** The inference providers a public custom LLM declares, or null for any other id. */
+export async function getPublicCustomLlmInferenceProviders(
+  modelId: string
+): Promise<ReadonlySet<string> | null> {
+  const customLlm = await findCustomLlm(modelId);
+  if (!customLlm || !isPublicCustomLlm(customLlm.definition)) return null;
+  return new Set(customLlm.definition.public.inference_providers);
 }

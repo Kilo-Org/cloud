@@ -29,7 +29,7 @@ import { z } from 'zod';
 import { classifyAuthResponse, isAuthTerminalRoute } from '@/lib/auth/auth-response-class';
 import { addTelemetryBreadcrumb, captureTelemetry } from '@/lib/telemetry/error-sink';
 import { isAbortError, isRequestDeadlineError } from '@/lib/telemetry/abort-classification';
-import { NETWORK_BODY_CONTEXT } from '@/lib/telemetry/sentry-scrub';
+import { NETWORK_BODY_CONTEXT, redactUrlText } from '@/lib/telemetry/sentry-scrub';
 
 // Re-exported for existing consumers and tests; the classifier lives in
 // `abort-classification.ts`.
@@ -122,11 +122,22 @@ function isExpectedStatus(status: number, trpc: TrpcErrorContext): boolean {
   );
 }
 
-/** Strip the query string from a URL. Returns empty string on a non-string. */
+/** A URL authority's userinfo prefix, the part before the host. */
+const URL_USERINFO_PATTERN = /^([a-z][\da-z+.-]*:\/\/)[^/?#]*@/iu;
+
+/**
+ * Reduce a URL to its origin and path: drop the query string, the fragment,
+ * and the authority's userinfo prefix. Fields built from this — the
+ * `network.url` context, the synthesized message, the fingerprint path — carry
+ * origin and path. Returns empty string on a non-string.
+ * Total: a plain string walk, not `new URL`, whose React Native polyfill does
+ * not implement every component.
+ */
 export function stripQueryString(url: string): string {
   try {
-    const queryIndex = url.indexOf('?');
-    return queryIndex === -1 ? url : url.slice(0, queryIndex);
+    const cut = url.search(/[?#]/u);
+    const originAndPath = cut === -1 ? url : url.slice(0, cut);
+    return originAndPath.replace(URL_USERINFO_PATTERN, '$1');
   } catch {
     return '';
   }
@@ -347,8 +358,10 @@ export function reportNetworkError(context: NetworkErrorContext): void {
     if (isBatchEnvelopeWithoutError(context)) {
       return;
     }
-    const pathOnly = stripQueryString(context.url);
-    const normalizedPath = normalizeUrlPath(context.url);
+    // One origin-and-path form for the fingerprint key, the synthesized
+    // message, and the context URL. The app-set tRPC procedure stays readable.
+    const pathOnly = redactUrlText(context.url);
+    const normalizedPath = redactUrlText(normalizeUrlPath(context.url));
     const procedure = trpcProcedureFromUrl(context.url);
     const trpc = readTrpcErrorContext(context.error);
     const trpcCode = trpc.code;
@@ -434,7 +447,7 @@ function isExpectedResponse(context: NetworkErrorContext): boolean {
 function recordExpectedResponse(context: NetworkErrorContext): void {
   try {
     const trpc = readTrpcErrorContext(context.error);
-    const path = normalizeUrlPath(context.url);
+    const path = redactUrlText(normalizeUrlPath(context.url));
     const procedure = trpcProcedureFromUrl(context.url);
     addTelemetryBreadcrumb({
       category: 'network',
@@ -465,7 +478,7 @@ function recordTransportFailure(
 ): void {
   try {
     const method = context.method ?? 'GET';
-    const path = normalizeUrlPath(context.url);
+    const path = redactUrlText(normalizeUrlPath(context.url));
     const outcome: TransportOutcome = isRequestDeadlineError(context.error) ? 'timeout' : 'failed';
     addTelemetryBreadcrumb({
       category: 'network',

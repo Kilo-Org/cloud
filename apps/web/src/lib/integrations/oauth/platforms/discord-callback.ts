@@ -5,7 +5,7 @@ import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizat
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { getCallbackReportParams } from '@/lib/integrations/oauth/callback-params';
 import { exchangeDiscordCode, upsertDiscordInstallation } from '@/lib/integrations/discord-service';
-import { isLegacyProviderOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
+import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
@@ -117,7 +117,7 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
       }
     }
 
-    if (verified.purpose !== 'provider_install' && !isLegacyProviderOAuthState(verified)) {
+    if (verified.provider !== PLATFORM.DISCORD || verified.purpose !== 'provider_install') {
       return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
 

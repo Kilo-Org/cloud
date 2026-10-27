@@ -52,6 +52,11 @@ describe('sandbox idle policy for route origins', () => {
     expect(sandboxIdlePolicyForOrigins(['scheduled', 'desktop'])).toBe('interactive');
   });
 
+  it('keeps the interactive window for Agent Manager routes', () => {
+    expect(sandboxIdlePolicyForOrigins(['agent-manager'])).toBe('interactive');
+    expect(sandboxIdlePolicyForOrigins(['cloud-agent-web', 'agent-manager'])).toBe('interactive');
+  });
+
   it.each([
     [['code-review']],
     [['slack', 'github']],

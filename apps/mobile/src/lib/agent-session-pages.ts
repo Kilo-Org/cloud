@@ -60,15 +60,17 @@ export function dedupeBySessionId<T extends { session_id: string }>(sessions: T[
  * the sorted timestamp.
  */
 export function collectUnfilteredPages<T extends { session_id: string }>(
-  pages: { cliSessions: T[] }[] | undefined
+  pages: readonly ({ cliSessions?: T[] } | null | undefined)[] | undefined
 ): T[] {
   const sessions: T[] = [];
   if (!pages) {
     return sessions;
   }
   for (const page of pages) {
-    for (const session of page.cliSessions) {
-      sessions.push(session);
+    if (Array.isArray(page?.cliSessions)) {
+      for (const session of page.cliSessions) {
+        sessions.push(session);
+      }
     }
   }
   return dedupeBySessionId(sessions);
@@ -80,15 +82,17 @@ export function collectUnfilteredPages<T extends { session_id: string }>(
  * pages keep their first-seen rows.
  */
 export function collectSearchPages<T extends { session_id: string }>(
-  pages: { results: T[] }[] | undefined
+  pages: readonly ({ results?: T[] } | null | undefined)[] | undefined
 ): T[] {
   const sessions: T[] = [];
   if (!pages) {
     return sessions;
   }
   for (const page of pages) {
-    for (const session of page.results) {
-      sessions.push(session);
+    if (Array.isArray(page?.results)) {
+      for (const session of page.results) {
+        sessions.push(session);
+      }
     }
   }
   return dedupeBySessionId(sessions);

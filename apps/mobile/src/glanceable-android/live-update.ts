@@ -95,15 +95,17 @@ type NotificationActions = {
 };
 
 /**
- * Only a cloud-agent permission ask can be answered headlessly, and only while
- * it is still the recorded ask. The session id goes into the Open intent and
- * nowhere else: never the title, the text, the compact text, or the label.
+ * Only a cloud-agent permission ask that names its pending request offers
+ * Approve; the action answers that request by id, so a surface with no request
+ * named keeps Open alone. The session id goes into the Open intent and nowhere
+ * else: never the title, the text, the compact text, or the label.
  */
 export function buildNotificationActions(
   ask: WaitingAsk | null,
   translate: (key: string) => string
 ): NotificationActions {
-  const canApprove = ask?.status === 'permission' && ask.isCloudAgent;
+  const canApprove =
+    ask?.status === 'permission' && ask.isCloudAgent && ask.boundPermissionId !== null;
   return {
     openLabel: translate(OPEN_SESSION_LABEL_KEY),
     openUrl: ask === null ? OPEN_AGENTS_URL : launcherSessionUrl(ask.kiloSessionId),

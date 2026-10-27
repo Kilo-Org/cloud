@@ -79,6 +79,19 @@ function fixture(rootCount = 1, childCount = 0) {
   const begin = vi.fn(async (_params: CloudAgentWorktreeDeletionParams) => structuredClone(state));
   const record = vi.fn(async (input: RecordCloudAgentWorktreeCleanupParams) => {
     state.runtimeLocations = input.runtimeLocations ?? state.runtimeLocations;
+    if (
+      input.completedRuntimeLocation &&
+      !state.manifest.completedRuntimeLocations?.some(
+        item =>
+          item.sandboxId === input.completedRuntimeLocation?.sandboxId &&
+          item.provider === input.completedRuntimeLocation.provider
+      )
+    ) {
+      state.manifest.completedRuntimeLocations = [
+        ...(state.manifest.completedRuntimeLocations ?? []),
+        input.completedRuntimeLocation,
+      ];
+    }
     for (const sessionId of [
       ...(input.sessionIds ?? []),
       ...(input.childSessions ?? []).map(child => child.sessionId),
@@ -347,7 +360,19 @@ describe('deleteWorktree authorization and completion', () => {
       success: true,
       deletedSessionIds: [kiloId(0)],
     });
-    expect(mocks.getControl).toHaveBeenCalledWith(f.ctx.env, location.sandboxId);
+    expect(mocks.getControl).toHaveBeenCalledTimes(2);
+  });
+
+  it('skips runtime locations whose successful cleanup is already journaled', async () => {
+    const f = fixture();
+    f.getState().runtimeLocations = [location];
+    f.getState().manifest.completedRuntimeLocations = [location];
+
+    await expect(f.caller.deleteWorktree({ worktreeId })).resolves.toEqual({
+      success: true,
+      deletedSessionIds: [kiloId(0)],
+    });
+    expect(f.cleanup).not.toHaveBeenCalled();
   });
 
   it('isolates unavailable allocation history instead of repeatedly waiting for registration that is fenced', async () => {

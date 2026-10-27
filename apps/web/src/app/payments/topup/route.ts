@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getStripeTopUpCheckoutUrl } from '@/lib/stripe';
 import { MAXIMUM_TOP_UP_AMOUNT, MINIMUM_TOP_UP_AMOUNT } from '@kilocode/web-shared/lib/constants';
-import { isValidReturnUrl } from '@/lib/payment-return-url';
+import { getSafeReturnUrlPath } from '@/lib/payment-return-url';
 import { captureException } from '@sentry/nextjs';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<unknown>>
   }
 
   const cancelPathRaw = searchParams.get('cancel-path');
-  const cancelPath = cancelPathRaw && isValidReturnUrl(cancelPathRaw) ? cancelPathRaw : null;
+  const cancelPath = cancelPathRaw ? getSafeReturnUrlPath(cancelPathRaw) : null;
 
   // Refuse before Stripe creates a session when bouncer blocks this payer's charges.
   const chargeVerdict = await decideCheckoutCharge({

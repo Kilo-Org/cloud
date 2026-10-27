@@ -12,7 +12,15 @@ image from the catalog. Manual mode, descriptor or image drift fails before Wran
 | downloaded | runtime-free | Verified immutable base digest, exact-SHA runtime descriptor |
 
 The runtime-free/preinstalled pair is invalid in the shared configuration schema and the Worker.
-Downloaded startup is native-only. SDK and Vercel keep preinstalled startup and their current adapters.
+Downloaded startup supports native Cloudflare Containers and BYOC Vercel. SDK pins keep preinstalled startup.
+
+BYOC Vercel uses its customer-owned snapshot as the base. The snapshot setup provides the fixed Node
+path and Bun version required by the bootstrap. Downloaded startup installs the selected immutable CLI
+and control release as root. The base digest covers the ABI, Node major, Bun, and base setup commands;
+CLI and wrapper changes do not change that digest or require a new snapshot. Existing allocations keep
+their installed release until a new allocation starts. Base dependency changes still require a snapshot
+upgrade. Upgrade older BYOC snapshots once before enabling downloaded mode, so they have the required
+fixed Node path. Native image selection does not change the Vercel snapshot.
 
 ## Approval and rollout order
 

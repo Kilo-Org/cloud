@@ -2,7 +2,7 @@
 import * as Clipboard from 'expo-clipboard';
 import { type Href, useRouter } from 'expo-router';
 import { Globe } from '@/components/ui/icons';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { I18nManager, Pressable, ScrollView, View } from 'react-native';
 import { useKeyboardState } from 'react-native-keyboard-controller';
@@ -25,7 +25,6 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
-  clearLoginDrafts,
   clearPersistedLoginDrafts,
   persistLoginDrafts,
   restoreLoginDrafts,
@@ -35,7 +34,7 @@ import { setLanguagePickerBridge } from '@/lib/picker-bridge';
 import { useScreenInsets } from '@/lib/screen-insets';
 
 export function LoginScreen() {
-  const { sessionEnded, signIn } = useAuth();
+  const { sessionEnded, signIn, token: publishedToken } = useAuth();
   const router = useRouter();
   const {
     status,
@@ -61,12 +60,16 @@ export function LoginScreen() {
     ssoRecovery: SsoRecoveryDraft | null;
   } | null>(null);
 
+  // Set once this mount completes a sign-in: the unmount persistence then
+  // stays off, because the signed-in session owns the screen and a typed
+  // email from the abandoned attempt must not survive into the next login.
+  const signedInRef = useRef(false);
+
   const persistToken = useCallback(
     async (tokenValue: string, refreshTokenValue?: string, expiresInValue?: number) => {
       setPersistFailed(false);
       try {
         await signIn(tokenValue, refreshTokenValue, expiresInValue);
-        clearLoginDrafts();
       } catch {
         // The message renders from the catalog at draw time, so a language
         // switch re-renders it in the new language.
@@ -75,6 +78,17 @@ export function LoginScreen() {
     },
     [signIn]
   );
+
+  // Every provider's completed sign-in — device code, email code, Apple,
+  // Google, passkey — publishes its token through the auth context, so this
+  // one watch covers them all: `signIn` drops the module drafts, and this
+  // flag keeps the unmount persistence off, or the next login mount would
+  // pre-fill the previous account's address.
+  useEffect(() => {
+    if (publishedToken !== undefined) {
+      signedInRef.current = true;
+    }
+  }, [publishedToken]);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,6 +108,22 @@ export function LoginScreen() {
     void restoreDrafts();
     return () => {
       cancelled = true;
+      // Write the module-level drafts back before this mount's state dies, so
+      // the next mount restores what the user had typed — a device rotation
+      // that recreates the activity must not blank the email field. A failed
+      // write leaves the field empty on the next mount; the restore path
+      // already tolerates missing drafts. After a completed sign-in the
+      // drafts were cleared on purpose, so persistence stays off.
+      if (signedInRef.current) {
+        return;
+      }
+      void (async () => {
+        try {
+          await persistLoginDrafts();
+        } catch {
+          // Swallow: nothing to show on an unmounting screen.
+        }
+      })();
     };
   }, []);
 

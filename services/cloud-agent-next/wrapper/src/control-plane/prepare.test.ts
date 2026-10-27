@@ -20,11 +20,8 @@ import type { WrapperKiloClient } from '../kilo-api.js';
 import type { ExecResult, ProcessOptions, ProcessOutputStream } from '../utils.js';
 import * as processUtils from '../utils.js';
 import { createPreparationManager, type PrepareRuntimePort } from './prepare.js';
-import {
-  SNAPSHOT_MAX_GENERATION,
-  SNAPSHOT_REFRESH_AFTER_MS,
-  type WorkspaceStamp,
-} from './workspace-stamp.js';
+import type { WorkspaceStamp } from './workspace-stamp.js';
+import { directoryHome } from './workspace-home.js';
 
 const NOW = 1_800_000_000_000;
 import {
@@ -36,7 +33,6 @@ import {
 } from './kilo-runtime.js';
 import type { restoreWorktreeRecovery } from './worktree-recovery.js';
 import { restoreSession } from '../restore-session.js';
-import { createWorkspaceCapture } from './workspace-capture.js';
 
 describe('replacement workspace local recovery', () => {
   const recovery = {
@@ -121,13 +117,7 @@ describe('replacement workspace local recovery', () => {
           },
         ],
       };
-      const harness = createHarness(FAST_TIMERS, {
-        capture: true,
-        beforeCapture: async () => {
-          expect(await fs.readFile(path.join(directory, 'lost.txt'), 'utf8')).toBe('newer local\n');
-          expect(harness.ensureCalls()).toBe(0);
-        },
-      });
+      const harness = createHarness(FAST_TIMERS);
       harness.setSessionExists(false);
       harness.setRestore(async () =>
         restoreSession(routeSpec().kiloSessionId, directory, undefined, {
@@ -144,15 +134,134 @@ describe('replacement workspace local recovery', () => {
         routeSpec({
           directory,
           git: { url: 'https://github.com/acme/repo.git' },
-          capture: true,
           worktreeRecovery: newer,
         })
       );
       expect(await fs.readFile(path.join(directory, 'lost.txt'), 'utf8')).toBe('newer local\n');
-      expect(harness.captureRequests).toHaveLength(1);
-      expect(JSON.parse(await fs.readFile(imported, 'utf8')).sessionDiff).toEqual(
-        snapshot.sessionDiff
+      expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+    } finally {
+      fetchSpy.mockRestore();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps recovered tracked and added bytes on a stamped same-allocation restart with older ingest', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-restart-recovery-'));
+    const directory = path.join(root, 'workspace');
+    const imported = path.join(root, 'imported.json');
+    const bin = path.join(root, 'bin');
+    const snapshot = {
+      info: { id: routeSpec().kiloSessionId, version: '2' },
+      messages: [],
+      sessionDiff: [
+        { file: 'tracked.txt', status: 'modified', after: 'older tracked\n' },
+        { file: 'added.txt', status: 'added', after: 'older added\n' },
+      ],
+    };
+    const fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(snapshot), { status: 200 })
+    );
+    try {
+      await fs.mkdir(directory);
+      await fs.mkdir(bin);
+      expect(Bun.spawnSync(['git', 'init', directory]).exitCode).toBe(0);
+      await fs.writeFile(path.join(directory, 'tracked.txt'), 'recovered tracked\n');
+      await fs.writeFile(path.join(directory, 'added.txt'), 'recovered added\n');
+      await fs.writeFile(path.join(bin, 'kilo'), `#!/bin/sh\ncp "$2" "${imported}"\n`, {
+        mode: 0o755,
+      });
+      const harness = createHarness(FAST_TIMERS, { hasGit: true });
+      harness.setStamp({
+        allocationId: 'alloc-current',
+        commit: 'c',
+        capturedAt: NOW,
+        generation: 0,
+      });
+      harness.setSessionExists(false);
+      harness.setRestore(async () =>
+        restoreSession(routeSpec().kiloSessionId, directory, undefined, {
+          restoreFiles: harness.restoreOptions()[0]?.restoreFiles !== false,
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            KILO_RUNTIME_CLI_PATH: path.join(bin, 'kilo'),
+            KILO_SESSION_INGEST_URL: 'https://ingest.test',
+            KILOCODE_TOKEN: 'test-token',
+          },
+        })
       );
+      await harness.manager.prepare(
+        routeSpec({
+          directory,
+          git: { url: 'https://github.com/acme/repo.git' },
+          worktreeRecovery: {
+            files: [
+              { path: 'tracked.txt', status: 'modified', patch: 'saved' },
+              { path: 'added.txt', status: 'added', patch: 'saved' },
+            ],
+          },
+        })
+      );
+      expect(harness.restoreOptions()[0]?.restoreFiles).toBe(false);
+      expect(await fs.readFile(path.join(directory, 'tracked.txt'), 'utf8')).toBe(
+        'recovered tracked\n'
+      );
+      expect(await fs.readFile(path.join(directory, 'added.txt'), 'utf8')).toBe(
+        'recovered added\n'
+      );
+      expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+    } finally {
+      fetchSpy.mockRestore();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('imports ingest files for a prepare with no recovery', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-no-recovery-'));
+    const directory = path.join(root, 'workspace');
+    const bin = path.join(root, 'bin');
+    const snapshot = {
+      info: { id: routeSpec().kiloSessionId, version: '2' },
+      messages: [],
+      sessionDiff: [{ file: 'lost.txt', status: 'modified', after: 'older ingest\n' }],
+    };
+    const fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(snapshot), { status: 200 })
+    );
+    try {
+      await fs.mkdir(directory);
+      await fs.mkdir(bin);
+      expect(Bun.spawnSync(['git', 'init', directory]).exitCode).toBe(0);
+      await fs.writeFile(path.join(directory, 'lost.txt'), 'base\n');
+      await fs.writeFile(
+        path.join(bin, 'kilo'),
+        `#!/bin/sh\ncp "$2" "${path.join(root, 'imported.json')}"\n`,
+        {
+          mode: 0o755,
+        }
+      );
+      const harness = createHarness(FAST_TIMERS);
+      harness.setSessionExists(false);
+      harness.setRestore(async () =>
+        restoreSession(routeSpec().kiloSessionId, directory, undefined, {
+          restoreFiles: harness.restoreOptions()[0]?.restoreFiles !== false,
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            KILO_RUNTIME_CLI_PATH: path.join(bin, 'kilo'),
+            KILO_SESSION_INGEST_URL: 'https://ingest.test',
+            KILOCODE_TOKEN: 'test-token',
+          },
+        })
+      );
+      await harness.manager.prepare(
+        routeSpec({
+          directory,
+          git: { url: 'https://github.com/acme/repo.git' },
+        })
+      );
+      expect(harness.restoreOptions()[0]?.restoreFiles).toBe(true);
+      expect(await fs.readFile(path.join(directory, 'lost.txt'), 'utf8')).toBe('older ingest\n');
       expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
     } finally {
       fetchSpy.mockRestore();
@@ -203,6 +312,257 @@ describe('replacement workspace local recovery', () => {
     expect(harness.restoreOptions()[0]?.restoreFiles).toBe(true);
     expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
     expect(harness.frames.some(frame => frame.type === 'session.failed')).toBe(false);
+  });
+
+  it('keeps two repeated unstamped crashes unstamped before the fallback import', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-deferred-crash-'));
+    const directory = path.join(root, 'workspace');
+    const bin = path.join(root, 'bin');
+    const imported = path.join(root, 'imported.json');
+    const snapshot = {
+      info: { id: routeSpec().kiloSessionId, version: '2' },
+      messages: [],
+      sessionDiff: [
+        { file: 'tracked.txt', status: 'modified', after: 'older tracked\n' },
+        { file: 'added.txt', status: 'added', after: 'older added\n' },
+      ],
+    };
+    const fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(snapshot), { status: 200 })
+    );
+    try {
+      await fs.mkdir(directory);
+      await fs.mkdir(bin);
+      expect(Bun.spawnSync(['git', 'init', directory]).exitCode).toBe(0);
+      await fs.writeFile(path.join(directory, 'tracked.txt'), 'local base\n');
+      await fs.writeFile(path.join(bin, 'kilo'), `#!/bin/sh\ncp "$2" "${imported}"\n`, {
+        mode: 0o755,
+      });
+      const harness = createHarness(FAST_TIMERS, {
+        recoverWorktree: async () => {
+          throw new Error('conflicting patch');
+        },
+      });
+      harness.setSessionExists(false);
+      // First and second prepares crash before the deferred import returns.
+      harness.setRestore(async () => {
+        throw new Error('import failed');
+      });
+      const crashed = routeSpec({
+        directory,
+        git: { url: 'https://github.com/acme/repo.git' },
+        worktreeRecovery: recovery,
+      });
+      await harness.manager.prepare(crashed);
+      expect(harness.stamp()).toBeNull();
+      await harness.manager.prepare(crashed);
+      expect(harness.stamp()).toBeNull();
+      // The third prepare imports the older tracked and added bytes, then stamps.
+      harness.setRestore(async () =>
+        restoreSession(routeSpec().kiloSessionId, directory, undefined, {
+          restoreFiles: harness.restoreOptions().at(-1)?.restoreFiles !== false,
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            KILO_RUNTIME_CLI_PATH: path.join(bin, 'kilo'),
+            KILO_SESSION_INGEST_URL: 'https://ingest.test',
+            KILOCODE_TOKEN: 'test-token',
+          },
+        })
+      );
+      await harness.manager.prepare(crashed);
+      expect(harness.restoreOptions().at(-1)?.restoreFiles).toBe(true);
+      expect(await fs.readFile(path.join(directory, 'tracked.txt'), 'utf8')).toBe(
+        'older tracked\n'
+      );
+      expect(await fs.readFile(path.join(directory, 'added.txt'), 'utf8')).toBe('older added\n');
+      expect(harness.stamp()).not.toBeNull();
+      expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+    } finally {
+      fetchSpy.mockRestore();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each(['throw', 'zero-applied'])(
+    'leaves no current-allocation stamp before the deferred import for %s',
+    async kind => {
+      const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-deferred-gate-'));
+      const directory = path.join(root, 'workspace');
+      const bin = path.join(root, 'bin');
+      const snapshot = {
+        info: { id: routeSpec().kiloSessionId, version: '2' },
+        messages: [],
+        sessionDiff: [
+          { file: 'tracked.txt', status: 'modified', after: 'older tracked\n' },
+          { file: 'added.txt', status: 'added', after: 'older added\n' },
+        ],
+      };
+      const fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify(snapshot), { status: 200 })
+      );
+      let releaseImport: () => void = () => undefined;
+      const importGate = new Promise<void>(resolve => {
+        releaseImport = resolve;
+      });
+      try {
+        await fs.mkdir(directory);
+        await fs.mkdir(bin);
+        expect(Bun.spawnSync(['git', 'init', directory]).exitCode).toBe(0);
+        await fs.writeFile(path.join(directory, 'tracked.txt'), 'local base\n');
+        await fs.writeFile(path.join(bin, 'kilo'), `#!/bin/sh\ncp "$2" "${root}/imported.json"\n`, {
+          mode: 0o755,
+        });
+        const harness = createHarness(FAST_TIMERS, {
+          recoverWorktree:
+            kind === 'throw'
+              ? async () => {
+                  throw new Error('conflicting patch');
+                }
+              : async () => ({
+                  applied: 0,
+                  total: 1,
+                  skipped: 1,
+                  skippedDiffs: [{ file: 'lost.txt', reason: 'patch_apply_failed' as const }],
+                }),
+          beforeEnsure: async () => {
+            await importGate;
+          },
+        });
+        harness.setSessionExists(false);
+        harness.setRestore(async () =>
+          restoreSession(routeSpec().kiloSessionId, directory, undefined, {
+            restoreFiles: harness.restoreOptions().at(-1)?.restoreFiles !== false,
+            env: {
+              ...process.env,
+              PATH: `${bin}:${process.env.PATH}`,
+              KILO_RUNTIME_CLI_PATH: path.join(bin, 'kilo'),
+              KILO_SESSION_INGEST_URL: 'https://ingest.test',
+              KILOCODE_TOKEN: 'test-token',
+            },
+          })
+        );
+        const run = harness.manager.prepare(
+          routeSpec({
+            directory,
+            git: { url: 'https://github.com/acme/repo.git' },
+            worktreeRecovery: recovery,
+          })
+        );
+        for (let attempt = 0; attempt < 200 && harness.ensureCalls() === 0; attempt += 1) {
+          await new Promise(resolve => setTimeout(resolve, 5));
+        }
+        expect(harness.ensureCalls()).toBeGreaterThan(0);
+        // Held inside the deferred import: the current-allocation stamp is absent.
+        expect(harness.stamp()).toBeNull();
+        releaseImport();
+        await run;
+        expect(await fs.readFile(path.join(directory, 'tracked.txt'), 'utf8')).toBe(
+          'older tracked\n'
+        );
+        expect(await fs.readFile(path.join(directory, 'added.txt'), 'utf8')).toBe('older added\n');
+        expect(harness.stamp()).not.toBeNull();
+      } finally {
+        fetchSpy.mockRestore();
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it('keeps a sibling from adopting or emptying the directory during a held deferred import', async () => {
+    let releaseImport: () => void = () => undefined;
+    const importGate = new Promise<void>(resolve => {
+      releaseImport = resolve;
+    });
+    let importStarted = false;
+    const harness = createHarness(FAST_TIMERS, {
+      recoverWorktree: async () => ({
+        applied: 0,
+        total: 1,
+        skipped: 1,
+        skippedDiffs: [{ file: 'lost.txt', reason: 'patch_apply_failed' as const }],
+      }),
+    });
+    harness.setSessionExists(false);
+    harness.setRestore(async () => {
+      importStarted = true;
+      await importGate;
+      return {
+        ok: true,
+        downloaded: true,
+        imported: true,
+        diffs: { applied: 1, skipped: 0, total: 1 },
+      };
+    });
+    const directory = '/tmp/prepare-sibling';
+    const spec = (sessionId: string) =>
+      routeSpec({
+        sessionId,
+        directory,
+        git: { url: 'https://github.com/acme/repo.git' },
+        worktreeRecovery: recovery,
+      });
+    const first = harness.manager.prepare(spec('ses_first_sibling'));
+    for (let attempt = 0; attempt < 200 && !importStarted; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 5));
+    }
+    expect(importStarted).toBe(true);
+    const ensureDuringHold = harness.ensureCalls();
+    const restoreDuringHold = harness.restoreCalls();
+    const second = harness.manager.prepare(spec('ses_second_sibling'));
+    await new Promise(resolve => setTimeout(resolve, 20));
+    // The sibling is queued behind the held lock: no adoption, no emptying, and
+    // no second import started.
+    expect(harness.emptyCalls).toHaveLength(0);
+    expect(harness.ensureCalls()).toBe(ensureDuringHold);
+    expect(harness.restoreCalls()).toBe(restoreDuringHold);
+    releaseImport();
+    await Promise.all([first, second]);
+    // After the first prepare stamps, the sibling sees the same allocation.
+    expect(harness.logs.some(line => line.includes('inspection=same'))).toBe(true);
+  });
+
+  it('releases a deferred per-session runtime when released during the deferred import', async () => {
+    let releasePreparation: () => void = () => undefined;
+    const gate = new Promise<void>(resolve => {
+      releasePreparation = resolve;
+    });
+    const harness = createHarness(FAST_TIMERS, {
+      recoverWorktree: async () => {
+        throw new Error('conflicting patch');
+      },
+      beforeEnsure: async () => {
+        await gate;
+      },
+    });
+    harness.setSessionExists(false);
+    harness.setRestore(async () => ({
+      ok: true,
+      downloaded: true,
+      imported: true,
+      diffs: { applied: 1, skipped: 0, total: 1 },
+    }));
+    const sessionId = 'ses_00000000000000000000000000';
+    const run = harness.manager.prepare(
+      routeSpec({
+        sessionId,
+        directory: '/tmp/prepare-deferred-release',
+        git: { url: 'https://github.com/acme/repo.git' },
+        runtimeIsolation: 'per-session',
+        worktreeRecovery: recovery,
+      })
+    );
+    for (let attempt = 0; attempt < 200 && harness.ensureCalls() === 0; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 5));
+    }
+    expect(harness.ensureCalls()).toBeGreaterThan(0);
+    // Stop/supersede while the deferred import holds the lock.
+    harness.manager.release(sessionId);
+    releasePreparation();
+    await run;
+    expect(harness.stamp()).toBeNull();
+    expect(harness.releaseCalls).toHaveLength(1);
+    expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(false);
   });
 });
 
@@ -285,31 +645,25 @@ type Harness = {
   stamp: () => WorkspaceStamp | null;
   setHasGit: (value: boolean) => void;
   emptyCalls: string[];
-  clearedHomes: string[];
-  truncations: () => number;
-  captureRequests: Array<{ sessionId: string; commit: string | undefined; timeoutMs: number }>;
-  setCaptureResult: (value: boolean | 'throw') => void;
   setSetupResult: (value: ExecResult) => void;
   setSetupOutput: (
     value: (onOutput: (stream: ProcessOutputStream, output: string) => void) => void
   ) => void;
 };
 
+/** Both home roots under one test directory, as the wrapper keeps them apart in production. */
+function homeRootsFor(root: string) {
+  return { directory: path.join(root, 'home'), legacy: path.join(root, 'kilo-worktrees') };
+}
+
 function createHarness(
   activeTimers: ControlPlaneTimers = FAST_TIMERS,
   options: {
     hasGit?: boolean;
-    capture?: boolean;
     beforeEnsure?: () => Promise<void>;
     homeRoot?: string;
     beforeInstall?: () => Promise<void>;
     recoverWorktree?: typeof restoreWorktreeRecovery;
-    beforeCapture?: () => Promise<void>;
-    captureRequest?: (
-      sessionId: string,
-      commit: string | undefined,
-      timeoutMs: number
-    ) => Promise<boolean>;
     beforeWorkspace?: () => Promise<void>;
     releaseCleanupDeadlineMs?: number;
     runtimes?: PrepareRuntimePort;
@@ -357,10 +711,6 @@ function createHarness(
   let stamp: WorkspaceStamp | null = null;
   let hasGitState = options.hasGit ?? false;
   const emptyCalls: string[] = [];
-  const clearedHomes: string[] = [];
-  let truncations = 0;
-  const captureRequests: Harness['captureRequests'] = [];
-  let captureResult: boolean | 'throw' = true;
   const unavailableKeys = new Set<string>();
   let activeClones = 0;
   let maxActiveClones = 0;
@@ -452,26 +802,11 @@ function createHarness(
     onNativeDiagnostic: (event, fields) => nativeDiagnostics.push({ event, fields }),
     runtimes,
     inheritedEnv: {},
-    homeRoot: options.homeRoot ?? '/tmp/prepare-test-homes',
+    homeRoots: homeRootsFor(options.homeRoot ?? '/tmp/prepare-test-homes'),
     allocationId: 'alloc-current',
-    now: () => NOW,
     ...(options.releaseCleanupDeadlineMs === undefined
       ? {}
       : { releaseCleanupDeadlineMs: options.releaseCleanupDeadlineMs }),
-    ...(options.capture
-      ? {
-          capture: {
-            request: async (sessionId: string, commit: string | undefined, timeoutMs: number) => {
-              await options.beforeCapture?.();
-              captureRequests.push({ sessionId, commit, timeoutMs });
-              if (options.captureRequest)
-                return options.captureRequest(sessionId, commit, timeoutMs);
-              if (captureResult === 'throw') throw new Error('capture channel failed');
-              return captureResult;
-            },
-          },
-        }
-      : {}),
     hasGit: async () => hasGitState,
     readStamp: async () => stamp,
     writeStamp: async (_directory, value) => {
@@ -481,12 +816,6 @@ function createHarness(
       emptyCalls.push(directory);
       hasGitState = false;
       stamp = null;
-    },
-    clearStaleHomes: async (_root, keep) => {
-      clearedHomes.push(keep);
-    },
-    truncateLog: async () => {
-      truncations += 1;
     },
     mkdir: async () => undefined,
     configureGitAuthor: async (_directory, _runGit, author) => {
@@ -596,12 +925,6 @@ function createHarness(
       hasGitState = value;
     },
     emptyCalls,
-    clearedHomes,
-    truncations: () => truncations,
-    captureRequests,
-    setCaptureResult: value => {
-      captureResult = value;
-    },
     setSetupResult: value => {
       setupResult = value;
     },
@@ -1538,7 +1861,7 @@ describe('createPreparationManager', () => {
           release: () => undefined,
         },
         inheritedEnv: {},
-        homeRoot: '/tmp/prepare-test-homes',
+        homeRoots: homeRootsFor('/tmp/prepare-test-homes'),
         hasGit: async () => false,
         readStamp: async () => null,
         writeStamp: async () => undefined,
@@ -1551,8 +1874,8 @@ describe('createPreparationManager', () => {
       await manager.prepare(routeSpec({ setupCommands: ['pnpm install'] }));
 
       expect(runProcess).toHaveBeenCalledWith(
-        'sh',
-        ['-c', 'pnpm install'],
+        'bash',
+        ['-e', '-o', 'pipefail', '-c', 'pnpm install'],
         expect.objectContaining({
           inactivityTimeoutMs: 300_000,
           hardTimeoutMs: 480_000,
@@ -1771,7 +2094,7 @@ describe('createPreparationManager', () => {
     ).toBe(true);
   });
 
-  it('keys shared HOME by worktree scope and directory', async () => {
+  it('keys a worktree runtime HOME by directory alone and keeps per-session homes', async () => {
     const harness = createHarness();
     const directory = '/tmp/home-scope-one';
     const worktree = routeSpec({
@@ -1779,22 +2102,42 @@ describe('createPreparationManager', () => {
       kiloSessionId: 'kilo_a',
       directory,
     });
-    // A non-worktree modern session carries its own session id as the scope id.
-    const nonWorktree = routeSpec({
+    // A sibling in the same directory with another scope shares the same HOME.
+    const sibling = routeSpec({
       sessionId: 'ses_b',
       kiloSessionId: 'kilo_b',
-      directory: '/tmp/home-non-worktree',
+      directory,
       kilo: { ...routeSpec().kilo!, scopeId: 'ses_b' },
+    });
+    // An existing allocation keeps its per-session runtime and HOME.
+    const perSession = routeSpec({
+      sessionId: 'ses_c',
+      kiloSessionId: 'kilo_c',
+      directory: '/tmp/home-per-session',
+      runtimeIsolation: 'per-session',
     });
 
     await harness.manager.prepare(worktree);
-    await harness.manager.prepare(nonWorktree);
+    await harness.manager.prepare(sibling);
+    await harness.manager.prepare(perSession);
 
-    const homeRoot = '/tmp/prepare-test-homes';
-    const expected = (key: string, dir: string): string =>
-      path.join(homeRoot, createHash('sha256').update(key).update('\0').update(dir).digest('hex'));
-    expect(harness.ensureInputs[0]!.env.HOME).toBe(expected('scope-1', directory));
-    expect(harness.ensureInputs[1]!.env.HOME).toBe(expected('ses_b', '/tmp/home-non-worktree'));
+    const roots = homeRootsFor('/tmp/prepare-test-homes');
+    expect(harness.ensureInputs[0]!.env.HOME).toBe(directoryHome(directory, roots.directory));
+    expect(harness.ensureInputs[1]!.env.HOME).toBe(directoryHome(directory, roots.directory));
+    expect(harness.ensureInputs[2]!.env.HOME).toBe(
+      path.join(
+        roots.legacy,
+        createHash('sha256')
+          .update('ses_c')
+          .update('\0')
+          .update('/tmp/home-per-session')
+          .digest('hex')
+      )
+    );
+    // The builder computes the same fixed home for the isolated workspace.
+    expect(directoryHome('/workspace/app')).toBe(
+      path.join('/home', createHash('sha256').update('/workspace/app').digest('hex'))
+    );
   });
 
   it('re-prepares a prepared route whose runtime is unavailable', async () => {
@@ -1825,8 +2168,7 @@ describe('createPreparationManager', () => {
     await harness.manager.prepare(spec, credentials);
 
     expect(harness.ensureCalls()).toBe(1);
-    const remote = harness.gitCalls.find(args => args[0] === 'remote');
-    expect(remote?.[3]).toContain('git-2');
+    expect(harness.gitCalls).toEqual([]);
     expect(harness.installCalls).toHaveLength(1);
     expect(harness.installCalls[0]!.env.KILOCODE_TOKEN).toBe('kilo-token-2');
     expect(lastFrame(harness.frames)).toEqual({
@@ -1852,10 +2194,7 @@ describe('createPreparationManager', () => {
     };
     await harness.manager.installCredentials(credentials);
 
-    const remote = harness.gitCalls.find(args => args[0] === 'remote');
-    expect(remote?.[1]).toBe('set-url');
-    expect(remote?.[3]).toContain('git-2');
-    expect(remote?.[3]).not.toContain('git-1');
+    expect(harness.gitCalls).toEqual([]);
     expect(harness.installCalls).toHaveLength(1);
     expect(harness.installCalls[0]!.key).toBe(spec.sessionId);
     expect(harness.installCalls[0]!.env.KILOCODE_TOKEN).toBe('kilo-token-2');
@@ -1865,25 +2204,18 @@ describe('createPreparationManager', () => {
     expect(harness.manager.isPrepared(spec.sessionId)).toBe(false);
   });
 
-  it('records refreshed Kilo environment before awaiting Git credential maintenance', async () => {
+  it('records refreshed Kilo environment before writing the renewed Git record', async () => {
     const harness = createHarness();
     const spec = routeSpec({ git: { url: 'https://github.com/acme/repo.git', token: 'git-1' } });
     await harness.manager.prepare(spec);
-    const gitStarted = Promise.withResolvers<void>();
-    const finishGit = Promise.withResolvers<ExecResult>();
-    harness.setGit(async () => {
-      gitStarted.resolve();
-      return finishGit.promise;
-    });
-    const installing = harness.manager.installCredentials({
+    harness.gitCalls.length = 0;
+    await harness.manager.installCredentials({
       sessionId: spec.sessionId,
       kilo: { token: 'kilo-token-2' },
       git: { token: 'git-2' },
     });
-    await gitStarted.promise;
     expect(harness.installCalls[0]?.env.KILOCODE_TOKEN).toBe('kilo-token-2');
-    finishGit.resolve(result(0));
-    await installing;
+    expect(harness.gitCalls).toEqual([]);
   });
 
   it('prefers the runtime-proxy handle and facade targets over the spec alias', async () => {
@@ -2000,7 +2332,7 @@ describe('createPreparationManager', () => {
         release: () => undefined,
       },
       inheritedEnv: {},
-      homeRoot: '/tmp/prepare-test-homes',
+      homeRoots: homeRootsFor('/tmp/prepare-test-homes'),
       allocationId: 'alloc-current',
       hasGit: async () => true,
       readStamp: async () => null,
@@ -2177,22 +2509,16 @@ describe('createPreparationManager', () => {
   });
 });
 
-const FOREIGN_STAMP = {
-  allocationId: 'alloc-previous',
-  commit: 'old-commit',
-  capturedAt: NOW - 60_000,
-  generation: 0,
-};
-const DUE_STAMP = { ...FOREIGN_STAMP, capturedAt: NOW - SNAPSHOT_REFRESH_AFTER_MS };
+const FOREIGN_STAMP = { allocationId: 'alloc-builder', commit: 'old-commit' };
 const REPO = 'https://github.com/acme/repo.git';
 
 function gitKinds(calls: string[][]): string[] {
   return calls.map(args => args.slice(0, args[0] === 'remote' ? 2 : 1).join(' '));
 }
 
-describe('adopting a repository snapshot', () => {
-  function adoptHarness(options: { capture?: boolean } = {}) {
-    const harness = createHarness(FAST_TIMERS, { hasGit: true, ...options });
+describe('adopting an environment snapshot', () => {
+  function adoptHarness() {
+    const harness = createHarness(FAST_TIMERS, { hasGit: true });
     harness.setStamp(FOREIGN_STAMP);
     harness.setGit(args => {
       if (args[0] === 'show-ref') return result(1);
@@ -2215,7 +2541,7 @@ describe('adopting a repository snapshot', () => {
 
     expect(harness.gitCalls.some(args => args[0] === 'clone')).toBe(false);
     const setUrl = harness.gitCalls.find(args => args[0] === 'remote' && args[1] === 'set-url');
-    expect(setUrl?.[3]).toContain('git-1');
+    expect(setUrl?.[3]).toBe(REPO);
     expect(gitKinds(harness.gitCalls).slice(0, 7)).toEqual([
       'remote set-url',
       'fetch',
@@ -2237,20 +2563,24 @@ describe('adopting a repository snapshot', () => {
       'kilo_runtime',
       'kilo_session',
     ]);
-    expect(harness.stamp()).toEqual({
-      allocationId: 'alloc-current',
-      commit: 'new-commit',
-      capturedAt: FOREIGN_STAMP.capturedAt,
-      generation: 0,
-    });
+    expect(harness.stamp()).toEqual({ allocationId: 'alloc-current', commit: 'new-commit' });
     expect(lastFrame(harness.frames)).toEqual({
       type: 'session.ready',
       sessionId: spec.sessionId,
       workspace: 'adopted',
     });
     expect(harness.emptyCalls).toEqual([]);
-    expect(harness.clearedHomes).toHaveLength(1);
-    expect(harness.clearedHomes[0]).toContain('/tmp/prepare-test-homes/');
+  });
+
+  it('adopts a stamp written by a snapshot-capturing wrapper', async () => {
+    const harness = adoptHarness();
+    harness.setStamp({ ...FOREIGN_STAMP, capturedAt: NOW - 60_000, generation: 4 });
+
+    await harness.manager.prepare(routeSpec({ git: { url: REPO } }));
+
+    expect(harness.gitCalls.some(args => args[0] === 'clone')).toBe(false);
+    expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'adopted' });
+    expect(harness.stamp()).toEqual({ allocationId: 'alloc-current', commit: 'new-commit' });
   });
 
   it('checks out an explicit branch with the ordinary branch logic', async () => {
@@ -2401,290 +2731,121 @@ describe('adopting a repository snapshot', () => {
     expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'cloned' });
   });
 
-  it('does nothing for a workspace this allocation already prepared', async () => {
+  it('reuses a prepared workspace without network or setup work', async () => {
     const harness = createHarness(FAST_TIMERS, { hasGit: true });
-    const prepared = {
-      allocationId: 'alloc-current',
-      commit: 'abc',
-      capturedAt: NOW,
-      generation: 0,
-    };
+    const prepared = { allocationId: 'alloc-current', commit: 'abc' };
     harness.setStamp(prepared);
     const spec = routeSpec({ git: { url: REPO }, setupCommands: ['npm install'] });
 
     await harness.manager.prepare(spec);
 
-    expect(harness.gitCalls).toEqual([]);
-    expect(harness.clearedHomes).toEqual([]);
+    expect(harness.gitCalls.some(args => ['clone', 'fetch', 'checkout'].includes(args[0]!))).toBe(
+      false
+    );
     expect(progressSteps(harness.frames)).toEqual(['kilo_runtime', 'kilo_session']);
     expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'same' });
     expect(harness.stamp()).toEqual(prepared);
   });
 
   it('reuses a repository without a stamp, never captures it, and stamps it', async () => {
-    const harness = createHarness(FAST_TIMERS, { hasGit: true, capture: true });
-    const spec = routeSpec({ git: { url: REPO }, capture: true });
+    const harness = createHarness(FAST_TIMERS, { hasGit: true });
+    const spec = routeSpec({ git: { url: REPO } });
 
     await harness.manager.prepare(spec);
 
     expect(harness.gitCalls.some(args => args[0] === 'clone')).toBe(false);
     expect(harness.gitCalls.some(args => args[0] === 'checkout')).toBe(true);
-    expect(harness.captureRequests).toEqual([]);
     expect(harness.stamp()?.allocationId).toBe('alloc-current');
     expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'cloned' });
   });
 });
 
-describe('refreshing an adopted repository snapshot', () => {
-  function refreshHarness(stamp: WorkspaceStamp) {
-    const harness = createHarness(FAST_TIMERS, { hasGit: true, capture: true });
-    harness.setStamp(stamp);
+function recordPath(root: string, spec: ControlPlaneRouteSpec): string {
+  const home = directoryHome(spec.directory, homeRootsFor(root).directory);
+  return path.join(home, '.local/share/kilo/cloud-agent/git-credentials');
+}
+
+describe('workspace origin normalization', () => {
+  it.each(['unstamped', 'same'] as const)('prepares the canonical origin: %s', async stamp => {
+    const harness = createHarness(FAST_TIMERS, { hasGit: true });
+    if (stamp === 'same') harness.setStamp({ allocationId: 'alloc-current', commit: 'abc' });
     harness.setGit(args => {
-      if (args[0] === 'show-ref') return result(1);
-      if (args[0] === 'for-each-ref') return { stdout: 'main\n', stderr: '', exitCode: 0 };
-      if (args[0] === 'rev-parse') return { stdout: 'new-commit\n', stderr: '', exitCode: 0 };
+      if (args[0] === 'remote' && args[1] === 'get-url') {
+        return {
+          stdout: 'https://x-access-token:stale@github.com/acme/repo.git\n',
+          stderr: '',
+          exitCode: 0,
+        };
+      }
       return result(0);
-    });
-    const spec = routeSpec({
-      git: { url: REPO, token: 'git-1', platform: 'github' },
-      setupCommands: ['npm install'],
-      capture: true,
-    });
-    return { harness, spec };
-  }
-
-  it('captures an adopted snapshot that is due, as the next generation', async () => {
-    const { harness, spec } = refreshHarness({ ...DUE_STAMP, generation: 2 });
-
-    await harness.manager.prepare(spec);
-
-    expect(harness.gitCalls.some(args => args[0] === 'clone')).toBe(false);
-    expect(harness.captureRequests).toHaveLength(1);
-    expect(progressSteps(harness.frames)).toContain('snapshot');
-    expect(harness.stamp()).toEqual({
-      allocationId: 'alloc-current',
-      commit: 'new-commit',
-      capturedAt: NOW,
-      generation: 3,
-    });
-    expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'adopted' });
-  });
-
-  it('does not capture a fresh snapshot and keeps its capture time', async () => {
-    const { harness, spec } = refreshHarness(FOREIGN_STAMP);
-
-    await harness.manager.prepare(spec);
-
-    expect(harness.captureRequests).toEqual([]);
-    expect(harness.stamp()).toMatchObject({
-      capturedAt: FOREIGN_STAMP.capturedAt,
-      generation: 0,
-    });
-  });
-
-  it('rebuilds a due snapshot at the generation cap from a clone, as generation 0', async () => {
-    const { harness, spec } = refreshHarness({
-      ...DUE_STAMP,
-      generation: SNAPSHOT_MAX_GENERATION,
-    });
-
-    await harness.manager.prepare(spec);
-
-    expect(harness.emptyCalls).toHaveLength(1);
-    expect(harness.gitCalls.filter(args => args[0] === 'clone')).toHaveLength(1);
-    expect(harness.gitCalls.some(args => args[0] === 'fetch')).toBe(false);
-    expect(harness.captureRequests).toHaveLength(1);
-    expect(harness.stamp()).toMatchObject({ capturedAt: NOW, generation: 0 });
-    expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'cloned' });
-  });
-
-  it('adopts a snapshot at the cap that is not due, without capturing it', async () => {
-    const { harness, spec } = refreshHarness({
-      ...FOREIGN_STAMP,
-      generation: SNAPSHOT_MAX_GENERATION,
-    });
-
-    await harness.manager.prepare(spec);
-
-    expect(harness.emptyCalls).toEqual([]);
-    expect(harness.captureRequests).toEqual([]);
-    expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'adopted' });
-    expect(harness.stamp()).toMatchObject({ generation: SNAPSHOT_MAX_GENERATION });
-  });
-
-  it('captures a due snapshot only when the route asks for a capture', async () => {
-    const { harness, spec } = refreshHarness(DUE_STAMP);
-
-    await harness.manager.prepare({ ...spec, capture: undefined });
-
-    expect(harness.captureRequests).toEqual([]);
-  });
-
-  it('starts over at generation 0 when the adopt falls back to a clone', async () => {
-    const harness = createHarness(timers({ restoreMs: 30, cloneMs: 2_000 }), {
-      hasGit: true,
-      capture: true,
-    });
-    harness.setStamp({ ...DUE_STAMP, generation: 3 });
-    harness.setGit(args => {
-      if (args[0] === 'fetch') return new Promise<ExecResult>(() => undefined);
-      return result(args[0] === 'show-ref' ? 1 : 0);
     });
 
     await harness.manager.prepare(
-      routeSpec({ git: { url: REPO, token: 'git-1', platform: 'github' }, capture: true })
+      routeSpec({ git: { url: REPO, token: 'git-1', platform: 'github' } })
     );
 
-    expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'cloned' });
-    expect(harness.captureRequests).toHaveLength(1);
-    expect(harness.stamp()).toMatchObject({ capturedAt: NOW, generation: 0 });
+    expect(harness.gitCalls).toContainEqual(['remote', 'set-url', 'origin', REPO]);
+    for (const args of harness.gitCalls) {
+      if (args[0] !== 'remote') continue;
+      expect(args.join(' ')).not.toContain('@');
+    }
+    expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.ready' });
   });
 });
 
-describe('capturing a repository snapshot', () => {
-  function captureSpec(overrides: Partial<ControlPlaneRouteSpec> = {}) {
-    return routeSpec({
-      git: { url: REPO, token: 'git-1', platform: 'github' },
-      setupCommands: ['npm install'],
-      capture: true,
-      ...overrides,
-    });
-  }
-
-  it('makes origin bare around the capture and restores the credential before Kilo starts', async () => {
-    const harness = createHarness(FAST_TIMERS, { capture: true });
-    const order: string[] = [];
-    harness.setGit(args => {
-      if (args[0] === 'remote') {
-        order.push(args[3]?.includes('git-1') ? 'origin:authenticated' : 'origin:bare');
-      }
-      if (args[0] === 'reflog') order.push('reflog');
-      if (args[0] === 'rev-parse') return { stdout: 'abc123\n', stderr: '', exitCode: 0 };
-      return result(0);
-    });
-    const spec = captureSpec();
-
-    await harness.manager.prepare(spec);
-
-    expect(harness.captureRequests).toEqual([
-      { sessionId: spec.sessionId, commit: 'abc123', timeoutMs: FAST_TIMERS.wrapper.captureMs },
-    ]);
-    expect(order).toEqual(['origin:bare', 'reflog', 'origin:authenticated']);
-    expect(progressSteps(harness.frames)).toEqual([
-      'clone',
-      'checkout',
-      'setup',
-      'snapshot',
-      'kilo_runtime',
-      'kilo_session',
-    ]);
-    expect(harness.stamp()).toEqual({
-      allocationId: 'alloc-current',
-      commit: 'abc123',
-      capturedAt: NOW,
-      generation: 0,
-    });
-    expect(harness.truncations()).toBe(1);
-    expect(harness.clearedHomes).toEqual([]);
-    expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'cloned' });
-  });
-
-  it('writes the stamp before it asks for the capture', async () => {
-    const harness = createHarness(FAST_TIMERS, { capture: true });
-    let stampAtCapture: unknown = 'unset';
-    const requests = harness.captureRequests;
-    const push = requests.push.bind(requests);
-    requests.push = (...items) => {
-      stampAtCapture = harness.stamp();
-      return push(...items);
-    };
-
-    await harness.manager.prepare(captureSpec());
-
-    expect(stampAtCapture).toMatchObject({ allocationId: 'alloc-current' });
-  });
-
-  it('continues when the capture is not saved or the channel fails, and restores origin', async () => {
-    for (const outcome of [false, 'throw'] as const) {
-      const harness = createHarness(FAST_TIMERS, { capture: true });
-      harness.setCaptureResult(outcome);
-      const spec = captureSpec();
+describe('workspace Git credentials', () => {
+  it('clones with the credential-free URL and records the token for the helper', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-git-credentials-'));
+    try {
+      const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+      const spec = routeSpec({
+        git: { url: 'https://github.com/acme/repo.git', token: 'git-1', platform: 'github' },
+      });
 
       await harness.manager.prepare(spec);
 
-      expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.ready' });
-      const setUrls = harness.gitCalls.filter(
-        args => args[0] === 'remote' && args[1] === 'set-url'
+      const clone = harness.gitCalls.find(args => args[0] === 'clone');
+      expect(clone).toContain('https://github.com/acme/repo.git');
+      for (const args of harness.gitCalls) expect(args.join(' ')).not.toContain('git-1');
+      const recordPathForSpec = recordPath(root, spec);
+      expect(await fs.readFile(recordPathForSpec, 'utf8')).toBe(
+        'protocol=https\nhost=github.com\nusername=x-access-token\npassword=git-1\n'
       );
-      expect(setUrls.at(-1)?.[3]).toContain('git-1');
+      expect((await fs.stat(recordPathForSpec)).mode & 0o777).toBe(0o600);
+      expect(harness.ensureInputs[0]?.env.GIT_CONFIG_COUNT).toBe('2');
+      expect(harness.ensureInputs[0]?.env.GIT_CONFIG_KEY_0).toBe('credential.helper');
+      expect(harness.ensureInputs[0]?.env.GIT_CONFIG_VALUE_0).toBe(
+        '/opt/kilo-cloud/kilo-git-credential'
+      );
+      expect(harness.ensureInputs[0]?.env.GIT_TERMINAL_PROMPT).toBe('0');
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
     }
   });
 
-  it('does not capture when origin cannot be made bare', async () => {
-    const harness = createHarness(FAST_TIMERS, { capture: true });
-    harness.setGit(args =>
-      args[0] === 'remote' && !args[3]?.includes('git-1')
-        ? result(1, 'fatal: no such remote')
-        : result(0)
-    );
+  it('rewrites the record on a credential renewal without touching origin', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-git-credentials-'));
+    try {
+      const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+      const spec = routeSpec({
+        git: { url: 'https://github.com/acme/repo.git', token: 'git-1', platform: 'github' },
+      });
+      await harness.manager.prepare(spec);
+      harness.gitCalls.length = 0;
 
-    await harness.manager.prepare(captureSpec());
+      await harness.manager.installCredentials({
+        sessionId: spec.sessionId,
+        git: { token: 'git-2', platform: 'github' },
+        kilo: { token: 'kilo-token-2' },
+      });
 
-    expect(harness.captureRequests).toEqual([]);
-    expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.ready' });
-  });
-
-  it('continues through Kilo startup when the capture acknowledgement times out', async () => {
-    const capture = createWorkspaceCapture({ send: () => undefined });
-    const harness = createHarness(timers({ captureMs: 20 }), {
-      capture: true,
-      captureRequest: (sessionId, commit, timeoutMs) =>
-        capture.request(sessionId, commit, timeoutMs),
-    });
-    const spec = captureSpec();
-    harness.setSessionExists(false);
-
-    await harness.manager.prepare(spec);
-
-    expect(harness.captureRequests).toHaveLength(1);
-    expect(harness.logs).toContain(`control-plane capture not saved session=${spec.sessionId}`);
-    const setUrls = harness.gitCalls.filter(args => args[0] === 'remote' && args[1] === 'set-url');
-    expect(setUrls.at(-1)?.[3]).toContain('git-1');
-    expect(harness.ensureCalls()).toBe(1);
-    expect(harness.ensureSessionCalls()).toBe(1);
-    expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.ready' });
-    expect(harness.frames.some(frame => frame.type === 'session.failed')).toBe(false);
-  });
-
-  it('fails the route when the credential cannot be restored after a capture', async () => {
-    const harness = createHarness(FAST_TIMERS, { capture: true });
-    harness.setGit(args =>
-      args[0] === 'remote' && args[3]?.includes('git-1')
-        ? result(1, 'fatal: cannot set url')
-        : result(0)
-    );
-
-    await harness.manager.prepare(captureSpec());
-
-    expect(lastFrame(harness.frames)).toMatchObject({
-      type: 'session.failed',
-      reason: 'workspace_setup_failed',
-      step: 'snapshot',
-    });
-  });
-
-  it('does not capture without a capture request, a repository or a capture channel', async () => {
-    const withoutRequest = createHarness(FAST_TIMERS, { capture: true });
-    await withoutRequest.manager.prepare(captureSpec({ capture: undefined }));
-    expect(withoutRequest.captureRequests).toEqual([]);
-
-    const withoutChannel = createHarness(FAST_TIMERS);
-    await withoutChannel.manager.prepare(captureSpec());
-    expect(progressSteps(withoutChannel.frames)).not.toContain('snapshot');
-
-    const withoutRepo = createHarness(FAST_TIMERS, { capture: true });
-    await withoutRepo.manager.prepare(captureSpec({ git: undefined }));
-    expect(withoutRepo.captureRequests).toEqual([]);
+      expect(harness.gitCalls).toEqual([]);
+      expect(await fs.readFile(recordPath(root, spec), 'utf8')).toBe(
+        'protocol=https\nhost=github.com\nusername=x-access-token\npassword=git-2\n'
+      );
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 });
 
@@ -3338,27 +3499,37 @@ describe('credentials buffered during prepare', () => {
     ).toBe(true);
   });
 
-  it('still updates the Git remote when the proxy handle is unchanged', async () => {
+  it('refreshes the Git record when the proxy handle is unchanged, leaving origin alone', async () => {
     // Regression guard for the prepare-side effect: an unchanged handle must
-    // still reach the runtime and refresh the Git remote. The "no restart
+    // still reach the runtime and refresh the Git credential. The "no restart
     // marker" half of the contract is covered by the real-runtime test
     // `does not roll for a repeated or stale proxy handle but latches a pending one`.
-    const harness = createHarness();
-    const spec = routeSpec({ git: { url: 'https://github.com/acme/repo.git', token: 'git-1' } });
-    const handle = proxyHandle(EXP_NOW);
-    await harness.manager.prepare(spec, credentialsFor(spec, handle));
-    harness.gitCalls.length = 0;
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-git-renewal-'));
+    try {
+      const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+      const spec = routeSpec({
+        git: { url: 'https://github.com/acme/repo.git', token: 'git-1', platform: 'github' },
+      });
+      const handle = proxyHandle(EXP_NOW);
+      await harness.manager.prepare(spec, credentialsFor(spec, handle));
+      harness.gitCalls.length = 0;
 
-    await harness.manager.installCredentials({
-      sessionId: spec.sessionId,
-      git: { token: 'git-2' },
-      kilo: { token: 'alias' },
-      proxy: { handle, targets: specTargets(spec) },
-    });
+      await harness.manager.installCredentials({
+        sessionId: spec.sessionId,
+        git: { token: 'git-2', platform: 'github' },
+        kilo: { token: 'alias' },
+        proxy: { handle, targets: specTargets(spec) },
+      });
 
-    expect(harness.installCalls).toHaveLength(1);
-    expect(harness.installCalls[0]?.env.KILOCODE_TOKEN).toBe(handle);
-    expect(harness.gitCalls.some(args => args[0] === 'remote' && args[1] === 'set-url')).toBe(true);
+      expect(harness.installCalls).toHaveLength(1);
+      expect(harness.installCalls[0]?.env.KILOCODE_TOKEN).toBe(handle);
+      expect(harness.gitCalls).toEqual([]);
+      expect(await fs.readFile(recordPath(root, spec), 'utf8')).toBe(
+        'protocol=https\nhost=github.com\nusername=x-access-token\npassword=git-2\n'
+      );
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 });
 
@@ -3386,7 +3557,7 @@ describe('release cleanup with no live runtime client', () => {
         release: () => undefined,
       },
       inheritedEnv: {},
-      homeRoot: '/tmp/prepare-test-homes',
+      homeRoots: homeRootsFor('/tmp/prepare-test-homes'),
       hasGit: async () => false,
       readStamp: async () => null,
       writeStamp: async () => undefined,

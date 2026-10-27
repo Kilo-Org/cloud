@@ -22,8 +22,26 @@ import {
 } from './session-prepare.js';
 import { createSessionStartHandlers } from './session-start.js';
 
+function environmentLoad(
+  layer: Record<string, unknown>,
+  environmentId: string,
+  sandboxAllocation: string | null = null
+) {
+  return {
+    layer,
+    sandboxAllocation,
+    reference: {
+      environmentId,
+      owner: { type: 'user' as const, id: 'user-123' },
+      configurationRevision: 3,
+      repository: { platform: 'github' as const, repoFullName: 'acme/repo' },
+    },
+  };
+}
+
 const {
   mergeProfileConfigurationMock,
+  loadEnvironmentForSessionMock,
   assertKiloModelAvailableMock,
   assertBitbucketRepositoryAccessMock,
   assertOrganizationMembershipMock,
@@ -33,6 +51,7 @@ const {
   parentRuntimeTokenMock,
 } = vi.hoisted(() => ({
   mergeProfileConfigurationMock: vi.fn().mockResolvedValue({}),
+  loadEnvironmentForSessionMock: vi.fn().mockResolvedValue(null),
   parentRuntimeTokenMock: vi.fn().mockResolvedValue('trusted-parent-model-token'),
   assertKiloModelAvailableMock: vi.fn().mockResolvedValue(undefined),
   assertBitbucketRepositoryAccessMock: vi.fn().mockResolvedValue(undefined),
@@ -71,6 +90,7 @@ vi.mock('@kilocode/cloud-agent-profile', async importActual => {
   return {
     ...actual,
     mergeProfileConfiguration: mergeProfileConfigurationMock,
+    loadEnvironmentForSession: loadEnvironmentForSessionMock,
   };
 });
 
@@ -140,6 +160,7 @@ describe('prepareSession operation-ledger admission gate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mergeProfileConfigurationMock.mockResolvedValue({});
+    loadEnvironmentForSessionMock.mockResolvedValue(null);
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
     assertBitbucketRepositoryAccessMock.mockResolvedValue(undefined);
     assertOrganizationMembershipMock.mockResolvedValue(undefined);
@@ -840,5 +861,40 @@ describe('prepareSession operation-ledger admission gate', () => {
     expect(mergeProfileConfigurationMock).toHaveBeenCalledTimes(2);
     expect(assertKiloModelAvailableMock).toHaveBeenCalledTimes(2);
     expect(createSessionWithLedgerMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('carries the repository environment and its merged configuration in the registration-only create request', async () => {
+    const caller = router.createCaller(createContext());
+    const environmentId = '123e4567-e89b-12d3-a456-426614174099';
+    const layer = { envVars: { ENV_ONLY: 'from-environment' }, setupCommands: ['env-setup'] };
+    loadEnvironmentForSessionMock.mockResolvedValueOnce(environmentLoad(layer, environmentId));
+    mergeProfileConfigurationMock.mockResolvedValueOnce(layer);
+
+    await caller.prepareSession({
+      prompt: 'Use environment',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      autoInitiate: false,
+      createdOnPlatform: 'cloud-agent-web',
+    });
+
+    expect(mergeProfileConfigurationMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ environment: layer })
+    );
+    expect(registerNewSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        environment: environmentLoad({}, environmentId).reference,
+        profile: expect.objectContaining({
+          resolved: expect.objectContaining({
+            envVars: { ENV_ONLY: 'from-environment' },
+            setupCommands: ['env-setup'],
+          }),
+        }),
+      }),
+      expect.objectContaining({ userId: 'test-user-123' }),
+      { billingOrigin: 'cloud-agent-web' }
+    );
   });
 });

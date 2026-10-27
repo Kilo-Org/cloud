@@ -1,5 +1,5 @@
 import 'server-only';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import * as z from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -48,7 +48,9 @@ import {
 import {
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH,
   cloudAgentWorktreeIdSchema,
+  WORKSPACE_REQUIRES_ROOT_SESSION,
   isDefaultSessionTitle,
   sessionShareOptionsSchema,
   projectPrivateWorktreePaths,
@@ -85,6 +87,17 @@ import { after } from 'next/server';
  * Check if an error indicates the session was not found in the cloud-agent DO.
  * This is expected for legacy sessions created before the new DO-based system.
  */
+function sessionTrpcErrorCode(err: unknown): string | undefined {
+  if (!(err instanceof TRPCClientError)) return undefined;
+  const data = err.data as { code?: string } | undefined;
+  const shape = err.shape as { data?: { code?: string } } | undefined;
+  return data?.code ?? shape?.data?.code;
+}
+
+function isSessionConflictError(err: unknown): boolean {
+  return sessionTrpcErrorCode(err) === 'CONFLICT';
+}
+
 function isSessionNotFoundError(err: unknown): boolean {
   if (err instanceof TRPCClientError) {
     const data = err.data as { code?: string; httpStatus?: number } | undefined;
@@ -724,7 +737,7 @@ const GetSessionMessagesPageInputSchema = z
       .positive()
       .max(MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE)
       .default(DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE),
-    cursor: z.string().min(1).optional(),
+    cursor: z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).optional(),
   })
   .superRefine((params, ctx) => {
     if (params.cursor === undefined) return;
@@ -2234,6 +2247,57 @@ export const cliSessionsV2Router = createTRPCRouter({
     const { session_id } = input;
     const session = await getSessionWithAccessCheck(session_id, ctx);
 
+    const hostedCloudSessionId =
+      session.cloud_agent_session_id !== null &&
+      SESSION_ID_RE.test(session.cloud_agent_session_id) &&
+      session.cloud_agent_worktree_id !== null &&
+      session.parent_session_id === null
+        ? session.cloud_agent_session_id
+        : null;
+    if (hostedCloudSessionId !== null) {
+      const authToken = (
+        await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+          headers: ctx.headersList,
+          organizationId: session.organization_id ?? undefined,
+          tokenSource: 'cloud-agent',
+        })
+      ).token;
+      const client = createCloudAgentNextClient(authToken);
+      let alreadyGone = false;
+      try {
+        await client.deleteHostedWorkspaceSession({
+          workspaceId: cloudAgentWorktreeIdSchema.parse(session.cloud_agent_worktree_id),
+          sessionId: hostedCloudSessionId,
+          operationKey: randomUUID(),
+        });
+      } catch (err) {
+        if (isSessionConflictError(err)) {
+          const message =
+            err instanceof Error && err.message.includes(WORKSPACE_REQUIRES_ROOT_SESSION)
+              ? WORKSPACE_REQUIRES_ROOT_SESSION
+              : 'session_deletion_conflict';
+          throw new TRPCError({ code: 'CONFLICT', message, cause: err });
+        }
+        if (!isSessionNotFoundError(err)) {
+          captureException(err, {
+            tags: { source: 'cli-sessions-v2-router', endpoint: 'delete-hosted-workspace-session' },
+            extra: {
+              session_id,
+              cloud_agent_session_id: session.cloud_agent_session_id,
+              cloud_agent_worktree_id: session.cloud_agent_worktree_id,
+            },
+          });
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to clean up cloud-agent session',
+            cause: err,
+          });
+        }
+        alreadyGone = true;
+      }
+      if (!alreadyGone) return { success: true, session_id };
+    }
+
     if (session.cloud_agent_session_id && SESSION_ID_RE.test(session.cloud_agent_session_id)) {
       const authToken = (
         await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
@@ -2249,6 +2313,13 @@ export const cliSessionsV2Router = createTRPCRouter({
           throw new Error('Cloud-agent session deletion was not confirmed');
         }
       } catch (err) {
+        if (isSessionConflictError(err)) {
+          const message =
+            err instanceof Error && err.message.includes(WORKSPACE_REQUIRES_ROOT_SESSION)
+              ? WORKSPACE_REQUIRES_ROOT_SESSION
+              : 'session_deletion_conflict';
+          throw new TRPCError({ code: 'CONFLICT', message, cause: err });
+        }
         if (!isSessionNotFoundError(err)) {
           captureException(err, {
             tags: { source: 'cli-sessions-v2-router', endpoint: 'delete' },

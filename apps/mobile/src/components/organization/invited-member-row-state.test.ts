@@ -119,13 +119,23 @@ describe('useResendInvite', () => {
     });
   });
 
-  it('announces a failed resend in catalog copy, not the server sentence', () => {
+  it('names a missing invitation instead of claiming the resend failed', () => {
     toast.error.mockClear();
     useResendInvite('org-1');
 
     capturedOptions?.onError?.(new Error('Invitation not found'));
 
-    expect(toast.error).toHaveBeenCalledWith(i18n.t('organization.members.resendInviteError'));
+    expect(toast.error).toHaveBeenCalledWith(i18n.t('queryError.notFoundDescription'));
     expect(toast.error).not.toHaveBeenCalledWith('Invitation not found');
+  });
+
+  it('announces any other failed resend in catalog copy, not the server sentence', () => {
+    toast.error.mockClear();
+    useResendInvite('org-1');
+
+    capturedOptions?.onError?.(new Error('Failed to fetch'));
+
+    expect(toast.error).toHaveBeenCalledWith(i18n.t('organization.members.resendInviteError'));
+    expect(toast.error).not.toHaveBeenCalledWith('Failed to fetch');
   });
 });

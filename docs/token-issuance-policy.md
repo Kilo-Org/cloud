@@ -183,6 +183,12 @@ This PR does not retire legacy native exchange, shorten user credentials, change
 
 Workflow issuance reads the existing primary user pepper, including explicit `null`, without initializing or rotating it. Modern workflow tokens retain their audience, purpose, exchange restrictions, and bounded lifetime. This requires no migration and must not reset already initialized peppers; genuine pepper rotation continues to revoke previously issued credentials.
 
+Discord session operations use `generateCloudAgentWorkflowToken` for the installation's
+acting user, with the installation's organization scope and a one-hour lifetime.
+The shared Cloud Agent rollout flags select the credential format. Model calls retain
+their separate API credential; session preparation and initiation use the workflow
+credential and the shared model-eligibility policy.
+
 ## Dedicated Home widget credential
 
 `activeSessions.widgetCredential({ organizationId })` issues a 30-day,
@@ -232,3 +238,14 @@ not authority to restore a cleared account. The native renderer retains its
 last-confirmed Home data on transient failures, ages using shared/server-derived
 presentation timeline boundaries, and clears private data on explicit auth or
 privacy failure.
+
+## MCP account approval
+
+MCP sign-in uses apps/web for account approval and the worker for organization
+selection and OAuth issuance. The approval page presents app-provided connection
+details for the user to confirm. The worker retains the display code for approval
+links and the polling value for the server-side status read, including when the
+user returns to an unfinished request.
+
+Deploy the shared database migration, apps/web, then the MCP worker. The worker's
+SQLite migration runs on first access to its authorization store.

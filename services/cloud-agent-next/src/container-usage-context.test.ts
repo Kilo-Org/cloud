@@ -385,6 +385,18 @@ describe('container usage context', () => {
     });
   });
 
+  it('attributes Agent Manager sessions to agent-manager', () => {
+    const input = buildSandboxBillingInput(
+      metadata({
+        sessionId: 'agent_manager',
+        userId: 'user_manager',
+        billingOrigin: 'agent-manager',
+      }),
+      'dind-abcdef'
+    );
+    expect(input.metadata?.origin).toBe('agent-manager');
+  });
+
   it('maps unknown caller-provided origins to other', () => {
     const input = buildSandboxBillingInput(
       metadata({

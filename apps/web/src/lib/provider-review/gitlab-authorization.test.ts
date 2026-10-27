@@ -10,6 +10,7 @@ import {
   classifyGitLabStatus,
   GitLabApiStatusError,
   GitLabReviewError,
+  gitlabReviewErrorToTrpcError,
   type GitLabReviewOwner,
 } from './gitlab-authorization';
 
@@ -181,6 +182,9 @@ describe('authorizeProject — repository matching', () => {
     const access = await authorizeProject(SELF_MANAGED_USER, 'GROUP/Sub/REPO');
 
     expect(access.projectPath).toBe('group/sub/repo');
+    // The resolved identity travels with the credentials so a caller can
+    // record which connection and repository an action belongs to.
+    expect(access).toMatchObject({ integrationId: 'intg_1', repositoryId: 7 });
   });
 
   it('refuses a prefix or suffix of a nested path (exact full path only)', async () => {
@@ -345,5 +349,42 @@ describe('classifyGitLabErrorForOwner', () => {
     expect(classifyGitLabErrorForOwner(new TypeError('fetch failed'), SELF_MANAGED_ORG).kind).toBe(
       'retryable'
     );
+  });
+});
+
+describe('gitlabReviewErrorToTrpcError', () => {
+  it.each([
+    ['not_found', 'NOT_FOUND'],
+    ['forbidden', 'FORBIDDEN'],
+    ['reconnect', 'PRECONDITION_FAILED'],
+    ['stale_head', 'CONFLICT'],
+    ['bad_request', 'BAD_REQUEST'],
+    ['retryable', 'BAD_GATEWAY'],
+  ] as const)('maps the %s kind to %s', (kind, code) => {
+    const mapped = gitlabReviewErrorToTrpcError(
+      new GitLabReviewError(kind, 'fixed copy'),
+      SELF_MANAGED_USER
+    );
+
+    expect(mapped.code).toBe(code);
+    expect(mapped.message).toBe('fixed copy');
+  });
+
+  it('classifies before mapping, so an organization 403 is a reconnect', () => {
+    const refusal = new GitLabReviewError('forbidden', 'denied', 403);
+
+    expect(gitlabReviewErrorToTrpcError(refusal, SELF_MANAGED_ORG).code).toBe(
+      'PRECONDITION_FAILED'
+    );
+    expect(gitlabReviewErrorToTrpcError(refusal, SELF_MANAGED_USER).code).toBe('FORBIDDEN');
+  });
+
+  it('passes an intentional tRPC refusal through unchanged', () => {
+    const refusal = new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'Draft merge requests are skipped.',
+    });
+
+    expect(gitlabReviewErrorToTrpcError(refusal, SELF_MANAGED_USER)).toBe(refusal);
   });
 });

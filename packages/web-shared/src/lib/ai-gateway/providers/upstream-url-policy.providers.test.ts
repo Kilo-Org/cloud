@@ -30,29 +30,41 @@ const PROVIDER_URLS = [
       model.provider.apiUrlOverrides
     )
   ),
-  ...DIRECT_BYOK_PROVIDERS.flatMap(provider =>
-    urlsOf(`direct-byok ${provider.id}`, provider.base_url, provider.base_url_overrides)
-  ),
   ['openai-chatgpt', OPENAI_CHATGPT_API_URL],
 ];
 
-describe('hard-coded provider URLs', () => {
-  beforeEach(() => {
-    clearUpstreamUrlPolicyCache();
+async function expectPassesUpstreamUrlPolicy(url: string) {
+  clearUpstreamUrlPolicyCache();
+  const resolvedHosts: string[] = [];
+  const violation = await findUpstreamUrlViolation(url, {
+    resolveHostAddresses: async hostname => {
+      resolvedHosts.push(hostname);
+      return ['104.18.2.115'];
+    },
   });
 
+  expect(violation).toBeNull();
+  expect(resolvedHosts).toHaveLength(1);
+}
+
+describe('hard-coded provider URLs', () => {
   // DNS answers are not part of the code, so the resolver reports a public
   // address; this checks the scheme and host each URL is written with.
   it.each(PROVIDER_URLS)('%s (%s) passes the upstream URL policy', async (_name, url) => {
-    const resolvedHosts: string[] = [];
-    const violation = await findUpstreamUrlViolation(url, {
-      resolveHostAddresses: async hostname => {
-        resolvedHosts.push(hostname);
-        return ['104.18.2.115'];
-      },
-    });
-
-    expect(violation).toBeNull();
-    expect(resolvedHosts).toHaveLength(1);
+    await expectPassesUpstreamUrlPolicy(url);
   });
+
+  it.each(DIRECT_BYOK_PROVIDERS.map(provider => [provider.id, provider] as const))(
+    'direct-byok %s passes the upstream URL policy',
+    async (id, provider) => {
+      const upstream = await provider.resolveUpstream({
+        credential: 'test-credential',
+        model: { id: 'test-model' },
+        stream: false,
+      });
+      for (const [, url] of urlsOf(id, upstream.apiUrl, upstream.apiUrlOverrides)) {
+        await expectPassesUpstreamUrlPolicy(url);
+      }
+    }
+  );
 });

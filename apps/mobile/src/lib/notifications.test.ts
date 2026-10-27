@@ -2858,7 +2858,7 @@ describe('cold iOS background delivery', () => {
     expect(rows).toEqual(
       new Map([['scope-token', { kind: 'ios_push_to_start', organizationId: 'org-9' }]])
     );
-    expect(await background.cleanup.readLogoutCleanupTombstone()).toBeNull();
+    expect(await background.cleanup.readLogoutCleanupRecords()).toEqual([]);
   });
 
   it('waits for the real adapter to submit the native deadline before background completion', async () => {
@@ -2918,6 +2918,8 @@ describe('cold iOS background delivery', () => {
         organizationId: 'org-9',
         userId: 'u1',
         recordedAt: Date.parse('2026-01-01T00:00:00.000Z'),
+        statusUpdatedAt: '2026-01-01T00:00:00.000Z',
+        boundPermissionId: 'perm_1',
       })
     );
     const background = await loadColdBackground();
@@ -2932,6 +2934,36 @@ describe('cold iOS background delivery', () => {
     ).toBe(0);
 
     expect(JSON.parse(native.props ?? '{}')).toMatchObject({ needsInput: 1, canApprove: true });
+  });
+
+  it('parses a mirrored ask that names no request and keeps Approve off the card', async () => {
+    // A record written before asks carried their request parses and still names
+    // the session, but no request is named, so the push must not offer Approve
+    // until a live select binds one.
+    secureStore.set(
+      'glanceable-waiting-ask',
+      JSON.stringify({
+        kiloSessionId: 'session-1',
+        status: 'permission',
+        isCloudAgent: true,
+        scopeKey: SCOPE_KEY,
+        organizationId: 'org-9',
+        userId: 'u1',
+        recordedAt: Date.parse('2026-01-01T00:00:00.000Z'),
+      })
+    );
+    const background = await loadColdBackground();
+    expect(
+      await background.deliver({
+        status: 'happy',
+        running: 0,
+        needsInput: 1,
+        idle: 0,
+        needsInputSince: '2026-01-01T00:00:00.000Z',
+      })
+    ).toBe(0);
+
+    expect(JSON.parse(native.props ?? '{}')).toMatchObject({ needsInput: 1, canApprove: false });
   });
 
   it('does not revive a mirrored ask recorded for another scope', async () => {
@@ -3033,18 +3065,21 @@ describe('cold iOS background delivery', () => {
     expect(native.exists).toBe(false);
     expect(rows.has('scope-token')).toBe(true);
     expect(rows.has('failed-activity-token')).toBe(true);
-    expect(await background.cleanup.readLogoutCleanupTombstone()).toMatchObject({
-      userId: null,
-      needsPushUnregister: false,
-      needsActivityUnregister: true,
-      activityTokens: ['failed-activity-token'],
-    });
+    expect(await background.cleanup.readLogoutCleanupRecords()).toMatchObject([
+      {
+        userId: null,
+        pushTokens: [],
+        pushLookupPending: false,
+        needsActivityUnregister: true,
+        activityTokens: ['failed-activity-token'],
+      },
+    ]);
     const { attemptLogoutReconciliation } = await import('@/lib/auth/logout-reconciliation');
     await attemptLogoutReconciliation('u1');
     expect(rows).toEqual(
       new Map([['scope-token', { kind: 'ios_push_to_start', organizationId: 'org-9' }]])
     );
-    expect(await background.cleanup.readLogoutCleanupTombstone()).toBeNull();
+    expect(await background.cleanup.readLogoutCleanupRecords()).toEqual([]);
   });
 });
 

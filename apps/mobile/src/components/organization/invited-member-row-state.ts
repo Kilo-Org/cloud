@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { type InvitedOrgMember } from '@/lib/hooks/use-organization-queries';
+import { knownServerErrorMessage } from '@/lib/server-error-copy';
 import { trpcClient, useTRPC } from '@/lib/trpc';
 
 /**
@@ -88,8 +89,10 @@ export function useResendInvite(organizationId: string) {
         queryKey: trpc.organizations.withMembers.queryKey({ organizationId }),
       });
     },
-    onError: () => {
-      announcingToast.error(i18n.t('organization.members.resendInviteError'));
+    onError: (error: unknown) => {
+      announcingToast.error(
+        knownServerErrorMessage(error) ?? i18n.t('organization.members.resendInviteError')
+      );
     },
   });
 }

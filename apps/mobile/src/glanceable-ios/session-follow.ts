@@ -23,6 +23,7 @@ import {
 import { getGlanceableDelivery } from '@/lib/glanceable/sink-registry';
 import { launcherSessionUrl } from '@/lib/launcher-surfaces';
 
+import * as cardScopes from './session-card-scope';
 import {
   clearSessionCardPress,
   readSessionCards,
@@ -49,6 +50,12 @@ import { liveActivitiesAllowedBySystem } from './system-switch';
  * card's sink reads `ActiveAgentsLiveActivity` instances only, and expo-widgets
  * filters each factory's instances by name, so neither cleanup can end the
  * other's cards.
+ *
+ * A card belongs to the account and organization that followed it, and no
+ * field of its content state says which: the server rebuilds that state on
+ * every push. The device keeps the scope per session in
+ * `session-card-scope.ts`, writes it on Follow, and the launch/foreground
+ * restore ends any card it cannot place in the current scope.
  */
 
 export type SessionFollowContext = { userId: string; organizationId: string | null };
@@ -62,6 +69,12 @@ export const SESSION_FINISHED_DISMISS_MS = 15 * 60 * 1000;
 const cards = new Map<string, SessionActivity>();
 const listeners = new Set<() => void>();
 let revision = 0;
+/**
+ * True when the last `discoverSessionCards` read ActivityKit itself. While it
+ * is false the returned cards are only the ones this process already knew, so a
+ * restore must not treat the result as the whole live set.
+ */
+let discoveryReadable = true;
 
 function emit(): void {
   revision += 1;
@@ -119,6 +132,18 @@ function endCard(
 }
 
 /**
+ * Stop following one session in this process: its card, its press state, and
+ * the scope record it was followed under.
+ */
+function forgetFollow(sessionId: string): void {
+  clearSessionCardPress(sessionId);
+  cardScopes.forgetSessionCardScopes([sessionId]);
+  if (cards.delete(sessionId)) {
+    emit();
+  }
+}
+
+/**
  * Rebuild the map from native truth. A second live card for one session is a
  * duplicate (spec "Starting" rule 3), so it ends at once. A card this process
  * knew that is no longer live (iOS or the server ended it) is released, and the
@@ -128,8 +153,10 @@ function endCard(
 export function discoverSessionCards(): SessionActivity[] {
   const instances = readSessionCards(false);
   if (instances === null) {
+    discoveryReadable = false;
     return [...cards.values()];
   }
+  discoveryReadable = true;
   const liveIds = new Set(instances.map(activity => activity.getId()));
   const known = new Set([
     ...[...cards.values()].map(activity => activity.getId()),
@@ -172,12 +199,16 @@ export function discoverSessionCards(): SessionActivity[] {
 }
 
 /**
- * Launch and foreground: rebuild the map, then register every card's token
- * again. A registration that failed earlier retries here (spec "Error
- * Handling" rule 4). Without a known account the cards stay as they are: a
- * locked keychain is not a sign-out, and sign-out ends the cards itself.
+ * Launch and foreground: rebuild the map, then register again the cards this
+ * account and organization followed. A card's follow scope travels in the
+ * device record (`session-card-scope.ts`), never in the card: the server
+ * replaces the card's whole content state on every push, so the card cannot
+ * keep it. A card whose record is absent (written by an earlier build) or names
+ * another account or organization is out of scope and ends here; only a store
+ * that cannot be read now, like a locked keychain, leaves the cards as they are.
+ * A registration that failed earlier retries here (spec "Error Handling" 4).
  */
-export function restoreFollowedSessionCards(ctx: SessionFollowContext | null): void {
+export async function restoreFollowedSessionCards(ctx: SessionFollowContext | null): Promise<void> {
   if (!getLiveActivityEnabled()) {
     // The in-app switch turned off while no process ran: no card may stay.
     // Retire the token scope first, so it reads each card's token before the
@@ -187,14 +218,36 @@ export function restoreFollowedSessionCards(ctx: SessionFollowContext | null): v
     return;
   }
   const live = discoverSessionCards();
+  // Capture this restore's own discovery result before the await: another
+  // restore or a Follow can run a different discovery in the meantime.
+  const discoveryRead = discoveryReadable;
   if (ctx === null) {
     return;
   }
+  const records = await cardScopes.readSessionCardScopes();
+  if (records === null) {
+    return;
+  }
+  const kept: string[] = [];
   for (const activity of live) {
     const sessionId = activity.getProps()?.sessionId;
-    if (sessionId !== undefined) {
-      registerSessionActivityToken(activity.getId(), activity, { sessionId, ...ctx });
+    const scope = sessionId === undefined ? undefined : records.get(sessionId);
+    if (sessionId === undefined) {
+      endCard(activity, 'immediate');
+    } else if (scope !== undefined && cardScopes.isSessionCardScopeCurrent(scope, ctx)) {
+      kept.push(sessionId);
+      registerSessionActivityToken(activity.getId(), activity, { sessionId, ...scope });
+    } else {
+      // A card no record names (an earlier build kept none), or one followed
+      // under another account or organization: it is out of scope.
+      forgetFollow(sessionId);
+      endCard(activity, 'immediate');
     }
+  }
+  // An unreadable ActivityKit read proves nothing about which cards are live, so
+  // its empty result must not prune the records the cards still rely on.
+  if (discoveryRead) {
+    cardScopes.pruneSessionCardScopes(kept, records);
   }
   retrySessionActivityTokens();
 }
@@ -249,6 +302,7 @@ export function followSession(
     return 'refused';
   }
   cards.set(row.id, activity);
+  cardScopes.rememberSessionCardScope(row.id, ctx);
   registerSessionActivityToken(activity.getId(), activity, { sessionId: row.id, ...ctx });
   emit();
   return 'started';
@@ -260,10 +314,8 @@ export function unfollowSession(sessionId: string): void {
   if (activity === undefined) {
     return;
   }
-  cards.delete(sessionId);
-  clearSessionCardPress(sessionId);
+  forgetFollow(sessionId);
   endCard(activity, 'immediate');
-  emit();
 }
 
 /**
@@ -275,10 +327,8 @@ export function dismissFinishedSessionCard(sessionId: string): void {
     const props = activity.getProps();
     if (props?.sessionId === sessionId && (!isLive(activity) || props.statusKind === 'idle')) {
       if (cards.get(sessionId)?.getId() === activity.getId()) {
-        cards.delete(sessionId);
-        emit();
+        forgetFollow(sessionId);
       }
-      clearSessionCardPress(sessionId);
       endCard(activity, 'immediate');
     }
   }
@@ -297,6 +347,7 @@ export function endAllSessionCards(): void {
     void settleCardWork(activity.end('immediate'));
   }
   clearSessionCardPress();
+  cardScopes.clearSessionCardScopes();
   if (cards.size > 0) {
     cards.clear();
     emit();
@@ -317,7 +368,6 @@ export function syncFollowedSessionCards(
     return;
   }
   const updatedAt = new Date(checkedAt > 0 ? checkedAt : Date.now()).toISOString();
-  let ended = false;
   for (const [sessionId, activity] of cards) {
     const row = rows.find(candidate => candidate.id === sessionId);
     const current = activity.getProps();
@@ -333,9 +383,7 @@ export function syncFollowedSessionCards(
       });
       // A failed run ends like a finished one, with its stop reason.
       if (content.statusKind === 'idle' || content.statusKind === 'failed') {
-        cards.delete(sessionId);
-        clearSessionCardPress(sessionId);
-        ended = true;
+        forgetFollow(sessionId);
         endCard(activity, after(new Date(Date.now() + SESSION_FINISHED_DISMISS_MS)), content);
       } else if (!drawsSame(current, content)) {
         void settleCardWork(
@@ -347,9 +395,6 @@ export function syncFollowedSessionCards(
         );
       }
     }
-  }
-  if (ended) {
-    emit();
   }
 }
 

@@ -115,7 +115,6 @@ describe('ChatComposerInputRow mounted — iOS writing-tools lock', () => {
       isStreaming: true,
       canSend: false,
       hasSendableContent: false,
-      voiceInputAvailable: true,
     });
 
     expect(findAllByType(renderer.root, 'VoiceInputButton')).toHaveLength(1);
@@ -226,7 +225,6 @@ describe('ChatComposerInputRow mounted — iOS writing-tools lock', () => {
   it('renders the mic at the lg size so it reaches the 48dp Android target', async () => {
     const renderer = await renderRow({
       inputEditable: true,
-      voiceInputAvailable: true,
     });
 
     const [mic] = findAllByType(renderer.root, 'VoiceInputButton');

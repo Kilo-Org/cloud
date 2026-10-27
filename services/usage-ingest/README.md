@@ -158,17 +158,22 @@ first-delivery consumer samples for queue latency objectives; even those may car
 historical events, so event age is a freshness signal.
 
 Completion logs use application sampling: staging records 100%; production
-`recorded` and `duplicate` outcomes are sampled uniformly at 1%; `not_recorded`
-and `error` outcomes always log. Every emitted completion includes `sample_rate`
-(`1` or `0.01`). `VERCEL_ENV=production` takes precedence over a conflicting
+`recorded` and `duplicate` outcomes log at 100% by default. Set the
+server-only `USAGE_RECORD_COMPLETION_SAMPLE_RATE` to a probability from `0` to `1`
+and redeploy to change production success sampling (`0.01` for 1%, `0.1` for 10%, `1` for 100%,
+`0` to disable success completion logs). Unset, blank, malformed or out-of-range
+values fall back to `1`. Set it consistently on the gateway and HTTP writer
+apps for comparable samples. `not_recorded` and `error` outcomes always log.
+Every emitted completion includes its actual `sample_rate`.
+`VERCEL_ENV=production` takes precedence over a conflicting
 staging target. Otherwise `VERCEL_TARGET_ENV=staging` or a nonproduction
 `VERCEL_ENV` keeps full logging, even with `NODE_ENV=production`. Without that
 deployment metadata, `NODE_ENV=production` uses production sampling; local/test
 defaults keep full logging. Existing consumer outcome/receipt/retry logs remain
 at 100%, and the existing slow-plus-1% phase diagnostics are unchanged.
 
-Estimate completion attempt counts by outcome using `sum(1 / sample_rate)`;
-this accounts only for application sampling, so additional platform sampling or
+With a nonzero sampling rate, estimate completion attempt counts by outcome using
+`sum(1 / sample_rate)`; this accounts only for application sampling, so additional platform sampling or
 log loss must be handled separately. Production sampled IDs cannot establish
 exact distinct-event completeness. Success latency samples are uniform within
 each outcome/path/region; keep them separate from the slow-biased phase series.

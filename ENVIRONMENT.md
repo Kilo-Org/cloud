@@ -28,6 +28,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `DEBUG_SHOW_DEV_UI` - Enables dev-only UI elements (debug panels, admin buttons); checked in `packages/web-shared/src/lib/constants.ts` and `apps/web/src/app/(app)/profile/page.tsx`. [SERVER]
 - `TRPC_TIMING_LOGGING` - Enables tRPC timing logs in development; checked in `packages/web-shared/src/lib/trpc/init.ts`. [SERVER]
 - `TRPC_TIMING_SAMPLE_RATE` - Sample rate (`0`-`1`) for non-mobile request timing lines; mobile clients are always logged. Defaults to `0.01` when unset or malformed; read in `packages/web-shared/src/lib/observability/request-timing.ts`. [SERVER]
+- `USAGE_RECORD_COMPLETION_SAMPLE_RATE` - Production success sample rate (`0`-`1`) for shared gateway/HTTP writer `usage_record_completion` logs; defaults to `1` (100%) when unset, blank, malformed or out of range. `0` disables recorded/duplicate completion logs; `1` logs every success. Not-recorded/errors and nonproduction completions always log. Set consistently on gateway and HTTP writer apps and redeploy to change it; read in `packages/web-shared/src/lib/ai-gateway/usage-record-diagnostics.ts`. [SERVER]
 - `JEST_MAX_WORKERS` - Limits max worker threads for Jest; read in `apps/web/jest.config.ts`. [SERVER]
 - `JEST_SILENT` - When `false`, shows verbose Jest output; read in `apps/web/jest.config.ts` and `apps/web/.env.test`. [SERVER]
 - `JEST_WORKER_ID` - Set by Jest to identify the current worker thread; used by db connection pooling and libraries to handle worker-specific state. [SERVER]

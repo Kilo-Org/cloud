@@ -225,9 +225,9 @@ describe('POST /api/auth/magic-link', () => {
     await POST(createRequest({ email: 'User@Example.com' }));
     await POST(createRequest({ email: 'user@example.com' }));
 
-    expect(mockCheckRateLimit).toHaveBeenCalledTimes(2);
+    expect(mockCheckRateLimit).toHaveBeenCalledTimes(4);
     const firstKey = mockCheckRateLimit.mock.calls[0]?.[1]?.rateLimitKey;
-    const secondKey = mockCheckRateLimit.mock.calls[1]?.[1]?.rateLimitKey;
+    const secondKey = mockCheckRateLimit.mock.calls[2]?.[1]?.rateLimitKey;
     expect(firstKey).toEqual(expect.stringMatching(/^magic-link-email:[A-Za-z0-9_-]+$/));
     expect(secondKey).toBe(firstKey);
   });
@@ -237,7 +237,7 @@ describe('POST /api/auth/magic-link', () => {
     await POST(createRequest({ email: 'test+second@googlemail.com' }));
 
     const firstKey = mockCheckRateLimit.mock.calls[0]?.[1]?.rateLimitKey;
-    const secondKey = mockCheckRateLimit.mock.calls[1]?.[1]?.rateLimitKey;
+    const secondKey = mockCheckRateLimit.mock.calls[2]?.[1]?.rateLimitKey;
     expect(secondKey).toBe(firstKey);
   });
 

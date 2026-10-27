@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { clearGitCredentialRecord } from '../control/git-credentials.js';
 import {
   stripGitCredentials,
   truncateWrapperLog,
@@ -95,6 +96,9 @@ async function containsCanary(file: string, canaries: readonly string[]): Promis
  * workspace may be captured.
  */
 export async function removeBuildCredentials(input: CleanupInput): Promise<string | null> {
+  if (!(await clearGitCredentialRecord(input.home))) {
+    return 'build Git credential record could not be removed';
+  }
   const bare = await stripGitCredentials({
     git: input.git,
     directory: input.directory,

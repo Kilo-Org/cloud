@@ -1719,7 +1719,7 @@ export function RouterBenchmarksSection({ router }: { router: AutoRouter }) {
           <CardContent className="flex flex-col gap-3 p-4 pt-0">
             <p className="text-muted-foreground text-xs">
               Measurements and published tables are isolated for the selected router. Classifier
-              measurements are shared. Custom owner pools use the efficient router only.
+              measurements are shared.
             </p>
             {registryQuery.isLoading ? (
               <Skeleton className="h-20 w-full" />

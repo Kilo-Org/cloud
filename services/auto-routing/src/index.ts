@@ -12,10 +12,9 @@ import { authMiddleware } from './auth';
 import { classifierAnalyticsHandler } from './admin-classifier-analytics';
 import { getClassifierModelHandler, putClassifierModelHandler } from './admin-classifier-model';
 import { getRoutingModeHandler, putRoutingModeHandler } from './admin-routing-mode';
-import { getRoutingSettingsHandler, putRoutingSettingsHandler } from './admin-routing-settings';
+import { ownerPoolConversionScanHandler } from './owner-pool-conversion';
 import { decideHandler } from './decide';
 import type { HonoEnv } from './hono-env';
-import { ownerPoolConversionScanHandler } from './owner-pool-conversion';
 import {
   evalCaseHandler,
   evalPlanHandler,
@@ -48,10 +47,8 @@ app.get('/admin/classifier-model', getClassifierModelHandler);
 app.put('/admin/classifier-model', putClassifierModelHandler);
 app.get('/admin/routing-mode', getRoutingModeHandler);
 app.put('/admin/routing-mode', putRoutingModeHandler);
-app.get('/admin/routing-settings', getRoutingSettingsHandler);
-app.put('/admin/routing-settings', putRoutingSettingsHandler);
-app.get('/admin/classifier-analytics', classifierAnalyticsHandler);
 app.post(OWNER_POOL_CONVERSION_SCAN_PATH, ownerPoolConversionScanHandler);
+app.get('/admin/classifier-analytics', classifierAnalyticsHandler);
 
 app.post('/decide', decideHandler);
 

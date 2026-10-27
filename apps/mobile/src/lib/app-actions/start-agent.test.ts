@@ -6,7 +6,7 @@ import { getAgentSessionPath } from '@/components/agents/session-detail-routes';
 import { i18n } from '@/i18n';
 import { type OutboxRow } from '@/lib/persist/mutation-outbox';
 import { AGENT_MODEL_PREFERENCE_KEY } from '@/lib/storage-keys';
-import { startAgent } from './start-agent';
+import { resolveStartAgentRepository, startAgent } from './start-agent';
 
 const SESSION_ID = 'ses_12345678901234567890123456';
 
@@ -132,6 +132,31 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe('resolveStartAgentRepository', () => {
+  it('resolves a recent repository', async () => {
+    recentRepositoriesQuery.mockResolvedValue({
+      repositories: [{ gitUrl: 'https://github.com/owner/recent.git' }],
+    });
+
+    await expect(resolveStartAgentRepository({ prompt: 'inspect the project' })).resolves.toEqual({
+      ok: true,
+      repository: { platform: 'github', fullName: 'owner/recent', isPrivate: false },
+    });
+  });
+
+  it('resolves a nested GitLab project', async () => {
+    await expect(
+      resolveStartAgentRepository({
+        prompt: 'inspect the project',
+        repository: 'https://gitlab.com/group/sub/project',
+      })
+    ).resolves.toEqual({
+      ok: true,
+      repository: { platform: 'gitlab', fullName: 'group/sub/project', isPrivate: false },
+    });
+    expect(recentRepositoriesQuery).not.toHaveBeenCalled();
+  });
+});
 describe('startAgent happy path', () => {
   it('starts a session and returns its id and the agent-chat href', async () => {
     const result = await startAgent({
@@ -167,6 +192,22 @@ describe('startAgent happy path', () => {
         operationKey: expect.any(String),
       })
     );
+  });
+
+  it('prepares with a resolved GitLab project', async () => {
+    await startAgent({
+      prompt: 'inspect the project',
+      resolvedRepository: {
+        platform: 'gitlab',
+        fullName: 'group/sub/project',
+        isPrivate: true,
+      },
+    });
+
+    expect(prepareSessionMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ gitlabProject: 'group/sub/project', autoInitiate: true })
+    );
+    expect(recentRepositoriesQuery).not.toHaveBeenCalled();
   });
 
   it('persists the safe-retry row before the mutate and removes it on success', async () => {

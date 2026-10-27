@@ -13,6 +13,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq, desc } from 'drizzle-orm';
 import { millisecondsInDay, millisecondsInHour } from 'date-fns/constants';
 import { assertNoError } from '@kilocode/web-shared/lib/maybe-result';
+import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 
 describe('grantCreditForCategory', () => {
   const mockUser: User = defineTestUser({});
@@ -38,7 +39,7 @@ describe('grantCreditForCategory', () => {
   });
 
   it('should successfully grant credits for valid category', async () => {
-    const result = await grantCreditForCategory(mockUser, {
+    const result = await grantCreditForCategory(await insertTestUser(), {
       credit_category: 'vibeday',
       counts_as_selfservice: false,
     });
@@ -57,7 +58,7 @@ describe('grantCreditForCategory', () => {
   });
 
   it('should grant custom category with amount', async () => {
-    const result = await grantCreditForCategory(mockUser, {
+    const result = await grantCreditForCategory(await insertTestUser(), {
       credit_category: 'custom',
       amount_usd: 25,
       counts_as_selfservice: false,
@@ -68,6 +69,7 @@ describe('grantCreditForCategory', () => {
   });
 
   it('returns a fixed message when the grant throws', async () => {
+    const user = await insertTestUser();
     const thrown = new Error('sensitive-internal-detail');
     jest.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(() => {
       throw thrown;
@@ -88,7 +90,7 @@ describe('grantCreditForCategory', () => {
         await import('@kilocode/web-shared/lib/promotionalCredits');
 
       const result = await isolatedGrant(
-        { organization: null, user: mockUser },
+        { organization: null, user },
         { credit_category: 'unexpected-failure', counts_as_selfservice: false },
         config
       );
@@ -102,7 +104,7 @@ describe('grantCreditForCategory', () => {
       tags: { source: 'promotional_credits_grant' },
       extra: {
         credit_category: 'unexpected-failure',
-        kilo_user_id: mockUser.id,
+        kilo_user_id: user.id,
         organization_id: null,
       },
     });
@@ -149,6 +151,35 @@ describe('grantCreditForCategory', () => {
         },
       ])
     );
+  });
+
+  it('checks grant requirements before opening the grant transaction', async () => {
+    const owner = await insertTestUser();
+    const organization = await createOrganization(
+      `promo-requirement-${crypto.randomUUID()}`,
+      owner.id
+    );
+    const transaction = jest.spyOn(db, 'transaction');
+    let transactionsOpenedDuringRequirement: number | undefined;
+    try {
+      const result = await grantCreditForCategoryConfig(
+        { organization, user: owner },
+        { credit_category: 'ORG_REQUIREMENT_OUTSIDE_TX', counts_as_selfservice: false },
+        {
+          credit_category: 'ORG_REQUIREMENT_OUTSIDE_TX',
+          amount_usd: 5,
+          organization_requirement: async () => {
+            transactionsOpenedDuringRequirement = transaction.mock.calls.length;
+            return { success: true };
+          },
+        }
+      );
+      assertNoError(result);
+      expect(transactionsOpenedDuringRequirement).toBe(0);
+      expect(transaction).toHaveBeenCalledTimes(1);
+    } finally {
+      transaction.mockRestore();
+    }
   });
 
   it('should grant valid self-serviceable promo codes', async () => {
@@ -516,6 +547,85 @@ describe('grantCreditForCategory', () => {
       .from(credit_transactions)
       .where(eq(credit_transactions.credit_category, 'PARALLEL_CAP_TEST'));
     expect(rows.length).toBe(cap);
+  });
+
+  it('reconciles expired lots and repays refund debt once for competing capped grants', async () => {
+    const expiredAt = new Date(Date.now() - millisecondsInDay).toISOString();
+    const user = await insertTestUser({
+      total_microdollars_acquired: 5_000_000,
+      microdollars_used: 10_000_000,
+      next_credit_expiration_at: expiredAt,
+    });
+    const sourceId = crypto.randomUUID();
+    const refundId = crypto.randomUUID();
+    const expiredId = crypto.randomUUID();
+    await db.insert(credit_transactions).values([
+      {
+        id: sourceId,
+        kilo_user_id: user.id,
+        amount_microdollars: 10_000_000,
+        consumed_microdollars: 10_000_000,
+        is_free: false,
+        expiration_baseline_microdollars_used: 0,
+        original_baseline_microdollars_used: 0,
+      },
+      {
+        id: refundId,
+        kilo_user_id: user.id,
+        source_transaction_id: sourceId,
+        amount_microdollars: -10_000_000,
+        refund_principal_microdollars: -10_000_000,
+        is_free: false,
+      },
+      {
+        id: expiredId,
+        kilo_user_id: user.id,
+        amount_microdollars: 5_000_000,
+        is_free: true,
+        expiry_date: expiredAt,
+        expiration_baseline_microdollars_used: 10_000_000,
+        original_baseline_microdollars_used: 10_000_000,
+      },
+    ]);
+    const category = `CAPPED_REFUND_REPAYMENT_${crypto.randomUUID()}`;
+    const results = await Promise.all(
+      Array.from({ length: 2 }, () =>
+        grantCreditForCategoryConfig(
+          { organization: null, user },
+          { credit_category: category, counts_as_selfservice: false },
+          { credit_category: category, amount_usd: 10, total_redemptions_allowed: 1 }
+        )
+      )
+    );
+    const succeeded = results.filter(result => result.success);
+    expect(succeeded).toHaveLength(1);
+    expect(results.filter(result => !result.success)[0]?.message).toContain('redemption limit');
+    const grant = assertNoError(succeeded[0]);
+    const rows = await db
+      .select()
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    expect(rows.filter(row => row.credit_category === category)).toHaveLength(1);
+    expect(rows.find(row => row.id === grant.credit_transaction_id)).toMatchObject({
+      expiration_baseline_microdollars_used: 0,
+      original_baseline_microdollars_used: 10_000_000,
+    });
+    expect(rows.filter(row => row.original_transaction_id === expiredId)).toEqual([
+      expect.objectContaining({ amount_microdollars: -5_000_000 }),
+    ]);
+    expect(rows.filter(row => row.credit_category === `refund_debt_absorbed:${refundId}`)).toEqual([
+      expect.objectContaining({
+        source_transaction_id: grant.credit_transaction_id,
+        amount_microdollars: 0,
+        consumed_microdollars: 10_000_000,
+      }),
+    ]);
+    const [current] = await db.select().from(kilocode_users).where(eq(kilocode_users.id, user.id));
+    expect(current).toMatchObject({
+      total_microdollars_acquired: 10_000_000,
+      microdollars_used: 10_000_000,
+      next_credit_expiration_at: null,
+    });
   });
 
   it('applies total_redemptions_allowed when the caller supplies the transaction', async () => {

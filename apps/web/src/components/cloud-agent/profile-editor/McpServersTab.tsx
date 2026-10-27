@@ -490,7 +490,9 @@ function McpForm(props: McpFormProps) {
                 <code className="bg-muted rounded px-1 py-0.5 font-mono">
                   {MASKED_SECRET_VALUE}
                 </code>
-                ; leave them to keep the secret, or replace to rotate.
+                {form.type === 'local'
+                  ? '; leave one to keep its stored secret, or replace it to rotate that value. Changing the command line requires every value again.'
+                  : '; leave one to keep its stored secret, or replace it to rotate that value. Changing the URL requires every value again.'}
               </>
             )}
           </span>

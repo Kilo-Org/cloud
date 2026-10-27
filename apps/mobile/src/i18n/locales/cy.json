@@ -227,7 +227,6 @@
     "hideBalance": "Cuddio'r balans",
     "showBalance": "Dangos y balans",
     "balanceHidden": "Balans wedi'i guddio",
-    "bonusCreditsExpiring": "Mae {{amount}} o gredydau yn dod i ben ar {{date}}.",
     "signOutTitle": "Allgofnodi?",
     "signOutMessage": "Bydd angen i ti fewngofnodi eto i gael mynediad i dy weithle.",
     "deleteAccountTitle": "Dileu cyfrif?",
@@ -952,6 +951,18 @@
       "securityFindingsUnavailable": "Galluogwch Asiant diogelwch Kilo ar gwmpas i gael canfyddiadau diogelwch.",
       "spendAlertsSubtitle": "croesi trothwyon a sbigau bob awr",
       "spendAlertsToggle": "Categori rhybuddion gwariant"
+    },
+    "history": {
+      "title": "Hanes hysbysiadau",
+      "subtitle": "Hysbysiadau a dderbyniodd y cyfrif hwn",
+      "bannerBody": "Mae hysbysiadau gwthio wedi'u diffodd ar gyfer y ddyfais hon, felly ni fydd rhai newydd yn cyrraedd yma.",
+      "bannerAction": "Gosodiadau hysbysiadau",
+      "emptyTitle": "Dim hysbysiadau eto",
+      "emptyCategoryTitle": "Dim hysbysiadau yn y categori hwn",
+      "emptyBody": "Bydd hysbysiadau a ddaw i'r cyfrif hwn yn ymddangos yma. Cânt eu cadw am {{days}} diwrnod.",
+      "capped": "Yn dangos y hysbysiadau diweddaraf.",
+      "loadError": "Methu llwytho hanes hysbysiadau.",
+      "openFailed": "Nid yw'r hysbysiad hwn yn agor yn unman mwyach."
     },
     "action": {
       "openSession": "Agor y sesiwn"
@@ -2736,7 +2747,9 @@
       "retrying": "Yn ceisio eto…",
       "retryDeny": "Ceisio gwrthod eto",
       "retryAllowOnce": "Ceisio caniatáu unwaith eto",
-      "retryAlwaysAllow": "Ceisio caniatáu bob tro eto"
+      "retryAlwaysAllow": "Ceisio caniatáu bob tro eto",
+      "unreadableTitle": "Methwyd darllen y cais am ganiatâd",
+      "unreadableBody": "Mae'r asiant yn aros am benderfyniad ganiatâd na all yr ap hwn ei ddangos. Diweddarwch yr ap neu'r CLI, neu atebwch y cais yn y CLI i barhau."
     },
     "questionCard": {
       "title": "Mae angen mewnbwn ar yr asiant",
@@ -3156,8 +3169,9 @@
     "unavailableDevice": "Nid yw mewnbwn llais ar gael ar y ddyfais hon.",
     "unavailableLanguage": "Nid yw mewnbwn llais ar gael ar gyfer iaith y ddyfais hon.",
     "languageNotInstalledTitle": "Nid yw mewnbwn llais ar gyfer {{language}} yn barod eto",
-    "languageNotInstalledMessage": "Nid yw ffeiliau lleferydd all-lein {{language}} wedi'u gosod ar y ffôn hon. Llwythwch nhw i lawr, yna ceisiwch fewnbwn llais eto.",
+    "languageNotInstalledMessage": "Nid yw ffeiliau lleferydd all-lein {{language}} wedi'u gosod, a mae trawsgrifio ar-lein wedi'i ddiffodd. Llwythwch y ffeiliau i lawr neu trowch trawsgrifio ar-lein ymlaen eto er mwyn defnyddio mewnbwn llais.",
     "downloadOfflineModel": "Llwytho i lawr",
+    "useOnlineTranscription": "Caniatáu trawsgrifio ar-lein",
     "offlineModelDownloadScheduled": "Bydd y ffeiliau lleferydd all-lein yn cael eu llwytho i lawr yn y cefndir. Ceisiwch fewnbwn llais eto yn nes ymlaen.",
     "listeningStopped": "Daeth y gwrando i ben.",
     "transcribing": "Yn trawsgrifio...",
@@ -3335,7 +3349,7 @@
     "creditActivity": {
       "emptyDescription": "Bydd pryniannau, defnydd ac addasiadau credyd y sefydliad hwn yn ymddangos yma wrth iddynt ddigwydd.",
       "emptyTitle": "Dim gweithgaredd credyd",
-      "expires": "Yn dod i ben {{date}}",
+      "expiresUtc": "Yn dod i ben {{date}} (UTC)",
       "title": "Gweithgaredd credyd",
       "transactionFallback": "Trafodiad credyd",
       "category": {
@@ -4044,6 +4058,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Mae gwerthoedd a ddangosir fel •••• yn cadw eu cyfrinach storio; disodlwch werth i'w gylchdroi. Mae newid y llinell orchymyn yn gofyn am bob gwerth eto",
+      "headersHint": "Mae gwerthoedd a ddangosir fel •••• yn cadw eu cyfrinach storio; disodlwch werth i'w gylchdroi. Mae newid yr URL yn gofyn am bob gwerth eto",
       "nameRequired": "Rhowch enw gweinydd",
       "nameInvalid": "Dim ond llythrennau ASCII, rhifau, tanlinellau a llinellau toriad y gall enw eu defnyddio, hyd at 100 nod",
       "commandRequired": "Rhowch orchymyn",
@@ -4142,6 +4158,10 @@
   "credits": {
     "title": "Prynu credydau",
     "description": "Mae credydau yn bryniant un-tro sy'n cael ei ychwanegu at eich balans Kilo ar gyfer rhedeg sesiynau codio AI yn Kilo App. Mae'r siop yn codi eich cyfrif ac mae credydau'n cael eu hychwanegu ar ôl i'r siop gadarnhau'r taliad.",
+    "nextExpiry": "Mae {{amount}} o gredydau yn dod i ben ar {{date}} (UTC). Defnyddir y credydau sy'n dod i ben gyntaf yn gyntaf.",
+    "appStoreExpiry": "Nid yw credydau a brynwyd drwy'r App Store yn dod i ben.",
+    "playOneYearExpiry": "Mae'r credydau hyn yn dod i ben un flwyddyn galendr ar ôl eu prynu.",
+    "playNonexpiring": "Nid yw'r credydau hyn yn dod i ben.",
     "packLabel": "Ychwanegu {{amount}} o gredydau",
     "priceUnavailable": "Pris ddim ar gael",
     "purchased": "Ychwanegwyd credydau at eich balans.",
@@ -4296,6 +4316,18 @@
     "generate": "Creu crynodeb",
     "retrySummary": "Rhoi cynnig eto ar grynodeb taledig",
     "sources": "Tystiolaeth ac arteffactau",
+    "sessionsShown_zero": "Yn dangos {{shown}} o {{total}} sesiwn",
+    "sessionsShown_one": "Yn dangos {{shown}} o {{total}} sesiwn",
+    "sessionsShown_two": "Yn dangos {{shown}} o {{total}} sesiwn",
+    "sessionsShown_few": "Yn dangos {{shown}} o {{total}} sesiwn",
+    "sessionsShown_many": "Yn dangos {{shown}} o {{total}} sesiwn",
+    "sessionsShown_other": "Yn dangos {{shown}} o {{total}} sesiwn",
+    "itemsShown_zero": "Yn dangos {{shown}} o {{total}} eitem",
+    "itemsShown_one": "Yn dangos {{shown}} o {{total}} eitem",
+    "itemsShown_two": "Yn dangos {{shown}} o {{total}} eitem",
+    "itemsShown_few": "Yn dangos {{shown}} o {{total}} eitem",
+    "itemsShown_many": "Yn dangos {{shown}} o {{total}} eitem",
+    "itemsShown_other": "Yn dangos {{shown}} o {{total}} eitem",
     "timezone": "Cylchfa amser y briff",
     "deviceTimezone": "Defnyddio cylchfa amser y ddyfais",
     "timezoneHint": "Cylchfa amser IANA, er enghraifft Europe/Berlin. Bydd newidiadau i'r amserlen yn berthnasol i friffiau'r dyfodol.",

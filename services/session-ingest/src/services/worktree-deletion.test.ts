@@ -1224,6 +1224,23 @@ describe('durable worktree deletion journal', () => {
     ).rejects.toThrow('session_conflict');
   });
 
+  it('journals completed runtime locations idempotently', async () => {
+    const f = database();
+    await beginWorktreeDeletion(env, params);
+
+    await recordWorktreeCleanup(env, { ...params, completedRuntimeLocation: location });
+    const recorded = await recordWorktreeCleanup(env, {
+      ...params,
+      completedRuntimeLocation: location,
+    });
+
+    expect(recorded.manifest.completedRuntimeLocations).toEqual([location]);
+    expect(
+      cloudAgentWorktreeDeletionManifestSchema.parse(f.worktrees[0].deletion_manifest)
+        .completedRuntimeLocations
+    ).toEqual([location]);
+  });
+
   it('refuses exclusive teardown for another worktree or an unopened root with unknown runtime ownership', async () => {
     const f = database();
     await beginWorktreeDeletion(env, params);

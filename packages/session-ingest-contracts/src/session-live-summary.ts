@@ -111,13 +111,67 @@ export function sessionDisplayLine(raw: string): string {
     .join('');
 }
 
+let graphemeSegmenter: Intl.Segmenter | null | undefined;
+
+/**
+ * The segmenter the cut reads character boundaries from, or null when the
+ * runtime does not provide one. A built segmenter is kept: it is stateless, and
+ * the granularity is the same for every language, so no locale is needed.
+ *
+ * A missing one is not remembered. Hermes ships no `Intl.Segmenter` and the
+ * mobile app installs the polyfill into the running process, so a caller that
+ * cuts text before that install must read the next cut through the segmenter
+ * that is there now, not keep a code-unit cut for the rest of the process.
+ */
+function characterSegmenter(): Intl.Segmenter | null {
+  if (graphemeSegmenter) return graphemeSegmenter;
+  if (typeof Intl !== 'object' || Intl === null || typeof Intl.Segmenter !== 'function') {
+    return null;
+  }
+  graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+  return graphemeSegmenter;
+}
+
+/**
+ * The end of the character at or before `maxIndex`, as the index just past it:
+ * the largest extended grapheme cluster boundary no greater than `maxIndex`.
+ * A runtime without segmentation falls back to a code unit boundary that keeps
+ * a surrogate pair whole.
+ */
+function characterCut(line: string, maxIndex: number): number {
+  const segmenter = characterSegmenter();
+  if (segmenter === null) {
+    const last = line.charCodeAt(maxIndex - 1);
+    return maxIndex > 0 && last >= 0xd800 && last <= 0xdbff ? maxIndex - 1 : maxIndex;
+  }
+  let end = 0;
+  for (const { index } of segmenter.segment(line)) {
+    if (index > maxIndex) break;
+    end = index;
+  }
+  return end;
+}
+
+/**
+ * The longest prefix of `text` that fits in `limit` UTF-16 code units and ends
+ * on a character boundary, so an emoji sequence, a flag, a skin-tone or keycap
+ * modifier, or a combining mark is never left half drawn. Every capped card
+ * text reads its cut from here. A runtime without segmentation keeps a code
+ * unit boundary that does not split a surrogate pair.
+ */
+export function sessionLiveCut(text: string, limit: number): string {
+  if (text.length <= limit) return text;
+  return text.slice(0, characterCut(text, limit));
+}
+
 /**
  * One line of display text: control characters and line breaks become spaces,
  * layout format controls are removed, the joiners that shape adjacent
  * characters are kept, runs of white space collapse, and text longer than
- * `limit` ends with an ellipsis inside the limit. The cut never splits a UTF-16
- * surrogate pair. Empty text, white space, and text made only of joiners give
- * null.
+ * `limit` ends with an ellipsis inside the limit. The cut falls on a character
+ * boundary, so the line never ends half drawn, and the whole result stays
+ * within `limit` UTF-16 code units. Empty text, white space, and text made only
+ * of joiners give null.
  */
 export function sessionLiveText(raw: unknown, limit: number): string | null {
   if (typeof raw !== 'string') return null;
@@ -133,8 +187,5 @@ export function sessionLiveText(raw: unknown, limit: number): string | null {
     return null;
   }
   if (line.length <= limit) return line;
-  let cut = line.slice(0, limit - 1);
-  const last = cut.charCodeAt(cut.length - 1);
-  if (last >= 0xd800 && last <= 0xdbff) cut = cut.slice(0, -1);
-  return `${cut.trimEnd()}…`;
+  return `${sessionLiveCut(line, limit - 1).trimEnd()}…`;
 }

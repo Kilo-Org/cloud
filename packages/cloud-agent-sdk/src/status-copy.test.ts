@@ -111,6 +111,7 @@ const mockSession = {
     getQuestion: jest.fn(() => null),
     getSessionInfo: jest.fn(() => null),
     getPermission: jest.fn(() => null),
+    getUnreadablePermissions: jest.fn(() => []),
     getSuggestion: jest.fn(() => null),
     getPendingMessages: jest.fn((): ReadonlyMap<string, MessageDeliveryState> => new Map()),
     clearFailedMessage: jest.fn(),

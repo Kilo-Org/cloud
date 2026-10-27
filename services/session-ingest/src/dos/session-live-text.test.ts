@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { sessionLiveText } from '@kilocode/session-ingest-contracts';
 
@@ -41,6 +41,88 @@ describe('sessionLiveText', () => {
   it('still maps line breaks and control characters to one space', () => {
     expect(sessionLiveText('a\u0000b\nc', 40)).toBe('a b c');
     expect(sessionLiveText('  a\u2028\u2029b  ', 40)).toBe('a b');
+  });
+
+  it('cuts on character boundaries, not inside a drawn sequence', () => {
+    // A family emoji is four people and three joiners: one drawn character.
+    expect(sessionLiveText('abc👨‍👩‍👧def', 8)).toBe('abc…');
+    expect(sessionLiveText('abc👨‍👩‍👧def', 12)).toBe('abc👨‍👩‍👧…');
+    // A flag is two regional indicators, one drawn character.
+    expect(sessionLiveText('abc🇷🇸def', 6)).toBe('abc…');
+    expect(sessionLiveText('abc🇷🇸def', 8)).toBe('abc🇷🇸…');
+    // A letter and its combining mark are one drawn character.
+    expect(sessionLiveText('abe\u0301cd', 4)).toBe('ab…');
+    expect(sessionLiveText('abe\u0301cd', 5)).toBe('abe\u0301…');
+    // A skin-tone modifier and a keycap belong to the character they modify.
+    expect(sessionLiveText('abc👍🏽def', 7)).toBe('abc…');
+    expect(sessionLiveText('abc👍🏽def', 8)).toBe('abc👍🏽…');
+    expect(sessionLiveText('abc4\u20e3def', 5)).toBe('abc…');
+    expect(sessionLiveText('abc4\u20e3def', 6)).toBe('abc4\u20e3…');
+  });
+
+  it('keeps every cut inside the limit and on a drawn character boundary', () => {
+    const line = `run ${'👨‍👩‍👧'.repeat(6)} now`;
+    const boundaries = new Set([
+      ...[...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(line)].map(
+        ({ index }) => index
+      ),
+      // The last segment ends at the end of the line, which a segment does not report.
+      line.length,
+    ]);
+    for (let limit = 1; limit <= line.length; limit += 1) {
+      const cut = sessionLiveText(line, limit);
+      expect(cut).not.toBeNull();
+      expect(cut!.length).toBeLessThanOrEqual(limit);
+      const body = cut!.endsWith('…') ? cut!.slice(0, -1) : cut!;
+      expect(line.startsWith(body)).toBe(true);
+      expect(boundaries.has(body.length)).toBe(true);
+    }
+  });
+
+  it('falls back to a code unit boundary when the runtime has no segmenter', async () => {
+    const actual = globalThis.Intl;
+    try {
+      vi.stubGlobal('Intl', { Segmenter: undefined });
+      vi.resetModules();
+      // A dynamic import re-evaluates the module, which is the only way to reach
+      // the absent-segmenter branch once the module has cached its segmenter.
+      const { sessionLiveText: withoutSegmenter } =
+        await import('@kilocode/session-ingest-contracts/session-live-summary');
+      // The fallback keeps a code unit boundary, so it can stop between a flag's
+      // two indicators, while it never splits a surrogate pair.
+      expect(withoutSegmenter('ab🇷🇸cd', 5)).toBe('ab🇷…');
+      expect(withoutSegmenter('ab😀cd', 4)).toBe('ab…');
+      vi.stubGlobal('Intl', actual);
+      vi.resetModules();
+      // The same fresh module with segmentation in place drops the whole flag.
+      const { sessionLiveText: withSegmenter } =
+        await import('@kilocode/session-ingest-contracts/session-live-summary');
+      expect(withSegmenter('ab🇷🇸cd', 5)).toBe('ab…');
+    } finally {
+      vi.stubGlobal('Intl', actual);
+      vi.resetModules();
+    }
+  });
+
+  it('reads a segmenter that arrives after an earlier cut', async () => {
+    const actual = globalThis.Intl;
+    try {
+      vi.stubGlobal('Intl', { Segmenter: undefined });
+      vi.resetModules();
+      // A dynamic import re-evaluates the module, which is the only way to give
+      // this case a process that has not built a segmenter yet.
+      const { sessionLiveText: cut } =
+        await import('@kilocode/session-ingest-contracts/session-live-summary');
+      // The first cut runs before the runtime has a segmenter, so it keeps code
+      // units: the app installs that polyfill into the same process it draws in.
+      expect(cut('ab🇷🇸cd', 5)).toBe('ab🇷…');
+      vi.stubGlobal('Intl', actual);
+      // Same module instance, so only a fresh look at `Intl` can see it.
+      expect(cut('ab🇷🇸cd', 5)).toBe('ab…');
+    } finally {
+      vi.stubGlobal('Intl', actual);
+      vi.resetModules();
+    }
   });
 
   it('returns null for non-strings, blanks, and joiner-only text', () => {

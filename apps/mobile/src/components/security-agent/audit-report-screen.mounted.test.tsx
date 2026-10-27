@@ -30,15 +30,14 @@ vi.mock('@/lib/trpc', () => ({
     organizations: { securityAgent: { getAuditReport: { queryOptions: orgQueryOptions } } },
   }),
 }));
-vi.mock('@tanstack/react-query', () => ({
-  useQuery,
-}));
+vi.mock('@tanstack/react-query', () => ({ useQuery }));
 // Faithful mirror of the real classifier (covered by its own suite): only the
 // literal 'personal' scope is personal.
 vi.mock('@kilocode/app-shared/security-agent', () => ({
   isPersonalSecurityScope: (scope: string) => scope === 'personal',
 }));
 vi.mock('@/lib/format', () => ({
+  formatCalendarDate: String,
   formatDate: String,
   formatNumber: String,
 }));

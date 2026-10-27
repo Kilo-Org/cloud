@@ -208,7 +208,7 @@ export const restoreFollowedSessionsFromStorage = async (): Promise<boolean> => 
   return known;
 };
 
-/** Android only: a dismissed notification is an Unfollow (spec "Android: actions" 3). */
+/** Android only: a dismissed notification is an Unfollow (spec "Android: actions" 4). */
 export const unfollowDismissedSession = async (sessionId: string): Promise<void> => {
   if (Platform.OS === 'android') {
     await android().unfollowDismissedSession(sessionId);

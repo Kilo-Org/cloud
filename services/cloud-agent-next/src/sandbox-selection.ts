@@ -1,4 +1,8 @@
 import { enrolledByocVercelOwner } from './byoc/vercel-owner.js';
+import {
+  fetchByocVercelEnrollment,
+  fetchByocVercelEnrollmentForUser,
+} from './byoc/vercel-credential-resolver.js';
 import { TRPCError } from '@trpc/server';
 import {
   CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION,
@@ -33,6 +37,10 @@ export type SessionRepositoryType = 'github' | 'gitlab' | 'bitbucket' | 'git';
  */
 export type SandboxAllocationCapability = 'review' | 'remediation';
 
+const VERCEL_NOT_ENROLLED_REASON =
+  'Configure Vercel BYOC in Cloud Agent settings to use Vercel compute';
+const VERCEL_NOT_READY_REASON = 'Vercel compute setup is not ready';
+
 export function sandboxAllocationProviderCapabilityReason(
   allocation: SandboxAllocation,
   capability: SandboxAllocationCapability | undefined
@@ -44,34 +52,24 @@ export function sandboxAllocationProviderCapabilityReason(
     : 'Vercel sandboxes do not include the security-remediation command-line tools';
 }
 
-export function isByocIncompatibleAllocation(
-  env: Env,
-  owner: { userId?: string; orgId?: string },
-  allocation: SandboxAllocation
-): boolean {
-  return (
-    enrolledByocVercelOwner(env, owner) !== undefined &&
-    getSandboxAllocationProvider(allocation) !== 'vercel'
-  );
-}
-
 export function sandboxAllocationUnavailableReason(
   env: Env,
   owner: SelectionOwner,
   allocation: SandboxAllocation,
-  capability?: SandboxAllocationCapability
+  capability?: SandboxAllocationCapability,
+  vercelUnavailableReason?: string
 ): string | undefined {
   const capabilityReason = sandboxAllocationProviderCapabilityReason(allocation, capability);
   if (capabilityReason) return capabilityReason;
-  if (isByocIncompatibleAllocation(env, owner, allocation))
-    return 'BYOC Vercel accounts cannot select non-Vercel allocations';
   const provider = getSandboxAllocationProvider(allocation);
   switch (provider) {
     case 'cloudflare':
       return undefined;
     case 'vercel':
-      if (enrolledByocVercelOwner(env, owner) !== undefined) return undefined;
-      return 'Configure Vercel BYOC in Cloud Agent settings to use Vercel compute';
+      if (enrolledByocVercelOwner(env, owner) === undefined) {
+        return VERCEL_NOT_ENROLLED_REASON;
+      }
+      return vercelUnavailableReason;
     case 'cloudflare-containers':
       if (!isCloudflareContainersEnrolled(env, { orgId: owner.orgId })) {
         return 'Cloudflare containers are not enabled for this account';
@@ -135,12 +133,13 @@ export function getSandboxSelectionCapabilities(
   options?: {
     repositoryType?: SessionRepositoryType;
     capability?: SandboxAllocationCapability;
+    vercelUnavailableReason?: string;
   }
 ): SandboxSelectionCapabilities {
-  if (
-    !isOrgInList(env.SANDBOX_SELECTION_IDS, owner.userId) &&
-    !isOrgInList(env.SANDBOX_SELECTION_IDS, owner.orgId)
-  ) {
+  const selectionAllowed =
+    isOrgInList(env.SANDBOX_SELECTION_IDS, owner.userId) ||
+    isOrgInList(env.SANDBOX_SELECTION_IDS, owner.orgId);
+  if (!selectionAllowed && enrolledByocVercelOwner(env, owner) === undefined) {
     // Owners without selection still run somewhere; report where so the UI can
     // show it without offering a choice.
     return {
@@ -159,7 +158,8 @@ export function getSandboxSelectionCapabilities(
       env,
       owner,
       allocation,
-      capability
+      capability,
+      options?.vercelUnavailableReason
     );
     const repositoryUnavailableReason = repositoryType
       ? sandboxAllocationRepositoryUnavailableReason(allocation, repositoryType)
@@ -179,6 +179,29 @@ export function getSandboxSelectionCapabilities(
   };
 }
 
+export type VercelSelectionReadiness = {
+  vercelUnavailableReason?: string;
+};
+
+export async function resolveVercelSelectionReadiness(
+  env: Env,
+  owner: SelectionOwner
+): Promise<VercelSelectionReadiness> {
+  const byocOwner = enrolledByocVercelOwner(env, owner);
+  if (byocOwner === undefined) return {};
+  try {
+    const enrollment =
+      byocOwner.organizationId !== undefined
+        ? await fetchByocVercelEnrollment(env, byocOwner.organizationId)
+        : await fetchByocVercelEnrollmentForUser(env, byocOwner.userId);
+    return enrollment.setupStatus === 'ready'
+      ? {}
+      : { vercelUnavailableReason: VERCEL_NOT_READY_REASON };
+  } catch {
+    return { vercelUnavailableReason: VERCEL_NOT_READY_REASON };
+  }
+}
+
 export function assertSandboxAllocationAvailable(
   env: Env,
   owner: SelectionOwner,
@@ -196,21 +219,16 @@ export function assertSandboxAllocationAvailable(
       message: 'Sandbox selection is not enabled for this owner',
     });
   }
-  const unavailableReason = isByocIncompatibleAllocation(env, owner, allocation)
-    ? sandboxAllocationUnavailableReason(env, owner, allocation, capability)
-    : undefined;
-  if (unavailableReason !== undefined || !isSandboxAllocationAvailable(capabilities, allocation)) {
-    const option = capabilities.options.find(
-      candidate => getSandboxAllocation(candidate.allocation) === allocation
-    );
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message:
-        option?.unavailableReason ??
-        option?.repositoryUnavailableReason ??
-        unavailableReason ??
-        sandboxAllocationUnavailableReason(env, owner, allocation, capability) ??
-        'Sandbox allocation is unavailable',
-    });
-  }
+  if (isSandboxAllocationAvailable(capabilities, allocation)) return;
+  const option = capabilities.options.find(
+    candidate => getSandboxAllocation(candidate.allocation) === allocation
+  );
+  throw new TRPCError({
+    code: 'BAD_REQUEST',
+    message:
+      option?.unavailableReason ??
+      option?.repositoryUnavailableReason ??
+      sandboxAllocationUnavailableReason(env, owner, allocation, capability) ??
+      'Sandbox allocation is unavailable',
+  });
 }

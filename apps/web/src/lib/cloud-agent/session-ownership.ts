@@ -1,6 +1,6 @@
 import { cliSessions, organization_memberships } from '@kilocode/db/schema';
 import type { db } from '@kilocode/web-shared/lib/drizzle';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { queryAccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-agent-session-access';
 
 /**
@@ -10,40 +10,19 @@ import { queryAccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-a
 type DrizzleDb = typeof db;
 
 /**
- * Verifies that a user owns a specific CLI session by session_id.
+ * Verifies that a user owns a personal session by cloud_agent_session_id.
  *
- * Used for personal context session ownership verification
- * before signing stream tickets.
- *
- * @param fromDb - Database instance to query
- * @param userId - The user's ID (kilo_user_id)
- * @param sessionId - The CLI session ID (session_id) to verify
- * @returns true if the user owns the session, false otherwise
- */
-export async function verifyUserOwnsSession(
-  fromDb: DrizzleDb,
-  userId: string,
-  sessionId: string
-): Promise<boolean> {
-  const [session] = await fromDb
-    .select({ session_id: cliSessions.session_id })
-    .from(cliSessions)
-    .where(and(eq(cliSessions.session_id, sessionId), eq(cliSessions.kilo_user_id, userId)))
-    .limit(1);
-
-  return session !== undefined;
-}
-
-/**
- * Verifies that a user owns a session by cloud_agent_session_id.
- *
- * Used for WebSocket ticket signing where we need to verify ownership
- * using the cloudAgentSessionId that will be used for the WebSocket URL.
+ * Used for WebSocket ticket signing in personal context, where we need to
+ * verify ownership using the cloudAgentSessionId that will be used for the
+ * WebSocket URL. Only rows with no organization are personal: a session owned
+ * by an organization is reachable through
+ * {@link verifyOrgOwnsSessionByCloudAgentId}, which also requires a current
+ * membership, so it never resolves here.
  *
  * @param fromDb - Database instance to query
  * @param userId - The user's ID (kilo_user_id)
  * @param cloudAgentSessionId - The cloud-agent session ID to verify
- * @returns The kiloSessionId if user owns the session, null otherwise
+ * @returns The kiloSessionId if the user owns the personal session, null otherwise
  */
 export async function verifyUserOwnsSessionByCloudAgentId(
   fromDb: DrizzleDb,
@@ -56,7 +35,8 @@ export async function verifyUserOwnsSessionByCloudAgentId(
     .where(
       and(
         eq(cliSessions.cloud_agent_session_id, cloudAgentSessionId),
-        eq(cliSessions.kilo_user_id, userId)
+        eq(cliSessions.kilo_user_id, userId),
+        isNull(cliSessions.organization_id)
       )
     )
     .limit(1);

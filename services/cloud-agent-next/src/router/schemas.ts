@@ -556,7 +556,7 @@ const PrepareSessionSharedFields = {
     .max(100)
     .optional()
     .describe('Platform that created this session (e.g. slack, code-review)'),
-  clientProvenance: z.enum(['browser', 'mobile']).optional(),
+  clientProvenance: z.enum(['browser', 'mobile', 'agent-manager']).optional(),
   shallow: z
     .boolean()
     .optional()

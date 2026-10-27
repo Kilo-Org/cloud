@@ -227,7 +227,6 @@
     "hideBalance": "Peida saldo",
     "showBalance": "Näita saldot",
     "balanceHidden": "Saldo on peidetud",
-    "bonusCreditsExpiring": "Krediit summas {{amount}} aegub {{date}}.",
     "signOutTitle": "Kas logida välja?",
     "signOutMessage": "Tööruumi kasutamiseks pead uuesti sisse logima.",
     "deleteAccountTitle": "Kas kustutada konto?",
@@ -876,6 +875,18 @@
       "securityFindingsUnavailable": "Luba Kilo turvaagent ühes ulatuses, et saada turvalisuse leide.",
       "spendAlertsSubtitle": "lävendi ületamised ja tunnipõhised tõusud",
       "spendAlertsToggle": "Kulutushoiatuste kategooria"
+    },
+    "history": {
+      "title": "Teavituste ajalugu",
+      "subtitle": "Teavitused, mille see konto sai",
+      "bannerBody": "Tõuketeavitused on selle seadme jaoks välja lülitatud, seega uued siia ei jõua.",
+      "bannerAction": "Teavituste seaded",
+      "emptyTitle": "Teavitusi veel pole",
+      "emptyCategoryTitle": "Selles kategoorias pole teavitusi",
+      "emptyBody": "Teavitused, mille see konto saab, kuvatakse siin. Neid säilitatakse {{days}} päeva.",
+      "capped": "Kuvatakse kõige hiljutisemad teavitused.",
+      "loadError": "Teavituste ajaloo laadimine ebaõnnestus.",
+      "openFailed": "See teavitus ei avane enam kuskil."
     },
     "action": {
       "openSession": "Ava seanss"
@@ -2592,7 +2603,9 @@
       "retrying": "Uuesti proovimine…",
       "retryDeny": "Proovi keelamist uuesti",
       "retryAllowOnce": "Proovi lubamist üks kord uuesti",
-      "retryAlwaysAllow": "Proovi lubamist alati uuesti"
+      "retryAlwaysAllow": "Proovi lubamist alati uuesti",
+      "unreadableTitle": "Lubamistaotlust ei saanud lugeda",
+      "unreadableBody": "Agent ootab luba puudutavat otsust, mida see rakendus ei saa näidata. Uuenda rakendust või CLI-t või vasta taotlusele CLI-s, et jätkata."
     },
     "questionCard": {
       "title": "Agent vajab vastust",
@@ -2984,8 +2997,9 @@
     "unavailableDevice": "Häälsisestus pole sellel seadmel saadaval.",
     "unavailableLanguage": "Häälsisestus pole selle seadme keele puhul saadaval.",
     "languageNotInstalledTitle": "Häälsisestus keele {{language}} jaoks pole veel valmis",
-    "languageNotInstalledMessage": "Keele {{language}} võrguühenduseta kõnefailid pole selles telefonis installitud. Laadi need alla ja proovi häälsisestust uuesti.",
+    "languageNotInstalledMessage": "Keele {{language}} võrguühenduseta kõnefailid pole paigaldatud ja veebipõhine transkriptsioon on välja lülitatud. Laadi kõnefailid alla või lülita veebipõhine transkriptsioon uuesti sisse, et häälsisestust kasutada.",
     "downloadOfflineModel": "Laadi alla",
+    "useOnlineTranscription": "Luba veebipõhine transkriptsioon",
     "offlineModelDownloadScheduled": "Võrguühenduseta kõnefailid laaditakse taustal alla. Proovi häälsisestust hiljem uuesti.",
     "listeningStopped": "Kuulamine peatus.",
     "transcribing": "Kõnetuvastus...",
@@ -3159,7 +3173,7 @@
     "creditActivity": {
       "emptyDescription": "Siin kuvatakse selle organisatsiooni ostud, krediidikasutus ja krediidi korrigeerimised kohe, kui need toimuvad.",
       "emptyTitle": "Krediiditehinguid pole",
-      "expires": "Aegub {{date}}",
+      "expiresUtc": "Aegub {{date}} (UTC)",
       "title": "Krediiditehingud",
       "transactionFallback": "Krediiditehing",
       "category": {
@@ -3840,6 +3854,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Väärtused, mis on kuvatud kujul ••••, säilitavad oma salvestatud saladuse; väärtuse asendamisega saab selle vahetada. Käsurea muutmine nõuab kõiki väärtusi uuesti",
+      "headersHint": "Väärtused, mis on kuvatud kujul ••••, säilitavad oma salvestatud saladuse; väärtuse asendamisega saab selle vahetada. URL-i muutmine nõuab kõiki väärtusi uuesti",
       "nameRequired": "Sisestage serveri nimi",
       "nameInvalid": "Nimes võib kasutada ainult ASCII tähti, numbreid, allkriipse ja sidekriipse, kuni 100 tähemärki",
       "commandRequired": "Sisestage käsk",
@@ -3938,6 +3954,10 @@
   "credits": {
     "title": "Osta krediiti",
     "description": "Krediit on ühekordne ost, mis lisatakse sinu Kilo saldole AI kodeerimisseansside käitamiseks Kilo Appis. Pood võtab tasu sinu kontolt ja krediit lisatakse pärast seda, kui pood makse kinnitab.",
+    "nextExpiry": "Krediit summas {{amount}} aegub {{date}} (UTC). Esmalt kasutatakse kõige varem aeguvaid krediite.",
+    "appStoreExpiry": "App Store'i kaudu ostetud krediidid ei aegu.",
+    "playOneYearExpiry": "Need krediidid aeguvad üks kalendriaasta pärast ostu.",
+    "playNonexpiring": "Need krediidid ei aegu.",
     "packLabel": "Lisa {{amount}} krediiti",
     "priceUnavailable": "Hind pole saadaval",
     "purchased": "Krediit on sinu saldole lisatud.",
@@ -4076,6 +4096,10 @@
     "generate": "Koosta kokkuvõte",
     "retrySummary": "Proovi tasulist kokkuvõtet uuesti",
     "sources": "Tõendid ja artefaktid",
+    "sessionsShown_one": "{{total}} seansist kuvatakse {{shown}}",
+    "sessionsShown_other": "{{total}} seansist kuvatakse {{shown}}",
+    "itemsShown_one": "{{total}} kirjest kuvatakse {{shown}}",
+    "itemsShown_other": "{{total}} kirjest kuvatakse {{shown}}",
     "timezone": "Ülevaate ajavöönd",
     "deviceTimezone": "Kasuta seadme ajavööndit",
     "timezoneHint": "IANA ajavöönd, näiteks Europe/Berlin. Ajakava muudatused kehtivad tulevastele ülevaadetele.",

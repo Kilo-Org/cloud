@@ -25,6 +25,7 @@ import {
   type SkillCustomInput,
   type SkillUpdateInput,
 } from './contracts/skills';
+import { skillsShInputSchema, parseSkillsShSourceUrl, type SkillsShInput } from './skills-sh';
 
 export {
   MAX_PROFILE_SKILLS,
@@ -40,8 +41,9 @@ export {
   skillCustomInputSchema,
   skillUpdateInputSchema,
   parseSkillFrontmatter,
+  skillsShInputSchema,
 };
-export type { SkillCustomInput, SkillUpdateInput };
+export type { SkillCustomInput, SkillUpdateInput, SkillsShInput };
 
 type SkillWriteTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
 
@@ -147,6 +149,41 @@ export async function createCustomSkill(
   });
 }
 
+export async function createSkillsShSkill(
+  db: WorkerDb,
+  profileId: string,
+  input: SkillsShInput,
+  owner: ProfileOwner
+): Promise<{ id: string }> {
+  await verifyProfileOwnership(db, profileId, owner);
+
+  return await db.transaction(async tx => {
+    await tx
+      .select({ id: agent_environment_profiles.id })
+      .from(agent_environment_profiles)
+      .where(eq(agent_environment_profiles.id, profileId))
+      .for('update');
+
+    await assertSkillLimit(tx, profileId);
+
+    const [row] = await tx
+      .insert(agent_environment_profile_skills)
+      .values({
+        profile_id: profileId,
+        name: input.source.skill,
+        description: null,
+        source_type: 'skills-sh',
+        source_url: input.source.sourceUrl,
+        raw_markdown: '',
+        files: {},
+        enabled: input.enabled ?? true,
+      })
+      .returning({ id: agent_environment_profile_skills.id });
+
+    return { id: row.id };
+  });
+}
+
 export async function updateSkill(
   db: WorkerDb,
   profileId: string,
@@ -155,7 +192,17 @@ export async function updateSkill(
   owner: ProfileOwner
 ): Promise<void> {
   await verifyProfileOwnership(db, profileId, owner);
-  await fetchSkill(db, skillId, profileId);
+  const existing = await fetchSkill(db, skillId, profileId);
+
+  if (
+    existing.source_type === 'skills-sh' &&
+    (input.name !== undefined || input.rawMarkdown !== undefined || input.files !== undefined)
+  ) {
+    throw new TRPCError({
+      code: 'PRECONDITION_FAILED',
+      message: 'Skills.sh references cannot be modified; delete and re-add the skill instead',
+    });
+  }
 
   const updates: Partial<AgentEnvironmentProfileSkill> = {};
   if (input.name !== undefined) updates.name = input.name;
@@ -204,13 +251,20 @@ export async function setSkillEnabled(
 
 /**
  * Shape used for session materialization. Only enabled skills are returned.
+ * Custom and marketplace skills carry their bundle; skills.sh references carry
+ * only the validated `owner/repo` source and are installed during setup.
  * Internal: no ownership check.
  */
-export type SkillForSession = {
-  name: string;
-  rawMarkdown: string;
-  files: Record<string, string>;
-};
+export type SkillForSession =
+  | {
+      name: string;
+      rawMarkdown: string;
+      files: Record<string, string>;
+    }
+  | {
+      name: string;
+      source: string;
+    };
 
 export async function getSkillsForSession(
   db: WorkerDb,
@@ -219,6 +273,8 @@ export async function getSkillsForSession(
   const skills = await db
     .select({
       name: agent_environment_profile_skills.name,
+      sourceType: agent_environment_profile_skills.source_type,
+      sourceUrl: agent_environment_profile_skills.source_url,
       rawMarkdown: agent_environment_profile_skills.raw_markdown,
       files: agent_environment_profile_skills.files,
     })
@@ -230,5 +286,19 @@ export async function getSkillsForSession(
       )
     )
     .orderBy(agent_environment_profile_skills.name);
-  return skills.map(s => ({ ...s, files: s.files ?? {} }));
+
+  return skills.map(skill => {
+    if (skill.sourceType === 'skills-sh') {
+      const parsed = skill.sourceUrl ? parseSkillsShSourceUrl(skill.sourceUrl) : null;
+      if (!parsed || parsed.skill !== skill.name) {
+        throw new Error(`Skill '${skill.name}' does not match its skills.sh source URL`);
+      }
+      return { name: skill.name, source: parsed.ownerRepo };
+    }
+    return {
+      name: skill.name,
+      rawMarkdown: skill.rawMarkdown,
+      files: skill.files ?? {},
+    };
+  });
 }

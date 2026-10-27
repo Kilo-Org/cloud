@@ -10,6 +10,13 @@ import { useGrantOrganizationCredit } from '@/app/admin/api/organizations/hooks'
 import { toast } from 'sonner';
 import { useAdminCreditManagementPermission } from '@/app/admin/useAdminCreditManagementPermission';
 import { CreditManagementAccessOverlay } from '@/app/admin/components/CreditManagementAccessOverlay';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export function OrganizationAdminCreditGrant({ organizationId }: { organizationId: string }) {
   const grantCreditMutation = useGrantOrganizationCredit();
@@ -20,6 +27,7 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
   const [expirationDate, setExpirationDate] = useState<string>('');
   const [expiryHours, setExpiryHours] = useState<string>('');
   const [neverExpire, setNeverExpire] = useState(true);
+  const [creditKind, setCreditKind] = useState<'paid' | 'promotional'>('promotional');
 
   const parsedAmount = parseFloat(amount);
   const isNegative = parsedAmount < 0;
@@ -28,7 +36,7 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
     !isNaN(parsedAmount) &&
     parsedAmount !== 0 &&
     (!isNegative || description.trim().length > 0) &&
-    (isNegative || hasExpiration);
+    (isNegative || creditKind === 'paid' || hasExpiration);
 
   const handleGrantCredit = async () => {
     if (!canManageCredits || !isFormValid) return;
@@ -43,8 +51,9 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
         organizationId,
         amount_usd: parsedAmount,
         description: description.trim() || undefined,
-        expiry_date: neverExpire ? null : expiry_date,
-        expiry_hours: neverExpire ? null : expiry_hours_val,
+        creditKind: isNegative ? 'promotional' : creditKind,
+        expiry_date: creditKind === 'paid' || neverExpire ? null : expiry_date,
+        expiry_hours: creditKind === 'paid' || neverExpire ? null : expiry_hours_val,
       });
 
       toast.success(`Successfully granted $${amount} credits to organization`);
@@ -53,6 +62,7 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
       setExpirationDate('');
       setExpiryHours('');
       setNeverExpire(true);
+      setCreditKind('promotional');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to grant credit');
     }
@@ -68,7 +78,7 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
           <DollarSign className="h-5 w-5" />
           Grant Credits
         </CardTitle>
-        <CardDescription>Grant promotional credits to this organization</CardDescription>
+        <CardDescription>Grant paid or promotional credits to this organization</CardDescription>
       </CardHeader>
       <CardContent className={canManageCredits ? '' : 'pointer-events-none select-none opacity-35'}>
         <form
@@ -97,6 +107,30 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
           </div>
 
           {!isNegative && (
+            <div className="space-y-2">
+              <Label htmlFor="org-credit-kind">Credit classification</Label>
+              <Select
+                value={creditKind}
+                onValueChange={value => {
+                  if (value === 'paid' || value === 'promotional') setCreditKind(value);
+                }}
+                disabled={!canManageCredits}
+              >
+                <SelectTrigger id="org-credit-kind">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="promotional">Promotional / bonus credits</SelectItem>
+                  <SelectItem value="paid">Paid credits (payment received)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-muted-foreground text-xs">
+                Use paid credits only for a verified payment. Paid-credit expiration is determined
+                by the purchase policy, not promotional expiration overrides.
+              </p>
+            </div>
+          )}
+          {!isNegative && creditKind === 'promotional' && (
             <div className="grid [grid-template-columns:repeat(auto-fit,minmax(150px,1fr))] gap-4">
               <div>
                 <Label
@@ -153,6 +187,7 @@ export function OrganizationAdminCreditGrant({ organizationId }: { organizationI
 
           {canManageCredits &&
             !isNegative &&
+            creditKind === 'promotional' &&
             !isNaN(parsedAmount) &&
             parsedAmount !== 0 &&
             !hasExpiration && (

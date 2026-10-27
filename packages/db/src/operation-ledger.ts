@@ -238,6 +238,26 @@ export async function admitOperation(
   return runInTransaction(database, tx => admitOperationInTransaction(tx, input));
 }
 
+/** Read one unexpired operation identity without admitting a missing row. */
+export async function getOperation(
+  database: LedgerDatabase,
+  input: { userId: string; domain: string; operationKey: string }
+): Promise<OperationLedgerRow | null> {
+  const [row] = await database
+    .select()
+    .from(operation_ledgers)
+    .where(
+      and(
+        eq(operation_ledgers.kilo_user_id, input.userId),
+        eq(operation_ledgers.domain, input.domain),
+        eq(operation_ledgers.operation_key, input.operationKey),
+        sql`${operation_ledgers.expires_at} >= ${new Date().toISOString()}::timestamptz`
+      )
+    )
+    .limit(1);
+  return row ?? null;
+}
+
 async function admitOperationInTransaction(
   tx: LedgerTransaction,
   input: AdmitOperationInput

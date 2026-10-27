@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { WorkerDb } from '@kilocode/db/client';
+import type * as ByocCredentialResolverModule from '../byoc/vercel-credential-resolver.js';
 import type { Env } from '../types.js';
 import {
   requestedSandboxAllocation,
@@ -12,9 +13,22 @@ const { getSandboxAllocationCandidatesMock } = vi.hoisted(() => ({
   getSandboxAllocationCandidatesMock: vi.fn(),
 }));
 
+const { fetchByocVercelEnrollmentMock, fetchByocVercelEnrollmentForUserMock } = vi.hoisted(() => ({
+  fetchByocVercelEnrollmentMock: vi.fn(),
+  fetchByocVercelEnrollmentForUserMock: vi.fn(),
+}));
+
 vi.mock('@kilocode/cloud-agent-profile', () => ({
   getSandboxAllocationCandidates: getSandboxAllocationCandidatesMock,
 }));
+vi.mock('../byoc/vercel-credential-resolver.js', async importActual => {
+  const actual = await importActual<typeof ByocCredentialResolverModule>();
+  return {
+    ...actual,
+    fetchByocVercelEnrollment: fetchByocVercelEnrollmentMock,
+    fetchByocVercelEnrollmentForUser: fetchByocVercelEnrollmentForUserMock,
+  };
+});
 
 const db = {} as WorkerDb;
 const owner = { userId: 'oauth/user', orgId: 'org-id' };
@@ -43,6 +57,7 @@ function resolve(
     repositoryType?: 'github' | 'gitlab' | 'bitbucket';
     capability?: 'review' | 'remediation';
     environmentAllocation?: string;
+    readiness?: { vercelUnavailableReason?: string };
   } = {}
 ) {
   return resolveSavedSandboxAllocation({
@@ -52,12 +67,25 @@ function resolve(
     repositoryType: args.repositoryType ?? 'github',
     ...(args.capability ? { capability: args.capability } : {}),
     ...(args.environmentAllocation ? { environmentAllocation: args.environmentAllocation } : {}),
+    ...(args.readiness ? { readiness: args.readiness } : {}),
   });
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   getSandboxAllocationCandidatesMock.mockResolvedValue({});
+  fetchByocVercelEnrollmentMock.mockReset();
+  fetchByocVercelEnrollmentForUserMock.mockReset();
+  fetchByocVercelEnrollmentMock.mockResolvedValue({
+    organizationId: owner.orgId,
+    credentialId: 'f47ac10b-58cc-4372-a567-0e02b2c3d4aa',
+    setupStatus: 'ready',
+  });
+  fetchByocVercelEnrollmentForUserMock.mockResolvedValue({
+    userId: owner.userId,
+    credentialId: 'f47ac10b-58cc-4372-a567-0e02b2c3d4ab',
+    setupStatus: 'ready',
+  });
 });
 
 describe('resolveSavedSandboxAllocation', () => {
@@ -143,12 +171,91 @@ describe('resolveSavedSandboxAllocation', () => {
     }
   );
 
-  it('keeps a saved Vercel choice only for a BYOC-enrolled owner', async () => {
+  it('keeps a saved Vercel choice for a BYOC-enrolled owner with ready credentials', async () => {
     getSandboxAllocationCandidatesMock.mockResolvedValue({ contextAllocation: 'vercel-small' });
 
     await expect(resolve({ env: { ...env, BYOC_VERCEL_IDS: owner.orgId } as Env })).resolves.toBe(
       'vercel-small'
     );
+    expect(fetchByocVercelEnrollmentMock).toHaveBeenCalledWith(
+      { ...env, BYOC_VERCEL_IDS: owner.orgId },
+      owner.orgId
+    );
+  });
+
+  it('resolves a saved Vercel choice from BYOC enrollment without the selection allowlist', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({ contextAllocation: 'vercel-small' });
+
+    await expect(
+      resolve({ env: { ...env, SANDBOX_SELECTION_IDS: '', BYOC_VERCEL_IDS: owner.orgId } as Env })
+    ).resolves.toBe('vercel-small');
+  });
+
+  it.each([
+    ['pending', { setupStatus: 'pending' }],
+    ['building', { setupStatus: 'building' }],
+    ['failed', { setupStatus: 'failed' }],
+  ] as const)('skips a saved Vercel choice when setup is %s', async (_status, enrollment) => {
+    const byocEnv = { ...env, BYOC_VERCEL_IDS: owner.orgId } as Env;
+    fetchByocVercelEnrollmentMock.mockResolvedValue({
+      organizationId: owner.orgId,
+      credentialId: 'f47ac10b-58cc-4372-a567-0e02b2c3d4ac',
+      ...enrollment,
+    });
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      repositoryAllocation: 'vercel-small',
+      contextAllocation: 'cloudflare-single',
+    });
+
+    await expect(resolve({ env: byocEnv })).resolves.toBe('cloudflare-single');
+  });
+
+  it('skips a saved Vercel choice when credentials are missing', async () => {
+    const byocEnv = { ...env, BYOC_VERCEL_IDS: owner.orgId } as Env;
+    fetchByocVercelEnrollmentMock.mockRejectedValue(new Error('not found'));
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      contextAllocation: 'vercel-small',
+    });
+
+    await expect(resolve({ env: byocEnv })).resolves.toBeUndefined();
+  });
+
+  it('skips a saved Vercel choice when credential lookup fails', async () => {
+    const byocEnv = { ...env, BYOC_VERCEL_IDS: owner.orgId } as Env;
+    fetchByocVercelEnrollmentMock.mockRejectedValue(new Error('credential service unavailable'));
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      repositoryAllocation: 'vercel-small',
+      contextAllocation: 'cloudflare-shared',
+    });
+
+    await expect(resolve({ env: byocEnv })).resolves.toBe('cloudflare-shared');
+  });
+
+  it('keeps an enrolled saved Cloudflare allocation without reading BYOC credentials', async () => {
+    const byocEnv = { ...env, BYOC_VERCEL_IDS: owner.orgId } as Env;
+    fetchByocVercelEnrollmentMock.mockRejectedValue(
+      new Error('Vercel credentials must not be consulted for Cloudflare')
+    );
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      repositoryAllocation: 'cloudflare-shared',
+      contextAllocation: 'vercel-small',
+    });
+
+    await expect(resolve({ env: byocEnv })).resolves.toBe('cloudflare-shared');
+    expect(fetchByocVercelEnrollmentMock).not.toHaveBeenCalled();
+  });
+
+  it('reuses resolved readiness without reading credentials again', async () => {
+    const byocEnv = { ...env, BYOC_VERCEL_IDS: owner.orgId } as Env;
+    getSandboxAllocationCandidatesMock.mockResolvedValue({ contextAllocation: 'vercel-small' });
+
+    await expect(
+      resolve({
+        env: byocEnv,
+        readiness: { vercelUnavailableReason: 'Vercel compute setup is not ready' },
+      })
+    ).resolves.toBeUndefined();
+    expect(fetchByocVercelEnrollmentMock).not.toHaveBeenCalled();
   });
 
   it('returns nothing when no saved setting resolves', async () => {

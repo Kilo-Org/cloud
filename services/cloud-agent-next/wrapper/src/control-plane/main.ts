@@ -26,7 +26,7 @@ import {
   createControlLogUploadAuth,
   type ControlLogUploadAuth,
 } from '../control/log-upload-auth.js';
-import { logToFile } from '../utils.js';
+import { logToFile, withTimeoutAndAbort } from '../utils.js';
 import { createControlPlaneConnection, type ControlPlaneConnection } from './connection.js';
 import {
   cleanupStaleKiloPidfiles,
@@ -86,7 +86,7 @@ export type ControlPlaneLifecycleDeps = {
   connection: ControlPlaneConnection;
   diagnostics: Pick<ControlDiagnostics, 'onDiagnostic' | 'finalize'>;
   fileLogs: Pick<ControlFileLogUploader, 'finalize'>;
-  logUploadAuth?: Pick<ControlLogUploadAuth, 'stop'>;
+  logUploadAuth?: Pick<ControlLogUploadAuth, 'waitForCurrent' | 'disconnected' | 'stop'>;
   onNativeDiagnostic?: ControlDiagnosticReporter;
   exit: (code: number) => void;
   process?: ControlPlaneProcess;
@@ -129,6 +129,24 @@ export function createControlPlaneLifecycle(
     if (shuttingDown) return;
     shuttingDown = true;
     log(`control-plane wrapper stopping exitCode=${exitCode} reason=${reason}`);
+    let diagnosticsBudget = DIAGNOSTICS_FINALIZE_TIMEOUT_MS;
+    const uploadAuth = deps.logUploadAuth;
+    if (uploadAuth) {
+      const started = performance.now();
+      await settle(async () => {
+        await withTimeoutAndAbort(
+          uploadAuth.waitForCurrent(AbortSignal.timeout(diagnosticsBudget)),
+          {
+            timeoutMs: diagnosticsBudget,
+            timeoutMessage: 'Final upload credential refresh timed out',
+            abortMessage: 'Final upload credential refresh aborted',
+          }
+        );
+      });
+      diagnosticsBudget = Math.max(0, diagnosticsBudget - Math.ceil(performance.now() - started));
+    }
+    deps.connection.close();
+    uploadAuth?.disconnected();
     await settle(() => deps.stop?.() ?? Promise.resolve());
     const detail = diagnosticDetail(reason);
     deps.diagnostics.onDiagnostic('wrapper.lifecycle', {
@@ -136,9 +154,8 @@ export function createControlPlaneLifecycle(
       exitCode,
       ...(detail ? { detail } : {}),
     });
-    await settle(() => deps.diagnostics.finalize(DIAGNOSTICS_FINALIZE_TIMEOUT_MS));
+    await settle(() => deps.diagnostics.finalize(diagnosticsBudget));
     await settle(() => deps.fileLogs.finalize(FILE_LOG_FINALIZE_TIMEOUT_MS));
-    deps.connection.close();
     // Only after the final uploads have had their budget: stopping earlier
     // would hide the credential those uploads need.
     deps.logUploadAuth?.stop();

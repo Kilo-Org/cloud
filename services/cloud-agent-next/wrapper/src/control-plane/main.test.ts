@@ -145,10 +145,34 @@ describe('controlPlaneExitPolicy', () => {
 });
 
 describe('createControlPlaneLifecycle', () => {
-  it('keeps credential renewal connected through both final uploads', async () => {
+  it('closes prompt delivery before native teardown and finalization', async () => {
+    let closedDuringStop = 0;
+    const state = createLifecycle({
+      stop: async () => {
+        closedDuringStop = state.connectionState.closed();
+      },
+    });
+    await state.lifecycle.shutdown(0, 'stop with a concurrent incoming prompt');
+    expect(closedDuringStop).toBe(1);
+    expect(state.finalizes()).toEqual({ diagnostics: 1, fileLogs: 1 });
+  });
+
+  it('refreshes upload credentials before fencing delivery and tearing down native runtimes', async () => {
     const connection = createFakeConnection();
     const tokens: Array<string | undefined> = [];
-    const auth = createControlLogUploadAuth({ initialGrant: 'old-token', send() {} });
+    const auth = createControlLogUploadAuth({
+      initialGrant: 'old-token',
+      send() {
+        queueMicrotask(() => {
+          if (connection.closed() === 0)
+            auth.receive({
+              type: 'logs.credentials',
+              grant: 'fresh-token',
+              expiresAt: Date.now() + 4 * 60 * 60_000,
+            });
+        });
+      },
+    });
     auth.connected();
     void auth.rejected('old-token');
     const close = connection.connection.close;
@@ -162,19 +186,12 @@ describe('createControlPlaneLifecycle', () => {
       diagnostics: {
         onDiagnostic() {},
         finalize: async () => {
-          const pending = auth.waitForCurrent(AbortSignal.timeout(100));
-          if (connection.closed() === 0)
-            auth.receive({
-              type: 'logs.credentials',
-              grant: 'fresh-token',
-              expiresAt: Date.now() + 4 * 60 * 60_000,
-            });
-          tokens.push((await pending)?.token);
+          tokens.push(auth.current()?.token);
         },
       },
       fileLogs: {
         finalize: async () => {
-          tokens.push((await auth.waitForCurrent(AbortSignal.timeout(100)))?.token);
+          tokens.push(auth.current()?.token);
         },
       },
       logUploadAuth: auth,
@@ -183,6 +200,71 @@ describe('createControlPlaneLifecycle', () => {
     await lifecycle.shutdown(0, 'shutdown during renewal');
     expect(tokens).toEqual(['fresh-token', 'fresh-token']);
     expect(connection.closed()).toBe(1);
+  });
+
+  it('charges credential refresh against the existing diagnostics finalize budget', async () => {
+    const connection = createFakeConnection();
+    let budget = 0;
+    const lifecycle = createControlPlaneLifecycle({
+      connection: connection.connection,
+      process: createFakeProcess(),
+      diagnostics: {
+        onDiagnostic() {},
+        finalize: async timeoutMs => {
+          budget = timeoutMs ?? 0;
+        },
+      },
+      fileLogs: { finalize: async () => undefined },
+      logUploadAuth: {
+        waitForCurrent: async () => {
+          await new Promise(resolve => setTimeout(resolve, 20));
+          return undefined;
+        },
+        disconnected() {},
+        stop() {},
+      },
+      exit() {},
+    });
+    await lifecycle.shutdown(0, 'refresh fails transiently');
+    expect(budget).toBeGreaterThan(0);
+    expect(budget).toBeLessThan(4000);
+    expect(connection.closed()).toBe(1);
+  });
+
+  it('bounds an unresponsive pre-shutdown refresh and still closes delivery before teardown', async () => {
+    const connection = createFakeConnection();
+    const refresh = Promise.withResolvers<undefined>();
+    let budget = -1;
+    let closedDuringStop = 0;
+    let fileFinalized = false;
+    const lifecycle = createControlPlaneLifecycle({
+      connection: connection.connection,
+      process: createFakeProcess(),
+      stop: async () => {
+        closedDuringStop = connection.closed();
+      },
+      diagnostics: {
+        onDiagnostic() {},
+        finalize: async timeoutMs => {
+          budget = timeoutMs ?? -1;
+        },
+      },
+      fileLogs: {
+        finalize: async () => {
+          fileFinalized = true;
+        },
+      },
+      logUploadAuth: {
+        waitForCurrent: () => refresh.promise,
+        disconnected: () => refresh.resolve(undefined),
+        stop() {},
+      },
+      exit() {},
+    });
+    await lifecycle.shutdown(0, 'renewal unavailable during shutdown');
+    expect(budget).toBe(0);
+    expect(closedDuringStop).toBe(1);
+    expect(fileFinalized).toBe(true);
   });
 
   it('starts the connection and recycles on demand', () => {

@@ -168,7 +168,11 @@ export function createControlLogUploadAuth(options: Options): ControlLogUploadAu
     current,
     waitForCurrent(signal) {
       const credential = current();
-      if (credential !== undefined || signal.aborted || stopped)
+      if (
+        (credential !== undefined && credential.expiresAt - now() > refreshWindowMs) ||
+        signal.aborted ||
+        stopped
+      )
         return Promise.resolve(signal.aborted ? undefined : credential);
       return new Promise(resolve => {
         const finish = (): void => {

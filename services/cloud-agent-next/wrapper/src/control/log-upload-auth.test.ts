@@ -32,6 +32,24 @@ function setup(options: { initialGrant?: string; clock?: number } = {}) {
 }
 
 describe('control log upload auth', () => {
+  it('awaits a fresh grant near expiry while keeping the still-valid cached credential available', async () => {
+    const oldGrant = tokenWithExpiry(30 * 60_000);
+    const freshGrant = tokenWithExpiry(4 * HOUR_MS);
+    const auth = createControlLogUploadAuth({ initialGrant: oldGrant, now: () => 0, send() {} });
+    auth.connected();
+    let completed = false;
+    const ready = auth.waitForCurrent(AbortSignal.timeout(100)).then(value => {
+      completed = true;
+      return value;
+    });
+    await Promise.resolve();
+    expect(completed).toBe(false);
+    expect(auth.current()?.token).toBe(oldGrant);
+    auth.receive({ type: 'logs.credentials', grant: freshGrant, expiresAt: 4 * HOUR_MS });
+    expect((await ready)?.token).toBe(freshGrant);
+    auth.stop();
+  });
+
   it('does not miss credentials delivered synchronously by the refresh send', async () => {
     const grant = tokenWithExpiry(4 * HOUR_MS);
     const frames: ControlPlaneWrapperFrame[] = [];

@@ -50,6 +50,7 @@ import {
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
   MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH,
   cloudAgentWorktreeIdSchema,
+  WORKSPACE_REQUIRES_ROOT_SESSION,
   isDefaultSessionTitle,
   sessionShareOptionsSchema,
   projectPrivateWorktreePaths,
@@ -86,6 +87,17 @@ import { after } from 'next/server';
  * Check if an error indicates the session was not found in the cloud-agent DO.
  * This is expected for legacy sessions created before the new DO-based system.
  */
+function sessionTrpcErrorCode(err: unknown): string | undefined {
+  if (!(err instanceof TRPCClientError)) return undefined;
+  const data = err.data as { code?: string } | undefined;
+  const shape = err.shape as { data?: { code?: string } } | undefined;
+  return data?.code ?? shape?.data?.code;
+}
+
+function isSessionConflictError(err: unknown): boolean {
+  return sessionTrpcErrorCode(err) === 'CONFLICT';
+}
+
 function isSessionNotFoundError(err: unknown): boolean {
   if (err instanceof TRPCClientError) {
     const data = err.data as { code?: string; httpStatus?: number } | undefined;
@@ -2250,6 +2262,13 @@ export const cliSessionsV2Router = createTRPCRouter({
           throw new Error('Cloud-agent session deletion was not confirmed');
         }
       } catch (err) {
+        if (isSessionConflictError(err)) {
+          const message =
+            err instanceof Error && err.message.includes(WORKSPACE_REQUIRES_ROOT_SESSION)
+              ? WORKSPACE_REQUIRES_ROOT_SESSION
+              : 'session_deletion_conflict';
+          throw new TRPCError({ code: 'CONFLICT', message, cause: err });
+        }
         if (!isSessionNotFoundError(err)) {
           captureException(err, {
             tags: { source: 'cli-sessions-v2-router', endpoint: 'delete' },

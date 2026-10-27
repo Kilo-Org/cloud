@@ -216,6 +216,51 @@ export const deleteSessionForCloudAgentSchema = z.object({
 });
 export type DeleteSessionForCloudAgentParams = z.input<typeof deleteSessionForCloudAgentSchema>;
 
+/**
+ * Stable conflict returned when a destructive session delete would remove the
+ * last hosted root session of an active workspace. Removing the final root is
+ * only allowed through the separate whole-workspace deletion operation.
+ */
+export const WORKSPACE_REQUIRES_ROOT_SESSION = 'workspace_requires_root_session';
+/** Stable conflict returned while a workspace is being destructively deleted. */
+export const WORKSPACE_DELETING = 'workspace_deleting';
+/** Stable conflict returned when a workspace cannot serve another root session. */
+export const WORKSPACE_UNAVAILABLE = 'workspace_unavailable';
+/** Stable conflict returned when a workspace's derived identity is inconsistent. */
+export const WORKSPACE_IDENTITY_CONFLICT = 'workspace_identity_conflict';
+
+export const deleteHostedWorkspaceSessionSchema = z
+  .object({
+    kiloUserId: z.string().min(1),
+    workspaceId: cloudAgentWorktreeIdSchema,
+    sessionId: sessionIdSchema,
+    cloudAgentSessionId: z.templateLiteral(['workspace_', z.uuid()]),
+  })
+  .strict();
+export type DeleteHostedWorkspaceSessionParams = z.input<typeof deleteHostedWorkspaceSessionSchema>;
+
+export type DeleteHostedWorkspaceSessionResult = {
+  success: true;
+  sessionId: string;
+  deletedSessionIds: string[];
+};
+
+export const assertHostedWorkspaceSessionDeletableSchema = z
+  .object({
+    kiloUserId: z.string().min(1),
+    sessionId: sessionIdSchema,
+    cloudAgentSessionId: z.templateLiteral(['workspace_', z.uuid()]),
+  })
+  .strict();
+export type AssertHostedWorkspaceSessionDeletableParams = z.input<
+  typeof assertHostedWorkspaceSessionDeletableSchema
+>;
+
+export type AssertHostedWorkspaceSessionDeletableResult = {
+  /** The workspace whose final-root invariant was checked, if any. */
+  workspaceId: CloudAgentWorktreeId | null;
+};
+
 export const resolveCloudAgentRootSessionSchema = z.object({
   kiloUserId: z.string().min(1),
   kiloSessionId: sessionIdSchema,
@@ -1211,6 +1256,12 @@ export type SessionIngestRpcMethods = {
     params: CreateSessionForCloudAgentParams
   ) => Promise<CreateSessionForCloudAgentResult>;
   deleteSessionForCloudAgent: (params: DeleteSessionForCloudAgentParams) => Promise<void>;
+  deleteHostedWorkspaceSession: (
+    params: DeleteHostedWorkspaceSessionParams
+  ) => Promise<DeleteHostedWorkspaceSessionResult>;
+  assertHostedWorkspaceSessionDeletable: (
+    params: AssertHostedWorkspaceSessionDeletableParams
+  ) => Promise<AssertHostedWorkspaceSessionDeletableResult>;
   resolveCloudAgentRootSessionForKiloSession: (
     params: ResolveCloudAgentRootSessionForKiloSessionParams
   ) => Promise<ResolveCloudAgentRootSessionForKiloSessionResult>;

@@ -739,6 +739,8 @@ export class CloudAgentNextClient {
         error instanceof TRPCClientError &&
         (error.data?.code === 'NOT_FOUND' ||
           error.shape?.data?.code === 'NOT_FOUND' ||
+          error.data?.code === 'CONFLICT' ||
+          error.shape?.data?.code === 'CONFLICT' ||
           error.data?.httpStatus === 404 ||
           error.shape?.data?.httpStatus === 404)
       ) {

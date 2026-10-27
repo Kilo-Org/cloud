@@ -403,6 +403,29 @@ describe('cliSessionsV2 worktree projections and session deletion', () => {
       mockDeleteSessionIngest.mock.invocationCallOrder[0]
     );
   });
+
+  it('surfaces a final-root conflict before deleting the ownership row', async () => {
+    mockRuntimeDelete.mockRejectedValueOnce(
+      new TRPCClientError('workspace_requires_root_session', {
+        result: {
+          error: {
+            code: -32603,
+            message: 'workspace_requires_root_session',
+            data: { code: 'CONFLICT' },
+          },
+        },
+      })
+    );
+
+    await expect(createCaller({ user }).delete({ session_id: SESSION_ID })).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'workspace_requires_root_session',
+    });
+
+    expect(await readSessions()).toHaveLength(1);
+    expect(mockDeleteSessionIngest).not.toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
 });
 
 describe('cliSessionsV2 worktreeDetails and persistent names', () => {

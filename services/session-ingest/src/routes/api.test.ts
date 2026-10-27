@@ -183,6 +183,7 @@ function makeDbFakes() {
     from: vi.fn(() => select),
     leftJoin: vi.fn(() => select),
     where: vi.fn((_condition: unknown) => select),
+    orderBy: vi.fn(() => select),
     limit: vi.fn(() => select),
     for: vi.fn(() => select),
     then: vi.fn((resolve: (v: unknown) => unknown) => resolve(selectResult())),

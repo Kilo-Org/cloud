@@ -2292,8 +2292,14 @@ export const ReasoningDetailsTransformSchema = z.enum(ReasoningDetailsTransform)
 
 export type ReasoningDetailsTransform = z.infer<typeof ReasoningDetailsTransformSchema>;
 
+export const CustomLlmApiKindSchema = z.enum(['chat_completions', 'messages', 'responses']);
+
+export type CustomLlmApiKind = z.infer<typeof CustomLlmApiKindSchema>;
+
 export const CustomLlmApiConfigSchema = z.object({
   internal_id: z.string().min(1).optional(),
+  /** Gateway APIs the upstream serves. Without it, `opencode_settings.ai_sdk_provider` picks one. */
+  api_kinds: z.array(CustomLlmApiKindSchema).min(1).optional(),
   base_url: z.url(),
   disable_url_suffix: z.boolean().optional(),
   add_cache_breakpoints: z.boolean().optional(),

@@ -4,30 +4,47 @@ Date: 2026-10-14
 Status: Observation-only foundation implemented; automatic-repair MVP blocked on
 runtime safety prerequisites. Not ready for the MVP release gate.
 
-## Implementation status (2026-10-15)
+## Implementation status (2026-10-27)
 
-The first deliverable is deliberately observation-only behind the
-`cloud-agent-watch-pr` release toggle. It does not issue execution credentials,
-queue repair prompts, create repair chats, edit files, or push commits.
+The first deliverable is deliberately observation-only. Watch enablement is behind
+the `cloud-agent-watch-pr` release toggle; passive PR hover-card counts are not.
+It does not issue execution credentials, queue repair prompts, create repair chats,
+edit files, or push commits.
 
 Implemented:
 
 - PostgreSQL watch state, global live-PR uniqueness, generation-fenced controls,
   bounded observation projection, activity history, and user-deletion cleanup.
-- Enablement from a verified grouped Cloud Agent session, with exact tenant,
-  installation, repository, and open same-repository PR validation.
+- Backend/API enablement from a verified grouped Cloud Agent session, with exact
+  tenant, installation, repository, and open same-repository PR validation.
 - Signed payload-first PR, review, inline comment, check, status, and branch-push
-  observations. Receipt and projection commit together before webhook success;
-  admission failures return a retryable response. No deferred repair dispatch is
-  represented as durable delivery.
+  observations. Each successful watch transaction commits its activity receipt
+  and projection together. The Watch PR observer is awaited, but its failures are
+  logged/reported and do not fail the enclosing webhook: remaining consumers
+  continue, and the delivery can still receive HTTP 200. This boundary is
+  best-effort, not retryable Watch PR admission or a durable repair queue.
 - Semantic observation ordering, current-head check failures, bounded early-SHA
   evidence, independent check identities, and ambiguity instead of guessed success.
-- Accessible watch controls beside the PR badge, pause/resume/stop, activity, and
-  an explicit manual recheck of PR identity/lifecycle only. Recheck does not scan
-  checks or reviews. Enablement covers future events, not existing problems.
+- Authenticated tRPC/API and MCP procedures for watch options, enable, pause,
+  resume, stop, recent activity, and explicit PR identity/lifecycle recheck.
+  Recheck does not scan checks or reviews. Enablement covers future events, not
+  existing problems.
+- Passive PR hover-card check/thread observation counts. Client watch controls,
+  confirmation, watch activity, and lifecycle-recheck UI are planned follow-ups,
+  not implemented clients of these procedures.
 - Worktree deletion finishes associated watches in the deletion transaction.
   Expiry is enforced on event admission and lifecycle access; no expiry scheduler
   or recurring GitHub observation job is introduced in this milestone.
+
+The Redis CI inbox retains only successfully written check/status receipts, at
+most 100 per installation/app-type/repository key and at most 24 hours old. Replay
+filters out receipts received before watch creation and matches the current head
+SHA. It runs only when an admitted PR/push event or explicit lifecycle recheck
+changes the watched head SHA, not on a same-head recheck or a periodic retry.
+It cannot recover failed Redis writes, evicted/expired receipts, or PR, push, and
+feedback events. Those events can remain missing after a Watch PR failure is
+acknowledged. No complete-delivery guarantee is made. This does not change the
+separate passive PR-cache observer's existing error behavior.
 
 Automatic repairs remain unavailable because the existing asynchronous prompt
 path is not an exclusive shared-worktree repair boundary, and existing writable
@@ -47,14 +64,18 @@ Before implementing dispatch, complete and test:
   and durable repair queue delivery/coalescing with finite retries.
 - Trusted reviewer verification, bounded diagnostics, repairs for all three
   categories, rate-limit handling, competing-writer coordination, and live pilot
-  verification. Saved preferences in the current UI grant no automatic-write
+  verification. Saved backend preferences grant no automatic-write
   authority; execution will require separate consent.
 
-Operational prerequisites: apply the generated migration before enabling the
-toggle, and configure/verify the GitHub App event subscriptions and grants. This
-change does not update remote GitHub App configuration or deploy services. The
-observation-only implementation does not fulfill sections 14-15's repair/runtime
-acceptance criteria.
+Operational prerequisites: apply `0307_cloud_agent_pr_watches.sql` before
+deploying the consumers, since passive PR-cache reads are not toggle-gated.
+Configure/verify the GitHub App event subscriptions and grants before relying on
+observations. This change does not update remote GitHub App configuration or
+deploy services. The observation-only implementation does not fulfill sections
+14-15's repair/runtime acceptance criteria.
+
+Sections 1-15 below describe the planned automatic-repair MVP, including its
+future client controls and durable retry boundary, not the current pilot.
 
 ## 1. Goal and agreed constraints
 

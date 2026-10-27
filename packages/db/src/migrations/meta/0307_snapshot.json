@@ -1,5 +1,5 @@
 {
-  "id": "d42e5035-1044-4dac-b385-ac7933a3e92c",
+  "id": "10c95306-8ba5-41f3-a005-0eecd50742d4",
   "prevId": "fcf37899-7ba7-40f9-810d-7a7f831dc3e0",
   "version": "7",
   "dialect": "postgresql",
@@ -5736,6 +5736,22 @@
           ],
           "isUnique": false,
           "where": "\"cloud_agent_code_reviews\".\"started_at\" is not null",
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_cloud_agent_code_reviews_started_at_effective": {
+          "name": "idx_cloud_agent_code_reviews_started_at_effective",
+          "columns": [
+            {
+              "expression": "COALESCE(\"started_at\", \"updated_at\", \"created_at\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"cloud_agent_code_reviews\".\"status\" NOT IN ('pending', 'queued') AND COALESCE(\"cloud_agent_code_reviews\".\"terminal_reason\", '') <> 'abandoned'",
           "concurrently": true,
           "method": "btree",
           "with": {}
@@ -22394,13 +22410,6 @@
         },
         "attempts": {
           "name": "attempts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "legacy_attempts": {
-          "name": "legacy_attempts",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,

@@ -45,10 +45,14 @@ import {
   VercelUserByokInferenceProviderIdSchema,
   AzureCredentialsSchema,
   BedrockCredentialsSchema,
+  DirectVertexCredentialsSchema,
   VertexCredentialsSchema,
   type VercelUserByokInferenceProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
+import {
+  DIRECT_BYOK_PROVIDERS_META,
+  isDirectCloudByokProviderId,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 import { getCodingPlanManagedKeyLabel } from '@/components/subscriptions/coding-plans/coding-plan-provider';
 import { cn } from '@/lib/utils';
@@ -112,8 +116,10 @@ export function getStructuredCredentialKind(providerId: string): StructuredCrede
     case VercelUserByokInferenceProviderIdSchema.enum.azure:
       return 'azure';
     case VercelUserByokInferenceProviderIdSchema.enum.bedrock:
+    case DirectUserByokInferenceProviderIdSchema.enum['aws-bedrock']:
       return 'bedrock';
     case VercelUserByokInferenceProviderIdSchema.enum.vertex:
+    case DirectUserByokInferenceProviderIdSchema.enum['gcp-vertex']:
       return 'vertex';
     default:
       return null;
@@ -234,6 +240,12 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   );
 
   const { data: supportedModels } = useQuery(trpc.byok.listSupportedModels.queryOptions());
+  const { data: directCloudByokAvailable = false } = useQuery(
+    trpc.byok.directCloudByokAvailable.queryOptions(listQueryInput)
+  );
+  const addableProviders = ADD_BYOK_PROVIDERS.filter(
+    provider => directCloudByokAvailable || !isDirectCloudByokProviderId(provider.id)
+  );
   const showsCodingPlanKey =
     !organizationId && (keys?.some(key => key.management_source === 'coding_plan') ?? false);
 
@@ -324,7 +336,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
         : kind === 'bedrock'
           ? BedrockCredentialsSchema
           : kind === 'vertex'
-            ? VertexCredentialsSchema
+            ? providerId === DirectUserByokInferenceProviderIdSchema.enum['gcp-vertex']
+              ? DirectVertexCredentialsSchema
+              : VertexCredentialsSchema
             : null;
     if (!schema) return null;
     let parsed: unknown;
@@ -442,6 +456,8 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   };
   const structuredCredentialKind = getStructuredCredentialKind(selectedProvider);
   const usesStructuredCredentials = structuredCredentialKind !== null;
+  const isDirectVertex =
+    selectedProvider === DirectUserByokInferenceProviderIdSchema.enum['gcp-vertex'];
   return (
     <div className="space-y-4">
       <BYOKDescription showsCodingPlanKey={showsCodingPlanKey} />
@@ -594,7 +610,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                     <SelectValue placeholder="Select provider" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(editingKeyId ? BYOK_PROVIDERS : ADD_BYOK_PROVIDERS).map(provider => {
+                    {(editingKeyId ? BYOK_PROVIDERS : addableProviders).map(provider => {
                       const isDisabled = !editingKeyId && hasExistingKey(provider.id);
                       return (
                         <SelectItem
@@ -656,7 +672,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                             ? '{"apiKey": "...", "resourceName": "..."}'
                             : structuredCredentialKind === 'bedrock'
                               ? '{"accessKeyId": "...", "secretAccessKey": "...", "region": "us-east-1"}'
-                              : '{"project": "...", "location": "global", "googleCredentials": {"clientEmail": "...", "privateKey": "..."}}'
+                              : isDirectVertex
+                                ? '{"type": "service_account", "project_id": "...", "client_email": "...", "private_key": "...", ...}'
+                                : '{"project": "...", "location": "global", "googleCredentials": {"clientEmail": "...", "privateKey": "..."}}'
                         }
                         className={cn(
                           'border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-20 w-full rounded-md border px-3 py-2 pr-10 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
@@ -762,6 +780,47 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                         Your IAM user needs <code className="text-xs">bedrock:InvokeModel</code> and{' '}
                         <code className="text-xs">bedrock:InvokeModelWithResponseStream</code>{' '}
                         permissions.
+                        {selectedProvider ===
+                        DirectUserByokInferenceProviderIdSchema.enum['aws-bedrock'] ? (
+                          <>
+                            {' '}
+                            Models served by the <code className="text-xs">
+                              bedrock-mantle
+                            </code>{' '}
+                            endpoint also need the matching{' '}
+                            <code className="text-xs">bedrock-mantle</code> permissions.
+                          </>
+                        ) : null}
+                      </p>
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {isDirectVertex && (
+                  <Alert>
+                    <Info className="size-4" />
+                    <AlertDescription>
+                      <p>Paste a service account key file as JSON:</p>
+                      <code className="mt-1 block text-xs break-all">
+                        {
+                          '{"type": "service_account", "project_id": "...", "client_email": "...", "private_key": "...", "location": "global"}'
+                        }
+                      </code>
+                      <p className="mt-1">
+                        <code className="text-xs">location</code> is optional and defaults to{' '}
+                        <code className="text-xs">global</code>. JSON with{' '}
+                        <code className="text-xs">project</code>,{' '}
+                        <code className="text-xs">location</code>, and{' '}
+                        <code className="text-xs">googleCredentials</code> also works.
+                      </p>
+                      <p className="mt-1">
+                        Enable the Vertex AI API and grant the service account the Vertex AI User
+                        role. Claude and partner models must also be enabled in Model Garden.
+                      </p>
+                      <p className="mt-1">
+                        Mistral models only run in <code className="text-xs">us-central1</code> and{' '}
+                        <code className="text-xs">europe-west4</code>; requests use{' '}
+                        <code className="text-xs">europe-west4</code> when the location is in
+                        Europe.
                       </p>
                     </AlertDescription>
                   </Alert>

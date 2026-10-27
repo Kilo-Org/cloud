@@ -7,7 +7,6 @@ import test from 'node:test';
 
 import { load } from 'js-yaml';
 
-
 const workflowPath = '.github/workflows/kilo-app-release.yml';
 
 function readWorkflow() {

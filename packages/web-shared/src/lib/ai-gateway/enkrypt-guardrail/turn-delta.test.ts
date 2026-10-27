@@ -89,6 +89,53 @@ describe('extractTurnDeltaText', () => {
       expect(text).toBe('file contents\n\nweb page text\n\ndocument text\n\nsummarize');
     });
 
+    it('returns search results and the server tool results of the last assistant turn', () => {
+      const text = extractTurnDeltaText(
+        request('messages', {
+          messages: [
+            {
+              role: 'assistant',
+              content: [{ type: 'mcp_tool_result', tool_use_id: 'old', content: 'older result' }],
+            },
+            { role: 'user', content: 'search the docs' },
+            {
+              role: 'assistant',
+              content: [
+                { type: 'text', text: 'model text' },
+                {
+                  type: 'mcp_tool_result',
+                  tool_use_id: 'mcptoolu_1',
+                  content: [{ type: 'text', text: 'mcp server output' }],
+                },
+                {
+                  type: 'web_fetch_tool_result',
+                  tool_use_id: 'srvtoolu_1',
+                  content: {
+                    type: 'web_fetch_result',
+                    url: 'https://example.com',
+                    content: { type: 'document', source: { type: 'text', data: 'fetched page' } },
+                  },
+                },
+              ],
+            },
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'search_result',
+                  source: 'https://example.com/doc',
+                  title: 'Doc',
+                  content: [{ type: 'text', text: 'search hit' }],
+                },
+              ],
+            },
+          ],
+        })
+      );
+
+      expect(text).toBe('mcp server output\n\nfetched page\n\nsearch hit');
+    });
+
     it('skips an assistant prefill at the end of the conversation', () => {
       const text = extractTurnDeltaText(
         request('messages', {
@@ -135,6 +182,34 @@ describe('extractTurnDeltaText', () => {
       );
 
       expect(text).toBe('tool output\n\nstructured output\n\ncustom output');
+    });
+
+    it('returns the server tool output of the last assistant turn but not older turns', () => {
+      const text = extractTurnDeltaText(
+        request('responses', {
+          input: [
+            { type: 'mcp_call', id: 'mcp_0', name: 'old', arguments: '{}', output: 'older output' },
+            { role: 'user', content: 'look it up' },
+            {
+              type: 'mcp_call',
+              id: 'mcp_1',
+              name: 'lookup',
+              arguments: '{}',
+              output: 'mcp output',
+            },
+            {
+              type: 'file_search_call',
+              id: 'fs_1',
+              queries: ['q'],
+              results: [{ file_id: 'file_1', text: 'file search hit' }],
+            },
+            { type: 'function_call', call_id: 'call_1', name: 'read', arguments: '{}' },
+            { type: 'function_call_output', call_id: 'call_1', output: 'tool output' },
+          ],
+        })
+      );
+
+      expect(text).toBe('mcp output\n\nfile search hit\n\ntool output');
     });
   });
 

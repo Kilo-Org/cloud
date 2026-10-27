@@ -93,6 +93,30 @@ the worker keeps serving them.
 The serving worker reads definitions through its existing Hyperdrive binding with an isolate
 cache. The web app owns create, update, and delete.
 
+## Linked entries
+
+Gateway and client entries can explicitly set `measuredAs` to a platform model ID whose
+measurements they reuse. The entry keeps its own serving identity, capabilities, variants,
+and owner pricing. A link is a live reference, not a copied measurement or a new benchmark
+profile. The CLI may `suggestMeasuredAs`, but the owner must confirm the suggestion before
+it becomes an explicit `measuredAs`; model-name similarity never creates an implicit link.
+
+Saving a new or changed link requires an existing ready platform measurement for the selected
+base router. The web service validates the merged definition inside the owner's advisory lock
+using the platform measurements list. Unchanged links with the same entry key are exempt when
+the base router is unchanged; changing the base router revalidates every link. Linked gateway
+entries do not enter platform benchmark admission. Once saved, a link serves the newest ready
+measurement, including stale measurements and measurements whose model has since disappeared
+from the gateway catalog.
+
+Variants match by exact same name; the default variant matches only `null`. There is no
+cross-variant fallback. Unmatched variants remain client-measured rather than inheriting a
+different platform variant. Accuracy and latency come from the referenced measurement. Cost
+is repriced using the measurement's token means (input, cached input/cache read, output, and
+reasoning) and the entry's own pricing: client pricing supplied by the owner, or its own
+model-catalog pricing for a direct-BYOK gateway entry. Null client pricing means $0. Older
+summaries without token means use a blended-price ratio to scale measured cost.
+
 ## Measurements
 
 The benchmark worker stays the only writer of measurements and routing tables.
@@ -100,6 +124,7 @@ The benchmark worker stays the only writer of measurements and routing tables.
 | Entry | Who runs the eval | Who pays inference | Stored as |
 |---|---|---|---|
 | Gateway model that the platform key can serve | Platform container | Platform | Global `benchmark_profiles`, keyed by base router |
+| Linked gateway or client entry | No new eval; live platform measurement | No new inference | Referenced global measurement, repriced for the entry |
 | Any other entry, including Kilo-stored direct-BYOK IDs | Owner's CLI | Owner | Owner-scoped client profiles |
 
 - Platform-paid admission is limited to 20 new models per base router per owner per rolling 24
@@ -298,8 +323,9 @@ A changed cutover date requires a separately reviewed update campaign, not an or
 4. Client measurements are owner-scoped and never affect another owner's routing.
 5. Platform routers require exact engine identity; custom routers serve the newest measurement
    and flag it stale.
-6. The platform pays only for inference that the platform key serves. The owner pays for client
-   inference, judged grading of client outputs, and classification.
+6. The platform pays only for inference that the platform key serves. Linking an entry never
+   starts new platform inference. The owner pays for client inference, judged grading of client
+   outputs, and classification.
 
 ## Consequences
 

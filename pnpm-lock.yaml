@@ -1916,6 +1916,9 @@ importers:
       '@kilocode/kiloclaw-secret-catalog':
         specifier: workspace:*
         version: link:../kiloclaw-secret-catalog
+      '@kilocode/notifications':
+        specifier: workspace:*
+        version: link:../notifications
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../worker-utils

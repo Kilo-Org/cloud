@@ -876,6 +876,18 @@
       "spendAlertsSubtitle": "melepasi ambang dan lonjakan setiap jam",
       "spendAlertsToggle": "Kategori amaran perbelanjaan"
     },
+    "history": {
+      "title": "Sejarah pemberitahuan",
+      "subtitle": "Pemberitahuan yang diterima oleh akaun ini",
+      "bannerBody": "Pemberitahuan push dimatikan untuk peranti ini, jadi yang baharu tidak akan tiba di sini.",
+      "bannerAction": "Tetapan pemberitahuan",
+      "emptyTitle": "Belum ada pemberitahuan",
+      "emptyCategoryTitle": "Tiada pemberitahuan dalam kategori ini",
+      "emptyBody": "Pemberitahuan yang diterima oleh akaun ini muncul di sini. Ia disimpan selama {{days}} hari.",
+      "capped": "Memaparkan pemberitahuan terkini.",
+      "loadError": "Tidak dapat memuatkan sejarah pemberitahuan.",
+      "openFailed": "Pemberitahuan ini tidak lagi boleh dibuka di mana-mana."
+    },
     "action": {
       "openSession": "Buka sesi"
     },

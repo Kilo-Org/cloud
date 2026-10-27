@@ -876,6 +876,18 @@
       "spendAlertsSubtitle": "ịgafe oke na mmụba kwa awa",
       "spendAlertsToggle": "Otu ọkwa gbasara mmefu"
     },
+    "history": {
+      "title": "Akụkọ ọkwa",
+      "subtitle": "Ọkwa akaụntụ a nwetara",
+      "bannerBody": "Agbanyụla ọkwa push maka ngwaọrụ a, yabụ ndị ọhụrụ agaghị abịa ebe a.",
+      "bannerAction": "Ntọala ọkwa",
+      "emptyTitle": "Ọnwebeghị ọkwa",
+      "emptyCategoryTitle": "Ọnwebeghị ọkwa n'ụdị a",
+      "emptyBody": "Ọkwa akaụntụ a na-anweta na-apụta ebe a. A na-edebe ha maka ụbọchị {{days}}.",
+      "capped": "Na-egosi ọkwa ndị kachasị ọhụrụ.",
+      "loadError": "Enweghị ike ịbute akụkọ ọkwa.",
+      "openFailed": "Ọkwa a anaghịzi emeghe ebe ọ bụla."
+    },
     "action": {
       "openSession": "Mepee nnọkọ"
     },

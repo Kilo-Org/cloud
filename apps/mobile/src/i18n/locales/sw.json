@@ -876,6 +876,18 @@
       "spendAlertsSubtitle": "kuvuka vizingiti na kuongezeka kwa saa",
       "spendAlertsToggle": "Aina ya tahadhari za matumizi"
     },
+    "history": {
+      "title": "Historia ya arifa",
+      "subtitle": "Arifa ambazo akaunti hii imepokea",
+      "bannerBody": "Arifa za push zimezimwa kwenye kifaa hiki, kwa hivyo mpya hazitafika hapa.",
+      "bannerAction": "Mipangilio ya arifa",
+      "emptyTitle": "Hakuna arifa bado",
+      "emptyCategoryTitle": "Hakuna arifa katika kundi hili",
+      "emptyBody": "Arifa ambazo akaunti hii inapokea zinaonekana hapa. Zinahifadhiwa kwa siku {{days}}.",
+      "capped": "Inaonyesha arifa za hivi karibuni.",
+      "loadError": "Imeshindikana kupakia historia ya arifa.",
+      "openFailed": "Arifa hii haifunguki tena popote."
+    },
     "action": {
       "openSession": "Fungua kikao"
     },

@@ -914,6 +914,18 @@
       "spendAlertsSubtitle": "prekročenia prahov a hodinové špičky",
       "spendAlertsToggle": "Kategória upozornení na výdavky"
     },
+    "history": {
+      "title": "História upozornení",
+      "subtitle": "Upozornenia, ktoré tento účet dostal",
+      "bannerBody": "Push upozornenia sú pre toto zariadenie vypnuté, takže sem nové nebudú prichádzať.",
+      "bannerAction": "Nastavenia upozornení",
+      "emptyTitle": "Zatiaľ žiadne upozornenia",
+      "emptyCategoryTitle": "Žiadne upozornenia v tejto kategórii",
+      "emptyBody": "Upozornenia, ktoré tento účet dostáva, sa zobrazujú tu. Uchovávajú sa {{days}} dní.",
+      "capped": "Zobrazujú sa najnovšie upozornenia.",
+      "loadError": "Históriu upozornení sa nepodarilo načítať.",
+      "openFailed": "Toto upozornenie sa už nikde neotvorí."
+    },
     "action": {
       "openSession": "Otvoriť reláciu"
     },

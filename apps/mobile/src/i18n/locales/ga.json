@@ -933,6 +933,18 @@
       "spendAlertsSubtitle": "sáruithe tairsí agus spuaiceanna uaire",
       "spendAlertsToggle": "Catagóir foláirimh chaiteachais"
     },
+    "history": {
+      "title": "Stair fógraí",
+      "subtitle": "Na fógraí a fuair an cuntas seo",
+      "bannerBody": "Tá fógraí push múchta don ghléas seo, mar sin ní thiocfaidh cinn nua anseo.",
+      "bannerAction": "Socruithe fógraí",
+      "emptyTitle": "Níl aon fhógraí fós",
+      "emptyCategoryTitle": "Níl aon fhógraí sa chatagóir seo",
+      "emptyBody": "Taispeántar na fógraí a fhaigheann an cuntas seo anseo. Coimeádtar iad ar feadh {{days}} lá.",
+      "capped": "Taispeántar na fógraí is déanaí.",
+      "loadError": "Níorbh fhéidir stair fógraí a lódáil.",
+      "openFailed": "Ní osclaíonn an fógra seo in áit ar bith a thuilleadh."
+    },
     "action": {
       "openSession": "Oscail an seisiún"
     },

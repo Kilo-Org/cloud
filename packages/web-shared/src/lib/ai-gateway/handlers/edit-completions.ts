@@ -202,6 +202,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     mode: null,
     auto_model: null,
     ttfb_ms: null,
+    requestStartedAt,
     bouncer: {
       requestId: bouncerRequestId,
       occurredAt: new Date(requestStartedAtMs),
@@ -310,7 +311,6 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     body: JSON.stringify(bodyForUpstream),
   });
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
-  usageContext.ttfb_ms = ttfbMs;
   usageContext.status_code = proxyRes.status;
 
   emitApiMetricsForResponse(

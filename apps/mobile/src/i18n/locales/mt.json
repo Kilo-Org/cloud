@@ -227,7 +227,6 @@
     "hideBalance": "Aħbi l-bilanċ",
     "showBalance": "Uri l-bilanċ",
     "balanceHidden": "Il-bilanċ huwa moħbi",
-    "bonusCreditsExpiring": "{{amount}} fi krediti jiskadu: {{date}}.",
     "signOutTitle": "Toħroġ mill-kont?",
     "signOutMessage": "Ikollok terġa' tidħol biex taċċessa l-ispazju tax-xogħol tiegħek.",
     "deleteAccountTitle": "Tħassar il-kont?",
@@ -933,6 +932,18 @@
       "securityFindingsUnavailable": "Ippermetti l-Aġent tas-sigurtà Kilo fuq firxa biex tikseb sejbiet tas-sigurtà.",
       "spendAlertsSubtitle": "qbiż ta' limiti u żidiet fis-siegħa",
       "spendAlertsToggle": "Kategorija tat-twissijiet tal-infiq"
+    },
+    "history": {
+      "title": "Kronoloġija tan-notifiki",
+      "subtitle": "In-notifiki li rċieva dan il-kont",
+      "bannerBody": "In-notifiki push huma mitfija għal dan l-apparat, għalhekk dawk ġodda mhux se jaslu hawn.",
+      "bannerAction": "Impostazzjonijiet tan-notifiki",
+      "emptyTitle": "Għad m'hemmx notifiki",
+      "emptyCategoryTitle": "Għad m'hemmx notifiki f'din il-kategorija",
+      "emptyBody": "In-notifiki li jirċievi dan il-kont jidhru hawn. Jinżammu għal {{days}} ġranet.",
+      "capped": "Qed jintwerew in-notifiki l-aktar reċenti.",
+      "loadError": "Ma setgħetx tiġi mgħobbija l-kronoloġija tan-notifiki.",
+      "openFailed": "Din in-notifika m'għadhiex tinfetaħ imkien."
     },
     "action": {
       "openSession": "Iftaħ is-sessjoni"
@@ -2700,7 +2711,9 @@
       "retrying": "Qed jerġa' jipprova…",
       "retryDeny": "Erġa' pprova tiċħad",
       "retryAllowOnce": "Erġa' pprova tippermetti darba biss",
-      "retryAlwaysAllow": "Erġa' pprova tippermetti dejjem"
+      "retryAlwaysAllow": "Erġa' pprova tippermetti dejjem",
+      "unreadableTitle": "It-talba għall-permess ma setgħetx inqrat",
+      "unreadableBody": "L-agent qed jistenna deċiżjoni dwar il-permess li din l-app ma tistax turi. Aġġorna l-app jew il-CLI, jew wieġeb it-talba fil-CLI biex tkompli."
     },
     "questionCard": {
       "title": "L-aġent jeħtieġ it-tweġiba tiegħek",
@@ -3113,8 +3126,9 @@
     "unavailableDevice": "Id-dħul bil-vuċi mhux disponibbli fuq dan l-apparat.",
     "unavailableLanguage": "Id-dħul bil-vuċi mhux disponibbli għal-lingwa ta' dan l-apparat.",
     "languageNotInstalledTitle": "Id-dħul bil-vuċi għal {{language}} għadux lest",
-    "languageNotInstalledMessage": "Il-fajls tad-diskors offline għal {{language}} mhumiex installati fuq dan it-telefon. Niżżelhom, imbagħad erġa' pprova d-dħul bil-vuċi.",
+    "languageNotInstalledMessage": "Il-fajls tad-diskors offline għal {{language}} mhumiex installati, u t-traskrizzjoni onlajn hija mitfija. Biex tkun tista' tuża d-dħul bil-vuċi, trid jew tagħmel dawn il-fajls installati jew terġa' tattiva t-traskrizzjoni onlajn.",
     "downloadOfflineModel": "Niżżel",
+    "useOnlineTranscription": "Ippermetti t-traskrizzjoni onlajn",
     "offlineModelDownloadScheduled": "Il-fajls tad-diskors offline se jinżżlu fl-isfond. Erġa' pprova d-dħul bil-vuċi iktar 'il quddiem.",
     "listeningStopped": "Is-smigħ waqaf.",
     "transcribing": "Qed nitraskrivi…",
@@ -3291,7 +3305,7 @@
     "creditActivity": {
       "emptyDescription": "Ix-xiri, l-użu u l-aġġustamenti tal-krediti ta' din l-organizzazzjoni se jidhru hawn hekk kif iseħħu.",
       "emptyTitle": "L-ebda attività tal-krediti",
-      "expires": "Jiskadi: {{date}}",
+      "expiresUtc": "Jiskadi: {{date}} (UTC)",
       "title": "Attività tal-krediti",
       "transactionFallback": "Tranżazzjoni tal-krediti",
       "category": {
@@ -3884,6 +3898,7 @@
     "title": "Profili",
     "entrySubtitle": "Uża mill-ġdid is-settings tal-ambjent matul is-sessjonijiet",
     "newProfile": "Profil ġdid",
+    "openHint": "Jiftaħ il-profil",
     "emptyTitle": "Għadu l-ebda profil",
     "emptyDescription": "Oħloq profil biex tuża mill-ġdid il-varjabbli ambjentali, il-kmandi tas-setup, u l-ħiliet matul is-sessjonijiet.",
     "loadFailed": "Ma setgħetx tagħbija profili",
@@ -3992,6 +4007,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Il-valuri murija bħala •••• iżommu s-sigriet maħżun tagħhom; sostitwixxi valur biex iddawru. Il-bdil tal-linja tal-kmand jeħtieġ kull valur mill-ġdid",
+      "headersHint": "Il-valuri murija bħala •••• iżommu s-sigriet maħżun tagħhom; sostitwixxi valur biex iddawru. Il-bdil tal-URL jeħtieġ kull valur mill-ġdid",
       "nameRequired": "Daħħal isem server",
       "nameInvalid": "Isem jista' juża biss ittri ASCII, numri, underscores, u sings, sa 100 karattru",
       "commandRequired": "Daħħal kmand",
@@ -4090,6 +4107,10 @@
   "credits": {
     "title": "Ixtri krediti",
     "description": "Il-krediti huma xiri ta' darba li jiżdied mal-bilanċ Kilo tiegħek biex imexxi sessjonijiet ta' kodifikazzjoni bl-AI fl-App Kilo. Il-ħanut jaddebita l-kont tiegħek u l-krediti jiżdiedu wara li l-ħanut jikkonferma l-ħlas.",
+    "nextExpiry": "{{amount}} fi krediti jiskadu: {{date}} (UTC). Il-krediti li jiskadu l-ewwel jintużaw l-ewwel.",
+    "appStoreExpiry": "Il-krediti mixtrija permezz tal-App Store ma jiskadux.",
+    "playOneYearExpiry": "Dawn il-krediti jiskadu sena kalendarja wara x-xiri.",
+    "playNonexpiring": "Dawn il-krediti ma jiskadux.",
     "packLabel": "Żid {{amount}} f'krediti",
     "priceUnavailable": "Prezz mhux disponibbli",
     "purchased": "Il-krediti ġew miżjuda mal-bilanċ tiegħek.",
@@ -4136,11 +4157,13 @@
       "namePlaceholder": "Żbalji, Ideat, Ħruġ…",
       "emoji": "Emoji",
       "mode": "Mod",
-      "defaultsHint": "Is-sessjonijiet li jinbdew minn din il-lista jużaw dawn id-defaults."
+      "defaultsHint": "Is-sessjonijiet li jinbdew minn din il-lista jużaw dawn id-defaults.",
+      "saveFailed": "Il-lista ma ġietx salvata. Iċċekkja l-konnessjoni tiegħek u erġa’ pprova."
     },
     "list": {
       "addPlaceholder": "Kompitu ġdid",
       "add": "Żid kompitu",
+      "addFailed": "Il-kompitu ma ġiex miżjud. Iċċekkja l-konnessjoni tiegħek u erġa’ pprova.",
       "empty": "S'issa m'hemmx kompiti",
       "setDefaults": "Issettja repożitorju, mod u mudell",
       "completed_one": "Lest ({{count}})",
@@ -4183,7 +4206,9 @@
       "startNewSession": "Ibda sessjoni ġdida",
       "startNewSessionHint": "Agħfas fit-tul biex tibda sessjoni ġdida.",
       "linkSession": "Qabbad sessjoni",
-      "linkFailed": "Ma setgħetx tiġi marbuta s-sessjoni mal-kompitu"
+      "linkFailed": "Ma setgħetx tiġi marbuta s-sessjoni mal-kompitu",
+      "moveToAnotherTodo": "Mexxi għal kompitu ieħor",
+      "startRefreshFailed": "Is-sessjoni bdiet, imma din il-lista ma ġietx aġġornata."
     },
     "linkSession": {
       "title": "Agħżel sessjoni",
@@ -4192,6 +4217,7 @@
     },
     "upNext": "Li jmiss",
     "sessionTodo": "Kompitu: {{title}}",
+    "openTodoHint": "Jiftaħ il-kompitu.",
     "linkToTodo": "Qabbad mal-kompitu",
     "candidates": {
       "empty": "L-ebda kompitu miftuħ"
@@ -4235,6 +4261,16 @@
     "generate": "Iġġenera sommarju",
     "retrySummary": "Erġa' pprova s-sommarju bi ħlas",
     "sources": "Evidenza u artifacts",
+    "sessionsShown_one": "Qed jintwerew {{shown}} minn {{total}} sessjoni",
+    "sessionsShown_two": "Qed jintwerew {{shown}} minn {{total}} sessjonijiet",
+    "sessionsShown_few": "Qed jintwerew {{shown}} minn {{total}} sessjonijiet",
+    "sessionsShown_many": "Qed jintwerew {{shown}} minn {{total}} sessjoni",
+    "sessionsShown_other": "Qed jintwerew {{shown}} minn {{total}} sessjoni",
+    "itemsShown_one": "Qed jintwerew {{shown}} minn {{total}} oġġett",
+    "itemsShown_two": "Qed jintwerew {{shown}} minn {{total}} oġġetti",
+    "itemsShown_few": "Qed jintwerew {{shown}} minn {{total}} oġġetti",
+    "itemsShown_many": "Qed jintwerew {{shown}} minn {{total}} oġġett",
+    "itemsShown_other": "Qed jintwerew {{shown}} minn {{total}} oġġett",
     "timezone": "Żona tal-ħin tal-briefing",
     "deviceTimezone": "Uża ż-żona tal-ħin tal-apparat",
     "timezoneHint": "Żona tal-ħin IANA, pereżempju Europe/Berlin. Il-bidliet fl-iskeda japplikaw għall-briefings li ġejjin.",

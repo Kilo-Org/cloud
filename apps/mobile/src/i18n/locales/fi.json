@@ -227,7 +227,6 @@
     "hideBalance": "Piilota saldo",
     "showBalance": "Näytä saldo",
     "balanceHidden": "Saldo piilotettu",
-    "bonusCreditsExpiring": "Krediittejä vanhenee {{date}}: {{amount}}.",
     "signOutTitle": "Kirjaudutaanko ulos?",
     "signOutMessage": "Pääset takaisin työtilaasi kirjautumalla uudelleen sisään.",
     "deleteAccountTitle": "Poistetaanko tili?",
@@ -876,6 +875,18 @@
       "securityFindingsUnavailable": "Ota Kilo-tietoturva-agentti käyttöön laajuudessa saadaksesi tietoturvalöydöksiä.",
       "spendAlertsSubtitle": "raja-arvojen ylitykset ja tunneittaiset piikit",
       "spendAlertsToggle": "Kulutusvaroitusten luokka"
+    },
+    "history": {
+      "title": "Ilmoitushistoria",
+      "subtitle": "Tämän tilin vastaanottamat ilmoitukset",
+      "bannerBody": "Push-ilmoitukset ovat pois päältä tällä laitteella, joten uudet ilmoitukset eivät saavu tänne.",
+      "bannerAction": "Ilmoitusasetukset",
+      "emptyTitle": "Ei vielä ilmoituksia",
+      "emptyCategoryTitle": "Ei ilmoituksia tässä kategoriassa",
+      "emptyBody": "Tämän tilin vastaanottamat ilmoitukset näkyvät täällä. Ne säilytetään {{days}} päivää.",
+      "capped": "Näytetään uusimmat ilmoitukset.",
+      "loadError": "Ilmoitushistoriaa ei voitu ladata.",
+      "openFailed": "Tämä ilmoitus ei enää avaudu missään."
     },
     "action": {
       "openSession": "Avaa istunto"
@@ -2592,7 +2603,9 @@
       "retrying": "Yritetään uudelleen…",
       "retryDeny": "Yritä kieltää uudelleen",
       "retryAllowOnce": "Yritä salli kerran uudelleen",
-      "retryAlwaysAllow": "Yritä salli aina uudelleen"
+      "retryAlwaysAllow": "Yritä salli aina uudelleen",
+      "unreadableTitle": "Lupapyyntöä ei voitu lukea",
+      "unreadableBody": "Agentti odottaa lupapäätöstä, jota tämä sovellus ei voi näyttää. Päivitä sovellus tai CLI tai vastaa pyyntöön CLI:ssä jatkaaksesi."
     },
     "questionCard": {
       "title": "Agentti tarvitsee vastauksesi",
@@ -2984,8 +2997,9 @@
     "unavailableDevice": "Puheentunnistus ei ole käytettävissä tällä laitteella.",
     "unavailableLanguage": "Puheentunnistus ei ole käytettävissä laitteen nykyisellä kielellä. Asenna kielen offline-puhetiedostot tai käytä toista sovelluksen kieltä.",
     "languageNotInstalledTitle": "Puheentunnistus ei ole vielä valmis kielelle {{language}}",
-    "languageNotInstalledMessage": "Kielen {{language}} offline-puhetiedostoja ei ole asennettu tähän puhelimeen. Lataa ne ja kokeile puheentunnistusta uudelleen.",
+    "languageNotInstalledMessage": "Kielen {{language}} offline-puhetiedostot eivät ole asennettuna, ja online-puheentunnistus on poissa käytöstä. Lataa tiedostot tai ota online-puheentunnistus takaisin käyttöön, jotta äänisyöttö toimii.",
     "downloadOfflineModel": "Lataa",
+    "useOnlineTranscription": "Salli online-puheentunnistus",
     "offlineModelDownloadScheduled": "Offline-puhetiedostot ladataan taustalla. Kokeile puheentunnistusta myöhemmin uudelleen.",
     "listeningStopped": "Kuuntelu lopetettiin.",
     "transcribing": "Muunnetaan tekstiksi…",
@@ -3159,7 +3173,7 @@
     "creditActivity": {
       "emptyDescription": "Organisaation ostot, käyttö ja krediittien muutokset näkyvät tässä sitä mukaa kuin niitä kertyy.",
       "emptyTitle": "Ei krediittitapahtumia",
-      "expires": "Vanhenee {{date}}",
+      "expiresUtc": "Vanhenee {{date}} (UTC)",
       "title": "Krediittitapahtumat",
       "transactionFallback": "Krediittitapahtuma",
       "category": {
@@ -3746,6 +3760,7 @@
     "title": "Profiilit",
     "entrySubtitle": "Käytä ympäristöasetuksia uudelleen istuntojen aikana",
     "newProfile": "Uusi profiili",
+    "openHint": "Avaa profiilin",
     "emptyTitle": "Ei vielä profiileja",
     "emptyDescription": "Luo profiili käyttääksesi uudelleen ympäristömuuttujia, asetuskomentoja ja taitoja istuntojen aikana.",
     "loadFailed": "Profiilien lataaminen epäonnistui",
@@ -3839,6 +3854,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Arvot, jotka näkyvät muodossa ••••, säilyttävät tallennetun salaisuutensa; korvaa arvo vaihtaaksesi sen. Komentorivin muuttaminen edellyttää kaikkien arvojen antamista uudelleen",
+      "headersHint": "Arvot, jotka näkyvät muodossa ••••, säilyttävät tallennetun salaisuutensa; korvaa arvo vaihtaaksesi sen. URL-osoitteen muuttaminen edellyttää kaikkien arvojen antamista uudelleen",
       "nameRequired": "Anna palvelimen nimi",
       "nameInvalid": "Nimessä voi käyttää vain ASCII-kirjaimia, numeroita, alaviivoja ja väliviivoja, enintään 100 merkkiä",
       "commandRequired": "Anna komento",
@@ -3937,6 +3954,10 @@
   "credits": {
     "title": "Osta krediittejä",
     "description": "Krediitit ovat kertaostos, joka lisätään Kilo-saldoosi AI-koodausistuntojen ajamista varten Kilo-sovelluksessa. Kauppa veloittaa tiliäsi ja krediitit lisätään, kun kauppa vahvistaa maksun.",
+    "nextExpiry": "Krediittejä vanhenee {{date}} (UTC): {{amount}}. Aikaisimmin vanhenevat krediitit käytetään ensin.",
+    "appStoreExpiry": "App Storen kautta ostetut krediitit eivät vanhene.",
+    "playOneYearExpiry": "Nämä krediitit vanhenevat yhden kalenterivuoden kuluttua ostosta.",
+    "playNonexpiring": "Nämä krediitit eivät vanhene.",
     "packLabel": "Lisää {{amount}} krediittejä",
     "priceUnavailable": "Hinta ei saatavilla",
     "purchased": "Krediitit on lisätty saldoosi.",
@@ -3977,11 +3998,13 @@
       "namePlaceholder": "Virheet, ideat, julkaisu…",
       "emoji": "Emoji",
       "mode": "Tila",
-      "defaultsHint": "Tästä listasta aloitetut istunnot käyttävät näitä oletusasetuksia."
+      "defaultsHint": "Tästä listasta aloitetut istunnot käyttävät näitä oletusasetuksia.",
+      "saveFailed": "Listaa ei voitu tallentaa. Tarkista yhteytesi ja yritä uudelleen."
     },
     "list": {
       "addPlaceholder": "Lisää uusi tehtävä",
       "add": "Lisää tehtävä",
+      "addFailed": "Tehtävää ei voitu lisätä. Tarkista yhteytesi ja yritä uudelleen.",
       "empty": "Ei vielä tehtäviä",
       "setDefaults": "Aseta koodivarasto, tila ja malli",
       "completed_one": "Valmis ({{count}})",
@@ -4018,7 +4041,9 @@
       "startNewSession": "Aloita uusi istunto",
       "startNewSessionHint": "Aloita uusi istunto pitämällä painettuna.",
       "linkSession": "Linkitä istunto",
-      "linkFailed": "Istunnon linkittäminen tehtävään ei onnistunut"
+      "linkFailed": "Istunnon linkittäminen tehtävään ei onnistunut",
+      "moveToAnotherTodo": "Siirrä toiseen tehtävään",
+      "startRefreshFailed": "Istunto aloitettiin, mutta tätä listaa ei päivitetty."
     },
     "linkSession": {
       "title": "Istunnon linkittäminen",
@@ -4027,6 +4052,7 @@
     },
     "upNext": "Seuraavaksi",
     "sessionTodo": "Tehtävä: {{title}}",
+    "openTodoHint": "Avaa tehtävän.",
     "linkToTodo": "Linkitä tehtävään",
     "candidates": {
       "empty": "Ei avoimia tehtäviä"
@@ -4070,6 +4096,10 @@
     "generate": "Luo yhteenveto",
     "retrySummary": "Yritä maksullista yhteenvetoa uudelleen",
     "sources": "Todisteet ja artefaktit",
+    "sessionsShown_one": "Näytetään {{shown}}/{{total}} istunto",
+    "sessionsShown_other": "Näytetään {{shown}}/{{total}} istuntoa",
+    "itemsShown_one": "Näytetään {{shown}}/{{total}} kohde",
+    "itemsShown_other": "Näytetään {{shown}}/{{total}} kohdetta",
     "timezone": "Katsauksen aikavyöhyke",
     "deviceTimezone": "Käytä laitteen aikavyöhykettä",
     "timezoneHint": "IANA-aikavyöhyke, esimerkiksi Europe/Berlin. Aikataulumuutokset koskevat tulevia katsauksia.",

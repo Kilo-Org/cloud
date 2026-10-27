@@ -1,11 +1,13 @@
 import { createRequire } from 'node:module';
 import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
 import { defineConfig } from 'vitest/config';
+import { binaryAsArrayBuffer } from './test/plugins/binary-as-arraybuffer.js';
 
 // Integration tests - run in Cloudflare Workers runtime via Miniflare
 // Use cloudflare:test utilities: env, runInDurableObject, createMessageBatch, etc.
 export default defineConfig({
   plugins: [
+    binaryAsArrayBuffer,
     {
       name: 'fix-pg-cjs-dependencies',
       enforce: 'pre',
@@ -25,6 +27,13 @@ export default defineConfig({
         configPath: './wrangler.test.jsonc',
       },
       miniflare: {
+        // Lifecycle fixtures own their startup mode. Do not inherit a local
+        // developer's downloaded release or runtime-free image selection.
+        bindings: {
+          RUNTIME_STARTUP_MODE: 'preinstalled',
+          RUNTIME_RELEASE_DESCRIPTOR: '',
+          NATIVE_RUNTIME_IMAGE: 'all-in-one',
+        },
         // Faster queue processing in tests
         queueConsumers: {
           EXECUTION_QUEUE: {

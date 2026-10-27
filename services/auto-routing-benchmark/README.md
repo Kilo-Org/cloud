@@ -48,6 +48,17 @@ Both routers are custom-router bases (ADR 0005): owner profile admission, the ow
 custom router tables, and client evals accept `efficient` and `frontier`.
 Owner work for a base uses that base's configuration, dataset, engine identity, and quota.
 
+Client and direct-BYOK custom-router entries can explicitly link `measuredAs` to a globally
+measured platform model. Same-name variants reuse the base router's live platform measurement;
+other variants remain client-measured. Linked variants neither enter client eval plans nor accept
+client uploads, and status reads do not admit additional platform work for them. Custom tables
+preserve the entry's candidate identity and reprice the linked measurement at its owner's prices:
+token means give exact costs, while older summaries use the blended input/output price ratio.
+Missing client pricing means zero cost; an unpriceable linked summary is excluded from ranking.
+Ready history remains available as stale when its identity changes or its model leaves the catalog.
+`GET /admin/platform-measurements?router=efficient|frontier` lists models and variants with ready
+global history for link selection, including owner-requested platform-key measurements.
+
 ## System-optimal policy settings
 
 The daily platform sync recomputes each router's policy settings before publishing, and stores

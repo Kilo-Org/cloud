@@ -510,6 +510,7 @@ describe('handleKiloFacadeRequest', () => {
         {
           kiloSessionId,
           cloudAgentSessionId: firstWorkspaceSessionId,
+          workspaceId: 'worktree_11111111-1111-4111-8111-111111111111',
           userId: 'usr_1',
           organizationId: null,
           title: 'Mapped session',
@@ -2434,6 +2435,7 @@ describe('hosted global native events', () => {
     return {
       kiloSessionId: id,
       cloudAgentSessionId,
+      workspaceId: 'worktree_11111111-1111-4111-8111-111111111111',
       userId: groupedOwnerId,
       organizationId: null,
       title: 'Owned root',

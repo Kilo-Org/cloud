@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { GEMINI_THOUGHT_TAG_MARKER } from '@kilocode/web-shared/lib/ai-gateway/reasoning-details-transform';
 import {
   isOpenRouterProviderConfig,
   type GatewayResponsesRequest,
@@ -45,6 +46,7 @@ import {
   addCacheBreakpoints,
   enableReasoningSummaries,
   fixResponsesRequest,
+  mapReasoningDetailsToReasoning,
   mapReasoningDetailsToReasoningContent,
   replaceReasoningObjectWithReasoningEffort,
   scrubOpenCodeSpecificProperties,
@@ -52,7 +54,9 @@ import {
 import { isQwenExplicitCacheModel } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
 import { ReasoningFormat } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/format';
 import { ReasoningDetailType } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
+import type { CustomPricing } from '@kilocode/db/schema-types';
 import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
@@ -136,6 +140,10 @@ function applyGeminiReasoningTransform(request: OpenRouterChatCompletionRequest)
         ...(reasoningEffort !== undefined ? { thinking_level: reasoningEffort } : {}),
         include_thoughts: true,
       },
+      // Without streaming, thoughts and answer share one content string, and
+      // only these tags separate them. Streams flag thought chunks instead, and
+      // asking for tags there would also put the closing tag in the answer.
+      ...(request.stream !== true ? { thought_tag_marker: GEMINI_THOUGHT_TAG_MARKER } : {}),
     };
   }
 
@@ -237,9 +245,9 @@ function serviceTierForLog(serviceTier: unknown) {
 export function removeUnsupportedRequestServiceTier(
   requestedModel: string,
   requestToMutate: GatewayRequest,
-  kiloExclusiveModel: KiloExclusiveModel | null
+  kiloExclusiveModel: KiloExclusiveModel | null,
+  customPricing: CustomPricing | undefined
 ) {
-  const customPricing = getCustomPricing(requestedModel);
   const reason =
     customPricing && !customPricing.fallbackOnly
       ? 'non-fallback custom pricing'
@@ -261,11 +269,11 @@ export function removeUnsupportedRequestServiceTier(
 }
 
 /**
- * Inverse of the reasoning-content response transform: folds
- * client-supplied `reasoning_details` back into the `reasoning_content` string
- * the upstream speaks, so reasoning survives the round trip. Reasoning-content
- * upstreams are OpenAI-compatible, so OpenRouter's `reasoning` object is also
- * replaced with `reasoning_effort`.
+ * Inverse of the reasoning-content and reasoning response transforms: folds
+ * client-supplied `reasoning_details` back into the `reasoning_content` or
+ * `reasoning` string the upstream speaks, so reasoning survives the round trip.
+ * These upstreams are OpenAI-compatible, so OpenRouter's `reasoning` object is
+ * also replaced with `reasoning_effort`.
  */
 export function applyReasoningDetailsTransform(
   provider: Provider,
@@ -282,6 +290,10 @@ export function applyReasoningDetailsTransform(
     case ReasoningDetailsTransform.ReasoningContent:
       replaceReasoningObjectWithReasoningEffort(requestToMutate);
       mapReasoningDetailsToReasoningContent(requestToMutate.body);
+      break;
+    case ReasoningDetailsTransform.Reasoning:
+      replaceReasoningObjectWithReasoningEffort(requestToMutate);
+      mapReasoningDetailsToReasoning(requestToMutate.body);
       break;
     case null:
       break;
@@ -302,7 +314,7 @@ export async function applyProviderSpecificLogic(
   isNonTrialEnterprise: boolean
 ) {
   removeModelsFallback(requestedModel, requestToMutate);
-  if (isFreeModelExcludingCustomLlms(requestedModel)) {
+  if (isFreeModelExcludingCustomLlms(requestedModel) || userByok !== null) {
     removePaidServerFeatures(provider, requestedModel, requestToMutate, userId);
   }
   applyTrackingIds(requestToMutate, provider, userId, taskId);
@@ -346,7 +358,12 @@ export async function applyProviderSpecificLogic(
   enableReasoningSummaries(requestToMutate);
 
   const kiloExclusiveModel = findKiloExclusiveModel(requestedModel);
-  removeUnsupportedRequestServiceTier(requestedModel, requestToMutate, kiloExclusiveModel);
+  removeUnsupportedRequestServiceTier(
+    requestedModel,
+    requestToMutate,
+    kiloExclusiveModel,
+    getCustomPricing(await getCustomPricingConfig(), requestedModel)
+  );
   if (kiloExclusiveModel) {
     applyKiloExclusiveModelSettings(requestToMutate, kiloExclusiveModel);
   }

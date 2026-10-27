@@ -340,10 +340,22 @@ let gatewayDeniedModelIds: string[] = [];
 let gatewayFailuresLeft = 0;
 let gatewayFailureStatus = 503;
 let blacklistedDomainsConfig: string | null = null;
+let blacklistedDomainsUpdatedAt: string | null = null;
 let redisAvailable = true;
 
-function blacklistConfig(domains: string[]) {
-  return JSON.stringify({ domains, updated_at: null, updated_by: null, updated_by_email: null });
+function blacklistConfig(domains: string[], updatedAt: string | null = null) {
+  return JSON.stringify({
+    domains,
+    updated_at: updatedAt,
+    updated_by: null,
+    updated_by_email: null,
+  });
+}
+
+function redisReads() {
+  return fetchMock.mock.calls
+    .filter(([input]) => requestUrl(input).includes('redis'))
+    .map(([, init]) => (JSON.parse(init?.body as string) as string[])[1]);
 }
 
 function gatewayCalls() {
@@ -369,6 +381,7 @@ beforeEach(() => {
   gatewayFailuresLeft = 0;
   gatewayFailureStatus = 503;
   blacklistedDomainsConfig = null;
+  blacklistedDomainsUpdatedAt = null;
   redisAvailable = true;
   fetchMock.mockReset().mockImplementation(async (input, init) => {
     const url = requestUrl(input);
@@ -383,9 +396,13 @@ beforeEach(() => {
     if (url === 'https://redis.example.test' && init?.method === 'POST') {
       if (!redisAvailable) return new Response('unavailable', { status: 503 });
       const [command, key] = JSON.parse(init.body as string) as string[];
-      return command === 'GET' && key === 'admin:blacklisted-domains'
-        ? Response.json({ result: blacklistedDomainsConfig })
-        : Response.json({ error: 'unexpected command' }, { status: 400 });
+      if (command === 'GET' && key === 'admin:blacklisted-domains') {
+        return Response.json({ result: blacklistedDomainsConfig });
+      }
+      if (command === 'GET' && key === 'admin:blacklisted-domains:updated-at') {
+        return Response.json({ result: blacklistedDomainsUpdatedAt });
+      }
+      return Response.json({ error: 'unexpected command' }, { status: 400 });
     }
     return new Response('not found', { status: 404 });
   });
@@ -729,6 +746,18 @@ describe('public custom router decide', () => {
     expect(
       fetchMock.mock.calls.filter(([input]) => requestUrl(input).includes('redis'))
     ).toHaveLength(2);
+  });
+
+  it('rechecks only the updated_at key while the blocked-domain list is unchanged', async () => {
+    blacklistedDomainsUpdatedAt = '2026-10-22T13:30:00.000Z';
+    blacklistedDomainsConfig = blacklistConfig(['example.com'], blacklistedDomainsUpdatedAt);
+    expect((await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())).status).toBe(403);
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 61_000);
+    expect((await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody())).status).toBe(403);
+    expect(redisReads()).toEqual([
+      'admin:blacklisted-domains',
+      'admin:blacklisted-domains:updated-at',
+    ]);
   });
 
   it('fails with custom_router_unavailable when no entry is servable', async () => {

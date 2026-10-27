@@ -227,7 +227,6 @@
     "hideBalance": "Haftee dhoksi",
     "showBalance": "Haftee agarsiisi",
     "balanceHidden": "Hafteen dhokateera",
-    "bonusCreditsExpiring": "Kiriiditiin {{amount}} gaafa {{date}} yeroon isaa darba.",
     "signOutTitle": "Keessaa baataa?",
     "signOutMessage": "Iddoo hojii keetti deebi'uuf ammas seenuu qabda.",
     "deleteAccountTitle": "Herrega haqxaa?",
@@ -876,6 +875,18 @@
       "securityFindingsUnavailable": "Argannoowwan nageenyaa argachuuf Kilo eejentii nageenyaa daangaa irratti dandeessisi.",
       "spendAlertsSubtitle": "daarbii daangaa fi olka'iinsa sa'aatii",
       "spendAlertsToggle": "Ramaddii akeekkachiisa baasii"
+    },
+    "history": {
+      "title": "Seenaa beeksisaa",
+      "subtitle": "Beeksisoota herregni kun argate",
+      "bannerBody": "Beeksisoonni push meeshaa kanaaf cufamaniiru, kanaaf haaraan asitti hin dhufan.",
+      "bannerAction": "Qindaa'ina beeksisaa",
+      "emptyTitle": "Ammatti beeksisoonni hin jiran",
+      "emptyCategoryTitle": "Beeksisoonni rammii kana keessatti hin jiran",
+      "emptyBody": "Beeksisoonni herregni kun fudhatu asitti mul'atu. Guyyaa {{days}}f ni eegamu.",
+      "capped": "Beeksisoonni haaraan agarsiifamaa jiran.",
+      "loadError": "Seenaa beeksisaa fiduu hin dandeenye.",
+      "openFailed": "Beeksisni kun amma bakka tokkollee hin banamu."
     },
     "action": {
       "openSession": "Turtii bani"
@@ -2592,7 +2603,9 @@
       "retrying": "Deebi'ee yaalaa jira…",
       "retryDeny": "Diduuf deebi'ii yaali",
       "retryAllowOnce": "Al tokko hayyamuuf deebi'ii yaali",
-      "retryAlwaysAllow": "Yeroo hunda hayyamuuf deebi'ii yaali"
+      "retryAlwaysAllow": "Yeroo hunda hayyamuuf deebi'ii yaali",
+      "unreadableTitle": "Gaaffiin hayyamaa dubbifamuu hin dandeenye",
+      "unreadableBody": "Ajentiin murtii hayyamaa eeggachaa jira; appiin kun sana agarsiisuu hin danda'u. Appii ykn CLI haaromsi, ykn itti fufuuf gaaffii CLI keessatti deebisi."
     },
     "questionCard": {
       "title": "Ergamaan deebii barbaada",
@@ -2984,8 +2997,9 @@
     "unavailableDevice": "Meeshaa kana irratti sagaleen galchuun hin danda'amu.",
     "unavailableLanguage": "Afaan meeshaa kanaatiin sagaleen galchuun hin danda'amu.",
     "languageNotInstalledTitle": "Sagaleen galchuu afaan {{language}} tiif hin qophaa'i",
-    "languageNotInstalledMessage": "Faayiloota sagalee offlaayinii afaan {{language}} tiif bilbilaa kana irratti hin dhaabbatamin. Isaan buufadhu, ergasii sagaleen galchuu irra deebi'ii yaali.",
+    "languageNotInstalledMessage": "Faayiloonni sagalee offlaayinii afaan {{language}} hin buufamne, warraabbi intarneetii amma cufameera. Faayiloota buufachuun ykn warraabbi intarneetii deebisuun sagalee galchuu akka hojjete taasisa.",
     "downloadOfflineModel": "Buufadhu",
+    "useOnlineTranscription": "Warraabbi intarneetii hayyami",
     "offlineModelDownloadScheduled": "Faayiloota sagalee offlaayinii duubatti buufamu. Sagaleen galchuu booda irra deebi'ii yaali.",
     "listeningStopped": "Dhaggeeffachuun dhaabbateera.",
     "transcribing": "Barreeffamatti jijjiiraa jira...",
@@ -3159,7 +3173,7 @@
     "creditActivity": {
       "emptyDescription": "Bittaan, fayyadamni fi sirreeffamni kiriiditii dhaabbata kanaa yeroo raawwataman asitti mul'atu.",
       "emptyTitle": "Sochii kiriiditii hin jiru",
-      "expires": "{{date}} irratti yeroon isaa darba",
+      "expiresUtc": "{{date}} (UTC) irratti yeroon isaa darba",
       "title": "Sochii kiriiditii",
       "transactionFallback": "Daddabarsa kiriiditii",
       "category": {
@@ -3746,6 +3760,7 @@
     "title": "Profaayilii",
     "entrySubtitle": "Sajoo naannoo turtii hunda keessatti irra deebi'ii fayyadami",
     "newProfile": "Profaayila haaraa",
+    "openHint": "Profaayilii bana",
     "emptyTitle": "Ammatti piroofaayilii hin jiru",
     "emptyDescription": "Jijjiiramoota naannoo, ajajoota saaguu, fi dandeettiiwwan turtii hunda irra deebi'ee fayyadamuuf piroofaayilii uumi.",
     "loadFailed": "Profaayilii fe'uu hin dandeenye",
@@ -3839,6 +3854,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Gatiwwan akka •••• agarsiifaman icciita isaanii kuufame qabu; isa jijjiiruuf gatii tokko bakka buusi. Yeroo sarara ajaja jijjiiramu, gatiin hundi barbaachisaadha",
+      "headersHint": "Gatiwwan akka •••• agarsiifaman icciita isaanii kuufame qabu; isa jijjiiruuf gatii tokko bakka buusi. Yeroo URL jijjiiramu, gatiin hundi barbaachisaadha",
       "nameRequired": "Maqaa sarvarii galchi",
       "nameInvalid": "Maqaan qubee ASCII, lakkoofsota, sarara jalaa fi daash qofa fayyadamuu danda'a, arfiilee 100 ykn isaa gadi",
       "commandRequired": "Ajaja galchi",
@@ -3937,6 +3954,10 @@
   "credits": {
     "title": "Kireedita bituu",
     "description": "Kireeditiin bittaa yeroo tokkoo kan baalansii Kilo kee irratti dabalame ta'ee, shumarra code AI Kilo App keessatti hojjechuuf oola. Suuqii ammaataa kee irraa kaffaltii fudhata, suuqiin kaffaltii erga mirkaneesse booda kireeditiin dabalama.",
+    "nextExpiry": "Kireeditiin {{amount}} gaafa {{date}} (UTC) yeroon isaa darba. Kireeditiin dursee yeroon isaa darbu dursa itti fayyadamama.",
+    "appStoreExpiry": "Kireeditiin App Store irraa bitame yeroon isaa hin darbu.",
+    "playOneYearExpiry": "Kireeditiin kun bittaa irraa eegalee waggaa kaalaandarii tokko booda yeroon isaa darba.",
+    "playNonexpiring": "Kireeditiin kun yeroon isaa hin darbu.",
     "packLabel": "Kireedita {{amount}} dabali",
     "priceUnavailable": "Gatii hin argamu",
     "purchased": "Kireeditiin baalansii kee irratti dabalameera.",
@@ -3977,11 +3998,13 @@
       "namePlaceholder": "Rakkoo, Yaada, Baasii…",
       "emoji": "Mallattoo miiraa",
       "mode": "Haala",
-      "defaultsHint": "Turtiiwwan tarree kana irraa eegalan durtiiwwan kana fayyadamu."
+      "defaultsHint": "Turtiiwwan tarree kana irraa eegalan durtiiwwan kana fayyadamu.",
+      "saveFailed": "Tarreen ol kaa’uun hin danda’amne. Walitti qabsiisa kee mirkaneessiis irra deebiin yaali."
     },
     "list": {
       "addPlaceholder": "Hojii dabali",
       "add": "Dabali",
+      "addFailed": "Hojii dabaluun hin danda’amne. Walitti qabsiisa kee mirkaneessiis irra deebiin yaali.",
       "empty": "Hojii hin jiru",
       "setDefaults": "Kuusaa koodii, haala fi moodela sirreessi",
       "completed_one": "Xumurame ({{count}})",
@@ -4018,7 +4041,9 @@
       "startNewSession": "Seeshinii haaraa jalqabi",
       "startNewSessionHint": "Seeshinii haaraa jalqabuuf yeroo dheeraa tuqi.",
       "linkSession": "Turtii walitti hidhi",
-      "linkFailed": "Turtii hojii waliin walitti hidhuun hin danda'amne"
+      "linkFailed": "Turtii hojii waliin walitti hidhuun hin danda'amne",
+      "moveToAnotherTodo": "Gara hojii biraatti darbi",
+      "startRefreshFailed": "Seesiiniin eegalame, garuu tarreen kun hin haaromsamne."
     },
     "linkSession": {
       "title": "Turtii walitti hidhi",
@@ -4027,6 +4052,7 @@
     },
     "upNext": "Itti aanu",
     "sessionTodo": "Hojii: {{title}}",
+    "openTodoHint": "Hojii bana.",
     "linkToTodo": "Hojii waliin hidhi",
     "candidates": {
       "empty": "Hojii banaa hin jiru"
@@ -4070,6 +4096,10 @@
     "generate": "Cuunfaa uumi",
     "retrySummary": "Cuunfaa kaffaltii irra deebi'ii yaali",
     "sources": "Ragaalee fi meeshaalee",
+    "sessionsShown_one": "Seeshinii {{total}} keessaa {{shown}} agarsiifamaa jira",
+    "sessionsShown_other": "Seeshinii {{total}} keessaa {{shown}} agarsiifamaa jira",
+    "itemsShown_one": "Ragaa {{total}} keessaa {{shown}} agarsiifamaa jira",
+    "itemsShown_other": "Ragaa {{total}} keessaa {{shown}} agarsiifamaa jira",
     "timezone": "Zoonii yeroo gabaasaa",
     "deviceTimezone": "Zoonii yeroo meeshaa fayyadami",
     "timezoneHint": "Zoonii yeroo IANA, fakkeenyaaf Europe/Berlin. Jijjiiramni sagantaa gabaasota dhufaniif hojjeta.",

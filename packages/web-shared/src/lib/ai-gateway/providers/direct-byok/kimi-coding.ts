@@ -1,5 +1,6 @@
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
+  apiKeyUpstream,
   COMPATIBLE_USER_AGENT,
   type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
@@ -10,10 +11,11 @@ import {
 
 export default {
   id: 'kimi-coding',
-  base_url: 'https://api.kimi.com/coding/v1',
-  base_url_overrides: {},
-  supported_chat_apis: ['chat_completions'],
-  reasoning_details_transform: ReasoningDetailsTransform.ReasoningContent,
+  resolveUpstream: apiKeyUpstream({
+    apiUrl: 'https://api.kimi.com/coding/v1',
+    supportedChatApis: ['chat_completions'],
+    responseTransforms: ReasoningDetailsTransform.ReasoningContent,
+  }),
   transformRequest(context) {
     const reasoningDisabled = isReasoningExplicitlyDisabled(context.request);
     context.request.body.thinking = {

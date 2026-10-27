@@ -1,7 +1,8 @@
-import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   github_app_installations,
+  kilocode_users,
   platform_integrations,
   user_auth_provider,
   type User,
@@ -12,11 +13,17 @@ import type { BotRunInput, BotRunResult } from '@/lib/bots/core/run-bot';
 import type { RunSessionInput, RunSessionResult } from '@/lib/cloud-agent-next/run-session';
 import type { DiscordBotMessageResult } from './discord-bot';
 import type { DiscordEventContext } from './discord-bot/discord-channel-context';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { verifyKiloTokenForPolicy } from '@kilocode/worker-utils/kilo-token-policy';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { generateBotUserId } from '@/lib/bot-users/types';
+import { eq } from 'drizzle-orm';
 
 const mockRunBot = jest.fn<(input: BotRunInput) => Promise<BotRunResult>>();
 const mockRunSessionToCompletion = jest.fn<(input: RunSessionInput) => Promise<RunSessionResult>>();
 const mockGetGitHubTokenForUser = jest.fn<() => Promise<string | undefined>>();
 const mockGetGitHubTokenForOrganization = jest.fn<() => Promise<string | undefined>>();
+let mockDiscordContextForPrompt = '';
 
 // Factories delegate through lazy wrappers so the hoisted `jest.mock` calls do
 // not read the mock constants before this module initializes them.
@@ -24,18 +31,9 @@ jest.mock('@/lib/bots/core/run-bot', () => ({
   runBot: (input: BotRunInput) => mockRunBot(input),
 }));
 
-jest.mock('@/lib/discord/auth', () => ({
-  getDiscordBotAuthTokenForOwner: () =>
-    Promise.resolve({ authToken: 'discord-bot-token', userId: 'discord-bot-user' }),
-}));
-
 jest.mock('@/lib/discord-bot/discord-channel-context', () => ({
   getDiscordConversationContext: () => Promise.resolve({}),
-  formatDiscordConversationContextForPrompt: () => '',
-}));
-
-jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
-  createCloudAgentNextClient: () => ({}),
+  formatDiscordConversationContextForPrompt: () => mockDiscordContextForPrompt,
 }));
 
 jest.mock('@/lib/cloud-agent-next/run-session', () => ({
@@ -144,8 +142,13 @@ describe('processDiscordBotMessage session start authorization', () => {
     ({ processDiscordBotMessage } = await import('./discord-bot'));
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockDiscordContextForPrompt = '';
     modelRequestedRepository = CONNECTED_REPOSITORY;
     mockRunBot.mockImplementation(async input => {
       if ((input.tools ?? []).length === 0) {
@@ -196,6 +199,20 @@ describe('processDiscordBotMessage session start authorization', () => {
     expect(mockRunSessionToCompletion).not.toHaveBeenCalled();
     expect(result.cloudAgentSessionId).toBeUndefined();
   });
+  it('places Discord context in its named prompt section', async () => {
+    mockDiscordContextForPrompt = 'Channel topic: weekly update';
+
+    await processDiscordBotMessage(
+      `Change something in ${CONNECTED_REPOSITORY}`,
+      guildId,
+      eventContext(nextSnowflake())
+    );
+
+    const [runInput] = mockRunBot.mock.calls[0];
+    expect(runInput.systemPrompt).toContain('<platform_conversation_context platform="discord">');
+    expect(runInput.systemPrompt).toContain('Channel topic: weekly update');
+    expect(runInput.systemPrompt).toContain('</platform_conversation_context>');
+  });
 
   it('answers without session tools when the linked account lacks workspace access', async () => {
     const otherUser = await insertTestUser();
@@ -242,6 +259,77 @@ describe('processDiscordBotMessage session start authorization', () => {
     });
     expect(result.cloudAgentSessionId).toBe('cloud-session-1');
   });
+
+  it.each(['user', 'org'] as const)(
+    'authenticates %s session operations with bounded workflow authority',
+    async ownerType => {
+      jest.replaceProperty(process, 'env', {
+        ...process.env,
+        SHARED_RESOURCE_TOKENS_ENABLED: 'true',
+        CLOUD_AGENT_RESOURCE_TOKENS_ENABLED: 'true',
+      });
+      const organization =
+        ownerType === 'org'
+          ? await createTestOrganization('Discord workspace', installationOwner.id, 0)
+          : undefined;
+      if (organization) {
+        await db
+          .update(platform_integrations)
+          .set({ owned_by_user_id: null, owned_by_organization_id: organization.id })
+          .where(eq(platform_integrations.owned_by_user_id, installationOwner.id));
+      }
+      const actingUserId = organization
+        ? generateBotUserId(organization.id, 'discord-bot')
+        : installationOwner.id;
+      const discordUserId = nextSnowflake();
+      await linkDiscordAccount(installationOwner.id, discordUserId);
+      jest.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
+        const bearer = new Headers(init?.headers).get('authorization')?.replace(/^Bearer /, '');
+        if (!bearer) throw new Error('Session credential required');
+        const verified = await verifyKiloTokenForPolicy(bearer, NEXTAUTH_SECRET, {
+          audience: 'cloud-agent-next',
+          mode: 'required',
+        });
+        const [actingUser] = await db
+          .select()
+          .from(kilocode_users)
+          .where(eq(kilocode_users.id, actingUserId));
+        expect(verified.userId).toBe(actingUserId);
+        expect(verified.claims.organizationId).toBe(organization?.id);
+        expect(verified.claims.botId).toBe(organization ? 'discord-bot' : undefined);
+        expect(verified.claims.runtimeAdmission).toMatchObject({
+          source: 'automation',
+          authorizationUserId: actingUserId,
+          authorizationPepper: actingUser.api_token_pepper,
+        });
+        expect(verified.claims.credentialExchange).toBe(false);
+        expect(verified.claims.exp - verified.claims.iat).toBeLessThanOrEqual(3600);
+        return Response.json({
+          result: {
+            data: { cloudAgentSessionId: 'cloud-session-1', kiloSessionId: 'kilo-session-1' },
+          },
+        });
+      });
+      mockRunSessionToCompletion.mockImplementationOnce(async input => {
+        const prepared = await input.client.prepareSession(input.prepareInput);
+        return {
+          response: 'The session finished.',
+          sessionId: prepared.cloudAgentSessionId,
+          hasError: false,
+          statusMessages: [],
+        };
+      });
+
+      const result = await processDiscordBotMessage(
+        `Inspect ${CONNECTED_REPOSITORY}`,
+        guildId,
+        eventContext(discordUserId)
+      );
+
+      expect(result.response).toBe('The session finished.');
+      expect(result.cloudAgentSessionId).toBe('cloud-session-1');
+    }
+  );
 
   it('refuses a repository outside the installation without starting a session', async () => {
     const discordUserId = nextSnowflake();

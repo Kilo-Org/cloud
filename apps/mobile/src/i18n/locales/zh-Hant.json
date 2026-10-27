@@ -227,7 +227,6 @@
     "hideBalance": "隱藏餘額",
     "showBalance": "顯示餘額",
     "balanceHidden": "餘額已隱藏",
-    "bonusCreditsExpiring": "{{amount}} 的點數將於 {{date}} 到期。",
     "signOutTitle": "登出？",
     "signOutMessage": "登出後，你需要重新登入才能存取工作區。",
     "deleteAccountTitle": "刪除帳戶？",
@@ -352,6 +351,18 @@
       "securityFindingsUnavailable": "在某個範圍啟用 Kilo 資安代理程式以接收安全問題。",
       "spendAlertsSubtitle": "門檻突破與每小時激增",
       "spendAlertsToggle": "支出提醒類別"
+    },
+    "history": {
+      "title": "通知歷史",
+      "subtitle": "此帳戶收到的通知",
+      "bannerBody": "此裝置的推播通知已關閉，因此新通知不會送達這裡。",
+      "bannerAction": "通知設定",
+      "emptyTitle": "尚無通知",
+      "emptyCategoryTitle": "此類別尚無通知",
+      "emptyBody": "此帳戶收到的通知會顯示在這裡。通知會保留 {{days}} 天。",
+      "capped": "顯示最近的通知。",
+      "loadError": "無法載入通知歷史。",
+      "openFailed": "此通知已無法開啟。"
     },
     "action": {
       "openSession": "開啟工作階段"
@@ -2068,7 +2079,9 @@
       "retrying": "重試中…",
       "retryDeny": "再次嘗試拒絕",
       "retryAllowOnce": "再次嘗試僅允許這次",
-      "retryAlwaysAllow": "再次嘗試一律允許"
+      "retryAlwaysAllow": "再次嘗試一律允許",
+      "unreadableTitle": "無法讀取權限要求",
+      "unreadableBody": "代理程式正在等待一項權限決策，但此應用程式無法顯示該要求。請更新應用程式或 CLI，或在 CLI 中回覆該要求以繼續。"
     },
     "questionCard": {
       "title": "智慧代理需要你的回覆",
@@ -2460,8 +2473,9 @@
     "unavailableDevice": "此裝置上無法使用語音輸入。",
     "unavailableLanguage": "語音輸入不支援此裝置目前使用的語言。請安裝該語言的離線語音檔案，或改用應用程式語言。",
     "languageNotInstalledTitle": "{{language}} 的語音輸入尚未就緒",
-    "languageNotInstalledMessage": "此手機尚未安裝 {{language}} 的離線語音檔案。請下載這些檔案，然後再試一次語音輸入。",
+    "languageNotInstalledMessage": "尚未安裝 {{language}} 的離線語音檔案，且線上轉錄功能已關閉。請安裝檔案或重新開啟線上轉錄功能，即可使用語音輸入。",
     "downloadOfflineModel": "下載",
+    "useOnlineTranscription": "允許線上轉錄",
     "offlineModelDownloadScheduled": "離線語音檔案將在背景下載。請稍後再試一次語音輸入。",
     "listeningStopped": "已停止聆聽。",
     "transcribing": "正在轉錄…",
@@ -3151,7 +3165,7 @@
     "creditActivity": {
       "emptyDescription": "此組織的購買、用量與點數調整記錄都會顯示在這裡。",
       "emptyTitle": "尚無點數記錄",
-      "expires": "{{date}} 到期",
+      "expiresUtc": "{{date}}（UTC） 到期",
       "title": "點數記錄",
       "transactionFallback": "點數交易",
       "category": {
@@ -3746,6 +3760,7 @@
     "title": "設定檔",
     "entrySubtitle": "跨會話重複使用環境設置",
     "newProfile": "新增設定檔",
+    "openHint": "開啟設定檔",
     "emptyTitle": "還沒有設定檔",
     "emptyDescription": "建立設定檔以跨會話重複使用環境變數、設定命令和技能。",
     "loadFailed": "無法載入設定檔",
@@ -3839,6 +3854,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "顯示為 •••• 的值會保留已儲存的密鑰；替換值即可輪換。變更命令列時必須重新輸入所有值",
+      "headersHint": "顯示為 •••• 的值會保留已儲存的密鑰；替換值即可輪換。變更網址時必須重新輸入所有值",
       "nameRequired": "輸入伺服器名稱",
       "nameInvalid": "名稱只能使用 ASCII 字母、數字、底線和連字符，最多 100 個字元",
       "commandRequired": "輸入命令",
@@ -3937,6 +3954,10 @@
   "credits": {
     "title": "購買點數",
     "description": "點數是一次性購買，會加入你的 Kilo 餘額，用於在 Kilo App 中執行 AI 程式設計工作階段。商店會向你的帳戶收費，商店確認付款後點數才會入帳。",
+    "nextExpiry": "{{amount}} 的點數將於 {{date}}（UTC）到期。最早到期的點數會優先使用。",
+    "appStoreExpiry": "透過 App Store 購買的點數不會過期。",
+    "playOneYearExpiry": "這些點數將在購買滿一個日曆年後過期。",
+    "playNonexpiring": "這些點數不會過期。",
     "packLabel": "新增 {{amount}} 點數",
     "priceUnavailable": "價格無法取得",
     "purchased": "點數已加入你的餘額。",
@@ -3977,11 +3998,13 @@
       "namePlaceholder": "錯誤、想法、版本…",
       "emoji": "表情符號",
       "mode": "模式",
-      "defaultsHint": "從此清單開始的工作階段會使用這些預設值。"
+      "defaultsHint": "從此清單開始的工作階段會使用這些預設值。",
+      "saveFailed": "無法儲存清單。請檢查您的連線，然後再試一次。"
     },
     "list": {
       "addPlaceholder": "新增待辦事項",
       "add": "新增待辦事項",
+      "addFailed": "無法新增待辦事項。請檢查您的連線，然後再試一次。",
       "empty": "尚無待辦事項",
       "setDefaults": "設定儲存庫、模式和模型",
       "completed_one": "已完成 ({{count}})",
@@ -4018,7 +4041,9 @@
       "startNewSession": "開始新的工作階段",
       "startNewSessionHint": "長按以開始新的工作階段。",
       "linkSession": "連結工作階段",
-      "linkFailed": "無法將工作階段連結至待辦事項"
+      "linkFailed": "無法將工作階段連結至待辦事項",
+      "moveToAnotherTodo": "移至另一個待辦事項",
+      "startRefreshFailed": "工作階段已開始，但此清單並未更新。"
     },
     "linkSession": {
       "title": "連結工作階段",
@@ -4027,6 +4052,7 @@
     },
     "upNext": "接下來",
     "sessionTodo": "待辦事項：{{title}}",
+    "openTodoHint": "開啟該待辦事項。",
     "linkToTodo": "連結至待辦事項",
     "candidates": {
       "empty": "沒有未完成的待辦事項"
@@ -4070,6 +4096,10 @@
     "generate": "產生摘要",
     "retrySummary": "重試付費摘要",
     "sources": "證據與產出物",
+    "sessionsShown_one": "顯示 {{total}} 個工作階段中的 {{shown}} 個",
+    "sessionsShown_other": "顯示 {{total}} 個工作階段中的 {{shown}} 個",
+    "itemsShown_one": "顯示 {{total}} 筆項目中的 {{shown}} 筆",
+    "itemsShown_other": "顯示 {{total}} 筆項目中的 {{shown}} 筆",
     "timezone": "簡報時區",
     "deviceTimezone": "使用裝置時區",
     "timezoneHint": "IANA 時區，例如 Europe/Berlin。排程變更將套用於之後的簡報。",

@@ -6,7 +6,8 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { BriefingScorecard } from './briefing-card';
-import { briefingSessionHref, briefingSourceHref } from './briefing-session-href';
+import { briefingSourceHref } from './briefing-session-href';
+import { BriefingSessionList } from './briefing-session-list';
 import { BriefingSummary } from './briefing-summary';
 import { BriefingPeriodLabel } from './briefing-period-label';
 import { formatBriefingTimestamp } from './briefing-window';
@@ -22,7 +23,6 @@ import {
   useBriefingInvalidation,
   useBriefingPreferences,
 } from '@/lib/agent-briefing';
-import { briefingMoney } from '@/lib/agent-briefing-format';
 import { briefingAccessDenied, briefingReportMissing } from '@/lib/agent-briefing-state';
 import { openExternalUrl } from '@/lib/external-link';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
@@ -145,40 +145,7 @@ export function BriefingDetailScreen() {
           ) : (
             <BriefingSummary report={report} />
           )}
-          <View className="gap-2">
-            <Text className="font-semibold">{t('common.agents')}</Text>
-            {report.sessions.map(session => {
-              const coverage = report.coverage.spend;
-              const lowerBound =
-                coverage !== 'complete' &&
-                coverage !== 'unavailable' &&
-                session.spendMicrodollars > 0;
-              let spend = t('common.unknown');
-              if (
-                coverage !== 'unavailable' &&
-                (coverage === 'complete' || session.spendMicrodollars > 0)
-              ) {
-                const amount = briefingMoney(session.spendMicrodollars, i18n.language, {
-                  lowerBound,
-                });
-                spend = lowerBound ? t('agentBriefing.atLeast', { value: amount }) : amount;
-              }
-              return (
-                <Pressable
-                  key={session.sessionId}
-                  accessibilityRole="button"
-                  className="gap-1 rounded-xl border border-border bg-card p-4 active:opacity-70"
-                  onPress={() => {
-                    setOrganizationId(report.context.organizationId);
-                    router.push(briefingSessionHref(report, session.sessionId));
-                  }}
-                >
-                  <Text>{session.title || t('agents.sessionRow.untitled')}</Text>
-                  <Text className="text-xs text-muted-foreground">{spend}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <BriefingSessionList report={report} />
           <View className="gap-2">
             <Text className="font-semibold">{t('agentBriefing.sources')}</Text>
             {report.sources.map(source => (

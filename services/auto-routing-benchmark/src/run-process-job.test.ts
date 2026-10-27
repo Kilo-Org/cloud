@@ -190,6 +190,10 @@ const [benchCase] = DECIDER_CASES;
 const successfulCliResult = {
   text: 'not the expected answer',
   costUsd: null,
+  inputTokens: null,
+  cachedInputTokens: null,
+  outputTokens: null,
+  reasoningTokens: null,
   latencyMs: 25,
   exitCode: 0,
   stderrTail: '',
@@ -503,6 +507,34 @@ describe('processJob — scheduler-owned execution', () => {
     expect(claimScheduledChunks).toHaveBeenCalled();
     expect(queueSendBatch).not.toHaveBeenCalled();
     expect(destroyDeciderCliContainer).not.toHaveBeenCalled();
+  });
+
+  it('carries token usage through pending output and the recorded case result', async () => {
+    const result = {
+      ...successfulCliResult,
+      inputTokens: 12,
+      cachedInputTokens: 24,
+      outputTokens: 36,
+      reasoningTokens: 48,
+    };
+    vi.mocked(runDeciderCaseViaCli).mockResolvedValueOnce(result);
+
+    await processJob(env, deciderMessage());
+
+    expect(savePendingDeciderOutput).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.any(Object),
+      expect.objectContaining({ result })
+    );
+    expect(upsertCaseResult).toHaveBeenCalledWith(
+      env.BENCH_DB,
+      expect.objectContaining({
+        input_tokens: 12,
+        cached_input_tokens: 24,
+        output_tokens: 36,
+        reasoning_tokens: 48,
+      })
+    );
   });
 
   it('defers a claim whose exact pair is missing rather than executing another variant', async () => {
@@ -1232,7 +1264,7 @@ describe('processJob — scheduler waits and paid-call safety', () => {
     expect(clearUnbilledCase).toHaveBeenCalledTimes(1);
   });
 
-  it('preserves retry cost and generation from a container callback through grading', async () => {
+  it('preserves retry cost, tokens, and generation from a container callback through grading', async () => {
     const execution = {
       runId,
       model,
@@ -1243,13 +1275,19 @@ describe('processJob — scheduler waits and paid-call safety', () => {
       attemptStartedAt: 1_729_411_200_001,
       retried: true,
       priorCostUsd: 0.01,
+      priorUsage: {
+        inputTokens: 100,
+        cachedInputTokens: null,
+        outputTokens: 20,
+        reasoningTokens: 5,
+      },
     };
     const response = {
       exitCode: 0,
       durationMs: 12,
       stdoutLines: [
         '{"type":"text","part":{"text":"42","time":{"end":1}}}',
-        '{"type":"step_finish","part":{"cost":0.02}}',
+        '{"type":"step_finish","part":{"cost":0.02,"tokens":{"input":300,"output":40,"reasoning":0,"cache":{"read":50}}}}',
       ],
       stderrTail: '',
     };
@@ -1283,6 +1321,10 @@ describe('processJob — scheduler waits and paid-call safety', () => {
       env.BENCH_DB,
       expect.objectContaining({
         cost_usd: 0.03,
+        input_tokens: 400,
+        cached_input_tokens: 50,
+        output_tokens: 60,
+        reasoning_tokens: 5,
         retried: true,
         prompt_revision: 2,
       })
@@ -1412,6 +1454,10 @@ describe('processJob — canonical registry publication', () => {
         score: 1,
         latency_ms: 10,
         cost_usd: 0.001,
+        input_tokens: null,
+        cached_input_tokens: null,
+        output_tokens: null,
+        reasoning_tokens: null,
         error: null,
         fallback_reason: null,
         route_hit: null,

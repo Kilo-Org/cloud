@@ -227,7 +227,6 @@
     "hideBalance": "Sakrij saldo",
     "showBalance": "Prikaži saldo",
     "balanceHidden": "Saldo je sakriven",
-    "bonusCreditsExpiring": "Krediti u iznosu od {{amount}} istječu {{date}}.",
     "signOutTitle": "Odjaviti se?",
     "signOutMessage": "Za pristup svom radnom prostoru morat ćeš se ponovo prijaviti.",
     "deleteAccountTitle": "Obrisati nalog?",
@@ -895,6 +894,18 @@
       "securityFindingsUnavailable": "Omogućite Kilo sigurnosnog agenta na opsegu da biste dobili sigurnosne nalaze.",
       "spendAlertsSubtitle": "prekoračenja pragova i skokovi na sat",
       "spendAlertsToggle": "Kategorija upozorenja o potrošnji"
+    },
+    "history": {
+      "title": "Historija obavijesti",
+      "subtitle": "Obavijesti koje je ovaj račun primio",
+      "bannerBody": "Push obavijesti su isključene za ovaj uređaj, pa nove neće stizati ovdje.",
+      "bannerAction": "Postavke obavijesti",
+      "emptyTitle": "Još nema obavijesti",
+      "emptyCategoryTitle": "Nema obavijesti u ovoj kategoriji",
+      "emptyBody": "Obavijesti koje ovaj račun primi pojavljuju se ovdje. Čuvaju se {{days}} dana.",
+      "capped": "Prikazuju se najnovije obavijesti.",
+      "loadError": "Nije moguće učitati historiju obavijesti.",
+      "openFailed": "Ova obavijest se više ne otvara nigdje."
     },
     "action": {
       "openSession": "Otvori sesiju"
@@ -2628,7 +2639,9 @@
       "retrying": "Ponovni pokušaj…",
       "retryDeny": "Pokušaj ponovo odbiti",
       "retryAllowOnce": "Pokušaj ponovo dozvoliti jednom",
-      "retryAlwaysAllow": "Pokušaj ponovo uvijek dozvoliti"
+      "retryAlwaysAllow": "Pokušaj ponovo uvijek dozvoliti",
+      "unreadableTitle": "Zahtjev za dozvolu nije moguće pročitati",
+      "unreadableBody": "Agent čeka odluku o dozvoli koju ova aplikacija ne može prikazati. Ažurirajte aplikaciju ili CLI, ili odgovorite na zahtjev u CLI-ju da biste nastavili."
     },
     "questionCard": {
       "title": "Agent traži odgovor",
@@ -3027,8 +3040,9 @@
     "unavailableDevice": "Glasovni unos nije dostupan na ovom uređaju.",
     "unavailableLanguage": "Glasovni unos nije dostupan za jezik ovog uređaja.",
     "languageNotInstalledTitle": "Glasovni unos za {{language}} još nije spreman",
-    "languageNotInstalledMessage": "Vanmrežne datoteke govora za {{language}} nisu instalirane na ovom telefonu. Preuzmi ih, a zatim pokušaj glasovni unos ponovo.",
+    "languageNotInstalledMessage": "Vanmrežne datoteke govora za {{language}} nisu instalirane, a pretvaranje govora u tekst putem interneta je isključeno. Preuzmi datoteke ili ponovo omogući obradu govora putem interneta da bi glasovni unos radio.",
     "downloadOfflineModel": "Preuzmi",
+    "useOnlineTranscription": "Dozvoli pretvaranje putem interneta",
     "offlineModelDownloadScheduled": "Vanmrežne datoteke govora bit će preuzete u pozadini. Pokušaj glasovni unos ponovo kasnije.",
     "listeningStopped": "Slušanje je zaustavljeno.",
     "transcribing": "Transkribiram...",
@@ -3203,7 +3217,7 @@
     "creditActivity": {
       "emptyDescription": "Ovdje će se prikazivati kupovine, potrošnja i korekcije kredita ove organizacije.",
       "emptyTitle": "Nema prometa kredita",
-      "expires": "Istječe {{date}}",
+      "expiresUtc": "Istječe {{date}} (UTC)",
       "title": "Promet kredita",
       "transactionFallback": "Transakcija kredita",
       "category": {
@@ -3792,6 +3806,7 @@
     "title": "Profili",
     "entrySubtitle": "Ponovo koristite postavke okruženja u svim sesijama",
     "newProfile": "Novi profil",
+    "openHint": "Otvara profil",
     "emptyTitle": "Još nema profila",
     "emptyDescription": "Kreirajte profil za ponovno korištenje varijabli okruženja, naredbi za postavljanje i vještina u svim sesijama.",
     "loadFailed": "Učitavanje profila nije uspjelo",
@@ -3890,6 +3905,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Vrijednosti prikazane kao •••• čuvaju svoju pohranjenu tajnu; zamijenite vrijednost da biste je rotirali. Promjena komandne linije zahtijeva ponovni unos svih vrijednosti",
+      "headersHint": "Vrijednosti prikazane kao •••• čuvaju svoju pohranjenu tajnu; zamijenite vrijednost da biste je rotirali. Promjena URL-a zahtijeva ponovni unos svih vrijednosti",
       "nameRequired": "Unesite ime servera",
       "nameInvalid": "Ime može koristiti samo ASCII slova, brojeve, donje crte i crtice, najviše 100 znakova",
       "commandRequired": "Unesite komandu",
@@ -3988,6 +4005,10 @@
   "credits": {
     "title": "Kupi kredite",
     "description": "Krediti su jednokratna kupovina koja se dodaje na tvoj Kilo saldo za pokretanje AI sesija kodiranja u Kilo App. Trgovina naplaćuje tvoj račun, a krediti se dodaju nakon što trgovina potvrdi plaćanje.",
+    "nextExpiry": "Krediti u iznosu od {{amount}} istječu {{date}} (UTC). Prvo se koriste krediti s najranijim rokom isteka.",
+    "appStoreExpiry": "Krediti kupljeni putem App Storea ne istječu.",
+    "playOneYearExpiry": "Ovi krediti istječu jednu kalendarsku godinu nakon kupovine.",
+    "playNonexpiring": "Ovi krediti ne istječu.",
     "packLabel": "Dodaj {{amount}} kredita",
     "priceUnavailable": "Cijena nije dostupna",
     "purchased": "Krediti su dodani na tvoj saldo.",
@@ -4030,11 +4051,13 @@
       "namePlaceholder": "Greške, ideje, izdanje…",
       "emoji": "Emotikon",
       "mode": "Način rada",
-      "defaultsHint": "Sesije pokrenute iz ove liste koriste ove zadane postavke."
+      "defaultsHint": "Sesije pokrenute iz ove liste koriste ove zadane postavke.",
+      "saveFailed": "Nije moguće spremiti listu. Provjerite vezu i pokušajte ponovo."
     },
     "list": {
       "addPlaceholder": "Dodaj novi zadatak",
       "add": "Dodaj zadatak",
+      "addFailed": "Nije moguće dodati zadatak. Provjerite vezu i pokušajte ponovo.",
       "empty": "Još nema zadataka",
       "setDefaults": "Postavi repozitorij, način rada i model",
       "completed_one": "Završeno ({{count}})",
@@ -4073,7 +4096,9 @@
       "startNewSession": "Započni novu sesiju",
       "startNewSessionHint": "Dugo pritisni da započneš novu sesiju.",
       "linkSession": "Poveži sesiju",
-      "linkFailed": "Povezivanje sesije sa zadatkom nije uspjelo"
+      "linkFailed": "Povezivanje sesije sa zadatkom nije uspjelo",
+      "moveToAnotherTodo": "Premjesti na drugi zadatak",
+      "startRefreshFailed": "Sesija je pokrenuta, ali se ova lista nije ažurirala."
     },
     "linkSession": {
       "title": "Povezivanje sesije",
@@ -4082,6 +4107,7 @@
     },
     "upNext": "Sljedeće na redu",
     "sessionTodo": "Zadatak: {{title}}",
+    "openTodoHint": "Otvara zadatak.",
     "linkToTodo": "Poveži sa zadatkom",
     "candidates": {
       "empty": "Nema otvorenih zadataka"
@@ -4125,6 +4151,12 @@
     "generate": "Generiši sažetak",
     "retrySummary": "Ponovi plaćeni sažetak",
     "sources": "Dokazi i artefakti",
+    "sessionsShown_one": "Prikazano {{shown}} od {{total}} sesije",
+    "sessionsShown_few": "Prikazano {{shown}} od {{total}} sesije",
+    "sessionsShown_other": "Prikazano {{shown}} od {{total}} sesija",
+    "itemsShown_one": "Prikazano {{shown}} od {{total}} stavke",
+    "itemsShown_few": "Prikazano {{shown}} od {{total}} stavke",
+    "itemsShown_other": "Prikazano {{shown}} od {{total}} stavki",
     "timezone": "Vremenska zona izvještaja",
     "deviceTimezone": "Koristi vremensku zonu uređaja",
     "timezoneHint": "IANA vremenska zona, npr. Europe/Berlin. Promjene rasporeda važe za buduće izvještaje.",

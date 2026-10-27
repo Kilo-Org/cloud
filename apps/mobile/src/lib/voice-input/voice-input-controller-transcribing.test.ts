@@ -105,4 +105,21 @@ describe('voice-input controller - refreshAvailability', () => {
     const controller = createVoiceInputController(harness.native);
     expect(typeof controller.refreshAvailability).toBe('function');
   });
+
+  it('restores availability after a failed start once the recognizer answers again', async () => {
+    const harness = createVoiceInputNativeHarness({ isAvailable: false });
+    const controller = createVoiceInputController(harness.native);
+    const { feedback, onFeedback } = recordFeedback();
+
+    await expect(controller.start(makeStartOptions({ onFeedback }))).resolves.toBe(false);
+    expect(controller.getSnapshot().availability).toBe('unavailable');
+    expect(feedback.at(-1)?.message).toBe("Voice input isn't available on this device.");
+
+    harness.controls.isAvailable = true;
+    controller.refreshAvailability();
+    expect(controller.getSnapshot().availability).toBe('available');
+
+    await expect(controller.start(makeStartOptions({ onFeedback }))).resolves.toBe(true);
+    expect(harness.mocks.start).toHaveBeenCalledTimes(1);
+  });
 });

@@ -60,17 +60,25 @@ import {
 } from '@kilocode/db/schema';
 import {
   decodeCloudAgentRootSessionsCursor,
+  decodeCloudAgentWorkspacesCursor,
   decodeKiloSdkMessagesCursor,
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   encodeCloudAgentRootSessionsCursor,
   encodeKiloSdkMessagesCursor,
+  getCloudAgentRootSessionMessagesSchema,
+  getSessionMessagesSchema,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES,
+  MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH,
+  fitsKiloSdkMessagesCursorId,
+  tryEncodeKiloSdkMessagesCursor,
   cloudAgentWorktreeIdSchema,
   messageIdSchema,
   partIdSchema,
+  validateCloudAgentRootSessionsCursor,
   validateKiloSdkMessagesCursor,
 } from '@kilocode/session-ingest-contracts';
-import { desc, gte, isNotNull, lt, or, SQL } from 'drizzle-orm';
+import { desc, gte, isNotNull, lt, or, sql, SQL } from 'drizzle-orm';
 import { getSessionIngestDO } from './dos/SessionIngestDO';
 import { getSessionAccessCacheDO } from './dos/SessionAccessCacheDO';
 import { SessionIngestRPC } from './session-ingest-rpc';
@@ -109,6 +117,7 @@ const sdkStoredMessageFixture = { info: sdkUserMessageFixture, parts: [sdkTextPa
 type MappingRow = {
   kiloSessionId?: string;
   cloudAgentSessionId?: string | null;
+  workspaceId?: string | null;
   userId?: string;
   organizationId?: string | null;
   title?: string | null;
@@ -119,6 +128,55 @@ type MappingRow = {
   createdAt?: string;
   updatedAt?: string;
 };
+
+type WorkspaceRow = {
+  workspaceId: string | null;
+  userId: string;
+  organizationId: string | null;
+  name: string | null;
+  gitUrl: string | null;
+  gitBranch: string | null;
+  profileId: string | null;
+  deletionStartedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lastActivityAt: string;
+};
+
+function makeWorkspaceDbFakes(results: unknown[][]) {
+  const queuedResults = [...results];
+  const whereConditions: SQL[] = [];
+  const havingConditions: Array<SQL | undefined> = [];
+  const builders: Array<Record<string, ReturnType<typeof vi.fn>>> = [];
+  const db = {
+    select: vi.fn(() => {
+      const rows = queuedResults.shift() ?? [];
+      const builder = {
+        from: vi.fn(() => builder),
+        leftJoin: vi.fn(() => builder),
+        where: vi.fn((condition: SQL) => {
+          whereConditions.push(condition);
+          return builder;
+        }),
+        groupBy: vi.fn(() => builder),
+        having: vi.fn((condition: SQL | undefined) => {
+          havingConditions.push(condition);
+          return builder;
+        }),
+        orderBy: vi.fn(() => builder),
+        limit: vi.fn(() => builder),
+        as: vi.fn(() => ({
+          rank: sql<number>`rank`,
+          workspaceId: sql<string>`workspace_id`,
+        })),
+        then: vi.fn((resolve: (value: unknown) => unknown) => resolve(rows)),
+      };
+      builders.push(builder);
+      return builder;
+    }),
+  };
+  return { db, builders, havingConditions, whereConditions };
+}
 
 function makeDbFakes(rows: MappingRow[]) {
   const selectResult = vi.fn(async () => rows);
@@ -1978,6 +2036,172 @@ describe('Kilo SDK message cursor codec', () => {
       decodeKiloSdkMessagesCursor(encodeUnchecked({ id: 'other_01', time: 1 }))
     ).toThrow();
   });
+
+  it('round-trips the longest cursor the schemas accept', () => {
+    const cursor = {
+      id: `msg${'a'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES - 3)}`,
+      time: 1761000000100,
+    };
+    const encoded = encodeKiloSdkMessagesCursor(cursor);
+
+    expect(encoded.length).toBeLessThanOrEqual(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH);
+    expect(decodeKiloSdkMessagesCursor(encoded)).toEqual(cursor);
+    expect(validateKiloSdkMessagesCursor(encoded)).toBe(true);
+  });
+
+  it('round-trips a multi-byte id at the cursor id byte limit', () => {
+    const id = `msg${'😀'.repeat(15)}a`;
+    const cursor = { id, time: 1761000000100 };
+    const encoded = encodeKiloSdkMessagesCursor(cursor);
+
+    expect(new TextEncoder().encode(id).length).toBe(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES);
+    expect(encoded.length).toBeLessThanOrEqual(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH);
+    expect(decodeKiloSdkMessagesCursor(encoded)).toEqual(cursor);
+  });
+
+  it('rejects an encoded cursor longer than the wire cap without decoding it', () => {
+    const oversized = 'A'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH + 1);
+
+    expect(validateKiloSdkMessagesCursor(oversized)).toBe(false);
+    expect(() => decodeKiloSdkMessagesCursor(oversized)).toThrow();
+    expect(validateKiloSdkMessagesCursor(btoa('x'.repeat(65536)))).toBe(false);
+  });
+
+  it('rejects a cursor whose decoded message id is longer than the id cap', () => {
+    const oversized = btoa(
+      JSON.stringify({
+        id: `msg${'a'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES - 2)}`,
+        time: 1,
+      })
+    )
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+
+    expect(oversized.length).toBeLessThanOrEqual(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH);
+    expect(validateKiloSdkMessagesCursor(oversized)).toBe(false);
+    expect(() => decodeKiloSdkMessagesCursor(oversized)).toThrow();
+  });
+
+  it('counts UTF-8 bytes rather than UTF-16 code units for the id cap', () => {
+    const overByteCap = `msg${'😀'.repeat(16)}`;
+    const payload = btoa(
+      String.fromCharCode(...new TextEncoder().encode(JSON.stringify({ id: overByteCap, time: 1 })))
+    )
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+
+    expect(overByteCap.length).toBeLessThan(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES);
+    expect(validateKiloSdkMessagesCursor(payload)).toBe(false);
+    expect(() => encodeKiloSdkMessagesCursor({ id: overByteCap, time: 1 })).toThrow();
+  });
+
+  it('counts JSON-escaped bytes in the id cap', () => {
+    const escapesAtLimit = Math.floor((MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES - 3) / 2);
+    const escapedAtLimit = `msg${'"'.repeat(escapesAtLimit)}`;
+    const escapedOverLimit = `msg${'"'.repeat(escapesAtLimit + 1)}`;
+
+    expect(escapedAtLimit.length).toBeLessThan(MAX_KILO_SDK_MESSAGES_CURSOR_ID_BYTES);
+    expect(fitsKiloSdkMessagesCursorId(escapedAtLimit)).toBe(true);
+    expect(fitsKiloSdkMessagesCursorId(escapedOverLimit)).toBe(false);
+    expect(encodeKiloSdkMessagesCursor({ id: escapedAtLimit, time: 1 }).length).toBeLessThanOrEqual(
+      MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH
+    );
+    expect(tryEncodeKiloSdkMessagesCursor({ id: escapedOverLimit, time: 1 })).toBeNull();
+  });
+
+  it('reports the wire form of a cursor that satisfies the contract', () => {
+    const cursor = { id: 'msg_user_01', time: 1761000000100 };
+
+    expect(tryEncodeKiloSdkMessagesCursor(cursor)).toBe(encodeKiloSdkMessagesCursor(cursor));
+  });
+
+  it('rejects characters outside the base64 cursor alphabet', () => {
+    expect(validateKiloSdkMessagesCursor('not-valid')).toBe(false);
+    expect(validateKiloSdkMessagesCursor('cursor with spaces')).toBe(false);
+    expect(validateKiloSdkMessagesCursor('eyJpZCI6Im1zZ191c2VyXzAxIiwidGltZSI6MX0=')).toBe(true);
+  });
+
+  it('rejects an over-length before cursor at the history request schemas', () => {
+    const oversized = 'A'.repeat(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH + 1);
+    const generic = getSessionMessagesSchema.safeParse({
+      kiloUserId: 'usr_owner',
+      kiloSessionId: sdkSessionInfoFixture.id,
+      before: oversized,
+    });
+
+    expect(generic.success).toBe(false);
+    if (generic.success) throw new Error('expected the oversized cursor to be rejected');
+    expect(generic.error.issues.map(issue => issue.path[0])).toContain('before');
+    expect(
+      getCloudAgentRootSessionMessagesSchema.safeParse({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        limit: 10,
+        before: oversized,
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts an encoded cursor at the history request schemas', () => {
+    const before = encodeKiloSdkMessagesCursor({ id: 'msg_user_01', time: 1761000000100 });
+
+    expect(
+      getSessionMessagesSchema.safeParse({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        before,
+      }).success
+    ).toBe(true);
+    expect(
+      getCloudAgentRootSessionMessagesSchema.safeParse({
+        kiloUserId: 'usr_owner',
+        kiloSessionId: sdkSessionInfoFixture.id,
+        limit: 10,
+        before,
+      }).success
+    ).toBe(true);
+  });
+});
+
+describe('Cloud Agent root sessions cursor codec', () => {
+  const updatedAt = '2026-05-28 09:13:37.651263+00';
+  const cursor = { version: 1, updatedAt, sessionId: sdkSessionInfoFixture.id } as const;
+
+  it('round-trips a canonical cursor', () => {
+    const encoded = encodeCloudAgentRootSessionsCursor({
+      updatedAt,
+      sessionId: cursor.sessionId,
+    });
+
+    expect(decodeCloudAgentRootSessionsCursor(encoded)).toEqual(cursor);
+    expect(validateCloudAgentRootSessionsCursor(encoded)).toBe(true);
+  });
+
+  it('rejects values outside the base64url charset', () => {
+    expect(validateCloudAgentRootSessionsCursor('abc+def')).toBe(false);
+    expect(validateCloudAgentRootSessionsCursor('abc/def')).toBe(false);
+  });
+
+  it('rejects a non-canonical encoding of an otherwise valid payload', () => {
+    const spaced = `{"version":1, "updatedAt":${JSON.stringify(updatedAt)},"sessionId":${JSON.stringify(
+      cursor.sessionId
+    )}}`;
+    const nonCanonical = btoa(spaced).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+
+    expect(validateCloudAgentRootSessionsCursor(nonCanonical)).toBe(false);
+    expect(() => decodeCloudAgentRootSessionsCursor(nonCanonical)).toThrow(/cursor/);
+  });
+
+  it('rejects bytes that are not valid UTF-8', () => {
+    const invalidUtf8 = btoa(String.fromCharCode(0xff, 0xfe))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+
+    expect(validateCloudAgentRootSessionsCursor(invalidUtf8)).toBe(false);
+  });
 });
 
 describe('SessionIngestRPC.resolveCloudAgentRootSessionForKiloSession', () => {
@@ -2724,6 +2948,7 @@ describe('SessionIngestRPC.listCloudAgentRootSessions', () => {
       {
         kiloSessionId: secondSessionId,
         cloudAgentSessionId: 'agent_same_time_b',
+        workspaceId: 'worktree_11111111-1111-4111-8111-111111111111',
         userId: 'usr_owner',
         organizationId: null,
         title: 'Second',
@@ -2737,6 +2962,7 @@ describe('SessionIngestRPC.listCloudAgentRootSessions', () => {
       {
         kiloSessionId: sdkSessionInfoFixture.id,
         cloudAgentSessionId: 'agent_same_time_a',
+        workspaceId: 'worktree_22222222-2222-4222-8222-222222222222',
         userId: 'usr_owner',
         organizationId: '22222222-2222-4222-8222-222222222222',
         title: 'First',
@@ -2750,6 +2976,7 @@ describe('SessionIngestRPC.listCloudAgentRootSessions', () => {
       {
         kiloSessionId: thirdSessionId,
         cloudAgentSessionId: 'agent_same_time_0',
+        workspaceId: 'worktree_33333333-3333-4333-8333-333333333333',
         userId: 'usr_owner',
         organizationId: null,
         title: 'Overflow sentinel',
@@ -2769,6 +2996,7 @@ describe('SessionIngestRPC.listCloudAgentRootSessions', () => {
       {
         kiloSessionId: secondSessionId,
         cloudAgentSessionId: 'agent_same_time_b',
+        workspaceId: 'worktree_11111111-1111-4111-8111-111111111111',
         userId: 'usr_owner',
         organizationId: null,
         title: 'Second',
@@ -2782,6 +3010,7 @@ describe('SessionIngestRPC.listCloudAgentRootSessions', () => {
       {
         kiloSessionId: sdkSessionInfoFixture.id,
         cloudAgentSessionId: 'agent_same_time_a',
+        workspaceId: 'worktree_22222222-2222-4222-8222-222222222222',
         userId: 'usr_owner',
         organizationId: '22222222-2222-4222-8222-222222222222',
         title: 'First',
@@ -2856,6 +3085,7 @@ describe('SessionIngestRPC.listCloudAgentRootSessions', () => {
       {
         kiloSessionId: sdkSessionInfoFixture.id,
         cloudAgentSessionId: 'agent_org_root',
+        workspaceId: null,
         userId: 'usr_owner',
         organizationId: null,
         title: longTitle,
@@ -2874,6 +3104,7 @@ describe('SessionIngestRPC.listCloudAgentRootSessions', () => {
         {
           kiloSessionId: sdkSessionInfoFixture.id,
           cloudAgentSessionId: 'agent_org_root',
+          workspaceId: null,
           userId: 'usr_owner',
           organizationId: null,
           title: longTitle.slice(0, 512),
@@ -2934,6 +3165,422 @@ describe('SessionIngestRPC.listCloudAgentRootSessions', () => {
     ).rejects.toThrow();
     expect(db.select).not.toHaveBeenCalled();
     expect(getWorkerDb).not.toHaveBeenCalled();
+  });
+});
+
+describe('SessionIngestRPC hosted workspace catalog', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('groups distinct workspace IDs with root-derived metadata and bounded nested roots', async () => {
+    const firstWorkspaceId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const secondWorkspaceId = 'worktree_22222222-2222-4222-8222-222222222222';
+    const createdAt = '2026-05-27 20:53:24.190157+00';
+    const updatedAt = '2026-05-28 09:13:37.651263+00';
+    const workspaceRows: WorkspaceRow[] = [
+      {
+        workspaceId: firstWorkspaceId,
+        userId: 'usr_owner',
+        organizationId: null,
+        name: 'First workspace',
+        gitUrl: 'https://github.com/acme/repo',
+        gitBranch: 'feature/first',
+        profileId: null,
+        deletionStartedAt: null,
+        createdAt,
+        updatedAt,
+        lastActivityAt: updatedAt,
+      },
+      {
+        workspaceId: secondWorkspaceId,
+        userId: 'usr_owner',
+        organizationId: null,
+        name: null,
+        gitUrl: 'https://gitlab.com/acme/repo',
+        gitBranch: 'feature/second',
+        profileId: '11111111-1111-4111-8111-111111111111',
+        deletionStartedAt: updatedAt,
+        createdAt,
+        updatedAt,
+        lastActivityAt: updatedAt,
+      },
+    ];
+    const nestedRows = workspaceRows.map((workspace, index) => ({
+      kiloSessionId: index === 0 ? sdkSessionInfoFixture.id : 'ses_abcdefghijklmnopqrstuvwxyz',
+      cloudAgentSessionId: `workspace_${index}`,
+      workspaceId: workspace.workspaceId,
+      userId: workspace.userId,
+      organizationId: workspace.organizationId,
+      title: `Root ${index}`,
+      gitUrl: workspace.gitUrl,
+      gitBranch: workspace.gitBranch,
+      profileId: workspace.profileId,
+      createdOnPlatform: 'cloud-agent-web',
+      createdAt,
+      updatedAt,
+      rank: 1,
+    }));
+    const { db, builders, havingConditions, whereConditions } = makeWorkspaceDbFakes([
+      workspaceRows,
+      [],
+      nestedRows,
+    ]);
+    const rpc = makeRpc(db);
+
+    const page = await rpc.listCloudAgentWorkspaces({
+      kiloUserId: 'usr_owner',
+      repositoryUrl: 'git@github.com:ACME/REPO.git',
+      sessionLimit: 1,
+    });
+
+    expect(page.items).toEqual([
+      expect.objectContaining({
+        workspaceId: firstWorkspaceId,
+        repositoryProvider: 'github',
+        gitUrl: 'https://github.com/acme/repo',
+        deletionState: 'active',
+        sessions: [expect.objectContaining({ workspaceId: firstWorkspaceId })],
+      }),
+      expect.objectContaining({
+        workspaceId: secondWorkspaceId,
+        repositoryProvider: 'gitlab',
+        deletionState: 'deleting',
+        sessions: [expect.objectContaining({ workspaceId: secondWorkspaceId })],
+      }),
+    ]);
+    expect(page.nextCursor).toBeNull();
+    const query = new PgDialect().sqlToQuery(whereConditions[0]!);
+    expect(query.sql).toContain('"cli_sessions_v2"."parent_session_id" is null');
+    expect(query.sql).toContain('"cli_sessions_v2"."cloud_agent_session_id" is not null');
+    expect(query.sql).toContain('"cli_sessions_v2"."cloud_agent_worktree_id" is not null');
+    expect(query.sql).toContain('"cloud_agent_worktrees"."deletion_completed_at" is null');
+    const havingQuery = new PgDialect().sqlToQuery(havingConditions[0]!);
+    expect(havingQuery.sql).toContain('array_agg');
+    expect(havingQuery.params).toContain('https://github.com/acme/repo');
+    expect(builders[0]!.limit).toHaveBeenCalledWith(51);
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+  });
+
+  it('uses a stable workspace cursor and rejects guessed owner/cursor input before IO', async () => {
+    const workspaceId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const updatedAt = '2026-05-28 09:13:37.651263+00';
+    const overflowRows: WorkspaceRow[] = Array.from({ length: 2 }, (_, index) => ({
+      workspaceId: index === 0 ? workspaceId : 'worktree_22222222-2222-4222-8222-222222222222',
+      userId: 'usr_owner',
+      organizationId: null,
+      name: null,
+      gitUrl: null,
+      gitBranch: null,
+      profileId: null,
+      deletionStartedAt: null,
+      createdAt: updatedAt,
+      updatedAt,
+      lastActivityAt: updatedAt,
+    }));
+    const { db } = makeWorkspaceDbFakes([overflowRows, [], []]);
+    const rpc = makeRpc(db);
+
+    const page = await rpc.listCloudAgentWorkspaces({ kiloUserId: 'usr_owner', limit: 1 });
+
+    expect(decodeCloudAgentWorkspacesCursor(page.nextCursor!)).toEqual({
+      version: 1,
+      updatedAt,
+      workspaceId,
+    });
+
+    vi.mocked(getWorkerDb).mockClear();
+    await expect(
+      rpc.listCloudAgentWorkspaces({
+        kiloUserId: 'usr_owner',
+        cursor: 'not-a-cursor',
+      })
+    ).rejects.toThrow();
+    await expect(
+      rpc.getCloudAgentWorkspace({
+        kiloUserId: 'usr_owner',
+        workspaceId: 'not-a-worktree',
+      } as never)
+    ).rejects.toThrow();
+    expect(getWorkerDb).not.toHaveBeenCalled();
+  });
+
+  it('returns only an authorized completed tombstone when no active root exists', async () => {
+    const workspaceId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const timestamp = '2026-05-28 09:13:37.651263+00';
+    const { db, whereConditions } = makeWorkspaceDbFakes([
+      [],
+      [
+        {
+          workspaceId,
+          userId: 'usr_owner',
+          organizationId: null,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+      ],
+    ]);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getCloudAgentWorkspace({ kiloUserId: 'usr_owner', workspaceId })
+    ).resolves.toEqual({
+      workspaceId,
+      userId: 'usr_owner',
+      organizationId: null,
+      name: null,
+      repositoryProvider: null,
+      gitUrl: null,
+      gitBranch: null,
+      profileId: null,
+      deletionState: 'deleted',
+      created: new Date(timestamp).getTime(),
+      updated: new Date(timestamp).getTime(),
+      lastActivity: new Date(timestamp).getTime(),
+      sessions: [],
+      nextSessionCursor: null,
+    });
+    const tombstoneQuery = new PgDialect().sqlToQuery(whereConditions.at(-1)!);
+    expect(tombstoneQuery.sql).toContain('"cloud_agent_worktrees"."worktree_id" = $');
+    expect(tombstoneQuery.sql).toContain('"cloud_agent_worktrees"."kilo_user_id" = $');
+    expect(tombstoneQuery.sql).toContain('"deletion_completed_at" is not null');
+    expect(tombstoneQuery.params).toEqual(expect.arrayContaining([workspaceId, 'usr_owner']));
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+  });
+
+  it('reports stored activity and journal progress for an active workspace', async () => {
+    const workspaceId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const timestamp = '2026-05-28 09:13:37.651263+00';
+    const workspaceRow: WorkspaceRow = {
+      workspaceId,
+      userId: 'usr_owner',
+      organizationId: null,
+      name: null,
+      gitUrl: null,
+      gitBranch: null,
+      profileId: null,
+      deletionStartedAt: null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      lastActivityAt: timestamp,
+    };
+    const { db, whereConditions } = makeWorkspaceDbFakes([
+      [workspaceRow],
+      [],
+      [
+        {
+          kiloSessionId: sdkSessionInfoFixture.id,
+          cloudAgentSessionId: 'workspace_00000000-0000-4000-8000-000000000000',
+          workspaceId,
+          userId: 'usr_owner',
+          organizationId: null,
+          title: 'Root',
+          gitUrl: null,
+          gitBranch: null,
+          profileId: null,
+          createdOnPlatform: 'cloud-agent-web',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          rank: 1,
+        },
+      ],
+      [
+        {
+          deletionStartedAt: null,
+          deletionCompletedAt: null,
+          deletionManifest: null,
+          runtimeLocations: [],
+          deletedSessionIds: null,
+        },
+      ],
+      [{ activeSessionCount: 2 }],
+    ]);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getCloudAgentWorkspaceStatus({ kiloUserId: 'usr_owner', workspaceId })
+    ).resolves.toEqual({
+      workspaceId,
+      userId: 'usr_owner',
+      organizationId: null,
+      deletionState: 'active',
+      activeSessionCount: 2,
+      deletion: {
+        started: false,
+        completed: false,
+        startedAt: null,
+        phase: 'not_started',
+        sessionCount: 0,
+        runtimeLocationCount: 0,
+        completedRuntimeLocationCount: 0,
+        remainingRuntimeLocationCount: 0,
+        deletedSessionIds: [],
+      },
+    });
+    const activityQuery = new PgDialect().sqlToQuery(whereConditions.at(-1)!);
+    expect(activityQuery.sql).toContain('"cli_sessions_v2"."kilo_user_id" = $');
+    expect(activityQuery.sql).toContain('"cli_sessions_v2"."cloud_agent_worktree_id" = $');
+    expect(activityQuery.sql).toContain(
+      '"cli_sessions_v2"."cloud_agent_session_scope_id" is not null'
+    );
+    expect(activityQuery.params).toEqual(expect.arrayContaining([workspaceId, 'usr_owner']));
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
+  });
+
+  it('reuses a caller-authorized workspace without repeating the catalog query', async () => {
+    const workspaceId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const { db, builders } = makeWorkspaceDbFakes([
+      [
+        {
+          deletionStartedAt: null,
+          deletionCompletedAt: null,
+          deletionManifest: null,
+          runtimeLocations: [],
+          deletedSessionIds: null,
+        },
+      ],
+      [{ activeSessionCount: 1 }],
+    ]);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getCloudAgentWorkspaceStatus({
+        kiloUserId: 'usr_owner',
+        workspaceId,
+        authorizedWorkspace: {
+          userId: 'usr_owner',
+          organizationId: null,
+          deletionState: 'active',
+        },
+      })
+    ).resolves.toMatchObject({ workspaceId, activeSessionCount: 1 });
+    expect(builders).toHaveLength(2);
+  });
+
+  it('reports incomplete journal progress without touching a deleted workspace twice', async () => {
+    const workspaceId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const timestamp = '2026-05-28 09:13:37.651263+00';
+    const workspaceRow: WorkspaceRow = {
+      workspaceId,
+      userId: 'usr_owner',
+      organizationId: null,
+      name: null,
+      gitUrl: null,
+      gitBranch: null,
+      profileId: null,
+      deletionStartedAt: timestamp,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      lastActivityAt: timestamp,
+    };
+    const { db } = makeWorkspaceDbFakes([
+      [workspaceRow],
+      [],
+      [],
+      [
+        {
+          deletionStartedAt: timestamp,
+          deletionCompletedAt: null,
+          deletionManifest: {
+            version: 1,
+            sessions: [
+              {
+                sessionId: sdkSessionInfoFixture.id,
+                cloudAgentSessionId: 'workspace_00000000-0000-4000-8000-000000000000',
+              },
+              { sessionId: 'ses_22222222222222222222222222', cloudAgentSessionId: null },
+            ],
+            completedRuntimeLocations: [
+              { sandboxId: 'usr-original-route', provider: 'cloudflare' },
+            ],
+          },
+          runtimeLocations: [
+            { sandboxId: 'usr-original-route', provider: 'cloudflare' },
+            { sandboxId: 'usr-pending-route', provider: 'cloudflare' },
+          ],
+          deletedSessionIds: null,
+        },
+      ],
+      [{ activeSessionCount: 0 }],
+    ]);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getCloudAgentWorkspaceStatus({ kiloUserId: 'usr_owner', workspaceId })
+    ).resolves.toMatchObject({
+      deletionState: 'deleting',
+      activeSessionCount: 0,
+      deletion: {
+        started: true,
+        completed: false,
+        startedAt: new Date(timestamp).getTime(),
+        phase: 'runtime_cleanup',
+        sessionCount: 2,
+        runtimeLocationCount: 2,
+        completedRuntimeLocationCount: 1,
+        remainingRuntimeLocationCount: 1,
+        deletedSessionIds: [],
+      },
+    });
+  });
+
+  it('reports a completed tombstone without counting stored sessions', async () => {
+    const workspaceId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const timestamp = '2026-05-28 09:13:37.651263+00';
+    const { db } = makeWorkspaceDbFakes([
+      [],
+      [
+        {
+          workspaceId,
+          userId: 'usr_owner',
+          organizationId: null,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        },
+      ],
+      [
+        {
+          deletionStartedAt: timestamp,
+          deletionCompletedAt: timestamp,
+          deletionManifest: null,
+          runtimeLocations: [],
+          deletedSessionIds: [sdkSessionInfoFixture.id],
+        },
+      ],
+    ]);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getCloudAgentWorkspaceStatus({ kiloUserId: 'usr_owner', workspaceId })
+    ).resolves.toEqual({
+      workspaceId,
+      userId: 'usr_owner',
+      organizationId: null,
+      deletionState: 'deleted',
+      activeSessionCount: 0,
+      deletion: {
+        started: true,
+        completed: true,
+        startedAt: new Date(timestamp).getTime(),
+        phase: 'completed',
+        sessionCount: 1,
+        runtimeLocationCount: 0,
+        completedRuntimeLocationCount: 0,
+        remainingRuntimeLocationCount: 0,
+        deletedSessionIds: [sdkSessionInfoFixture.id],
+      },
+    });
+  });
+
+  it('returns null for an unknown or foreign workspace', async () => {
+    const workspaceId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const { db } = makeWorkspaceDbFakes([[], []]);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getCloudAgentWorkspaceStatus({ kiloUserId: 'usr_owner', workspaceId })
+    ).resolves.toBeNull();
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
   });
 });
 

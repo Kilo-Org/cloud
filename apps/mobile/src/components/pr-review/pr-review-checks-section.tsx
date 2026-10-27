@@ -28,7 +28,7 @@ import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
 import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
-import { providerPrTermKey, providerPrWebUrl } from '@/lib/pr-review/provider-pr-ref';
+import { providerPrTermKey, useProviderPrWebUrl } from '@/lib/pr-review/provider-pr-ref';
 import { cn } from '@/lib/utils';
 import { openExternalUrl } from '@/lib/external-link';
 
@@ -225,8 +225,10 @@ export function PrReviewChecksSection({
   const queries = useProviderPrQueries({ owner, repo, number });
   const colors = useThemeColors();
   const { t } = useTranslation();
-  // Null on a GitLab ref with no instance hint: no host, so no link out.
-  const prUrl = providerPrWebUrl(queries.ref);
+  // The loaded PR/MR's own URL, published by the screen. Null until the read
+  // answers (and always the fixed host on GitHub), so the section renders no
+  // link until it has one.
+  const prUrl = useProviderPrWebUrl();
 
   const checks = useQuery(queries.checksOptions(headSha));
 

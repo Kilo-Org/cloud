@@ -1,3 +1,4 @@
+import { byocVercelOwnerFields } from '../byoc/vercel-owner.js';
 /**
  * Session creation helpers for the grouped `start` path and retained split
  * `prepareSession` path.
@@ -61,6 +62,16 @@ import {
   type CredentialContainment,
   type SessionMetadata,
 } from '../persistence/session-metadata.js';
+import {
+  bindingFromLegacyProvider,
+  SandboxProviderBindingSchema,
+  type SandboxProviderBinding,
+} from '../sandbox-provider-binding.js';
+import {
+  fetchByocVercelEnrollment,
+  fetchByocVercelEnrollmentForUser,
+  ByocCredentialMissingError,
+} from '../byoc/vercel-credential-resolver.js';
 import { logger } from '../logger.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { getSandboxSessionStub, type SessionStub } from '../sandbox-session/session-stub.js';
@@ -174,6 +185,7 @@ export type SessionRegistrationResult = {
   sandboxProvider: SandboxSelection['provider'];
   worktreeId?: CloudAgentWorktreeId;
   sandboxAllocation?: SandboxAllocation;
+  sandboxProviderBinding: SandboxProviderBinding;
   /**
    * Canonical initial turn reserved for a later split initiation request.
    * Omitted for a clone-only create, which has no synthetic initial turn.
@@ -284,7 +296,11 @@ export function assertSessionOperationIdentity(
   row: OperationLedgerRow,
   expected: {
     userId: string;
-    intent: 'create_cloud' | 'create_worktree_chat';
+    intent:
+      | 'create_cloud'
+      | 'create_worktree_chat'
+      | 'create_workspace_session'
+      | 'delete_workspace_session';
     organizationId?: string | null;
     resourceKey?: string | null;
   }
@@ -529,14 +545,36 @@ function computeCredentialContainment(
   };
 }
 
+/**
+ * Client provenance values trusted to create the first hosted session of a
+ * workspace. Each provenance is only accepted with the origin its owning
+ * endpoint sets server-side; a caller cannot select a trusted pair through a
+ * public input field.
+ */
+const TRUSTED_WORKTREE_CREATE_ORIGINS: Readonly<Record<string, string>> = {
+  browser: 'cloud-agent-web',
+  'agent-manager': 'agent-manager',
+};
+
+export function isTrustedWorktreeCreateOrigin(
+  provenance: string | undefined,
+  createdOnPlatform: string | undefined
+): boolean {
+  return (
+    provenance !== undefined && TRUSTED_WORKTREE_CREATE_ORIGINS[provenance] === createdOnPlatform
+  );
+}
+
 function isEligibleFirstWorktreeSession(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext
 ): boolean {
   return (
-    input.options?.clientProvenance === 'browser' &&
-    input.options.createdOnPlatform === 'cloud-agent-web' &&
-    input.options.operationKey !== undefined &&
+    isTrustedWorktreeCreateOrigin(
+      input.options?.clientProvenance,
+      input.options?.createdOnPlatform
+    ) &&
+    input.options?.operationKey !== undefined &&
     input.initialTurn !== undefined &&
     input.clone === undefined &&
     ctx.botId === undefined
@@ -786,6 +824,7 @@ async function allocateNewSession(
   let sandboxId: SandboxId;
   let sandboxKind: SandboxKind | undefined;
   let sandboxProvider: SandboxSelection['provider'] = 'cloudflare';
+  let sandboxProviderBinding: SandboxProviderBinding = { kind: 'cloudflare' };
   try {
     const decision = await selectControlPlaneSandbox({
       env: ctx.env,
@@ -799,6 +838,33 @@ async function allocateNewSession(
     sandboxId = decision.sandboxId;
     sandboxKind = decision.sandboxKind;
     sandboxProvider = decision.provider;
+    if (sandboxProvider === 'vercel') {
+      let enrollment: Awaited<ReturnType<typeof fetchByocVercelEnrollment>>;
+      try {
+        enrollment =
+          orgId !== undefined
+            ? await fetchByocVercelEnrollment(ctx.env, orgId)
+            : await fetchByocVercelEnrollmentForUser(ctx.env, ctx.userId);
+      } catch (error) {
+        if (error instanceof ByocCredentialMissingError) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'byoc_vercel_not_ready' });
+        }
+        throw error;
+      }
+      if (enrollment.setupStatus !== 'ready') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'byoc_vercel_not_ready' });
+      }
+      sandboxProviderBinding = {
+        kind: 'vercel',
+        source: {
+          kind: 'byoc',
+          ...byocVercelOwnerFields(enrollment),
+          credentialId: enrollment.credentialId,
+        },
+      };
+    } else {
+      sandboxProviderBinding = bindingFromLegacyProvider(sandboxProvider);
+    }
   } catch (error) {
     await recordPostSetupFailure(() =>
       recordCloudAgentSessionFailure(
@@ -833,6 +899,7 @@ async function allocateNewSession(
       await recordOperationProgress(ledger.db, ledger.rowId, {
         sandboxId,
         sandboxProvider,
+        sandboxProviderBinding,
         ...(sandboxKind ? { sandboxKind } : {}),
       });
     } catch (error) {
@@ -945,6 +1012,7 @@ async function allocateNewSession(
     sandboxProvider,
     ...(worktreeId ? { worktreeId } : {}),
     ...(sandboxAllocation ? { sandboxAllocation } : {}),
+    sandboxProviderBinding,
     initialTurn,
     credentialContainment,
     rollbackCliSession: async () => {
@@ -990,6 +1058,7 @@ function rebuildRecordedSessionAllocation(
   const initialMessageId = canonical.initialMessageId;
   const sandboxId = canonical.sandboxId;
   const sandboxProvider = canonical.sandboxProvider;
+  const sandboxProviderBinding = canonical.sandboxProviderBinding;
   // A legacy prefixed key recorded no kind; a placed key never rebuilds without one.
   const recordedKind = sandboxKindSchema.optional().safeParse(canonical.sandboxKind);
   if (
@@ -1065,6 +1134,16 @@ function rebuildRecordedSessionAllocation(
   assertEgressPolicyAllocation(input, { sandboxProvider: recordedProvider.data, sandboxKind });
   const cloneFromKiloSessionId = input.clone?.cloneFromKiloSessionId;
 
+  const parsedBinding = SandboxProviderBindingSchema.safeParse(
+    sandboxProviderBinding === undefined
+      ? bindingFromLegacyProvider(recordedProvider.data)
+      : sandboxProviderBinding
+  );
+  if (!parsedBinding.success || parsedBinding.data.kind !== recordedProvider.data) {
+    throw creationInProgressError();
+  }
+  const normalizedBinding = parsedBinding.data;
+
   return {
     cloudAgentSessionId,
     kiloSessionId,
@@ -1073,6 +1152,7 @@ function rebuildRecordedSessionAllocation(
     sandboxProvider: recordedProvider.data,
     ...(worktreeId ? { worktreeId } : {}),
     ...(recorded.data ? { sandboxAllocation: recorded.data } : {}),
+    sandboxProviderBinding: normalizedBinding,
     initialTurn,
     credentialContainment: computeCredentialContainment(cloudAgentSessionId, input, ctx.env),
     rollbackCliSession: async () => {
@@ -1150,6 +1230,7 @@ function buildSessionRegistrationCommand(
     },
     repository: input.repository,
     profile: input.profile?.resolved,
+    ...(input.environment ? { environment: input.environment } : {}),
     finalization: input.finalization,
     callback: input.options?.callbackTarget ? { target: input.options.callbackTarget } : undefined,
     workspace: {
@@ -1160,6 +1241,7 @@ function buildSessionRegistrationCommand(
         ? { egressAllowlist: egressAllowlistSchema.parse(input.runtime.egressAllowlist ?? []) }
         : {}),
       ...(allocation.sandboxAllocation ? { sandboxAllocation: allocation.sandboxAllocation } : {}),
+      sandboxProviderBinding: allocation.sandboxProviderBinding,
       shallow: input.options?.shallow,
       ...(allocation.worktreeId
         ? {
@@ -1391,6 +1473,7 @@ async function registerAndAdmitInitialTurn(
     sandboxId: allocation.sandboxId,
     sandboxProvider: allocation.sandboxProvider,
     ...(allocation.sandboxAllocation ? { sandboxAllocation: allocation.sandboxAllocation } : {}),
+    sandboxProviderBinding: allocation.sandboxProviderBinding,
     admission,
   };
   if (ledger) {
@@ -1741,7 +1824,11 @@ export async function sessionCreateIntentFingerprint(
         ? {
             kilocodeOrganizationId: input.options.kilocodeOrganizationId || undefined,
             createdOnPlatform: input.options.createdOnPlatform || undefined,
-            clientProvenance: input.options.clientProvenance === 'browser' ? 'browser' : undefined,
+            clientProvenance:
+              input.options.clientProvenance === 'browser' ||
+              input.options.clientProvenance === 'agent-manager'
+                ? input.options.clientProvenance
+                : undefined,
             shallow: input.options.shallow === true ? true : undefined,
           }
         : undefined,

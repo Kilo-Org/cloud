@@ -1,4 +1,4 @@
-import { createParser, type EventSourceMessage } from 'eventsource-parser';
+import type { EventSourceMessage } from 'eventsource-parser';
 import { captureException, captureMessage, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
 import { sentryRootSpan } from '../getRootSpan';
@@ -16,7 +16,6 @@ import {
   providerReportsIsByok,
   computeVercelCostMicrodollars,
   drainSseStream,
-  extractVercelGenerationTime,
   extractVercelIsByok,
   extractVercelUpstreamId,
   reportUpstreamStreamError,
@@ -135,7 +134,8 @@ export async function parseMessagesMicrodollarUsageFromStream(
   openrouterRequestSpan: Span | undefined,
   provider: ProviderId,
   statusCode: number,
-  usesUserCredentials: boolean
+  usesUserCredentials: boolean,
+  requestStartedAt?: number
 ): Promise<MicrodollarUsageStats> {
   openrouterRequestSpan?.end();
   const streamProcessingSpan = startInactiveSpan({
@@ -159,81 +159,86 @@ export async function parseMessagesMicrodollarUsageFromStream(
   let providerMetadata: VercelProviderMetaData | null = null;
   let inference_provider: string | null = null;
 
-  const sseStreamParser = createParser({
-    onEvent(event: EventSourceMessage) {
-      if (!firstTokenReceived) {
-        sentryRootSpan()?.setAttribute(
-          'messages.time_to_first_token_ms',
-          performance.now() - startedAt
-        );
-        firstTokenReceived = true;
-        timeToFirstTokenSpan.end();
+  const onEvent = (event: EventSourceMessage) => {
+    if (!firstTokenReceived) {
+      sentryRootSpan()?.setAttribute(
+        'messages.time_to_first_token_ms',
+        performance.now() - startedAt
+      );
+      firstTokenReceived = true;
+      timeToFirstTokenSpan.end();
+    }
+
+    if (event.data === '[DONE]') {
+      return;
+    }
+
+    const json = JSON.parse(event.data) as
+      | Anthropic.Messages.MessageStreamEvent
+      | MessagesApiStreamErrorEvent;
+
+    if (!json) {
+      captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
+        extra: { event },
+      });
+      return;
+    }
+
+    if (json.type === 'error') {
+      reportedError = true;
+      finish_reason = json.error?.error_type ?? json.error?.type ?? 'error';
+      reportUpstreamStreamError({
+        label: 'Messages API stream error',
+        source: 'messages_sse_processing',
+        error: json.error ?? {},
+        usesUserCredentials,
+        logContext: { provider, inference_provider, messageId, model },
+        sentryExtra: { json, event },
+      });
+      return;
+    }
+
+    if (json.type === 'message_start') {
+      messageId = json.message.id;
+      model = json.message.model;
+      startUsage = json.message.usage ?? startUsage;
+      const openRouterProvider = (json.message as MaybeHasOpenRouterProvider).provider;
+      if (openRouterProvider) {
+        inference_provider = openRouterProvider;
       }
-
-      if (event.data === '[DONE]') {
-        return;
+      const meta = (json.message as MaybeHasVercelProviderMetadata).provider_metadata;
+      if (meta) {
+        providerMetadata = meta;
+        model = getVercelResolvedModel(meta) ?? model;
+        inference_provider = meta.gateway?.routing?.finalProvider ?? inference_provider;
       }
+    }
 
-      const json = JSON.parse(event.data) as
-        | Anthropic.Messages.MessageStreamEvent
-        | MessagesApiStreamErrorEvent;
+    if (
+      json.type === 'content_block_delta' &&
+      json.delta.type === 'text_delta' &&
+      json.delta.text
+    ) {
+      responseContent += json.delta.text;
+    }
 
-      if (!json) {
-        captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
-          extra: { event },
-        });
-        return;
+    if (json.type === 'message_delta') {
+      finish_reason = json.delta.stop_reason;
+      deltaUsage = json.usage ?? deltaUsage;
+      const meta = (json as MaybeHasVercelProviderMetadata).provider_metadata;
+      if (meta) {
+        providerMetadata = meta;
+        model = getVercelResolvedModel(meta) ?? model;
+        inference_provider = meta.gateway?.routing?.finalProvider ?? inference_provider;
       }
+    }
+  };
 
-      if (json.type === 'error') {
-        reportedError = true;
-        finish_reason = json.error?.error_type ?? json.error?.type ?? 'error';
-        reportUpstreamStreamError({
-          label: 'Messages API stream error',
-          source: 'messages_sse_processing',
-          error: json.error ?? {},
-          usesUserCredentials,
-          logContext: { provider, inference_provider, messageId, model },
-          sentryExtra: { json, event },
-        });
-        return;
-      }
-
-      if (json.type === 'message_start') {
-        messageId = json.message.id;
-        model = json.message.model;
-        startUsage = json.message.usage ?? startUsage;
-        const openRouterProvider = (json.message as MaybeHasOpenRouterProvider).provider;
-        if (openRouterProvider) {
-          inference_provider = openRouterProvider;
-        }
-      }
-
-      if (
-        json.type === 'content_block_delta' &&
-        json.delta.type === 'text_delta' &&
-        json.delta.text
-      ) {
-        responseContent += json.delta.text;
-      }
-
-      if (json.type === 'message_delta') {
-        finish_reason = json.delta.stop_reason;
-        deltaUsage = json.usage ?? deltaUsage;
-        const meta = (json as MaybeHasVercelProviderMetadata).provider_metadata;
-        if (meta) {
-          providerMetadata = meta;
-          model = getVercelResolvedModel(meta) ?? model;
-          inference_provider = meta.gateway?.routing?.finalProvider ?? inference_provider;
-        }
-      }
-    },
-  });
-
-  const wasAborted = await drainSseStream(
+  const { wasAborted, timing } = await drainSseStream(
     stream,
-    chunk => sseStreamParser.feed(chunk),
-    streamProcessingSpan
+    onEvent,
+    streamProcessingSpan,
+    requestStartedAt
   );
 
   if (!reportedError && !deltaUsage) {
@@ -252,9 +257,9 @@ export async function parseMessagesMicrodollarUsageFromStream(
     inference_provider,
     finish_reason,
     upstream_id: extractVercelUpstreamId(providerMetadata),
-    latency: null,
+    latency: timing.latency,
     moderation_latency: null,
-    generation_time: extractVercelGenerationTime(providerMetadata),
+    generation_time: timing.generation_time,
     streamed: true,
     cancelled: null,
     status_code: statusCode,
@@ -295,7 +300,7 @@ export function parseMessagesMicrodollarUsageFromString(
     finish_reason,
     latency: null,
     moderation_latency: null,
-    generation_time: extractVercelGenerationTime(providerMetadata),
+    generation_time: null,
     streamed: false,
     cancelled: null,
     status_code: statusCode,

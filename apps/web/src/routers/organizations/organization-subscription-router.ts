@@ -34,6 +34,7 @@ import {
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import type Stripe from 'stripe';
+import type { StripeSubscription } from '@kilocode/web-shared/lib/stripe-subscription';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { BillingCycleSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
@@ -64,21 +65,33 @@ const UpdateSeatCountInputSchema = OrganizationIdInputSchema.extend({
   newSeatCount: z.number().int().min(1),
 });
 
-const OrganizationSubscriptionResponseSchema = z.object({
-  subscription: z.custom<Stripe.Subscription>().nullable(),
-  seatsUsed: z.number(),
-  totalSeats: z.number(),
-  nextSeatCount: z.number().int().nonnegative().nullable(),
-  nextSeatCountEffectiveAt: z.string().datetime().nullable(),
-  paidSeatItemId: z.string().nullable(),
-  latestSeatPurchaseStatus: z.custom<OrganizationSeatsPurchase['subscription_status']>().nullable(),
-});
+type OrganizationSubscriptionResponse = {
+  subscription: StripeSubscription | null;
+  seatsUsed: number;
+  totalSeats: number;
+  nextSeatCount: number | null;
+  nextSeatCountEffectiveAt: string | null;
+  paidSeatItemId: string | null;
+  latestSeatPurchaseStatus: OrganizationSeatsPurchase['subscription_status'] | null;
+};
+
+const OrganizationSubscriptionResponseSchema: z.ZodType<OrganizationSubscriptionResponse> =
+  z.object({
+    subscription: z.custom<StripeSubscription>().nullable(),
+    seatsUsed: z.number(),
+    totalSeats: z.number(),
+    nextSeatCount: z.number().int().nonnegative().nullable(),
+    nextSeatCountEffectiveAt: z.string().datetime().nullable(),
+    paidSeatItemId: z.string().nullable(),
+    latestSeatPurchaseStatus: z
+      .custom<OrganizationSeatsPurchase['subscription_status']>()
+      .nullable(),
+  });
 
 const OrganizationSeatPurchaseStatusResponseSchema = z.object({
   latestSeatPurchaseStatus: z.custom<OrganizationSeatsPurchase['subscription_status']>().nullable(),
 });
 
-type OrganizationSubscriptionResponse = z.infer<typeof OrganizationSubscriptionResponseSchema>;
 type OrganizationSeatPurchaseStatusResponse = z.infer<
   typeof OrganizationSeatPurchaseStatusResponseSchema
 >;
@@ -139,7 +152,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
 
       // Fetch the subscription information from Stripe — including ended
       // subscriptions so the overview card can show the resubscribe UI.
-      let subscription: Stripe.Subscription | null = null;
+      let subscription: StripeSubscription | null = null;
       try {
         subscription = await retrieveSubscription(latestPurchase.subscription_stripe_id);
       } catch (error) {
@@ -234,7 +247,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
 
   getByStripeSessionId: baseProcedure
     .input(z.object({ sessionId: z.string().min(1) }))
-    .query(async ({ input }) => {
+    .query(async ({ input }): Promise<{ status: string }> => {
       const { sessionId } = input;
 
       const session = await client.checkout.sessions.retrieve(sessionId);
@@ -589,19 +602,30 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
           from_subscription: subscription.id,
         });
       } catch (error) {
-        // Concurrent requests may both pass the existing-schedule check above
-        // but only one can create a schedule. Catch the Stripe rejection for the
-        // second and return a clean client error instead of a 500.
         if (
           error instanceof Error &&
           'type' in error &&
-          (error as { code?: string }).code === 'resource_already_exists'
+          error.type === 'StripeInvalidRequestError'
         ) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message:
-              'A billing cycle change is already scheduled. Cancel the existing change before scheduling a new one.',
-          });
+          const current = await retrieveSubscription(subscription.id).catch(() => null);
+          const attached =
+            typeof current?.schedule === 'string'
+              ? await client.subscriptionSchedules.retrieve(current.schedule).catch(() => null)
+              : current?.schedule;
+          const attachedSubscriptionId =
+            typeof attached?.subscription === 'string'
+              ? attached.subscription
+              : attached?.subscription?.id;
+          if (
+            attachedSubscriptionId === subscription.id &&
+            (attached?.status === 'active' || attached?.status === 'not_started')
+          ) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message:
+                'A billing cycle change is already scheduled. Cancel the existing change before scheduling a new one.',
+            });
+          }
         }
         throw error;
       }

@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { kilocode_users, platform_integrations } from '@kilocode/db/schema';
+import {
+  kilocode_users,
+  platform_integrations,
+  slack_oauth_credentials,
+} from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { createOAuthState } from '@/lib/integrations/oauth-state';
@@ -45,6 +49,16 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
   captureMessage: jest.fn(),
 }));
+jest.mock('@kilocode/web-shared/lib/config.server', () => {
+  // Test-only envelope keyset; a jest factory cannot import the module above.
+  const slackTestKeyset = jest.requireActual(
+    '@/lib/integrations/platforms/slack/credential-test-keyset'
+  ) as { TEST_SLACK_CREDENTIAL_KEYSET_JSON: string };
+  return {
+    ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
+    SLACK_CREDENTIAL_KEYSET_JSON: slackTestKeyset.TEST_SLACK_CREDENTIAL_KEYSET_JSON,
+  };
+});
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedBotGetAdapter = jest.mocked(bot.getAdapter);
@@ -149,8 +163,14 @@ describe('GET /api/integrations/slack/callback', () => {
         platform: 'slack',
         platform_installation_id: TEAM_ID,
         platform_account_login: 'Acme Workspace',
-        metadata: expect.objectContaining({ bot_user_id: 'U0BOT', access_token: 'xoxb-new-token' }),
+        metadata: expect.objectContaining({ bot_user_id: 'U0BOT' }),
       });
+      expect((stored.metadata as Record<string, unknown>).access_token).toBeUndefined();
+      const credentialRows = await db
+        .select()
+        .from(slack_oauth_credentials)
+        .where(eq(slack_oauth_credentials.platform_integration_id, stored.id));
+      expect(credentialRows).toHaveLength(1);
     } finally {
       mockedUpsertSlackInstallation.mockReset();
       await db.delete(kilocode_users).where(eq(kilocode_users.id, USER_ID));

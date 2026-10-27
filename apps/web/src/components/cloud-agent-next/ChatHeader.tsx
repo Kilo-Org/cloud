@@ -12,6 +12,7 @@ import {
 import { ExternalLink, MoreHorizontal } from 'lucide-react';
 import { SessionInfoDialog } from './SessionInfoDialog';
 import type { SessionCostBreakdown } from './session-cost-breakdown';
+import type { SessionUsage } from './session-token-usage';
 import { SessionActionsDialog } from './SessionActionsDialog';
 import { SoundToggleButton } from '@/components/shared/SoundToggleButton';
 import { FeedbackDialog } from './FeedbackDialog';
@@ -33,6 +34,8 @@ type ChatHeaderProps = {
   model?: string;
   modelDisplayName?: string;
   getSessionCostBreakdown?: () => SessionCostBreakdown;
+  getSessionUsage?: () => SessionUsage;
+  hasIncompleteHistory?: boolean;
   sessionInfoOpen: boolean;
   onSessionInfoOpenChange: (open: boolean) => void;
   sessionInfoTriggerRef: RefObject<HTMLElement | null>;
@@ -57,6 +60,8 @@ export function ChatHeader({
   model = 'Unknown',
   modelDisplayName,
   getSessionCostBreakdown,
+  getSessionUsage,
+  hasIncompleteHistory,
   sessionInfoOpen,
   onSessionInfoOpenChange,
   sessionInfoTriggerRef,
@@ -77,6 +82,10 @@ export function ChatHeader({
   const sessionCostBreakdown = useMemo(
     () => (sessionInfoOpen ? getSessionCostBreakdown?.() : undefined),
     [getSessionCostBreakdown, sessionInfoOpen]
+  );
+  const sessionUsage = useMemo(
+    () => (sessionInfoOpen ? getSessionUsage?.() : undefined),
+    [getSessionUsage, sessionInfoOpen]
   );
 
   const browseUrl = buildRepoBrowseUrl(gitUrl);
@@ -102,6 +111,9 @@ export function ChatHeader({
         model={model}
         modelDisplayName={modelDisplayName}
         sessionCostBreakdown={sessionCostBreakdown}
+        sessionTokenUsage={sessionUsage?.tokens}
+        sessionModelUsage={sessionUsage?.models}
+        hasIncompleteHistory={hasIncompleteHistory}
       />
       <SessionActionsDialog
         open={showActionsDialog}

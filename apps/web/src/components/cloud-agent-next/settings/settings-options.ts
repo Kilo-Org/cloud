@@ -1,6 +1,6 @@
 import {
   SELECTABLE_SANDBOX_ALLOCATIONS,
-  getKiloSandboxAllocation,
+  getSandboxAllocation,
   getSandboxAllocationRequest,
   isSelectableSandboxAllocation,
   type SandboxDestination,
@@ -63,7 +63,7 @@ export function getEligibleAllocationChoices(
   capabilities: SandboxSelectionCapabilities | undefined
 ): SandboxAllocationChoice[] {
   return getSandboxSelectionOptions(capabilities).flatMap(option => {
-    const allocation = getKiloSandboxAllocation(option.allocation);
+    const allocation = getSandboxAllocation(option.allocation);
     return allocation && isSelectableSandboxAllocation(allocation)
       ? [toChoice(allocation, option.allocation)]
       : [];

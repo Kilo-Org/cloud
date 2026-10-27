@@ -3,6 +3,8 @@ import { getEnvVariable, requireEnv } from '@kilocode/web-shared/lib/dotenvx';
 import 'server-only';
 
 export const IS_IN_AUTOMATED_TEST = !!getEnvVariable('IS_IN_AUTOMATED_TEST');
+export const PAID_CREDIT_EXPIRATION_EFFECTIVE_AT =
+  getEnvVariable('PAID_CREDIT_EXPIRATION_EFFECTIVE_AT') || null;
 export const NEXTAUTH_URL = APP_URL;
 export const MAILGUN_API_KEY = getEnvVariable('MAILGUN_API_KEY');
 export const MAILGUN_DOMAIN = getEnvVariable('MAILGUN_DOMAIN');
@@ -61,6 +63,7 @@ export const MISTRAL_API_KEY = getEnvVariable('MISTRAL_API_KEY');
 export const INCEPTION_API_KEY = getEnvVariable('INCEPTION_API_KEY');
 export const EXA_API_KEY = getEnvVariable('EXA_API_KEY');
 export const INTERNAL_API_SECRET = getEnvVariable('INTERNAL_API_SECRET');
+export const CODE_REVIEW_HEALTH_SECRET = getEnvVariable('CODE_REVIEW_HEALTH_SECRET');
 export const USAGE_INGEST_URL = getEnvVariable('USAGE_INGEST_URL');
 export const USAGE_INGEST_PUBLISH_SECRET = getEnvVariable('USAGE_INGEST_PUBLISH_SECRET');
 export const USAGE_SHADOW_PUBLISH_ENABLED =

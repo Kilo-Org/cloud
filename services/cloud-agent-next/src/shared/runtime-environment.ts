@@ -57,3 +57,19 @@ export const CONTROL_RUNTIME_RESERVED_ENV_VARS = [
  * write-time rejection because it cannot import from this service.
  */
 export const RESERVED_ENV_VAR_PREFIXES = ['XDG_', 'KILO', 'OPENCODE'] as const;
+
+/**
+ * Root of the directory-keyed homes (plan "Builder and session home"). A
+ * `worktree` runtime allocation keys HOME by directory alone under this root,
+ * so an environment builder and every session of an isolated sandbox share the
+ * one home of `/workspace/app`, and caches its setup wrote there are reused.
+ * `/tmp` is not used: setup scripts clear it and `TMPDIR` would move it.
+ */
+export const CONTROL_HOME_ROOT = '/home';
+
+/**
+ * Directory name, under the OS temporary directory, of the per-scope homes of
+ * allocations that predate directory-keyed homes. Those allocations keep it for
+ * their lifetime; the log uploader reads both roots while they exist.
+ */
+export const LEGACY_CONTROL_HOME_DIR_NAME = 'kilo-worktrees';

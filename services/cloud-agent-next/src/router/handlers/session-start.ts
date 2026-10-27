@@ -14,6 +14,7 @@ import { protectedProcedure } from '../auth.js';
 import { logger, withLogTags } from '../../logger.js';
 import type * as z from 'zod';
 import { StartSessionInput, StartSessionOutput } from '../schemas.js';
+import type { ProfileInput, RepositoryInput } from '../schemas.js';
 import { createSessionWithLedger, startNewSession } from '../../session/session-registration.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
 import { preflightSessionCreation } from './session-creation-preflight.js';
@@ -26,28 +27,22 @@ export function createSessionStartHandlers(): SessionStartHandlers {
   return { start: startSessionHandler };
 }
 
-function startInputToSessionCreateRequest(
-  input: z.infer<typeof StartSessionInput>
-): SessionCreateRequest {
-  const repo = input.repository;
-  const profile = input.profile;
-
-  let repository: SessionCreateRequest['repository'];
+export function repositoryInputToSessionRepository(
+  repo: RepositoryInput
+): SessionCreateRequest['repository'] {
   switch (repo.type) {
     case 'github':
-      repository = {
+      return {
         type: 'github',
         repo: repo.repo,
         githubAccessPurpose: 'workflow',
         ...(repo.githubIntegrationId ? { githubIntegrationId: repo.githubIntegrationId } : {}),
         branch: repo.branch,
       };
-      break;
     case 'gitlab':
-      repository = { type: 'gitlab', url: repo.url, branch: repo.branch };
-      break;
+      return { type: 'gitlab', url: repo.url, branch: repo.branch };
     case 'bitbucket':
-      repository = {
+      return {
         type: 'bitbucket',
         url: repo.url,
         workspaceUuid: repo.workspaceUuid,
@@ -55,11 +50,22 @@ function startInputToSessionCreateRequest(
         bitbucketIntegrationId: repo.bitbucketIntegrationId,
         branch: repo.branch,
       };
-      break;
     case 'git':
-      repository = { type: 'git', url: repo.url, token: repo.token, branch: repo.branch };
-      break;
+      return { type: 'git', url: repo.url, token: repo.token, branch: repo.branch };
   }
+}
+
+export function profileInputToSessionProfile(
+  profile: ProfileInput
+): SessionCreateRequest['profile'] {
+  return profile ? { id: profile.id, overrides: profile.overrides } : undefined;
+}
+
+function startInputToSessionCreateRequest(
+  input: z.infer<typeof StartSessionInput>
+): SessionCreateRequest {
+  const profile = input.profile;
+  const repository = repositoryInputToSessionRepository(input.repository);
 
   return {
     allowSubagentSessions: input.allowSubagentSessions ?? false,
@@ -67,17 +73,12 @@ function startInputToSessionCreateRequest(
       type: 'prompt',
       id: input.message.id,
       prompt: input.message.prompt,
-      attachments: input.message.attachments ?? input.message.images,
+      attachments: input.message.attachments,
     },
     agent: input.agent,
     repository,
     ...(input.runtime ? { runtime: input.runtime } : {}),
-    profile: profile
-      ? {
-          id: profile.id,
-          overrides: profile.overrides,
-        }
-      : undefined,
+    profile: profileInputToSessionProfile(profile),
     finalization: input.finalization,
     options: input.options
       ? {

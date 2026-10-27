@@ -88,7 +88,7 @@ vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 // and the native SQLCipher dismissal journal; the notification categories this
 // suite asserts are independent of it.
 vi.mock('@/components/agent-briefing/briefing-notification-toggle', () => ({
-  BriefingNotificationToggle: () => null,
+  BriefingNotificationCategoryRow: () => null,
 }));
 vi.mock('@/components/tab-screen', () => ({
   TabScreenScrollView: (props: { children?: unknown }) => props.children,

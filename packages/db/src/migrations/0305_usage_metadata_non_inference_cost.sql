@@ -1,0 +1,1 @@
+ALTER TABLE "microdollar_usage_metadata" ADD COLUMN "non_inference_cost" bigint;

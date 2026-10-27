@@ -1,11 +1,13 @@
 # Queue delivery diagnostics
 
 `USAGE_INGEST_DIAGNOSTICS=all` enables 100% diagnostic logging on the staging
-publisher/consumer and staging writer relay. No random sampling is applied: each
-valid test usage ID can join across stages. An absent or different value disables
+publisher/consumer and retained staging writer relay (when bound). No random
+sampling is applied: each valid test usage ID can join across stages. An absent or different value disables
 the extra logs and correlation header. Production omits the setting. Existing
 processing outcome logs remain enabled, now including `queue` for old/EU filters.
-Disable both staging settings after the investigation to reduce log volume.
+Normal staging calls the writer directly, so it emits no relay-forward records or
+relay correlation header. Disable diagnostic settings after the investigation to
+reduce log volume.
 
 | Event | Fields and boundary |
 |---|---|
@@ -43,8 +45,8 @@ existing response validation and overload failure still determine disposition.
 1. Confirm both deployed versions/settings and exact source/config first. Send a
    small approved staging cohort with known usage IDs and reconcile persistence
    using the existing shared writer. This PR does not authorize or perform it.
-2. Join enqueue start/acceptance, handler entry, processing and relay records by
-   usage ID; retain queue/message/attempt/batch fields. Confirm finite runtime
+2. Join enqueue start/acceptance, handler entry, processing and, when bound, relay
+   records by usage ID; retain queue/message/attempt/batch fields. Confirm finite runtime
    timestamps, actual send/batch metadata shape and unchanged ACK/duplicate/retry
    behavior. Check missing-log coverage before computing tails.
 3. Compare per-event publisher-before-send → handler-entry and accepted-send →

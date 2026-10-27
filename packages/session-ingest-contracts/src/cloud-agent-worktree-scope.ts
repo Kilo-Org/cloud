@@ -1,7 +1,9 @@
 import { z } from 'zod';
 
-import { containedKiloSessionIdSchema } from './cloud-agent-session-scope';
-import { cloudAgentWorktreeIdSchema } from './rpc-contract';
+import {
+  containedKiloSessionIdSchema,
+  cloudAgentWorktreeIdSchema,
+} from './cloud-agent-session-scope';
 
 export const cloudAgentSessionScopeProtocolVersionV2 = '2' as const;
 
@@ -34,9 +36,9 @@ export type CloudAgentSessionScopeV2Assertion = z.infer<
 >;
 
 export type CloudAgentSessionScopeV2 = {
-  worktreeId: string;
-  organizationId: string | null;
-  memberRootKiloSessionIds: string[];
+  worktreeId: CloudAgentSessionScopeV2Assertion['worktreeId'];
+  organizationId: CloudAgentSessionScopeV2Assertion['expectedOrganization'] | null;
+  memberRootKiloSessionIds: CloudAgentSessionScopeV2Assertion['memberRootKiloSessionIds'];
 };
 
 export type CloudAgentSessionScopeV2HeaderInput = {
@@ -64,13 +66,42 @@ export function measureCloudAgentSessionScopeV2HeaderBytes(
   );
 }
 
+/**
+ * Encodes the v2 header block through the assertion schema, so every header
+ * block this writes is one `parseCloudAgentSessionScopeV2Headers` accepts, and
+ * throws when the scope is outside the contract.
+ */
 export function encodeCloudAgentSessionScopeV2Headers(
   scope: CloudAgentSessionScopeV2
 ): Required<CloudAgentSessionScopeV2HeaderInput> {
-  return {
+  const headers = tryEncodeCloudAgentSessionScopeV2Headers(scope);
+  if (headers === null) {
+    throw new Error('Cloud Agent session scope is not encodable');
+  }
+  return headers;
+}
+
+/**
+ * Same encoding as `encodeCloudAgentSessionScopeV2Headers`, for callers holding
+ * a scope they did not build themselves: it returns `null` instead of throwing
+ * when the scope is outside the contract.
+ */
+export function tryEncodeCloudAgentSessionScopeV2Headers(
+  scope: CloudAgentSessionScopeV2
+): Required<CloudAgentSessionScopeV2HeaderInput> | null {
+  const assertion = cloudAgentSessionScopeV2AssertionSchema.safeParse({
+    protocolVersion: cloudAgentSessionScopeProtocolVersionV2,
     worktreeId: scope.worktreeId,
     expectedOrganization: scope.organizationId ?? CLOUD_AGENT_SESSION_SCOPE_PERSONAL_ORGANIZATION,
-    memberRootKiloSessionIds: scope.memberRootKiloSessionIds.join(','),
+    memberRootKiloSessionIds: scope.memberRootKiloSessionIds,
+  });
+  if (!assertion.success) {
+    return null;
+  }
+  return {
+    worktreeId: assertion.data.worktreeId,
+    expectedOrganization: assertion.data.expectedOrganization,
+    memberRootKiloSessionIds: assertion.data.memberRootKiloSessionIds.join(','),
   };
 }
 

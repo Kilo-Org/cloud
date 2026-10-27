@@ -151,7 +151,24 @@ describe('runOwnerPoolConversion', () => {
     const { error, completed } = await run(scan).result;
 
     expect(completed).toBe(false);
-    expect(error?.message).toBe('scan responded 502 without a summary; retry with --resume user:');
+    expect(error?.message).toContain(
+      'scan responded 502 without a summary; retry with --resume user:'
+    );
+    expect(error?.message).toContain('auto_routing_owner_pool_conversion_scan');
+    expect(error?.message).toContain('owner-key arrays');
+  });
+
+  it('points to durable audit findings after a transport failure', async () => {
+    const scan = vi.fn<ScanPage>(async () => {
+      throw new Error('connection lost');
+    });
+
+    const { error, completed } = await run(scan).result;
+
+    expect(completed).toBe(false);
+    expect(error?.message).toContain('connection lost; retry with --resume user:');
+    expect(error?.message).toContain('auto_routing_owner_pool_conversion_scan');
+    expect(error?.message).toContain('owner-key arrays');
   });
 
   it('resumes at the given owner type and cursor, and skips the unmatched audit', async () => {

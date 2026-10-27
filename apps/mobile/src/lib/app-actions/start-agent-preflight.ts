@@ -6,6 +6,8 @@
 // a request that cannot start is classified the same way on both paths and the
 // user is not asked to approve a run that cannot happen.
 
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
+
 import { i18n } from '@/i18n';
 
 import {
@@ -30,10 +32,22 @@ function nonBlank(value: string | undefined): string | null {
 
 /** A terminal `StartAgent` result: no session was created. */
 function startAgentFailure(
-  code: 'empty-prompt' | 'no-repository' | 'unknown-repository' | 'unsupported-repository',
+  code:
+    | 'empty-prompt'
+    | 'prompt-too-long'
+    | 'no-repository'
+    | 'unknown-repository'
+    | 'unsupported-repository',
   message: string
 ): AppActionResult {
   return { ok: false, action: 'StartAgent', code, retryable: false, message };
+}
+
+function promptTooLongFailure(): AppActionResult {
+  return startAgentFailure(
+    'prompt-too-long',
+    i18n.t('chat.errors.messageTooLong', { limit: CLOUD_AGENT_PROMPT_MAX_LENGTH })
+  );
 }
 
 /** The empty state: no repository is named and none was used recently. */
@@ -70,6 +84,9 @@ export function preflightStartAgent(input: {
       ok: false,
       result: startAgentFailure('empty-prompt', i18n.t('appActions.start.promptRequired')),
     };
+  }
+  if (input.prompt.length > CLOUD_AGENT_PROMPT_MAX_LENGTH) {
+    return { ok: false, result: promptTooLongFailure() };
   }
   const named = nonBlank(input.repository);
   if (named === null) {

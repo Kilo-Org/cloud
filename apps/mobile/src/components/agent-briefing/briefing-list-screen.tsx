@@ -20,6 +20,7 @@ import {
 } from '@/lib/agent-briefing';
 import { briefingAccessDenied } from '@/lib/agent-briefing-state';
 import { useBriefingListFilters } from '@/lib/hooks/use-briefing-list-filters';
+import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useTRPC } from '@/lib/trpc';
@@ -54,6 +55,7 @@ export function BriefingListScreen() {
     enabled: access.enabled,
     refetchInterval: history ? false : 30_000,
   });
+  const [refreshing, onRefresh] = useManualRefresh(query.refetch, t('common.couldNotRefresh'));
   useBriefingInvalidation(query.error);
   const reports = briefingAccessDenied(query.error)
     ? []
@@ -143,10 +145,8 @@ export function BriefingListScreen() {
         <FlashList
           data={reports}
           keyExtractor={report => report.id}
-          refreshing={query.isRefetching}
-          onRefresh={() => {
-            void query.refetch();
-          }}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
           onEndReached={() => {
             // Once the next page has failed, auto-loading re-fires on every
             // content-size change (the footer grows/shrinks as the fetch flips

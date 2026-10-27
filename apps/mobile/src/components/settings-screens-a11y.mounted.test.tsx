@@ -70,6 +70,7 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('@/components/ui/icons', () => ({
   Bell: 'Bell',
   Globe: 'Globe',
+  History: 'History',
   KeyRound: 'KeyRound',
   Mic: 'Mic',
   Shield: 'Shield',

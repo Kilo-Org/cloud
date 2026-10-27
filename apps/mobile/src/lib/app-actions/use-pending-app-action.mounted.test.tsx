@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
   dispatch: vi.fn(),
   realDispatch: null as null | DispatchAppAction,
   confirmStart: vi.fn(),
+  resolveRepository: vi.fn(),
   startAgent: vi.fn(),
   toastError: vi.fn(),
 }));
@@ -32,14 +33,15 @@ vi.mock('expo-router', () => ({ useRouter: () => ({ navigate: mocks.navigate }) 
 
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
 
-// The two ends of the StartAgent path stay real below their own suites: this
-// file replaces the confirmation surface and the headless create so the
-// dispatcher runs its real order — confirm, then create.
+// This harness keeps the dispatcher active and replaces its UI and create boundaries.
 vi.mock('@/lib/app-actions/confirm-app-action-start', () => ({
   confirmAppActionStart: mocks.confirmStart,
 }));
 
-vi.mock('@/lib/app-actions/start-agent', () => ({ startAgent: mocks.startAgent }));
+vi.mock('@/lib/app-actions/start-agent', () => ({
+  resolveStartAgentRepository: mocks.resolveRepository,
+  startAgent: mocks.startAgent,
+}));
 
 // The refusal decision stays real — it is the contract's, and the hook must
 // consume the real one. Only the dispatch is replaced, by a function that can
@@ -108,6 +110,16 @@ describe('usePendingAppAction', () => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     vi.resetAllMocks();
     mocks.confirmStart.mockResolvedValue(true);
+    mocks.resolveRepository.mockImplementation(({ repository }: { repository?: string }) =>
+      Promise.resolve({
+        ok: true,
+        repository: {
+          platform: 'github',
+          fullName: repository ?? 'owner/recent',
+          isPrivate: false,
+        },
+      })
+    );
     takePendingAppAction();
   });
 
@@ -176,14 +188,20 @@ describe('usePendingAppAction', () => {
     setPendingAppAction({ action: 'StartAgent', prompt: 'fix the build' });
     const renderer = mount(SETTLED);
     await update(renderer, SETTLED);
-    expect(mocks.confirmStart).toHaveBeenCalledExactlyOnceWith({ prompt: 'fix the build' });
+    expect(mocks.confirmStart).toHaveBeenCalledExactlyOnceWith({
+      prompt: 'fix the build',
+      repository: 'GitHub: owner/recent',
+    });
     await update(renderer, SETTLED);
     expect(mocks.startAgent).not.toHaveBeenCalled();
     await act(async () => {
       answer.resolve(true);
       await Promise.resolve();
     });
-    expect(mocks.startAgent).toHaveBeenCalledExactlyOnceWith({ prompt: 'fix the build' });
+    expect(mocks.startAgent).toHaveBeenCalledExactlyOnceWith({
+      prompt: 'fix the build',
+      resolvedRepository: { platform: 'github', fullName: 'owner/recent', isPrivate: false },
+    });
     renderer.unmount();
   });
 

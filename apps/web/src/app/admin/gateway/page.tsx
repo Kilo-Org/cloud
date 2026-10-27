@@ -12,6 +12,7 @@ import { AutoFreeContent } from '@/app/admin/gateway/AutoFreeContent';
 import { GatewayModelListContent } from '@/app/admin/gateway/GatewayModelListContent';
 import { VercelModelIdOverridesContent } from '@/app/admin/gateway/VercelModelIdOverridesContent';
 import { PreferredProviderOrderContent } from '@/app/admin/gateway/PreferredProviderOrderContent';
+import { CustomPricingContent } from '@/app/admin/gateway/CustomPricingContent';
 import ApiRequestLogPage from '@/app/admin/api-request-log/page';
 import RequestLoggingOptInsContent from '@/app/admin/request-logging-opt-ins/RequestLoggingOptInsContent';
 
@@ -23,6 +24,7 @@ const VALID_TABS: readonly string[] = [
   'preferred-models',
   'unavailable-models',
   'provider-order',
+  'custom-pricing',
   'api-request-log',
 ];
 type Tab =
@@ -33,6 +35,7 @@ type Tab =
   | 'preferred-models'
   | 'unavailable-models'
   | 'provider-order'
+  | 'custom-pricing'
   | 'api-request-log';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
@@ -95,6 +98,9 @@ export default function AdminGatewayPage() {
             <TabsTrigger value="provider-order" className={tabTriggerClass}>
               Provider Order
             </TabsTrigger>
+            <TabsTrigger value="custom-pricing" className={tabTriggerClass}>
+              Custom Pricing
+            </TabsTrigger>
             <TabsTrigger value="api-request-log" className={tabTriggerClass}>
               API Request Log
             </TabsTrigger>
@@ -145,6 +151,9 @@ export default function AdminGatewayPage() {
           </TabsContent>
           <TabsContent value="provider-order" className="mt-4">
             <PreferredProviderOrderContent />
+          </TabsContent>
+          <TabsContent value="custom-pricing" className="mt-4">
+            <CustomPricingContent />
           </TabsContent>
           <TabsContent
             value="api-request-log"

@@ -291,6 +291,11 @@ const AddMemberInputSchema = z.object({
   role: OrganizationRoleSchema,
 });
 
+const SearchParentMembersInputSchema = z.object({
+  organizationId: z.uuid(),
+  search: z.string().trim().min(1).max(200),
+});
+
 export const organizationAdminRouter = createTRPCRouter({
   create: adminProcedure.input(OrganizationCreateInputSchema).mutation(async ({ input, ctx }) => {
     const parentOrganizationId = input.parentOrganizationId ?? null;
@@ -1006,6 +1011,53 @@ export const organizationAdminRouter = createTRPCRouter({
     };
   }),
 
+  searchParentMembers: adminProcedure
+    .input(SearchParentMembersInputSchema)
+    .query(async ({ input }) => {
+      const organization = await getOrganizationById(input.organizationId);
+      if (!organization?.parent_organization_id) {
+        return { users: [] };
+      }
+
+      const childMemberships = alias(organization_memberships, 'child_memberships');
+      const pattern = `%${input.search}%`;
+      const users = await db
+        .select({
+          id: kilocode_users.id,
+          google_user_email: kilocode_users.google_user_email,
+          google_user_name: kilocode_users.google_user_name,
+        })
+        .from(organization_memberships)
+        .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+        .innerJoin(
+          organizations,
+          and(
+            eq(organizations.id, organization_memberships.organization_id),
+            isNull(organizations.deleted_at)
+          )
+        )
+        .leftJoin(
+          childMemberships,
+          and(
+            eq(childMemberships.organization_id, organization.id),
+            eq(childMemberships.kilo_user_id, kilocode_users.id)
+          )
+        )
+        .where(
+          and(
+            eq(organization_memberships.organization_id, organization.parent_organization_id),
+            eq(kilocode_users.is_bot, false),
+            isNull(childMemberships.id),
+            or(
+              ilike(kilocode_users.google_user_email, pattern),
+              ilike(kilocode_users.google_user_name, pattern)
+            )
+          )
+        )
+        .limit(10);
+
+      return { users };
+    }),
   addMember: adminProcedure.input(AddMemberInputSchema).mutation(async ({ input, ctx }) => {
     const { organizationId, userId, role } = input;
 
@@ -1030,6 +1082,13 @@ export const organizationAdminRouter = createTRPCRouter({
         .select({ id: organization_memberships.id })
         .from(organization_memberships)
         .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+        .innerJoin(
+          organizations,
+          and(
+            eq(organizations.id, organization_memberships.organization_id),
+            isNull(organizations.deleted_at)
+          )
+        )
         .where(
           and(
             eq(organization_memberships.organization_id, organization.parent_organization_id),

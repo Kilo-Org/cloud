@@ -762,6 +762,13 @@ export async function acceptOrganizationInvite(
           .select({ id: organization_memberships.id })
           .from(organization_memberships)
           .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+          .innerJoin(
+            organizations,
+            and(
+              eq(organizations.id, organization_memberships.organization_id),
+              isNull(organizations.deleted_at)
+            )
+          )
           .where(
             and(
               eq(organization_memberships.organization_id, organization.parent_organization_id),

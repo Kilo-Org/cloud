@@ -1675,6 +1675,32 @@ describe('Organizations', () => {
         });
       });
 
+      test('rejects a child invitation after the parent organization is deleted', async () => {
+        const owner = await insertTestUser();
+        const invitee = await insertTestUser({ google_user_email: 'deleted-parent@example.com' });
+        const parent = await createOrganization('Parent Org', owner.id);
+        const child = await createOrganization('Child Org', owner.id);
+        await addUserToOrganization(parent.id, invitee.id, 'member');
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: parent.id })
+          .where(eq(organizations.id, child.id));
+        const invitation = await inviteUserToOrganization(
+          child.id,
+          owner.id,
+          invitee.google_user_email,
+          'member'
+        );
+        await markOrganizationAsDeleted(parent.id);
+
+        const result = await acceptOrganizationInvite(invitee.id, invitation.token);
+
+        expect(result).toEqual({
+          success: false,
+          error: CHILD_ORGANIZATION_ACCEPT_REQUIRES_PARENT_MEMBER,
+        });
+      });
+
       test('should accept invitation with owner role', async () => {
         const owner = await insertTestUser();
         const invitee = await insertTestUser();

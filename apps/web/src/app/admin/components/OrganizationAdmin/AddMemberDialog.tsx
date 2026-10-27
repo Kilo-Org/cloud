@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
-import { useAddMember } from '@/app/admin/api/organizations/hooks';
+import { useAddMember, useSearchParentMembers } from '@/app/admin/api/organizations/hooks';
 import { useSearchUsers } from '@/app/admin/api/users/hooks';
 import { Button } from '@/components/ui/button';
 import {
@@ -25,7 +25,6 @@ import {
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { Loader2, Search } from 'lucide-react';
 import { toast } from 'sonner';
-import { searchParentOrganizationMembers } from './parent-member-search';
 
 type User = {
   id: string;
@@ -57,20 +56,18 @@ export function AddMemberDialog({
   const parentOrganizationId = organizationData?.parent_organization_id ?? null;
   const currentMembers = organizationData?.members || [];
   const currentMemberEmails = new Set(currentMembers.map(member => member.email));
-  const parentMembersQuery = useOrganizationWithMembers(parentOrganizationId ?? '', {
-    enabled: open && parentOrganizationId !== null,
-  });
+  const parentMembersQuery = useSearchParentMembers(
+    organizationId,
+    debouncedSearchTerm,
+    open && parentOrganizationId !== null
+  );
 
   const searchUsersQuery = useSearchUsers(
     organizationData && !parentOrganizationId ? debouncedSearchTerm : ''
   );
 
   const filteredSearchResults = parentOrganizationId
-    ? searchParentOrganizationMembers(
-        parentMembersQuery.data?.members ?? [],
-        debouncedSearchTerm,
-        currentMemberEmails
-      )
+    ? (parentMembersQuery.data?.users ?? [])
     : (searchUsersQuery.data?.users ?? []).filter(
         user => !currentMemberEmails.has(user.google_user_email)
       );

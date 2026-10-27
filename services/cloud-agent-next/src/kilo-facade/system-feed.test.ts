@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Env } from '../types.js';
 import type { SandboxStatusSnapshot } from '../shared/sandbox-status.js';
 import {
@@ -226,6 +226,49 @@ describe('openSystemFeedStream', () => {
       })
     ).rejects.toThrow('System event source unavailable');
   });
+
+  it.each([
+    ['events', 'upgrade'],
+    ['sandbox', 'upgrade'],
+    ['events', 'fetch'],
+    ['sandbox', 'fetch'],
+  ] as const)(
+    'closes the sibling upstream when the %s channel fails during %s',
+    async (channel, failure) => {
+      const socket = {
+        addEventListener: vi.fn(),
+        accept: vi.fn(),
+        close: vi.fn(),
+      };
+      const failedEnv = {
+        SANDBOX_SESSION: {
+          idFromName: () => 'test',
+          get: () => ({
+            fetch: async (request: Request) => {
+              const sandboxChannel = new URL(request.url).searchParams.has('sandboxStatus');
+              if (sandboxChannel === (channel === 'sandbox')) {
+                if (failure === 'fetch') throw new Error('Session DO unavailable');
+                return new Response(null, { status: 503 });
+              }
+              return Object.assign(new Response(null), { webSocket: socket });
+            },
+          }),
+        },
+      } as unknown as Env;
+
+      await expect(
+        defaultSystemFeedUpstream({
+          env: failedEnv,
+          userId: 'usr_1',
+          cloudAgentSessionId,
+          onFrame: () => undefined,
+          onEnd: () => undefined,
+        })
+      ).rejects.toThrow('System event source unavailable');
+      expect(socket.accept).toHaveBeenCalledOnce();
+      expect(socket.close).toHaveBeenCalledExactlyOnceWith(1000, 'System feed closed');
+    }
+  );
 
   it('replays and then tails preparation and cloud events from the event channel', async () => {
     const upstream = upstreamDouble();

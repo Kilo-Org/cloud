@@ -207,7 +207,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get AUTO_ROUTING_DECISION_SECRET() {
     return mockDecisionSecret;
   },
-  ENKRYPT_GUARDRAILS_API_KEY: 'test-enkrypt-key',
+  ENKRYPT_API_KEY: 'test-enkrypt-key',
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/processUsage', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/ai-gateway/processUsage');

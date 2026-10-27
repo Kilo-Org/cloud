@@ -9,7 +9,7 @@ import {
   type EnkryptGuardrailScanResult,
   type EnkryptGuardrailVerdict,
 } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detect';
-import { ENKRYPT_GUARDRAILS_API_KEY } from '@kilocode/web-shared/lib/config.server';
+import { ENKRYPT_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 
 const logError = sentryLogger('enkrypt-guardrail', 'error');
@@ -31,7 +31,7 @@ export function startEnkryptInputGuardrail(
     .then(resolved =>
       resolved
         ? scanTurnDelta(resolved, {
-            apiKey: ENKRYPT_GUARDRAILS_API_KEY,
+            apiKey: ENKRYPT_API_KEY,
             fetch,
             timeoutMs: ENKRYPT_GUARDRAIL_TIMEOUT_MS,
           })

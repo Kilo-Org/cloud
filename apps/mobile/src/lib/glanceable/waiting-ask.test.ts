@@ -52,6 +52,8 @@ function askFor(overrides: Partial<WaitingAsk> = {}): WaitingAsk {
     organizationId: null,
     userId: 'u1',
     recordedAt: NOW,
+    statusUpdatedAt: null,
+    boundPermissionId: null,
     ...overrides,
   };
 }
@@ -89,6 +91,10 @@ describe('selectWaitingAsk', () => {
       organizationId: null,
       userId: 'u1',
       recordedAt: NOW,
+      // The identity the binding is carried on, and no binding yet: selection
+      // never reads the control plane.
+      statusUpdatedAt: at(-60_000),
+      boundPermissionId: null,
     });
   });
 
@@ -332,6 +338,34 @@ describe('waiting ask store', () => {
     store.set(ASK_KEY, JSON.stringify(ask));
 
     await expect(readWaitingAsk()).resolves.toEqual(ask);
+  });
+
+  it('parses a mirror written before asks named their request', async () => {
+    setLocalScope(CTX);
+    // A release without bindings wrote neither key. The record still names the
+    // session, so it parses: an ask with no identity time and no binding, which
+    // keeps Approve off the surface until a live select reads one.
+    store.set(
+      ASK_KEY,
+      JSON.stringify({
+        kiloSessionId: 's1',
+        status: 'permission',
+        isCloudAgent: true,
+        scopeKey: buildOpaqueScopeKey(CTX),
+        organizationId: null,
+        userId: 'u1',
+        recordedAt: NOW,
+      })
+    );
+
+    const ask = await readWaitingAsk();
+    expect(ask).toMatchObject({
+      kiloSessionId: 's1',
+      boundPermissionId: null,
+    });
+    // No time was written, so the record keeps none: its binding key is the
+    // session and status alone.
+    expect(ask?.statusUpdatedAt).toBeUndefined();
   });
 
   it('drops a mirrored ask recorded for another scope', async () => {

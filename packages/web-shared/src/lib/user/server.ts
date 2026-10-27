@@ -18,7 +18,9 @@ import type { NextAuthOptions, JWT, LoggerInstance } from 'next-auth';
 import { getServerSession } from 'next-auth';
 import { IS_DEVELOPMENT, ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { redirect } from 'next/navigation';
-import type { Organization, User } from '@kilocode/db/schema';
+import { device_sessions, type Organization, type User } from '@kilocode/db/schema';
+import { and, eq, isNull } from 'drizzle-orm';
+import { isDeviceSessionActive } from '@kilocode/web-shared/lib/auth/device-session-cache';
 import {
   isApiTokenPepperCurrent,
   isEmailBlacklistedByDomain,
@@ -51,7 +53,10 @@ import {
   type KiloCredentialExchangeEligibilityPolicy,
 } from '@kilocode/worker-utils/kilo-token-policy';
 
-import { getBlacklistedDomains } from '@kilocode/web-shared/lib/blacklist-domains-config';
+import {
+  getBlacklistedDomains,
+  getBlockedSignupTlds,
+} from '@kilocode/web-shared/lib/blacklist-domains-config';
 
 // NextAuth calls a user-provided `debug` logger regardless of the `debug` option,
 // and its debug payloads contain sensitive data (tokens, secrets, provider config).
@@ -242,7 +247,10 @@ export async function getUserFromBearerForCredentialExchange(
     false,
     undefined,
     undefined,
-    db
+    db,
+    undefined,
+    undefined,
+    auth.claims.deviceSessionId
   );
   if (!result.user) return result;
   if (!isKiloCredentialExchangeEligible(auth, policy)) {
@@ -455,6 +463,26 @@ async function validateUserAuthorization(
     return authError(403, 'Access denied (nonadmin)', kiloUserId);
   }
 
+  // A credential bound to a device session is only valid while that session is
+  // active. The answer is cached per instance for
+  // `DEVICE_SESSION_CACHE_TTL_MS`, which is the window in which a revocation
+  // written by another instance takes effect here; a revocation on this
+  // instance invalidates its entry. See `lib/auth/device-session-cache`.
+  if (deviceSessionId !== undefined) {
+    const active = uuid.safeParse(deviceSessionId).success
+      ? await isDeviceSessionActive(deviceSessionId, kiloUserId, () =>
+          readActiveDeviceSession(deviceSessionId, kiloUserId)
+        )
+      : false;
+    if (!active) {
+      // The caller presented a credential that no longer works, so this must
+      // not degrade into an anonymous request.
+      return authError(401, 'Device session is no longer active', kiloUserId, {
+        credentialsRejected: true,
+      });
+    }
+  }
+
   if (organizationId) {
     const uuidResult = uuid.safeParse(organizationId);
     if (!uuidResult.success) {
@@ -478,6 +506,25 @@ async function validateUserAuthorization(
   };
 }
 
+/**
+ * Read a session from the primary: a session created moments ago must
+ * authenticate its first request, which a lagging replica would refuse.
+ */
+async function readActiveDeviceSession(
+  deviceSessionId: string,
+  kiloUserId: string
+): Promise<boolean> {
+  const session = await db.query.device_sessions.findFirst({
+    where: and(
+      eq(device_sessions.id, deviceSessionId),
+      eq(device_sessions.kilo_user_id, kiloUserId),
+      isNull(device_sessions.revoked_at)
+    ),
+    columns: { id: true },
+  });
+  return session !== undefined;
+}
+
 export async function isUserBlacklistedByDomain(
   existingUser: Pick<User, 'google_user_email'>
 ): Promise<boolean> {
@@ -490,10 +537,21 @@ export async function isEmailBlacklistedByDomainAsync(email: string): Promise<bo
   return isEmailBlacklistedByDomain(email, domains);
 }
 
-export const isBlockedTLD = (email: string) => {
-  const lowercaseEmail = email.toLowerCase();
-  return lowercaseEmail.endsWith('.shop') || lowercaseEmail.endsWith('.top');
-};
+/**
+ * Pure TLD gate used by the async {@link isBlockedTLD}. Entries are bare
+ * labels (`asia`), so an entry matches every address on that TLD.
+ */
+export function isEmailOnBlockedTld(email: string, blockedTlds: readonly string[]): boolean {
+  return isEmailBlacklistedByDomain(email, blockedTlds);
+}
+
+/**
+ * New-signup TLD gate. The TLD list is admin-configurable in Redis, so a cheap
+ * TLD can be blocked without a deploy. Only new accounts are refused; an
+ * existing account on a blocked TLD keeps signing in.
+ */
+export const isBlockedTLD = async (email: string): Promise<boolean> =>
+  isEmailOnBlockedTld(email, await getBlockedSignupTlds());
 
 export function report_blocked_user(kiloUserId: string) {
   return authError(403, 'Access denied (R1)', kiloUserId);

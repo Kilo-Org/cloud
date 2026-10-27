@@ -26,6 +26,35 @@ it('uses a real or automatically provisioned production OAuth KV namespace', () 
   }
 });
 
+it('declares the per-account search allowance in both environments, with distinct counters', () => {
+  // src/index.ts reads `env.SEARCH_RATE_LIMITER` and applies the configured
+  // limit to each grant user, so the binding has to exist in every environment
+  // the worker deploys to. A separate namespace id keeps the dev worker's
+  // counters apart from production's.
+  const config = readWranglerConfig() as {
+    ratelimits?: Array<{
+      name: string;
+      namespace_id: string;
+      simple: { limit: number; period: number };
+    }>;
+    env?: {
+      dev?: {
+        ratelimits?: Array<{
+          name: string;
+          namespace_id: string;
+          simple: { limit: number; period: number };
+        }>;
+      };
+    };
+  };
+  const production = config.ratelimits?.find(item => item.name === 'SEARCH_RATE_LIMITER');
+  const dev = config.env?.dev?.ratelimits?.find(item => item.name === 'SEARCH_RATE_LIMITER');
+  expect(production).toMatchObject({ simple: { limit: 60, period: 60 } });
+  expect(dev).toMatchObject({ simple: { limit: 60, period: 60 } });
+  expect(production?.namespace_id).toBeDefined();
+  expect(dev?.namespace_id).not.toBe(production?.namespace_id);
+});
+
 it('marks the dev AI and Vectorize bindings remote so semantic search is reachable locally', () => {
   // Workers AI and Vectorize have no local emulation: `wrangler dev` reports
   // them "not supported" and every search degrades to token-only, so the

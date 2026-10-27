@@ -1,3 +1,4 @@
+import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
 import { isPdfSupportingModel } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
 import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
@@ -20,7 +21,10 @@ import { getGatewayOpenCodeSettings } from '@kilocode/web-shared/lib/ai-gateway/
 import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
 import { AUTO_MODELS, type AutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
-import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  getOpenRouterModelsMetadataFromDatabase,
+  type StoredModelMap,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   getDataCollectionRequiredModelIds,
   getProviderSlugsForModels,
@@ -41,6 +45,11 @@ import {
   NVIDIA_TRIAL_TOS,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/nvidia';
 import { applyCustomPricingToModel } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import {
+  getCustomLlmsById,
+  isPublicCustomLlm,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { convertCustomLlmToCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
 import { addMonths } from 'date-fns';
 import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
 
@@ -121,6 +130,41 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
   return name;
 }
 
+/**
+ * The price the model picker shows for a catalog entry: the preferred
+ * provider's route price when the snapshot knows one, otherwise the entry's
+ * own catalog price.
+ */
+export function pickerModelPricing(
+  model: OpenRouterModel,
+  endpointsMetadata: StoredModelMap,
+  preferredProviderOrderConfig: PreferredProviderOrderConfig
+): OpenRouterModel['pricing'] {
+  const preferredProvider = resolvePreferredProviderOrder(
+    preferredProviderOrderConfig,
+    model.id
+  ).at(0);
+  const endpoints = endpointsMetadata[model.id]?.endpoints ?? [];
+  const rawPricing = !preferredProvider
+    ? endpoints[0]?.pricing
+    : (endpoints.find(e => e.tag === preferredProvider)?.pricing ??
+      endpoints.find(
+        e => normalizeInferenceProviderId(e.tag) === normalizeInferenceProviderId(preferredProvider)
+      )?.pricing);
+  return getModelDisplayPricing(rawPricing) ?? model.pricing;
+}
+
+/**
+ * The catalog entry the picker adds for an id that the OpenRouter response
+ * does not carry: a Kilo-exclusive model or one of Kilo's own Auto models.
+ */
+export function pickerExtraModel(modelId: string): OpenRouterModel | undefined {
+  const exclusive = kiloExclusiveModels.find(model => model.public_id === modelId);
+  return exclusive
+    ? convertFromKiloExclusiveModel(exclusive)
+    : buildAutoModels().find(model => model.id === modelId);
+}
+
 async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
   const [
@@ -129,45 +173,52 @@ async function enhancedModelList(models: OpenRouterModel[]) {
     preferredModels,
     unavailableModelIds,
     preferredProviderOrderConfig,
+    customLlmsById,
   ] = await Promise.all([
     getOpenRouterModelsMetadataFromDatabase(),
     getDataCollectionRequiredModelIds(),
     getPreferredModels(),
     getUnavailableModelIds(),
     getPreferredProviderOrderConfig(),
+    getCustomLlmsById(),
   ]);
+  const publicCustomLlms = [...customLlmsById.values()].flatMap(customLlm =>
+    isPublicCustomLlm(customLlm.definition) &&
+    !unavailableModelIds.has(customLlm.public_id.toLowerCase())
+      ? [{ ...customLlm, definition: customLlm.definition }]
+      : []
+  );
+  const publicCustomLlmProviders = new Map(
+    publicCustomLlms.map(({ public_id, definition }) => [
+      public_id,
+      definition.public.inference_providers,
+    ])
+  );
+  const publicCustomLlmModels = publicCustomLlms.map(({ public_id, definition }) =>
+    convertCustomLlmToCatalogModel(public_id, definition)
+  );
   const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
   const summaries = await getTerminalBenchSummaries();
   const catalogModels = models
     .filter(
       model =>
         (!hasEndpointsMetadata || endpointsMetadata[model.id] !== undefined) &&
+        // OpenRouter may add a model after a custom LLM claimed its id, and
+        // routing serves the custom LLM.
+        !customLlmsById.has(model.id.toLowerCase()) &&
         !kiloExclusiveModels.some(m => m.public_id === model.id) &&
         !unavailableModelIds.has(model.id) &&
         !model.id.endsWith(':batch')
     )
     .map((model): OpenRouterModel => {
-      const preferredProvider = resolvePreferredProviderOrder(
-        preferredProviderOrderConfig,
-        model.id
-      ).at(0);
-      const endpoints = endpointsMetadata[model.id]?.endpoints ?? [];
-      const rawPricing = !preferredProvider
-        ? endpoints[0]?.pricing
-        : (endpoints.find(e => e.tag === preferredProvider)?.pricing ??
-          endpoints.find(
-            e =>
-              normalizeInferenceProviderId(e.tag) ===
-              normalizeInferenceProviderId(preferredProvider)
-          )?.pricing);
-      const pricing = getModelDisplayPricing(rawPricing);
+      const pricing = pickerModelPricing(model, endpointsMetadata, preferredProviderOrderConfig);
       const terminalBench = terminalBenchFor(summaries, model.id);
       const aliasTarget = model.id.startsWith('~')
         ? endpointsMetadata[model.id]?.alias_target?.slug
         : undefined;
       return {
         ...model,
-        ...(pricing && { pricing }),
+        pricing,
         ...(terminalBench && { terminalBench }),
         alias_target: aliasTarget,
       };
@@ -178,7 +229,10 @@ async function enhancedModelList(models: OpenRouterModel[]) {
         .map(model => convertFromKiloExclusiveModel(model))
     )
     .concat(autoModels)
-    .map(applyCustomPricingToModel);
+    .map(applyCustomPricingToModel)
+    // Public custom LLMs are complete as defined; id-based pricing, PDF, and
+    // protocol guesses below would describe a model routing does not serve.
+    .concat(publicCustomLlmModels);
   const exclusiveById = new Map(kiloExclusiveModels.map(entry => [entry.public_id, entry]));
   const providerLookupId = (model: OpenRouterModel) =>
     exclusiveById.get(model.id)?.internal_id ?? model.alias_target ?? model.id;
@@ -188,17 +242,22 @@ async function enhancedModelList(models: OpenRouterModel[]) {
       const preferredIndex = preferredModels.indexOf(model.id);
       const exclusive = exclusiveById.get(model.id);
       const providerIds =
-        exclusive && exclusive.inference_providers.length > 0
+        publicCustomLlmProviders.get(model.id) ??
+        (exclusive && exclusive.inference_providers.length > 0
           ? exclusive.inference_providers
-          : (indexedProviders.get(providerLookupId(model)) ?? []);
+          : (indexedProviders.get(providerLookupId(model)) ?? []));
       const inferenceProviderIds = [
         ...new Set([...providerIds].map(id => normalizeInferenceProviderId(id))),
       ];
+      const isPublicCustomLlmModel = publicCustomLlmProviders.has(model.id);
       const addPdf =
-        isPdfSupportingModel(model.id) && !model.architecture.input_modalities.includes('pdf');
-      const description = isFreeNemotronModel(model.id)
-        ? model.description + '\n\n**Terms of service** ' + NVIDIA_TRIAL_TOS
-        : model.description;
+        !isPublicCustomLlmModel &&
+        isPdfSupportingModel(model.id) &&
+        !model.architecture.input_modalities.includes('pdf');
+      const description =
+        !isPublicCustomLlmModel && isFreeNemotronModel(model.id)
+          ? model.description + '\n\n**Terms of service** ' + NVIDIA_TRIAL_TOS
+          : model.description;
       const isFree = await isFreeModel(model.id);
       return {
         ...model,
@@ -209,12 +268,14 @@ async function enhancedModelList(models: OpenRouterModel[]) {
         isFree: model.isFree ?? isFree,
         mayTrainOnYourPrompts:
           model.mayTrainOnYourPrompts ?? (isFree || dataCollectionRequiredModelIds.has(model.id)),
-        opencode:
-          model.opencode ??
-          (await getGatewayOpenCodeSettings(
-            model.id,
-            model.supported_parameters?.includes('reasoning') ?? false
-          )),
+        // A custom LLM's protocol comes only from its definition, as in routing.
+        opencode: isPublicCustomLlmModel
+          ? model.opencode
+          : (model.opencode ??
+            (await getGatewayOpenCodeSettings(
+              model.id,
+              model.supported_parameters?.includes('reasoning') ?? false
+            ))),
         architecture: addPdf
           ? {
               ...model.architecture,

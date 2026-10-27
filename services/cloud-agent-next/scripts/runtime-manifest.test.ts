@@ -30,6 +30,7 @@ describe('runtime distribution contract', () => {
       'src/bitbucket-review-cli.ts',
       'src/github-review-publish-mcp.ts',
       'src/control-plane/main.ts',
+      'src/environment-builder/main.ts',
     ]);
     expect(new Set(WRAPPER_BUNDLES.map(bundle => bundle.installName)).size).toBe(
       WRAPPER_BUNDLES.length
@@ -43,6 +44,7 @@ describe('runtime distribution contract', () => {
       'bb',
       'github-review-publish-mcp',
       'kilocode-control-plane-wrapper.js',
+      'kilocode-environment-builder.js',
       'kilocode-control-plane-supervisor.sh',
       'kilo-git-credential',
     ]);

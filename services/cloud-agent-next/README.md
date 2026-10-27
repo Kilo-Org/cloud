@@ -66,6 +66,14 @@ Both sandbox Dockerfiles configure the [Git stable PPA](https://launchpad.net/~g
 APT verifies the repository with its signing key in a dedicated `signed-by` keyring.
 This retains current Git packages without calling the Launchpad API through `add-apt-repository`.
 
+### Managed GitLab requests
+
+Managed GitLab sessions support project REST operations and Git smart-HTTP/LFS
+endpoints for their configured repository. REST project selectors use the full
+project path; project credentials also support their recorded numeric project ID.
+The configured instance base path and outbound container binding remain part of
+request authorization.
+
 ## API Documentation
 
 ### Overview
@@ -153,6 +161,9 @@ const ack = await client.initiateFromKilocodeSessionV2.mutate({
 // 3) Obtain a stream ticket (short-lived JWT for WebSocket auth)
 // Option A: If using Next.js prepareSession API, ticket is included in response
 // Option B: Call /stream-ticket endpoint with cloudAgentSessionId
+// Pass organizationId whenever the session belongs to an organization; it must
+// match the session's organization and your current membership. A personal
+// session omits the field.
 const ticketResponse = await fetch(
   'https://your-backend.com/api/cloud-agent/sessions/stream-ticket',
   {
@@ -161,7 +172,10 @@ const ticketResponse = await fetch(
       'Content-Type': 'application/json',
       Authorization: `Bearer ${USER_SESSION_TOKEN}`,
     },
-    body: JSON.stringify({ cloudAgentSessionId: ack.cloudAgentSessionId }),
+    body: JSON.stringify({
+      cloudAgentSessionId: ack.cloudAgentSessionId,
+      organizationId: 'your-org-id-here',
+    }),
   }
 );
 const { ticket } = await ticketResponse.json();

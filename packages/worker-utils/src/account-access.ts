@@ -179,6 +179,10 @@ export const BLACKLISTED_DOMAINS_REDIS_KEY = 'admin:blacklisted-domains';
 
 export const BlacklistDomainsConfigSchema = z.object({
   domains: z.array(z.string()),
+  // TLDs whose new signups are refused. Optional because configs written
+  // before this field existed must keep parsing; readers fall back to the
+  // deployment default in that case. An empty array means "no TLD blocked".
+  blocked_signup_tlds: z.array(z.string()).optional(),
   updated_at: z.string().nullable(),
   updated_by: z.string().nullable(),
   updated_by_email: z.string().nullable(),
@@ -191,6 +195,12 @@ export function blacklistedDomainsFromConfig(
   if (!raw) return fallbackDomains;
   const { domains } = BlacklistDomainsConfigSchema.parse(JSON.parse(raw));
   return domains.length > 0 ? domains : fallbackDomains;
+}
+
+export function blockedSignupTldsFromConfig(raw: string | null, fallbackTlds: string[]): string[] {
+  if (!raw) return fallbackTlds;
+  const { blocked_signup_tlds } = BlacklistDomainsConfigSchema.parse(JSON.parse(raw));
+  return blocked_signup_tlds ?? fallbackTlds;
 }
 
 // The admin config is cached for a minute, so auth checks keep re-using the same

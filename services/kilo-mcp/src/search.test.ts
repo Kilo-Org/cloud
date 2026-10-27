@@ -331,6 +331,30 @@ describe('searchCatalog', () => {
     expect(hiddenGuardedMatches).toBe(false);
   });
 
+  it('keeps later searches on one catalog ranked by their own query', async () => {
+    // The catalog's row tokens are computed once per catalog object; a second
+    // search must reuse them without inheriting the first query's ranking.
+    const first = await searchCatalogDetailed('organizations', { catalog: testCatalog });
+    expect(first.results.map(row => row.path)).toContain('organizations.list');
+
+    const second = await searchCatalogDetailed('balance', { catalog: testCatalog });
+    expect(second.results[0]?.path).toBe('user.getBalance');
+    expect(second.results.map(row => row.path)).not.toContain('organizations.list');
+  });
+
+  it('keeps row tokens separate for two catalog objects that share a path', async () => {
+    const rewritten: Catalog = {
+      'user.getBalance': {
+        ...testCatalog['user.getBalance']!,
+        searchBlob: 'user.getBalance credit top up the wallet. balance credit',
+      },
+    };
+    expect((await searchCatalogDetailed('wallet', { catalog: testCatalog })).results).toEqual([]);
+
+    const { results } = await searchCatalogDetailed('wallet', { catalog: rewritten });
+    expect(results.map(row => row.path)).toEqual(['user.getBalance']);
+  });
+
   it('degrades to token-only results with a logged note when semantic search fails', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     try {

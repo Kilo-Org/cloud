@@ -1,5 +1,10 @@
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
-import { organizations, platform_integrations, provider_oauth_attempts } from '@kilocode/db/schema';
+import {
+  cloud_agent_environments,
+  organizations,
+  platform_integrations,
+  provider_oauth_attempts,
+} from '@kilocode/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
@@ -278,6 +283,40 @@ describe('provider OAuth attempts', () => {
         .from(provider_oauth_attempts)
         .where(eq(provider_oauth_attempts.owned_by_organization_id, organization.id))
     ).resolves.toHaveLength(0);
+  });
+
+  it('soft-deletes organization repository environments inside the same transaction', async () => {
+    const owner = await insertTestUser();
+    const organization = await createTestOrganization('Environment deletion org', owner.id, 0);
+    await db.insert(cloud_agent_environments).values({
+      owned_by_organization_id: organization.id,
+      created_by_user_id: owner.id,
+      name: 'org-env',
+      platform: 'bitbucket',
+      repo_full_name: 'team/repo',
+      bitbucket_workspace_uuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      bitbucket_repository_uuid: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    });
+    await db.insert(cloud_agent_environments).values({
+      owned_by_user_id: owner.id,
+      name: 'personal-env',
+      platform: 'github',
+      repo_full_name: 'acme/widgets',
+    });
+
+    await markOrganizationAsDeleted(organization.id);
+
+    const orgEnvironments = await db
+      .select()
+      .from(cloud_agent_environments)
+      .where(eq(cloud_agent_environments.owned_by_organization_id, organization.id));
+    expect(orgEnvironments).toHaveLength(0);
+
+    const personalEnvironments = await db
+      .select()
+      .from(cloud_agent_environments)
+      .where(eq(cloud_agent_environments.owned_by_user_id, owner.id));
+    expect(personalEnvironments).toHaveLength(1);
   });
 
   it('globally prunes another owner expired retention row without touching active attempts', async () => {

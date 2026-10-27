@@ -4,6 +4,8 @@ import {
   BlacklistDomainsInputSchema,
   DEFAULT_BLACKLIST_DOMAINS_CONFIG,
   getBlacklistedDomains,
+  getBlockedSignupTlds,
+  normalizeSignupTlds,
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { BlacklistDomainsConfigSchema } from '@kilocode/worker-utils/account-access';
 import { BLACKLIST_DOMAINS_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
@@ -96,7 +98,14 @@ async function readConfig(): Promise<BlacklistDomainsConfig> {
 
 export const adminBlacklistDomainsRouter = createTRPCRouter({
   get: adminProcedure.query(async () => {
-    return readConfig();
+    const config = await readConfig();
+    return {
+      ...config,
+      // The editor always shows an editable list: the stored one, or the
+      // effective fallback (env or built-in) when the stored config predates
+      // the field.
+      blocked_signup_tlds: config.blocked_signup_tlds ?? (await getBlockedSignupTlds()),
+    };
   }),
 
   set: adminProcedure.input(BlacklistDomainsInputSchema).mutation(async ({ input, ctx }) => {
@@ -109,24 +118,35 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
     // trigger a backfill. A failed read must not look like an empty list: that
     // would turn a one-domain save into a backfill of every listed domain. Skip
     // the automatic run in that case and let the manual backfill handle it.
-    let addedDomains: string[] | null;
-    let removedDomains: string[] | null;
+    let previous: BlacklistDomainsConfig | null = null;
     try {
-      const previous = await readConfigOrThrow();
-      const previousDomains = new Set(
-        previous.domains.map(d => d.toLowerCase().trim()).filter(Boolean)
-      );
-      const normalizedSet = new Set(normalizedDomains);
-      addedDomains = normalizedDomains.filter(domain => !previousDomains.has(domain));
-      removedDomains = [...previousDomains].filter(domain => !normalizedSet.has(domain));
+      previous = await readConfigOrThrow();
     } catch (error) {
       captureException(error, { tags: { source: 'blacklist_domains_previous_config_read' } });
-      addedDomains = null;
-      removedDomains = null;
     }
+    const previousDomains = new Set(
+      (previous?.domains ?? []).map(d => d.toLowerCase().trim()).filter(Boolean)
+    );
+    const normalizedSet = new Set(normalizedDomains);
+    const addedDomains = previous
+      ? normalizedDomains.filter(domain => !previousDomains.has(domain))
+      : null;
+    const removedDomains = previous
+      ? [...previousDomains].filter(domain => !normalizedSet.has(domain))
+      : null;
+
+    // An omitted field keeps the stored list so a stale admin tab cannot
+    // silently disable TLD blocking. A failed previous read falls back to the
+    // cached effective list rather than overwriting with the built-in default.
+    // A TLD never triggers a backfill: it only gates new signups.
+    const blockedSignupTlds =
+      input.blocked_tlds === undefined
+        ? (previous?.blocked_signup_tlds ?? (await getBlockedSignupTlds()))
+        : normalizeSignupTlds(input.blocked_tlds);
 
     const config: BlacklistDomainsConfig = {
       domains: normalizedDomains,
+      blocked_signup_tlds: blockedSignupTlds,
       updated_at: new Date().toISOString(),
       updated_by: ctx.user.id,
       updated_by_email: ctx.user.google_user_email,

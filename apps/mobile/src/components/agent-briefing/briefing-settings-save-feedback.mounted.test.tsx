@@ -160,13 +160,13 @@ describe('briefing schedule save confirmation', () => {
     });
   });
 
-  it('shows only the invalid-schedule error when the window is empty', () => {
+  it('does not show a toast when the schedule is invalid', () => {
     const renderer = mount(
       createElement(ScheduleSettings, { preferences: { ...preferences, morningStart: '22:00' } })
     );
     pressSave(renderer);
     expect(h.mutate).not.toHaveBeenCalled();
-    expect(h.error).toHaveBeenCalledTimes(1);
+    expect(h.error).not.toHaveBeenCalled();
     expect(h.success).not.toHaveBeenCalled();
     act(() => {
       renderer.unmount();

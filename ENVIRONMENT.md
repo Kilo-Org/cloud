@@ -18,6 +18,24 @@ This document lists all environment variables used in the Kilo Code cloud monore
 
 Manage shared web env var additions and rotations with `pnpm web:env set <VARIABLE>`. The helper coordinates tracked root and `apps/web` dotenv defaults, the `kilocode-app` and `kilocode-ai-gateway` Vercel deployments, and 1Password storage for sensitive Production values. `pnpm web:env copy` fills a new project from an existing one. See `DEVELOPMENT.md` for the full workflow.
 
+### Code review health monitor
+
+`CODE_REVIEW_HEALTH_SECRET` is a dedicated server-only monitor credential. `[SECRET]`
+The monitor must send `Authorization: Bearer <configured value>`. An unset or empty
+value disables access. Each running instance shares its cached health response
+across authorized callers for 60 seconds; simultaneous refreshes share one evaluation.
+
+Apply `packages/db/src/migrations/0307_review_window_index.sql` before deploying
+the application.
+For initial deployment or rotation, the owner runs
+`pnpm web:env set CODE_REVIEW_HEALTH_SECRET`, supplies a newly generated secret, and
+coordinates the application deployment with the external monitor's header update.
+Verify the monitor after the deployment and header update. Only one configured
+secret is accepted; deployment and monitor configuration must agree.
+Keep credentials out of tracked defaults. For local monitor development, generate
+a separate value with `openssl rand -base64 32` and set it in the local environment;
+ordinary local startup does not require this credential.
+
 ### Configuration & Constant URLs
 
 - `APP_URL_OVERRIDE` - Optional base application URL override in any environment; used in `packages/web-shared/src/lib/constants.ts` and `next.config.mjs`. When unset, Vercel's `staging` target uses `https://staging-app.kilo.ai`, production uses `https://app.kilo.ai`, and local development uses `PORT`. [SERVER]
@@ -28,6 +46,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `DEBUG_SHOW_DEV_UI` - Enables dev-only UI elements (debug panels, admin buttons); checked in `packages/web-shared/src/lib/constants.ts` and `apps/web/src/app/(app)/profile/page.tsx`. [SERVER]
 - `TRPC_TIMING_LOGGING` - Enables tRPC timing logs in development; checked in `packages/web-shared/src/lib/trpc/init.ts`. [SERVER]
 - `TRPC_TIMING_SAMPLE_RATE` - Sample rate (`0`-`1`) for non-mobile request timing lines; mobile clients are always logged. Defaults to `0.01` when unset or malformed; read in `packages/web-shared/src/lib/observability/request-timing.ts`. [SERVER]
+- `USAGE_RECORD_COMPLETION_SAMPLE_RATE` - Production success sample rate (`0`-`1`) for shared gateway/HTTP writer `usage_record_completion` logs; defaults to `1` (100%) when unset, blank, malformed or out of range. `0` disables recorded/duplicate completion logs; `1` logs every success. Not-recorded/errors and nonproduction completions always log. Set consistently on gateway and HTTP writer apps and redeploy to change it; read in `packages/web-shared/src/lib/ai-gateway/usage-record-diagnostics.ts`. [SERVER]
 - `JEST_MAX_WORKERS` - Limits max worker threads for Jest; read in `apps/web/jest.config.ts`. [SERVER]
 - `JEST_SILENT` - When `false`, shows verbose Jest output; read in `apps/web/jest.config.ts` and `apps/web/.env.test`. [SERVER]
 - `JEST_WORKER_ID` - Set by Jest to identify the current worker thread; used by db connection pooling and libraries to handle worker-specific state. [SERVER]
@@ -99,6 +118,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `RUNTIME_ISOLATION_ENABLED` - Cloud Agent Worker rollout control for new modern control-plane sessions and worktree destinations. Production and dev Worker configs set this to `true`; exact `true` permits adoption, while unset/other values reject it before durable work. Legacy attachments keep directory-shared Kilo runtimes. Persisted modern runtime authorization continues selecting per-session isolation after rollback, and the connected wrapper must advertise the isolation capability. Actual web issuance remains off behind its separate issuance gates. Outstanding smoke failures must be resolved before merge; enabling this Worker admission gate does not remove that merge prerequisite. Foreground expiry recovery retains the same session identity and requires acknowledged idle transport retirement; this flag does not establish complete real-provider smoke coverage. See `docs/token-issuance-policy.md`, Phase 5.2 merge, automatic deployment, and activation. [SERVER]
 - `CALLBACK_TOKEN_SECRET` - Secret for signing callback tokens. Required for local development. `[SECRET]`
 - `INTERNAL_SECRET` - Alias/fallback for `INTERNAL_API_SECRET`; used in KiloClaw E2E scripts (`services/kiloclaw/e2e/`). `[SECRET]`
+- Sign-in code email rate limits are Vercel Firewall rules configured in the project's firewall configuration, not environment variables. `magic-link-email` counts sends per normalized address; `sign-in-code-email-ip` counts sends per caller address. `apps/web/src/lib/auth/email-signin-eligibility.ts` reports a rule that is not configured to Sentry at most once a minute, so both rules belong in that configuration.
 
 ### Social OAuth Clients
 
@@ -202,6 +222,9 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `GOOGLE_PLAY_RTDN_PUSH_AUDIENCE` - Expected OIDC audience for Play Real-time Developer Notification Pub/Sub push (the HTTPS URL of POST /api/kilo-pass/play/notifications). `[SERVER]`
 - `GOOGLE_PLAY_RTDN_PUSH_SERVICE_ACCOUNT_EMAIL` - Expected service-account email for the Play RTDN Pub/Sub push OIDC token; the token `email` claim must match it. [SERVER]
 - `APPLE_APP_BUNDLE_ID` - iOS app bundle ID for Apple App Attest and Sign In verification. [SERVER]
+- `APPLE_JWKS_URL_OVERRIDE` - Apple JWKS endpoint override for local verification runs; applies only outside production deployments. [SERVER]
+- `NATIVE_APPLE_NONCE_REQUIRED_SINCE` - ISO 8601 instant; the native Apple sign-in nonce requirement applies from this instant onward. Before it, requests are accepted without the field while the `native-apple-signin-nonce-relaxed-path` release toggle is enabled. Unset, invalid, or past ⇒ the requirement applies unconditionally. [SERVER]
+- `NATIVE_APPLE_NONCE_TRANSITION_LOCAL` - When `true` in a development environment outside Vercel, the transition window opens without the release toggle, for local verification runs without PostHog credentials. [SERVER]
 - `NATIVE_ADMISSION_DEV_SENTINEL` - When `true`, non-production accepts the fixed device-attestation sentinel from devices that cannot attest (simulator, emulator without Play Services). Ignored when `NODE_ENV=production`. The mobile build reads the same name. [SERVER]
 - `GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER` - Google Cloud project number for Play Integrity API. Also read by the mobile build, where it ships in the bundle; it is an identifier, not a secret. [SERVER]
 - `GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY` - Service account JSON key for Play Integrity API. `[SECRET]`
@@ -327,6 +350,8 @@ admission responses within the same slot and deadline.
 - `dispatch-invite-email-outbox` - Vercel cron path (`/api/cron/dispatch-invite-email-outbox`) that drains the organization invite-email outbox; reuses `CRON_SECRET` for auth. [SERVER]
 - `dispatch-bouncer-credit-event-outbox` - Vercel cron path (`/api/cron/dispatch-bouncer-credit-event-outbox`) that drains the Bouncer credit-event outbox every minute; reuses `CRON_SECRET` for auth. [SERVER]
 - `dispatch-bouncer-usage-event-outbox` - Vercel cron path (`/api/cron/dispatch-bouncer-usage-event-outbox`) that retries the Bouncer usage-event outbox every minute; reuses `CRON_SECRET` for auth. [SERVER]
+- `expire-credits` - Vercel cron path (`/api/cron/expire-credits`) that expires due personal and organization credit grants every 5 minutes; reuses `CRON_SECRET` for auth. It never triggers auto-top-up. [SERVER]
+- `PAID_CREDIT_EXPIRATION_EFFECTIVE_AT` - ISO-8601 instant when new paid credits start receiving a one-calendar-year expiry. Unset or invalid keeps every new purchase non-expiring. Terms are captured at checkout or term start, so pending purchases and annual terms paid earlier keep legacy terms. Apple in-app purchases never expire. Create the `_1year_v2` Google Play credit products before setting it. [SERVER]
 - `WORKOS_API_KEY` - WorkOS API key for enterprise SSO. `[SECRET]`
 - `WORKOS_CLIENT_ID` - WorkOS client ID for enterprise SSO. [PUBLIC]
 
@@ -393,6 +418,7 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `IMPACT_ADVOCATE_TENANT_ALIAS` - Impact.com Advocate tenant alias. [SERVER]
 - `IMPACT_ADVOCATE_API_BASE_URL` - Impact.com Advocate API base URL. Defaults to `https://app.referralsaasquatch.com`. [SERVER]
 - `IMPACT_CAMPAIGN_ID` - Impact.com campaign ID for event tracking. [SERVER]
+
 ### Cloudflare Analytics
 
 - `CLOUDFLARE_ACCOUNT_ID` - Cloudflare account ID used as the GraphQL `accountTag` for Containers Analytics queries and admin dashboard deep links; used in `packages/web-shared/src/lib/config.server.ts` and `apps/web/src/lib/cloudflare/container-usage-analytics.ts`. [SERVER]
@@ -468,10 +494,11 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `WORKSPACE_PATH` - Filesystem path of the agent workspace. [SERVER]
 - `SESSION_ID` - Reserved session identifier for the `cloud-agent-next` runtime; reserved in `RESERVED_ENV_VARS`. [SERVER]
 - `SANDBOX_SELECTION_IDS` - Comma-separated user or org IDs allowed to pick a Cloud Agent sandbox destination on the new-session page. Empty admits nobody. `*` includes personal accounts. Production `wrangler.jsonc` sets the allowlist, so a deploy overwrites the Cloudflare dashboard value. Wrangler `dev` and `.dev.vars.example` default to `*`. [SERVER]
-- `VERCEL_SANDBOX_ORG_IDS` - Comma-separated org IDs routed to Vercel sandboxes. Empty is off. `*` includes personal accounts. [SERVER]
 - `CLOUDFLARE_CONTAINERS_ORG_IDS` - Comma-separated org IDs enrolled for the DO-managed Cloudflare Containers runtime, which is also the default sandbox destination for isolated control-plane sessions. Empty is off. `*` includes every organization and personal account. Production `wrangler.jsonc` sets `*` so a deploy overwrites the Cloudflare dashboard value; wrangler `dev` also sets `*`. [SERVER]
+- `ENVIRONMENT_SNAPSHOT_ORG_IDS` - Comma-separated organization IDs allowed to build and restore environment snapshots. Empty or unset disables snapshots. Personal accounts and `*` are excluded. Native-container enrollment is also required. Removing an organization stops its active builds and prevents restore of its existing snapshots. [SERVER]
 - `PREVIEW_HOST_SUFFIX` - Hostname suffix the Cloud Agent Next Worker dispatches preview hosts under; a preview host is `p<port>-<workspace-uuid-hex>.<suffix>`. Unset or empty disables preview dispatch and the `/preview/open` hop, and the web app hides the preview button (it reads availability from the Worker's `getPreviewOptions`). The web app needs no preview setting. Production `wrangler.jsonc` sets `cloud-agent.kiloapps.ai`. `services/cloud-agent-next/.dev.vars.example` sets `localhost`. [SERVER]
 - `PREVIEW_ENABLED_IDS` - Comma-separated user or org IDs that the Cloud Agent Next Worker shows the preview button and preview links to. `*` includes personal accounts. Unset or empty shows nobody. A UI gate only: `getPreviewOptions` answers `enabled: false` for other owners, but the `/preview/open` hop and the preview host do not check it. The org ID comes from the web route and is not verified. Production `wrangler.jsonc` sets `*`, so a deploy overwrites the Cloudflare dashboard value. Wrangler `dev` and `.dev.vars.example` default to `*`. [SERVER]
+- `BYOC_VERCEL_IDS` - Comma-separated user or organization IDs enrolled in customer-paid Vercel compute. Empty is off; `*` enrolls both personal accounts and organizations. An enrolled owner fails closed when its ready credential is absent. [SERVER]
 - `HOME` - Reserved in `RESERVED_ENV_VARS` for cloud-agent-next session home management. [SYSTEM]
 
 ### Gastown

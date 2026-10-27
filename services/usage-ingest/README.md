@@ -158,17 +158,22 @@ first-delivery consumer samples for queue latency objectives; even those may car
 historical events, so event age is a freshness signal.
 
 Completion logs use application sampling: staging records 100%; production
-`recorded` and `duplicate` outcomes are sampled uniformly at 1%; `not_recorded`
-and `error` outcomes always log. Every emitted completion includes `sample_rate`
-(`1` or `0.01`). `VERCEL_ENV=production` takes precedence over a conflicting
+`recorded` and `duplicate` outcomes log at 100% by default. Set the
+server-only `USAGE_RECORD_COMPLETION_SAMPLE_RATE` to a probability from `0` to `1`
+and redeploy to change production success sampling (`0.01` for 1%, `0.1` for 10%, `1` for 100%,
+`0` to disable success completion logs). Unset, blank, malformed or out-of-range
+values fall back to `1`. Set it consistently on the gateway and HTTP writer
+apps for comparable samples. `not_recorded` and `error` outcomes always log.
+Every emitted completion includes its actual `sample_rate`.
+`VERCEL_ENV=production` takes precedence over a conflicting
 staging target. Otherwise `VERCEL_TARGET_ENV=staging` or a nonproduction
 `VERCEL_ENV` keeps full logging, even with `NODE_ENV=production`. Without that
 deployment metadata, `NODE_ENV=production` uses production sampling; local/test
 defaults keep full logging. Existing consumer outcome/receipt/retry logs remain
 at 100%, and the existing slow-plus-1% phase diagnostics are unchanged.
 
-Estimate completion attempt counts by outcome using `sum(1 / sample_rate)`;
-this accounts only for application sampling, so additional platform sampling or
+With a nonzero sampling rate, estimate completion attempt counts by outcome using
+`sum(1 / sample_rate)`; this accounts only for application sampling, so additional platform sampling or
 log loss must be handled separately. Production sampled IDs cannot establish
 exact distinct-event completeness. Success latency samples are uniform within
 each outcome/path/region; keep them separate from the slow-biased phase series.
@@ -226,8 +231,8 @@ attributing any hosted latency effect.
 The first test sequence is diagnostics → EU → batching. Diagnostics and EU are
 already on main; staging-host middleware remains deferred. This refresh preserves
 the sole selected EU source/DLQ, its preparation and routing rollback behavior,
-both diagnostics and parallelism variables, and the relay. Keep one consumer at
-cap 200 / batch 2 / parallelism 2 (at most 400 writer calls); do not reconnect a
+both diagnostics and parallelism variables, and the writer target. Keep one
+consumer at cap 200 / batch 2 / parallelism 2 (at most 400 writer calls); do not reconnect a
 legacy consumer or split the cap. The queue-budget and relay runtime tests pin
 the actual EU queue names and policy. Verify the refreshed source and those
 checks before merge. Historical four-PR compatibility results do not validate
@@ -235,7 +240,7 @@ this first-test source, which keeps middleware unchanged.
 
 For a full configuration rollback, restore absent parallelism (or `1`), batch 1,
 timeout 0 and cap 200 for the same single queue. Preserve diagnostics, the current
-writer, relay, retry delay/budget and per-message dispositions.
+writer route, retry delay/budget and per-message dispositions.
 
 ## Deploy
 
@@ -247,9 +252,9 @@ or `staging`.
 Normal staging CI has one queue preparation step before any Worker upload.
 It reads queue names from `wrangler.jsonc`, creates missing resources with
 explicit `jurisdiction: "eu"`, and verifies/reuses existing EU resources.
-Unknown jurisdiction or lookup/API errors stop deployment. Then the existing
-Frankfurt relay and consumer deploy in order; both consumer upload attempts disable Wrangler's
-global auto-provisioning for EU selections. The preparation step also detaches the obsolete
+Unknown jurisdiction or lookup/API errors stop deployment. The consumer then
+deploys with direct HTTP to the staging writer; both consumer upload attempts
+disable Wrangler's global auto-provisioning for EU selections. The preparation step also detaches the obsolete
 staging consumer before Wrangler attaches the selected source; it preserves both queue pairs.
 See [deployment-driven cutover and routing rollback](eu-queues.md).
 Production keeps automatic provisioning and its original names/policy.
@@ -262,7 +267,6 @@ account in `wrangler.jsonc`:
 ```bash
 # Staging: use the same preparation entrypoint as CI, then existing deploy commands.
 pnpm --filter cloudflare-usage-ingest queues:prepare
-pnpm --filter cloudflare-usage-ingest exec wrangler deploy --config wrangler.writer-relay.jsonc
 pnpm --filter cloudflare-usage-ingest exec wrangler deploy --env staging --experimental-provision=false
 
 # Production
@@ -312,15 +316,22 @@ The queue is simulated locally and delivered to the shipped `queue()` handler in
 the same Worker. Runtime tests cover HTTP publishing, receipt consumption, and opt-in processing
 in both environments.
 
-## Staging Frankfurt writer relay
+## Staging direct writer and retained Frankfurt relay
 
-The existing `staging` configuration sends queued writes through a private
-service binding's **fetch** method to `usage-writer-relay-staging`. The relay's
-fetch handler forwards to the same staging Vercel writer with a placement hint
-of `aws:eu-central-1`. Production keeps direct writes. The writer, middleware and
-database stay unchanged.
+Normal `staging` has no `USAGE_WRITER_RELAY` binding. The existing writer client
+calls `https://staging-app.kilo.ai/api/internal/usage/record` directly, preserving
+authentication, optional Vercel protection bypass, usage identity, the 160-second
+budget, response validation and per-message ACK/retry behavior. The single EU
+queue/DLQ, batch 2, parallelism 2, cap 200, retries and diagnostics stay unchanged.
+Production remains direct; the writer, middleware and database stay unchanged.
+This removes one hop for a controlled comparison; no latency improvement is
+established without hosted measurement.
 
-This is an outbound-request placement experiment. [Placement's shared limitations](https://developers.cloudflare.com/workers/configuration/placement/#review-limitations-1)
+The private `usage-writer-relay-staging` code, config, tests and deployed resource
+are retained for revert. Its fetch handler forwards to the same writer with a
+placement hint of `aws:eu-central-1`.
+
+The retained relay is an outbound-request placement experiment. [Placement's shared limitations](https://developers.cloudflare.com/workers/configuration/placement/#review-limitations-1)
 apply to fetch handlers and do not pin the queue consumer. The hint selects a
 Cloudflare data center near Frankfurt, not an AWS-hosted Worker. A US consumer
 still crosses to Europe and waits for the return; the relay adds a hop and may
@@ -340,23 +351,28 @@ responses ACK. The relay adds no retries or persistence.
 Normal staging CI uses `--env staging`. Both the single-worker and changed-worker
 paths in `deploy-workers.yml` deploy `wrangler.writer-relay.jsonc` **first**, then
 deploy the existing consumer when the selected source's staging binding requires
-the relay. Historical direct-path revisions skip it. A required relay's missing
-config or failed deployment stops the consumer deploy.
+the relay. The current direct-path configuration skips relay deployment while
+still preparing the EU queues and uploading the consumer. A required relay's
+missing config or failed deployment stops the consumer deploy.
 The relay's nonstandard config filename keeps it out of independent discovery;
 its deployment is owned by usage-ingest. Other Workers and production skip this
 relay step. There is no separate `staging-relay` environment or manual activation.
 
-Record both Worker revisions and the unchanged writer deployment SHA. Send one
-authenticated smoke event, verify its stable usage ID/ACK/persistence, then inspect
-the relay's actual placement and the Vercel ingress/function trace. Compute region
+For an authorized comparison, record the consumer revision, relay revision when
+used, and unchanged writer deployment SHA. Send one authenticated smoke event and
+verify its stable usage ID/ACK/persistence. Inspect the Vercel ingress/function
+trace and, when bound, the relay's actual placement. Compute region
 is `executionRegion`/`proxy.lambdaRegion`; `proxy.region` is the ingress hop.
 For a subsequent approved comparison, keep queue cap/workload and cold/warm
 conditions fixed and capture aligned event age, full consumer HTTP p95/p99, queue
 backlog/retries/DLQ and DB pool/lock limits. Accounting creation → persistence
 excludes return/ACK; the full consumer HTTP duration includes the return leg.
-Local runtime tests prove the service-binding path and ACK/retry behavior, not
-geographical placement or speedup.
+Local runtime tests cover the normal direct route and the optional service-binding
+route with ACK/retry behavior; geographical placement and speedup remain unproved.
 
-For relay-only rollback, deploy a reviewed direct-path change preserving the EU
-queue pair and single consumer. Queue routing rollback retains the deployment helper and changes only staging queue
-selection as described in the [EU setup](eu-queues.md); a full PR revert cannot detach EU automatically. The unused relay can remain private.
+To restore the relay, revert the staging bypass change and redeploy staging.
+This restores the service binding; CI deploys the retained relay before the
+consumer. Keep the EU queue pair, single consumer and all queue policy unchanged.
+Do not delete the unused private relay. Queue routing rollback is separate: retain
+the deployment helper and change only staging queue selection as described in the
+[EU setup](eu-queues.md); reverting the earlier EU change cannot detach EU automatically.

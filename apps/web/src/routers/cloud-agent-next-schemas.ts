@@ -20,9 +20,6 @@ import {
   CLOUD_AGENT_ATTACHMENT_MAX_SIZE_BYTES,
   CLOUD_AGENT_ATTACHMENT_RELAXED_CONTENT_TYPE_REGEX,
   CLOUD_AGENT_ATTACHMENT_RELAXED_FILENAME_REGEX,
-  CLOUD_AGENT_IMAGE_ALLOWED_TYPES,
-  CLOUD_AGENT_IMAGE_MAX_COUNT,
-  CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES,
 } from '@/lib/cloud-agent/constants';
 import {
   PREVIEW_PORT_MAX,
@@ -45,26 +42,6 @@ export type {
  *
  * Uses V2 WebSocket-based API only.
  */
-
-const cloudAgentImageFilenameSchema = z
-  .string()
-  .regex(
-    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.(?:png|jpg|webp|gif)$/
-  );
-
-export const cloudAgentImagesSchema = z
-  .object({
-    path: z.uuid(),
-    files: z.array(cloudAgentImageFilenameSchema).min(1).max(CLOUD_AGENT_IMAGE_MAX_COUNT),
-  })
-  .optional();
-
-export const cloudAgentGetImageUploadUrlSchema = z.object({
-  messageUuid: z.uuid(),
-  imageId: z.uuid(),
-  contentType: z.enum(CLOUD_AGENT_IMAGE_ALLOWED_TYPES),
-  contentLength: z.number().int().positive().max(CLOUD_AGENT_IMAGE_MAX_SIZE_BYTES),
-});
 
 const DENIED_EXTENSION_SET = new Set<string>(CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS);
 
@@ -185,10 +162,6 @@ export const cloudAgentGetAttachmentDownloadUrlSchema = z.object({
 export const cloudAgentReleasePendingUploadsSchema = z.object({
   objectKeys: z.array(z.string().min(1).max(1024)).min(1).max(CLOUD_AGENT_ATTACHMENT_MAX_COUNT),
 });
-
-function hasOnlyOneAttachmentField(data: { images?: unknown; attachments?: unknown }): boolean {
-  return data.images === undefined || data.attachments === undefined;
-}
 
 /**
  * Agent mode enum - all supported modes.
@@ -364,7 +337,7 @@ export const sendMessageNextPayloadSchema = z.discriminatedUnion('type', [
 /**
  * Send-only execution payload for follow-up messages. Mirrors
  * `sendMessageNextPayloadSchema` but allows an empty prompt, because a
- * follow-up send may carry attachments or images with no text; that is the
+ * follow-up send may carry attachments with no text; that is the
  * only difference, since both paths keep the shared length cap. Used only by
  * `baseSendMessageNextSchema.payload`; prepare `initialPayload` keeps the
  * `.min(1)` prompt via `sendMessageNextPayloadSchema`.
@@ -446,7 +419,6 @@ const PrepareSessionSharedFields = {
   upstreamBranch: z.string().optional(),
   autoCommit: z.boolean().optional(),
   attachments: cloudAgentAttachmentsSchema.optional(),
-  images: cloudAgentImagesSchema,
   devcontainer: z
     .boolean()
     .refine(value => !value, { message: 'Devcontainer support has been retired' })
@@ -503,10 +475,6 @@ export const basePrepareSessionNextSchema = z
   .refine(data => data.githubIntegrationId === undefined || data.githubRepo !== undefined, {
     message: 'GitHub integration requires a GitHub repository',
     path: ['githubIntegrationId'],
-  })
-  .refine(hasOnlyOneAttachmentField, {
-    message: 'Must not provide both attachments and images',
-    path: ['attachments'],
   });
 
 export const personalPrepareSessionNextSchema = basePrepareSessionNextSchema
@@ -591,7 +559,6 @@ export const baseSendMessageNextSchema = z
      */
     messageId: messageIdNextSchema,
     attachments: cloudAgentAttachmentsSchema.optional(),
-    images: cloudAgentImagesSchema,
   })
   .refine(
     data =>
@@ -599,17 +566,11 @@ export const baseSendMessageNextSchema = z
       controlPlaneSessionIdNextSchema.safeParse(data.cloudAgentSessionId).success,
     { message: 'Worktree review requires a control-plane session', path: ['cloudAgentSessionId'] }
   )
-  .refine(hasOnlyOneAttachmentField, {
-    message: 'Must not provide both attachments and images',
-    path: ['attachments'],
-  })
   .refine(
     data => {
       if (data.payload.type === 'command') return true;
       if (data.payload.prompt.trim().length > 0) return true;
-      const hasFiles =
-        (data.attachments?.files.length ?? 0) > 0 || (data.images?.files.length ?? 0) > 0;
-      return hasFiles;
+      return (data.attachments?.files.length ?? 0) > 0;
     },
     {
       message: 'Prompt is required',

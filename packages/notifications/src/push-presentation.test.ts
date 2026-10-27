@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { pushDataSchema } from './push-data';
 import {
+  AGENT_BRIEFING_CHANNEL_APP_VERSION,
   AGENT_CHANNEL_SPLIT_APP_VERSION,
   AGENT_NOTIFICATION_KINDS,
   ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION,
@@ -42,7 +43,7 @@ const channelCases = [
   ],
   [{ type: 'cloud_agent_session', cliSessionId: 'cli1', category: 'status' }, 'agent-progress'],
   [{ type: 'cloud_agent_session', cliSessionId: 'cli1' }, 'agent-progress'],
-  [{ type: 'agent_briefing', url: '/agent-briefing' }, 'agent-progress'],
+  [{ type: 'agent_briefing', url: '/agent-briefing' }, 'agent-briefing'],
   [{ type: 'low_balance', organizationId: 'org1' }, 'balance'],
   [{ type: 'spend_alert', scope: 'organization', organizationId: 'org1' }, 'balance'],
   [{ type: 'security_finding', findingId: 'f1', scope: 'org' }, 'security'],
@@ -109,6 +110,7 @@ describe('ANDROID_NOTIFICATION_CHANNELS', () => {
     expect(ANDROID_NOTIFICATION_CHANNELS).toEqual([
       { id: 'needs-input', name: 'Needs input', importance: 'high', bypassDnd: true },
       { id: 'agent-progress', name: 'Agent progress', importance: 'default', bypassDnd: false },
+      { id: 'agent-briefing', name: 'Agent brief', importance: 'default', bypassDnd: false },
       { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default', bypassDnd: false },
       { id: 'balance', name: 'Balance alerts', importance: 'default', bypassDnd: false },
       { id: 'security', name: 'Security findings', importance: 'high', bypassDnd: false },
@@ -421,6 +423,20 @@ describe('androidChannelIdForPushDataToAppVersion', () => {
         '1.0.0'
       )
     ).toBe('balance');
+  });
+
+  it('keeps the brief on its earlier channel until every build creates its own', () => {
+    const brief = { type: 'agent_briefing', url: '/agent-briefing' } as const;
+    // Builds of 1.0.15 shipped without `agent-briefing`; Android 8+ would drop
+    // a push addressed to it, so those tokens stay on `agent-progress`.
+    expect(androidChannelIdForPushDataToAppVersion(brief, '1.0.15')).toBe('agent-progress');
+    expect(androidChannelIdForPushDataToAppVersion(brief, '1.0.12')).toBe('agent-progress');
+    expect(androidChannelIdForPushDataToAppVersion(brief, '1.0.11')).toBeUndefined();
+    expect(androidChannelIdForPushDataToAppVersion(brief, null)).toBeUndefined();
+    expect(androidChannelIdForPushDataToAppVersion(brief, AGENT_BRIEFING_CHANNEL_APP_VERSION)).toBe(
+      'agent-briefing'
+    );
+    expect(androidChannelIdForPushDataToAppVersion(brief, '1.1.0')).toBe('agent-briefing');
   });
 
   it('shares the channel gate and preserves the legacy glanceable route', () => {

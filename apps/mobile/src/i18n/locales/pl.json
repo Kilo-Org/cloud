@@ -227,7 +227,6 @@
     "hideBalance": "Ukryj saldo",
     "showBalance": "Pokaż saldo",
     "balanceHidden": "Saldo ukryte",
-    "bonusCreditsExpiring": "Środki w kwocie {{amount}} stracą ważność {{date}}.",
     "signOutTitle": "Wylogować się?",
     "signOutMessage": "Aby wrócić do swojego obszaru roboczego, musisz zalogować się ponownie.",
     "deleteAccountTitle": "Usunąć konto?",
@@ -352,6 +351,18 @@
       "securityFindingsUnavailable": "Włącz Agenta bezpieczeństwa Kilo w zakresie, aby otrzymywać problemy z bezpieczeństwem.",
       "spendAlertsSubtitle": "przekroczenia progów i skoki godzinowe",
       "spendAlertsToggle": "Kategoria alertów o wydatkach"
+    },
+    "history": {
+      "title": "Historia powiadomień",
+      "subtitle": "Powiadomienia otrzymane przez to konto",
+      "bannerBody": "Powiadomienia push są wyłączone dla tego urządzenia, więc nowe nie będą tu przychodzić.",
+      "bannerAction": "Ustawienia powiadomień",
+      "emptyTitle": "Nie ma jeszcze powiadomień",
+      "emptyCategoryTitle": "Brak powiadomień w tej kategorii",
+      "emptyBody": "Powiadomienia otrzymywane przez to konto pojawiają się tutaj. Są przechowywane przez {{days}} dni.",
+      "capped": "Wyświetlane są najnowsze powiadomienia.",
+      "loadError": "Nie udało się wczytać historii powiadomień.",
+      "openFailed": "Tego powiadomienia nie można już nigdzie otworzyć."
     },
     "action": {
       "openSession": "Otwórz sesję"
@@ -2102,7 +2113,9 @@
       "retrying": "Ponawianie…",
       "retryDeny": "Ponów odmowę",
       "retryAllowOnce": "Ponów zezwolenie tylko tym razem",
-      "retryAlwaysAllow": "Ponów zezwalanie zawsze"
+      "retryAlwaysAllow": "Ponów zezwalanie zawsze",
+      "unreadableTitle": "Nie można odczytać prośby o zgodę",
+      "unreadableBody": "Agent czeka na decyzję o zgodzie, której ta aplikacja nie może pokazać. Zaktualizuj aplikację lub CLI albo odpowiedz na prośbę w CLI, aby kontynuować."
     },
     "questionCard": {
       "title": "Agent czeka na odpowiedź",
@@ -2508,8 +2521,9 @@
     "unavailableDevice": "Dyktowanie nie jest dostępne na tym urządzeniu.",
     "unavailableLanguage": "Dyktowanie nie jest dostępne w języku ustawionym na tym urządzeniu.",
     "languageNotInstalledTitle": "Dyktowanie dla języka {{language}} nie jest jeszcze gotowe",
-    "languageNotInstalledMessage": "Pliki mowy offline dla języka {{language}} nie są zainstalowane na tym telefonie. Pobierz je, a następnie ponownie spróbuj dyktowania.",
+    "languageNotInstalledMessage": "Pliki mowy offline dla języka {{language}} nie są zainstalowane, a transkrypcja online jest wyłączona. Pobierz pliki lub włącz ponownie transkrypcję online, aby korzystać z wprowadzania głosowego.",
     "downloadOfflineModel": "Pobierz",
+    "useOnlineTranscription": "Zezwól na transkrypcję online",
     "offlineModelDownloadScheduled": "Pliki mowy offline zostaną pobrane w tle. Spróbuj dyktowania ponownie później.",
     "listeningStopped": "Nasłuchiwanie zostało zatrzymane.",
     "transcribing": "Transkrypcja...",
@@ -3239,7 +3253,7 @@
     "creditActivity": {
       "emptyDescription": "Tutaj na bieżąco pojawiają się doładowania, zużycie środków i korekty salda tej organizacji.",
       "emptyTitle": "Brak operacji na saldzie",
-      "expires": "Wygasa {{date}}",
+      "expiresUtc": "Wygasa {{date}} (UTC)",
       "title": "Historia salda",
       "transactionFallback": "Operacja na saldzie",
       "category": {
@@ -3838,6 +3852,7 @@
     "title": "Profile",
     "entrySubtitle": "Wykorzystuj ponownie ustawienia środowiska w różnych sesjach",
     "newProfile": "Nowy profil",
+    "openHint": "Otwiera profil",
     "emptyTitle": "Nie ma jeszcze profili",
     "emptyDescription": "Utwórz profil, aby ponownie używać zmiennych środowiskowych, poleceń konfiguracyjnych i umiejętności w różnych sesjach.",
     "loadFailed": "Nie udało się załadować profili",
@@ -3941,6 +3956,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Wartości wyświetlane jako •••• zachowują zapisany sekret; zastąp wartość, aby go zmienić. Zmiana wiersza poleceń wymaga ponownego podania wszystkich wartości",
+      "headersHint": "Wartości wyświetlane jako •••• zachowują zapisany sekret; zastąp wartość, aby go zmienić. Zmiana adresu URL wymaga ponownego podania wszystkich wartości",
       "nameRequired": "Wprowadź nazwę serwera",
       "nameInvalid": "W nazwie można używać wyłącznie liter ASCII, cyfr, podkreśleń i myślników, maksymalnie 100 znaków",
       "commandRequired": "Wprowadź polecenie",
@@ -4039,6 +4056,10 @@
   "credits": {
     "title": "Kup kredyty",
     "description": "Kredyty to jednorazowy zakup dodawany do Twojego salda Kilo na potrzeby sesji kodowania AI w aplikacji Kilo. Sklep obciąża Twoje konto, a kredyty są dodawane po potwierdzeniu płatności przez sklep.",
+    "nextExpiry": "Kredyty w kwocie {{amount}} stracą ważność {{date}} (UTC). Najpierw wykorzystywane są kredyty z najwcześniejszym terminem ważności.",
+    "appStoreExpiry": "Kredyty kupione przez App Store nie tracą ważności.",
+    "playOneYearExpiry": "Te kredyty tracą ważność rok kalendarzowy po zakupie.",
+    "playNonexpiring": "Te kredyty nie tracą ważności.",
     "packLabel": "Dodaj {{amount}} w kredytach",
     "priceUnavailable": "Cena niedostępna",
     "purchased": "Kredyty zostały dodane do Twojego salda.",
@@ -4083,11 +4104,13 @@
       "namePlaceholder": "Błędy, Pomysły, Wydanie…",
       "emoji": "Emoji",
       "mode": "Tryb",
-      "defaultsHint": "Sesje rozpoczęte z tej listy używają tych ustawień domyślnych."
+      "defaultsHint": "Sesje rozpoczęte z tej listy używają tych ustawień domyślnych.",
+      "saveFailed": "Nie udało się zapisać listy. Sprawdź połączenie i spróbuj ponownie."
     },
     "list": {
       "addPlaceholder": "Dodaj zadanie",
       "add": "Dodaj zadanie",
+      "addFailed": "Nie udało się dodać zadania. Sprawdź połączenie i spróbuj ponownie.",
       "empty": "Brak zadań",
       "setDefaults": "Ustaw repozytorium, tryb i model",
       "completed_one": "Ukończone ({{count}})",
@@ -4128,7 +4151,9 @@
       "startNewSession": "Rozpocznij nową sesję",
       "startNewSessionHint": "Przytrzymaj, aby rozpocząć nową sesję.",
       "linkSession": "Powiąż sesję",
-      "linkFailed": "Nie udało się powiązać sesji z zadaniem"
+      "linkFailed": "Nie udało się powiązać sesji z zadaniem",
+      "moveToAnotherTodo": "Przenieś do innego zadania",
+      "startRefreshFailed": "Sesja została rozpoczęta, ale nie udało się zaktualizować tej listy."
     },
     "linkSession": {
       "title": "Powiąż sesję",
@@ -4137,6 +4162,7 @@
     },
     "upNext": "Następne",
     "sessionTodo": "Zadanie: {{title}}",
+    "openTodoHint": "Otwiera zadanie.",
     "linkToTodo": "Powiąż z zadaniem",
     "candidates": {
       "empty": "Brak otwartych zadań"
@@ -4180,6 +4206,14 @@
     "generate": "Utwórz podsumowanie",
     "retrySummary": "Ponów płatne podsumowanie",
     "sources": "Dowody i artefakty",
+    "sessionsShown_one": "Pokazano {{shown}} z {{total}} sesji",
+    "sessionsShown_few": "Pokazano {{shown}} z {{total}} sesji",
+    "sessionsShown_many": "Pokazano {{shown}} z {{total}} sesji",
+    "sessionsShown_other": "Pokazano {{shown}} z {{total}} sesji",
+    "itemsShown_one": "Pokazano {{shown}} z {{total}} pozycji",
+    "itemsShown_few": "Pokazano {{shown}} z {{total}} pozycji",
+    "itemsShown_many": "Pokazano {{shown}} z {{total}} pozycji",
+    "itemsShown_other": "Pokazano {{shown}} z {{total}} pozycji",
     "timezone": "Strefa czasowa raportu",
     "deviceTimezone": "Użyj strefy czasowej urządzenia",
     "timezoneHint": "Strefa czasowa IANA, np. Europe/Berlin. Zmiany harmonogramu dotyczą kolejnych raportów.",

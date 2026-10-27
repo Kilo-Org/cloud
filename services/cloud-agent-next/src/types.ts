@@ -1,4 +1,5 @@
 import type { SessionId } from './types/ids.js';
+import type { EnvironmentBuild } from './environment-build/environment-build-do.js';
 import type { getSandbox, ExecutionSession, Sandbox } from '@cloudflare/sandbox';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
@@ -10,6 +11,7 @@ import type { AccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-a
 import type { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
 import type { SandboxControlV2 as SandboxControl } from './control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 as SandboxSession } from './control-plane/session/session-do.js';
+import type { VercelSnapshotBuild } from './persistence/VercelSnapshotBuild.js';
 import type { SandboxContainers } from './sandbox-containers/SandboxContainers.js';
 import type { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
 // Type-only exception to "no reverse import from production code": erased at
@@ -267,7 +269,8 @@ type IssueGitHubSessionCapabilityResult =
 type RedeemGitHubSessionCapabilityResult =
   | {
       success: true;
-      authorization: string;
+      /** Null means the request is forwarded anonymously. */
+      authorization: string | null;
       installationId?: string;
       source?: 'user' | 'installation';
       appType?: 'standard' | 'lite';
@@ -538,10 +541,14 @@ export type Env = {
   SandboxCodeReviewContainment: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for sandbox-scoped wrapper call-home control */
   SANDBOX_CONTROL: DurableObjectNamespace<SandboxControl>;
+  /** Durable Object namespace for organization-scoped BYOC runtime snapshot builds. */
+  VERCEL_SNAPSHOT_BUILD?: DurableObjectNamespace<VercelSnapshotBuild>;
   /** Durable Object namespace for control-plane sessions */
   SANDBOX_SESSION: DurableObjectNamespace<SandboxSession>;
   /** Durable Object namespace for DO-managed Cloudflare containers (control-plane only) */
   SANDBOX_CONTAINERS: DurableObjectNamespace<SandboxContainers>;
+  /** One environment build coordinator per repository environment id. */
+  ENVIRONMENT_BUILD: DurableObjectNamespace<EnvironmentBuild>;
   /** Durable Object namespace for per-user Kilo SDK facade coordination */
   USER_KILO_FACADE: DurableObjectNamespace<UserKiloFacade>;
   /** Durable Object namespace for one-time stream/terminal ticket nonce consumption */
@@ -550,8 +557,6 @@ export type Env = {
   E2E_CALLBACK_SINK?: DurableObjectNamespace<E2eCallbackSink>;
   /** One-way shared sandbox failover overrides keyed by shared identity */
   SHARED_SANDBOX_OVERRIDES: KVNamespace;
-  /** Repository snapshot index for control-plane container starts; absent disables snapshots. */
-  REPO_SNAPSHOTS?: KVNamespace;
   /** Service binding for the session ingest worker */
   SESSION_INGEST: SessionIngestBinding;
   /** Record-only container lifecycle usage meter. */
@@ -619,12 +624,12 @@ export type Env = {
   CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED?: string;
   /** Comma-separated user or org IDs whose Code Reviewer sessions use the Cloudflare Containers runtime. `*` includes personal. */
   CODE_REVIEW_CONTAINERS_ORG_IDS?: string;
+  /** User or organization IDs enrolled in customer-paid Vercel compute. */
+  BYOC_VERCEL_IDS?: string;
   RUNTIME_ISOLATION_ENABLED?: string;
   /** Comma-separated user or org IDs allowed to pick a sandbox destination. `*` includes personal. */
   SANDBOX_SELECTION_IDS?: string;
   CREDENTIAL_CONTAINMENT_ENABLED?: string;
-  /** Comma-separated user or org IDs whose isolated control-plane containers start from repository snapshots, or '*' for all */
-  CONTAINER_REPO_SNAPSHOT_IDS?: string;
   /**
    * Wrapper-side tool/server memory cgroup partition configuration. See
    * MEMORY_CGROUPS_PLAN.md (W4).
@@ -635,18 +640,13 @@ export type Env = {
   TOOL_CGROUP_OOM_GROUP?: string;
   TOOL_CGROUP_CPU_WEIGHT?: string;
   TOOL_CGROUP_SERVER_CPU_WEIGHT?: string;
-  VERCEL_TOKEN?: string;
-  VERCEL_TEAM_ID?: string;
-  VERCEL_PROJECT_ID?: string;
-  VERCEL_SANDBOX_SNAPSHOT_ID?: string;
-  VERCEL_SANDBOX_RUNTIME_BUILD_ID?: string;
   VERCEL_SANDBOX_RUNTIME?: string;
   VERCEL_SANDBOX_INITIAL_TIMEOUT_MS?: string;
   VERCEL_SANDBOX_EXTEND_DURATION_MS?: string;
-  /** Comma-separated org IDs routed to Vercel. Empty is off. `*` includes personal. */
-  VERCEL_SANDBOX_ORG_IDS?: string;
   /** Comma-separated org IDs routed to DO-managed Cloudflare containers. Empty is off. `*` includes personal. */
   CLOUDFLARE_CONTAINERS_ORG_IDS?: string;
+  /** Explicit organization IDs allowed to build and restore environment snapshots. Empty is off. */
+  ENVIRONMENT_SNAPSHOT_ORG_IDS?: string;
   /** R2 endpoint for S3-compatible API access (presigned URL generation) */
   R2_ENDPOINT?: string;
   /** R2 read-only access key ID for downloading image attachments */

@@ -51,6 +51,7 @@ import {
   computeVercelCostMicrodollars,
   extractVercelIsByok,
   providerReportsIsByok,
+  readResponseText,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -235,19 +236,42 @@ export function checkExclusiveModelProviderAllowed(
   model: string,
   provider: OpenRouterProviderConfig | undefined
 ) {
-  if (!provider) return null;
   const exclusiveModel = findKiloExclusiveModel(model);
   if (!exclusiveModel) return null;
   const inferenceProviders = exclusiveModel.inference_providers;
   if (inferenceProviders.length === 0) return null;
-  if (
-    inferenceProviders.some(
-      inferenceProvider =>
-        (!provider.only || provider.only.includes(inferenceProvider)) &&
-        (!provider.ignore || !provider.ignore.includes(inferenceProvider))
+  return checkInferenceProvidersAllowed(inferenceProviders, provider);
+}
+
+/**
+ * Rejects a request whose provider config excludes every provider that can
+ * serve the model. Used for models routed to a fixed set of providers.
+ */
+export function checkInferenceProvidersAllowed(
+  inferenceProviders: readonly string[],
+  provider: OpenRouterProviderConfig | undefined
+) {
+  return allowedInferenceProviders(inferenceProviders, provider).length > 0
+    ? null
+    : inferenceProvidersNotAllowedResponse(inferenceProviders);
+}
+
+/** The inference providers that every given provider config's only/ignore lists allow. */
+export function allowedInferenceProviders(
+  inferenceProviders: readonly string[],
+  ...providerConfigs: ReadonlyArray<OpenRouterProviderConfig | undefined>
+): string[] {
+  return inferenceProviders.filter(inferenceProvider =>
+    providerConfigs.every(
+      provider =>
+        !provider ||
+        ((!provider.only || provider.only.includes(inferenceProvider)) &&
+          (!provider.ignore || !provider.ignore.includes(inferenceProvider)))
     )
-  )
-    return null;
+  );
+}
+
+export function inferenceProvidersNotAllowedResponse(inferenceProviders: readonly string[]) {
   const error = `No eligible provider can serve the selected model. Please enable provider: ${inferenceProviders.join(', ')}`;
   return NextResponse.json(
     {
@@ -1333,7 +1357,6 @@ type EmbeddingResponse = {
 };
 
 type TranscriptionUsage = {
-  seconds?: number;
   total_tokens?: number;
   input_tokens?: number;
   output_tokens?: number;
@@ -1448,7 +1471,7 @@ export function parseTranscriptionUsageFromResponse(
     finish_reason: null,
     latency: null,
     moderation_latency: null,
-    generation_time: json.usage?.seconds ?? null,
+    generation_time: null,
     streamed: false,
     cancelled: false,
     status_code: statusCode,
@@ -1536,17 +1559,17 @@ export function countAndStoreTranscriptionUsage(
   const statusCode = usageContext.status_code ?? 0;
   const usageStatsPromise = !clonedResponse.body
     ? Promise.resolve(null)
-    : clonedResponse
-        .text()
-        .then(text =>
-          parseTranscriptionUsageFromResponse(
+    : readResponseText(clonedResponse.body, usageContext.requestStartedAt)
+        .then(({ text, timing }) => ({
+          ...parseTranscriptionUsageFromResponse(
             text,
             statusCode,
             usageContext.requested_model,
             usageContext.provider,
             clonedResponse.headers.get('x-generation-id')
-          )
-        )
+          ),
+          ...timing,
+        }))
         .catch(() => null);
 
   after(

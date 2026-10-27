@@ -69,6 +69,7 @@ export type AppActionResult =
       retryable: boolean;
       code:
         | 'empty-prompt'
+        | 'prompt-too-long'
         | 'unknown-repository'
         | 'unsupported-repository'
         | 'no-repository'
@@ -214,8 +215,12 @@ export type ParsedActionRepository =
   | { kind: 'github' | 'gitlab'; fullName: string }
   | { kind: 'unsupported'; fullName: string };
 
-/** A project-path segment the providers accept. */
-const REPOSITORY_SEGMENT_PATTERN = /^[A-Za-z0-9_.-]+$/;
+/**
+ * A project-path segment the providers accept. The providers never name a
+ * project `.` or `..`, so those two are not segments even though they use only
+ * accepted characters.
+ */
+const REPOSITORY_SEGMENT_PATTERN = /^(?!\.\.?$)[A-Za-z0-9_.-]+$/;
 
 /**
  * Walk a path, dropping empty segments and a trailing `.git`, and reject any
@@ -260,7 +265,8 @@ function urlRepositoryPath(raw: string): string | null {
  * cannot use. A host that is not a known provider is null (unknown); a bare
  * path with no host defaults to GitHub, whose repository form is exactly
  * `owner/repo` — a GitLab project with subgroups is addressed by its URL
- * instead.
+ * instead. A value whose path holds a segment no provider names a project with
+ * is null whichever provider the host belongs to.
  */
 export function parseActionRepository(raw: string): ParsedActionRepository | null {
   const trimmed = raw.trim();
@@ -269,7 +275,8 @@ export function parseActionRepository(raw: string): ParsedActionRepository | nul
   }
   const platform = detectRepositoryPlatform(trimmed);
   if (platform === 'bitbucket') {
-    return { kind: 'unsupported', fullName: urlRepositoryPath(trimmed) ?? trimmed };
+    const fullName = urlRepositoryPath(trimmed);
+    return fullName === null ? null : { kind: 'unsupported', fullName };
   }
   if (platform === 'github' || platform === 'gitlab') {
     const fullName = urlRepositoryPath(trimmed);

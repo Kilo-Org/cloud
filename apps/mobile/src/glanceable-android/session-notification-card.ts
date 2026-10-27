@@ -8,7 +8,7 @@ import { i18n } from '@/i18n';
 import { launcherSessionUrl } from '@/lib/launcher-surfaces';
 
 import { formatGlanceableClock, formatGlanceableCount } from './count-format';
-import { type SessionNotificationCard } from './session-notification';
+import { type SessionCardScope, type SessionNotificationCard } from './session-notification';
 
 /**
  * How one session's content maps to the Android notification's system-template
@@ -147,7 +147,7 @@ function quietFields(content: SessionLiveActivityContentState, now: number): Qui
 /** The system-notification card for one content state. */
 export function buildSessionNotificationCard(
   content: SessionLiveActivityContentState,
-  organizationId: string | null,
+  scope: SessionCardScope,
   now: number = Date.now()
 ): SessionNotificationCard {
   const title = (content.title ?? '').trim();
@@ -161,7 +161,8 @@ export function buildSessionNotificationCard(
   const timed = content.statusKind === 'running' && Number.isFinite(statusSince);
   return {
     sessionId: content.sessionId,
-    organizationId,
+    userId: scope.userId,
+    organizationId: scope.organizationId,
     title: title.length > 0 ? title : translate('common.agent'),
     subText: planText(content),
     // The cost so far, by the app's one cost rule: a small cost is exact or

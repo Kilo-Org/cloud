@@ -1,3 +1,4 @@
+import { byocVercelOwnerSchema } from '../../byoc/vercel-owner.js';
 import { z } from 'zod';
 import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { agentSandboxProviderSchema } from '../../types.js';
@@ -5,6 +6,7 @@ import { sandboxProviderConfigurationSchema } from '../../sandbox-control/provid
 import { sandboxBillingInputEnvelopeSchema } from '../../container-usage-context.js';
 import { credentialContainmentSchema } from '../../sandbox-control/credential-containment.js';
 import { sandboxKindSchema } from '../../sandbox-placement.js';
+import { environmentReferenceSchema } from '../../environment-build/reference.js';
 import {
   controlPlaneCredentialSourceSchema,
   controlPlaneRouteSpecSchema,
@@ -25,6 +27,7 @@ export const controlPlaneSandboxSelectionSchema = egressPolicySchema
     containment: credentialContainmentSchema.optional(),
     /** The stored kind of a placed (`sbx-`) key; absent for a legacy prefixed key. */
     sandboxKind: sandboxKindSchema.optional(),
+    byoc: z.object({ credentialId: z.uuid() }).and(byocVercelOwnerSchema).optional(),
   })
   .strict()
   .refine(
@@ -33,6 +36,11 @@ export const controlPlaneSandboxSelectionSchema = egressPolicySchema
       (selection.provider === 'cloudflare-containers' &&
         (selection.sandboxKind === undefined || selection.sandboxKind === 'isolated')),
     'allowlist egress requires an isolated Cloudflare containers sandbox'
+  )
+  .refine(input => input.byoc === undefined || input.provider === 'vercel', 'BYOC requires Vercel')
+  .refine(
+    input => input.provider !== 'vercel' || input.byoc !== undefined,
+    'Vercel requires BYOC credentials'
   );
 
 export type ControlPlaneSandboxSelection = z.infer<typeof controlPlaneSandboxSelectionSchema>;
@@ -47,6 +55,8 @@ export const controlPlanePrepareInputWithSelectionSchema = z
     spec: controlPlaneRouteSpecSchema,
     credentials: controlPlaneCredentialSourceSchema,
     sandboxSelection: controlPlaneSandboxSelectionSchema.optional(),
+    /** The admitted repository environment; DO-private like `credentials`. */
+    environment: environmentReferenceSchema.optional(),
   })
   .strict();
 

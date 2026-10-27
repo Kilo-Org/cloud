@@ -33,6 +33,10 @@
     "generate": "Generate summary",
     "retrySummary": "Retry paid summary",
     "sources": "Evidence and artifacts",
+    "sessionsShown_one": "Showing {{shown}} of {{total}} session",
+    "sessionsShown_other": "Showing {{shown}} of {{total}} sessions",
+    "itemsShown_one": "Showing {{shown}} of {{total}} item",
+    "itemsShown_other": "Showing {{shown}} of {{total}} items",
     "timezone": "Brief time zone",
     "deviceTimezone": "Use device time zone",
     "timezoneHint": "IANA time zone, for example Europe/Berlin. Schedule changes apply to future briefs.",
@@ -327,7 +331,6 @@
     "hideBalance": "Hide balance",
     "showBalance": "Show balance",
     "balanceHidden": "Balance hidden",
-    "bonusCreditsExpiring": "{{amount}} in credits expiring {{date}}",
     "signOutTitle": "Sign out?",
     "signOutMessage": "You will need to sign in again to access your workspace.",
     "deleteAccountTitle": "Delete account?",
@@ -976,6 +979,18 @@
       "securityFindingsUnavailable": "Enable Kilo Security Agent on a scope to get security findings.",
       "spendAlertsSubtitle": "threshold crossings and hourly spikes",
       "spendAlertsToggle": "Spend alerts category"
+    },
+    "history": {
+      "title": "Notification history",
+      "subtitle": "Notifications this account received",
+      "bannerBody": "Push notifications are off for this device, so new ones will not arrive here.",
+      "bannerAction": "Notification settings",
+      "emptyTitle": "No notifications yet",
+      "emptyCategoryTitle": "No notifications in this category",
+      "emptyBody": "Notifications this account receives appear here. They are kept for {{days}} days.",
+      "capped": "Showing the most recent notifications.",
+      "loadError": "Could not load notification history.",
+      "openFailed": "This notification no longer opens anywhere."
     },
     "action": {
       "openSession": "Open session"
@@ -2711,7 +2726,9 @@
       "retrying": "Retrying…",
       "retryDeny": "Retry deny",
       "retryAllowOnce": "Retry allow once",
-      "retryAlwaysAllow": "Retry always allow"
+      "retryAlwaysAllow": "Retry always allow",
+      "unreadableTitle": "Permission request could not be read",
+      "unreadableBody": "The agent is waiting for a permission decision this app cannot show. Update the app or the CLI, or answer the request in the CLI to continue."
     },
     "questionCard": {
       "title": "Agent needs input",
@@ -3098,8 +3115,9 @@
     "unavailableDevice": "Voice input isn't available on this device.",
     "unavailableLanguage": "Voice input isn't available for this device language. Install its offline speech files or use another app language.",
     "languageNotInstalledTitle": "Voice input for {{language}} isn't ready",
-    "languageNotInstalledMessage": "The {{language}} offline speech files aren't installed on this phone. Download them, then try voice input again.",
+    "languageNotInstalledMessage": "The {{language}} offline speech files aren't installed, and online transcription is off. Download the files, or turn online transcription back on, to use voice input.",
     "downloadOfflineModel": "Download",
+    "useOnlineTranscription": "Allow online transcription",
     "offlineModelDownloadScheduled": "The offline speech files will download in the background. Try voice input again later.",
     "transcribing": "Transcribing...",
     "gatewayUnreachable": "Couldn't reach the Kilo gateway. Check your connection and try again.",
@@ -3272,7 +3290,7 @@
     "creditActivity": {
       "emptyDescription": "Purchases, usage, and credit adjustments for this organization will appear here as they happen.",
       "emptyTitle": "No credit activity",
-      "expires": "Expires {{date}}",
+      "expiresUtc": "Expires {{date}} (UTC)",
       "title": "Credit activity",
       "transactionFallback": "Credit transaction",
       "truncated": "Older credit activity is available.",
@@ -3693,7 +3711,7 @@
       "loadingModel": "Loading model details",
       "couldNotLoadModel": "Couldn't load this model",
       "noFiles": "No files this app can run",
-      "noFilesDescription": "This app runs models that are one GGUF file.",
+      "noFilesDescription": "This app runs models that are one complete GGUF file, and this repository offers none.",
       "tooLargeTitle": "This model may not run",
       "tooLargeMessage": "{{name}} likely needs more memory than this device has. The app can close while the model answers. Download it anyway?",
       "downloadAnyway": "Download anyway"
@@ -3846,6 +3864,7 @@
     "title": "Profiles",
     "entrySubtitle": "Reuse environment settings across sessions",
     "newProfile": "New profile",
+    "openHint": "Opens the profile",
     "emptyTitle": "No profiles yet",
     "emptyDescription": "Create a profile to reuse environment variables, setup commands, and skills across sessions.",
     "loadFailed": "Couldn't load profiles",
@@ -3939,6 +3958,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Values shown as •••• keep their stored secret; replace a value to rotate it. Changing the command line requires every value again",
+      "headersHint": "Values shown as •••• keep their stored secret; replace a value to rotate it. Changing the URL requires every value again",
       "nameRequired": "Enter a server name",
       "nameInvalid": "Name can use only ASCII letters, numbers, underscores, and dashes, up to 100 characters",
       "commandRequired": "Enter a command",
@@ -4037,6 +4058,10 @@
   "credits": {
     "title": "Buy credits",
     "description": "Credits are a one-time purchase added to your Kilo balance for running AI coding sessions in Kilo App. The store charges your account and credits are added after the store confirms payment.",
+    "nextExpiry": "{{amount}} in credits expires {{date}} (UTC). Credits with the earliest expiry are used first.",
+    "appStoreExpiry": "Credits purchased through the App Store do not expire.",
+    "playOneYearExpiry": "These credits expire one calendar year after purchase.",
+    "playNonexpiring": "These credits do not expire.",
     "packLabel": "Add {{amount}} of credits",
     "priceUnavailable": "Price unavailable",
     "purchased": "Credits added to your balance.",
@@ -4077,11 +4102,13 @@
       "namePlaceholder": "Bugs, Ideas, Release…",
       "emoji": "Emoji",
       "mode": "Mode",
-      "defaultsHint": "Sessions started from this list use these defaults."
+      "defaultsHint": "Sessions started from this list use these defaults.",
+      "saveFailed": "Couldn’t save the list. Check your connection and try again."
     },
     "list": {
       "addPlaceholder": "Add a to-do",
       "add": "Add to-do",
+      "addFailed": "Couldn’t add the to-do. Check your connection and try again.",
       "empty": "No to-dos yet",
       "setDefaults": "Set repository, mode and model",
       "completed_one": "Completed ({{count}})",
@@ -4118,7 +4145,9 @@
       "startNewSession": "Start new session",
       "startNewSessionHint": "Long-press to start a new session.",
       "linkSession": "Link session",
-      "linkFailed": "Couldn’t link the session to the to-do"
+      "linkFailed": "Couldn’t link the session to the to-do",
+      "moveToAnotherTodo": "Move to another to-do",
+      "startRefreshFailed": "The session started, but this list didn’t update."
     },
     "linkSession": {
       "title": "Link a session",
@@ -4127,6 +4156,7 @@
     },
     "upNext": "Up next",
     "sessionTodo": "To-do: {{title}}",
+    "openTodoHint": "Opens the to-do.",
     "linkToTodo": "Link to to-do",
     "candidates": {
       "empty": "No open to-dos"

@@ -2115,6 +2115,69 @@
       "when": 1792876471766,
       "tag": "0301_contributor_credit_window",
       "breakpoints": true
+    },
+    {
+      "idx": 302,
+      "version": "7",
+      "when": 1792878599267,
+      "tag": "0302_loud_victor_mancha",
+      "breakpoints": true
+    },
+    {
+      "idx": 303,
+      "version": "7",
+      "when": 1793016204545,
+      "tag": "0303_rainy_wildside",
+      "breakpoints": true
+    },
+    {
+      "idx": 304,
+      "version": "7",
+      "when": 1793024513267,
+      "tag": "0304_fine_moonstone",
+      "breakpoints": true
+    },
+    {
+      "idx": 305,
+      "version": "7",
+      "when": 1793045874155,
+      "tag": "0305_usage_metadata_non_inference_cost",
+      "breakpoints": true
+    },
+    {
+      "idx": 306,
+      "version": "7",
+      "when": 1793049243861,
+      "tag": "0306_byok_api_key_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 307,
+      "version": "7",
+      "when": 1793099416452,
+      "tag": "0307_review_window_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 308,
+      "version": "7",
+      "when": 1793102557863,
+      "tag": "0308_swift_wong",
+      "breakpoints": true
+    },
+    {
+      "idx": 309,
+      "version": "7",
+      "when": 1793104458886,
+      "tag": "0309_good_silk_fever",
+      "breakpoints": true
+    },
+    {
+      "idx": 310,
+      "version": "7",
+      "when": 1793107189542,
+      "tag": "0310_ancient_sauron",
+      "breakpoints": true
     }
   ]
 }

@@ -227,7 +227,6 @@
     "hideBalance": "Balansni yashirish",
     "showBalance": "Balansni ko'rsatish",
     "balanceHidden": "Balans yashirilgan",
-    "bonusCreditsExpiring": "{{amount}} miqdoridagi kreditlarning muddati {{date}} sanasida tugaydi.",
     "signOutTitle": "Tizimdan chiqilsinmi?",
     "signOutMessage": "Ish maydoningizdan foydalanish uchun hisobingizga qayta kirishingiz kerak bo‘ladi.",
     "deleteAccountTitle": "Hisob o'chirilsinmi?",
@@ -876,6 +875,18 @@
       "securityFindingsUnavailable": "Xavfsizlik zaifliklarini olish uchun bir qamrovda Kilo Xavfsizlik agentini yoqing.",
       "spendAlertsSubtitle": "chegaradan oshish va soatlik ko'tarilishlar",
       "spendAlertsToggle": "Xarajat bildirishnomalari toifasi"
+    },
+    "history": {
+      "title": "Bildirishnomalar tarixi",
+      "subtitle": "Ushbu hisob olgan bildirishnomalar",
+      "bannerBody": "Ushbu qurilmada push-bildirishnomalar o'chirilgan, shuning uchun yangilari bu yerga kelmaydi.",
+      "bannerAction": "Bildirishnoma sozlamalari",
+      "emptyTitle": "Hozircha bildirishnomalar yo'q",
+      "emptyCategoryTitle": "Bu toifada bildirishnomalar yo'q",
+      "emptyBody": "Ushbu hisob oladigan bildirishnomalar shu yerda ko'rinadi. Ular {{days}} kun saqlanadi.",
+      "capped": "Eng so'nggi bildirishnomalar ko'rsatilmoqda.",
+      "loadError": "Bildirishnomalar tarixini yuklab bo'lmadi.",
+      "openFailed": "Bu bildirishnoma endi hech qayerda ochilmaydi."
     },
     "action": {
       "openSession": "Sessiyani ochish"
@@ -2592,7 +2603,9 @@
       "retrying": "Qayta urinilmoqda…",
       "retryDeny": "Qayta rad etish",
       "retryAllowOnce": "Qayta bir marta ruxsat berish",
-      "retryAlwaysAllow": "Qayta doim ruxsat berish"
+      "retryAlwaysAllow": "Qayta doim ruxsat berish",
+      "unreadableTitle": "Ruxsat so'rovini o'qib bo'lmadi",
+      "unreadableBody": "Agent ruxsat qarorini kutmoqda, lekin bu ilova bu so'rovni ko'rsata olmaydi. Davom etish uchun ilovani yoki CLI'ni yangilang yoki so'rovga CLI'da javob bering."
     },
     "questionCard": {
       "title": "Agentga javob kerak",
@@ -2984,8 +2997,9 @@
     "unavailableDevice": "Ovozli kiritish bu qurilmada mavjud emas.",
     "unavailableLanguage": "Qurilmada tanlangan til uchun ovozli kiritish mavjud emas.",
     "languageNotInstalledTitle": "{{language}} uchun ovozli kiritish hali tayyor emas",
-    "languageNotInstalledMessage": "{{language}} tilining oflayn nutq fayllari bu telefonda o'rnatilmagan. Ularni yuklab oling, so'ngra ovozli kiritishni qayta sinab ko'ring.",
+    "languageNotInstalledMessage": "{{language}} uchun oflayn nutq fayllari o'rnatilmagan va onlayn transkripsiya o'chirilgan. Ovozli kiritishdan foydalanish uchun fayllarni yuklab oling yoki onlayn transkripsiyani qayta yoqing.",
     "downloadOfflineModel": "Yuklab olish",
+    "useOnlineTranscription": "Onlayn transkripsiyaga ruxsat berish",
     "offlineModelDownloadScheduled": "Oflayn nutq fayllari fonda yuklab olinadi. Ovozli kiritishni keyinroq qayta sinab ko'ring.",
     "listeningStopped": "Tinglash to'xtatildi.",
     "transcribing": "Matnga aylantirilmoqda...",
@@ -3159,7 +3173,7 @@
     "creditActivity": {
       "emptyDescription": "Bu yerda tashkilotning kredit xaridlari, sarfi va kreditlar miqdoridagi o'zgarishlar ko'rsatiladi.",
       "emptyTitle": "Kreditlar bo'yicha amallar yo'q",
-      "expires": "Amal qilish muddati: {{date}}",
+      "expiresUtc": "Amal qilish muddati: {{date}} (UTC)",
       "title": "Kreditlar tarixi",
       "transactionFallback": "Kredit amali",
       "category": {
@@ -3746,6 +3760,7 @@
     "title": "Profillar",
     "entrySubtitle": "Seanslar davomida muhit sozlamalaridan qayta foydalaning",
     "newProfile": "Yangi profil",
+    "openHint": "Profilni ochadi",
     "emptyTitle": "Hozircha profil yo'q",
     "emptyDescription": "Seanslar davomida muhit o'zgaruvchilari, sozlash buyruqlari va ko'nikmalarni qayta ishlatish uchun profil yarating.",
     "loadFailed": "Profillarni yuklab bo‘lmadi",
@@ -3839,6 +3854,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "•••• ko'rinishida ko'rsatilgan qiymatlar saqlangan yashirin qiymatni o'zgartirmaydi; uni almashtirish uchun qiymatni yangilang. Buyruq qatorini o'zgartirish barcha qiymatlarni qaytadan talab qiladi",
+      "headersHint": "•••• ko'rinishida ko'rsatilgan qiymatlar saqlangan yashirin qiymatni o'zgartirmaydi; uni almashtirish uchun qiymatni yangilang. URL manzilini o'zgartirish barcha qiymatlarni qaytadan talab qiladi",
       "nameRequired": "Server nomini kiriting",
       "nameInvalid": "Ism faqat ASCII harflar, raqamlar, pastki chiziq va chiziqlardan foydalanishi mumkin, jami 100 ta belgidan oshmasligi kerak",
       "commandRequired": "Buyruqni kiriting",
@@ -3937,6 +3954,10 @@
   "credits": {
     "title": "Kredit sotib olish",
     "description": "Kreditlar Kilo App'da AI kodlash sessiyalarini ishga tushirish uchun Kilo balansingizga qo'shiladigan bir martalik xariddir. Do'kon hisobingizdan to'lov oladi va do'kon to'lovni tasdiqlaganidan keyin kreditlar qo'shiladi.",
+    "nextExpiry": "{{amount}} miqdoridagi kreditlarning muddati {{date}} (UTC) sanasida tugaydi. Muddati eng erta tugaydigan kreditlar birinchi sarflanadi.",
+    "appStoreExpiry": "App Store orqali sotib olingan kreditlarning muddati tugamaydi.",
+    "playOneYearExpiry": "Bu kreditlarning muddati xariddan bir kalendar yil o'tgach tugaydi.",
+    "playNonexpiring": "Bu kreditlarning muddati tugamaydi.",
     "packLabel": "{{amount}} qiymatidagi kredit qo'shish",
     "priceUnavailable": "Narx mavjud emas",
     "purchased": "Kreditlar balansingizga qo'shildi.",
@@ -3977,11 +3998,13 @@
       "namePlaceholder": "Xatolar, g‘oyalar, relizlar…",
       "emoji": "Emoji",
       "mode": "Rejim",
-      "defaultsHint": "Bu ro‘yxatdan boshlangan sessiyalar shu standart sozlamalardan foydalanadi."
+      "defaultsHint": "Bu ro‘yxatdan boshlangan sessiyalar shu standart sozlamalardan foydalanadi.",
+      "saveFailed": "Ro‘yxatni saqlab bo‘lmadi. Internetingizni tekshirib, qayta urinib ko‘ring."
     },
     "list": {
       "addPlaceholder": "Yangi vazifa qo‘shish",
       "add": "Vazifa qo‘shish",
+      "addFailed": "Vazifani qo‘shib bo‘lmadi. Internetingizni tekshirib, qayta urinib ko‘ring.",
       "empty": "Hozircha vazifalar yo‘q",
       "setDefaults": "Repozitoriy, rejim va modelni belgilash",
       "completed_one": "Yakunlangan ({{count}})",
@@ -4018,7 +4041,9 @@
       "startNewSession": "Yangi sessiya boshlash",
       "startNewSessionHint": "Yangi sessiya boshlash uchun uzoq bosib turing.",
       "linkSession": "Sessiya bog‘lash",
-      "linkFailed": "Sessiyani vazifaga bog‘lab bo‘lmadi"
+      "linkFailed": "Sessiyani vazifaga bog‘lab bo‘lmadi",
+      "moveToAnotherTodo": "Boshqa vazifaga ko‘chirish",
+      "startRefreshFailed": "Sessiya boshlandi, lekin bu ro‘yxat yangilanmadi."
     },
     "linkSession": {
       "title": "Sessiyani bog‘lash",
@@ -4027,6 +4052,7 @@
     },
     "upNext": "Navbatdagisi",
     "sessionTodo": "Vazifa: {{title}}",
+    "openTodoHint": "Vazifani ochadi.",
     "linkToTodo": "Vazifaga bog‘lash",
     "candidates": {
       "empty": "Ochiq vazifalar yo‘q"
@@ -4070,6 +4096,10 @@
     "generate": "Xulosa yaratish",
     "retrySummary": "Pullik xulosa yaratishga qayta urinish",
     "sources": "Dalillar va artefaktlar",
+    "sessionsShown_one": "{{total}} ta seansdan {{shown}} tasi ko‘rsatilmoqda",
+    "sessionsShown_other": "{{total}} ta seansdan {{shown}} tasi ko‘rsatilmoqda",
+    "itemsShown_one": "{{total}} ta yozuvdan {{shown}} tasi ko‘rsatilmoqda",
+    "itemsShown_other": "{{total}} ta yozuvdan {{shown}} tasi ko‘rsatilmoqda",
     "timezone": "Brifing vaqt mintaqasi",
     "deviceTimezone": "Qurilma vaqt mintaqasidan foydalanish",
     "timezoneHint": "IANA vaqt mintaqasi, masalan Europe/Berlin. Jadval o‘zgarishlari keyingi brifinglarga qo‘llanadi.",

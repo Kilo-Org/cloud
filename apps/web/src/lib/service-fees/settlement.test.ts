@@ -1,5 +1,5 @@
 import { describe, expect, test, jest } from '@jest/globals';
-import type Stripe from 'stripe';
+import Stripe from 'stripe';
 
 import { getKnownStripePriceIdsForKiloPass } from '@kilocode/web-shared/lib/kilo-pass/stripe-price-ids.server';
 import {
@@ -105,7 +105,7 @@ function pricedLine(
     amount,
     pricing: {
       type: 'price_details',
-      unit_amount_decimal: String(amount),
+      unit_amount_decimal: Stripe.Decimal.from(amount),
       price_details: { price: priceId, product: 'prod_pass' },
     },
     ...extra,
@@ -542,7 +542,7 @@ describe('settleKiloPassInvoiceServiceFee', () => {
             metadata: {},
             pricing: {
               type: 'price_details',
-              unit_amount_decimal: '245',
+              unit_amount_decimal: Stripe.Decimal.from('245'),
               price_details: { price: 'price_fee_generated', product: 'prod_fee' },
             },
           }),
@@ -617,7 +617,7 @@ describe('settleKiloPassInvoiceServiceFee', () => {
             metadata: {},
             pricing: {
               type: 'price_details',
-              unit_amount_decimal: '4900',
+              unit_amount_decimal: Stripe.Decimal.from('4900'),
               price_details: { price: 'price_unknown_pass', product: 'prod_unknown' },
             },
             parent: {
@@ -639,7 +639,7 @@ describe('settleKiloPassInvoiceServiceFee', () => {
             metadata: {},
             pricing: {
               type: 'price_details',
-              unit_amount_decimal: '8000',
+              unit_amount_decimal: Stripe.Decimal.from('8000'),
               price_details: { price: 'price_unrelated', product: 'prod_other' },
             },
             parent: {

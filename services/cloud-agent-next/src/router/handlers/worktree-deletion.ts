@@ -167,6 +167,14 @@ export async function deleteWorktreeResources(
     sessionCount = state.manifest.sessions.length;
     locationCount = state.runtimeLocations.length;
     for (const location of state.runtimeLocations) {
+      if (
+        state.manifest.completedRuntimeLocations?.some(
+          completed =>
+            completed.sandboxId === location.sandboxId && completed.provider === location.provider
+        )
+      ) {
+        continue;
+      }
       setStage('runtime_cleanup');
       const locationStartedAt = Date.now();
       let cleanup: WorktreeDeleteResult | undefined;
@@ -204,6 +212,7 @@ export async function deleteWorktreeResources(
             ...params,
             directory,
             sessionIds: cleanup.sessionIds,
+            completedRuntimeLocation: location,
           })
         );
       }

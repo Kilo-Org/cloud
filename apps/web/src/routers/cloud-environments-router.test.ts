@@ -82,6 +82,16 @@ describe('cloudEnvironmentsRouter', () => {
     await cleanupDbForTest();
   });
 
+  // The router graph loads after the mocks above, so it uses them.
+  beforeAll(async () => {
+    ({ createCallerForUser } = await import('@/routers/test-utils'));
+  });
+
+  afterEach(async () => {
+    mockGetSandboxSelectionOptions.mockImplementation(async input => offerAll(input));
+    await cleanupDbForTest();
+  });
+
   test('a member can list but cannot create, while owner and admin can create, update, and delete', async () => {
     const owner = await insertTestUser();
     const member = await insertTestUser();
@@ -346,7 +356,11 @@ describe('cloudEnvironmentsRouter', () => {
     const [summary] = await caller.cloudEnvironments.list({ repository });
     expect(summary).toMatchObject({ sandboxAllocation: 'cloudflare-single' });
 
-    await caller.cloudEnvironments.update({ environmentId: id, sandboxAllocation: null });
+    const { configurationRevision } = await caller.cloudEnvironments.update({
+      environmentId: id,
+      sandboxAllocation: null,
+    });
+    expect(configurationRevision).toBe(1);
     expect(
       (await caller.cloudEnvironments.get({ environmentId: id })).sandboxAllocation
     ).toBeNull();
@@ -512,7 +526,7 @@ describe('cloudEnvironmentsRouter', () => {
       owner: { type: 'user', id: selfHosted.id },
       repository: { platform: 'gitlab', cloneUrl: sessionCloneUrl ?? '' },
     });
-    expect(resolved).not.toBeNull();
+    expect(resolved?.reference.environmentId).toBe(id);
 
     const comList = await gitlabComCaller.cloudEnvironments.list({
       repository: { platform: 'gitlab', projectPath: 'group/repo' },
@@ -579,6 +593,69 @@ describe('cloudEnvironmentsRouter', () => {
       })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(await storedValue(id, 'PLACEHOLDER')).toBeUndefined();
+  });
+
+  test('update returns the configuration revision, which only setup changes advance', async () => {
+    const owner = await insertTestUser();
+    const caller = await createCallerForUser(owner.id);
+    const { id } = await caller.cloudEnvironments.create({
+      name: 'revisions',
+      repository: { platform: 'github', fullName: GITHUB_REPO },
+      commands: ['pnpm install'],
+    });
+    expect((await caller.cloudEnvironments.get({ environmentId: id })).configurationRevision).toBe(
+      1
+    );
+
+    const renamed = await caller.cloudEnvironments.update({ environmentId: id, name: 'renamed' });
+    expect(renamed.configurationRevision).toBe(1);
+
+    const edited = await caller.cloudEnvironments.update({
+      environmentId: id,
+      commands: ['pnpm install --frozen-lockfile'],
+    });
+    expect(edited.configurationRevision).toBe(2);
+    expect((await caller.cloudEnvironments.get({ environmentId: id })).configurationRevision).toBe(
+      2
+    );
+  });
+
+  test('a member cannot build, cancel, or read build logs', async () => {
+    const owner = await insertTestUser();
+    const member = await insertTestUser();
+    const organization = await createTestOrganization('Environment build org', owner.id, 0);
+    await addUserToOrganization(organization.id, member.id, 'member');
+    const ownerCaller = await createCallerForUser(owner.id);
+    const { id } = await ownerCaller.cloudEnvironments.create({
+      organizationId: organization.id,
+      name: 'shared',
+      repository: { platform: 'github', fullName: GITHUB_REPO },
+    });
+
+    const memberCaller = await createCallerForUser(member.id);
+    const buildId = '11111111-1111-4111-8111-111111111111';
+    await expect(
+      memberCaller.cloudEnvironments.build({
+        organizationId: organization.id,
+        environmentId: id,
+        expectedRevision: 1,
+        requestId: '22222222-2222-4222-8222-222222222222',
+      })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    await expect(
+      memberCaller.cloudEnvironments.cancelBuild({
+        organizationId: organization.id,
+        environmentId: id,
+        buildId,
+      })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    await expect(
+      memberCaller.cloudEnvironments.buildLogs({
+        organizationId: organization.id,
+        environmentId: id,
+        buildId,
+      })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
   });
 
   test('a soft-deleted organization is not found for list, get, and create', async () => {

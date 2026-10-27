@@ -74,13 +74,25 @@ const ClientProviderIdSchema = z
   .min(1)
   .refine(provider => !provider.includes('/'), 'Provider ID must not contain /');
 
-export const GatewayCustomRouterEntrySchema = z.object({
+const GatewayModelIdSchema = ModelIdSchema.refine(
+  model => !model.startsWith(CLIENT_CANDIDATE_PREFIX),
+  'Gateway model ID must not start with client:'
+);
+
+// A platform model whose global measurement a linked entry reuses for its same-name variants.
+export const MeasuredAsModelIdSchema = GatewayModelIdSchema.refine(
+  model => !model.toLowerCase().startsWith('kilo-auto/'),
+  'measuredAs must name a concrete platform model'
+);
+
+// The client prefix is reserved so candidate model strings stay injective.
+const GatewayCustomRouterEntryRefSchema = z.object({
   kind: z.literal('gateway'),
-  // The client prefix is reserved so candidate model strings stay injective.
-  model: ModelIdSchema.refine(
-    model => !model.startsWith(CLIENT_CANDIDATE_PREFIX),
-    'Gateway model ID must not start with client:'
-  ),
+  model: GatewayModelIdSchema,
+});
+
+export const GatewayCustomRouterEntrySchema = GatewayCustomRouterEntryRefSchema.extend({
+  measuredAs: MeasuredAsModelIdSchema.optional(),
 });
 export type GatewayCustomRouterEntry = z.infer<typeof GatewayCustomRouterEntrySchema>;
 
@@ -110,6 +122,7 @@ export const ClientCustomRouterEntrySchema = z.object({
   capabilities: ClientModelCapabilitiesSchema,
   // Null means the model costs $0.
   pricing: ClientModelPricingSchema.nullable(),
+  measuredAs: MeasuredAsModelIdSchema.optional(),
 });
 export type ClientCustomRouterEntry = z.infer<typeof ClientCustomRouterEntrySchema>;
 
@@ -126,7 +139,7 @@ export const CustomRouterClientEntryIdSchema = z.object({
 export type CustomRouterClientEntryId = z.infer<typeof CustomRouterClientEntryIdSchema>;
 
 export const CustomRouterEntryRefSchema = z.discriminatedUnion('kind', [
-  GatewayCustomRouterEntrySchema,
+  GatewayCustomRouterEntryRefSchema,
   CustomRouterClientEntryIdSchema.extend({ kind: z.literal('client') }),
 ]);
 export type CustomRouterEntryRef = z.infer<typeof CustomRouterEntryRefSchema>;
@@ -151,7 +164,7 @@ export function customRouterCandidateModel(entry: CustomRouterEntryRef): string 
 
 export function parseCustomRouterCandidateModel(model: string): CustomRouterEntryRef | null {
   if (!model.startsWith(CLIENT_CANDIDATE_PREFIX)) {
-    const gateway = GatewayCustomRouterEntrySchema.safeParse({ kind: 'gateway', model });
+    const gateway = GatewayCustomRouterEntryRefSchema.safeParse({ kind: 'gateway', model });
     return gateway.success ? gateway.data : null;
   }
   const id = model.slice(CLIENT_CANDIDATE_PREFIX.length);
@@ -198,6 +211,16 @@ function addEntryBudgetIssues(
   prefix: readonly (string | number)[] = []
 ): void {
   const path = (...parts: (string | number)[]) => [...prefix, ...parts];
+  if (
+    entry.measuredAs !== undefined &&
+    entry.measuredAs.length > MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH
+  ) {
+    addEntryBudgetIssue(
+      ctx,
+      path('measuredAs'),
+      `Too big: expected measuredAs to have <=${MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH} characters`
+    );
+  }
   if (entry.kind === 'gateway') {
     if (entry.model.length > MAX_CUSTOM_ROUTER_MODEL_ID_LENGTH) {
       addEntryBudgetIssue(
@@ -621,8 +644,49 @@ export const CustomRouterVariantStatusSchema = z.object({
   variant: VariantSchema,
   status: CustomRouterEntryStatusSchema,
   failureReason: z.string().nullable(),
+  // True when the variant reuses the platform measurement of the entry's `measuredAs` model.
+  linked: z.boolean().default(false),
 });
 export type CustomRouterVariantStatus = z.infer<typeof CustomRouterVariantStatusSchema>;
+
+// Platform models with a ready measurement for one base router: the candidates an entry can link
+// to. Variants list the measured variant names; null is the default variant.
+export const PlatformMeasurementsResponseSchema = z.object({
+  baseRouter: AutoRouterSchema,
+  models: z.array(
+    z.object({
+      model: MeasuredAsModelIdSchema,
+      variants: z.array(VariantSchema),
+    })
+  ),
+});
+export type PlatformMeasurementsResponse = z.infer<typeof PlatformMeasurementsResponseSchema>;
+
+export const AUTO_ROUTING_PLATFORM_MEASUREMENTS_PATH = '/api/auto-routing/platform-measurements';
+
+// Case and `.`/`_`/`:` versus `-` differ across catalogs: models.dev `claude-opus-4-5`, Kilo
+// `claude-opus-4.5`.
+function linkKey(id: string): string {
+  return id.toLowerCase().replace(/[._:]/g, '-');
+}
+
+/**
+ * The platform model an entry most likely runs, for the owner to confirm. An exact provider/model
+ * match wins; otherwise the model name alone, when it names exactly one platform model.
+ */
+export function suggestMeasuredAs(
+  entry: { provider: string | null; model: string },
+  platformModels: readonly string[]
+): string | null {
+  const full = linkKey(entry.provider === null ? entry.model : `${entry.provider}/${entry.model}`);
+  const exact = platformModels.find(model => linkKey(model) === full);
+  if (exact) return exact;
+  const name = linkKey(entry.model.slice(entry.model.lastIndexOf('/') + 1));
+  const byName = platformModels.filter(
+    model => linkKey(model.slice(model.lastIndexOf('/') + 1)) === name
+  );
+  return byName.length === 1 ? (byName[0] ?? null) : null;
+}
 
 export const CustomRouterListEntrySchema = z.object({
   key: EntryKeySchema,
@@ -714,6 +778,8 @@ export type RegisterClientEntryRequest = z.infer<typeof RegisterClientEntryReque
 
 export const CUSTOM_ROUTER_TABLE_PATH = '/admin/custom-router-table';
 export const CUSTOM_ROUTER_STATUS_PATH = '/admin/custom-router-status';
+// GET ?router=<base router>; answers with PlatformMeasurementsResponseSchema.
+export const PLATFORM_MEASUREMENTS_PATH = '/admin/platform-measurements';
 
 const customRouterBenchmarkContextShape = {
   ownerType: OwnerTypeSchema,
@@ -721,7 +787,8 @@ const customRouterBenchmarkContextShape = {
   baseRouter: AutoRouterSchema,
   entries: CustomRouterEntriesSchema,
   // Keys of the entries the owner's CLI measures: every client entry, and each gateway entry the
-  // platform key cannot serve. Their measurements are owner-scoped client profiles.
+  // platform key cannot serve. Their measurements are owner-scoped client profiles, except the
+  // variants a `measuredAs` link serves from the platform measurement.
   clientEvalEntryKeys: z.array(EntryKeySchema),
 };
 

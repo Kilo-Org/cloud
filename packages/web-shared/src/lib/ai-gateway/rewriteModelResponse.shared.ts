@@ -1,8 +1,18 @@
+import type { CustomPricingConfig } from '@kilocode/db/schema-types';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { getReasoningEffortTimeoutSuggestion } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { UpstreamTimeoutError } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
-import { getUpstreamBodyTermination } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
-import type { OpenRouterUsage } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import {
+  computeVercelCostMicrodollars,
+  getUpstreamBodyTermination,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
+import type {
+  JustTheCostsUsageStats,
+  MicrodollarUsageContext,
+  VercelProviderMetaData,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
 import type { createParser } from 'eventsource-parser';
@@ -21,11 +31,58 @@ export type RequestLogCapture = {
 
 export type RewriteResponseParams = {
   response: Response;
-  removeCost: boolean;
+  usageContext: ResponseUsageContext;
   capture: RequestLogCapture | null;
   vercelRequestId: string | null;
   reasoningEffort: string | null;
 };
+
+export type ResponseUsageContext = Pick<
+  MicrodollarUsageContext,
+  'requested_model' | 'provider' | 'is_free' | 'user_byok' | 'api_kind'
+> & { custom_pricing_config: CustomPricingConfig };
+
+export type ResponseUsage = {
+  cost?: number;
+  is_byok?: boolean | null;
+  cost_details?: { upstream_inference_cost?: number | null };
+  market_cost?: number;
+  gateway_cost?: number;
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  prompt_tokens_details?: {
+    cached_tokens?: number;
+    cache_write_tokens?: number;
+    cache_creation_input_tokens?: number;
+  };
+  completion_tokens_details?: { reasoning_tokens?: number };
+  input_tokens?: number | null;
+  output_tokens?: number;
+  input_tokens_details?: { cached_tokens?: number; cache_write_tokens?: number };
+  cache_read_input_tokens?: number | null;
+  cache_creation_input_tokens?: number | null;
+};
+
+export type ResponseMetadata = {
+  model?: string;
+  provider_metadata?: VercelProviderMetaData;
+  providerMetadata?: VercelProviderMetaData;
+};
+
+export function rewriteResponseMetadata(value: ResponseMetadata, context: ResponseUsageContext) {
+  if (
+    value.model !== undefined &&
+    !context.requested_model.startsWith('~') &&
+    !context.requested_model.startsWith('openrouter/')
+  ) {
+    value.model = context.requested_model;
+  }
+  if (value.provider_metadata !== undefined || value.providerMetadata !== undefined) {
+    console.debug('[rewriteModelResponse] removing upstream provider metadata');
+    delete value.provider_metadata;
+    delete value.providerMetadata;
+  }
+}
 
 export type ResponseReadError = {
   errorType: 'timeout' | 'upstream_disconnect';
@@ -229,12 +286,60 @@ export async function rewriteSseStream(
   }
 }
 
-export function rewriteUsage(usage: OpenRouterUsage, removeCost: boolean) {
-  if (removeCost) {
-    delete usage.cost;
-    delete usage.cost_details;
-    delete usage.is_byok;
+export function rewriteUsage(
+  usage: ResponseUsage,
+  context: ResponseUsageContext,
+  providerMetadata?: VercelProviderMetaData,
+  startUsage?: ResponseUsage
+) {
+  const isMessages = context.api_kind === 'messages';
+  const isChat = context.api_kind === 'chat_completions';
+  const cacheHitTokens = isChat
+    ? (usage.prompt_tokens_details?.cached_tokens ?? 0)
+    : isMessages
+      ? (usage.cache_read_input_tokens ?? startUsage?.cache_read_input_tokens ?? 0)
+      : (usage.input_tokens_details?.cached_tokens ?? 0);
+  const cacheWriteTokens = isChat
+    ? (usage.prompt_tokens_details?.cache_write_tokens ??
+      usage.prompt_tokens_details?.cache_creation_input_tokens ??
+      0)
+    : isMessages
+      ? (usage.cache_creation_input_tokens ?? startUsage?.cache_creation_input_tokens ?? 0)
+      : (usage.input_tokens_details?.cache_write_tokens ?? 0);
+  const gateway = providerMetadata?.gateway;
+  const upstreamCost = usage.is_byok
+    ? (usage.cost_details?.upstream_inference_cost ?? 0)
+    : (usage.cost ?? 0);
+  const costs: JustTheCostsUsageStats = {
+    cost_mUsd:
+      !isChat && usage.cost == null && usage.is_byok == null && gateway
+        ? computeVercelCostMicrodollars(gateway)
+        : toMicrodollars(upstreamCost),
+    inputTokens: isChat
+      ? (usage.prompt_tokens ?? 0)
+      : isMessages
+        ? (usage.input_tokens ?? startUsage?.input_tokens ?? 0) + cacheHitTokens + cacheWriteTokens
+        : (usage.input_tokens ?? 0),
+    outputTokens: isChat ? (usage.completion_tokens ?? 0) : (usage.output_tokens ?? 0),
+    cacheHitTokens,
+    cacheWriteTokens,
+    is_byok: usage.is_byok ?? null,
+  };
+  applyUsagePricing(costs, context, context.custom_pricing_config);
+  usage.cost = costs.cost_mUsd / 1_000_000;
+  usage.is_byok = context.user_byok || context.provider === 'openai-chatgpt';
+  if (
+    usage.cost_details?.upstream_inference_cost == null &&
+    gateway &&
+    (gateway.marketCost != null || gateway.cost != null)
+  ) {
+    usage.cost_details = {
+      ...usage.cost_details,
+      upstream_inference_cost: computeVercelCostMicrodollars(gateway) / 1_000_000,
+    };
   }
+  delete usage.market_cost;
+  delete usage.gateway_cost;
   if (usage.prompt_tokens_details) {
     if (usage.prompt_tokens_details.cached_tokens === undefined) {
       usage.prompt_tokens_details.cached_tokens = 0; // OpenCode crashes if this is absent

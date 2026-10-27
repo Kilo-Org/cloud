@@ -1,3 +1,4 @@
+import { environmentReferenceSchema } from '../../environment-build/reference.js';
 import { DurableObject } from 'cloudflare:workers';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import { normalizeGitUrl } from '@kilocode/worker-utils';
@@ -31,6 +32,8 @@ import { z } from 'zod';
 import { resolveSecret } from '../../auth.js';
 import type { CallbackTarget } from '../../callbacks/index.js';
 import type { DurableAdmissionAck } from '../../execution/types.js';
+import { getSandboxProviderBinding } from '../../persistence/session-metadata.js';
+import { sameSandboxProviderBinding } from '../../sandbox-provider-binding.js';
 import { logger } from '../../logger.js';
 import type { WrapperPty } from '../../terminal/types.js';
 import type { OperationResult } from '../../persistence/types.js';
@@ -119,6 +122,10 @@ import {
 } from '../../shared/control-plane-protocol.js';
 import { resolveControlPlaneTimers } from '../../shared/control-plane-timers.js';
 import type { SandboxStatusSnapshot } from '../../shared/sandbox-status.js';
+import type {
+  WorkspaceBillingProjection,
+  WorkspaceRuntimeStatus,
+} from '../../shared/workspace-runtime-status.js';
 import type { SessionId } from '../../types/ids.js';
 import type { Env } from '../../types.js';
 import { withDORetry } from '../../utils/do-retry.js';
@@ -247,6 +254,7 @@ const SETUP_EVENT_TYPES: ReadonlySet<string> = new Set([
 /** Public `PreparingStep` for a control-plane route preparation step (spec §10). */
 const PREPARING_STEP_PUBLIC: Record<ControlPlanePreparationStep, string> = {
   sandbox_create: 'sandbox_provision',
+  environment_snapshot: 'environment_snapshot',
   sandbox_start: 'sandbox_boot',
   snapshot_fallback: 'snapshot_fallback',
   clone: 'cloning',
@@ -260,6 +268,7 @@ const PREPARING_STEP_PUBLIC: Record<ControlPlanePreparationStep, string> = {
 
 const PREPARING_STEP_MESSAGE: Record<ControlPlanePreparationStep, string> = {
   sandbox_create: 'Creating sandbox',
+  environment_snapshot: 'Checking the environment snapshot',
   sandbox_start: 'Starting sandbox',
   snapshot_fallback: 'Retrying without a snapshot',
   clone: 'Cloning repository',
@@ -311,6 +320,8 @@ export const controlPlaneSessionRegistrationSchema = z
     credentials: controlPlaneCredentialSourceSchema,
     /** Worker-selected provider pin (H1/H2); the DO applies it, never re-decides it. */
     sandboxSelection: controlPlaneSandboxSelectionSchema.optional(),
+    /** The admitted repository environment; DO-private, for snapshot selection only. */
+    environment: environmentReferenceSchema.optional(),
   })
   .strict();
 export type ControlPlaneSessionRegistration = z.infer<typeof controlPlaneSessionRegistrationSchema>;
@@ -403,6 +414,8 @@ export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
   getWrapperId(): Promise<string | null>;
   /** B10: the public sandbox status snapshot projected from the allocation. */
   getStatusSnapshot(): Promise<SandboxStatusSnapshot>;
+  /** Passive billing projection for the workspace that owns this sandbox. */
+  getWorkspaceBillingProjection(): Promise<WorkspaceBillingProjection | null>;
   fetch(request: Request): Promise<Response>;
 };
 
@@ -1300,6 +1313,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       (existing.allowSubagentSessions ?? false) === (metadata.allowSubagentSessions ?? false) &&
       existing.parentCloudAgentSessionId === metadata.parentCloudAgentSessionId &&
       sameRepository(existing.repository, metadata.repository) &&
+      sameSandboxProviderBinding(
+        getSandboxProviderBinding(existing),
+        getSandboxProviderBinding(metadata)
+      ) &&
       this.registration.sandboxId === metadata.workspace?.sandboxId &&
       (existing.workspace?.egressMode ?? 'unrestricted') ===
         (metadata.workspace?.egressMode ?? 'unrestricted') &&
@@ -1962,6 +1979,23 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     } catch {
       return unavailableStatusSnapshot();
     }
+  }
+
+  /**
+   * Worker-facing workspace status RPC. Composes the passive sandbox snapshot
+   * with the sandbox's stored billing projection; it never prepares a route,
+   * delivers a message or starts the container.
+   */
+  async getWorkspaceRuntimeStatus(): Promise<WorkspaceRuntimeStatus> {
+    await this.initialized;
+    const sandboxId = this.registration?.sandboxId;
+    const peer = sandboxId === undefined ? null : this.sandboxPeerFor(sandboxId);
+    if (peer === null) return { sandbox: unavailableStatusSnapshot(), billing: null };
+    const [sandbox, billing] = await Promise.all([
+      peer.getStatusSnapshot().catch(() => unavailableStatusSnapshot()),
+      peer.getWorkspaceBillingProjection().catch(() => null),
+    ]);
+    return { sandbox, billing };
   }
 
   /** The preparation attempts the stream replays, for the first transcript page. */
@@ -2724,6 +2758,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
             ...(registration.sandboxSelection
               ? { sandboxSelection: registration.sandboxSelection }
               : {}),
+            ...(registration.environment ? { environment: registration.environment } : {}),
           }),
         'session.prepare',
         this.sandboxRpcConfig(pass)

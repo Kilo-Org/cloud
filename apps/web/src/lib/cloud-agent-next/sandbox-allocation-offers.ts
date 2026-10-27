@@ -1,7 +1,7 @@
 import 'server-only';
 import { TRPCError } from '@trpc/server';
 import {
-  getKiloSandboxAllocation,
+  getSandboxAllocation,
   type SandboxSelectionCapabilities,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import type { User } from '@kilocode/db/schema';
@@ -41,7 +41,7 @@ export function findSandboxOption(
   allocation: string
 ): SandboxSelectionCapabilities['options'][number] | undefined {
   return capabilities.options.find(
-    option => getKiloSandboxAllocation(option.allocation) === allocation
+    option => getSandboxAllocation(option.allocation) === allocation
   );
 }
 

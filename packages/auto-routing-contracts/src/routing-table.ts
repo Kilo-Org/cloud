@@ -74,6 +74,57 @@ export function estimateRequestCostUsd(
       (candidate.pricing.cacheReadUsdPerToken ?? candidate.pricing.promptUsdPerToken)
   );
 }
+
+// Industry-standard blended price weighting (3 input : 1 output) for summaries without tokens.
+const BLENDED_INPUT_WEIGHT = 3;
+const BLENDED_OUTPUT_WEIGHT = 1;
+
+function blendedUsdPerToken(pricing: CandidatePricing): number {
+  return (
+    (BLENDED_INPUT_WEIGHT * pricing.promptUsdPerToken +
+      BLENDED_OUTPUT_WEIGHT * pricing.completionUsdPerToken) /
+    (BLENDED_INPUT_WEIGHT + BLENDED_OUTPUT_WEIGHT)
+  );
+}
+
+export type LinkedCostSummary = {
+  avgCostUsd: number | null;
+  avgInputTokens?: number | null;
+  avgCachedInputTokens?: number | null;
+  avgOutputTokens?: number | null;
+  avgReasoningTokens?: number | null;
+};
+
+/**
+ * Mean cost per case of a platform measurement at the owner's prices (ADR 0005 linked entries).
+ * Null owner pricing is $0. Summaries with token means are repriced exactly; older summaries
+ * scale the measured cost by the blended price ratio. Null when the cost cannot be derived, which
+ * keeps the pair out of ranking rather than ranking it at a guessed price.
+ */
+export function linkedAvgCostUsd(
+  summary: LinkedCostSummary,
+  ownerPricing: CandidatePricing | null,
+  platformPricing: CandidatePricing | null
+): number | null {
+  if (ownerPricing === null) return 0;
+  const { avgInputTokens, avgCachedInputTokens, avgOutputTokens, avgReasoningTokens } = summary;
+  if (
+    avgInputTokens != null &&
+    avgCachedInputTokens != null &&
+    avgOutputTokens != null &&
+    avgReasoningTokens != null
+  ) {
+    return (
+      avgInputTokens * ownerPricing.promptUsdPerToken +
+      avgCachedInputTokens * (ownerPricing.cacheReadUsdPerToken ?? ownerPricing.promptUsdPerToken) +
+      (avgOutputTokens + avgReasoningTokens) * ownerPricing.completionUsdPerToken
+    );
+  }
+  if (summary.avgCostUsd === null || platformPricing === null) return null;
+  const platformBlended = blendedUsdPerToken(platformPricing);
+  if (platformBlended <= 0) return null;
+  return summary.avgCostUsd * (blendedUsdPerToken(ownerPricing) / platformBlended);
+}
 /**
  * Reader precedence for candidate variant identity: prefer `variant`; when
  * absent, a valid legacy `reasoningEffort` string may be interpreted as the

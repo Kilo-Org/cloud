@@ -1,5 +1,7 @@
 import {
   AUTO_ROUTING_CUSTOM_ROUTERS_PATH,
+  AUTO_ROUTING_PLATFORM_MEASUREMENTS_PATH,
+  PlatformMeasurementsResponseSchema,
   CustomRouterErrorResponseSchema,
   CustomRouterListResponseSchema,
   CustomRouterResponseSchema,
@@ -39,6 +41,17 @@ export function customRouterItemEndpoint(
   organizationId: string | undefined
 ): string {
   return withOrganization(customRouterPath(scope, slug), organizationId);
+}
+
+export async function fetchPlatformMeasurements(
+  baseRouter: AutoRouter,
+  organizationId: string | undefined
+) {
+  const params = new URLSearchParams({ router: baseRouter });
+  if (organizationId) params.set('organizationId', organizationId);
+  const response = await fetch(`${AUTO_ROUTING_PLATFORM_MEASUREMENTS_PATH}?${params}`);
+  if (!response.ok) throw new Error(await errorMessage(response));
+  return PlatformMeasurementsResponseSchema.parse(await response.json());
 }
 
 export function entryLabel(entry: CustomRouterEntryRef): string {
@@ -113,7 +126,11 @@ export function entryDisplayStatus(entry: CustomRouterListEntry): EntryDisplaySt
     return {
       kind: 'stale',
       label: 'Stale',
-      detail: 'Measured with an older benchmark. Routing still uses it.',
+      detail:
+        entry.entry.measuredAs &&
+        variants.some(variant => variant.linked && variant.status === 'stale')
+          ? 'Linked platform measurements are stale. Routing still uses them.'
+          : 'Measured with an older benchmark. Routing still uses it.',
     };
   }
   return { kind: 'ready', label: 'Ready', detail: null };

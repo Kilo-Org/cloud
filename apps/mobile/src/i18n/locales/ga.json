@@ -227,7 +227,6 @@
     "hideBalance": "Folaigh an t-iarmhéid",
     "showBalance": "Taispeáin an t-iarmhéid",
     "balanceHidden": "Tá an t-iarmhéid folaithe",
-    "bonusCreditsExpiring": "Rachaidh {{amount}} de chreidmheasanna in éag {{date}}.",
     "signOutTitle": "Ar mhaith leat síniú amach?",
     "signOutMessage": "Beidh ort síniú isteach arís chun rochtain a fháil ar do spás oibre.",
     "deleteAccountTitle": "An scriosfar an cuntas?",
@@ -933,6 +932,18 @@
       "securityFindingsUnavailable": "Cumasaigh Gníomhaire slándála Kilo ar raon chun torthaí slándála a fháil.",
       "spendAlertsSubtitle": "sáruithe tairsí agus spuaiceanna uaire",
       "spendAlertsToggle": "Catagóir foláirimh chaiteachais"
+    },
+    "history": {
+      "title": "Stair fógraí",
+      "subtitle": "Na fógraí a fuair an cuntas seo",
+      "bannerBody": "Tá fógraí push múchta don ghléas seo, mar sin ní thiocfaidh cinn nua anseo.",
+      "bannerAction": "Socruithe fógraí",
+      "emptyTitle": "Níl aon fhógraí fós",
+      "emptyCategoryTitle": "Níl aon fhógraí sa chatagóir seo",
+      "emptyBody": "Taispeántar na fógraí a fhaigheann an cuntas seo anseo. Coimeádtar iad ar feadh {{days}} lá.",
+      "capped": "Taispeántar na fógraí is déanaí.",
+      "loadError": "Níorbh fhéidir stair fógraí a lódáil.",
+      "openFailed": "Ní osclaíonn an fógra seo in áit ar bith a thuilleadh."
     },
     "action": {
       "openSession": "Oscail an seisiún"
@@ -2700,7 +2711,9 @@
       "retrying": "Ag triail arís…",
       "retryDeny": "Bain triail eile as diúltú",
       "retryAllowOnce": "Bain triail eile as ceadú uair amháin",
-      "retryAlwaysAllow": "Bain triail eile as ceadú i gcónaí"
+      "retryAlwaysAllow": "Bain triail eile as ceadú i gcónaí",
+      "unreadableTitle": "Níorbh fhéidir an t-iarratas ceada a léamh",
+      "unreadableBody": "Tá an gníomhaire ag fanacht le cinneadh ceada nach féidir leis an aip seo a thaispeáint. Nuashonraigh an aip nó an CLI, nó freagair an t-iarratas sa CLI chun leanúint ar aghaidh."
     },
     "questionCard": {
       "title": "Tá ionchur ag teastáil ón ngníomhaire",
@@ -3113,8 +3126,9 @@
     "unavailableDevice": "Níl ionchur gutha ar fáil ar an ngléas seo.",
     "unavailableLanguage": "Níl ionchur gutha ar fáil don teanga atá roghnaithe ar an ngléas seo.",
     "languageNotInstalledTitle": "Níl ionchur gutha do {{language}} réidh fós",
-    "languageNotInstalledMessage": "Níl comhaid cainte as líne do {{language}} suiteáilte ar an bhfón seo. Íoslódáil iad, agus bain triail as ionchur gutha arís ina dhiaidh sin.",
+    "languageNotInstalledMessage": "Níl comhaid cainte as líne do {{language}} suiteáilte, agus tá an tras-scríobh ar líne múchta. Suiteáil na comhaid sin, nó las an tras-scríobh ar líne arís, chun ionchur gutha a úsáid.",
     "downloadOfflineModel": "Íoslódáil",
+    "useOnlineTranscription": "Ceadaigh tras-scríobh ar líne",
     "offlineModelDownloadScheduled": "Íoslódófar na comhaid cainte as líne sa chúlra. Bain triail as ionchur gutha arís níos déanaí.",
     "listeningStopped": "Stopadh an éisteacht.",
     "transcribing": "Ag tras-scríobh...",
@@ -3291,7 +3305,7 @@
     "creditActivity": {
       "emptyDescription": "Beidh ceannacháin, úsáid agus coigeartuithe creidmheasa na heagraíochta seo le feiceáil anseo de réir mar a tharlaíonn siad.",
       "emptyTitle": "Níl aon ghníomhaíocht creidmheasa",
-      "expires": "In éag: {{date}}",
+      "expiresUtc": "In éag: {{date}} (UTC)",
       "title": "Gníomhaíocht creidmheasa",
       "transactionFallback": "Idirbheart creidmheasa",
       "category": {
@@ -3884,6 +3898,7 @@
     "title": "Próifílí",
     "entrySubtitle": "Athúsáid socruithe timpeallachta ar fud na seisiún",
     "newProfile": "Próifíl nua",
+    "openHint": "Osclaíonn sé an phróifíl",
     "emptyTitle": "Níl próifílí ann fós",
     "emptyDescription": "Cruthaigh próifíl chun athróga timpeallachta, orduithe socraithe, agus scileanna a athúsáid thar seisiúin.",
     "loadFailed": "Níorbh fhéidir próifílí a lódáil",
@@ -3992,6 +4007,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Coinníonn luachanna a thaispeántar mar •••• a rún stóráilte; athchuir luach chun é a rothlú. Teastaíonn gach luach arís nuair a athraítear an líne ordaithe",
+      "headersHint": "Coinníonn luachanna a thaispeántar mar •••• a rún stóráilte; athchuir luach chun é a rothlú. Teastaíonn gach luach arís nuair a athraítear an URL",
       "nameRequired": "Cuir isteach ainm freastalaí",
       "nameInvalid": "Ní féidir le hainm ach litreacha ASCII, uimhreacha, béimeanna agus daiseanna a úsáid, suas le 100 carachtar",
       "commandRequired": "Cuir isteach ordú",
@@ -4090,6 +4107,10 @@
   "credits": {
     "title": "Ceannaigh creidmheasanna",
     "description": "Is ceannach aonuaire iad creidmheasanna a chuirtear le do chothromas Kilo chun seisiúin chódaithe AI a rith in Kilo App. Gearrann an siopa do chuntas agus cuirtear creidmheasanna leis tar éis don siopa an íocaíocht a dhearbhú.",
+    "nextExpiry": "Rachaidh {{amount}} de chreidmheasanna in éag {{date}} (UTC). Úsáidtear na creidmheasanna is luaithe a rachaidh in éag ar dtús.",
+    "appStoreExpiry": "Ní théann creidmheasanna a ceannaíodh tríd an App Store in éag.",
+    "playOneYearExpiry": "Rachaidh na creidmheasanna seo in éag bliain féilire amháin tar éis an cheannaigh.",
+    "playNonexpiring": "Ní théann na creidmheasanna seo in éag.",
     "packLabel": "Cuir {{amount}} i gcreidmheasanna leis",
     "priceUnavailable": "Praghas gan fáil",
     "purchased": "Cuireadh creidmheasanna le do chothromas.",
@@ -4136,11 +4157,13 @@
       "namePlaceholder": "Fabhtanna, Smaointe, Eisiúintí…",
       "emoji": "Emoji",
       "mode": "Mód",
-      "defaultsHint": "Úsáideann seisiúin a thosaítear ón liosta seo na réamhshocruithe seo."
+      "defaultsHint": "Úsáideann seisiúin a thosaítear ón liosta seo na réamhshocruithe seo.",
+      "saveFailed": "Níorbh fhéidir an liosta a shábháil. Seiceáil do cheangal agus bain triail eile as."
     },
     "list": {
       "addPlaceholder": "Cuir tasc leis",
       "add": "Cuir leis",
+      "addFailed": "Níorbh fhéidir an tasc a chur leis. Seiceáil do cheangal agus bain triail eile as.",
       "empty": "Níl aon tasc ann fós",
       "setDefaults": "Socraigh stór, mód agus samhail",
       "completed_one": "Críochnaithe ({{count}})",
@@ -4183,7 +4206,9 @@
       "startNewSession": "Tosaigh seisiún nua",
       "startNewSessionHint": "Brúigh go fada chun seisiún nua a thosú.",
       "linkSession": "Nasc seisiún",
-      "linkFailed": "Níorbh fhéidir an seisiún a nascadh leis an tasc"
+      "linkFailed": "Níorbh fhéidir an seisiún a nascadh leis an tasc",
+      "moveToAnotherTodo": "Bog go tasc eile",
+      "startRefreshFailed": "Thosaigh an seisiún, ach níor nuashonraíodh an liosta seo."
     },
     "linkSession": {
       "title": "Nasc le seisiún",
@@ -4192,6 +4217,7 @@
     },
     "upNext": "An chéad rud eile",
     "sessionTodo": "Tasc: {{title}}",
+    "openTodoHint": "Osclaíonn sé an tasc.",
     "linkToTodo": "Nasc le tasc",
     "candidates": {
       "empty": "Gan aon tasc oscailte"
@@ -4235,6 +4261,16 @@
     "generate": "Gin achoimre",
     "retrySummary": "Bain triail eile as an achoimre íoctha",
     "sources": "Fianaise agus déantáin",
+    "sessionsShown_one": "Ag taispeáint {{shown}} as {{total}} seisiún",
+    "sessionsShown_two": "Ag taispeáint {{shown}} as {{total}} sheisiún",
+    "sessionsShown_few": "Ag taispeáint {{shown}} as {{total}} sheisiún",
+    "sessionsShown_many": "Ag taispeáint {{shown}} as {{total}} seisiún",
+    "sessionsShown_other": "Ag taispeáint {{shown}} as {{total}} seisiún",
+    "itemsShown_one": "Ag taispeáint {{shown}} as {{total}} mír",
+    "itemsShown_two": "Ag taispeáint {{shown}} as {{total}} mhír",
+    "itemsShown_few": "Ag taispeáint {{shown}} as {{total}} mhír",
+    "itemsShown_many": "Ag taispeáint {{shown}} as {{total}} mír",
+    "itemsShown_other": "Ag taispeáint {{shown}} as {{total}} mír",
     "timezone": "Crios ama na tuarascála",
     "deviceTimezone": "Úsáid crios ama an ghléis",
     "timezoneHint": "Crios ama IANA, mar shampla Europe/Berlin. Bainfidh athruithe sceidil le tuarascálacha amach anseo.",

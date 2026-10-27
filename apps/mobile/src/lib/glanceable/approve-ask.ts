@@ -1,5 +1,4 @@
 import type * as ExpoCrypto from 'expo-crypto';
-import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import { type GlanceableSessionRow } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';
@@ -9,6 +8,8 @@ import { ackSessionAttention } from '@/lib/session-attention';
 import { trpcClient } from '@/lib/trpc';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
+import { whenAskBindingSettled } from './ask-binding';
+import { NotApprovableError, resolveCloudAgentSessionId } from './cloud-agent-session';
 import { createGlanceablePublisher } from './create-publisher';
 import { resolveAnsweredRaises } from './attention-rows';
 import { resolvePendingPermissionId } from './pending-permission';
@@ -28,8 +29,8 @@ import { readWaitingAsk, recordWaitingAsk } from './waiting-ask';
  * through `expo-widgets` (a Live Activity press rides an in-process
  * `LiveActivityUserInteraction`, `src/glanceable-ios/interaction.ts`) and has
  * no promoted ongoing notification; Android has the Live Update notification
- * whose Approve broadcast boots WorkManager headless JS
- * (`modules/active-agents-live-update/android/`, `src/glanceable-android/`)
+ * whose Approve action starts a gate activity that boots WorkManager headless
+ * JS (`modules/active-agents-live-update/android/`, `src/glanceable-android/`)
  * and has no ActivityKit. The answer body, the failure classification, and the
  * republish stay here so the two surfaces cannot disagree.
  */
@@ -41,42 +42,16 @@ type PermissionResponse = 'once' | 'always' | 'reject';
 export type GlanceableApproveResult =
   | { kind: 'approved' }
   | { kind: 'retryable' }
-  | { kind: 'gone' }
+  /**
+   * Nothing was answered. `replaced` marks the case the caller proved locally:
+   * the ask named a request, and the live request is a different one, so the
+   * session is still waiting and must keep counting as needs-input.
+   */
+  | { kind: 'gone'; replaced?: true }
   | { kind: 'none' };
-
-/**
- * The session the ask names has no cloud-agent (control-plane) permission to
- * answer. Carries the tRPC-shaped `data.code` so the shared code reader
- * classifies it like any other terminal rejection.
- */
-export class NotApprovableError extends Error {
-  readonly data = { code: 'NOT_APPROVABLE' };
-
-  constructor() {
-    super('The session has no cloud-agent permission to answer');
-    this.name = 'NotApprovableError';
-  }
-}
 
 /** Permission answers must not be batched into a composed request. */
 const skipBatchOptions = { context: { skipBatch: true } };
-
-/**
- * Resolve the cloud-agent (control-plane) session id from the kilo session id.
- * The same `cliSessionsV2.get` read `resolveSession` uses; a row without a
- * cloud-agent id is not approvable.
- */
-async function resolveCloudAgentSessionId(kiloSessionId: string): Promise<string> {
-  // The row id is a Kilo session id; the brand is only a compile-time marker.
-  const session = await trpcClient.cliSessionsV2.get.query({
-    session_id: kiloSessionId as KiloSessionId,
-  });
-  const cloudAgentSessionId = session.cloud_agent_session_id;
-  if (!cloudAgentSessionId) {
-    throw new NotApprovableError();
-  }
-  return cloudAgentSessionId;
-}
 
 export type AnswerSessionPermissionInput = {
   /**
@@ -194,7 +169,10 @@ async function classifyUnauthorized(): Promise<GlanceableApproveResult> {
 /**
  * The flow both platforms run on an Approve tap. A question ask and a legacy
  * wrapper session have no single approval, so both are `none` and the caller
- * drops the action; an answered-elsewhere ask is `gone`.
+ * drops the action; an answered-elsewhere ask is `gone`. An aggregate ask with
+ * no recorded binding — a record made before its read landed, or one whose read
+ * failed — is `retryable` and answers nothing: no request is named, so none is
+ * answered.
  *
  * A terminal outcome acks session attention, exactly as the other answer paths
  * do (`notification-action-interaction.ts`, `approve-front-agent.ts`): the
@@ -213,8 +191,13 @@ export async function runGlanceableApprove(
     // A session card names its own session and request; the recorded ask is
     // the aggregate card's and stays as it is. A card's Approve answers a
     // permission, and the card carries no status time.
-    const result = await answerPendingPermission(options.target, options);
-    if (result.kind === 'approved' || result.kind === 'gone') {
+    const result = await answerPendingPermission(
+      { ...options.target, permissionId: null },
+      options
+    );
+    // A request replaced by another one leaves the session waiting, so its
+    // raise is not the one that ended: only the terminal outcomes ack.
+    if (result.kind === 'approved' || (result.kind === 'gone' && result.replaced !== true)) {
       ackSessionAttention(options.target.kiloSessionId, 'permission');
     }
     return result;
@@ -223,11 +206,21 @@ export async function runGlanceableApprove(
   if (ask?.status !== 'permission' || !ask.isCloudAgent) {
     return { kind: 'none' };
   }
-  const result = await answerPendingPermission({ ...ask, approvalKey: null }, options);
+  if (ask.boundPermissionId === null) {
+    // No request is named, so nothing can be answered. The tap stays
+    // retryable because a fresh record or a completed read makes this same ask
+    // answerable.
+    return { kind: 'retryable' };
+  }
+  const result = await answerPendingPermission(
+    { ...ask, approvalKey: null, permissionId: ask.boundPermissionId },
+    options
+  );
   if (result.kind === 'approved') {
     recordWaitingAsk(null);
   }
-  if (result.kind === 'approved' || result.kind === 'gone') {
+  // As on the card path: a replaced request is not an answered raise.
+  if (result.kind === 'approved' || (result.kind === 'gone' && result.replaced !== true)) {
     ackSessionAttention(ask.kiloSessionId, ask.status, ask.statusUpdatedAt);
   }
   return result;
@@ -256,12 +249,19 @@ async function approvalKeyOf(kiloSessionId: string, permissionId: string): Promi
 }
 
 /**
- * The answer body, whose terminal outcome the caller acks. With an approval
- * key, only the exact request that key names is answered: a newer request on
- * the same session is not the one the user saw, so it reads as `gone`.
+ * The answer body, whose terminal outcome the caller acks. A caller that names
+ * its request — the session card's approval key, or the aggregate ask's pending
+ * permission id — answers only that request: the live request must match it, or
+ * the outcome is `gone`.
  */
 async function answerPendingPermission(
-  target: { kiloSessionId: string; organizationId: string | null; approvalKey: string | null },
+  target: {
+    kiloSessionId: string;
+    organizationId: string | null;
+    approvalKey: string | null;
+    /** The pending permission the aggregate surface drew; null for a card. */
+    permissionId: string | null;
+  },
   options: { now?: () => number }
 ): Promise<GlanceableApproveResult> {
   try {
@@ -273,11 +273,14 @@ async function answerPendingPermission(
     if (permissionId === null) {
       return { kind: 'gone' };
     }
+    if (target.permissionId !== null && permissionId !== target.permissionId) {
+      return { kind: 'gone', replaced: true };
+    }
     if (
       target.approvalKey !== null &&
       (await approvalKeyOf(target.kiloSessionId, permissionId)) !== target.approvalKey
     ) {
-      return { kind: 'gone' };
+      return { kind: 'gone', replaced: true };
     }
     await answerSessionPermission({
       kiloSessionId: target.kiloSessionId,
@@ -311,6 +314,8 @@ type GlanceableSnapshotPublisher = {
     rows: readonly GlanceableSessionRow[],
     ctx: { userId: string; organizationId: string | null }
   ): void;
+  /** Write the last frame again, for a fact the sinks read at draw time. */
+  redraw?: () => void;
 };
 
 export type RefreshGlanceableSnapshotDeps = {
@@ -405,6 +410,10 @@ export async function refreshGlanceableSnapshot(
         // instead would leave a second waiting session unrecorded, so the skip
         // happens at selection.
         skipWaitingAskSessionId: input.askEnded ? input.answeredKiloSessionId : undefined,
+        // This publisher lives for one refresh: the binding wait below redraws
+        // it, and a subscription would outlive it in the module-level listener
+        // set.
+        redrawOnAskBound: false,
       }));
   const sleep = deps?.sleep ?? defaultSleep;
   const pollMs = deps?.pollIntervalMs ?? GLANCEABLE_REFRESH_POLL_MS;
@@ -417,14 +426,20 @@ export async function refreshGlanceableSnapshot(
     const rows = await fetchTrayRowsOrNull(fetchRows, input.organizationId);
     if (rows === null) {
       // The last published snapshot stays; nothing is fabricated.
-      return;
+      break;
     }
     publisher.handleSessions(resolveAnsweredRaises(rows), ctx);
     if (elapsedMs >= deadlineMs || !hasWaitingAnsweredSession(rows, input.answeredKiloSessionId)) {
-      return;
+      break;
     }
     // eslint-disable-next-line no-await-in-loop -- 1 s poll cadence
     await sleep(pollMs);
     elapsedMs += pollMs;
   }
+  // The surface reads the ask's request binding at draw time, and the select
+  // above starts that read. The headless caller ends with this promise, so wait
+  // for it and draw again: the card left behind must offer Approve for the ask
+  // it names, not the frame written before the binding landed.
+  await whenAskBindingSettled();
+  publisher.redraw?.();
 }

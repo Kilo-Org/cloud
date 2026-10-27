@@ -453,6 +453,38 @@ describe('coding plans', () => {
     expect(subscriptions).toHaveLength(1);
   });
 
+  it('cannot activate a coding plan with expired principal before any balance page is viewed', async () => {
+    const user = await createUserWithBalance(COST_MICRODOLLARS);
+    const expiry = new Date(Date.now() - 60_000).toISOString();
+    await db.insert(credit_transactions).values({
+      kilo_user_id: user.id,
+      amount_microdollars: COST_MICRODOLLARS,
+      is_free: false,
+      expiry_date: expiry,
+      expiration_baseline_microdollars_used: 0,
+      original_baseline_microdollars_used: 0,
+      description: 'Expired enrollment funds',
+    });
+    await db
+      .update(kilocode_users)
+      .set({ next_credit_expiration_at: expiry })
+      .where(eq(kilocode_users.id, user.id));
+    await seedInventoryKey('expired-balance-key', BYTEPLUS_PLAN_ID, BYTEPLUS_PROVIDER_ID);
+
+    await expect(subscribeToCodingPlan(user.id, BYTEPLUS_PLAN_ID, 'expired')).rejects.toThrow(
+      'Insufficient credit balance'
+    );
+    const payer = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(payer?.microdollars_used).toBe(0);
+    expect(
+      await db.query.coding_plan_subscriptions.findMany({
+        where: eq(coding_plan_subscriptions.user_id, user.id),
+      })
+    ).toHaveLength(0);
+  });
+
   it('rolls back activation when credits are insufficient or capacity is absent', async () => {
     const poorUser = await createUserWithBalance(COST_MICRODOLLARS - 1);
     await seedInventoryKey('rollback-key', BYTEPLUS_PLAN_ID, BYTEPLUS_PROVIDER_ID);

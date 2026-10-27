@@ -23,6 +23,7 @@ import { waitFor } from '@/test/render-with-providers';
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
   error: vi.fn(),
+  canManage: true,
   query: {
     data: undefined as TestProfileDetail | undefined,
     isError: false,
@@ -34,6 +35,10 @@ const h = vi.hoisted(() => ({
     setVar: { mutateAsync: vi.fn(), isPending: false },
     deleteVar: { mutateAsync: vi.fn(), isPending: false },
   },
+}));
+
+vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
+  useCanManageOrganizationProfiles: () => h.canManage,
 }));
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
@@ -87,6 +92,7 @@ function pressEmptyAction(renderer: Awaited<ReturnType<typeof mountScreen>>['ren
 describe('ProfileVariablesScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    h.canManage = true;
     Object.assign(h.query, {
       data: undefined,
       isError: false,
@@ -158,7 +164,7 @@ describe('ProfileVariablesScreen', () => {
     unmount();
   });
 
-  it('non-retryable: an empty key is refused before the call', async () => {
+  it('non-retryable: an empty key is refused, and an over-long key names the length', async () => {
     h.query.data = testProfile();
     h.query.isPending = false;
 
@@ -169,15 +175,6 @@ describe('ProfileVariablesScreen', () => {
     expect(h.mutations.setVar.mutateAsync).not.toHaveBeenCalled();
     expect(findField(renderer.root, 'Key').props.error).toBe('required');
 
-    unmount();
-  });
-
-  it('non-retryable: an over-long key names the key length before the call', async () => {
-    h.query.data = testProfile();
-    h.query.isPending = false;
-
-    const { renderer, unmount } = await mountScreen();
-    pressEmptyAction(renderer);
     changeText(renderer.root, 'Key', 'a'.repeat(257));
     pressButton(renderer.root, 'Save');
 
@@ -331,22 +328,15 @@ describe('ProfileVariablesScreen', () => {
     unmount();
   });
 
-  it('happy: a new variable marked secret says its value is encrypted', async () => {
-    h.query.data = testProfile();
+  it('read-only: rows render without edit or delete controls', async () => {
+    h.canManage = false;
+    h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
     h.query.isPending = false;
-
     const { renderer, unmount } = await mountScreen();
-    pressEmptyAction(renderer);
-    // Until it is marked secret, the value field keeps the plain placeholder.
-    expect(findField(renderer.root, 'Value').props.placeholder).toBe('Value');
-
-    act(() => {
-      (
-        findOne(renderer.root, 'Switch').props as { onValueChange: (value: boolean) => void }
-      ).onValueChange(true);
-    });
-    expect(findField(renderer.root, 'Value').props.placeholder).toBe('Secret value (encrypted)');
-
+    const rowActions = findAll(renderer.root, 'Pressable').filter(
+      node => node.props.accessibilityLabel === 'Delete'
+    );
+    expect(rowActions).toHaveLength(0);
     unmount();
   });
 
@@ -354,7 +344,6 @@ describe('ProfileVariablesScreen', () => {
     h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
     h.query.isPending = false;
     h.mutations.deleteVar.mutateAsync.mockResolvedValue({ success: true });
-
     const { renderer, unmount } = await mountScreen();
     pressPressable(renderer.root, 'Delete');
     await act(async () => {
@@ -435,7 +424,6 @@ describe('ProfileVariablesScreen', () => {
   it('keeps the rows while a refetch is in flight', async () => {
     h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
     h.query.isPending = false;
-
     const { renderer, queryClient, unmount } = await mountScreen();
 
     h.query.isRefetching = true;

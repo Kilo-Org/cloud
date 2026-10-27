@@ -115,7 +115,7 @@ function layoutField(root: ReactTestInstance, label: string, y: number): void {
   if (!field) {
     throw new Error(`field ${label} was not rendered`);
   }
-  const handler: unknown = field.props.containerOnLayout;
+  const handler: unknown = field.props.containerOnLayout ?? field.parent?.props.onLayout;
   if (typeof handler !== 'function') {
     throw new TypeError(`field ${label} has no layout handler`);
   }

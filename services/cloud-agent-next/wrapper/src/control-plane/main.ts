@@ -31,7 +31,6 @@ import {
   liveRuntimeClient,
 } from './kilo-runtime.js';
 import { createPreparationManager, runtimeKey, type PreparationManager } from './prepare.js';
-import { createWorkspaceCapture, type WorkspaceCapture } from './workspace-capture.js';
 import { createTurnManager, type TurnManager, type TurnManagerDeps } from './turn.js';
 import { createControlPlaneTerminals, type ControlPlaneTerminalRuntime } from './terminals.js';
 import { createNativeStatusReporter } from './native-status.js';
@@ -214,7 +213,6 @@ export type ControlPlaneFrameDispatcherDeps = {
   preparation: { current?: PreparationManager };
   turns: { current?: TurnManager };
   terminals: { current?: ControlPlaneTerminalRuntime };
-  capture: { current?: WorkspaceCapture };
   worktreeChanges: { current?: ReturnType<typeof createControlPlaneWorktreeChanges> };
   worktreeDeletion: { current?: ReturnType<typeof createControlPlaneWorktreeDeletion> };
   kiloRequests: { current?: ReturnType<typeof createControlPlaneKiloRequests> };
@@ -252,7 +250,7 @@ export function createControlPlaneFrameDispatcher(
           .catch(() => undefined);
         return;
       case 'workspace.captured':
-        deps.capture.current?.onCaptured(frame.sessionId, frame.ok);
+        // Sessions never capture; a reply to a pre-change request is ignored.
         return;
       case 'session.credentials':
         void deps.preparation.current?.installCredentials(frame).catch(() => {
@@ -355,9 +353,6 @@ export async function runControlPlaneWrapper(
   // Preparation is created after the connection (it emits through it), so the
   // connection reaches it through a holder.
   const preparationRef: { current?: ReturnType<typeof createPreparationManager> } = {};
-  // A repository capture is requested by preparation and answered by a frame the
-  // connection delivers, so the connection reaches it through a holder.
-  const captureRef: { current?: WorkspaceCapture } = {};
   // Turns share work with preparation but need the runtimes' restart callbacks,
   // so both sides reach each other through holders.
   const turnsRef: { current?: TurnManager } = {};
@@ -408,7 +403,6 @@ export async function runControlPlaneWrapper(
       preparation: preparationRef,
       turns: turnsRef,
       terminals: terminalsRef,
-      capture: captureRef,
       worktreeChanges: worktreeChangesRef,
       worktreeDeletion: worktreeDeletionRef,
       kiloRequests: kiloRequestsRef,
@@ -424,12 +418,10 @@ export async function runControlPlaneWrapper(
     wrapperId: connection.wrapperId,
     runtimes,
   });
-  captureRef.current = createWorkspaceCapture({ send: frame => connection.send(frame) });
   preparationRef.current = createPreparationManager({
     timers,
     onNativeDiagnostic: projector,
     allocationId,
-    capture: captureRef.current,
     runtimes: {
       ensure: input => runtimes.ensure(input),
       installCredentials: async (key, nextEnv, cloudAgentMcp) => {

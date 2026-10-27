@@ -59,6 +59,7 @@ function waitUntilActive(): Promise<boolean> {
 export type StartConfirmationInput = {
   prompt: string;
   repository?: string;
+  sessionId?: string;
 };
 
 /**
@@ -102,12 +103,17 @@ export async function confirmAppActionStart(input: StartConfirmationInput): Prom
     return false;
   }
   const { promise, resolve } = Promise.withResolvers<boolean>();
+  const message = i18n.t('appActions.start.confirmMessage', {
+    prompt: displayPrompt(input.prompt),
+    repository: displayRepository(input.repository),
+  });
+  const session = input.sessionId?.trim();
+  const confirmation = session
+    ? `${message}\n\n${i18n.t('agentChat.session.title')}: ${session}`
+    : message;
   Alert.alert(
     i18n.t('appActions.start.confirmTitle'),
-    i18n.t('appActions.start.confirmMessage', {
-      prompt: displayPrompt(input.prompt),
-      repository: displayRepository(input.repository),
-    }),
+    confirmation,
     [
       {
         text: i18n.t('common.cancel'),

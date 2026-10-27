@@ -25,6 +25,9 @@ vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfile: () => h.query,
   useAgentProfileSectionMutations: () => h.mutations,
 }));
+vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
+  useCanManageOrganizationProfiles: () => true,
+}));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('react-native', () => ({
   View: 'View',

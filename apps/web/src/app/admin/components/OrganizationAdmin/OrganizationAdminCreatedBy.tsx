@@ -42,11 +42,9 @@ export function OrganizationAdminCreatedBy({ organizationId }: OrganizationAdmin
 
   const { data: organization } = useAdminOrganizationDetails(organizationId);
 
-  // Search users query - only enabled when there's a search term
   const searchUsersQuery = useSearchUsers(debouncedSearchTerm);
   const filteredSearchResults = searchUsersQuery.data?.users || [];
 
-  // Mutation to update created_by_kilo_user_id
   const updateCreatedByMutation = useMutation(
     trpc.organizations.admin.updateCreatedBy.mutationOptions({
       onSuccess: () => {
@@ -131,7 +129,6 @@ export function OrganizationAdminCreatedBy({ organizationId }: OrganizationAdmin
 
   const handleOpen = () => {
     setOpen(true);
-    // Pre-populate with current user if set
     if (organization?.created_by_kilo_user_id && organization?.created_by_user_email) {
       const currentUser: User = {
         id: organization.created_by_kilo_user_id,

@@ -3,14 +3,18 @@
  *
  * Hermes (React Native) cannot reliably parse PostgreSQL timestamps
  * ("2026-03-16 15:21:40.957+00") or date-only strings ("2026-09-26") with
- * `new Date()`, so all shared code must go through this helper.
+ * `new Date()`, so all shared code must go through this helper. Missing values
+ * produce an invalid Date; renderers must omit their timestamp label.
  *
  * A date-only string is a calendar date, not an instant: it becomes local
  * midnight, so formatting the result in the device timezone renders that same
  * day in every timezone. A surface that must render a date-only value in UTC
  * formats the calendar components directly (mobile: `formatCalendarDate`).
  */
-export function parseTimestamp(value: string): Date {
+export function parseTimestamp(value: string | null | undefined): Date {
+  if (typeof value !== 'string' || value.length === 0) {
+    return new Date(Number.NaN);
+  }
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     const year = Number(value.slice(0, 4));
     const month = Number(value.slice(5, 7));

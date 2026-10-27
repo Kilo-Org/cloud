@@ -15,6 +15,7 @@ import {
   gt,
   gte,
   lt,
+  lte,
   and,
   or,
   inArray,
@@ -33,7 +34,11 @@ import type { Env } from '../env';
 import { MAX_INGEST_ITEM_BYTES } from '../util/ingest-limits';
 import type { IngestBatch } from '../types/session-sync';
 import type { SessionDataItem } from '../types/session-sync';
-import { getItemIdentity, getPartItemIdentityRange } from '../util/compaction';
+import {
+  getItemIdentity,
+  getPreviousPartItemIdentity,
+  streamMessagePartRows,
+} from '../util/compaction';
 import { isItemWithinMessageCut } from '../util/message-cut';
 import {
   extractNormalizedGitBranchFromItem,
@@ -363,6 +368,24 @@ export type IngestResult =
 /** How many of the newest message rows to inspect when pairing an idle transition with the assistant turn that just finished. */
 const COMPLETED_MESSAGE_SCAN_LIMIT = 50;
 
+/** Part rows read per batch when building the excerpt a completed turn's push carries. */
+const EXCERPT_PART_BATCH_SIZE = 256;
+
+type PartExcerptRow = {
+  id: number;
+  ingested_at: number | null;
+  item_id: string;
+  item_data: string;
+};
+
+type PartExportRow = {
+  id: number;
+  ingested_at: number | null;
+  item_id: string;
+  item_data: string;
+  item_data_r2_key: string | null;
+};
+
 type IngestLifecycleEvent =
   | { type: 'session_open' }
   | {
@@ -620,17 +643,36 @@ export class SessionIngestDO extends DurableObject<Env> {
           .from(ingestItems)
           .where(eq(ingestItems.item_id, item_id))
           .get();
-        if (
+        const previousItem =
+          item.type === 'part'
+            ? this.db
+                .select({ ingested_at: ingestItems.ingested_at })
+                .from(ingestItems)
+                .where(
+                  and(
+                    eq(
+                      ingestItems.item_id,
+                      getPreviousPartItemIdentity(item.data.messageID, item.data.id)
+                    ),
+                    eq(ingestItems.item_type, 'part')
+                  )
+                )
+                .get()
+            : undefined;
+        const existingIsNewer =
           existing?.ingested_at !== null &&
           existing?.ingested_at !== undefined &&
-          existing.ingested_at > ingestedAt
-        ) {
+          existing.ingested_at > ingestedAt;
+        const previousIsNewer =
+          previousItem?.ingested_at !== null &&
+          previousItem?.ingested_at !== undefined &&
+          previousItem.ingested_at > ingestedAt;
+        if (existingIsNewer || previousIsNewer) {
           // Item is stale — if the caller wrote an R2 blob for it, that blob is orphaned
           const newR2Key = r2References?.[item_id];
           if (newR2Key) orphanedR2Keys.push(newR2Key);
           continue;
         }
-
         // If the existing row pointed to a different R2 blob, it will be orphaned after upsert
         const newR2Key = r2References?.[item_id] ?? null;
         if (existing?.item_data_r2_key && existing.item_data_r2_key !== newR2Key) {
@@ -661,6 +703,30 @@ export class SessionIngestDO extends DurableObject<Env> {
           },
         })
         .run();
+      if (item.type === 'part') {
+        // A part row can also exist under the older `<messageID>/<partID>` id. The row just
+        // written supersedes it, so remove it to leave one row per part; the item-type and
+        // timestamp guards keep the delete on a superseded copy of the same part.
+        const superseded = this.db
+          .delete(ingestItems)
+          .where(
+            and(
+              eq(
+                ingestItems.item_id,
+                getPreviousPartItemIdentity(item.data.messageID, item.data.id)
+              ),
+              eq(ingestItems.item_type, 'part'),
+              ingestedAt === undefined
+                ? undefined
+                : or(isNull(ingestItems.ingested_at), lte(ingestItems.ingested_at, ingestedAt))
+            )
+          )
+          .returning({ item_data_r2_key: ingestItems.item_data_r2_key })
+          .all();
+        for (const row of superseded) {
+          if (row.item_data_r2_key) orphanedR2Keys.push(row.item_data_r2_key);
+        }
+      }
       if (
         item.type === 'part' &&
         (item.data.type === 'text' || item.data.type === 'tool') &&
@@ -1159,26 +1225,41 @@ export class SessionIngestDO extends DurableObject<Env> {
 
   /** Builds a text excerpt for a completed assistant message from its already-ingested text parts. */
   private buildAssistantExcerptForMessage(messageId: string): string {
-    const range = getPartItemIdentityRange(messageId);
-    const rows = this.db
-      .select({
-        item_data: ingestItems.item_data,
-      })
-      .from(ingestItems)
-      .where(
-        and(
-          eq(ingestItems.item_type, 'part'),
-          gte(ingestItems.item_id, range.start),
-          lt(ingestItems.item_id, range.end),
-          isNull(ingestItems.item_data_r2_key)
-        )
-      )
-      .orderBy(ingestItems.ingested_at, ingestItems.id)
-      .all();
+    const itemDataRows: string[] = [];
+    for (const row of streamMessagePartRows<PartExcerptRow>({
+      messageId,
+      order: 'ingest',
+      batchSize: EXCERPT_PART_BATCH_SIZE,
+      fetchPage: (range, after, limit) =>
+        this.db
+          .select({
+            id: ingestItems.id,
+            ingested_at: ingestItems.ingested_at,
+            item_id: ingestItems.item_id,
+            item_data: ingestItems.item_data,
+          })
+          .from(ingestItems)
+          .where(
+            and(
+              eq(ingestItems.item_type, 'part'),
+              gte(ingestItems.item_id, range.start),
+              lt(ingestItems.item_id, range.end),
+              isNull(ingestItems.item_data_r2_key),
+              after
+                ? afterIngestOrderCursor({ ingestedAt: after.ingested_at, id: after.id })
+                : undefined
+            )
+          )
+          .orderBy(ingestItems.ingested_at, ingestItems.id)
+          .limit(limit)
+          .all(),
+    })) {
+      itemDataRows.push(row.item_data);
+    }
 
     // Parts offloaded to R2 (oversized items) store '{}' inline; skip them rather
     // than fetching from R2 — this is a best-effort excerpt, not a full transcript.
-    return buildAssistantExcerpt(rows.map(row => row.item_data));
+    return buildAssistantExcerpt(itemDataRows);
   }
 
   /**
@@ -1397,44 +1478,48 @@ export class SessionIngestDO extends DurableObject<Env> {
               controller.enqueue(encoder.encode('{"info":'));
               await enqueueItemData(controller, msgRow, r2, encoder);
 
-              // parts for this message: item_id = '{msgId}/{partId}'
+              // parts for this message: `part/{msgId}/{partId}`, and `{msgId}/{partId}` for rows
+              // in the older layout
               const msgId = msgRow.item_id.slice('message/'.length);
-              const partRange = getPartItemIdentityRange(msgId);
               controller.enqueue(encoder.encode(',"parts":['));
-              let partCursor: IngestOrderCursor | undefined;
               let firstPart = true;
 
-              while (true) {
-                const partBatch = db
-                  .select({
-                    id: ingestItems.id,
-                    ingested_at: ingestItems.ingested_at,
-                    item_data: ingestItems.item_data,
-                    item_data_r2_key: ingestItems.item_data_r2_key,
-                  })
-                  .from(ingestItems)
-                  .where(
-                    and(
-                      eq(ingestItems.item_type, 'part'),
-                      gte(ingestItems.item_id, partRange.start),
-                      lt(ingestItems.item_id, partRange.end),
-                      ingestedBeforeCondition,
-                      partCursor ? afterIngestOrderCursor(partCursor) : undefined
+              for (const partRow of streamMessagePartRows<PartExportRow>({
+                messageId: msgId,
+                order: 'ingest',
+                batchSize: CURSOR_BATCH,
+                fetchPage: (range, after, limit) =>
+                  db
+                    .select({
+                      id: ingestItems.id,
+                      ingested_at: ingestItems.ingested_at,
+                      item_id: ingestItems.item_id,
+                      item_data: ingestItems.item_data,
+                      item_data_r2_key: ingestItems.item_data_r2_key,
+                    })
+                    .from(ingestItems)
+                    .where(
+                      and(
+                        eq(ingestItems.item_type, 'part'),
+                        gte(ingestItems.item_id, range.start),
+                        lt(ingestItems.item_id, range.end),
+                        ingestedBeforeCondition,
+                        after
+                          ? afterIngestOrderCursor({
+                              ingestedAt: after.ingested_at,
+                              id: after.id,
+                            })
+                          : undefined
+                      )
                     )
-                  )
-                  .orderBy(ingestItems.ingested_at, ingestItems.id)
-                  .limit(CURSOR_BATCH)
-                  .all();
+                    .orderBy(ingestItems.ingested_at, ingestItems.id)
+                    .limit(limit)
+                    .all(),
+              })) {
+                if (!firstPart) controller.enqueue(encoder.encode(','));
+                firstPart = false;
 
-                if (partBatch.length === 0) break;
-                partCursor = ingestOrderCursor(partBatch[partBatch.length - 1]);
-
-                for (const partRow of partBatch) {
-                  if (!firstPart) controller.enqueue(encoder.encode(','));
-                  firstPart = false;
-
-                  await enqueueItemData(controller, partRow, r2, encoder);
-                }
+                await enqueueItemData(controller, partRow, r2, encoder);
               }
 
               controller.enqueue(encoder.encode(']}'));
@@ -1840,6 +1925,23 @@ export class SessionIngestDO extends DurableObject<Env> {
     params: { kiloUserId: string; sessionId: string; key: string },
     body: ReadableStream<unknown> | Uint8Array
   ): Promise<boolean> {
+    const result = await this.stageR2ObjectInternal(params, body);
+    if (result === 'too_large') throw new Error('Unbounded staging returned a byte-limit result');
+    return result;
+  }
+  async stageBoundedR2Object(
+    params: { kiloUserId: string; sessionId: string; key: string },
+    body: ReadableStream<unknown> | Uint8Array,
+    maxBytes: number
+  ): Promise<boolean | 'too_large'> {
+    return this.stageR2ObjectInternal(params, body, maxBytes);
+  }
+
+  private async stageR2ObjectInternal(
+    params: { kiloUserId: string; sessionId: string; key: string },
+    body: ReadableStream<unknown> | Uint8Array,
+    maxBytes?: number
+  ): Promise<boolean | 'too_large'> {
     const cancelBody = async (): Promise<void> => {
       if (body instanceof ReadableStream) await body.cancel();
     };
@@ -1851,19 +1953,22 @@ export class SessionIngestDO extends DurableObject<Env> {
     ) {
       throw new Error('Session R2 identity conflict');
     }
+    if (maxBytes !== undefined && body instanceof Uint8Array && body.byteLength > maxBytes) {
+      return 'too_large';
+    }
     if (this.isDeleted()) {
       await cancelBody();
       return false;
     }
     writeIngestMetaIfChanged(this.db, { key: 'kiloUserId', incomingValue: params.kiloUserId });
     writeIngestMetaIfChanged(this.db, { key: 'sessionId', incomingValue: params.sessionId });
-    const key = `pendingR2/${params.key}`;
+    const pendingKey = `pendingR2/${params.key}`;
     this.db
       .insert(ingestMeta)
-      .values({ key, value: params.key })
+      .values({ key: pendingKey, value: params.key })
       .onConflictDoUpdate({ target: ingestMeta.key, set: { value: params.key } })
       .run();
-    const operation = (async () => {
+    const operation = (async (): Promise<boolean | 'too_large'> => {
       const reservation = await this.env.SESSION_INGEST_R2.put(params.key, crypto.randomUUID(), {
         onlyIf: new Headers({ 'If-None-Match': '*' }),
       });
@@ -1871,21 +1976,106 @@ export class SessionIngestDO extends DurableObject<Env> {
       if (this.isDeleted()) {
         await cancelBody();
         await this.env.SESSION_INGEST_R2.delete(params.key);
-        this.db.delete(ingestMeta).where(eq(ingestMeta.key, key)).run();
+        this.db.delete(ingestMeta).where(eq(ingestMeta.key, pendingKey)).run();
         return false;
       }
       if (!etag) throw new Error('Session R2 reservation disappeared');
-      const written = await this.env.SESSION_INGEST_R2.put(params.key, body, {
-        onlyIf: { etagMatches: etag },
-      });
+
+      let written: R2Object | null;
+      if (maxBytes === undefined) {
+        written = await this.env.SESSION_INGEST_R2.put(params.key, body, {
+          onlyIf: { etagMatches: etag },
+        });
+      } else if (body instanceof Uint8Array) {
+        written = await this.env.SESSION_INGEST_R2.put(params.key, body, {
+          onlyIf: { etagMatches: etag },
+        });
+      } else {
+        const result = await this.writeBoundedMultipart(params.key, body, maxBytes, etag);
+        if (result === 'too_large') {
+          await this.env.SESSION_INGEST_R2.delete(params.key);
+          this.db.delete(ingestMeta).where(eq(ingestMeta.key, pendingKey)).run();
+          return result;
+        }
+        written = result;
+      }
       const deleted = this.isDeleted();
       if (!written && !deleted) throw new Error('Session R2 reservation changed');
       if (deleted) await this.env.SESSION_INGEST_R2.delete(params.key);
-      this.db.delete(ingestMeta).where(eq(ingestMeta.key, key)).run();
+      this.db.delete(ingestMeta).where(eq(ingestMeta.key, pendingKey)).run();
       return !deleted;
     })();
     this.activeR2Writes.add(operation);
     return operation.finally(() => this.activeR2Writes.delete(operation));
+  }
+
+  private async writeBoundedMultipart(
+    key: string,
+    body: ReadableStream<unknown>,
+    maxBytes: number,
+    reservationEtag: string
+  ): Promise<R2Object | null | 'too_large'> {
+    const partSize = 5 * 1024 * 1024;
+    const reader = body.getReader();
+    let buffer = new Uint8Array(partSize);
+    let buffered = 0;
+    let total = 0;
+    let upload: R2MultipartUpload | undefined;
+    const uploadedParts: R2UploadedPart[] = [];
+    try {
+      while (true) {
+        const result = await reader.read();
+        if (result.done) break;
+        if (!(result.value instanceof Uint8Array)) {
+          throw new TypeError('Staging stream yielded a non-byte chunk');
+        }
+        total += result.value.byteLength;
+        if (total > maxBytes) {
+          await reader.cancel('ingest body exceeded the staging byte budget').catch(() => {});
+          await upload?.abort().catch(() => {});
+          return 'too_large';
+        }
+        let offset = 0;
+        while (offset < result.value.byteLength) {
+          const count = Math.min(partSize - buffered, result.value.byteLength - offset);
+          buffer.set(result.value.subarray(offset, offset + count), buffered);
+          buffered += count;
+          offset += count;
+          if (buffered === partSize) {
+            upload ??= await this.env.SESSION_INGEST_R2.createMultipartUpload(key);
+            uploadedParts.push(await upload.uploadPart(uploadedParts.length + 1, buffer));
+            buffer = new Uint8Array(partSize);
+            buffered = 0;
+          }
+        }
+      }
+
+      if (!upload) {
+        return this.env.SESSION_INGEST_R2.put(key, buffer.subarray(0, buffered), {
+          onlyIf: { etagMatches: reservationEtag },
+        });
+      }
+      if (buffered > 0) {
+        uploadedParts.push(
+          await upload.uploadPart(uploadedParts.length + 1, buffer.subarray(0, buffered))
+        );
+      }
+      if (this.isDeleted()) {
+        await upload.abort();
+        return null;
+      }
+      const current = await this.env.SESSION_INGEST_R2.head(key);
+      if (current?.etag !== reservationEtag) {
+        await upload.abort();
+        return null;
+      }
+      return await upload.complete(uploadedParts);
+    } catch (error) {
+      await upload?.abort().catch(() => {});
+      throw error;
+    } finally {
+      reader.releaseLock();
+    }
   }
 
   async clearForWorktree(kiloUserId: string, sessionId: string): Promise<void> {

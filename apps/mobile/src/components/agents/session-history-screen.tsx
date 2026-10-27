@@ -12,6 +12,7 @@ import { selectShowSearchBusy } from '@/components/agents/session-list-search-bu
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { useAgentSessionListData } from '@/components/agents/use-agent-session-list-data';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
+import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
 import { useSessionSearchInput } from '@/components/agents/use-session-search-input';
 import { ContextControl } from '@/components/context-control';
 import { ScreenHeader } from '@/components/screen-header';
@@ -22,10 +23,6 @@ import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { SESSION_SEARCH_DRAFT_KEY } from '@/lib/persist/drafts';
 import { useOrganization } from '@/lib/organization-context';
-
-const noopCreateSession = () => {
-  // History owns no creation flow: the empty-state CTA is intentionally inert.
-};
 
 /**
  * Pushed sibling of the live Agents tab. Owns the stored session history with
@@ -82,7 +79,7 @@ export function SessionHistoryScreen() {
     storedIsPending,
     storedFetchedSinceMount,
     paging,
-    handleRetry,
+    handleRetry: retryHistory,
     handleRefetch,
     isSearching,
     search,
@@ -96,6 +93,20 @@ export function SessionHistoryScreen() {
     ready,
     searchQuery,
   });
+
+  const [isRetrying, setIsRetrying] = useState(false);
+  const handleRetry = useCallback(() => {
+    setIsRetrying(true);
+    void (async () => {
+      try {
+        await retryHistory();
+      } catch {
+        setIsRetrying(false);
+        return;
+      }
+      setIsRetrying(false);
+    })();
+  }, [retryHistory]);
 
   const showSearchBusy = selectShowSearchBusy({
     awaitingCommit,
@@ -142,6 +153,14 @@ export function SessionHistoryScreen() {
   }, [navigation, refetchOutsidePull]);
 
   const navigateToSession = useAgentSessionNavigator();
+  const { openNewSession } = useNewSessionNavigator();
+
+  // The empty history's next step is a real session, in the current
+  // organization: the same destination the Agents tab's "New session" action
+  // opens, so history never dead-ends at a message.
+  const handleCreateSession = useCallback(() => {
+    openNewSession(organizationId);
+  }, [openNewSession, organizationId]);
 
   const handleEndReached = useCallback(() => {
     if (shouldLoadMoreSessions(paging)) {
@@ -204,8 +223,9 @@ export function SessionHistoryScreen() {
       hasActiveQuery={hasActiveQuery}
       isSearching={isSearching}
       searchQuery={searchQuery}
+      isRetrying={isRetrying}
       onClearQuery={handleClearQuery}
-      onCreateSession={noopCreateSession}
+      onCreateSession={handleCreateSession}
     />
   );
 
@@ -219,7 +239,7 @@ export function SessionHistoryScreen() {
           <SessionListHeaderActions
             activeFilterCount={activeFilterCount}
             showNewSession={false}
-            onNewSession={noopCreateSession}
+            onNewSession={handleCreateSession}
             onOpenFilters={() => {
               // The search field sits above this button; without the dismissal
               // the keyboard stays up and covers the sheet’s Apply row.

@@ -189,6 +189,9 @@ describe('formatMeta (moved helper, regression guard)', () => {
       timeAgo(parseTimestamp('2024-01-01T00:00:00.000Z')).toUpperCase()
     );
   });
+  it('omits a missing restored timestamp', () => {
+    expect(formatMeta(null)).toBe('');
+  });
 });
 
 describe('formatScheduledWake', () => {

@@ -249,6 +249,7 @@ const KNOWN_ORIGINS = new Set([
   'cloud-agent',
   'cloud-agent-web',
   'code-review',
+  'environment-build',
   'discord',
   'github',
   'linear',

@@ -79,7 +79,7 @@ function redactCredentials(value: string): string {
     .replace(/eyJ[\w-]+\.[\w-]+\.[\w-]*/g, '[redacted]')
     .replace(/\b(sk|pk|rk)-[\w-]+/gi, '[redacted]')
     .replace(
-      /\b(api[_-]?key|token|secret|password|key|authorization)(["']?\s*[:=]\s*["']?)[^\s"',;&)]+/gi,
+      /\b([a-z_-]*(?:key|token|secret|password|authorization))(["']?\s*[:=]\s*["']?)[^\s"',;&)]+/gi,
       '$1$2[redacted]'
     )
     .replace(/[A-Za-z0-9_-]{24,}/g, '[redacted]');
@@ -137,7 +137,7 @@ function errorExcerpt(body: string, contentType: string | null): string | undefi
   if (contentType?.includes('html')) {
     const title = /<title[^>]*>([^<]*)<\/title>/i.exec(body)?.[1];
     const text =
-      title ??
+      title?.trim() ||
       body.replace(/<(script|style)[^>]*>[\s\S]*?(<\/\1>|$)/gi, ' ').replace(/<[^>]*>?/g, ' ');
     return boundedText(redactCredentials(text), MAX_EXCERPT_LENGTH);
   }

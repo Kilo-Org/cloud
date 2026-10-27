@@ -71,9 +71,24 @@ describe('readUpstreamFailureEvidence', () => {
     });
   });
 
-  it('falls back to visible text for HTML without a title', async () => {
+  it('redacts camelCase credential fields', async () => {
     const response = new Response(
-      '<html><head><style>body { color: red }</style></head><body><h1>Access denied</h1></body></html>',
+      'rejected {"apiKey":"abc123","accessToken":"tok1","clientSecret":"s3"}',
+      { status: 401, headers: { 'Content-Type': 'text/plain' } }
+    );
+
+    await expect(readUpstreamFailureEvidence(response)).resolves.toMatchObject({
+      upstreamErrorExcerpt:
+        'rejected {"apiKey":"[redacted]","accessToken":"[redacted]","clientSecret":"[redacted]"}',
+    });
+  });
+
+  it.each([
+    ['without a title', ''],
+    ['with a blank title', '<title>  </title>'],
+  ])('falls back to visible text for HTML %s', async (_case, title) => {
+    const response = new Response(
+      `<html><head>${title}<style>body { color: red }</style></head><body><h1>Access denied</h1></body></html>`,
       { status: 403, headers: { 'Content-Type': 'text/html' } }
     );
 

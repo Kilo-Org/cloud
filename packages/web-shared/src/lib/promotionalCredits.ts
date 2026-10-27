@@ -12,6 +12,10 @@ import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { millisecondsInHour } from 'date-fns/constants';
 import { successResult, type CustomResult } from '@kilocode/web-shared/lib/maybe-result';
+import { reconcileCreditExpirationsInTransaction } from '@kilocode/db/credit-expiration';
+import { resolvePaidCreditPolicy } from './paidCreditPolicy';
+import { getPaidCreditTerms } from './paidCreditPolicy.server';
+import { recordRefundDebtRepayment } from '@kilocode/db/credit-refund-repayments';
 
 export type CreditEntity = { user: User; organization: Organization | null };
 
@@ -19,6 +23,7 @@ export type DbOrTx = typeof db | DrizzleTransaction;
 
 export type GrantCreditOptions = Pick<PromoCreditCategoryConfig, 'credit_category'> & {
   counts_as_selfservice: boolean;
+  creditKind?: 'paid' | 'promotional';
   /**
    * Optional transaction handle.
    *
@@ -173,9 +178,6 @@ export async function grantCreditForCategoryConfig(
       if (!requirementCheck.success) return { success: false, message: requirementCheck.error };
     }
 
-    // The redemption cap must be enforced in the same transaction as the
-    // insert. Serialize capped categories on a transaction-scoped advisory
-    // lock, then check the count inside the transaction that inserts.
     const capped = typeof promotion.total_redemptions_allowed === 'number';
     if (options.dbOrTx) {
       if (capped) {
@@ -234,8 +236,6 @@ async function executeGrant({
   entity: CreditEntity;
   options: GrantCreditOptions;
   promotion: PromoCreditCategoryConfig;
-  // Callers either pass `options.dbOrTx` (always a transaction in practice)
-  // or a freshly opened transaction from `db.transaction`.
   dbOrTx: DrizzleTransaction;
   amount_usd: number;
 }): Promise<GrantCreditResult> {
@@ -268,33 +268,45 @@ async function executeGrant({
   const explicit_expiry_date = options.credit_expiry_date ?? promotion.credit_expiry_date;
   const expiry_hours = options.expiry_hours ?? promotion.expiry_hours;
   const expiryFromHours = computeExpiryDateFromHours(expiry_hours);
-  const credit_expiry_date = getEarlierDate(explicit_expiry_date, expiryFromHours);
+  const policy =
+    options.creditKind === 'paid'
+      ? resolvePaidCreditPolicy({
+          source: 'admin',
+          purchasedAt: new Date(),
+          terms: getPaidCreditTerms('admin'),
+        })
+      : null;
+  const credit_expiry_date = policy
+    ? policy.expiry_date
+      ? new Date(policy.expiry_date)
+      : null
+    : getEarlierDate(explicit_expiry_date, expiryFromHours);
+  const owner = organization_id
+    ? { type: 'organization' as const, id: organization_id }
+    : { type: 'user' as const, id: user.id };
+  const current = await reconcileCreditExpirationsInTransaction(owner, dbOrTx);
+  const baseline = Math.min(current.microdollars_used, current.total_microdollars_acquired);
   const new_credit_transaction_id = crypto.randomUUID();
   const insertStatementBase = dbOrTx.insert(credit_transactions).values({
     id: new_credit_transaction_id,
     kilo_user_id: user.id,
     organization_id: organization_id,
     created_by_kilo_user_id: options.created_by_kilo_user_id,
-    is_free: true,
+    is_free: options.creditKind !== 'paid',
+    credit_source: 'promotion',
+    ...policy,
     amount_microdollars: toMicrodollars(amount_usd),
     description: description,
     credit_category: promotion.credit_category,
     expiry_date: credit_expiry_date?.toISOString() || null,
-    expiration_baseline_microdollars_used: credit_expiry_date
-      ? organization_id
-        ? (entity.organization?.microdollars_used ?? 0)
-        : user.microdollars_used
-      : null,
-    original_baseline_microdollars_used: organization_id
-      ? (entity.organization?.microdollars_used ?? 0)
-      : user.microdollars_used,
+    expiration_baseline_microdollars_used: baseline,
+    original_baseline_microdollars_used: current.microdollars_used,
     check_category_uniqueness: promotion.is_idempotent,
   });
   const insertResult = await (promotion.is_idempotent
     ? insertStatementBase.onConflictDoNothing()
     : insertStatementBase);
 
-  // Check if any rows were inserted
   if (insertResult.rowCount === 0) {
     return {
       success: false,
@@ -302,6 +314,16 @@ async function executeGrant({
         ? `Code ${promotion.credit_category} ${GRANT_MSG_ALREADY_APPLIED} to ${entityName}.`
         : `FAIL: Code ${promotion.credit_category} not applied to ${entityName}.`,
     };
+  }
+
+  if (amount_usd > 0) {
+    await recordRefundDebtRepayment(dbOrTx, {
+      owner,
+      transactionId: new_credit_transaction_id,
+      priorAcquired: current.total_microdollars_acquired,
+      priorUsed: current.microdollars_used,
+      amountMicrodollars: toMicrodollars(amount_usd),
+    });
   }
   logExceptInTest(
     !organization_id
@@ -314,7 +336,6 @@ async function executeGrant({
       .update(kilocode_users)
       .set({
         total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} + ${toMicrodollars(amount_usd)}`,
-        // Update next_credit_expiration_at to the earlier of current value and new expiry
         ...(credit_expiry_date && {
           next_credit_expiration_at: sql`COALESCE(LEAST(${kilocode_users.next_credit_expiration_at}, ${credit_expiry_date.toISOString()}), ${credit_expiry_date.toISOString()})`,
         }),

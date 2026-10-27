@@ -35,6 +35,8 @@ const factsSchema = briefingReportSchema.pick({
   sessions: true,
   sources: true,
   coverage: true,
+  omittedCollectedSessions: true,
+  omittedCollectedSources: true,
 });
 export const emptySummary = {
   status: 'disabled',

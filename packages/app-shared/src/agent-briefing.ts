@@ -85,10 +85,16 @@ export const briefingReportSchema = z.object({
         status: z.string().nullable(),
         spendMicrodollars: z.number(),
         sources: z.array(briefingSourceSchema).max(BRIEFING_MAX_SOURCES_PER_SESSION),
+        /** Evidence items of this session that `sources` leaves out. Absent on older reports. */
+        omittedSources: z.number().int().nonnegative().optional(),
       })
     )
     .max(BRIEFING_MAX_SESSIONS),
   sources: z.array(briefingSourceSchema).max(BRIEFING_MAX_SOURCES),
+  /** Active sessions of the window that `sessions` leaves out. Absent on older reports. */
+  omittedCollectedSessions: z.number().int().nonnegative().optional(),
+  /** Collected evidence items that `sources` leaves out. Absent on older reports. */
+  omittedCollectedSources: z.number().int().nonnegative().optional(),
   summary: briefingSummarySchema,
   expiresAt: z.string().datetime(),
 });

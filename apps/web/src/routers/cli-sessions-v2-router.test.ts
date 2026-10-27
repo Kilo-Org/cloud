@@ -33,12 +33,18 @@ import { captureException } from '@sentry/nextjs';
 const mockGetSession = jest.fn().mockRejectedValue(new Error('not mocked'));
 const mockGetPreparationAttempts = jest.fn().mockResolvedValue([]);
 const mockDeleteCloudAgentSession = jest.fn().mockResolvedValue({ success: true });
+const mockDeleteHostedWorkspaceSession = jest.fn().mockResolvedValue({
+  success: true,
+  workspaceId: 'worktree_12345678-1234-4234-9234-123456789abc',
+  sessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+});
 
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: jest.fn(() => ({
     getSession: mockGetSession,
     getPreparationAttempts: mockGetPreparationAttempts,
     deleteSession: mockDeleteCloudAgentSession,
+    deleteHostedWorkspaceSession: mockDeleteHostedWorkspaceSession,
   })),
   rethrowCloudAgentError: jest.fn(),
   InsufficientCreditsError: class InsufficientCreditsError extends Error {
@@ -264,6 +270,11 @@ describe('cli-sessions-v2-router', () => {
     afterCallbacks.length = 0;
     mockedNotifyCliSessionRenamed.mockReset().mockResolvedValue({ delivered: true });
     mockDeleteCloudAgentSession.mockReset().mockResolvedValue({ success: true });
+    mockDeleteHostedWorkspaceSession.mockReset().mockResolvedValue({
+      success: true,
+      workspaceId: 'worktree_12345678-1234-4234-9234-123456789abc',
+      sessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+    });
     mockedCaptureException.mockClear();
   });
 
@@ -1512,7 +1523,6 @@ describe('cli-sessions-v2-router', () => {
         session_id: sessionId,
         kilo_user_id: regularUser.id,
         cloud_agent_session_id: cloudAgentSessionId,
-        cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc',
         created_on_platform: 'cloud-agent-web',
       });
       fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(new Response(null, { status: 204 }));

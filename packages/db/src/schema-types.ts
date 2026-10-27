@@ -1051,6 +1051,34 @@ export const OrganizationAutoModelSettingsSchema = z.object({
 
 export type OrganizationAutoModelSettings = z.infer<typeof OrganizationAutoModelSettingsSchema>;
 
+export const EnkryptPiiEntitySchema = z.enum(['pii', 'secrets', 'ip_address', 'url']);
+
+export type EnkryptPiiEntity = z.infer<typeof EnkryptPiiEntitySchema>;
+
+/**
+ * Blocking Enkrypt AI input scan of each gateway chat turn. `fail_mode` decides whether a request
+ * is sent (`open`, the default) or rejected (`closed`) when Enkrypt fails or times out. Omitting
+ * `detectors` selects the default set; listing it enables only the detectors it names.
+ */
+export const EnkryptInputGuardrailSettingsSchema = z.object({
+  enabled: z.boolean(),
+  fail_mode: z.enum(['open', 'closed']).optional(),
+  detectors: z
+    .object({
+      injection_attack: z.boolean().optional(),
+      pii_entities: z.array(EnkryptPiiEntitySchema).optional(),
+      nsfw: z.boolean().optional(),
+      toxicity: z.boolean().optional(),
+    })
+    .optional(),
+});
+
+export type EnkryptInputGuardrailSettings = z.infer<typeof EnkryptInputGuardrailSettingsSchema>;
+
+export const OrganizationEnkryptSettingsSchema = z.object({
+  input_guardrail: EnkryptInputGuardrailSettingsSchema.optional(),
+});
+
 const OrganizationSettingsSchema = z.object({
   provider_allow_list: z.array(z.string()).optional(),
 
@@ -1091,6 +1119,7 @@ const OrganizationSettingsSchema = z.object({
   // Seeded usage microdollars written by the sales demo populate step. Used to
   // separate seeded usage from real spend when computing the ledger entry.
   sales_demo_seeded_microdollars: z.number().optional(),
+  enkrypt: OrganizationEnkryptSettingsSchema.optional(),
 });
 
 export type OrganizationSettings = z.infer<typeof OrganizationSettingsSchema>;
@@ -2120,6 +2149,10 @@ export const EnkryptVerificationsSchema = z.record(z.string().min(1), EnkryptVer
 
 export type EnkryptVerifications = z.infer<typeof EnkryptVerificationsSchema>;
 
+export type EnkryptGuardrailApiKind = 'chat_completions' | 'messages' | 'responses';
+
+export type EnkryptGuardrailDecision = 'allowed' | 'blocked' | 'error';
+
 export const ENKRYPT_STALE_AFTER_MS = 26 * 60 * 60 * 1000;
 
 export const EnkryptPublishedBenchmarkSchema = EnkryptBenchmarkSchema.extend({
@@ -2222,6 +2255,17 @@ export const ReasoningOptionSchema = z.discriminatedUnion('type', [
 
 export type ReasoningOption = z.infer<typeof ReasoningOptionSchema>;
 
+/**
+ * Per-key BYOK settings. Every field is optional so new settings need no backfill.
+ * `serve_catalog_models` (catalog mode): a direct BYOK key that serves only Kilo catalog model
+ * ids, so organization model policies apply to it.
+ */
+export const ByokApiKeySettingsSchema = z.object({
+  serve_catalog_models: z.boolean().optional(),
+});
+
+export type ByokApiKeySettings = z.infer<typeof ByokApiKeySettingsSchema>;
+
 export const DirectByokModelFlagSchema = z.enum(['recommended', 'vision', 'reasoning']);
 
 export type DirectByokModelFlag = z.infer<typeof DirectByokModelFlagSchema>;
@@ -2281,8 +2325,28 @@ export const ReasoningDetailsTransformSchema = z.enum(ReasoningDetailsTransform)
 
 export type ReasoningDetailsTransform = z.infer<typeof ReasoningDetailsTransformSchema>;
 
+export const CustomLlmApiKindSchema = z.enum(['chat_completions', 'messages', 'responses']);
+
+export type CustomLlmApiKind = z.infer<typeof CustomLlmApiKindSchema>;
+
+/** The API that clients use for a custom LLM, given its `opencode_settings.ai_sdk_provider`. */
+export function getCustomLlmClientApiKind(
+  aiSdkProvider: CustomLlmProvider | undefined
+): CustomLlmApiKind {
+  switch (aiSdkProvider) {
+    case 'anthropic':
+      return 'messages';
+    case 'openai':
+      return 'responses';
+    default:
+      return 'chat_completions';
+  }
+}
+
 export const CustomLlmApiConfigSchema = z.object({
   internal_id: z.string().min(1).optional(),
+  /** Gateway APIs the upstream serves, including the one clients use. Without it, only that one. */
+  api_kinds: z.array(CustomLlmApiKindSchema).min(1).optional(),
   base_url: z.url(),
   disable_url_suffix: z.boolean().optional(),
   add_cache_breakpoints: z.boolean().optional(),
@@ -2413,6 +2477,14 @@ export const CustomLlmDefinitionSchema = z
     public: CustomLlmPublicSchema.optional(),
   })
   .superRefine((definition, ctx) => {
+    const clientApiKind = getCustomLlmClientApiKind(definition.opencode_settings?.ai_sdk_provider);
+    if (definition.api_kinds && !definition.api_kinds.includes(clientApiKind)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['api_kinds'],
+        message: `api_kinds must include ${clientApiKind}, the API clients use for this ai_sdk_provider`,
+      });
+    }
     if (!definition.public) return;
     for (const key of ['organization_ids', 'group_ids'] as const) {
       if (definition[key] !== undefined) {
@@ -2573,6 +2645,72 @@ export const PreferredProviderOrderConfigSchema = z.object({
 
 export type PreferredProviderOrderConfig = z.infer<typeof PreferredProviderOrderConfigSchema>;
 
+export const CUSTOM_PRICING_MAX_MODELS = 500;
+
+const PricePerMillionSchema = z.number().finite().nonnegative();
+
+const CustomPricingTierSchema = z.object({
+  start_context_length: z.number().int().nonnegative(),
+  pricing: z.object({
+    prompt_per_million: PricePerMillionSchema,
+    completion_per_million: PricePerMillionSchema,
+    input_cache_read_per_million: PricePerMillionSchema.nullable(),
+    input_cache_write_per_million: PricePerMillionSchema.nullable(),
+  }),
+});
+
+export const CustomPricingSchema = z.object({
+  model: GatewayModelIdSchema,
+  pricing: z.tuple([CustomPricingTierSchema], CustomPricingTierSchema).superRefine((tiers, ctx) => {
+    if (tiers[0].start_context_length !== 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'The first pricing tier must start at context length 0',
+        path: [0, 'start_context_length'],
+      });
+    }
+    let previousStart = tiers[0].start_context_length;
+    for (const [index, { start_context_length }] of tiers.entries()) {
+      if (index > 0 && start_context_length <= previousStart) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Pricing tiers must be ordered by ascending start context length',
+          path: [index, 'start_context_length'],
+        });
+      }
+      previousStart = start_context_length;
+    }
+  }),
+  /** Human-readable discount shown in the model name; never used in calculations. */
+  discountPercentage: z.number().gt(0).lte(100).optional(),
+  /** Only use this pricing when the upstream response does not report a market cost. */
+  fallbackOnly: z.boolean().optional(),
+});
+
+export type CustomPricing = z.infer<typeof CustomPricingSchema>;
+
+/** Stored as an array because jsonb does not keep object key order. */
+export const CustomPricingConfigSchema = z.object({
+  models: z
+    .array(CustomPricingSchema)
+    .max(CUSTOM_PRICING_MAX_MODELS)
+    .superRefine((models, ctx) => {
+      const seen = new Set<string>();
+      for (const [index, { model }] of models.entries()) {
+        if (seen.has(model)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `Duplicate model "${model}"`,
+            path: [index, 'model'],
+          });
+        }
+        seen.add(model);
+      }
+    }),
+});
+
+export type CustomPricingConfig = z.infer<typeof CustomPricingConfigSchema>;
+
 // --- StoredModel ---
 
 export const ModelSchema = z.object({
@@ -2656,6 +2794,10 @@ export type StoredModel = z.infer<typeof StoredModelSchema>;
 // C. Stripe type (inline)
 // =============================================================================
 
+// Stripe treats subscription statuses as an open set: the SDK types every
+// generated enum as its documented values plus an arbitrary string, because the
+// provider can return a value a pinned SDK version does not list. The column
+// stores the provider's value unchanged, so the domain type mirrors that.
 export type StripeSubscriptionStatus =
   | 'incomplete'
   | 'incomplete_expired'
@@ -2664,7 +2806,8 @@ export type StripeSubscriptionStatus =
   | 'past_due'
   | 'canceled'
   | 'unpaid'
-  | 'paused';
+  | 'paused'
+  | (string & {});
 
 // --- Code review terminal reasons ---
 

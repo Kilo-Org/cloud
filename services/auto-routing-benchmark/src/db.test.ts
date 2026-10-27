@@ -117,6 +117,10 @@ describe('mapSummaryRow', () => {
       route_key: 'implementation/code_generation',
       accuracy: 0.92,
       avg_cost_usd: 0.0015,
+      avg_input_tokens: 100.5,
+      avg_cached_input_tokens: 40.25,
+      avg_output_tokens: 20.5,
+      avg_reasoning_tokens: 10.75,
       avg_latency_ms: 320.5,
       p50_latency_ms: 300.0,
       p95_latency_ms: 300.0,
@@ -133,6 +137,10 @@ describe('mapSummaryRow', () => {
       routeKey: 'implementation/code_generation',
       accuracy: 0.92,
       avgCostUsd: 0.0015,
+      avgInputTokens: 100.5,
+      avgCachedInputTokens: 40.25,
+      avgOutputTokens: 20.5,
+      avgReasoningTokens: 10.75,
       avgLatencyMs: 320.5,
       p50LatencyMs: 300.0,
       p95LatencyMs: 300.0,
@@ -151,6 +159,10 @@ describe('mapSummaryRow', () => {
       route_key: '*',
       accuracy: 0.85,
       avg_cost_usd: null,
+      avg_input_tokens: null,
+      avg_cached_input_tokens: null,
+      avg_output_tokens: null,
+      avg_reasoning_tokens: null,
       avg_latency_ms: 150.0,
       p50_latency_ms: null,
       p95_latency_ms: null,
@@ -163,6 +175,10 @@ describe('mapSummaryRow', () => {
     const result = mapSummaryRow(row);
     expect(result.variant).toBeNull();
     expect(result.avgCostUsd).toBeNull();
+    expect(result.avgInputTokens).toBeNull();
+    expect(result.avgCachedInputTokens).toBeNull();
+    expect(result.avgOutputTokens).toBeNull();
+    expect(result.avgReasoningTokens).toBeNull();
     expect(result.p50LatencyMs).toBeNull();
     expect(result.p95LatencyMs).toBeNull();
     expect(result.routeKey).toBe('*');

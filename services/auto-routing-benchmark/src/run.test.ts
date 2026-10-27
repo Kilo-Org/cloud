@@ -23,6 +23,10 @@ function makeRow(overrides: Partial<CaseResultRow> = {}): CaseResultRow {
     score: 1,
     latency_ms: 100,
     cost_usd: 0.001,
+    input_tokens: null,
+    cached_input_tokens: null,
+    output_tokens: null,
+    reasoning_tokens: null,
     error: null,
     fallback_reason: null,
     route_hit: null,
@@ -39,6 +43,32 @@ function makeRow(overrides: Partial<CaseResultRow> = {}): CaseResultRow {
 }
 
 describe('summarize — classifier kind', () => {
+  it('averages token categories only over rows reporting each category', () => {
+    const [summary] = summarize(
+      [
+        makeRow({ input_tokens: 10, cached_input_tokens: 0, output_tokens: 3 }),
+        makeRow({ input_tokens: 15, output_tokens: 4, reasoning_tokens: 8 }),
+        makeRow(),
+      ],
+      'classifier'
+    );
+    expect(summary).toMatchObject({
+      avgInputTokens: 12.5,
+      avgCachedInputTokens: 0,
+      avgOutputTokens: 3.5,
+      avgReasoningTokens: 8,
+    });
+  });
+
+  it('returns null token averages when no row reports usage', () => {
+    expect(summarize([makeRow()], 'decider')[0]).toMatchObject({
+      avgInputTokens: null,
+      avgCachedInputTokens: null,
+      avgOutputTokens: null,
+      avgReasoningTokens: null,
+    });
+  });
+
   it('groups all classifier rows under * route key', () => {
     const rows: CaseResultRow[] = [
       makeRow({

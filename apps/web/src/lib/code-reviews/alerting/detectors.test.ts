@@ -105,6 +105,42 @@ describe('code review alert detectors', () => {
     await expect(evaluateSlowReviews(db)).resolves.toEqual({ tripped: false });
   });
 
+  it.each(['running', 'completed'] as const)(
+    'uses updated_at for %s slow-review timing when started_at is missing',
+    async status => {
+      await insertReviews([
+        reviewValues({
+          status,
+          started_at: null,
+          created_at: minutesAgo(72 * 60),
+          updated_at: minutesAgo(61),
+          completed_at: status === 'running' ? null : minutesAgo(0),
+        }),
+        ...Array.from({ length: 9 }, () => reviewValues()),
+      ]);
+
+      await expect(evaluateSlowReviews(db)).resolves.toMatchObject({
+        tripped: true,
+        details: { kind: 'slow_reviews', rate: 0.1, startedCount: 10, slowCount: 1 },
+      });
+    }
+  );
+
+  it('excludes slow-review samples with an updated_at fallback outside the window', async () => {
+    await insertReviews([
+      reviewValues({
+        status: 'running',
+        started_at: null,
+        created_at: minutesAgo(72 * 60),
+        updated_at: minutesAgo(121),
+        completed_at: null,
+      }),
+      ...Array.from({ length: 9 }, () => reviewValues()),
+    ]);
+
+    await expect(evaluateSlowReviews(db)).resolves.toEqual({ tripped: false });
+  });
+
   it('counts running reviews over 60 minutes as slow', async () => {
     await insertReviews([
       reviewValues({
@@ -136,6 +172,23 @@ describe('code review alert detectors', () => {
     await expect(evaluateSlowReviews(db)).resolves.toMatchObject({
       tripped: true,
       details: { kind: 'slow_reviews', startedCount: 10, slowCount: 1 },
+    });
+  });
+
+  it('uses updated_at for completed-review duration when completed_at is missing', async () => {
+    await insertReviews([
+      reviewValues({
+        started_at: minutesAgo(70),
+        created_at: minutesAgo(70),
+        completed_at: null,
+        updated_at: minutesAgo(9),
+      }),
+      ...Array.from({ length: 9 }, () => reviewValues()),
+    ]);
+
+    await expect(evaluateSlowReviews(db)).resolves.toMatchObject({
+      tripped: true,
+      details: { kind: 'slow_reviews', rate: 0.1, startedCount: 10, slowCount: 1 },
     });
   });
 
@@ -196,17 +249,10 @@ describe('code review alert detectors', () => {
     });
   });
 
-  // A reaped review that never started has no started_at, so its effective
-  // start collapses to the reap-stamped updated_at. Without the CTE exclusion,
-  // each reaper run would inject days-old rows into the live window as fresh
-  // starts, diluting the rate below threshold and masking a real spike.
-  it('excludes reaped reviews from the error-spike denominator', async () => {
+  it('excludes abandoned reviews from the error-spike denominator', async () => {
     await insertReviews([
-      // A genuine 20% spike: 1 failure among 5 recent starts.
       reviewValues({ status: 'failed', terminal_reason: 'timeout' }),
       ...Array.from({ length: 4 }, () => reviewValues()),
-      // Five reaped rows, shaped like the reaper leaves them: never started,
-      // terminalized just now. Counting these would dilute the rate to 1/10.
       ...Array.from({ length: 5 }, () =>
         reviewValues({
           status: 'failed',
@@ -256,6 +302,46 @@ describe('code review alert detectors', () => {
     await expect(evaluateErrorSpike(db)).resolves.toEqual({ tripped: false });
   });
 
+  it('uses updated_at for error-spike timing when started_at is missing', async () => {
+    await insertReviews([
+      reviewValues({
+        status: 'failed',
+        terminal_reason: 'timeout',
+        started_at: null,
+        created_at: minutesAgo(72 * 60),
+        updated_at: minutesAgo(10),
+      }),
+      ...Array.from({ length: 4 }, () => reviewValues()),
+    ]);
+
+    await expect(evaluateErrorSpike(db)).resolves.toMatchObject({
+      tripped: true,
+      details: {
+        kind: 'error_spike',
+        rate: 0.2,
+        startedCount: 5,
+        errorCount: 1,
+        topReason: 'timeout',
+        topReasonCount: 1,
+      },
+    });
+  });
+
+  it('excludes error-spike samples with an updated_at fallback outside the window', async () => {
+    await insertReviews([
+      reviewValues({
+        status: 'failed',
+        terminal_reason: 'timeout',
+        started_at: null,
+        created_at: minutesAgo(72 * 60),
+        updated_at: minutesAgo(31),
+      }),
+      ...Array.from({ length: 4 }, () => reviewValues()),
+    ]);
+
+    await expect(evaluateErrorSpike(db)).resolves.toEqual({ tripped: false });
+  });
+
   it('excludes benign terminal reasons from error-spike counts', async () => {
     await insertReviews([
       reviewValues({ status: 'failed', terminal_reason: 'billing' }),
@@ -296,7 +382,7 @@ describe('code review alert detectors', () => {
     }
   );
 
-  it('excludes legacy model-not-found failed rows from error-spike counts', async () => {
+  it('excludes model-not-found error messages from error-spike counts', async () => {
     await insertReviews([
       reviewValues({
         status: 'failed',
@@ -320,7 +406,7 @@ describe('code review alert detectors', () => {
     await expect(evaluateErrorSpike(db)).resolves.toEqual({ tripped: false });
   });
 
-  it('continues counting non-model not-found failures as errors', async () => {
+  it('counts non-model not-found failures as errors', async () => {
     await insertReviews([
       reviewValues({
         status: 'failed',

@@ -93,6 +93,8 @@ export const AdminCreditTransactionSchema = z.object({
   stripe_payment_id: z.string().nullable(),
   credit_category: z.string().nullable(),
   expiry_date: z.string().datetime().nullable(),
+  paid_credit_policy: z.string().nullable().optional(),
+  credit_source: z.string().nullable().optional(),
   created_at: z.string().datetime(),
   created_by_kilo_user_id: z.string().nullable(),
   created_by_user_name: z.string().nullable(),
@@ -108,6 +110,7 @@ export type AddCreditRequest = {
   description?: string | null;
   credit_category?: string;
   credit_expiry_date?: string;
+  creditKind?: 'paid' | 'promotional';
   expiry_hours?: number | null;
   // Legacy names (for backward compatibility)
   // ref, e.g.: https://www.val.town/x/kilocode/stream-github-superstars/code/issue-credits.ts is still using old names.

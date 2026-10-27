@@ -2,6 +2,7 @@ import type { ControlPlaneSandboxPeer } from '../../../src/control-plane/session
 import type { ControlRuntimeCredentialProxyFence } from '../../../src/control-plane/sandbox/sandbox-do.js';
 import type { PreviewTargetResult } from '../../../src/control-plane/sandbox/preview-target.js';
 import type { SandboxStatusSnapshot } from '../../../src/shared/sandbox-status.js';
+import type { WorkspaceBillingProjection } from '../../../src/shared/workspace-runtime-status.js';
 import type {
   ControlPlaneAnswerPayload,
   ControlPlaneDeliverPayload,
@@ -115,6 +116,13 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
 
   async getStatusSnapshot(): Promise<SandboxStatusSnapshot> {
     return this.statusSnapshot;
+  }
+
+  /** The stored billing projection returned by `getWorkspaceBillingProjection`. */
+  billingProjection: WorkspaceBillingProjection | null = null;
+
+  async getWorkspaceBillingProjection(): Promise<WorkspaceBillingProjection | null> {
+    return this.billingProjection;
   }
 
   previewTargetResult: PreviewTargetResult = {

@@ -61,6 +61,7 @@ import { adminAutoFreeConfigRouter } from '@/routers/admin/auto-free-config-rout
 import { adminGatewayModelListsRouter } from '@/routers/admin/gateway-model-lists-router';
 import { adminVercelModelIdOverridesRouter } from '@/routers/admin/vercel-model-id-overrides-router';
 import { adminPreferredProviderOrderRouter } from '@/routers/admin/preferred-provider-order-router';
+import { adminCustomPricingRouter } from '@/routers/admin/custom-pricing-router';
 import { adminBlacklistDomainsRouter } from '@/routers/admin/blacklist-domains-router';
 import { adminRequestLoggingOptInsRouter } from '@/routers/admin/request-logging-opt-ins-router';
 import { adminBulkBlockRouter } from '@/routers/admin/bulk-block-router';
@@ -2753,6 +2754,7 @@ export const adminRouter = createTRPCRouter({
   gatewayModelLists: adminGatewayModelListsRouter,
   vercelModelIdOverrides: adminVercelModelIdOverridesRouter,
   preferredProviderOrder: adminPreferredProviderOrderRouter,
+  customPricing: adminCustomPricingRouter,
   blacklistDomains: adminBlacklistDomainsRouter,
   requestLoggingOptIns: adminRequestLoggingOptInsRouter,
   bulkBlock: adminBulkBlockRouter,

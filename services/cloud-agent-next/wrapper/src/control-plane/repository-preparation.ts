@@ -7,7 +7,7 @@ import { parseControlPlaneCredential } from '../../../src/shared/control-plane-c
 import type { WorkspaceFailureSubtype } from '../../../src/shared/wrapper-bootstrap.js';
 import { WrapperBootstrapError } from '../bootstrap-error.js';
 import { cleanTerminalOutput, gitOperationError, type GitRouteClass } from '../git-errors.js';
-import { authenticatedGitUrl } from '../control/git-url.js';
+import { credentialFreeGitUrl } from '../control/git-credentials.js';
 import { createOutputRedactor } from '../redact-output.js';
 import { isSyntheticReviewRef } from '../git-review-ref.js';
 import { isBloblessReviewCloneEligible, createGitProgressReporter } from '../session-bootstrap.js';
@@ -173,11 +173,9 @@ export function createRepositoryPreparation(
     onProgress();
     await mkdir(directory);
     if (!spec.git || (await hasGit(directory))) return;
-    // Diagnostic route class only: a managed credential was injected into the
-    // clone URL, otherwise the plain (direct) URL is used. Never log the URL.
     const gitRoute: GitRouteClass = spec.git.token ? 'managed' : 'direct';
     if (!(await hasGit(directory))) {
-      const cloneUrl = authenticatedGitUrl(spec.git.url, spec.git.token, spec.git.platform);
+      const cloneUrl = credentialFreeGitUrl(spec.git.url);
       const gitConfigArgs = managedGitHubPreparationGitArgs(spec, 'clone');
       const useBlobless = isBloblessReviewCloneEligible(
         spec.createdOnPlatform,

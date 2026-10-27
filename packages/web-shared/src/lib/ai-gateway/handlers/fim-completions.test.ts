@@ -71,7 +71,7 @@ const mockedResolveOrganizationMemberModelDecision = jest.mocked(
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
 
-function makeRequest(model = 'inception/mercury-edit-2') {
+function makeRequest(model = 'inception/mercury-edit-2', stream = false) {
   return new Request('http://localhost:3000/api/fim/completions', {
     method: 'POST',
     headers: {
@@ -83,6 +83,7 @@ function makeRequest(model = 'inception/mercury-edit-2') {
       prompt: 'const value =',
       suffix: ';',
       max_tokens: 100,
+      ...(stream ? { stream: true } : {}),
     }),
   });
 }
@@ -288,6 +289,55 @@ describe('POST /api/fim/completions', () => {
     const [, init] = mockedFetch.mock.calls[0];
     const headers = init?.headers as Record<string, string>;
     expect(headers.Authorization).toBe('Bearer org-inception-key');
+  });
+
+  it('asks Inception to report usage in a stream and bills it', async () => {
+    setOrganizationAuth();
+    const chunk = (fields: object) =>
+      `data: ${JSON.stringify({ id: 'cmpl-1', model: 'mercury-edit-2', created: 1, ...fields })}\n\n`;
+    mockedFetch.mockResolvedValue(
+      new Response(
+        chunk({ choices: [{ index: 0, text: ' compl', finish_reason: null }] }) +
+          chunk({ choices: [{ index: 0, text: 'etion', finish_reason: 'stop' }] }) +
+          chunk({
+            choices: [],
+            usage: { prompt_tokens: 1_000, completion_tokens: 100, total_tokens: 1_100 },
+          }) +
+          'data: [DONE]\n\n',
+        { status: 200, headers: { 'content-type': 'text/event-stream' } }
+      )
+    );
+
+    const { handleFimCompletionsRequest } = await import('./fim-completions');
+    const response = await handleFimCompletionsRequest(makeRequest(undefined, true) as never);
+    await response.text();
+
+    const [, init] = mockedFetch.mock.calls[0];
+    expect(JSON.parse(init?.body as string).stream_options).toEqual({ include_usage: true });
+    await flushAfter();
+    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats).toMatchObject({
+      responseContent: ' completion',
+      inputTokens: 1_000,
+      outputTokens: 100,
+      cost_mUsd: 325,
+    });
+  });
+
+  it.each([
+    ['inception/mercury-edit-2', true, { include_usage: true }],
+    ['mistralai/codestral-2508', true, { include_usage: true }],
+    ['inception/mercury-edit-2', false, undefined],
+    ['mistralai/codestral-2508', false, undefined],
+  ])('sets stream_options for %s with stream %s', async (model, stream, expected) => {
+    setOrganizationAuth();
+    mockedFetch.mockResolvedValue(makeUpstreamResponse());
+
+    const { handleFimCompletionsRequest } = await import('./fim-completions');
+    await handleFimCompletionsRequest(makeRequest(model, stream) as never);
+
+    const [, init] = mockedFetch.mock.calls[0];
+    expect(JSON.parse(init?.body as string).stream_options).toEqual(expected);
   });
 
   it.each<OrganizationSettings | undefined>([

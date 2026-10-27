@@ -15,11 +15,8 @@ const state = vi.hoisted(() => ({
   replace: vi.fn(),
 }));
 
-// The mutations this sheet consumes are pure state machines here: `isPending`
-// flips inside `mutateAsync`, so the header's disabled state is driven the way
-// the real mutation drives it.
-// `vi.mock` factories are hoisted above this file's static imports, so the React
-// they need can only come from a dynamic import inside the factory.
+// This fake mutation toggles isPending around mutateAsync, as the sheet expects.
+// The hoisted mock imports React dynamically.
 vi.mock('@/lib/hooks/use-todos', async () => {
   const React = await import('react');
   function useFakeMutation(kind: 'update' | 'create') {
@@ -173,10 +170,7 @@ function header() {
 
 function errorLine(): string | null {
   const status = renderedTree().findAllByType('AccessibleStatus').at(0);
-  if (!status) {
-    return null;
-  }
-  return status.children.map(child => (typeof child === 'string' ? child : '')).join('');
+  return status?.children.map(child => (typeof child === 'string' ? child : '')).join('') ?? null;
 }
 
 function nameInput() {
@@ -185,6 +179,21 @@ function nameInput() {
       (node.type as string) === 'TextInput' &&
       node.props.accessibilityLabel === i18n.t('todos.listSettings.name')
   ).props as TextInputProps;
+}
+
+function enterName(value: string) {
+  const preview = renderedTree().find(
+    node =>
+      (node.type as string) === 'Pressable' &&
+      node.props.accessibilityLabel === i18n.t('todos.listSettings.name')
+  );
+  const props = preview.props as { onPress: () => void };
+  act(() => {
+    props.onPress();
+  });
+  act(() => {
+    nameInput().onChangeText(value);
+  });
 }
 
 function mount(listValue: TodoList | null) {
@@ -208,10 +217,9 @@ async function settle(interaction: () => void) {
 }
 
 async function pressDone() {
-  const sheet = header();
-  expect(sheet.disabled).not.toBe(true);
+  expect(header().disabled).not.toBe(true);
   await settle(() => {
-    sheet.onDone();
+    header().onDone();
   });
 }
 
@@ -240,9 +248,7 @@ describe('To-do list settings save', () => {
   it('keeps the sheet open with an error when the update fails', async () => {
     state.update.mockRejectedValueOnce(new Error('offline'));
     mount(list);
-    act(() => {
-      nameInput().onChangeText('Renamed list');
-    });
+    enterName('Renamed list');
 
     await pressDone();
 
@@ -264,9 +270,7 @@ describe('To-do list settings save', () => {
     const pending = deferred();
     state.update.mockReturnValueOnce(pending.promise);
     mount(list);
-    act(() => {
-      nameInput().onChangeText('Renamed list');
-    });
+    enterName('Renamed list');
 
     await settle(() => {
       header().onDone();
@@ -287,9 +291,7 @@ describe('To-do list settings save', () => {
     const pending = deferred();
     state.update.mockReturnValueOnce(pending.promise);
     mount(list);
-    act(() => {
-      nameInput().onChangeText('Renamed list');
-    });
+    enterName('Renamed list');
 
     await settle(() => {
       const sheet = header();

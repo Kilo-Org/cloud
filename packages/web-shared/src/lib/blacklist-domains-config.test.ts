@@ -1,4 +1,8 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
+import {
+  BLACKLIST_DOMAINS_REDIS_KEY,
+  BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY,
+} from '@kilocode/web-shared/lib/redis-keys';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/redis', () => ({ redisClient: { get: jest.fn() } }));
@@ -19,6 +23,7 @@ const storedConfig = (domains: string[]) =>
 async function loadGetBlacklistedDomains(): Promise<
   TestMocks & {
     getBlacklistedDomains: () => Promise<string[]>;
+    getBlockedSignupTlds: () => Promise<string[]>;
   }
 > {
   jest.resetModules();
@@ -29,6 +34,7 @@ async function loadGetBlacklistedDomains(): Promise<
   ]);
   return {
     getBlacklistedDomains: config.getBlacklistedDomains,
+    getBlockedSignupTlds: config.getBlockedSignupTlds,
     redisGet: redis.redisClient.get as unknown as TestMocks['redisGet'],
     captureException: sentry.captureException as unknown as TestMocks['captureException'],
   };
@@ -54,6 +60,49 @@ describe('getBlacklistedDomains', () => {
 
     await expect(getBlacklistedDomains()).resolves.toEqual(['spam.example']);
     expect(captureException).not.toHaveBeenCalled();
+  });
+
+  test('rechecks only the updated_at key while the list is unchanged', async () => {
+    const { getBlacklistedDomains, redisGet } = await loadGetBlacklistedDomains();
+    const updatedAt = '2026-10-22T13:30:00.000Z';
+    redisGet.mockImplementation(async key =>
+      key === BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY
+        ? updatedAt
+        : JSON.stringify({
+            domains: ['spam.example'],
+            updated_at: updatedAt,
+            updated_by: null,
+            updated_by_email: null,
+          })
+    );
+
+    const first = await getBlacklistedDomains();
+    clock.mockReturnValue(TTL_MS + 1);
+    const second = await getBlacklistedDomains();
+
+    expect(second).toBe(first);
+    expect(redisGet.mock.calls.map(([key]) => key)).toEqual([
+      BLACKLIST_DOMAINS_REDIS_KEY,
+      BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY,
+    ]);
+  });
+
+  test('serves the domain and signup TLD lists from one config read', async () => {
+    const { getBlacklistedDomains, getBlockedSignupTlds, redisGet } =
+      await loadGetBlacklistedDomains();
+    redisGet.mockResolvedValue(
+      JSON.stringify({
+        domains: ['spam.example'],
+        blocked_signup_tlds: ['.ASIA'],
+        updated_at: null,
+        updated_by: null,
+        updated_by_email: null,
+      })
+    );
+
+    await expect(getBlacklistedDomains()).resolves.toEqual(['spam.example']);
+    await expect(getBlockedSignupTlds()).resolves.toEqual(['asia']);
+    expect(redisGet).toHaveBeenCalledTimes(1);
   });
 
   test('keeps the last domains read when a later read fails, and reports it once', async () => {

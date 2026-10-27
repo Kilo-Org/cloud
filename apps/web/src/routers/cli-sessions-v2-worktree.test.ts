@@ -37,6 +37,14 @@ const BRANCH = 'feature/worktree';
 const PR_URL = `${GIT_URL}/pull/42`;
 
 const mockRuntimeDelete = jest.fn<(sessionId: string) => Promise<{ success: boolean }>>();
+const mockHostedRuntimeDelete =
+  jest.fn<
+    (input: {
+      workspaceId: string;
+      sessionId: string;
+      operationKey: string;
+    }) => Promise<{ success: true; workspaceId: string; sessionId: string }>
+  >();
 const mockWorktreeDelete = jest.fn<(input: DeleteWorktreeInput) => Promise<DeleteWorktreeOutput>>();
 const mockGetRuntimeSession = jest.fn<(sessionId: string) => Promise<Record<string, unknown>>>();
 const mockDeleteSessionIngest = jest.fn<(sessionId: string, userId: string) => Promise<void>>();
@@ -48,6 +56,7 @@ const mockBatchReviewDecisionFetch =
 const mockGenerateCloudAgentToken = jest.fn((_user: User) => 'cloud-agent-token');
 const mockCreateCloudAgentNextClient = jest.fn((_token: string) => ({
   deleteSession: mockRuntimeDelete,
+  deleteHostedWorkspaceSession: mockHostedRuntimeDelete,
   deleteWorktree: mockWorktreeDelete,
   getSession: mockGetRuntimeSession,
 }));
@@ -243,6 +252,11 @@ beforeEach(async () => {
   ]);
   await db.insert(cli_sessions_v2).values(ownershipRow);
   mockRuntimeDelete.mockReset().mockResolvedValue({ success: true });
+  mockHostedRuntimeDelete.mockReset().mockResolvedValue({
+    success: true,
+    workspaceId: WORKTREE_ID,
+    sessionId: WORKSPACE_ID,
+  });
   mockWorktreeDelete
     .mockReset()
     .mockResolvedValue({ success: true, deletedSessionIds: [SESSION_ID] });
@@ -377,11 +391,8 @@ describe('cliSessionsV2 worktree projections and session deletion', () => {
     expect(result.git_branch).toBeNull();
   });
 
-  it.each([
-    ['reports success false', () => mockRuntimeDelete.mockResolvedValueOnce({ success: false })],
-    ['throws', () => mockRuntimeDelete.mockRejectedValueOnce(new Error('Worker unavailable'))],
-  ])('preserves ownership when runtime deletion %s', async (_, failDeletion) => {
-    failDeletion();
+  it('preserves ownership when the authoritative hosted delete fails', async () => {
+    mockHostedRuntimeDelete.mockRejectedValueOnce(new Error('Worker unavailable'));
     await expect(createCaller({ user }).delete({ session_id: SESSION_ID })).rejects.toMatchObject({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Failed to clean up cloud-agent session',
@@ -392,16 +403,63 @@ describe('cliSessionsV2 worktree projections and session deletion', () => {
     expect(mockCaptureException).toHaveBeenCalled();
   });
 
-  it('removes ownership only after runtime deletion confirms success', async () => {
+  it('delegates workspace-root deletion to the authoritative operation', async () => {
     await expect(createCaller({ user }).delete({ session_id: SESSION_ID })).resolves.toEqual({
       success: true,
       session_id: SESSION_ID,
     });
 
-    expect(await readSessions()).toHaveLength(0);
-    expect(mockRuntimeDelete.mock.invocationCallOrder[0]).toBeLessThan(
-      mockDeleteSessionIngest.mock.invocationCallOrder[0]
+    expect(mockHostedRuntimeDelete).toHaveBeenCalledWith({
+      workspaceId: WORKTREE_ID,
+      sessionId: WORKSPACE_ID,
+      operationKey: expect.any(String),
+    });
+    expect(mockRuntimeDelete).not.toHaveBeenCalled();
+    expect(mockDeleteSessionIngest).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a final-root conflict before deleting the ownership row', async () => {
+    mockHostedRuntimeDelete.mockRejectedValueOnce(
+      new TRPCClientError('workspace_requires_root_session', {
+        result: {
+          error: {
+            code: -32603,
+            message: 'workspace_requires_root_session',
+            data: { code: 'CONFLICT' },
+          },
+        },
+      })
     );
+
+    await expect(createCaller({ user }).delete({ session_id: SESSION_ID })).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'workspace_requires_root_session',
+    });
+
+    expect(await readSessions()).toHaveLength(1);
+    expect(mockDeleteSessionIngest).not.toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('falls back to ingest cleanup when the authoritative operation reports not found', async () => {
+    mockHostedRuntimeDelete.mockRejectedValueOnce(
+      new TRPCClientError('workspace_not_found', {
+        result: {
+          error: {
+            code: -32603,
+            message: 'workspace_not_found',
+            data: { code: 'NOT_FOUND' },
+          },
+        },
+      })
+    );
+
+    await expect(createCaller({ user }).delete({ session_id: SESSION_ID })).resolves.toEqual({
+      success: true,
+      session_id: SESSION_ID,
+    });
+
+    expect(mockDeleteSessionIngest).toHaveBeenCalledWith(SESSION_ID, user.id);
   });
 });
 

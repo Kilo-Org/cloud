@@ -6,12 +6,22 @@ import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 import type { AppleStoreDecodedTransaction } from '@/lib/kilo-pass/apple-store-verifier';
 import type * as AppleStoreVerifier from '@/lib/kilo-pass/apple-store-verifier';
 import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import type * as PaidCreditPolicyServer from '@kilocode/web-shared/lib/paidCreditPolicy.server';
 import {
   STORE_PURCHASE_PENDING_MESSAGE,
   StorePurchasePendingError,
   StoreVerificationError,
 } from './store-purchase-errors';
 import type * as StoreVerifier from './store-verifier';
+
+const mockGetPaidCreditTerms = jest.fn<typeof PaidCreditPolicyServer.getPaidCreditTerms>(
+  () => 'legacy'
+);
+
+jest.mock('@kilocode/web-shared/lib/paidCreditPolicy.server', () => ({
+  getPaidCreditTerms: (...args: Parameters<typeof PaidCreditPolicyServer.getPaidCreditTerms>) =>
+    mockGetPaidCreditTerms(...args),
+}));
 
 const mockGetGooglePlayProductPurchase =
   jest.fn<
@@ -96,6 +106,7 @@ describe('mapAppleCreditTransaction', () => {
       amountUsd: 10,
       amountMicrodollars: 10_000_000,
       purchasedAtIso: new Date(1_777_626_000_000).toISOString(),
+      paidCreditTerms: 'apple_exempt',
       environment: 'Sandbox',
       rawPayload: { transactionId: 'tx-1' },
     });
@@ -228,8 +239,61 @@ describe('verifyGooglePlayCreditPurchase', () => {
       amountUsd: 10,
       amountMicrodollars: 10_000_000,
       purchasedAtIso: new Date(1_777_626_000_000).toISOString(),
+      paidCreditTerms: 'legacy',
       environment: 'Production',
     });
+  });
+
+  it('keeps old Google SKUs legacy after activation', async () => {
+    mockGetPaidCreditTerms.mockReturnValueOnce('one_year');
+    mockGetGooglePlayProductPurchase.mockResolvedValueOnce(productPurchase());
+    const result = await loadVerifier().verifyGooglePlayCreditPurchase({
+      productId: 'credits_usd10',
+      purchaseToken: 'old-token',
+    });
+    expect(result.paidCreditTerms).toBe('legacy');
+    mockGetPaidCreditTerms.mockReset().mockReturnValue('legacy');
+  });
+
+  it('uses verified purchase time for an explicitly disclosed Google SKU', async () => {
+    mockGetPaidCreditTerms.mockReturnValueOnce('one_year');
+    mockGetGooglePlayProductPurchase.mockResolvedValueOnce(
+      productPurchase({
+        productId: 'credits_usd10_1year_v2',
+      })
+    );
+    const result = await loadVerifier().verifyGooglePlayCreditPurchase({
+      productId: 'credits_usd10_1year_v2',
+      purchaseToken: 'new-token',
+    });
+    expect(result.paidCreditTerms).toBe('one_year');
+    expect(mockGetPaidCreditTerms).toHaveBeenCalledWith('google_play', result.purchasedAtIso);
+  });
+
+  it('refuses to assign settlement time to receipts missing purchase time', async () => {
+    mockGetGooglePlayProductPurchase.mockResolvedValueOnce(
+      productPurchase({ purchaseTimeMillis: null })
+    );
+    await expect(
+      loadVerifier().verifyGooglePlayCreditPurchase({
+        productId: 'credits_usd10',
+        purchaseToken: 'missing-time',
+      })
+    ).rejects.toThrow('missing a valid purchase time');
+  });
+
+  it('keeps the new Google SKU legacy while activation is disabled', async () => {
+    mockGetPaidCreditTerms.mockReturnValueOnce('legacy');
+    mockGetGooglePlayProductPurchase.mockResolvedValueOnce(
+      productPurchase({
+        productId: 'credits_usd10_1year_v2',
+      })
+    );
+    const result = await loadVerifier().verifyGooglePlayCreditPurchase({
+      productId: 'credits_usd10_1year_v2',
+      purchaseToken: 'disabled-policy',
+    });
+    expect(result.paidCreditTerms).toBe('legacy');
   });
 
   it('rejects a canceled purchaseState as a terminal verification failure', async () => {

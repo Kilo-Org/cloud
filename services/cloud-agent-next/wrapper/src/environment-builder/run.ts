@@ -2,6 +2,8 @@ import path from 'node:path';
 import {
   CONTROL_RUNTIME_RESERVED_ENV_VARS,
   RESERVED_ENV_VAR_PREFIXES,
+  SYSTEM_GIT_CONFIG_ENV,
+  isStrippedGitConfigEnvVar,
 } from '../../../src/shared/runtime-environment.js';
 import {
   CONTROL_PLANE_SETUP_EVENTS,
@@ -13,6 +15,11 @@ import type {
   EnvironmentBuildRunnerFailure,
   EnvironmentBuildRunnerStep,
 } from '../../../src/shared/environment-build-protocol.js';
+import {
+  clearGitCredentialRecord,
+  credentialFreeGitUrl,
+  writeGitCredentialRecord,
+} from '../control/git-credentials.js';
 import { WrapperBootstrapError } from '../bootstrap-error.js';
 import { createSecretRedactor } from '../redact-output.js';
 import type { ExecResult, ProcessOptions } from '../utils.js';
@@ -51,10 +58,12 @@ export function builderSetupEnvironment(input: {
     RESERVED_ENV_VAR_PREFIXES.some(prefix => name.startsWith(prefix));
   const env: Record<string, string> = {};
   for (const [name, value] of Object.entries(input.inherited)) {
-    if (value !== undefined && !runtimeOwned(name)) env[name] = value;
+    if (value !== undefined && !runtimeOwned(name) && !isStrippedGitConfigEnvVar(name)) {
+      env[name] = value;
+    }
   }
   for (const [name, value] of Object.entries(input.vars)) {
-    if (!runtimeOwned(name)) env[name] = value;
+    if (!runtimeOwned(name) && !isStrippedGitConfigEnvVar(name)) env[name] = value;
   }
   return {
     ...env,
@@ -64,6 +73,7 @@ export function builderSetupEnvironment(input: {
     XDG_CONFIG_HOME: path.join(input.home, '.config'),
     XDG_CACHE_HOME: path.join(input.home, '.cache'),
     XDG_STATE_HOME: path.join(input.home, '.local', 'state'),
+    ...SYSTEM_GIT_CONFIG_ENV,
     GIT_TERMINAL_PROMPT: '0',
   };
 }
@@ -142,6 +152,12 @@ export async function runEnvironmentBuild(deps: BuildRunDeps): Promise<Environme
   let step: EnvironmentBuildRunnerStep = 'clone';
   try {
     reporter.setStep('clone');
+    await writeGitCredentialRecord({
+      home,
+      url: credentialFreeGitUrl(git.url),
+      token: git.token,
+      platform: git.platform,
+    });
     await repository.cloneRepository({
       git,
       directory,
@@ -188,7 +204,7 @@ export async function runEnvironmentBuild(deps: BuildRunDeps): Promise<Environme
       git: args => deps.runGit(args, { cwd: directory, env, inheritEnv: false }),
       directory,
       home,
-      bareUrl: input.git.url,
+      bareUrl: credentialFreeGitUrl(input.git.url),
       canaries: input.git.token === undefined ? [] : [input.git.token],
       logPath: deps.logPath,
     });
@@ -203,5 +219,7 @@ export async function runEnvironmentBuild(deps: BuildRunDeps): Promise<Environme
     if (step === 'clone') return failure('clone', 'clone_failed');
     if (step === 'setup') return failure('setup', setupFailureReason(error));
     return failure('cleanup', 'cleanup_failed', 'cleanup did not complete');
+  } finally {
+    await clearGitCredentialRecord(home).catch(() => false);
   }
 }

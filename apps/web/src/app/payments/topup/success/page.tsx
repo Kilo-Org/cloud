@@ -31,6 +31,7 @@ export function getRedirectUrl(txn: TopUpTransactionSummary | undefined, returnU
     return `/credits?${params.toString()}`;
   }
   params.set(TOPUP_AMOUNT_QUERY_STRING_KEY, fromMicrodollars(txn.amountMicrodollars).toString());
+  params.set(TOPUP_TRANSACTION_QUERY_STRING_KEY, txn.id);
   return `/organizations/${txn.organizationId}?${params.toString()}`;
 }
 

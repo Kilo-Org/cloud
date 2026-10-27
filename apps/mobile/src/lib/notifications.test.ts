@@ -209,6 +209,7 @@ vi.mock('@kilocode/notifications', async importOriginal => ({
   ANDROID_NOTIFICATION_CHANNELS: [
     { id: 'needs-input', name: 'Needs input', importance: 'high', bypassDnd: true },
     { id: 'agent-progress', name: 'Agent progress', importance: 'default', bypassDnd: false },
+    { id: 'agent-briefing', name: 'Agent brief', importance: 'default', bypassDnd: false },
     { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default', bypassDnd: false },
     { id: 'balance', name: 'Balance alerts', importance: 'default', bypassDnd: false },
     { id: 'security', name: 'Security findings', importance: 'high', bypassDnd: false },
@@ -340,6 +341,7 @@ describe('ensureAndroidNotificationChannels', () => {
           enableVibrate: false,
         },
       ],
+      ['agent-briefing', { name: 'Agent brief', importance: 3, bypassDnd: false }],
       ['kiloclaw', { name: 'KiloClaw activity', importance: 3, bypassDnd: false }],
       ['balance', { name: 'Balance alerts', importance: 3, bypassDnd: false }],
       ['security', { name: 'Security findings', importance: 4, bypassDnd: false }],
@@ -408,6 +410,7 @@ describe('ensureAndroidNotificationChannels', () => {
           enableVibrate: false,
         },
       ],
+      ['agent-briefing', { name: expect.any(String), importance: 3, bypassDnd: false }],
       ['kiloclaw', { name: expect.any(String), importance: 3, bypassDnd: false }],
       ['balance', { name: expect.any(String), importance: 3, bypassDnd: false }],
       ['security', { name: expect.any(String), importance: 4, bypassDnd: false }],
@@ -434,7 +437,7 @@ describe('ensureAndroidNotificationChannels', () => {
 
     expect(first).toBe(second);
     await Promise.all([first, second]);
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(7);
     expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(4);
   });
 
@@ -444,7 +447,7 @@ describe('ensureAndroidNotificationChannels', () => {
 
     await expect(ensureAndroidNotificationChannels()).resolves.toBeUndefined();
 
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(7);
     expect(mocks.deleteNotificationChannelAsync).toHaveBeenCalledTimes(4);
     expect(mocks.captureException).toHaveBeenCalledWith(expect.any(Error), {
       tags: {
@@ -486,6 +489,7 @@ describe('ensureAndroidNotificationChannels', () => {
     expect(mocks.setNotificationChannelAsync.mock.calls.map(call => call[0])).toEqual([
       'needs-input',
       'agent-progress',
+      'agent-briefing',
       'kiloclaw',
       'balance',
       'security',
@@ -502,7 +506,7 @@ describe('ensureAndroidNotificationChannels', () => {
     const { ensureAndroidNotificationChannels } = await loadNotifications();
 
     await ensureAndroidNotificationChannels();
-    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(6);
+    expect(mocks.setNotificationChannelAsync).toHaveBeenCalledTimes(7);
     mocks.setNotificationChannelAsync.mockClear();
 
     await ensureAndroidNotificationChannels();
@@ -2918,6 +2922,8 @@ describe('cold iOS background delivery', () => {
         organizationId: 'org-9',
         userId: 'u1',
         recordedAt: Date.parse('2026-01-01T00:00:00.000Z'),
+        statusUpdatedAt: '2026-01-01T00:00:00.000Z',
+        boundPermissionId: 'perm_1',
       })
     );
     const background = await loadColdBackground();
@@ -2932,6 +2938,36 @@ describe('cold iOS background delivery', () => {
     ).toBe(0);
 
     expect(JSON.parse(native.props ?? '{}')).toMatchObject({ needsInput: 1, canApprove: true });
+  });
+
+  it('parses a mirrored ask that names no request and keeps Approve off the card', async () => {
+    // A record written before asks carried their request parses and still names
+    // the session, but no request is named, so the push must not offer Approve
+    // until a live select binds one.
+    secureStore.set(
+      'glanceable-waiting-ask',
+      JSON.stringify({
+        kiloSessionId: 'session-1',
+        status: 'permission',
+        isCloudAgent: true,
+        scopeKey: SCOPE_KEY,
+        organizationId: 'org-9',
+        userId: 'u1',
+        recordedAt: Date.parse('2026-01-01T00:00:00.000Z'),
+      })
+    );
+    const background = await loadColdBackground();
+    expect(
+      await background.deliver({
+        status: 'happy',
+        running: 0,
+        needsInput: 1,
+        idle: 0,
+        needsInputSince: '2026-01-01T00:00:00.000Z',
+      })
+    ).toBe(0);
+
+    expect(JSON.parse(native.props ?? '{}')).toMatchObject({ needsInput: 1, canApprove: false });
   });
 
   it('does not revive a mirrored ask recorded for another scope', async () => {

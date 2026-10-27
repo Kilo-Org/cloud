@@ -1,9 +1,12 @@
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 
 export const modelsRouter = createTRPCRouter({
   preferred: baseProcedure.query(() => getPreferredModels()),
+
+  customPricing: baseProcedure.query(() => getCustomPricingConfig()),
 
   list: baseProcedure.query(async () => {
     const [response, preferredModels] = await Promise.all([

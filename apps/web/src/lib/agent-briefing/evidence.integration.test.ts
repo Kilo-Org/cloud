@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_briefing_events,
@@ -24,26 +24,31 @@ import {
   BRIEFING_MAX_USAGE_ROWS,
   collectBriefingEvidence,
 } from './evidence';
+import type { BriefingCountTimeouts } from './evidence-counts';
 import { emptySummary, refreshBriefingEvidence } from './store';
 
-type Facts = Pick<BriefingReport, 'sessions' | 'sources' | 'scorecard' | 'coverage'>;
+type Facts = Pick<
+  BriefingReport,
+  | 'sessions'
+  | 'sources'
+  | 'scorecard'
+  | 'coverage'
+  | 'omittedCollectedSessions'
+  | 'omittedCollectedSources'
+>;
 const factsSchema = briefingReportSchema.pick({
   sessions: true,
   sources: true,
   scorecard: true,
   coverage: true,
+  omittedCollectedSessions: true,
+  omittedCollectedSources: true,
 });
 const completeCoverage = {
   activity: 'complete',
   spend: 'complete',
   blockers: 'complete',
   pullRequests: 'complete',
-} satisfies Facts['coverage'];
-const partialCoverage = {
-  activity: 'partial',
-  spend: 'partial',
-  blockers: 'partial',
-  pullRequests: 'partial',
 } satisfies Facts['coverage'];
 let user: User;
 let nightStartAt: string;
@@ -102,8 +107,16 @@ async function seedUsage(
   );
 }
 
-function collect() {
-  return collectBriefingEvidence(user.id, null, nightStartAt, cutoffAt, morningEndAt);
+function collect(countTimeoutMs?: BriefingCountTimeouts) {
+  return collectBriefingEvidence(
+    user.id,
+    null,
+    nightStartAt,
+    cutoffAt,
+    morningEndAt,
+    false,
+    countTimeoutMs
+  );
 }
 
 async function persistFacts(facts: Facts) {
@@ -243,9 +256,12 @@ describe('scheduled briefing evidence collection', () => {
           status: null,
           spendMicrodollars: 29_000,
           sources,
+          omittedSources: 0,
         },
       ],
       sources,
+      omittedCollectedSessions: 0,
+      omittedCollectedSources: 0,
     };
     const facts = await collect();
     expect(facts).toEqual(expected);
@@ -253,7 +269,7 @@ describe('scheduled briefing evidence collection', () => {
     await expectStoredAndReadable(reportId, expected);
   });
 
-  it('consumes the scheduled event row budget and stores partial bounded facts', async () => {
+  it('counts every pull request past the event row cap and keeps coverage complete', async () => {
     const sessionId = 'ses_event_budget';
     await seedSessions([sessionId]);
     await db.insert(agent_briefing_events).values([
@@ -289,12 +305,17 @@ describe('scheduled briefing evidence collection', () => {
     const facts = await collect();
     expect(facts.scorecard).toEqual({
       sessions: 1,
-      pullRequests: BRIEFING_MAX_EVENT_ROWS,
+      pullRequests: BRIEFING_MAX_EVENT_ROWS + 1,
       blockers: 0,
       spendMicrodollars: 0,
     });
-    expect(facts.coverage).toEqual(partialCoverage);
+    expect(facts.coverage).toEqual(completeCoverage);
     expect(facts.sessions[0]?.status).toBeNull();
+    const [session] = facts.sessions;
+    expect(session?.sources).toHaveLength(BRIEFING_MAX_SOURCES_PER_SESSION);
+    expect(session?.omittedSources).toBeGreaterThanOrEqual(
+      BRIEFING_MAX_EVENT_ROWS - BRIEFING_MAX_SOURCES_PER_SESSION
+    );
     expect(
       facts.sources.some(source => source.id === `scheduled-event-${BRIEFING_MAX_EVENT_ROWS}`)
     ).toBe(true);
@@ -304,7 +325,7 @@ describe('scheduled briefing evidence collection', () => {
     expectBoundedFacts(await expectStoredAndReadable(reportId, facts));
   });
 
-  it('applies scheduled usage accounting', async () => {
+  it('sums every usage charge past the usage row cap', async () => {
     const sessionId = 'ses_usage_budget';
     await seedSessions([sessionId]);
     await seedUsage(
@@ -316,14 +337,15 @@ describe('scheduled briefing evidence collection', () => {
       }))
     );
     const facts = await collect();
+    const exactSpend = 1_000_000 + BRIEFING_MAX_USAGE_ROWS * 7;
     expect(facts.scorecard).toEqual({
       sessions: 1,
       pullRequests: 0,
       blockers: 0,
-      spendMicrodollars: BRIEFING_MAX_USAGE_ROWS * 7,
+      spendMicrodollars: exactSpend,
     });
-    expect(facts.sessions[0]?.spendMicrodollars).toBe(BRIEFING_MAX_USAGE_ROWS * 7);
-    expect(facts.coverage).toEqual(partialCoverage);
+    expect(facts.sessions[0]?.spendMicrodollars).toBe(exactSpend);
+    expect(facts.coverage).toEqual(completeCoverage);
     expectBoundedFacts(facts);
     const reportId = await persistFacts(facts);
     expectBoundedFacts(await expectStoredAndReadable(reportId, facts));
@@ -390,7 +412,7 @@ describe('scheduled briefing evidence collection', () => {
     expect(await expectStoredAndReadable(await persistFacts(facts), facts)).toBeTruthy();
   });
 
-  it('selects recently active sessions for the report', async () => {
+  it('counts every active session past the session cap', async () => {
     const sessionIds = Array.from({ length: 257 }, (_, index) => `ses_recent_${index}`);
     await seedSessions(sessionIds);
     await db.insert(agent_briefing_events).values(
@@ -406,8 +428,86 @@ describe('scheduled briefing evidence collection', () => {
     expect(facts.sessions).toHaveLength(BRIEFING_MAX_SESSIONS);
     expect(facts.sessions.some(session => session.sessionId === 'ses_recent_256')).toBe(true);
     expect(facts.sessions.some(session => session.sessionId === 'ses_recent_0')).toBe(false);
-    expect(facts.scorecard.sessions).toBe(256);
-    expect(facts.coverage.activity).toBe('partial');
+    expect(facts.scorecard.sessions).toBe(257);
+    expect(facts.omittedCollectedSessions).toBe(257 - BRIEFING_MAX_SESSIONS);
+    expect(facts.coverage.activity).toBe('complete');
+  });
+
+  it('counts blockers, sessions and spend exactly on a night past every cap', async () => {
+    const blockedCount = 300;
+    const sessionIds = Array.from({ length: blockedCount }, (_, index) => `ses_busy_${index}`);
+    await seedSessions(sessionIds);
+    await db.insert(agent_briefing_events).values(
+      sessionIds.map((sessionId, index) => ({
+        id: `busy-question-${index}`,
+        kilo_user_id: user.id,
+        session_id: sessionId,
+        kind: 'status',
+        status: 'question',
+        occurred_at: new Date(Date.parse(activityAt) + index).toISOString(),
+        payload: {
+          transitionId: `busy-question-${String(index).padStart(4, '0')}`,
+          previousStatusKnown: true,
+          previousStatus: 'busy',
+        },
+      }))
+    );
+    await db.execute(sql`
+      INSERT INTO ${agent_briefing_events} (id, session_id, kilo_user_id, kind, occurred_at)
+      SELECT 'busy-activity-' || n, 'ses_busy_0', ${user.id}, 'activity',
+        ${activityAt}::timestamptz + n * interval '1 millisecond'
+      FROM generate_series(1, ${BRIEFING_MAX_EVENT_ROWS + 100}) AS n
+    `);
+    await seedUsage(
+      sessionIds.map((sessionId, index) => ({
+        id: crypto.randomUUID(),
+        sessionId,
+        cost: 11,
+        occurredAt: new Date(Date.parse(activityAt) + index).toISOString(),
+      }))
+    );
+    const facts = await collect();
+    expect(facts.scorecard).toEqual({
+      sessions: blockedCount,
+      pullRequests: 0,
+      blockers: blockedCount,
+      spendMicrodollars: blockedCount * 11,
+    });
+    expect(facts.coverage).toEqual(completeCoverage);
+    expect(facts.omittedCollectedSessions).toBe(blockedCount - BRIEFING_MAX_SESSIONS);
+    expect(facts.omittedCollectedSources).toBeGreaterThan(0);
+    expectBoundedFacts(facts);
+    expectBoundedFacts(await expectStoredAndReadable(await persistFacts(facts), facts));
+  });
+
+  it('keeps collecting when one count times out and marks only that dimension partial', async () => {
+    const sessionCount = BRIEFING_MAX_EVENT_ROWS + 100;
+    await db.execute(sql`
+      INSERT INTO ${cli_sessions_v2} (session_id, kilo_user_id, title, created_on_platform)
+      SELECT 'ses_slow_' || n, ${user.id}, 'Slow ' || n, 'cli'
+      FROM generate_series(1, ${sessionCount}) AS n
+    `);
+    await db.execute(sql`
+      INSERT INTO ${agent_briefing_events} (id, session_id, kilo_user_id, kind, title, url, occurred_at)
+      SELECT 'slow-artifact-' || n, 'ses_slow_' || n, ${user.id}, 'artifact', 'Artifact',
+        'https://example.com/artifact/' || n, ${activityAt}::timestamptz + n * interval '1 millisecond'
+      FROM generate_series(1, ${sessionCount}) AS n
+    `);
+    await db.insert(agent_briefing_events).values(
+      [1, 2, 3].map(index => ({
+        id: `slow-pull-request-${index}`,
+        kilo_user_id: user.id,
+        session_id: 'ses_slow_1',
+        kind: 'pull_request',
+        url: `https://github.com/example/project/pull/${index}`,
+        occurred_at: activityAt,
+      }))
+    );
+    const facts = await collect({ sessions: 1 });
+    expect(facts.coverage).toEqual({ ...completeCoverage, activity: 'partial' });
+    expect(facts.scorecard.sessions).toBeLessThan(sessionCount);
+    expect(facts.scorecard.sessions).toBeGreaterThan(0);
+    expect(facts.scorecard).toMatchObject({ pullRequests: 3, blockers: 0, spendMicrodollars: 0 });
   });
 });
 

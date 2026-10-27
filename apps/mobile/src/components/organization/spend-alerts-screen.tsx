@@ -21,6 +21,7 @@ import {
   parseMultiplier,
   parseThreshold,
   thresholdError,
+  thresholdPlaceholder,
   toWindowHours,
 } from '@/components/organization/spend-alert-validators';
 import { QueryError } from '@/components/query-error';
@@ -476,7 +477,7 @@ function SpendAlertsForm({
             <FormField
               label={t('spendAlerts.limitLabel')}
               required={thresholdEnabled}
-              placeholder="25.00"
+              placeholder={thresholdPlaceholder()}
               keyboardType="decimal-pad"
               defaultValue={thresholdRef.current || undefined}
               validate={thresholdEnabled ? thresholdError : undefined}

@@ -1,519 +1,340 @@
-import { beforeEach, jest } from '@jest/globals';
-import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
-import {
-  createOrganization,
-  addUserToOrganization,
-} from '@kilocode/web-shared/lib/organizations/organizations';
+import { randomUUID } from 'node:crypto';
+import { TRPCError } from '@trpc/server';
+import Stripe from 'stripe';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { organization_seats_purchases } from '@kilocode/db/schema';
-import type { User, Organization } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import {
+  organizations,
+  organization_memberships,
+  organization_seats_purchases,
+  type User,
+} from '@kilocode/db/schema';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { client } from '@kilocode/web-shared/lib/stripe-client';
+import { retrieveSubscription } from '@/lib/stripe';
+import { organizationsSubscriptionRouter } from './organization-subscription-router';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyMock = jest.Mock<(...args: any[]) => any>;
+jest.mock('@/lib/stripe', () => ({
+  retrieveSubscription: jest.fn(),
+  KNOWN_SEAT_PRICE_IDS: new Set(['price_teams_monthly']),
+  getPlanForPriceId: jest.fn(() => 'teams'),
+  getPriceIdForPlanAndCycle: jest.fn(() => 'price_teams_annual'),
+}));
 
-jest.mock('@kilocode/web-shared/lib/stripe-client', () => {
-  const stripeMock = {
-    billingPortal: { sessions: { create: jest.fn() } },
-    invoices: { list: jest.fn() },
-    checkout: { sessions: { create: jest.fn() } },
-    subscriptions: { retrieve: jest.fn() },
-    createStripeCustomer: jest.fn(async () => ({ id: 'cus_test_org' })),
-  };
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
+  client: {
+    subscriptionSchedules: {
+      create: jest.fn(),
+      retrieve: jest.fn(),
+      update: jest.fn(),
+      release: jest.fn(),
+    },
+  },
+}));
 
-  return {
-    client: stripeMock,
-    createStripeCustomer: stripeMock.createStripeCustomer,
-    __stripeMock: stripeMock,
-  };
-});
-
-type StripeMock = {
-  billingPortal: { sessions: { create: AnyMock } };
-  invoices: { list: AnyMock };
-  checkout: { sessions: { create: AnyMock } };
-  subscriptions: { retrieve: AnyMock };
-  createStripeCustomer: AnyMock;
+const organizationId = randomUUID();
+const subscriptionId = `sub_cycle_race_${randomUUID()}`;
+const subscription: Stripe.Subscription = {
+  id: subscriptionId,
+  object: 'subscription',
+  application: null,
+  application_fee_percent: null,
+  automatic_tax: { disabled_reason: null, enabled: false, liability: null },
+  billing_cycle_anchor: 1_793_059_200,
+  billing_cycle_anchor_config: null,
+  billing_mode: { type: 'classic', flexible: null },
+  billing_schedules: [],
+  billing_thresholds: null,
+  cancel_at: null,
+  cancel_at_period_end: false,
+  canceled_at: null,
+  cancellation_details: null,
+  collection_method: 'charge_automatically',
+  created: 1_793_059_200,
+  currency: 'usd',
+  customer: 'cus_cycle_race',
+  customer_account: null,
+  days_until_due: null,
+  default_payment_method: null,
+  default_source: null,
+  description: null,
+  discounts: [],
+  ended_at: null,
+  invoice_settings: {
+    account_tax_ids: null,
+    custom_fields: null,
+    description: null,
+    footer: null,
+    issuer: { type: 'self' },
+  },
+  status: 'active',
+  schedule: null,
+  managed_payments: null,
+  metadata: { type: 'seats' },
+  items: {
+    object: 'list',
+    has_more: false,
+    url: `/v1/subscription_items?subscription=${subscriptionId}`,
+    data: [
+      {
+        id: 'si_paid',
+        object: 'subscription_item',
+        billing_thresholds: null,
+        created: 1_793_059_200,
+        current_period_start: 1_793_059_200,
+        current_period_end: 1_795_737_600,
+        current_trial: null,
+        discounts: [],
+        metadata: {},
+        quantity: 2,
+        subscription: subscriptionId,
+        tax_rates: [],
+        plan: {
+          id: 'price_teams_monthly',
+          object: 'plan',
+          active: true,
+          amount: 1800,
+          amount_decimal: Stripe.Decimal.from(1800),
+          billing_scheme: 'per_unit',
+          created: 1_793_059_200,
+          currency: 'usd',
+          interval: 'month',
+          interval_count: 1,
+          livemode: false,
+          metadata: {},
+          meter: null,
+          nickname: null,
+          product: 'prod_teams',
+          tiers_mode: null,
+          transform_usage: null,
+          trial_period_days: null,
+          usage_type: 'licensed',
+        },
+        price: {
+          id: 'price_teams_monthly',
+          object: 'price',
+          active: true,
+          billing_scheme: 'per_unit',
+          created: 1_793_059_200,
+          currency: 'usd',
+          custom_unit_amount: null,
+          livemode: false,
+          lookup_key: null,
+          metadata: {},
+          nickname: null,
+          product: 'prod_teams',
+          recurring: {
+            interval: 'month',
+            interval_count: 1,
+            meter: null,
+            trial_period_days: null,
+            usage_type: 'licensed',
+          },
+          tax_behavior: 'exclusive',
+          tiers_mode: null,
+          transform_quantity: null,
+          type: 'recurring',
+          unit_amount: 1800,
+          unit_amount_decimal: Stripe.Decimal.from(1800),
+        },
+      },
+    ],
+  },
+  latest_invoice: null,
+  livemode: false,
+  next_pending_invoice_item_invoice: null,
+  on_behalf_of: null,
+  pause_collection: null,
+  payment_settings: null,
+  pending_invoice_item_interval: null,
+  pending_setup_intent: null,
+  pending_update: null,
+  start_date: 1_793_059_200,
+  test_clock: null,
+  transfer_data: null,
+  trial_end: null,
+  trial_settings: null,
+  trial_start: null,
 };
 
-const stripeMock = jest.requireMock<{ __stripeMock: StripeMock }>(
-  '@kilocode/web-shared/lib/stripe-client'
-).__stripeMock;
+function attachedSchedule(
+  status: Stripe.SubscriptionSchedule.Status = 'active',
+  owner = subscriptionId
+): Stripe.SubscriptionSchedule {
+  return {
+    id: 'sub_sched_concurrent_cycle',
+    object: 'subscription_schedule',
+    application: null,
+    billing_mode: { type: 'classic', flexible: null },
+    canceled_at: null,
+    completed_at: null,
+    created: 1_793_059_200,
+    current_phase: null,
+    customer: 'cus_cycle_race',
+    customer_account: null,
+    default_settings: {
+      application_fee_percent: null,
+      billing_cycle_anchor: 'automatic',
+      billing_thresholds: null,
+      collection_method: 'charge_automatically',
+      default_payment_method: null,
+      description: null,
+      invoice_settings: {
+        account_tax_ids: null,
+        custom_fields: null,
+        days_until_due: null,
+        description: null,
+        footer: null,
+        issuer: { type: 'self' },
+      },
+      on_behalf_of: null,
+      transfer_data: null,
+    },
+    end_behavior: 'release',
+    livemode: false,
+    phases: [],
+    released_at: null,
+    released_subscription: null,
+    status,
+    subscription: owner,
+    metadata: { origin: 'billing-cycle-change' },
+    test_clock: null,
+  };
+}
 
-// Test users and organization will be created dynamically
-let regularUser: User;
-let _adminUser: User;
-let memberUser: User;
-let _nonMemberUser: User;
-let testOrganization: Organization;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let createCallerForUser: (userId: string) => Promise<any>;
+function duplicateAttachmentError() {
+  return Object.assign(
+    new Error('You cannot migrate a subscription that is already attached to a schedule.'),
+    {
+      type: 'StripeInvalidRequestError',
+    }
+  );
+}
 
-describe('organizations subscription trpc router', () => {
-  beforeAll(async () => {
-    ({ createCallerForUser } = await import('@/routers/test-utils'));
-    // Create test users using the helper function (no hardcoded emails to avoid cross-run collisions)
-    regularUser = await insertTestUser({
-      google_user_name: 'Regular Subscription User',
-      is_admin: false,
-    });
+let user: User;
 
-    _adminUser = await insertTestUser({
-      google_user_name: 'Admin Subscription User',
-      is_admin: true,
-    });
+async function changeBillingCycle() {
+  const caller = organizationsSubscriptionRouter.createCaller({ user, headersList: new Headers() });
+  return caller.changeBillingCycle({ organizationId, targetCycle: 'annual' });
+}
 
-    memberUser = await insertTestUser({
-      google_user_name: 'Member Subscription User',
-      is_admin: false,
-    });
+async function expectOriginalFailure(error: Error) {
+  try {
+    await changeBillingCycle();
+    throw new Error('Expected schedule creation to fail');
+  } catch (caught) {
+    expect(caught).toBeInstanceOf(TRPCError);
+    expect(caught).toMatchObject({ code: 'INTERNAL_SERVER_ERROR', cause: error });
+  }
+}
 
-    _nonMemberUser = await insertTestUser({
-      google_user_name: 'Non Member Subscription User',
-      is_admin: false,
-    });
+beforeAll(async () => {
+  user = await insertTestUser();
+  await db.insert(organizations).values({
+    id: organizationId,
+    name: 'Billing cycle race regression',
+    created_by_kilo_user_id: user.id,
+  });
+  await db
+    .insert(organization_memberships)
+    .values({ organization_id: organizationId, kilo_user_id: user.id, role: 'owner' });
+  await db.insert(organization_seats_purchases).values({
+    organization_id: organizationId,
+    subscription_stripe_id: subscriptionId,
+    subscription_status: 'active',
+    seat_count: 2,
+    amount_usd: 36,
+    starts_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + 30 * 86_400_000).toISOString(),
+  });
+});
 
-    // Create test organization using the CRUD method
-    testOrganization = await createOrganization('Test Subscription Organization', regularUser.id);
+beforeEach(() => {
+  jest.clearAllMocks();
+  jest.mocked(retrieveSubscription).mockReset();
+  jest.mocked(retrieveSubscription).mockResolvedValueOnce(subscription);
+  jest.mocked(client.subscriptionSchedules.create).mockReset();
+  jest.mocked(client.subscriptionSchedules.retrieve).mockReset();
+});
 
-    // Add member user to organization using CRUD method
-    await addUserToOrganization(testOrganization.id, memberUser.id, 'member');
+describe('concurrent organization billing cycle changes', () => {
+  it('returns BAD_REQUEST for an observed code-less provider refusal with a newly attached active schedule', async () => {
+    jest.mocked(client.subscriptionSchedules.create).mockRejectedValue(duplicateAttachmentError());
+    jest
+      .mocked(retrieveSubscription)
+      .mockResolvedValueOnce({ ...subscription, schedule: attachedSchedule() });
+
+    await expect(changeBillingCycle()).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(retrieveSubscription).toHaveBeenNthCalledWith(2, subscriptionId);
+    expect(client.subscriptionSchedules.update).not.toHaveBeenCalled();
+    expect(client.subscriptionSchedules.release).not.toHaveBeenCalled();
   });
 
-  beforeEach(() => {
-    stripeMock.billingPortal.sessions.create.mockReset();
-    stripeMock.billingPortal.sessions.create.mockResolvedValue({
-      url: 'https://stripe.example.test/portal',
+  it('resolves an attached schedule reference and rejects a not-started schedule without changing it', async () => {
+    const schedule = attachedSchedule('not_started');
+    jest.mocked(client.subscriptionSchedules.create).mockRejectedValue(duplicateAttachmentError());
+    jest
+      .mocked(retrieveSubscription)
+      .mockResolvedValueOnce({ ...subscription, schedule: schedule.id });
+    jest.mocked(client.subscriptionSchedules.retrieve).mockResolvedValue({
+      ...schedule,
+      lastResponse: { headers: {}, requestId: 'req_concurrent_schedule', statusCode: 200 },
     });
-    stripeMock.invoices.list.mockReset();
-    stripeMock.invoices.list.mockResolvedValue({ data: [], has_more: false });
-    stripeMock.checkout.sessions.create.mockReset();
-    stripeMock.checkout.sessions.create.mockResolvedValue({
-      url: 'https://stripe.example.test/checkout',
-    });
-    stripeMock.subscriptions.retrieve.mockReset();
-    stripeMock.subscriptions.retrieve.mockResolvedValue({
-      items: { data: [] },
-    });
-    stripeMock.createStripeCustomer.mockReset();
-    stripeMock.createStripeCustomer.mockImplementation(async () => ({ id: 'cus_test_org' }));
+
+    await expect(changeBillingCycle()).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(client.subscriptionSchedules.retrieve).toHaveBeenCalledWith(schedule.id);
+    expect(client.subscriptionSchedules.release).not.toHaveBeenCalled();
   });
 
-  describe('get procedure', () => {
-    it('rejects non-owner members from reading subscription details', async () => {
-      const caller = await createCallerForUser(memberUser.id);
-      await expect(
-        caller.organizations.subscription.get({
-          organizationId: testOrganization.id,
-        })
-      ).rejects.toThrow('You do not have the required organizational role to access this feature');
+  it.each(['released', 'completed', 'canceled'] as const)(
+    'preserves the provider refusal when the schedule is %s',
+    async status => {
+      const error = duplicateAttachmentError();
+      jest.mocked(client.subscriptionSchedules.create).mockRejectedValue(error);
+      jest
+        .mocked(retrieveSubscription)
+        .mockResolvedValueOnce({ ...subscription, schedule: attachedSchedule(status) });
+
+      await expectOriginalFailure(error);
+    }
+  );
+
+  it('does not classify a schedule belonging to another subscription as this race', async () => {
+    const error = duplicateAttachmentError();
+    jest.mocked(client.subscriptionSchedules.create).mockRejectedValue(error);
+    jest.mocked(retrieveSubscription).mockResolvedValueOnce({
+      ...subscription,
+      schedule: attachedSchedule('active', 'sub_other'),
     });
 
-    it('should validate input schema', async () => {
-      const caller = await createCallerForUser(regularUser.id);
-
-      // Test invalid UUID
-      await expect(
-        caller.organizations.subscription.get({
-          organizationId: 'invalid-uuid',
-        })
-      ).rejects.toThrow();
-    });
-
-    it('returns no latest seat purchase status when none exists', async () => {
-      const caller = await createCallerForUser(regularUser.id);
-      const result = await caller.organizations.subscription.get({
-        organizationId: testOrganization.id,
-      });
-
-      expect(result.latestSeatPurchaseStatus).toBeNull();
-    });
-
-    it('returns the latest local seat purchase status for entitlement consumers', async () => {
-      const [purchase] = await db
-        .insert(organization_seats_purchases)
-        .values({
-          organization_id: testOrganization.id,
-          subscription_stripe_id: 'sub_test_latest_status',
-          subscription_status: 'past_due',
-          seat_count: 2,
-          amount_usd: 42,
-          starts_at: '2026-04-01T00:00:00.000Z',
-          expires_at: '2027-04-01T00:00:00.000Z',
-          billing_cycle: 'yearly',
-        })
-        .returning();
-
-      const caller = await createCallerForUser(regularUser.id);
-      const result = await caller.organizations.subscription.get({
-        organizationId: testOrganization.id,
-      });
-
-      expect(result.latestSeatPurchaseStatus).toBe('past_due');
-
-      if (purchase) {
-        await db
-          .delete(organization_seats_purchases)
-          .where(eq(organization_seats_purchases.id, purchase.id));
-      }
-    });
+    await expectOriginalFailure(error);
   });
 
-  describe('getLatestSeatPurchaseStatus procedure', () => {
-    it('allows organization members to read an empty entitlement status without billing details', async () => {
-      const caller = await createCallerForUser(memberUser.id);
-      const result = await caller.organizations.subscription.getLatestSeatPurchaseStatus({
-        organizationId: testOrganization.id,
-      });
-
-      expect(result).toEqual({ latestSeatPurchaseStatus: null });
-      expect(result).not.toHaveProperty('subscription');
-      expect(result).not.toHaveProperty('paidSeatItemId');
-      expect(result).not.toHaveProperty('seatsUsed');
-      expect(stripeMock.subscriptions.retrieve).not.toHaveBeenCalled();
+  it('preserves an unrelated invalid request when no schedule is attached', async () => {
+    const error = Object.assign(new Error('Invalid request'), {
+      type: 'StripeInvalidRequestError',
     });
+    jest.mocked(client.subscriptionSchedules.create).mockRejectedValue(error);
+    jest.mocked(retrieveSubscription).mockResolvedValueOnce(subscription);
 
-    it('allows organization members to read the latest local paid-seat status', async () => {
-      const [purchase] = await db
-        .insert(organization_seats_purchases)
-        .values({
-          organization_id: testOrganization.id,
-          subscription_stripe_id: 'sub_test_member_latest_status',
-          subscription_status: 'past_due',
-          seat_count: 2,
-          amount_usd: 42,
-          starts_at: '2026-04-01T00:00:00.000Z',
-          expires_at: '2027-04-01T00:00:00.000Z',
-          billing_cycle: 'yearly',
-        })
-        .returning();
-
-      const caller = await createCallerForUser(memberUser.id);
-      const result = await caller.organizations.subscription.getLatestSeatPurchaseStatus({
-        organizationId: testOrganization.id,
-      });
-
-      expect(result).toEqual({ latestSeatPurchaseStatus: 'past_due' });
-      expect(stripeMock.subscriptions.retrieve).not.toHaveBeenCalled();
-
-      if (purchase) {
-        await db
-          .delete(organization_seats_purchases)
-          .where(eq(organization_seats_purchases.id, purchase.id));
-      }
-    });
-
-    it('rejects non-members from reading entitlement status', async () => {
-      const caller = await createCallerForUser(_nonMemberUser.id);
-      await expect(
-        caller.organizations.subscription.getLatestSeatPurchaseStatus({
-          organizationId: testOrganization.id,
-        })
-      ).rejects.toThrow('You do not have access to this organization');
-    });
+    await expectOriginalFailure(error);
   });
 
-  describe('getSubscriptionStripeUrl procedure', () => {
-    it('should throw UNAUTHORIZED error for non-owner members', async () => {
-      const caller = await createCallerForUser(memberUser.id);
+  it('preserves an unrelated connection error without another provider read', async () => {
+    const error = Object.assign(new Error('Connection failed'), { type: 'StripeConnectionError' });
+    jest.mocked(client.subscriptionSchedules.create).mockRejectedValue(error);
 
-      await expect(
-        caller.organizations.subscription.getSubscriptionStripeUrl({
-          organizationId: testOrganization.id,
-          seats: 1,
-          cancelUrl: 'https://example.com',
-          billingCycle: 'annual',
-        })
-      ).rejects.toThrow('You do not have the required organizational role to access this feature');
-    });
+    await expectOriginalFailure(error);
 
-    it('should throw UNAUTHORIZED error for non-member users', async () => {
-      const caller = await createCallerForUser(_nonMemberUser.id);
-
-      await expect(
-        caller.organizations.subscription.getSubscriptionStripeUrl({
-          organizationId: testOrganization.id,
-          seats: 1,
-          cancelUrl: 'https://example.com',
-          billingCycle: 'annual',
-        })
-      ).rejects.toThrow('You do not have access to this organization');
-    });
-
-    it('should accept billingCycle parameter without validation error', async () => {
-      const caller = await createCallerForUser(regularUser.id);
-
-      // The call will fail because there's no Stripe customer, but it should NOT
-      // fail on input validation — billingCycle: 'monthly' is a valid schema value.
-      const result = caller.organizations.subscription.getSubscriptionStripeUrl({
-        organizationId: testOrganization.id,
-        seats: 1,
-        cancelUrl: 'https://example.com',
-        billingCycle: 'monthly',
-      });
-
-      // Should pass input validation (no ZodError / BAD_REQUEST), then fail downstream
-      await expect(result).rejects.not.toThrow(/ZodError/);
-    });
-
-    it('should reject requests without billingCycle', async () => {
-      const caller = await createCallerForUser(regularUser.id);
-
-      // billingCycle is required (Seat Purchase 2) — omitting it must fail validation.
-      const result = caller.organizations.subscription.getSubscriptionStripeUrl({
-        organizationId: testOrganization.id,
-        seats: 1,
-        cancelUrl: 'https://example.com',
-      });
-
-      await expect(result).rejects.toThrow();
-    });
+    expect(retrieveSubscription).toHaveBeenCalledTimes(1);
   });
 
-  describe('cancel procedure', () => {
-    it('should throw UNAUTHORIZED error for non-owner users', async () => {
-      const caller = await createCallerForUser(memberUser.id);
+  it('preserves the original provider refusal when the confirming read fails', async () => {
+    const error = duplicateAttachmentError();
+    jest.mocked(client.subscriptionSchedules.create).mockRejectedValue(error);
+    jest.mocked(retrieveSubscription).mockRejectedValueOnce(new Error('Read failed'));
 
-      await expect(
-        caller.organizations.subscription.cancel({
-          organizationId: testOrganization.id,
-        })
-      ).rejects.toThrow('You do not have the required organizational role to access this feature');
-    });
-  });
-
-  describe('stopCancellation procedure', () => {
-    it('should throw UNAUTHORIZED error for non-owner users', async () => {
-      const caller = await createCallerForUser(memberUser.id);
-
-      await expect(
-        caller.organizations.subscription.stopCancellation({
-          organizationId: testOrganization.id,
-        })
-      ).rejects.toThrow('You do not have the required organizational role to access this feature');
-    });
-
-    it('should validate input schema', async () => {
-      const caller = await createCallerForUser(regularUser.id);
-
-      // Test invalid UUID
-      await expect(
-        caller.organizations.subscription.stopCancellation({
-          organizationId: 'invalid-uuid',
-        })
-      ).rejects.toThrow();
-    });
-  });
-
-  describe('updateSeatCount procedure', () => {
-    it('should throw UNAUTHORIZED error for non-owner users', async () => {
-      const caller = await createCallerForUser(memberUser.id);
-
-      await expect(
-        caller.organizations.subscription.updateSeatCount({
-          organizationId: testOrganization.id,
-          newSeatCount: 10,
-        })
-      ).rejects.toThrow('You do not have the required organizational role to access this feature');
-    });
-
-    it('should validate input schema', async () => {
-      const caller = await createCallerForUser(regularUser.id);
-
-      // Test invalid UUID
-      await expect(
-        caller.organizations.subscription.updateSeatCount({
-          organizationId: 'invalid-uuid',
-          newSeatCount: 10,
-        })
-      ).rejects.toThrow();
-    });
-
-    it('should validate newSeatCount is a positive integer', async () => {
-      const caller = await createCallerForUser(regularUser.id);
-
-      // Test negative seat count
-      await expect(
-        caller.organizations.subscription.updateSeatCount({
-          organizationId: testOrganization.id,
-          newSeatCount: -1,
-        })
-      ).rejects.toThrow();
-
-      // Test zero seat count
-      await expect(
-        caller.organizations.subscription.updateSeatCount({
-          organizationId: testOrganization.id,
-          newSeatCount: 0,
-        })
-      ).rejects.toThrow();
-    });
-
-    const periodStart = 1_775_001_600;
-    const periodEnd = 1_777_593_600;
-    it.each([
-      [
-        'an unsafe attached schedule',
-        (_seatPriceId: string, _passPriceId: string) => ({
-          id: 'sub_sched_foreign',
-          status: 'active',
-          metadata: { origin: 'billing-cycle-change' },
-          current_phase: null,
-          phases: [],
-        }),
-        'scheduled change',
-      ],
-      [
-        'a pending Kilo Pass removal',
-        (seatPriceId: string, passPriceId: string) => ({
-          id: 'sub_sched_cancel',
-          status: 'active',
-          metadata: { origin: 'kilo-pass-org-cancellation' },
-          current_phase: { start_date: periodStart, end_date: periodEnd },
-          phases: [
-            {
-              start_date: periodStart,
-              end_date: periodEnd,
-              items: [
-                { price: seatPriceId, quantity: 5 },
-                { price: passPriceId, quantity: 5 },
-              ],
-            },
-            {
-              start_date: periodEnd,
-              end_date: periodEnd + 2_592_000,
-              items: [{ price: seatPriceId, quantity: 5 }],
-            },
-          ],
-        }),
-        'Kilo Pass is scheduled to end',
-      ],
-    ])('maps %s to PRECONDITION_FAILED', async (_case, attachedSchedule, message) => {
-      const { KNOWN_SEAT_PRICE_IDS } = await import('@/lib/stripe');
-      const passPriceId =
-        process.env.STRIPE_KILO_PASS_TIER_19_MONTHLY_PRICE_ID ??
-        'price_test_kilo_pass_tier_19_monthly';
-      const seatPriceId = 'price_router_unsafe_schedule_seat';
-      KNOWN_SEAT_PRICE_IDS.add(seatPriceId);
-      const [purchase] = await db
-        .insert(organization_seats_purchases)
-        .values({
-          organization_id: testOrganization.id,
-          subscription_stripe_id: 'sub_router_unsafe_schedule',
-          subscription_status: 'active',
-          seat_count: 5,
-          amount_usd: 145,
-          starts_at: '2026-04-01T00:00:00.000Z',
-          expires_at: '2026-05-01T00:00:00.000Z',
-          billing_cycle: 'monthly',
-        })
-        .returning();
-      const item = (id: string, price: string) => ({
-        id,
-        quantity: 5,
-        price: { id: price, recurring: { interval: 'month' } },
-        current_period_start: periodStart,
-        current_period_end: periodEnd,
-      });
-      stripeMock.subscriptions.retrieve.mockResolvedValue({
-        id: 'sub_router_unsafe_schedule',
-        status: 'active',
-        metadata: { type: 'kilo-pass-org', organizationId: testOrganization.id },
-        items: {
-          data: [item('si_seat', seatPriceId), item('si_pass', passPriceId)],
-        },
-        schedule: attachedSchedule(seatPriceId, passPriceId),
-      });
-
-      try {
-        const caller = await createCallerForUser(regularUser.id);
-        await expect(
-          caller.organizations.subscription.updateSeatCount({
-            organizationId: testOrganization.id,
-            newSeatCount: 6,
-          })
-        ).rejects.toMatchObject({
-          code: 'PRECONDITION_FAILED',
-          message: expect.stringContaining(message),
-        });
-      } finally {
-        KNOWN_SEAT_PRICE_IDS.delete(seatPriceId);
-        if (purchase) {
-          await db
-            .delete(organization_seats_purchases)
-            .where(eq(organization_seats_purchases.id, purchase.id));
-        }
-      }
-    });
-  });
-
-  describe('getBillingHistory', () => {
-    it('rejects non-owner members', async () => {
-      const caller = await createCallerForUser(memberUser.id);
-      await expect(
-        caller.organizations.subscription.getBillingHistory({
-          organizationId: testOrganization.id,
-        })
-      ).rejects.toThrow('You do not have the required organizational role to access this feature');
-    });
-
-    it('returns empty when no purchase exists', async () => {
-      const caller = await createCallerForUser(regularUser.id);
-      const result = await caller.organizations.subscription.getBillingHistory({
-        organizationId: testOrganization.id,
-      });
-      expect(result).toEqual({ entries: [], hasMore: false, cursor: null });
-    });
-
-    it('maps Stripe invoices through the billing history mapper', async () => {
-      // Insert a fake purchase row so the procedure reaches the Stripe call.
-      const [purchase] = await db
-        .insert(organization_seats_purchases)
-        .values({
-          organization_id: testOrganization.id,
-          subscription_stripe_id: 'sub_test_billing_history',
-          subscription_status: 'active',
-          seat_count: 2,
-          amount_usd: 42,
-          starts_at: '2026-04-01T00:00:00.000Z',
-          expires_at: '2027-04-01T00:00:00.000Z',
-          billing_cycle: 'yearly',
-        })
-        .returning();
-
-      stripeMock.invoices.list.mockResolvedValue({
-        data: [
-          {
-            id: 'in_1',
-            created: 1_700_000_000,
-            amount_due: 4200,
-            amount_paid: 4200,
-            currency: 'usd',
-            status: 'paid',
-            invoice_pdf: 'https://pdf.example.com/1',
-            hosted_invoice_url: 'https://invoice.example.com/1',
-            lines: { data: [] },
-          },
-        ],
-        has_more: false,
-      });
-
-      const caller = await createCallerForUser(regularUser.id);
-      const result = await caller.organizations.subscription.getBillingHistory({
-        organizationId: testOrganization.id,
-      });
-
-      expect(result.entries).toHaveLength(1);
-      expect(result.entries[0]).toMatchObject({ id: 'in_1', status: 'paid' });
-      expect(result.hasMore).toBe(false);
-      expect(result.cursor).toBeNull();
-
-      // Clean up
-      if (purchase) {
-        await db
-          .delete(organization_seats_purchases)
-          .where(eq(organization_seats_purchases.id, purchase.id));
-      }
-    });
+    await expectOriginalFailure(error);
   });
 });

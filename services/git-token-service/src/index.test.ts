@@ -1782,6 +1782,8 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
   it.each([
     'https://github.com/acme/repo.git/info/lfs/objects/batch',
     'https://github.com/acme/repo.git/info/lfs/locks/verify',
+    'https://github.com/acme/repo.git/info/lfs/locks',
+    'https://github.com/acme/repo.git/info/lfs/locks/42/unlock',
   ])('redeems an installation-pinned capability for exact LFS control URL %s', async requestUrl => {
     const service = createService();
     const issued = await service.issueGitHubSessionCapability({
@@ -1810,16 +1812,21 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
   });
 
   it.each([
-    ['POST', 'https://api.github.com/graphql'],
-    ['GET', 'https://api.github.com/user/repos'],
-    ['DELETE', 'https://api.github.com/repos/acme/other/issues/42/comments/1'],
+    ['GET', 'https://api.github.com/repos/acme/repo/pulls/42'],
+    ['POST', 'https://api.github.com/repos/acme/repo/issues/42/comments'],
+    ['PUT', 'https://api.github.com/repos/acme/repo/pulls/42/merge'],
+    ['DELETE', 'https://api.github.com/repos/acme/repo/issues/42/labels/bug'],
     ['GET', 'https://api.github.com/repos/acme/repo/contents/src%2Findex.ts'],
+    ['GET', 'https://api.github.com/user'],
+    ['POST', 'https://api.github.com/graphql'],
+    ['POST', 'https://uploads.github.com/repos/acme/repo/releases/1/assets?name=asset.zip'],
     ['GET', 'https://npm.pkg.github.com/@acme%2fdesign'],
     ['GET', 'https://npm.pkg.github.com/download/@acme/design/1.0.0/package.tgz'],
-    ['POST', 'https://uploads.github.com/repos/acme/other/releases/1/assets?name=asset.zip'],
-    ['POST', 'https://github.com/acme/other.git/info/lfs/objects/batch'],
+    ['GET', 'https://github.com/acme/repo.git/info/refs?service=git-upload-pack'],
+    ['GET', 'https://github.com/acme/repo/info/refs?service=git-upload-pack'],
+    ['POST', 'https://github.com/acme/repo.git/git-receive-pack'],
   ] as const)(
-    'redeems an installation-pinned capability for unrestricted GitHub request %s %s',
+    'redeems an installation-pinned capability for its own repository request %s %s',
     async (requestMethod, requestUrl) => {
       const service = createService();
       const issued = await service.issueGitHubSessionCapability({
@@ -1847,6 +1854,45 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
         appType: 'standard',
       });
       expect(serviceMocks.getTokenForRepo).toHaveBeenCalledOnce();
+    }
+  );
+
+  it.each([
+    ['GET', 'https://api.github.com/repos/acme/other/pulls/42', 'repository_mismatch'],
+    ['GET', 'https://api.github.com/user/repos', 'repository_mismatch'],
+    ['GET', 'https://api.github.com/graphql', 'invalid_upstream_request'],
+    ['OPTIONS', 'https://api.github.com/repos/acme/repo/pulls/42', 'invalid_upstream_request'],
+    [
+      'POST',
+      'https://uploads.github.com/repos/acme/other/releases/1/assets?name=asset.zip',
+      'repository_mismatch',
+    ],
+    ['GET', 'https://npm.pkg.github.com/@other%2fdesign', 'repository_mismatch'],
+    ['POST', 'https://npm.pkg.github.com/@acme%2fdesign', 'invalid_upstream_request'],
+    ['GET', 'https://github.com/acme/other/issues', 'repository_mismatch'],
+    ['GET', 'https://github.com/acme/other.git/archive/main.tar.gz', 'repository_mismatch'],
+    ['GET', 'https://api.github.com/repos/acme/repo/files/..%2f..%2fother', 'invalid_upstream_url'],
+  ] as const)(
+    'applies the recorded repository scope to installation-pinned request %s %s',
+    async (requestMethod, requestUrl, reason) => {
+      const service = createService();
+      const issued = await service.issueGitHubSessionCapability({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId,
+      });
+      if (!issued.success) throw new Error('Expected successful issuance');
+      serviceMocks.getTokenForRepo.mockClear();
+
+      await expect(
+        service.redeemGitHubSessionCapability({
+          capability: issued.capability,
+          outboundContainerId,
+          requestMethod,
+          requestUrl,
+        })
+      ).resolves.toEqual({ success: false, reason });
+      expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
     }
   );
 
@@ -1921,16 +1967,21 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
   });
 
   it.each([
-    ['POST', 'https://api.github.com/graphql'],
-    ['GET', 'https://api.github.com/user/repos'],
-    ['DELETE', 'https://api.github.com/repos/acme/other/issues/42/comments/1'],
+    ['GET', 'https://api.github.com/repos/acme/repo/pulls/42'],
+    ['PATCH', 'https://api.github.com/repos/acme/repo/pulls/42'],
+    ['DELETE', 'https://api.github.com/repos/acme/repo/issues/42/labels/bug'],
     ['GET', 'https://api.github.com/repos/acme/repo/contents/src%2Findex.ts'],
+    ['GET', 'https://api.github.com/user'],
+    ['POST', 'https://api.github.com/graphql'],
+    ['POST', 'https://uploads.github.com/repos/acme/repo/releases/1/assets?name=asset.zip'],
     ['GET', 'https://npm.pkg.github.com/@acme%2fdesign'],
     ['GET', 'https://npm.pkg.github.com/download/@acme/design/1.0.0/package.tgz'],
-    ['POST', 'https://uploads.github.com/repos/acme/other/releases/1/assets?name=asset.zip'],
-    ['GET', 'https://github.com/acme/other.git/info/refs?service=git-upload-pack'],
+    ['GET', 'https://github.com/acme/repo/info/refs?service=git-upload-pack'],
+    ['POST', 'https://github.com/acme/repo.git/info/lfs/objects/batch'],
+    ['GET', 'https://github.com/acme/repo.git/info/lfs/locks?path=asset.bin&limit=100'],
+    ['POST', 'https://github.com/acme/repo.git/info/lfs/locks'],
   ] as const)(
-    'redeems a selected-user capability for unrestricted GitHub request %s %s',
+    'redeems a selected-user capability for its own repository request %s %s',
     async (requestMethod, requestUrl) => {
       const service = createService();
       const issued = await service.issueGitHubSessionCapability({
@@ -1960,6 +2011,194 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
         appType: 'standard',
       });
       expect(serviceMocks.selectUserAuthorization).toHaveBeenCalledOnce();
+    }
+  );
+
+  it('redeems GraphQL for a selected-user capability with the user token', async () => {
+    const service = createService();
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId,
+      allowUserAuthorization: true,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+    serviceMocks.selectUserAuthorization.mockClear();
+    serviceMocks.getTokenForRepo.mockClear();
+
+    await expect(
+      service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestMethod: 'POST',
+        requestUrl: 'https://api.github.com/graphql',
+      })
+    ).resolves.toEqual({
+      success: true,
+      authorization: 'Bearer user-token',
+      installationId: '123',
+      source: 'user',
+      appType: 'standard',
+    });
+    expect(serviceMocks.selectUserAuthorization).toHaveBeenCalledOnce();
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+  });
+
+  it('redeems GraphQL for an installation-source capability with the installation token', async () => {
+    const service = createService();
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+    expect(issued.source).toBe('installation');
+    serviceMocks.selectUserAuthorization.mockClear();
+    serviceMocks.getTokenForRepo.mockClear();
+
+    await expect(
+      service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestMethod: 'POST',
+        requestUrl: 'https://api.github.com/graphql',
+      })
+    ).resolves.toEqual({
+      success: true,
+      authorization: 'Bearer installation-token',
+      installationId: '123',
+      source: 'installation',
+      appType: 'standard',
+    });
+    expect(serviceMocks.getTokenForRepo).toHaveBeenCalledOnce();
+    expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+  });
+
+  it('refuses GraphQL for a selected-user capability whose pin no longer resolves', async () => {
+    const service = createService();
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId,
+      allowUserAuthorization: true,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+    serviceMocks.selectUserAuthorization.mockClear();
+    serviceMocks.selectUserAuthorization.mockResolvedValueOnce({
+      selected: false,
+      reason: 'no_user_authorization',
+    });
+    serviceMocks.getTokenForRepo.mockClear();
+
+    await expect(
+      service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestMethod: 'POST',
+        requestUrl: 'https://api.github.com/graphql',
+      })
+    ).resolves.toEqual({ success: false, reason: 'source_unavailable' });
+    expect(serviceMocks.selectUserAuthorization).toHaveBeenCalledOnce();
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+  });
+
+  it('refuses GraphQL for a selected-user capability when the installation integration no longer matches', async () => {
+    const service = createService();
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId,
+      allowUserAuthorization: true,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+    serviceMocks.findManagedInstallationForRepo.mockResolvedValueOnce({
+      success: false,
+      reason: 'integration_mismatch',
+    });
+    serviceMocks.findRefreshCandidates.mockResolvedValueOnce({ success: true, candidates: [] });
+    serviceMocks.getTokenForRepo.mockClear();
+
+    await expect(
+      service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestMethod: 'POST',
+        requestUrl: 'https://api.github.com/graphql',
+      })
+    ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+  });
+
+  it('forwards a Git request for another repository anonymously', async () => {
+    const service = createService();
+    const issued = await service.issueGitHubSessionCapability({
+      githubRepo: 'acme/repo',
+      userId: 'user_1',
+      outboundContainerId,
+      allowUserAuthorization: true,
+    });
+    if (!issued.success) throw new Error('Expected successful issuance');
+    serviceMocks.selectUserAuthorization.mockClear();
+    serviceMocks.getTokenForRepo.mockClear();
+
+    await expect(
+      service.redeemGitHubSessionCapability({
+        capability: issued.capability,
+        outboundContainerId,
+        requestMethod: 'GET',
+        requestUrl: 'https://github.com/acme/other.git/info/refs?service=git-upload-pack',
+      })
+    ).resolves.toEqual({
+      success: true,
+      authorization: null,
+      installationId: '123',
+      source: 'user',
+      appType: 'standard',
+    });
+    expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
+    expect(serviceMocks.getTokenForRepo).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['GET', 'https://api.github.com/repos/acme/other/pulls/42', 'repository_mismatch'],
+    ['GET', 'https://api.github.com/user/repos', 'repository_mismatch'],
+    [
+      'DELETE',
+      'https://api.github.com/repos/acme/other/issues/42/comments/1',
+      'repository_mismatch',
+    ],
+    [
+      'POST',
+      'https://uploads.github.com/repos/acme/other/releases/1/assets?name=asset.zip',
+      'repository_mismatch',
+    ],
+    ['GET', 'https://npm.pkg.github.com/@other%2fdesign', 'repository_mismatch'],
+    ['OPTIONS', 'https://api.github.com/repos/acme/repo/pulls/42', 'invalid_upstream_request'],
+    ['GET', 'https://github.com/acme/repo2/archive/main.tar.gz', 'repository_mismatch'],
+    ['GET', 'https://github.com/acme/other/issues', 'repository_mismatch'],
+  ] as const)(
+    'applies the recorded repository scope to selected-user request %s %s',
+    async (requestMethod, requestUrl, reason) => {
+      const service = createService();
+      const issued = await service.issueGitHubSessionCapability({
+        githubRepo: 'acme/repo',
+        userId: 'user_1',
+        outboundContainerId,
+        allowUserAuthorization: true,
+      });
+      if (!issued.success) throw new Error('Expected successful issuance');
+      expect(issued.source).toBe('user');
+      serviceMocks.selectUserAuthorization.mockClear();
+
+      await expect(
+        service.redeemGitHubSessionCapability({
+          capability: issued.capability,
+          outboundContainerId,
+          requestMethod,
+          requestUrl,
+        })
+      ).resolves.toEqual({ success: false, reason });
+      expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
     }
   );
 

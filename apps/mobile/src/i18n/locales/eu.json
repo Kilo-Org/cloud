@@ -227,7 +227,6 @@
     "hideBalance": "Ezkutatu saldoa",
     "showBalance": "Erakutsi saldoa",
     "balanceHidden": "Saldoa ezkutatuta dago",
-    "bonusCreditsExpiring": "{{amount}} kreditu iraungiko dira data honetan: {{date}}.",
     "signOutTitle": "Itxi saioa?",
     "signOutMessage": "Zure lan-eremura sartzeko berriro hasi beharko duzu saioa.",
     "deleteAccountTitle": "Ezabatu kontua?",
@@ -876,6 +875,18 @@
       "securityFindingsUnavailable": "Gaitu Kilo segurtasun-agentea esparru batean segurtasun-aurkikuntzak jasotzeko.",
       "spendAlertsSubtitle": "atalaseen gainditzeak eta orduko gorakadak",
       "spendAlertsToggle": "Gastu-alerten kategoria"
+    },
+    "history": {
+      "title": "Jakinarazpenen historia",
+      "subtitle": "Kontu honek jasotako jakinarazpenak",
+      "bannerBody": "Push jakinarazpenak desgaituta daude gailu honetan, beraz, berriak ez dira hona iritsiko.",
+      "bannerAction": "Jakinarazpenen ezarpenak",
+      "emptyTitle": "Oraindik ez dago jakinarazpenik",
+      "emptyCategoryTitle": "Kategoria honetan ez dago jakinarazpenik",
+      "emptyBody": "Kontu honek jasotzen dituen jakinarazpenak hemen agertzen dira. {{days}} egunez gordetzen dira.",
+      "capped": "Azken jakinarazpenak erakusten dira.",
+      "loadError": "Ezin izan da jakinarazpenen historia kargatu.",
+      "openFailed": "Jakinarazpen hau jada ez da inon irekitzen."
     },
     "action": {
       "openSession": "Ireki saioa"
@@ -2592,7 +2603,9 @@
       "retrying": "Berriro saiatzen…",
       "retryDeny": "Saiatu berriro ukatzen",
       "retryAllowOnce": "Saiatu berriro behin bakarrik baimetzen",
-      "retryAlwaysAllow": "Saiatu berriro beti baimetzen"
+      "retryAlwaysAllow": "Saiatu berriro beti baimetzen",
+      "unreadableTitle": "Baimen-eskaera ezin izan da irakurri",
+      "unreadableBody": "Agentea baimen-erabakiaren zain dago, baina aplikazio honek ezin du eskaera hori erakutsi. Eguneratu aplikazioa edo CLI-a, edo erantzun eskaerari CLI-n jarraitzeko."
     },
     "questionCard": {
       "title": "Agenteak zure erantzuna behar du",
@@ -2984,8 +2997,9 @@
     "unavailableDevice": "Ahots-sarrera ez dago erabilgarri gailu honetan.",
     "unavailableLanguage": "Ahots-sarrera ez dago erabilgarri gailu honetan hautatutako hizkuntzarako.",
     "languageNotInstalledTitle": "{{language}} hizkuntzaren ahots-sarrera ez dago prest oraindik",
-    "languageNotInstalledMessage": "{{language}} hizkuntzaren lineaz kanpo ahots-fitxategiak ez daude instalatuta telefono honetan. Deskargatu itzazu eta saiatu berriro ahots-sarrerarekin.",
+    "languageNotInstalledMessage": "{{language}} hizkuntzaren lineaz kanpoko ahots-fitxategiak ez daude instalatuta, eta lineako transkripzioa desaktibatuta dago. Fitxategiak deskargatuz edo lineako transkripzioa berriro aktibatuz, ahots-sarrera erabili ahal izango duzu.",
     "downloadOfflineModel": "Deskargatu",
+    "useOnlineTranscription": "Baimendu lineako transkripzioa",
     "offlineModelDownloadScheduled": "Lineaz kanpoko ahots-fitxategiak atzeko planoan deskargatuko dira. Saiatu ahots-sarrerarekin berriro geroago.",
     "listeningStopped": "Entzutea gelditu da.",
     "transcribing": "Transkribatzen...",
@@ -3159,7 +3173,7 @@
     "creditActivity": {
       "emptyDescription": "Erakunde honen erosketak, erabilera eta kreditu-doikuntzak hemen agertuko dira gertatu ahala.",
       "emptyTitle": "Ez dago kreditu-jarduerarik",
-      "expires": "Iraungitze-data: {{date}}",
+      "expiresUtc": "Iraungitze-data: {{date}} (UTC)",
       "title": "Kreditu-jarduera",
       "transactionFallback": "Kreditu-transakzioa",
       "category": {
@@ -3840,6 +3854,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "•••• gisa erakutsitako balioek gordetako sekretua mantentzen dute; ordeztu balio bat biratzeko. Komando-lerroa aldatzeak balio guztiak berriro eskatzen ditu",
+      "headersHint": "•••• gisa erakutsitako balioek gordetako sekretua mantentzen dute; ordeztu balio bat biratzeko. URLa aldatzeak balio guztiak berriro eskatzen ditu",
       "nameRequired": "Sartu zerbitzariaren izena",
       "nameInvalid": "Izenak ASCII hizkiak, zenbakiak, azpimarra eta marra soilik erabil ditzake, gehienez 100 karaktere",
       "commandRequired": "Sartu komando bat",
@@ -3938,6 +3954,10 @@
   "credits": {
     "title": "Erosi kredituak",
     "description": "Kredituak Kilo App-en AI kodetze-saioak exekutatzeko zure Kilo saldoari gehitzen zaion behin betiko erosketa bat dira. Dendak zure kontuari kobratzen dio eta kredituak dendak ordainketa baieztatu ondoren gehitzen dira.",
+    "nextExpiry": "{{amount}} kreditu iraungiko dira data honetan: {{date}} (UTC). Lehenago iraungitzen diren kredituak erabiltzen dira lehenik.",
+    "appStoreExpiry": "App Store bidez erositako kredituak ez dira iraungitzen.",
+    "playOneYearExpiry": "Kreditu hauek erosi eta urte natural batera iraungitzen dira.",
+    "playNonexpiring": "Kreditu hauek ez dira iraungitzen.",
     "packLabel": "Gehitu {{amount}} kreditutan",
     "priceUnavailable": "Prezioa ez dago erabilgarri",
     "purchased": "Kredituak zure saldoari gehitu zaizkio.",
@@ -4076,6 +4096,10 @@
     "generate": "Sortu laburpena",
     "retrySummary": "Saiatu berriro ordainpeko laburpena sortzen",
     "sources": "Ebidentziak eta artefaktuak",
+    "sessionsShown_one": "{{total}} saiotik {{shown}} erakusten",
+    "sessionsShown_other": "{{total}} saiotatik {{shown}} erakusten",
+    "itemsShown_one": "{{total}} elementutik {{shown}} erakusten",
+    "itemsShown_other": "{{total}} elementutatik {{shown}} erakusten",
     "timezone": "Txostenaren ordu-zona",
     "deviceTimezone": "Erabili gailuaren ordu-zona",
     "timezoneHint": "IANA ordu-zona, adibidez Europe/Berlin. Programazio-aldaketak hurrengo txostenetan aplikatuko dira.",

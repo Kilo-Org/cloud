@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { captureMessage } from '@sentry/nextjs';
+import { captureException, captureMessage } from '@sentry/nextjs';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
 import type { GatewayRequest } from './providers/openrouter/types';
 import { createMockUsageContext } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
@@ -31,6 +31,7 @@ jest.mock('./processUsage', () => ({
 jest.mock('@sentry/nextjs', () => ({
   ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
   captureMessage: jest.fn(),
+  captureException: jest.fn(),
 }));
 
 const mockedErrorExceptInTest = jest.fn();
@@ -66,6 +67,11 @@ import {
   requestedLogprobs,
   requestedSamples,
 } from './llm-proxy-helpers';
+import { createControlledClock } from '@kilocode/web-shared/tests/helpers/timed-body.helper';
+
+const clock = createControlledClock();
+
+const waitForUsageWrite = () => new Promise(resolve => setImmediate(resolve));
 
 describe('getOutputHeaders', () => {
   it.each(['text/event-stream', 'text/event-stream; charset=utf-8', 'Text/Event-Stream'])(
@@ -617,6 +623,117 @@ describe('countAndStoreFimUsage', () => {
     expect(stats.cacheDiscount_mUsd).toBe(0);
     expect(stats.market_cost).toBe(325);
   });
+
+  it('reports a JSON response it cannot parse instead of rejecting', async () => {
+    jest.mocked(captureException).mockClear();
+    const response = new Response(JSON.stringify({ error: { message: 'rate limited' } }), {
+      status: 429,
+    });
+
+    countAndStoreFimUsage(response, makeUsageContext({ status_code: 429 }), undefined);
+    await waitForUsageWrite();
+
+    expect(captureException).toHaveBeenCalledWith(expect.any(TypeError), {
+      tags: { source: 'fim_usage_processing' },
+      extra: { statusCode: 429 },
+    });
+    expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
+  });
+
+  describe('response timing', () => {
+    let clockSpy: ReturnType<typeof clock.install>;
+
+    beforeEach(() => {
+      clockSpy = clock.install();
+      jest.mocked(captureMessage).mockClear();
+    });
+
+    afterEach(() => {
+      clockSpy.mockRestore();
+    });
+
+    it('measures a JSON response from the request start', async () => {
+      const body = clock.bodyArrivingAt([
+        [400, '{"id":"fim-test","model":"mercury-edit-2",'],
+        [450, '"usage":{"prompt_tokens":1000,"completion_tokens":100,"total_tokens":1100},'],
+        [460, '"choices":[{"text":"completion"}]}'],
+      ]);
+
+      countAndStoreFimUsage(
+        new Response(body),
+        makeUsageContext({ requestStartedAt: 100 }),
+        undefined
+      );
+      await waitForUsageWrite();
+
+      const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+      expect(stats).toMatchObject({ latency: 300, generation_time: 60, cost_mUsd: 325 });
+    });
+
+    it('measures a streamed response by its SSE events', async () => {
+      const body = clock.bodyArrivingAt([
+        [300, ': keep-alive\n\n'],
+        [
+          350,
+          'data: {"id":"fim-test","model":"codestral-2508","choices":[{"delta":{"content":"comp"}}]}\n\n',
+        ],
+        [
+          700,
+          'data: {"id":"fim-test","model":"codestral-2508","choices":[{"delta":{"content":"letion"}}],"usage":{"prompt_tokens":1000,"completion_tokens":100,"total_tokens":1100}}\n\n',
+        ],
+        [720, 'data: [DONE]\n\n'],
+      ]);
+
+      countAndStoreFimUsage(
+        new Response(body),
+        makeUsageContext({
+          provider: 'mistral',
+          requested_model: 'mistralai/codestral-2508',
+          isStreaming: true,
+          requestStartedAt: 50,
+        }),
+        undefined
+      );
+      await waitForUsageWrite();
+
+      const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+      expect(stats).toMatchObject({
+        responseContent: 'completion',
+        hasError: false,
+        latency: 300,
+        generation_time: 370,
+        cost_mUsd: 390,
+      });
+    });
+
+    it('records an interrupted stream as an error', async () => {
+      const body = clock.bodyArrivingAt(
+        [
+          [
+            200,
+            'data: {"id":"fim-test","model":"codestral-2508","choices":[{"delta":{"content":"comp"}}]}\n\n',
+          ],
+        ],
+        new TypeError('terminated')
+      );
+
+      countAndStoreFimUsage(
+        new Response(body),
+        makeUsageContext({ provider: 'mistral', isStreaming: true, requestStartedAt: 0 }),
+        undefined
+      );
+      await waitForUsageWrite();
+
+      const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+      expect(stats).toMatchObject({
+        hasError: true,
+        latency: 200,
+        generation_time: 0,
+        cost_mUsd: 0,
+      });
+      expect(captureMessage).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe('countAndStoreEditUsage', () => {
@@ -720,6 +837,28 @@ describe('countAndStoreEditUsage', () => {
     expect(stats.cost_mUsd).toBe(4_750);
     expect(stats.cacheDiscount_mUsd).toBe(20_250);
     expect(stats.market_cost).toBe(4_750);
+  });
+
+  it('measures the response from the request start', async () => {
+    const clockSpy = clock.install();
+    try {
+      const body = clock.bodyArrivingAt([
+        [500, '{"id":"edit-timed","model":"mercury-edit-2",'],
+        [540, '"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15},"choices":[]}'],
+      ]);
+
+      countAndStoreEditUsage(
+        new Response(body),
+        makeUsageContext({ requestStartedAt: 200 }),
+        undefined
+      );
+      await waitForUsageWrite();
+    } finally {
+      clockSpy.mockRestore();
+    }
+
+    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats).toMatchObject({ messageId: 'edit-timed', latency: 300, generation_time: 40 });
   });
 
   it('does not log usage when the upstream body is missing', async () => {
@@ -925,7 +1064,7 @@ describe('parseTranscriptionUsageFromResponse', () => {
     expect(result.is_byok).toBe(true);
   });
 
-  it('stores duration as generation time', () => {
+  it('does not store the audio duration as generation time', () => {
     const result = parseTranscriptionUsageFromResponse(
       makeResponse(),
       200,
@@ -934,7 +1073,7 @@ describe('parseTranscriptionUsageFromResponse', () => {
       null
     );
 
-    expect(result.generation_time).toBe(2.5);
+    expect(result.generation_time).toBeNull();
   });
 
   it('falls back to requested model when response model is absent', () => {

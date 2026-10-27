@@ -28,33 +28,44 @@ describe('fetchExpiringTransactions', () => {
     expect(result[0].expiry_date).toContain(futureDate.slice(0, 10));
   });
 
-  test('excludes already-expired transactions (credits_expired)', async () => {
-    const user = await insertTestUser();
-    const pastDate = new Date(Date.now() - 86400000).toISOString();
+  test.each([
+    { category: 'credits_expired', matchesOwner: true, closed: true },
+    { category: 'orb_credit_expired', matchesOwner: true, closed: true },
+    { category: 'orb_credit_voided', matchesOwner: true, closed: true },
+    { category: 'accounting_adjustment', matchesOwner: true, closed: false },
+    { category: null, matchesOwner: true, closed: false },
+    { category: 'credits_expired', matchesOwner: false, closed: false },
+  ])(
+    'matches expiration owner and category ($category, owner match: $matchesOwner)',
+    async ({ category, matchesOwner, closed }) => {
+      const user = await insertTestUser();
+      const closureOwner = matchesOwner ? user : await insertTestUser();
+      const pastDate = new Date(Date.now() - 86400000).toISOString();
 
-    const [original] = await db
-      .insert(credit_transactions)
-      .values({
-        kilo_user_id: user.id,
-        amount_microdollars: 5_000_000,
+      const [original] = await db
+        .insert(credit_transactions)
+        .values({
+          kilo_user_id: user.id,
+          amount_microdollars: 5_000_000,
+          is_free: true,
+          credit_category: 'free_credits',
+          expiry_date: pastDate,
+        })
+        .returning();
+
+      // Add expiration record
+      await db.insert(credit_transactions).values({
+        kilo_user_id: closureOwner.id,
+        amount_microdollars: -5_000_000,
         is_free: true,
-        credit_category: 'free_credits',
-        expiry_date: pastDate,
-      })
-      .returning();
+        credit_category: category,
+        original_transaction_id: original.id,
+      });
 
-    // Add expiration record
-    await db.insert(credit_transactions).values({
-      kilo_user_id: user.id,
-      amount_microdollars: -5_000_000,
-      is_free: true,
-      credit_category: 'credits_expired',
-      original_transaction_id: original.id,
-    });
-
-    const result = await fetchExpiringTransactions(user.id);
-    expect(result).toHaveLength(0);
-  });
+      const result = await fetchExpiringTransactions(user.id);
+      expect(result.map(transaction => transaction.id)).toEqual(closed ? [] : [original.id]);
+    }
+  );
 });
 
 describe('recomputeNextCreditExpiration', () => {

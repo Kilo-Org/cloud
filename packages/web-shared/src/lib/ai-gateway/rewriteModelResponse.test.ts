@@ -25,6 +25,7 @@ import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake
 import { eq } from 'drizzle-orm';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import type { RewriteResponseParams } from './rewriteModelResponse.shared';
+import { CUSTOM_PRICING_FALLBACK_CONFIG } from './custom-pricing.constants';
 
 jest.mock('@kilocode/web-shared/lib/r2/create-client', () =>
   jest
@@ -56,6 +57,7 @@ const freeUsageContext = {
   provider: 'openrouter',
   is_free: true,
   user_byok: false,
+  custom_pricing_config: CUSTOM_PRICING_FALLBACK_CONFIG,
   api_kind: 'chat_completions',
 } satisfies RewriteResponseParams['usageContext'];
 
@@ -907,6 +909,43 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect(json.choices[0].message.reasoning_details).toBeUndefined();
     });
 
+    test('adds the missing function type to message tool calls', async () => {
+      const upstream = jsonResponse({
+        model: 'mistral-medium-3',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              tool_calls: [
+                { id: 'BlUZaHnVa', function: { name: 'read', arguments: '{}' }, index: 0 },
+              ],
+            },
+            finish_reason: 'tool_calls',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message.tool_calls).toEqual([
+        {
+          id: 'BlUZaHnVa',
+          type: 'function',
+          function: { name: 'read', arguments: '{}' },
+          index: 0,
+        },
+      ]);
+    });
+
     test('drops null message tool_calls', async () => {
       const upstream = jsonResponse({
         model: 'upstream-model',
@@ -1231,6 +1270,36 @@ describe('rewriteModelResponse_ChatCompletions', () => {
             format: 'google-gemini-v1',
           },
         ],
+      });
+    });
+
+    test('adds the missing function type to starting tool call deltas only', async () => {
+      const upstream = sseResponse(
+        'data: {"model":"mistral-medium-3","choices":[{"index":0,"delta":{"tool_calls":[{"id":"1KVxQL4of","function":{"name":"read","arguments":"{\\"a\\""},"index":0}]}},{"index":0,"delta":{"tool_calls":[{"function":{"arguments":":1}"},"index":0}]}}]}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
+        choices: Array<{ delta: { tool_calls: Array<Record<string, unknown>> } }>;
+      }>;
+
+      expect(chunk.choices[0].delta.tool_calls[0]).toEqual({
+        id: '1KVxQL4of',
+        type: 'function',
+        function: { name: 'read', arguments: '{"a"' },
+        index: 0,
+      });
+      expect(chunk.choices[1].delta.tool_calls[0]).toEqual({
+        function: { arguments: ':1}' },
+        index: 0,
       });
     });
 
@@ -2036,6 +2105,7 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
               provider,
               is_free: isFree,
               user_byok: userByok,
+              custom_pricing_config: CUSTOM_PRICING_FALLBACK_CONFIG,
               api_kind: shape.kind,
             },
             usage,
@@ -2064,6 +2134,7 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
           provider: 'openai-chatgpt',
           is_free: false,
           user_byok: false,
+          custom_pricing_config: CUSTOM_PRICING_FALLBACK_CONFIG,
           api_kind: shape.kind,
         },
         {
@@ -2093,6 +2164,7 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
             provider: 'vercel',
             is_free: false,
             user_byok: false,
+            custom_pricing_config: CUSTOM_PRICING_FALLBACK_CONFIG,
             api_kind: shape.kind,
           },
           {
@@ -2128,6 +2200,7 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
             provider: 'vercel',
             is_free: false,
             user_byok: userByok,
+            custom_pricing_config: CUSTOM_PRICING_FALLBACK_CONFIG,
             api_kind: shape.kind,
           },
           {
@@ -2197,6 +2270,7 @@ test.each(['openrouter', 'vercel'] as const)(
         provider,
         is_free: false,
         user_byok: false,
+        custom_pricing_config: CUSTOM_PRICING_FALLBACK_CONFIG,
         api_kind: 'messages',
       },
       capture: null,
@@ -2236,6 +2310,7 @@ test.each(['provider_metadata', 'providerMetadata'])(
         provider: 'vercel',
         is_free: false,
         user_byok: false,
+        custom_pricing_config: CUSTOM_PRICING_FALLBACK_CONFIG,
         api_kind: 'messages',
       },
       capture: null,
@@ -2310,6 +2385,7 @@ describe.each(usageShapes.filter(shape => shape.kind !== 'chat_completions'))(
             provider: 'vercel',
             is_free: false,
             user_byok: false,
+            custom_pricing_config: CUSTOM_PRICING_FALLBACK_CONFIG,
             api_kind: shape.kind,
           },
           capture: null,

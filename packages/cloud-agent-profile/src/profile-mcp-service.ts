@@ -111,33 +111,50 @@ function encryptValue(publicKeyBase64: string, value: string): EncryptedEnvelope
   return encryptWithPublicKey(value, publicKey);
 }
 
-/**
- * Encrypt plaintext values, but reuse an existing stored value for any key
- * whose input value is exactly `MASKED_SECRET_VALUE`. This lets the edit UI
- * surface existing keys with the placeholder so the user can decide per-key
- * whether to rotate or keep the secret — a replace-everything update would
- * otherwise force re-entering all values.
- *
- * Today the user-facing tRPC schema treats every value as a secret (see
- * `mcpLocalConfigInputSchema.environment`), so this function always emits
- * envelopes for fresh values. The `existing` record is typed as the
- * persisted union (`string | EncryptedEnvelope`) because legacy rows or a
- * future "non-secret" code path may have plaintext entries that need to
- * round-trip past the masked placeholder unchanged.
- */
 function encryptRecord(
   publicKeyBase64: string,
-  values: Record<string, string> | undefined,
-  existing?: Record<string, StoredMcpSecretValue>
+  values: Record<string, string> | undefined
 ): Record<string, StoredMcpSecretValue> | undefined {
   if (!values) return undefined;
   const out: Record<string, StoredMcpSecretValue> = {};
   for (const [key, value] of Object.entries(values)) {
-    if (value === MASKED_SECRET_VALUE && existing?.[key] !== undefined) {
-      out[key] = existing[key];
-    } else {
+    out[key] = encryptValue(publicKeyBase64, value);
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+type DestinationRule = {
+  unchanged: boolean;
+  field: 'command line' | 'URL';
+  kind: 'Environment' | 'Header';
+};
+
+function updateValueRecord(
+  publicKeyBase64: string,
+  values: Record<string, string> | undefined,
+  stored: Record<string, StoredMcpSecretValue> | undefined,
+  destination: DestinationRule
+): Record<string, StoredMcpSecretValue> | undefined {
+  if (!values) return undefined;
+  const out: Record<string, StoredMcpSecretValue> = {};
+  for (const [key, value] of Object.entries(values)) {
+    if (value !== MASKED_SECRET_VALUE) {
       out[key] = encryptValue(publicKeyBase64, value);
+      continue;
     }
+    if (!destination.unchanged) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: `${destination.kind} values must be re-entered when the ${destination.field} changes`,
+      });
+    }
+    const reused = stored?.[key];
+    if (reused === undefined) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: `Enter a value for "${key}": there is no stored ${destination.kind.toLowerCase()} value to keep`,
+      });
+    }
+    out[key] = reused;
   }
   return Object.keys(out).length > 0 ? out : undefined;
 }
@@ -159,49 +176,35 @@ function buildStoredConfig(
   existing?: StoredMcpConfig
 ): StoredMcpConfig {
   if (input.type === 'local') {
-    const existingLocal = existing && 'command' in existing ? existing : undefined;
-    if (
-      existing &&
-      (existingLocal === undefined ||
-        JSON.stringify(existingLocal.command) !== JSON.stringify(input.config.command)) &&
-      hasMaskedValue(input.config.environment)
-    ) {
-      throw new TRPCError({
-        code: 'BAD_REQUEST',
-        message:
-          'The command changed, so stored environment values cannot be kept: re-enter them as plain values',
-      });
-    }
+    const stored = existing !== undefined && 'command' in existing ? existing : undefined;
+    const commandUnchanged =
+      stored !== undefined &&
+      stored.command.length === input.config.command.length &&
+      stored.command.every((part, index) => part === input.config.command[index]);
     return {
       command: input.config.command,
-      environment: encryptRecord(
-        publicKeyBase64,
-        input.config.environment,
-        existingLocal?.environment
-      ),
+      environment:
+        existing === undefined
+          ? encryptRecord(publicKeyBase64, input.config.environment)
+          : updateValueRecord(publicKeyBase64, input.config.environment, stored?.environment, {
+              unchanged: commandUnchanged,
+              field: 'command line',
+              kind: 'Environment',
+            }),
     };
   }
-  const existingRemote = existing && 'url' in existing ? existing : undefined;
-  if (
-    existing &&
-    (existingRemote === undefined || existingRemote.url !== input.config.url) &&
-    hasMaskedValue(input.config.headers)
-  ) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message:
-        'The URL changed, so stored header values cannot be kept: re-enter them as plain values',
-    });
-  }
+  const stored = existing !== undefined && 'url' in existing ? existing : undefined;
   return {
     url: input.config.url,
-    headers: encryptRecord(publicKeyBase64, input.config.headers, existingRemote?.headers),
+    headers:
+      existing === undefined
+        ? encryptRecord(publicKeyBase64, input.config.headers)
+        : updateValueRecord(publicKeyBase64, input.config.headers, stored?.headers, {
+            unchanged: stored !== undefined && stored.url === input.config.url,
+            field: 'URL',
+            kind: 'Header',
+          }),
   };
-}
-
-function hasMaskedValue(values: Record<string, string> | undefined): boolean {
-  if (!values) return false;
-  return Object.values(values).some(value => value === MASKED_SECRET_VALUE);
 }
 
 /**

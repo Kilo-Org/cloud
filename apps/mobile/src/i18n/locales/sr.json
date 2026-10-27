@@ -227,7 +227,6 @@
     "hideBalance": "Sakrij saldo",
     "showBalance": "Prikaži saldo",
     "balanceHidden": "Saldo je sakriven",
-    "bonusCreditsExpiring": "Krediti u iznosu od {{amount}} ističu {{date}}.",
     "signOutTitle": "Odjaviti se?",
     "signOutMessage": "Moraćeš ponovo da se prijaviš da bi pristupio svom radnom prostoru.",
     "deleteAccountTitle": "Obrisati nalog?",
@@ -895,6 +894,18 @@
       "securityFindingsUnavailable": "Omogućite Kilo bezbednosnog agenta na opsegu da biste dobijali bezbednosne nalaze.",
       "spendAlertsSubtitle": "prekoračenja pragova i skokovi po satu",
       "spendAlertsToggle": "Kategorija obaveštenja o potrošnji"
+    },
+    "history": {
+      "title": "Istorija obaveštenja",
+      "subtitle": "Obaveštenja koja je ovaj nalog primio",
+      "bannerBody": "Push obaveštenja su isključena za ovaj uređaj, pa nova neće stizati ovde.",
+      "bannerAction": "Podešavanja obaveštenja",
+      "emptyTitle": "Još nema obaveštenja",
+      "emptyCategoryTitle": "Nema obaveštenja u ovoj kategoriji",
+      "emptyBody": "Obaveštenja koja ovaj nalog prima prikazuju se ovde. Čuvaju se {{days}} dana.",
+      "capped": "Prikazuju se najnovija obaveštenja.",
+      "loadError": "Učitavanje istorije obaveštenja nije uspelo.",
+      "openFailed": "Ovo obaveštenje se više ne otvara nigde."
     },
     "action": {
       "openSession": "Otvori sesiju"
@@ -2628,7 +2639,9 @@
       "retrying": "Ponovni pokušaj…",
       "retryDeny": "Pokušaj ponovo da odbiješ",
       "retryAllowOnce": "Pokušaj ponovo da dozvoliš jednom",
-      "retryAlwaysAllow": "Pokušaj ponovo da uvek dozvoliš"
+      "retryAlwaysAllow": "Pokušaj ponovo da uvek dozvoliš",
+      "unreadableTitle": "Zahtev za dozvolu nije mogao da se pročita",
+      "unreadableBody": "Agent čeka odluku o dozvoli koju ova aplikacija ne može da prikaže. Ažurirajte aplikaciju ili CLI, ili odgovorite na zahtev u CLI-ju da biste nastavili."
     },
     "questionCard": {
       "title": "Agent čeka odgovor",
@@ -3027,8 +3040,9 @@
     "unavailableDevice": "Glasovni unos nije dostupan na ovom uređaju.",
     "unavailableLanguage": "Glasovni unos nije dostupan za jezik ovog uređaja.",
     "languageNotInstalledTitle": "Glasovni unos za {{language}} još nije spreman",
-    "languageNotInstalledMessage": "Datoteke govora za vanmrežni rad za {{language}} nisu instalirane na ovom telefonu. Preuzmi ih, a zatim pokušaj glasovni unos ponovo.",
+    "languageNotInstalledMessage": "Datoteke govora za vanmrežni rad za {{language}} nisu instalirane, a mrežna obrada govora je isključena. Preuzmi datoteke ili ponovo uključi mrežnu obradu govora da bi glasovni unos radio.",
     "downloadOfflineModel": "Preuzmi",
+    "useOnlineTranscription": "Dozvoli mrežnu obradu govora",
     "offlineModelDownloadScheduled": "Datoteke govora za vanmrežni rad biće preuzete u pozadini. Pokušaj glasovni unos ponovo kasnije.",
     "listeningStopped": "Slušanje je zaustavljeno.",
     "transcribing": "Transkribujem…",
@@ -3203,7 +3217,7 @@
     "creditActivity": {
       "emptyDescription": "Ovde će se prikazivati kupovine, potrošnja i korekcije kredita ove organizacije čim se evidentiraju.",
       "emptyTitle": "Nema promena kredita",
-      "expires": "Ističe {{date}}",
+      "expiresUtc": "Ističe {{date}} (UTC)",
       "title": "Istorija kredita",
       "transactionFallback": "Transakcija kredita",
       "category": {
@@ -3891,6 +3905,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Vrednosti prikazane kao •••• zadržavaju sačuvanu tajnu; zamenite vrednost da biste je rotirali. Promena komandne linije zahteva ponovni unos svih vrednosti",
+      "headersHint": "Vrednosti prikazane kao •••• zadržavaju sačuvanu tajnu; zamenite vrednost da biste je rotirali. Promena URL-a zahteva ponovni unos svih vrednosti",
       "nameRequired": "Unesite ime servera",
       "nameInvalid": "Ime može da koristi samo ASCII slova, brojeve, donje crte i crtice, najviše 100 znakova",
       "commandRequired": "Unesite komandu",
@@ -3989,6 +4005,10 @@
   "credits": {
     "title": "Kupi kredite",
     "description": "Krediti su jednokratna kupovina koja se dodaje na tvoj Kilo saldo za pokretanje AI sesija kodiranja u Kilo aplikaciji. Prodavnica tereti tvoj račun, a krediti se dodaju nakon što prodavnica potvrdi plaćanje.",
+    "nextExpiry": "Krediti u iznosu od {{amount}} ističu {{date}} (UTC). Prvo se troše krediti sa najranijim rokom isteka.",
+    "appStoreExpiry": "Krediti kupljeni preko App Store-a ne ističu.",
+    "playOneYearExpiry": "Ovi krediti ističu jednu kalendarsku godinu nakon kupovine.",
+    "playNonexpiring": "Ovi krediti ne ističu.",
     "packLabel": "Dodaj {{amount}} u kreditima",
     "priceUnavailable": "Cena nije dostupna",
     "purchased": "Krediti su dodati na tvoj saldo.",
@@ -4131,6 +4151,12 @@
     "generate": "Generiši rezime",
     "retrySummary": "Ponovi plaćeni rezime",
     "sources": "Dokazi i artefakti",
+    "sessionsShown_one": "Prikazano {{shown}} od {{total}} sesije",
+    "sessionsShown_few": "Prikazano {{shown}} od {{total}} sesije",
+    "sessionsShown_other": "Prikazano {{shown}} od {{total}} sesija",
+    "itemsShown_one": "Prikazano {{shown}} od {{total}} stavke",
+    "itemsShown_few": "Prikazano {{shown}} od {{total}} stavke",
+    "itemsShown_other": "Prikazano {{shown}} od {{total}} stavki",
     "timezone": "Vremenska zona izveštaja",
     "deviceTimezone": "Koristi vremensku zonu uređaja",
     "timezoneHint": "IANA vremenska zona, na primer Europe/Berlin. Izmene rasporeda važe za buduće izveštaje.",

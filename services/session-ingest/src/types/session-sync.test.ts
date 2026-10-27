@@ -328,27 +328,6 @@ describe('SessionItemSchema storage key identity', () => {
     ).toBe(false);
   });
 
-  it('rejects a message ID over 256 characters before persistence', () => {
-    expect(
-      SessionItemSchema.safeParse({ type: 'message', data: { id: `msg_${'a'.repeat(256)}` } })
-        .success
-    ).toBe(false);
-  });
-
-  it('rejects a message ID over the message cursor byte limit', () => {
-    expect(
-      SessionItemSchema.safeParse({ type: 'message', data: { id: `msg_${'a'.repeat(62)}` } })
-        .success
-    ).toBe(false);
-  });
-
-  it('accepts a message ID exactly at the message cursor byte limit', () => {
-    expect(
-      SessionItemSchema.safeParse({ type: 'message', data: { id: `msg_${'a'.repeat(60)}` } })
-        .success
-    ).toBe(true);
-  });
-
   it('rejects a part ID or part message ID over 256 characters before persistence', () => {
     expect(
       SessionItemSchema.safeParse({

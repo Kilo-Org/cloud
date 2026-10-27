@@ -5,7 +5,6 @@ import type { AutoFreeConfig, CustomLlmDefinition } from '@kilocode/db/schema-ty
 import type { CustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   customLlmDefinition,
-  insertCustomLlmForTest,
   publicCustomLlmDefinition,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import {
@@ -73,7 +72,10 @@ describe('isAutoFreeEligibleModelId', () => {
     ],
     [
       'a public custom LLM without Chat Completions',
-      publicCustomLlmDefinition(['acme'], { api_kinds: ['messages'] }),
+      publicCustomLlmDefinition(['acme'], {
+        api_kinds: ['messages'],
+        opencode_settings: { ai_sdk_provider: 'anthropic' },
+      }),
       false,
     ],
     [
@@ -88,18 +90,31 @@ describe('isAutoFreeEligibleModelId', () => {
 });
 
 describe('getIneligibleAutoFreeModelIds', () => {
-  it('accepts public custom LLMs and rejects private ones', async () => {
-    await insertCustomLlmForTest('acme/public-free', publicCustomLlmDefinition(['acme']));
-    await insertCustomLlmForTest('acme/private-free', customLlmDefinition());
+  it('accepts public custom LLMs and rejects private ones', () => {
+    const customLlms: CustomLlm[] = [
+      {
+        public_id: 'Acme/Public-Free',
+        definition: publicCustomLlmDefinition(['acme']),
+        encrypted_api_key: null,
+      },
+      {
+        public_id: 'acme/private-free',
+        definition: customLlmDefinition(),
+        encrypted_api_key: null,
+      },
+    ];
 
-    await expect(
-      getIneligibleAutoFreeModelIds({
-        models: ['acme/public-free', 'acme/private-free', 'provider/paid-model'].map(model => ({
-          model,
-          weight: 1,
-          reasoning: {},
-        })),
-      })
-    ).resolves.toEqual(['acme/private-free', 'provider/paid-model']);
+    expect(
+      getIneligibleAutoFreeModelIds(
+        {
+          models: ['acme/public-free', 'acme/private-free', 'provider/paid-model'].map(model => ({
+            model,
+            weight: 1,
+            reasoning: {},
+          })),
+        },
+        customLlms
+      )
+    ).toEqual(['acme/private-free', 'provider/paid-model']);
   });
 });

@@ -4,7 +4,8 @@ import {
   getIneligibleAutoFreeModelIds,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { ai_gateway_config } from '@kilocode/db/schema';
+import { ai_gateway_config, custom_llm2 } from '@kilocode/db/schema';
+import { parseCustomLlmRows } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { AutoFreeConfigSchema } from '@kilocode/db/schema-types';
 import { TRPCError } from '@trpc/server';
 import { eq } from 'drizzle-orm';
@@ -25,8 +26,12 @@ export const adminAutoFreeConfigRouter = createTRPCRouter({
   }),
 
   set: adminProcedure.input(SetAutoFreeConfigSchema).mutation(async ({ input }) => {
+    // Read the primary, not the cached catalog, so a custom LLM saved moments ago counts.
     const ineligibleModelIds = input.config
-      ? await getIneligibleAutoFreeModelIds(input.config)
+      ? getIneligibleAutoFreeModelIds(
+          input.config,
+          parseCustomLlmRows(await db.select().from(custom_llm2))
+        )
       : [];
     if (ineligibleModelIds.length > 0) {
       throw new TRPCError({

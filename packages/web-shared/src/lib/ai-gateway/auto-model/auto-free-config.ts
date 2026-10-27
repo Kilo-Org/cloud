@@ -4,7 +4,6 @@ import { isKiloAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model'
 import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   isPublicCustomLlm,
-  requireCustomLlmsById,
   type CustomLlm,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { getCustomLlmApiKinds } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/api-kinds';
@@ -44,8 +43,13 @@ export function isAutoFreeEligibleModelId(
   return isFreeModelExcludingCustomLlms(model) && getAiSdkProvider(model, null) === undefined;
 }
 
-export async function getIneligibleAutoFreeModelIds(config: AutoFreeConfig): Promise<string[]> {
-  const customLlmsById = await requireCustomLlmsById();
+export function getIneligibleAutoFreeModelIds(
+  config: AutoFreeConfig,
+  customLlms: ReadonlyArray<CustomLlm>
+): string[] {
+  const customLlmsById = new Map(
+    customLlms.map(customLlm => [customLlm.public_id.toLowerCase(), customLlm])
+  );
   return config.models
     .map(({ model }) => model)
     .filter(model => !isAutoFreeEligibleModelId(model, customLlmsById.get(model.toLowerCase())));

@@ -341,7 +341,6 @@ describe('SessionItemSchema storage key identity', () => {
         .success
     ).toBe(false);
   });
-
   it('rejects a part ID or part message ID over 256 characters before persistence', () => {
     expect(
       SessionItemSchema.safeParse({

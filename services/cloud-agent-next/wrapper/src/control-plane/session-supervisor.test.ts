@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { CONTROL_PLANE_TIMERS } from '../../../src/shared/control-plane-timers.js';
 import {
   createSessionSupervisor,
   type ExecutionFailure,
@@ -26,7 +27,7 @@ function fixture() {
   const supervisor = createSessionSupervisor({
     nativeRuntimeId: 'runtime-1',
     directory: '/workspace',
-    timers: { noProgressMs: 20 * MINUTE, turnHardCapMs: 120 * MINUTE },
+    timers: CONTROL_PLANE_TIMERS.wrapper,
     now: () => now,
     onDeadline: (identity, reason, retry) => failures.push({ identity, reason, retry }),
     interrupt: (identity, reason, signal) => {
@@ -79,6 +80,40 @@ function fixture() {
     event('session.status', { sessionID: id, status: { type: 'idle' } });
     event('session.turn.close', { sessionID: id, reason: 'completed' });
   }
+  function assistantMessage(
+    id: string,
+    messageID: string,
+    time: { created: number; completed?: number }
+  ) {
+    event('message.updated', {
+      info: { id: messageID, sessionID: id, role: 'assistant', time },
+    });
+  }
+  function assistantText(id: string, messageID: string, partID: string, content: string) {
+    event('message.part.updated', {
+      part: { id: partID, sessionID: id, messageID, type: 'text', text: content },
+    });
+  }
+  function assistantTool(
+    id: string,
+    messageID: string,
+    partID: string,
+    status: string,
+    name = 'bash',
+    metadata: Record<string, unknown> = {}
+  ) {
+    event('message.part.updated', {
+      part: {
+        id: partID,
+        sessionID: id,
+        messageID,
+        type: 'tool',
+        tool: name,
+        callID: partID,
+        state: { status, metadata },
+      },
+    });
+  }
   return {
     supervisor,
     event,
@@ -86,6 +121,9 @@ function fixture() {
     tool,
     text,
     close,
+    assistantMessage,
+    assistantText,
+    assistantTool,
     failures,
     interruptions,
     recovery,
@@ -233,7 +271,7 @@ describe('native session supervision', () => {
   it('does not name a retry for the wall-clock execution limit', () => {
     const f = fixture();
     f.open();
-    for (let step = 0; step < 6; step++) {
+    for (let step = 0; step < 37; step++) {
       f.advance(19 * MINUTE);
       f.text('root', `output ${step}`);
       f.supervisor.tick();
@@ -242,7 +280,7 @@ describe('native session supervision', () => {
       sessionID: 'root',
       status: { type: 'retry', attempt: 1, message: 'Rate limit exceeded', next: 5_000 },
     });
-    f.advance(6 * MINUTE);
+    f.advance(17 * MINUTE);
     f.supervisor.tick();
     expect(f.failures.map(({ reason, retry }) => ({ reason, retry }))).toEqual([
       { reason: 'execution_limit', retry: undefined },
@@ -403,10 +441,10 @@ describe('native session supervision', () => {
     expect(f.failures.map(x => x.identity.sessionId)).toEqual(['unrelated', 'child']);
   });
 
-  it('keeps the 120 minute wall clock cap during progress and user waits', () => {
+  it('keeps the twelve-hour wall clock cap during progress and user waits', () => {
     const f = fixture();
     f.open();
-    for (let step = 0; step < 11; step++) {
+    for (let step = 0; step < 71; step++) {
       f.advance(10 * MINUTE);
       f.text('root', String(step));
       f.supervisor.tick();
@@ -433,7 +471,7 @@ describe('native session supervision', () => {
     f.event('session.turn.open', { sessionID: 'root' });
     f.event('session.status', { sessionID: 'root', status: { type: 'busy' } });
     expect(f.supervisor.state('root')?.execution).toBe(first?.execution);
-    for (let step = 0; step < 5; step++) {
+    for (let step = 0; step < 65; step++) {
       f.advance(10 * MINUTE);
       f.text('root', `after follow-up ${step}`);
       f.supervisor.tick();
@@ -534,7 +572,7 @@ describe('native session supervision', () => {
     expect(f.supervisor.needsCompute()).toBe(false);
   });
 
-  it('asks snapshots to re-read only in-flight assistant messages and bounds snapshot roles', () => {
+  it('asks snapshots to re-read only live assistant messages and bounds live roles', () => {
     const f = fixture();
     f.open();
     f.event('message.updated', {
@@ -557,15 +595,242 @@ describe('native session supervision', () => {
       { id: 'root', directory: '/workspace', messageIds: ['assistant-root'] },
     ]);
     expect(f.recovery).toEqual([]);
+    const live = (id: string) => ({
+      info: { id, role: 'assistant' as const },
+      parts: [],
+    });
     f.supervisor.reconcile(
       [
         {
           ...observation(),
-          messages: Array.from({ length: 1_000 }, (_, index) => completed(`m${index}`)),
+          messages: Array.from({ length: 1_000 }, (_, index) => live(`m${index}`)),
         },
       ],
       f.supervisor.beginSnapshot()
     );
+    expect(f.recovery).toEqual(['activity_capacity']);
+  });
+
+  it('retires terminal history without exhausting roles or parts across a long serial execution', () => {
+    const f = fixture();
+    f.open();
+    const execution = f.supervisor.state('root')?.execution;
+    const startedAt = f.supervisor.state('root')?.startedAt;
+    for (let index = 0; index < 1_500; index++) {
+      const messageID = `assistant-${index}`;
+      f.event('message.updated', {
+        info: { id: `user-${index}`, sessionID: 'root', role: 'user' },
+      });
+      f.assistantMessage('root', messageID, { created: 1_000 + index });
+      f.assistantText('root', messageID, `${messageID}-one`, `output ${index}`);
+      f.assistantText('root', messageID, `${messageID}-two`, `more ${index}`);
+      f.assistantMessage('root', messageID, {
+        created: 1_000 + index,
+        completed: 1_000 + index,
+      });
+    }
+    expect(f.recovery).toEqual([]);
+    expect(f.supervisor.state('root')?.execution).toBe(execution);
+    expect(f.supervisor.state('root')?.startedAt).toBe(startedAt);
+    expect(f.supervisor.observedSessions()).toEqual([
+      { id: 'root', directory: '/workspace', messageIds: ['assistant-root'] },
+    ]);
+    f.advance(20 * MINUTE);
+    f.supervisor.tick();
+    expect(f.failures.map(failure => failure.reason)).toEqual(['no_progress']);
+  });
+
+  it('terminal replay after retirement never resets no-progress', () => {
+    const f = fixture();
+    f.open();
+    f.assistantMessage('root', 'assistant-done', { created: 1_000 });
+    f.assistantText('root', 'assistant-done', 'done-text', 'finished');
+    f.assistantMessage('root', 'assistant-done', { created: 1_000, completed: 1_000 });
+    f.advance(20 * MINUTE - 1);
+    // A snapshot and feed replay of the same terminal message are not progress.
+    f.supervisor.reconcile(
+      [
+        {
+          ...observation(),
+          messages: [
+            {
+              info: {
+                id: 'assistant-done',
+                role: 'assistant',
+                time: { created: 1_000, completed: 1_000 },
+              },
+              parts: [{ id: 'done-text', messageID: 'assistant-done', type: 'text', text: 'x' }],
+            },
+          ],
+        },
+      ],
+      f.supervisor.beginSnapshot()
+    );
+    f.assistantText('root', 'assistant-done', 'done-text', 'replayed');
+    f.supervisor.tick();
+    expect(f.failures).toEqual([]);
+    f.advance(1);
+    f.supervisor.tick();
+    expect(f.failures.map(failure => failure.reason)).toEqual(['no_progress']);
+  });
+
+  it('does not credit a completed history message without assistant evidence', () => {
+    const f = fixture();
+    f.open();
+    f.advance(20 * MINUTE - 1);
+    f.supervisor.reconcile(
+      [
+        {
+          ...observation(),
+          messages: [
+            {
+              info: {
+                id: 'assistant-empty',
+                role: 'assistant',
+                time: { created: 1_000, completed: 1_100_000 },
+              },
+              parts: [],
+            },
+          ],
+        },
+      ],
+      f.supervisor.beginSnapshot()
+    );
+    f.supervisor.tick();
+    expect(f.failures).toEqual([]);
+    f.advance(1);
+    f.supervisor.tick();
+    expect(f.failures.map(failure => failure.reason)).toEqual(['no_progress']);
+  });
+
+  it('retired history replay does not reset a later execution', () => {
+    const f = fixture();
+    f.open();
+    f.assistantMessage('root', 'assistant-first', { created: 1_000 });
+    f.assistantText('root', 'assistant-first', 'first-text', 'first');
+    f.assistantMessage('root', 'assistant-first', { created: 1_000, completed: 1_000 });
+    f.close();
+    f.advance(1_000);
+    f.open();
+    const startedAt = f.supervisor.state('root')?.startedAt;
+    const snapshot = {
+      ...observation(),
+      messages: [
+        {
+          info: {
+            id: 'assistant-first',
+            role: 'assistant',
+            time: { created: 1_000, completed: 1_000 },
+          },
+          parts: [{ id: 'first-text', messageID: 'assistant-first', type: 'text', text: 'old' }],
+        },
+      ],
+    };
+    f.advance(20 * MINUTE - 1);
+    f.supervisor.reconcile([snapshot], f.supervisor.beginSnapshot());
+    f.supervisor.tick();
+    expect(f.supervisor.state('root')?.startedAt).toBe(startedAt);
+    expect(f.failures).toEqual([]);
+    f.advance(1);
+    f.supervisor.tick();
+    expect(f.failures.map(failure => failure.reason)).toEqual(['no_progress']);
+  });
+
+  it('credits a message completed between snapshot read and reconcile exactly once', () => {
+    const f = fixture();
+    f.open();
+    f.assistantMessage('root', 'assistant-live', { created: 1_000 });
+    f.assistantText('root', 'assistant-live', 'live-text', 'partial');
+    f.advance(19 * MINUTE);
+    const snapshot: SessionObservation = {
+      ...observation(),
+      messages: [
+        {
+          info: {
+            id: 'assistant-live',
+            role: 'assistant',
+            time: { created: 1_000, completed: 1_140_000 },
+          },
+          parts: [
+            { id: 'live-text', messageID: 'assistant-live', type: 'text', text: 'partial' },
+            { id: 'live-more', messageID: 'assistant-live', type: 'text', text: 'finished' },
+          ],
+        },
+      ],
+    };
+    f.supervisor.reconcile([snapshot], f.supervisor.beginSnapshot());
+    f.advance(20 * MINUTE - 1);
+    f.supervisor.reconcile([snapshot], f.supervisor.beginSnapshot());
+    f.supervisor.tick();
+    expect(f.failures).toEqual([]);
+    f.advance(1);
+    f.supervisor.tick();
+    expect(f.failures.map(failure => failure.reason)).toEqual(['no_progress']);
+  });
+
+  it('pins a live tool while later completed assistants are retired', () => {
+    const f = fixture();
+    f.open();
+    f.tool();
+    for (let index = 0; index < 50; index++) {
+      const messageID = `assistant-later-${index}`;
+      f.assistantMessage('root', messageID, { created: 1_001 + index });
+      f.assistantText('root', messageID, `${messageID}-text`, 'step');
+      f.assistantMessage('root', messageID, {
+        created: 1_001 + index,
+        completed: 1_001 + index,
+      });
+    }
+    expect(f.supervisor.observedSessions()).toEqual([
+      { id: 'root', directory: '/workspace', messageIds: ['assistant-root'] },
+    ]);
+    expect(f.supervisor.needsCompute()).toBe(true);
+  });
+
+  it('pins a running tool that is first seen inside completed history', () => {
+    const f = fixture();
+    f.open();
+    const snapshot: SessionObservation = {
+      ...observation('root', 'idle'),
+      messages: [
+        {
+          info: {
+            id: 'assistant-tool',
+            role: 'assistant',
+            time: { created: 1_000, completed: 1_100 },
+          },
+          parts: [
+            {
+              id: 'pinned',
+              messageID: 'assistant-tool',
+              type: 'tool',
+              tool: 'bash',
+              state: { status: 'running' },
+            },
+          ],
+        },
+      ],
+    };
+    f.supervisor.reconcile([snapshot], f.supervisor.beginSnapshot());
+    expect(f.supervisor.observedSessions()).toEqual([
+      { id: 'root', directory: '/workspace', messageIds: ['assistant-tool', 'assistant-root'] },
+    ]);
+    expect(f.supervisor.needsCompute()).toBe(true);
+    f.advance(20 * MINUTE);
+    f.supervisor.reconcile([snapshot], f.supervisor.beginSnapshot());
+    f.supervisor.tick();
+    expect(f.failures.map(failure => failure.reason)).toEqual(['no_progress']);
+  });
+
+  it('fails real concurrent capacity instead of discarding live work', () => {
+    const f = fixture();
+    f.open();
+    f.event('message.updated', {
+      info: { id: 'assistant-parts', sessionID: 'root', role: 'assistant' },
+    });
+    for (let index = 0; index < 2_001; index++) {
+      f.assistantTool('root', 'assistant-parts', `part-${index}`, 'running');
+    }
     expect(f.recovery).toEqual(['activity_capacity']);
   });
 

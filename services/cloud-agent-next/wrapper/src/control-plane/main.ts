@@ -1,5 +1,6 @@
 import {
   CONTROL_PLANE_ALLOCATION_ID_ENV,
+  type ControlPlaneSessionControlResult,
   type ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
 import {
@@ -21,7 +22,11 @@ import {
   createControlFileLogUploader,
   type ControlFileLogUploader,
 } from '../control/file-log-uploader.js';
-import { logToFile } from '../utils.js';
+import {
+  createControlLogUploadAuth,
+  type ControlLogUploadAuth,
+} from '../control/log-upload-auth.js';
+import { logToFile, withTimeoutAndAbort } from '../utils.js';
 import { createControlPlaneConnection, type ControlPlaneConnection } from './connection.js';
 import {
   cleanupStaleKiloPidfiles,
@@ -81,6 +86,10 @@ export type ControlPlaneLifecycleDeps = {
   connection: ControlPlaneConnection;
   diagnostics: Pick<ControlDiagnostics, 'onDiagnostic' | 'finalize'>;
   fileLogs: Pick<ControlFileLogUploader, 'finalize'>;
+  logUploadAuth?: Pick<
+    ControlLogUploadAuth,
+    'current' | 'waitForCurrent' | 'disconnected' | 'stop'
+  >;
   onNativeDiagnostic?: ControlDiagnosticReporter;
   exit: (code: number) => void;
   process?: ControlPlaneProcess;
@@ -123,7 +132,24 @@ export function createControlPlaneLifecycle(
     if (shuttingDown) return;
     shuttingDown = true;
     log(`control-plane wrapper stopping exitCode=${exitCode} reason=${reason}`);
+    let diagnosticsBudget = DIAGNOSTICS_FINALIZE_TIMEOUT_MS;
+    const uploadAuth = deps.logUploadAuth;
+    if (uploadAuth && uploadAuth.current() === undefined) {
+      const started = performance.now();
+      await settle(async () => {
+        await withTimeoutAndAbort(
+          uploadAuth.waitForCurrent(AbortSignal.timeout(diagnosticsBudget)),
+          {
+            timeoutMs: diagnosticsBudget,
+            timeoutMessage: 'Final upload credential refresh timed out',
+            abortMessage: 'Final upload credential refresh aborted',
+          }
+        );
+      });
+      diagnosticsBudget = Math.max(0, diagnosticsBudget - Math.ceil(performance.now() - started));
+    }
     deps.connection.close();
+    uploadAuth?.disconnected();
     await settle(() => deps.stop?.() ?? Promise.resolve());
     const detail = diagnosticDetail(reason);
     deps.diagnostics.onDiagnostic('wrapper.lifecycle', {
@@ -131,8 +157,11 @@ export function createControlPlaneLifecycle(
       exitCode,
       ...(detail ? { detail } : {}),
     });
-    await settle(() => deps.diagnostics.finalize(DIAGNOSTICS_FINALIZE_TIMEOUT_MS));
+    await settle(() => deps.diagnostics.finalize(diagnosticsBudget));
     await settle(() => deps.fileLogs.finalize(FILE_LOG_FINALIZE_TIMEOUT_MS));
+    // Only after the final uploads have had their budget: stopping earlier
+    // would hide the credential those uploads need.
+    deps.logUploadAuth?.stop();
     deps.exit(exitCode);
   }
 
@@ -216,6 +245,7 @@ export type ControlPlaneFrameDispatcherDeps = {
   worktreeChanges: { current?: ReturnType<typeof createControlPlaneWorktreeChanges> };
   worktreeDeletion: { current?: ReturnType<typeof createControlPlaneWorktreeDeletion> };
   kiloRequests: { current?: ReturnType<typeof createControlPlaneKiloRequests> };
+  logUploadAuth?: Pick<ControlLogUploadAuth, 'receive'>;
   send: (frame: ControlPlaneWrapperFrame) => void;
   log: (message: string) => void;
 };
@@ -282,6 +312,48 @@ export function createControlPlaneFrameDispatcher(
       case 'kilo.request':
         void deps.kiloRequests.current?.handle(frame);
         return;
+      case 'session.control': {
+        const emptyResult: ControlPlaneSessionControlResult =
+          frame.action === 'coverage'
+            ? { type: 'coverage', coveredMessageIds: [] }
+            : { type: 'abandon', outcome: 'absent', cleanedMessageIds: [] };
+        const turnManager = deps.turns.current;
+        if (turnManager === undefined) {
+          deps.send({
+            type: 'session.control.result',
+            requestId: frame.requestId,
+            ok: true,
+            result: emptyResult,
+          });
+          return;
+        }
+        void turnManager.sessionControl(frame).then(
+          result => {
+            deps.send({
+              type: 'session.control.result',
+              requestId: frame.requestId,
+              ok: true,
+              result,
+            });
+          },
+          () => {
+            deps.send({
+              type: 'session.control.result',
+              requestId: frame.requestId,
+              ok: false,
+              error: {
+                code: 'session_control_failed',
+                message: 'Session ownership could not be confirmed',
+                retryable: true,
+              },
+            });
+          }
+        );
+        return;
+      }
+      case 'logs.credentials':
+        deps.logUploadAuth?.receive(frame);
+        return;
       case 'terminal.create':
       case 'terminal.resize':
       case 'terminal.close':
@@ -309,10 +381,22 @@ export async function runControlPlaneWrapper(
   const projector = createControlDiagnosticProjector({
     enabled: nativeControlPlaneLogsEnabled(env),
   });
-  const diagnostics = createControlDiagnostics({ uploadUrl, uploadGrant, projector });
+  // The connection is created below; the auth owner sends the original launch
+  // grant as renewal proof once the socket is authenticated.
+  const uploadAuthSendRef: { current?: (frame: ControlPlaneWrapperFrame) => void } = {};
+  const logUploadAuth = createControlLogUploadAuth({
+    initialGrant: uploadGrant,
+    send: frame => uploadAuthSendRef.current?.(frame),
+    log: logToFile,
+  });
+  const diagnostics = createControlDiagnostics({
+    uploadUrl,
+    auth: logUploadAuth,
+    projector,
+  });
   const fileLogs = createControlFileLogUploader({
     uploadUrl,
-    uploadGrant,
+    auth: logUploadAuth,
     wrapperLogPath: env.WRAPPER_LOG_PATH,
     onDiagnostic: diagnostics.onDiagnostic,
     projector,
@@ -398,7 +482,10 @@ export async function runControlPlaneWrapper(
     timers,
     log: logToFile,
     onNativeDiagnostic: projector,
-    getHeartbeat: host.getHeartbeat,
+    getHeartbeat: () => {
+      logUploadAuth.tick();
+      return host.getHeartbeat();
+    },
     onFrame: createControlPlaneFrameDispatcher({
       preparation: preparationRef,
       turns: turnsRef,
@@ -406,13 +493,21 @@ export async function runControlPlaneWrapper(
       worktreeChanges: worktreeChangesRef,
       worktreeDeletion: worktreeDeletionRef,
       kiloRequests: kiloRequestsRef,
+      logUploadAuth,
       send: frame => connection.send(frame),
       log: logToFile,
     }),
     onShutdown: reason => shutdownRef.current?.(reason),
-    onConnected: () => diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'ready', ok: true }),
-    onDisconnected: reason => logToFile(`control-plane disconnected: ${reason}`),
+    onConnected: () => {
+      diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'ready', ok: true });
+      logUploadAuth.connected();
+    },
+    onDisconnected: reason => {
+      logUploadAuth.disconnected();
+      logToFile(`control-plane disconnected: ${reason}`);
+    },
   });
+  uploadAuthSendRef.current = frame => connection.send(frame);
   terminalsRef.current = createControlPlaneTerminals({
     controlUrl: url,
     wrapperId: connection.wrapperId,
@@ -507,6 +602,7 @@ export async function runControlPlaneWrapper(
     connection,
     diagnostics,
     fileLogs,
+    logUploadAuth,
     onNativeDiagnostic: projector,
     exit: code => process.exit(code),
     log: logToFile,

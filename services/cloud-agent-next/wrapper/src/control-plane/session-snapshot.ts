@@ -76,6 +76,7 @@ export async function readSessionSnapshot(input: {
           .map(message => message.info.id),
       ]);
       for (const messageId of messageIds) {
+        if (byId.has(messageId)) continue;
         const message = await client.getSessionMessage(id, directory, messageId, signal);
         if (message.info.sessionID !== id || message.info.id !== messageId)
           throw new Error('Activity snapshot received mismatched message identity');

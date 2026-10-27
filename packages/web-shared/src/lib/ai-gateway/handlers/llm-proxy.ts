@@ -119,7 +119,6 @@ import {
   applyResolvedModel,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
 import { decideCustomRouter } from '@kilocode/web-shared/lib/ai-gateway/auto-model/custom-router';
-import { findEffectiveLegacyPoolRouter } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { checkAutoDecision } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-decision';
 import {
   fetchCustomRouterDecision,
@@ -530,17 +529,6 @@ export async function handleLlmProxyRequest(
       requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id ||
       requestedModelLowerCased === KILO_AUTO_BALANCED_MODEL.id;
     isAutoRoutedRequest = isAutoEfficientId || isCustomRouterModelId(requestedModelLowerCased);
-    let legacyPoolTarget = false;
-    const legacyPoolRouter = async (): Promise<CustomRouterReference | null> => {
-      const auth = await authPromise;
-      if (!auth.user || auth.authFailedResponse) return null;
-      const router = await findEffectiveLegacyPoolRouter({
-        userId: auth.user.id,
-        organizationId: auth.organizationId ?? null,
-      });
-      legacyPoolTarget = router !== null;
-      return router ? { scope: router.ownerType, slug: router.slug } : null;
-    };
     const decisionForRouter = async (router: AutoRouter) => {
       const { user, authFailedResponse, organizationId } = await authPromise;
       // The classifier uses Kilo's paid credential. Unauthenticated callers
@@ -548,8 +536,8 @@ export async function handleLlmProxyRequest(
       if (!user || authFailedResponse) return null;
       const owner = { userId: user.id, organizationId: organizationId ?? null };
       const deniedModelIds = await autoRoutingDenials(
-        policy => collectDeniedAutoRoutingModelIds(policy, owner, router),
-        () => collectDataCollectionRequiredAutoRoutingModelIds(owner, router)
+        policy => collectDeniedAutoRoutingModelIds(policy, router),
+        () => collectDataCollectionRequiredAutoRoutingModelIds(router)
       );
       const result = await fetchEfficientAutoDecision({
         ...decisionRequest(owner),
@@ -583,9 +571,7 @@ export async function handleLlmProxyRequest(
             ...decisionRequest(caller),
             router: router.baseRouter,
             customRouter: reference,
-            requestedModel: legacyPoolTarget
-              ? requestedModel
-              : customRouterModelId(router.ownerType, router.slug),
+            requestedModel: customRouterModelId(router.ownerType, router.slug),
             deniedModelIds,
           });
           if (outcome.kind === 'ok') legacyClassifierCostUsd = outcome.costUsd;
@@ -612,7 +598,6 @@ export async function handleLlmProxyRequest(
         efficientDecision,
         frontierDecision,
         customRouterDecision,
-        legacyPoolRouter,
         organizationContext: organizationContextPromise,
         isAutoFreeCandidateAllowed: async modelId => {
           const policy = await organizationGroupPolicyPromise;

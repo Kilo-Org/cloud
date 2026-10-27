@@ -42,10 +42,7 @@ import {
   fetchCustomRouterDecision,
   fetchEfficientAutoDecision,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
-import {
-  findCustomRouter,
-  findEffectiveLegacyPoolRouter,
-} from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
+import { findCustomRouter } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import {
   signAutoDecision,
   type AutoDecisionPayload,
@@ -199,7 +196,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models', () =
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
   findCustomRouter: jest.fn(),
-  findEffectiveLegacyPoolRouter: jest.fn().mockResolvedValue(null),
 }));
 let mockDecisionSecret = 'test-decision-secret';
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
@@ -244,7 +240,6 @@ const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage)
 const mockedFetchEfficientAutoDecision = jest.mocked(fetchEfficientAutoDecision);
 const mockedFetchCustomRouterDecision = jest.mocked(fetchCustomRouterDecision);
 const mockedFindCustomRouter = jest.mocked(findCustomRouter);
-const mockedFindEffectiveLegacyPoolRouter = jest.mocked(findEffectiveLegacyPoolRouter);
 const mockedDeniedAutoRoutingCandidates = jest.mocked(deniedAutoRoutingCandidates);
 const mockedIsReleaseToggleEnabled = jest.mocked(isReleaseToggleEnabled);
 const mockedCollectDeniedAutoRoutingModelIds = jest.mocked(collectDeniedAutoRoutingModelIds);
@@ -2392,7 +2387,6 @@ describe('kilo-auto/efficient classifier billing', () => {
 
       expect(response.status).toBe(200);
       expect(mockedCollectDataCollectionRequiredAutoRoutingModelIds).toHaveBeenCalledWith(
-        { userId: 'user-123', organizationId: 'org-123' },
         'efficient'
       );
       expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
@@ -2589,7 +2583,6 @@ describe('custom routers and signed auto decisions', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedFindEffectiveLegacyPoolRouter.mockResolvedValue(null);
     mockDecisionSecret = 'test-decision-secret';
     setUserAuth();
     mockedGetProvider.mockResolvedValue({
@@ -2623,54 +2616,10 @@ describe('custom routers and signed auto decisions', () => {
   });
 
   describe('gateway path', () => {
-    it.each(['kilo-auto/efficient', 'kilo-auto/balanced'])(
-      'routes migrated %s through the canonical pool without changing billing attribution',
-      async model => {
-        const migrated: CustomRouterDefinition = {
-          ...personalRouter,
-          slug: 'efficient',
-          baseRouter: 'efficient',
-          legacyPool: true,
-        };
-        mockedFindEffectiveLegacyPoolRouter.mockResolvedValue(migrated);
-        mockedFindCustomRouter.mockResolvedValue(migrated);
-
-        const response = await handleLlmProxyRequest(makeRequest(makeBody(model)));
-
-        expect(response.status).toBe(200);
-        expect(mockedFetchCustomRouterDecision).toHaveBeenCalledWith(
-          expect.objectContaining({
-            customRouter: { scope: 'user', slug: 'efficient' },
-            requestedModel: model,
-          })
-        );
-        expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
-        expect(usageContext()).toMatchObject({ auto_model: model });
-      }
-    );
-
-    it('does not serve a platform fallback for a migrated pool when its worker is unavailable', async () => {
-      const migrated: CustomRouterDefinition = {
-        ...personalRouter,
-        slug: 'efficient',
-        baseRouter: 'efficient',
-        legacyPool: true,
-      };
-      mockedFindEffectiveLegacyPoolRouter.mockResolvedValue(migrated);
-      mockedFindCustomRouter.mockResolvedValue(migrated);
-      mockedFetchCustomRouterDecision.mockResolvedValue({ kind: 'unavailable' });
-
-      const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')));
-
-      expect(response.status).toBe(503);
-      expect(mockedFetchEfficientAutoDecision).not.toHaveBeenCalled();
-      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-    });
-
-    it('answers a retryable auto_routing_unavailable when the pool lookup for denials fails', async () => {
+    it('answers a retryable auto_routing_unavailable when loading routing-table denials fails', async () => {
       setOrganizationAuth('org-1');
       mockedCollectDeniedAutoRoutingModelIds.mockRejectedValueOnce(
-        new Error('Could not resolve the organization pool during the migration notice period')
+        new Error('Could not load the routing table')
       );
 
       const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')));

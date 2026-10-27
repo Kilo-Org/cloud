@@ -2,9 +2,9 @@
 
 ## Status
 
-Accepted. Supersedes [ADR 0003: Efficient Model Pools](./0003-efficient-model-pools.md) at the
-cutover described below. Amends [ADR 0002](./0002-auto-routing-efficient.md) invariant 5 for
-custom routers only.
+Accepted and in effect. Supersedes [ADR 0003: Efficient Model Pools](./0003-efficient-model-pools.md)
+since the cutover described below. Amends [ADR 0002](./0002-auto-routing-efficient.md) invariant 5
+for custom routers only.
 
 ## Context
 
@@ -293,6 +293,10 @@ The scanner requires `CLOUDFLARE_API_TOKEN` and `INTERNAL_API_SECRET`.
 Retain every report. Resolve unreadable, invalid, unmatched, missing-owner, collision, and
 router-cap findings before declaring the cohort complete. Interrupted writes retain a recovery
 fence; retry the conversion rather than clearing the fence manually.
+If a scan response is lost, recover owner keys from the structured
+`auto_routing_owner_pool_conversion_scan` event's `readFailedOwners`, `invalidPoolOwners`,
+`invalidModeOwners`, `needsAttentionOwners`, and `notPostedOwners` arrays before declaring the
+run clean; a retry can skip owners already marked converted.
 `--limit` controls the page size, not the total number of owners.
 
 Set `CUTOVER_AT` to a future timestamp with an explicit timezone.
@@ -314,6 +318,24 @@ successful targets. Resolve unknown delivery outcomes against provider records w
 `--reconcile-target` and `--reconcile-outcome`; use `--help` for the exact recovery procedure.
 Do not discard a used plan or remove its lock until the prior sender has stopped.
 A changed cutover date requires a separately reviewed update campaign, not an ordinary retry.
+If cutover passes during sending, the script stops before the next recipient and returns the
+saved partial summary with a nonzero exit status. Pending recipients stay pending; sent and
+unknown outcomes retain their history. Do not send an expired advance notice. Preserve the
+original campaign for reconciliation, and review a future campaign containing only pending or
+provider-confirmed `not_sent` recipients. Explicitly exclude sent and unknown targets; copying
+the entire original cohort into a new directory would notify successful recipients again.
+
+### Cutover verification
+
+- Verify a mode-only owner and an owner with a converted pool.
+- Save each platform mode, restart the worker, and read the saved mode again.
+- Clear the organization override and verify personal-mode inheritance.
+- Clear the personal mode and verify the default.
+- Verify Efficient selects from the platform table despite a retained legacy pool.
+- Edit a non-default custom-router member without changing the default member.
+- Reload the settings page and verify the custom pool, mode, and benchmark difficulty.
+- During tooling retirement, reuse the persisted namespace and verify these settings again.
+- Confirm the retired conversion endpoint returns not found while mode reads and writes remain available.
 
 ## Invariants
 

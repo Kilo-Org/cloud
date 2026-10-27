@@ -48,7 +48,6 @@ import {
 } from './[scope]/[slug]/client-entries/route';
 
 jest.mock('@kilocode/web-shared/lib/user/server');
-jest.mock('@kilocode/web-shared/lib/posthog-feature-flags');
 jest.mock('@kilocode/web-shared/lib/organizations/trial-middleware');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client', () => ({
   getCustomRouterStatus: jest.fn(),
@@ -219,91 +218,33 @@ describe('/api/auto-routing/custom-routers', () => {
   });
 
   describe('migrated owner pools', () => {
-    test('a migrated owner edits the canonical router and keeps full router access', async () => {
+    test('all owners can discover and create routers after cutover', async () => {
       await create(routerBody());
+      await create(routerBody({ slug: 'efficient' }));
+      const listed = await list();
+      expect(listed.body.canCreate).toBe(true);
+      expect(listed.body.routers).toHaveLength(2);
+      expect((await create(routerBody({ slug: 'another' }))).status).toBe(201);
+    });
+
+    test('returned migrated routers omit compatibility metadata', async () => {
       await create(routerBody({ slug: 'efficient' }));
       await db
         .update(auto_routing_custom_routers)
         .set({ legacy_pool: true, legacy_mode_inherited: true })
-        .where(eq(auto_routing_custom_routers.slug, 'efficient'));
 
-      const listed = await list();
-      expect(listed.body.canCreate).toBe(true);
-      expect(listed.body.routers).toEqual([
-        expect.objectContaining({ slug: 'coding', legacyPool: false, canEdit: true }),
-        expect.objectContaining({ slug: 'efficient', legacyPool: true, canEdit: true }),
-      ]);
-      expect((await create(routerBody({ slug: 'another' }))).status).toBe(201);
-      expect((await getRouter(request('/user/coding'), params('user', 'coding'))).status).toBe(200);
-      const response = await updateRouter(
-        request('/user/efficient', {
-          method: 'PATCH',
-          body: {
-            name: 'Edited pool',
-            mode: 'best_accuracy',
-            entries: [gateway(FLASH)],
-            defaultEntryKey: customRouterEntryKey(gateway(FLASH)),
-          },
-        }),
-        params('user', 'efficient')
-      );
-      expect(response.status).toBe(200);
-      expect(((await response.json()) as CustomRouterResponse).router).toMatchObject({
-        slug: 'efficient',
-        name: 'Edited pool',
-        mode: 'best_accuracy',
-        legacyPool: true,
-        legacyModeInherited: false,
-        defaultEntryKey: customRouterEntryKey(gateway(FLASH)),
-      });
-    });
-
-    test('an entries-only custom edit preserves the preexisting inherited mode marker', async () => {
-      await create(routerBody({ slug: 'efficient' }));
-      await db
-        .update(auto_routing_custom_routers)
-        .set({
-          legacy_pool: true,
-          legacy_mode_inherited: true,
-        })
         .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id));
-
-      const response = await updateRouter(
-        request('/user/efficient', {
-          method: 'PATCH',
-          body: {
-            entries: [gateway(FLASH)],
-            defaultEntryKey: customRouterEntryKey(gateway(FLASH)),
-          },
-        }),
-        params('user', 'efficient')
-      );
-
-      expect(response.status).toBe(200);
-      expect(((await response.json()) as CustomRouterResponse).router).toMatchObject({
-        legacyPool: true,
-        legacyModeInherited: true,
-      });
+      const listed = await list();
+      expect(listed.body.routers[0]).not.toHaveProperty('legacyPool');
+      expect(listed.body.routers[0]).not.toHaveProperty('legacyModeInherited');
     });
 
-    test('preserves the migrated slug and row while allowing benchmark difficulty edits', async () => {
+    test('releases migrated base changes and deletion while retaining provenance', async () => {
       await create(routerBody({ slug: 'efficient' }));
       await db
         .update(auto_routing_custom_routers)
         .set({ legacy_pool: true })
         .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id));
-
-      expect(
-        (
-          await updateRouter(
-            request('/user/efficient', {
-              method: 'PATCH',
-              body: { slug: 'renamed', name: 'Edited' },
-            }),
-            params('user', 'efficient')
-          )
-        ).status
-      ).toBe(400);
       expect(
         (
           await updateRouter(
@@ -312,6 +253,8 @@ describe('/api/auto-routing/custom-routers', () => {
           )
         ).status
       ).toBe(200);
+      const [row] = await db.select().from(auto_routing_custom_routers);
+      expect(row).toMatchObject({ base_router: 'frontier', legacy_pool: true });
       expect(
         (
           await deleteRouter(
@@ -319,13 +262,11 @@ describe('/api/auto-routing/custom-routers', () => {
             params('user', 'efficient')
           )
         ).status
-      ).toBe(400);
-      const [row] = await db.select().from(auto_routing_custom_routers);
-      expect(row).toMatchObject({ slug: 'efficient', base_router: 'frontier', legacy_pool: true });
+      ).toBe(204);
     });
 
     test.each(['member', 'billing_manager'] as const)(
-      'an organization %s retains existing role permissions on a migrated router',
+      'an organization %s retains existing role permissions',
       async role => {
         const organization = await createTestOrganization('Migrated', user.id, 0);
         await create(
@@ -348,7 +289,6 @@ describe('/api/auto-routing/custom-routers', () => {
         expect(listed.body.routers).toEqual([
           expect.objectContaining({
             modelId: 'kilo-auto/custom/org/efficient',
-            legacyPool: true,
             canEdit: role === 'billing_manager',
           }),
         ]);
@@ -361,7 +301,7 @@ describe('/api/auto-routing/custom-routers', () => {
     );
 
     test.each(['owner', 'admin', 'billing_manager'] as const)(
-      'a parent %s can discover and edit every router of its child organization',
+      'a parent %s can discover and edit its child routers',
       async role => {
         const parent = await createTestOrganization('Parent', user.id, 0);
         const childOwner = await insertTestUser();
@@ -386,19 +326,34 @@ describe('/api/auto-routing/custom-routers', () => {
         const listed = await list();
         expect(listed.status).toBe(200);
         expect(listed.body.canCreate).toBe(true);
-        expect(listed.body.routers).toEqual([
-          expect.objectContaining({
-            modelId: 'kilo-auto/custom/org/efficient',
-            legacyPool: true,
-            canEdit: true,
-          }),
-          expect.objectContaining({
-            modelId: 'kilo-auto/custom/org/unrelated-router',
-            legacyPool: false,
-            canEdit: true,
-          }),
-        ]);
-        mockedRequireActiveSubscription.mockClear();
+        expect(listed.body.routers).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ modelId: 'kilo-auto/custom/org/efficient', canEdit: true }),
+            expect.objectContaining({
+              modelId: 'kilo-auto/custom/org/unrelated-router',
+              canEdit: true,
+            }),
+          ])
+        );
+        expect(
+          (await getRouter(request('/org/efficient'), params('org', 'efficient'))).status
+        ).toBe(200);
+        expect(
+          (
+            await updateRouter(
+              request('/org/efficient', {
+                method: 'PATCH',
+                body: { name: 'Inherited editor change' },
+              }),
+              params('org', 'efficient')
+            )
+          ).status
+        ).toBe(200);
+        expect((await create(routerBody({ scope: 'org', slug: 'new-router' }))).status).toBe(201);
+        expect(
+          (await getRouter(request('/org/unrelated-router'), params('org', 'unrelated-router')))
+            .status
+        ).toBe(200);
         expect(
           (
             await updateRouter(
@@ -525,7 +480,6 @@ describe('/api/auto-routing/custom-routers', () => {
       expect((await list()).status).toBe(403);
     });
   });
-
   describe('personal routers', () => {
     test('creates a router owned by the authenticated user, ignoring owner fields in the body', async () => {
       const other = await insertTestUser();
@@ -708,7 +662,7 @@ describe('/api/auto-routing/custom-routers', () => {
       expect(created.body).toMatchObject({
         error: {
           code: 'invalid_request',
-          message: expect.stringContaining('frontier base router are not available yet'),
+          message: expect.stringContaining('frontier benchmark difficulty are not available yet'),
         },
       });
       expect(mockedRegister).toHaveBeenCalledWith(
@@ -747,6 +701,63 @@ describe('/api/auto-routing/custom-routers', () => {
       expect(listed.body.routers.map(router => router.modelId)).toEqual([
         'kilo-auto/custom/coding',
       ]);
+    });
+  });
+
+  test('persists custom mode, benchmark difficulty, and pool as independent settings', async () => {
+    await create(routerBody({ slug: 'efficient' }));
+    await db
+      .update(auto_routing_custom_routers)
+      .set({ legacy_pool: true, legacy_mode_inherited: true })
+      .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id));
+    const customParams = params('user', 'efficient');
+
+    const modeUpdate = await updateRouter(
+      request('/user/efficient', { method: 'PATCH', body: { mode: 'best_accuracy' } }),
+      customParams
+    );
+    expect(modeUpdate.status).toBe(200);
+    const afterMode = (await modeUpdate.json()) as CustomRouterResponse;
+    expect(afterMode.router.mode).toBe('best_accuracy');
+    expect(afterMode.router.baseRouter).toBe('efficient');
+    expect(afterMode.router.entries.map(entry => entry.entry)).toEqual([gateway(SONNET)]);
+
+    const difficultyUpdate = await updateRouter(
+      request('/user/efficient', { method: 'PATCH', body: { baseRouter: 'frontier' } }),
+      customParams
+    );
+    expect(difficultyUpdate.status).toBe(200);
+    const afterDifficulty = (await difficultyUpdate.json()) as CustomRouterResponse;
+    expect(afterDifficulty.router.mode).toBe('best_accuracy');
+    expect(afterDifficulty.router.baseRouter).toBe('frontier');
+    expect(afterDifficulty.router.entries.map(entry => entry.entry)).toEqual([gateway(SONNET)]);
+
+    const poolUpdate = await updateRouter(
+      request('/user/efficient', {
+        method: 'PATCH',
+        body: {
+          entries: [gateway(FLASH)],
+          defaultEntryKey: customRouterEntryKey(gateway(FLASH)),
+        },
+      }),
+      customParams
+    );
+    expect(poolUpdate.status).toBe(200);
+    const reloaded = await getRouter(request('/user/efficient'), customParams);
+    expect(reloaded.status).toBe(200);
+    const afterPool = (await reloaded.json()) as CustomRouterResponse;
+    expect(afterPool.router.mode).toBe('best_accuracy');
+    expect(afterPool.router.baseRouter).toBe('frontier');
+    expect(afterPool.router.entries.map(entry => entry.entry)).toEqual([gateway(FLASH)]);
+    const [row] = await db
+      .select()
+      .from(auto_routing_custom_routers)
+      .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id));
+    expect(row).toMatchObject({
+      mode: 'best_accuracy',
+      base_router: 'frontier',
+      entries: [gateway(FLASH)],
+      legacy_pool: true,
     });
   });
 
@@ -887,7 +898,6 @@ describe('/api/auto-routing/custom-routers', () => {
       expect(mockedRegister).not.toHaveBeenCalled();
     });
   });
-
   describe('validation and limits', () => {
     test.each([
       ['the reserved org slug', routerBody({ slug: 'org' })],

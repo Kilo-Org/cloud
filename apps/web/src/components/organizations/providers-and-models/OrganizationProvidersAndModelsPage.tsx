@@ -33,8 +33,8 @@ import {
   type ProviderPolicyFilter,
 } from '@/components/organizations/providers-and-models/useProvidersAndModelsAllowListsState';
 import { usePreferredModels } from '@/components/shared/usePreferredModels';
-import { AutoRoutingModeCard } from '@/components/auto-routing/AutoRoutingModeCard';
 import { CustomRoutersCard } from '@/components/auto-routing/CustomRoutersCard';
+import { AutoRoutingModeCard } from '@/components/auto-routing/AutoRoutingModeCard';
 import {
   modelRetainsPrompts,
   modelTrains,

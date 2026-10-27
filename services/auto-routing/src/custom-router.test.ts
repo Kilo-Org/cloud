@@ -30,7 +30,6 @@ import { app } from './index';
 
 const findCustomRouter = vi.hoisted(() => vi.fn());
 const findCustomRouterById = vi.hoisted(() => vi.fn());
-const findLegacyPoolRouter = vi.hoisted(() => vi.fn());
 const classifyNormalizedInput = vi.hoisted(() => vi.fn());
 const findOrganizationMemberRole = vi.hoisted(() => vi.fn());
 const findOrganizationMemberBalanceRow = vi.hoisted(() => vi.fn());
@@ -43,7 +42,6 @@ vi.mock('./custom-router-store', async importOriginal => ({
   ...(await importOriginal<typeof CustomRouterStoreModule>()),
   findCustomRouter,
   findCustomRouterById,
-  findLegacyPoolRouter,
 }));
 
 vi.mock('./model-classifier', async importOriginal => ({
@@ -214,7 +212,6 @@ const env = {
         if (mode === null) platformModes.delete(key);
         else platformModes.set(key, mode);
       },
-      getSettings: async () => ({ mode: platformModes.get(key) ?? null, pool: null }),
     }),
   },
 };
@@ -422,7 +419,6 @@ beforeEach(() => {
   dbRows.organization = [{ total_microdollars_acquired: 3_000_000, microdollars_used: 0 }];
   findCustomRouter.mockReset().mockResolvedValue(customRouter());
   findCustomRouterById.mockReset().mockResolvedValue(customRouter());
-  findLegacyPoolRouter.mockReset().mockResolvedValue(null);
   findOrganizationMemberRole.mockReset().mockResolvedValue('member');
   findOrganizationMemberBalanceRow.mockReset().mockResolvedValue(memberBalanceRow());
   classifyNormalizedInput.mockReset().mockResolvedValue({
@@ -450,14 +446,9 @@ afterEach(async () => {
 
 describe('public custom router decide', () => {
   it.each(['efficient', 'frontier'] as const)(
-    'uses the saved %s custom mode independently of platform modes and inheritance markers',
+    'keeps %s custom mode independent of personal and organization platform modes',
     async baseRouter => {
-      let router = customRouter({
-        baseRouter,
-        mode: 'best_accuracy',
-        legacyPool: true,
-        legacyModeInherited: true,
-      });
+      let router = customRouter({ baseRouter, mode: 'best_accuracy' });
       findCustomRouter.mockImplementation(async () => router);
       platformModes.set(`user:${USER_ID}`, 'cost_per_accuracy');
       platformModes.set(`org:${ORG_ID}`, 'cost_per_accuracy');
@@ -473,6 +464,7 @@ describe('public custom router decide', () => {
           { model: SONNET, accuracy: 0.95, avgCostUsd: 0.01, meetsThreshold: true, variant: null },
         ],
       });
+
       const headers = { 'X-KiloCode-OrganizationId': ORG_ID };
       const first = await decisionOf(await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), headers));
       expect(first.decision).toMatchObject({ model: SONNET, fallback: false });
@@ -482,6 +474,7 @@ describe('public custom router decide', () => {
       expect(edited.decision).toMatchObject({ model: 'client:ollama/qwen3:32b', fallback: false });
       expect(platformModes.get(`user:${USER_ID}`)).toBe('cost_per_accuracy');
       expect(platformModes.get(`org:${ORG_ID}`)).toBe('cost_per_accuracy');
+
       for (const [ownerType, ownerId] of [
         ['user', USER_ID],
         ['org', ORG_ID],
@@ -501,6 +494,7 @@ describe('public custom router decide', () => {
         );
         expect(updated.status).toBe(200);
       }
+
       const afterPlatformEdit = await decisionOf(
         await post(CUSTOM_ROUTER_DECIDE_PATH, decideBody(), headers)
       );
@@ -510,7 +504,6 @@ describe('public custom router decide', () => {
       });
       expect(router.mode).toBe('cost_per_accuracy');
       expect(getPlatformMode).not.toHaveBeenCalled();
-      expect(findLegacyPoolRouter).not.toHaveBeenCalled();
       expect(platformModes.get(`user:${USER_ID}`)).toBe('best_accuracy');
       expect(platformModes.get(`org:${ORG_ID}`)).toBe('best_accuracy');
     }
@@ -939,138 +932,25 @@ describe('internal custom router decide', () => {
     });
   });
 
-  it('routes old and new Efficient IDs through the same canonical table and cache scope', async () => {
-    const canonical = customRouter({
-      slug: 'efficient',
-      legacyPool: true,
-      entries: [sonnet],
-    });
-    findLegacyPoolRouter.mockResolvedValue(canonical);
-    findCustomRouter.mockResolvedValue(canonical);
-    const oldResponse = await internalDecide({ router: 'efficient' }, 'kilo-auto/efficient');
-    const newResponse = await internalDecide(
+  it('keeps the saved Efficient custom ID on its canonical table and cache scope', async () => {
+    findCustomRouter.mockResolvedValue(customRouter({ slug: 'efficient', entries: [sonnet] }));
+    const response = await internalDecide(
       { customRouter: { scope: 'user', slug: 'efficient' } },
       'kilo-auto/custom/efficient'
     );
-    expect(oldResponse.status).toBe(200);
-    expect(newResponse.status).toBe(200);
-    const oldBody = await oldResponse.json();
-    const newBody = await newResponse.json();
-    expect(oldBody).toHaveProperty('decision', expect.objectContaining({ model: SONNET }));
-    expect(newBody).toHaveProperty('decision', expect.objectContaining({ model: SONNET }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toHaveProperty(
+      'decision',
+      expect.objectContaining({ model: SONNET })
+    );
     expect(benchmarkFetch).toHaveBeenCalledTimes(1);
     expect(
       cacheIdFromName.mock.calls.every(([key]) => key.startsWith(`custom:${ROUTER_ID}:`))
     ).toBe(true);
     await drainBackgroundTasks();
     expect(recordUsage.mock.calls.map(([usage]) => usage.core.requested_model)).toContain(
-      'kilo-auto/efficient'
-    );
-  });
-
-  it('shares the canonical pool but not mode between a platform alias and explicit custom ID', async () => {
-    const canonical = customRouter({
-      slug: 'efficient',
-      legacyPool: true,
-      legacyModeInherited: true,
-      mode: 'best_accuracy',
-    });
-    findLegacyPoolRouter.mockResolvedValue(canonical);
-    findCustomRouter.mockResolvedValue(canonical);
-    platformModes.set(`user:${USER_ID}`, 'cost_per_accuracy');
-    customTable = table({
-      [ROUTE]: [
-        {
-          model: 'client:ollama/qwen3:32b',
-          accuracy: 0.8,
-          avgCostUsd: 0,
-          meetsThreshold: true,
-          variant: null,
-        },
-        { model: SONNET, accuracy: 0.95, avgCostUsd: 0.01, meetsThreshold: true, variant: null },
-      ],
-    });
-    const clientEntries = [{ provider: 'ollama', model: 'qwen3:32b' }];
-    const alias = await internalDecide(
-      { router: 'efficient', clientEntries },
-      'kilo-auto/efficient'
-    );
-    const explicit = await internalDecide({
-      customRouter: { scope: 'user', slug: 'efficient' },
-      clientEntries,
-    });
-    expect(alias.status).toBe(200);
-    expect(explicit.status).toBe(200);
-    await expect(alias.json()).resolves.toMatchObject({
-      decision: { model: 'client:ollama/qwen3:32b', fallback: false },
-    });
-    await expect(explicit.json()).resolves.toMatchObject({
-      decision: { model: SONNET, fallback: false },
-    });
-    expect(canonical.mode).toBe('best_accuracy');
-    expect(platformModes.get(`user:${USER_ID}`)).toBe('cost_per_accuracy');
-  });
-
-  it('uses platform mode for a gateway-resolved platform alias and the row mode for the explicit custom ID', async () => {
-    const canonical = customRouter({
-      slug: 'efficient',
-      legacyPool: true,
-      legacyModeInherited: true,
-      mode: 'best_accuracy',
-    });
-    findLegacyPoolRouter.mockResolvedValue(canonical);
-    findCustomRouter.mockResolvedValue(canonical);
-    platformModes.set(`user:${USER_ID}`, 'cost_per_accuracy');
-    customTable = table({
-      [ROUTE]: [
-        {
-          model: 'client:ollama/qwen3:32b',
-          accuracy: 0.8,
-          avgCostUsd: 0,
-          meetsThreshold: true,
-          variant: null,
-        },
-        { model: SONNET, accuracy: 0.95, avgCostUsd: 0.01, meetsThreshold: true, variant: null },
-      ],
-    });
-    const clientEntries = [{ provider: 'ollama', model: 'qwen3:32b' }];
-    const reference = { scope: 'user', slug: 'efficient' } as const;
-    const gatewayAlias = await internalDecide(
-      { customRouter: reference, clientEntries },
-      'kilo-auto/efficient'
-    );
-    const explicit = await internalDecide(
-      { customRouter: reference, clientEntries },
       'kilo-auto/custom/efficient'
     );
-    expect(gatewayAlias.status).toBe(200);
-    expect(explicit.status).toBe(200);
-    await expect(gatewayAlias.json()).resolves.toMatchObject({
-      decision: { model: 'client:ollama/qwen3:32b', fallback: false },
-    });
-    await expect(explicit.json()).resolves.toMatchObject({
-      decision: { model: SONNET, fallback: false },
-    });
-  });
-
-  it('never falls back outside a migrated legacy pool when policy denies its only gateway entry', async () => {
-    findLegacyPoolRouter.mockResolvedValue(
-      customRouter({ slug: 'efficient', legacyPool: true, entries: [sonnet] })
-    );
-    const response = await internalDecide(
-      { router: 'efficient', routingPolicy: { deniedModelIds: [SONNET] } },
-      'kilo-auto/efficient'
-    );
-    expect(response.status).toBe(422);
-    expect(await errorCode(response)).toBe('custom_router_unavailable');
-  });
-
-  it('does not consult a platform table after a canonical lookup fails', async () => {
-    findLegacyPoolRouter.mockRejectedValue(new Error('canonical storage unavailable'));
-    const response = await internalDecide({ router: 'efficient' }, 'kilo-auto/efficient');
-    expect(response.status).toBe(500);
-    expect(benchmarkFetch).not.toHaveBeenCalled();
-    expect(classifyNormalizedInput).not.toHaveBeenCalled();
   });
 
   it('returns router_not_found for an organization router without an organization', async () => {

@@ -78,6 +78,29 @@ describe('briefing model pricing', () => {
     );
   });
 
+  it('leaves a reasoning model output room for reasoning before the answer within the spend limit', async () => {
+    jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({
+      [aion.id]: {
+        id: aion.id,
+        name: aion.name,
+        reasoning: { mandatory: false, supported_efforts: ['low'] },
+        endpoints: [{ pricing: { prompt: '0.000001', completion: '0.000002' } }],
+      } satisfies StoredModel,
+    });
+
+    const roomy = await briefingPriceBound(aion.id, 'Overnight activity', 2_000_000);
+    expect(roomy.maxTokens).toBeGreaterThan(8192);
+    expect(roomy.upperBound).toBeLessThanOrEqual(2_000_000);
+    const tight = await briefingPriceBound(aion.id, 'Overnight activity', 20_000);
+    expect(tight.maxTokens).toBeLessThan(roomy.maxTokens);
+    expect(tight.upperBound).toBeLessThanOrEqual(20_000);
+  });
+
+  it('keeps a model without reasoning within the output limit every model accepts', async () => {
+    const quote = await briefingPriceBound(aion.id, 'Overnight activity', 2_000_000);
+    expect(quote.maxTokens).toBeLessThanOrEqual(2048);
+  });
+
   it('quotes the configured preferred route rather than the first endpoint or catalog price', async () => {
     jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue({
       rules: [{ includes: ['aion-labs/'], providers: ['preferred-route'] }],

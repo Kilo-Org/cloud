@@ -296,6 +296,11 @@ The session card data MUST hold exactly these facts, and nothing else:
 | approval key | Key of the request the card shows, or none. |
 | updated at | When the server confirmed this content. |
 
+Every capped text fact MUST be cut on a character boundary: a title, a current
+step's target, a plan step's name, and a permission command never end inside an
+emoji sequence, a flag, or a combining mark, and the cut MUST stay within the
+fact's length limit.
+
 ## Error Handling
 
 1. When an APNs push for a session card fails with a retryable error, the

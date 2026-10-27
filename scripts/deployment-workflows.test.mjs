@@ -19,6 +19,32 @@ const gate = workflow('check-deployment-changes');
 const workers = workflow('deploy-workers');
 const ci = workflow('ci');
 
+test('Cloud Agent source-map uploads are best-effort without masking build or deploy failures', () => {
+  for (const [job, selector] of [
+    ['deploy-manual', 'inputs.worker'],
+    ['deploy-changed', 'matrix.worker'],
+  ]) {
+    const steps = workers.jobs[job].steps;
+    const deploy = steps.find(step => step.id === 'deploy');
+    const retry = steps.find(step => step.name === 'Deploy to Cloudflare Workers (retry)');
+    const maps = steps.find(step => step.name === 'Upload Cloud Agent Sentry source maps');
+    assert.equal(maps['continue-on-error'], true);
+    assert.equal(maps.if, `${selector} == 'services/cloud-agent-next'`);
+    assert.doesNotMatch(maps.if, /always\(|failure\(/);
+    assert.ok(steps.indexOf(maps) > steps.indexOf(retry));
+    assert.equal(maps.run, 'pnpm run sentry:sourcemaps');
+    assert.equal(retry.if, "steps.deploy.outcome == 'failure'");
+    assert.equal(retry['continue-on-error'], undefined);
+    assert.equal(deploy['continue-on-error'], true);
+    for (const upload of [deploy, retry]) {
+      assert.equal(
+        upload.with.preCommands.trim(),
+        'if [ "$(jq -r \'.scripts.predeploy // empty\' package.json)" != "" ]; then pnpm run predeploy; fi'
+      );
+    }
+  }
+});
+
 test('both Worker deployment paths deploy the private relay before the staging usage consumer', () => {
   for (const [job, selector] of [
     ['deploy-manual', 'inputs.worker'],
@@ -73,9 +99,46 @@ test('both Worker deployment paths deploy the private relay before the staging u
     assert.doesNotMatch(steps[consumerIndex].if, /always\(|failure\(/);
     assert.equal(
       steps[consumerIndex].with.command,
-      "${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} " +
+      `\${{ ${selector} == 'services/cloud-agent-next' && format('{0} dist/worker/index.js --no-bundle --upload-source-maps', steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment))) || (steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment))) }} ` +
         "${{ steps.usage_relay.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}"
     );
+  }
+});
+
+test('both upload attempts preserve prepared commands and append artifacts only for Cloud Agent', () => {
+  for (const job of ['deploy-manual', 'deploy-changed']) {
+    const uploads = workers.jobs[job].steps.filter(step =>
+      step.name?.startsWith('Deploy to Cloudflare Workers')
+    );
+    assert.equal(uploads.length, 2);
+    for (const step of uploads) {
+      const expression = step.with.command.match(/^\$\{\{ (.*?) \}\}/)[1];
+      for (const worker of [
+        'services/cloud-agent-next',
+        'services/usage-ingest',
+        'services/other-worker',
+      ]) {
+        for (const environment of ['production', 'staging']) {
+          for (const prepared of [undefined, 'deploy --config prepared.jsonc']) {
+            const actual = runInNewContext(expression, {
+              inputs: { worker, target_environment: environment },
+              matrix: { worker },
+              steps: { runtime: { outputs: { command: prepared } } },
+              format: (template, ...values) =>
+                template.replace(/\{(\d+)\}/g, (_, index) => values[Number(index)]),
+            });
+            const command =
+              prepared || (environment === 'production' ? 'deploy' : 'deploy --env staging');
+            assert.equal(
+              actual,
+              worker === 'services/cloud-agent-next'
+                ? `${command} dist/worker/index.js --no-bundle --upload-source-maps`
+                : command
+            );
+          }
+        }
+      }
+    }
   }
 });
 

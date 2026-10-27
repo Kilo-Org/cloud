@@ -25,6 +25,8 @@ describe('reserved environment keys', () => {
       'CONTROL_LOG_UPLOAD_URL',
       'CONTROL_LOG_UPLOAD_GRANT',
       'CONTROL_WRAPPER_INSTANCE_ID',
+      'CLOUD_AGENT_SENTRY_DSN',
+      'CLOUD_AGENT_SENTRY_ENVIRONMENT',
       'XDG_DATA_HOME',
       'KILOCODE_TOKEN',
       'KILO_PLATFORM',
@@ -36,7 +38,16 @@ describe('reserved environment keys', () => {
   });
 
   it('allows tokens the sandbox does not own', () => {
-    for (const key of ['GH_TOKEN', 'GITHUB_TOKEN', 'GITLAB_TOKEN', 'BITBUCKET_TOKEN', 'MY_VAR']) {
+    for (const key of [
+      'GH_TOKEN',
+      'GITHUB_TOKEN',
+      'GITLAB_TOKEN',
+      'BITBUCKET_TOKEN',
+      'MY_VAR',
+      'SENTRY_DSN',
+      'SENTRY_AUTH_TOKEN',
+      'SENTRY_ENVIRONMENT',
+    ]) {
       expect(isReservedEnvironmentKey(key)).toBe(false);
       expect(() => assertValidEnvironmentKey(key)).not.toThrow();
     }

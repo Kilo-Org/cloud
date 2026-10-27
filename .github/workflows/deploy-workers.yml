@@ -144,6 +144,8 @@ jobs:
         # job below carries the evidence. A real failure fails both attempts.
         continue-on-error: true
         uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        env:
+          CLOUD_AGENT_DEPLOY_ENVIRONMENT: ${{ inputs.target_environment }}
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: ${{ inputs.worker }}
@@ -151,17 +153,27 @@ jobs:
           # right before deploy; all other workers are unaffected.
           preCommands: |
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
-          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ steps.usage_relay.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
+          command: ${{ inputs.worker == 'services/cloud-agent-next' && format('{0} dist/worker/index.js --no-bundle --upload-source-maps', steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment))) || (steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment))) }} ${{ steps.usage_relay.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
 
       - name: Deploy to Cloudflare Workers (retry)
         if: steps.deploy.outcome == 'failure'
         uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        env:
+          CLOUD_AGENT_DEPLOY_ENVIRONMENT: ${{ inputs.target_environment }}
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: ${{ inputs.worker }}
           preCommands: |
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
-          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ steps.usage_relay.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
+          command: ${{ inputs.worker == 'services/cloud-agent-next' && format('{0} dist/worker/index.js --no-bundle --upload-source-maps', steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment))) || (steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment))) }} ${{ steps.usage_relay.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
+
+      - name: Upload Cloud Agent Sentry source maps
+        if: inputs.worker == 'services/cloud-agent-next'
+        continue-on-error: true
+        working-directory: ${{ inputs.worker }}
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: pnpm run sentry:sourcemaps
 
   detect-changes:
     if: inputs.worker == '' && inputs.base_sha != ''
@@ -435,6 +447,8 @@ jobs:
         # attempts, so the job still fails.
         continue-on-error: true
         uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        env:
+          CLOUD_AGENT_DEPLOY_ENVIRONMENT: ${{ inputs.target_environment }}
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: ${{ matrix.worker }}
@@ -442,14 +456,24 @@ jobs:
           # right before deploy; all other workers are unaffected.
           preCommands: |
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
-          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ steps.usage_relay.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
+          command: ${{ matrix.worker == 'services/cloud-agent-next' && format('{0} dist/worker/index.js --no-bundle --upload-source-maps', steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment))) || (steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment))) }} ${{ steps.usage_relay.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
 
       - name: Deploy to Cloudflare Workers (retry)
         if: steps.deploy.outcome == 'failure'
         uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        env:
+          CLOUD_AGENT_DEPLOY_ENVIRONMENT: ${{ inputs.target_environment }}
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: ${{ matrix.worker }}
           preCommands: |
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
-          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ steps.usage_relay.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
+          command: ${{ matrix.worker == 'services/cloud-agent-next' && format('{0} dist/worker/index.js --no-bundle --upload-source-maps', steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment))) || (steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment))) }} ${{ steps.usage_relay.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
+
+      - name: Upload Cloud Agent Sentry source maps
+        if: matrix.worker == 'services/cloud-agent-next'
+        continue-on-error: true
+        working-directory: ${{ matrix.worker }}
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: pnpm run sentry:sourcemaps

@@ -37,6 +37,11 @@
         "class_name": "EnvironmentBuild",
         "name": "ENVIRONMENT_BUILD",
       },
+      { "class_name": "SentrySessionProbe", "name": "SENTRY_SESSION_PROBE" },
+      { "class_name": "SentryLegacySessionProbe", "name": "SENTRY_LEGACY_SESSION_PROBE" },
+      { "class_name": "SentrySandboxControlProbe", "name": "SENTRY_SANDBOX_CONTROL_PROBE" },
+      { "class_name": "SentrySandboxContainerProbe", "name": "SENTRY_SANDBOX_CONTAINER_PROBE" },
+      { "class_name": "SentryDisabledProbe", "name": "SENTRY_DISABLED_PROBE" },
     ],
   },
   "migrations": [
@@ -63,6 +68,16 @@
     {
       "new_sqlite_classes": ["EnvironmentBuild"],
       "tag": "v12",
+    },
+    {
+      "new_sqlite_classes": [
+        "SentrySessionProbe",
+        "SentryLegacySessionProbe",
+        "SentrySandboxControlProbe",
+        "SentrySandboxContainerProbe",
+        "SentryDisabledProbe",
+      ],
+      "tag": "sentry-probes",
     },
   ],
   "kv_namespaces": [{ "binding": "SHARED_SANDBOX_OVERRIDES" }],

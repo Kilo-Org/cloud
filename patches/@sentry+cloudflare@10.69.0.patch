@@ -1,0 +1,24 @@
+diff --git a/build/esm/async.js b/build/esm/async.js
+--- a/build/esm/async.js
++++ b/build/esm/async.js
+@@ -4,5 +4,7 @@
++let asyncStorage;
+ function setAsyncLocalStorageAsyncContextStrategy() {
+-  const asyncStorage = new AsyncLocalStorage();
++  if (asyncStorage) return;
++  asyncStorage = new AsyncLocalStorage();
+   function getScopes() {
+     const scopes = asyncStorage.getStore();
+     if (scopes) {
+diff --git a/build/cjs/async.js b/build/cjs/async.js
+--- a/build/cjs/async.js
++++ b/build/cjs/async.js
+@@ -6,5 +6,7 @@
++let asyncStorage;
+ function setAsyncLocalStorageAsyncContextStrategy() {
+-  const asyncStorage = new node_async_hooks.AsyncLocalStorage();
++  if (asyncStorage) return;
++  asyncStorage = new node_async_hooks.AsyncLocalStorage();
+   function getScopes() {
+     const scopes = asyncStorage.getStore();
+     if (scopes) {

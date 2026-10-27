@@ -68,19 +68,7 @@ ENV LANG=en_US.UTF-8
 RUN rm -f /usr/local/bin/bun \
 	&& npm install -g bun@${BUN_VERSION} pnpm@${PNPM_VERSION} @kilocode/cli@${KILOCODE_CLI_VERSION}
 
-# === Build wrapper bundle inside container ===
-# This ensures the wrapper is built with the same Bun version that will run it,
-# avoiding any compatibility issues between build and runtime environments.
-# The build entrypoint list lives in src/shared/runtime-distribution.ts.
-COPY wrapper /tmp/wrapper-build/wrapper
-COPY src/shared /tmp/wrapper-build/src/shared
-
-# Install wrapper dependencies (pnpm symlinks don't survive COPY) and build
-RUN cd /tmp/wrapper-build/wrapper && \
-    bun install --production && \
-    ln -sfn /tmp/wrapper-build/wrapper/node_modules /tmp/wrapper-build/node_modules && \
-    bun run build.ts --install-dir /usr/local/bin && \
-    rm -rf /tmp/wrapper-build
+COPY wrapper/dist/runtime/ /usr/local/bin/
 
 # DO NOT override USER, WORKDIR, or ENTRYPOINT from the base image
 # The Cloudflare sandbox base image entrypoint must run its control server

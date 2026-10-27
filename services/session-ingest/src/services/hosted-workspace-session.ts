@@ -114,6 +114,9 @@ export async function assertHostedWorkspaceSessionDeletable(
   }
 ): Promise<{ workspaceId: CloudAgentWorktreeId | null }> {
   return db.transaction(async tx => {
+    // Read the immutable workspace identity without taking a row lock. The
+    // guard below locks worktree -> roots (including this target) in the same
+    // order as HTTP deletes and whole-workspace deletion.
     const [row] = await tx
       .select({
         session_id: cli_sessions_v2.session_id,
@@ -128,8 +131,7 @@ export async function assertHostedWorkspaceSessionDeletable(
           eq(cli_sessions_v2.session_id, params.sessionId)
         )
       )
-      .limit(1)
-      .for('update');
+      .limit(1);
     if (!row) return { workspaceId: null };
     if (row.cloud_agent_session_id !== params.cloudAgentSessionId) {
       throw new HostedWorkspaceSessionDeleteError(WORKSPACE_IDENTITY_CONFLICT);
@@ -153,6 +155,9 @@ export async function deleteHostedWorkspaceSessionRows(
   rows: SessionDeleteRow[];
 }> {
   return db.transaction(async tx => {
+    // Read the immutable workspace identity without taking a row lock. The
+    // guard below locks worktree -> roots (including this target) in the same
+    // order as every other workspace deletion path.
     const [row] = await tx
       .select({
         session_id: cli_sessions_v2.session_id,
@@ -167,8 +172,7 @@ export async function deleteHostedWorkspaceSessionRows(
           eq(cli_sessions_v2.session_id, params.sessionId)
         )
       )
-      .limit(1)
-      .for('update');
+      .limit(1);
     if (!row) return { deleted: false, deletedSessionIds: [], rows: [] };
     if (
       row.cloud_agent_session_id !== params.cloudAgentSessionId ||

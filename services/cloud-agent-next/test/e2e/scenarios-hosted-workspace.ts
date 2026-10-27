@@ -14,7 +14,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { createDrizzleClient } from '@kilocode/db/client';
+import { computeDatabaseUrl, createDrizzleClient } from '@kilocode/db';
 import { createProfile } from '@kilocode/cloud-agent-profile';
 import {
   createHostedWorkspace,
@@ -43,6 +43,7 @@ const REMOTE_TURN_BUDGET_MS = 240_000;
 const REMOTE_TERMINAL_BUDGET_MS = 180_000;
 const PROFILE_CREATE_FAILED = 'persistent_profile_unavailable';
 const FINAL_ROOT_REJECTION_DEADLINE_MS = 30_000;
+const CLEANUP_REQUEST_TIMEOUT_MS = 30_000;
 
 /**
  * Poll the durable turn status inside one bounded scenario window. A cold
@@ -89,16 +90,24 @@ async function cleanupRemainingRoots(
   workspaceId: string | undefined
 ): Promise<void> {
   if (!workspaceId) return;
-  const workspace = await getHostedWorkspace(config, workspaceId).catch(() => null);
+  const workspace = await getHostedWorkspace(
+    config,
+    workspaceId,
+    AbortSignal.timeout(CLEANUP_REQUEST_TIMEOUT_MS)
+  ).catch(() => null);
   if (!workspace) return;
   // The final root intentionally cannot be deleted through a session operation;
   // siblings go first so the registry cleanup afterwards only meets that guard.
   const [first, ...siblings] = workspace.sessions;
   for (const session of siblings) {
-    await deleteHostedWorkspaceSession(config, {
-      workspaceId,
-      sessionId: session.cloudAgentSessionId,
-    }).catch(() => undefined);
+    await deleteHostedWorkspaceSession(
+      config,
+      {
+        workspaceId,
+        sessionId: session.cloudAgentSessionId,
+      },
+      AbortSignal.timeout(CLEANUP_REQUEST_TIMEOUT_MS)
+    ).catch(() => undefined);
   }
   void first;
 }
@@ -130,7 +139,8 @@ export async function runHostedWorkspaceSessions(
 
   try {
     assertScenarioPreconditions(scenarioConfig, args.api);
-    const databaseUrl = process.env.POSTGRES_URL;
+    const databaseUrl =
+      env.database?.url ?? (env.profile === 'local' ? computeDatabaseUrl() : undefined);
     if (!databaseUrl) throw new Error(PROFILE_CREATE_FAILED);
 
     const client = createDrizzleClient({
@@ -406,7 +416,7 @@ export async function runHostedWorkspaceSessions(
 export const HOSTED_WORKSPACE_SCENARIOS: Record<string, SharedScenario> = {
   'hosted-workspace-sessions': {
     name: 'hosted-workspace-sessions',
-    requires: ['sessionSandbox'],
+    requires: ['sessionSandbox', 'database'],
     defaultApi: 'unified',
     defaultConversation: '_',
     defaultTimeoutMs: HOSTED_WORKSPACE_TIMEOUT_MS,

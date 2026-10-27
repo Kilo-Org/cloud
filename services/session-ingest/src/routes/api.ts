@@ -151,7 +151,6 @@ async function deleteOwnedLeafSession(
   let outcome: 'deleted' | 'gone' | 'not_leaf';
   try {
     outcome = await db.transaction(async (tx): Promise<'deleted' | 'gone' | 'not_leaf'> => {
-      await lockAndAssertWorkspaceRootSurvives(tx, { kiloUserId, row: existing });
       if (existing.cloud_agent_session_scope_id) {
         await tx
           .select({ sessionId: cli_sessions_v2.session_id })

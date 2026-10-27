@@ -4,6 +4,7 @@ import { appRouter } from '../../router.js';
 import {
   CreateHostedWorkspaceInput,
   DeleteHostedWorkspaceSessionInput,
+  hostedWorkspaceCreateRequest,
 } from './hosted-workspace-mutations.js';
 import { CreateHostedWorkspaceSessionInput } from './session-worktree.js';
 
@@ -47,6 +48,12 @@ describe('hosted workspace mutation inputs', () => {
     expect(
       CreateHostedWorkspaceInput.safeParse({ ...validCreate, operationKey: undefined }).success
     ).toBe(false);
+  });
+
+  it('forwards a client-proposed Kilo session id into registration', () => {
+    const input = CreateHostedWorkspaceInput.parse({ ...validCreate, kiloSessionId });
+
+    expect(hostedWorkspaceCreateRequest(input).options?.kiloSessionId).toBe(kiloSessionId);
   });
 
   it('does not accept workspace-wide overrides when adding a sibling', () => {

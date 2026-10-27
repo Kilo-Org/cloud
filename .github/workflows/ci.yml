@@ -690,6 +690,9 @@ jobs:
       - name: Run Session Ingest Durable Object regressions
         run: pnpm --filter cloudflare-session-ingest run test:integration
 
+      - name: Run Session Ingest Postgres tests
+        run: NODE_ENV=development pnpm --filter cloudflare-session-ingest test:postgres
+
   # In its own job, madge runs beside the script tests instead of before them.
   dependency-cycle-check:
     needs: changes

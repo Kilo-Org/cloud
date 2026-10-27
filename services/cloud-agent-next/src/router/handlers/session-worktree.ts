@@ -837,6 +837,7 @@ async function createOwnershipRow(
       },
       organizationId: source.ownership.organizationId ?? undefined,
       createdOnPlatform: source.ownership.createdOnPlatform,
+      profileId: source.ownership.profileId ?? undefined,
       title: `New session - ${new Date().toISOString()}`,
       gitUrl: source.ownership.gitUrl ?? canonicalRepositoryUrl(source.repository),
     });

@@ -129,7 +129,7 @@ function workspaceIdForSession(cloudAgentSessionId: string): CloudAgentWorktreeI
   return parsed.data;
 }
 
-function createRequest(input: HostedWorkspaceCreate): SessionCreateRequest {
+export function hostedWorkspaceCreateRequest(input: HostedWorkspaceCreate): SessionCreateRequest {
   return {
     allowSubagentSessions: false,
     initialTurn: {
@@ -148,6 +148,7 @@ function createRequest(input: HostedWorkspaceCreate): SessionCreateRequest {
       createdOnPlatform: AGENT_MANAGER_ORIGIN,
       clientProvenance: 'agent-manager',
       operationKey: input.operationKey,
+      ...(input.kiloSessionId ? { kiloSessionId: input.kiloSessionId } : {}),
     },
   };
 }
@@ -181,7 +182,7 @@ const createHostedWorkspaceHandler = protectedProcedure
       throw new TRPCError({ code: 'FORBIDDEN', message: 'Session access denied' });
     }
     const request = await preflightSessionCreation(
-      createRequest(input),
+      hostedWorkspaceCreateRequest(input),
       ctx,
       'createHostedWorkspace'
     );
@@ -313,18 +314,19 @@ const deleteHostedWorkspaceSessionHandler = protectedProcedure
     }
 
     const row = await findHostedWorkspaceSession(db, ctx.userId, input.sessionId);
-    if (row) {
-      if (row.worktreeId !== input.workspaceId || row.parentSessionId !== null) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'workspace_session_not_found' });
-      }
-      await requireCurrentSessionAccess({
-        env: ctx.env,
-        kiloUserId: ctx.userId,
-        cloudAgentSessionId: input.sessionId,
-        expectedKiloSessionId: row.sessionId,
-        expectedOrganizationId: workspace.organizationId,
-      });
+    if (!row) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'workspace_session_not_found' });
     }
+    if (row.worktreeId !== input.workspaceId || row.parentSessionId !== null) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'workspace_session_not_found' });
+    }
+    await requireCurrentSessionAccess({
+      env: ctx.env,
+      kiloUserId: ctx.userId,
+      cloudAgentSessionId: input.sessionId,
+      expectedKiloSessionId: row.sessionId,
+      expectedOrganizationId: workspace.organizationId,
+    });
 
     const admission = await admitOperation(db, {
       userId: ctx.userId,
@@ -365,51 +367,43 @@ const deleteHostedWorkspaceSessionHandler = protectedProcedure
       throw new TRPCError({ code: 'CONFLICT', message: 'session_deletion_in_progress' });
     }
 
-    if (admission.admission === 'admitted' && !row) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'workspace_session_not_found' });
-    }
     if (!recorded) {
-      if (!row) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'workspace_session_not_found' });
-      }
       await recordOperationProgress(db, admission.row.id, {
         cloudAgentSessionId: input.sessionId,
         kiloSessionId: row.sessionId,
       });
     }
 
-    if (row) {
-      try {
-        await ctx.env.SESSION_INGEST.deleteHostedWorkspaceSession({
-          kiloUserId: ctx.userId,
-          workspaceId: input.workspaceId,
-          sessionId: recorded?.kiloSessionId ?? row.sessionId,
-          cloudAgentSessionId: input.sessionId,
-        });
-      } catch (error) {
-        const code = rpcErrorCode(error);
-        if (
-          code.includes(WORKSPACE_REQUIRES_ROOT_SESSION) ||
-          code.includes(WORKSPACE_DELETING) ||
-          code.includes(WORKSPACE_IDENTITY_CONFLICT)
-        ) {
-          await settleOperation(db, {
-            rowId: admission.row.id,
-            status: 'failed',
-            outcomeCode: code.includes(WORKSPACE_REQUIRES_ROOT_SESSION)
-              ? WORKSPACE_REQUIRES_ROOT_SESSION
-              : code.includes(WORKSPACE_DELETING)
-                ? WORKSPACE_DELETING
-                : WORKSPACE_IDENTITY_CONFLICT,
-          }).catch(() => undefined);
-          throw deletionConflict(code);
-        }
-        await markReconcilePending(db, { rowId: admission.row.id }).catch(() => undefined);
-        throw new TRPCError({
-          code: 'SERVICE_UNAVAILABLE',
-          message: 'session_deletion_unavailable',
-        });
+    try {
+      await ctx.env.SESSION_INGEST.deleteHostedWorkspaceSession({
+        kiloUserId: ctx.userId,
+        workspaceId: input.workspaceId,
+        sessionId: recorded?.kiloSessionId ?? row.sessionId,
+        cloudAgentSessionId: input.sessionId,
+      });
+    } catch (error) {
+      const code = rpcErrorCode(error);
+      if (
+        code.includes(WORKSPACE_REQUIRES_ROOT_SESSION) ||
+        code.includes(WORKSPACE_DELETING) ||
+        code.includes(WORKSPACE_IDENTITY_CONFLICT)
+      ) {
+        await settleOperation(db, {
+          rowId: admission.row.id,
+          status: 'failed',
+          outcomeCode: code.includes(WORKSPACE_REQUIRES_ROOT_SESSION)
+            ? WORKSPACE_REQUIRES_ROOT_SESSION
+            : code.includes(WORKSPACE_DELETING)
+              ? WORKSPACE_DELETING
+              : WORKSPACE_IDENTITY_CONFLICT,
+        }).catch(() => undefined);
+        throw deletionConflict(code);
       }
+      await markReconcilePending(db, { rowId: admission.row.id }).catch(() => undefined);
+      throw new TRPCError({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'session_deletion_unavailable',
+      });
     }
 
     try {
@@ -433,7 +427,7 @@ const deleteHostedWorkspaceSessionHandler = protectedProcedure
       canonicalResult: {
         workspaceId: input.workspaceId,
         cloudAgentSessionId: input.sessionId,
-        kiloSessionId: recorded?.kiloSessionId ?? row?.sessionId,
+        kiloSessionId: recorded?.kiloSessionId ?? row.sessionId,
       },
     });
     if (!settlement.settled && settlement.row?.status !== 'completed') {

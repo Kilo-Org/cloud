@@ -3,11 +3,18 @@
 Authenticated `POST /usage` validates the existing usage request contract and
 publishes it to `USAGE_INGEST_QUEUE`, preserving the supplied usage ID. A 202 means
 queue acceptance after `send` resolves, not consumer completion. The same Worker
-consumes shadow events as receipts by default, or writes them through the existing
-Frankfurt writer in opt-in processing mode.
-Acknowledged events are removed from the queue. Current direct usage writes remain
-authoritative. The gateway's shadow setting controls sending only;
-`USAGE_INGEST_MODE` selects consumer behavior.
+consumes usage events as receipts by default, or writes them through the existing
+Frankfurt writer in opt-in processing mode. `USAGE_INGEST_MODE` selects consumer
+behavior; receipt mode does not persist billing. Acknowledged events are removed
+from the queue.
+
+The gateway's `USAGE_QUEUE_ONLY_ENABLED` launch switch selects queued accounting
+for staging or for the production SFO cohort controlled by
+`USAGE_QUEUE_SFO_EXPOSURE` (`0`–`1`) and optional `USAGE_QUEUE_SFO_USER_IDS`.
+Unselected events keep direct accounting or the existing SFO handoff. Background
+shadow publication and its flag have been removed. Reconcile and drain historically
+accepted shadow events before switching a consumer to processing; this change
+does not remove old messages.
 
 In receipt mode, receipts contain only the validated usage ID, queue message ID, delivery attempt
 count, and non-negative event age in milliseconds. Malformed messages log an
@@ -143,7 +150,7 @@ attempts, with a fresh two-second timeout each and jittered 200–400 ms then
 ambiguous acceptance can create duplicate messages, which the writer deduplicates.
 Configuration failures and HTTP outcomes other than 408/429/5xx are not retried.
 Redirects are terminal 3xx failures; their targets are never followed.
-Shadow publication retains one attempt. `usage enqueue retrying` logs the usage
+`usage enqueue retrying` logs the usage
 ID, categorical reason and failed attempt number before each retry. `usage accounting publication failed` logs the finalized
 `usageId` and categorical `reason`; accounting returns null and emits no gateway
 persistence completion. This is not durable recovery: unaccepted events may be

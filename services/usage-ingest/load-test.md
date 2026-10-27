@@ -16,13 +16,15 @@ writer endpoint and queue policy for both runs.
 | Gateway setting | Direct baseline | Queued run |
 |---|---|---|
 | `USAGE_QUEUE_ONLY_ENABLED` | `false` | `true` |
-| `USAGE_SHADOW_PUBLISH_ENABLED` | `false` | `false` |
 
 Apply server environment settings through the gateway deployment. Queue-only is
-staging-restricted; this recipe does not activate production. Disabling queue-only
-while retaining shadow publishing sends events to both writers and contaminates
-the direct baseline with duplicate database attempts. Queue-only never falls back
-to a gateway billing writer. Count `usage accounting publication failed` errors
+enabled by the existing staging controls for this recipe; production SFO selection
+uses separate `USAGE_QUEUE_SFO_EXPOSURE` (`0`–`1`) and optional
+`USAGE_QUEUE_SFO_USER_IDS` controls and is not activated here. Disabling queue-only
+keeps new events on direct accounting. Background shadow publication has been
+removed; reconcile and drain any historically accepted shadow events before
+switching a consumer to processing. Queue-only never falls back to a gateway billing writer. Count
+`usage accounting publication failed` errors
 and report their usage IDs and categories with the run. These return null
 accounting results after the bounded retries, not queued or recorded success.
 `usage enqueue retrying` counts failed attempts, not distinct events: retries

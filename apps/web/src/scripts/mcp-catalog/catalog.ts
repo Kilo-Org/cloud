@@ -64,6 +64,8 @@ const NATIVE_ONLY_PATHS: Record<string, true> = {
   'agentBriefing.generateSummary': true,
   'agentBriefing.retrySummary': true,
   'agentBriefing.updateContextPreferences': true,
+  // Enabling guardrail scanning starts recurring organization spend and sends chat content to Enkrypt.
+  'organizations.settings.updateEnkryptShadowGuardrails': true,
 };
 
 /**

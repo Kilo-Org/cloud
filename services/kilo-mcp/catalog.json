@@ -26494,37 +26494,6 @@
     ],
     "searchBlob": "organizations.settings.updateDefaultModel Set the default model an organization's members use. Use to change the organization-wide default AI model. organizations settings updatedefaultmodel organizationid default_model organizationId default_model"
   },
-  "organizations.settings.updateEnkryptShadowGuardrails": {
-    "path": "organizations.settings.updateEnkryptShadowGuardrails",
-    "kind": "mutation",
-    "summary": "Enable or disable Enkrypt shadow guardrail scanning for an organization, recording an audit log entry when the setting changes.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "enabled": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "organizationId",
-        "enabled"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "settings",
-      "updateenkryptshadowguardrails",
-      "organizationid",
-      "enabled"
-    ],
-    "searchBlob": "organizations.settings.updateEnkryptShadowGuardrails Enable or disable Enkrypt shadow guardrail scanning for an organization, recording an audit log entry when the setting changes. organizations settings updateenkryptshadowguardrails organizationid enabled organizationId enabled"
-  },
   "organizations.settings.updateMinimumBalanceAlert": {
     "path": "organizations.settings.updateMinimumBalanceAlert",
     "kind": "mutation",

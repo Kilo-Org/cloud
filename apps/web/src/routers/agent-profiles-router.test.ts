@@ -1144,6 +1144,22 @@ describe('Agent Profiles Router', () => {
           const profileId = await createOrgProfile();
 
           await expectMemberRejected(
+            memberCaller.agentProfiles.createSkillsShSkill({
+              organizationId: organizationA.id,
+              profileId,
+              source: 'anthropics/skills@frontend-design',
+            })
+          );
+          const adminCaller = await createCallerForUser(adminUser.id);
+          await expect(
+            adminCaller.agentProfiles.createSkillsShSkill({
+              organizationId: organizationA.id,
+              profileId,
+              source: 'anthropics/skills@frontend-design',
+            })
+          ).resolves.toEqual({ id: expect.any(String) });
+
+          await expectMemberRejected(
             memberCaller.agentProfiles.createCustomSkill({
               organizationId: organizationA.id,
               profileId,

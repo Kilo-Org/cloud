@@ -21,6 +21,7 @@ export type FakeWrapperHelloInput = {
   allocationId: string;
   protocolVersion?: number;
   redactsNamedSecrets?: boolean;
+  installsSkillsSh?: boolean;
 };
 
 export type FakeNativeEvent = {
@@ -161,6 +162,7 @@ export class FakeWrapper {
       allocationId: input.allocationId,
       protocolVersion: input.protocolVersion ?? CONTROL_PLANE_PROTOCOL_VERSION,
       ...(input.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
+      ...(input.installsSkillsSh ? { installsSkillsSh: true } : {}),
     });
     return this.next();
   }

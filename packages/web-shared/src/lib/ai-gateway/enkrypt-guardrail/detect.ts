@@ -22,6 +22,13 @@ export const ENKRYPT_MAX_SCAN_CHARACTERS = 500_000;
 
 const MAX_BLOCK_MESSAGE_LENGTH = 500;
 
+/**
+ * The enabled detectors cost at most 53 credits per call (`injection_attack` caps at 50), so a
+ * larger header value is an Enkrypt bug. Clamping keeps the ledger insert and the balance debit
+ * within column range instead of failing in the deferred write.
+ */
+export const MAX_ENKRYPT_CREDITS_PER_CALL = 1_000;
+
 const TURN_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot scan more than ${ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US')} characters of new messages and tool results at once, so this request was not sent. Reduce the size of the latest tool output or message and retry.`;
 
 /**
@@ -104,7 +111,15 @@ function parseCreditsCost(response: Response): number | null {
   const header = response.headers.get('x-enkrypt-credits-cost');
   if (header === null || header.trim() === '') return null;
   const value = Number(header);
-  return Number.isFinite(value) && value >= 0 ? value : null;
+  if (!Number.isFinite(value) || value < 0) return null;
+  if (value > MAX_ENKRYPT_CREDITS_PER_CALL) {
+    warnExceptInTest('[enkrypt-guardrail] credits cost above the per-call maximum; clamped', {
+      credits_cost: value,
+      max_credits: MAX_ENKRYPT_CREDITS_PER_CALL,
+    });
+    return MAX_ENKRYPT_CREDITS_PER_CALL;
+  }
+  return value;
 }
 
 function isAbortError(error: unknown): boolean {

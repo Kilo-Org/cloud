@@ -2,6 +2,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 import {
   ENKRYPT_DETECT_URL,
   ENKRYPT_MAX_SCAN_CHARACTERS,
+  MAX_ENKRYPT_CREDITS_PER_CALL,
   scanTurnDelta,
   type EnkryptDetectDependencies,
   type EnkryptGuardrailScan,
@@ -79,6 +80,19 @@ describe('scanTurnDelta', () => {
       },
       user_metadata: { organization_id: '00000000-0000-4000-8000-000000000002' },
     });
+  });
+
+  it.each([
+    ['an implausibly large', '1e40', MAX_ENKRYPT_CREDITS_PER_CALL],
+    ['a negative', '-3', null],
+    ['a non-numeric', 'abc', null],
+  ])('records %s credits cost safely', async (_name, header, creditsCost) => {
+    const result = await scanTurnDelta(
+      makeScan(),
+      deps(async () => detectResponse({ summary: {} }, { credits: header }))
+    );
+
+    expect(result.charges).toEqual([expect.objectContaining({ creditsCost })]);
   });
 
   it('allows a clean turn and charges the reported credits', async () => {

@@ -16,6 +16,7 @@ import type { WrapperKiloClient } from '../kilo-api.js';
 import { fetchKiloServer } from '../kilo-server-auth.js';
 import {
   git,
+  runProcess,
   withTimeoutAndAbort,
   type ExecResult,
   type ProcessOptions,
@@ -111,6 +112,7 @@ export type PrepareDeps = {
     onOutput?: (stream: ProcessOutputStream, output: string) => void,
     signal?: AbortSignal
   ) => Promise<ExecResult>;
+  runSkillInstall?: typeof runProcess;
   /** Starts the default setup command, e.g. inside the setup cgroup. */
   spawnSetup?: ProcessSpawn;
   restore?: typeof restoreSession;
@@ -148,6 +150,7 @@ type PreparedRoute = {
 type PreparingRoute = {
   promise: Promise<void>;
   released: boolean;
+  skillInstallController?: AbortController;
   /** `runtimeKey(spec)` captured before the first await, for last-route release. */
   runtimeKey: string;
   /** A credentials frame that arrived before the route was prepared. */
@@ -1035,9 +1038,23 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       // One owner for runtime profile, runtime start and session resolution, shared
       // by the normal path after the lock and the deferred path inside it.
       const ensureRuntimeAndSession = async (restoreFiles: boolean): Promise<void> => {
+        const installsSkills = spec.runtimeSkills?.some(skill => skill.source !== undefined);
+        currentStep = installsSkills ? 'setup' : 'kilo_runtime';
+        owner.skillInstallController = new AbortController();
+        await materializeRuntimeProfile(home, spec, {
+          run: (command, args, options) =>
+            (deps.runSkillInstall ?? runProcess)(command, args, {
+              ...options,
+              spawn: deps.spawnSetup,
+            }),
+          signal: owner.skillInstallController.signal,
+          onProgress: detail => {
+            if (!owner.released) emitProgress(sessionId, 'setup', detail);
+          },
+        });
+        if (owner.released) return;
         currentStep = 'kilo_runtime';
         emitProgress(sessionId, 'kilo_runtime');
-        await materializeRuntimeProfile(home, spec);
         const client = await withRuntimeStartRetry(
           key,
           () =>
@@ -1292,7 +1309,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     },
     release(sessionId) {
       const preparation = preparing.get(sessionId);
-      if (preparation) preparation.released = true;
+      if (preparation) {
+        preparation.released = true;
+        preparation.skillInstallController?.abort();
+      }
       const route = prepared.get(sessionId);
       if (!route) return;
       prepared.delete(sessionId);

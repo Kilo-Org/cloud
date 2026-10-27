@@ -1004,6 +1004,7 @@ export function createLocalScenarioEnvironment(options?: {
     },
     sandbox,
     sessionSandbox,
+    ...(databaseUrl ? { database: { url: databaseUrl } } : {}),
     callbacks: createLocalCallbacks(),
     gates: { parkedStreamsSupported: true },
     sandboxFaults: createLocalSandboxFaults(),

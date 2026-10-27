@@ -23,6 +23,7 @@ const storedConfig = (domains: string[]) =>
 async function loadGetBlacklistedDomains(): Promise<
   TestMocks & {
     getBlacklistedDomains: () => Promise<string[]>;
+    getBlockedSignupTlds: () => Promise<string[]>;
   }
 > {
   jest.resetModules();
@@ -33,6 +34,7 @@ async function loadGetBlacklistedDomains(): Promise<
   ]);
   return {
     getBlacklistedDomains: config.getBlacklistedDomains,
+    getBlockedSignupTlds: config.getBlockedSignupTlds,
     redisGet: redis.redisClient.get as unknown as TestMocks['redisGet'],
     captureException: sentry.captureException as unknown as TestMocks['captureException'],
   };
@@ -83,6 +85,24 @@ describe('getBlacklistedDomains', () => {
       BLACKLIST_DOMAINS_REDIS_KEY,
       BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY,
     ]);
+  });
+
+  test('serves the domain and signup TLD lists from one config read', async () => {
+    const { getBlacklistedDomains, getBlockedSignupTlds, redisGet } =
+      await loadGetBlacklistedDomains();
+    redisGet.mockResolvedValue(
+      JSON.stringify({
+        domains: ['spam.example'],
+        blocked_signup_tlds: ['.ASIA'],
+        updated_at: null,
+        updated_by: null,
+        updated_by_email: null,
+      })
+    );
+
+    await expect(getBlacklistedDomains()).resolves.toEqual(['spam.example']);
+    await expect(getBlockedSignupTlds()).resolves.toEqual(['asia']);
+    expect(redisGet).toHaveBeenCalledTimes(1);
   });
 
   test('keeps the last domains read when a later read fails, and reports it once', async () => {

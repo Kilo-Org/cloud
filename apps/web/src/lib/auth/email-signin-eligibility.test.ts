@@ -49,7 +49,7 @@ describe('checkDomainSignInEligibility', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockIsEmailBlacklistedByDomainAsync.mockResolvedValue(false);
-    mockIsBlockedTLD.mockReturnValue(false);
+    mockIsBlockedTLD.mockResolvedValue(false);
     mockFindUserByNormalizedEmail.mockResolvedValue(undefined);
     mockResolveSsoAuthorityForDomain.mockResolvedValue({
       status: 'not_required',
@@ -76,7 +76,7 @@ describe('isNewAccountEligibleForMagicLink', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockIsEmailBlacklistedByDomainAsync.mockResolvedValue(false);
-    mockIsBlockedTLD.mockReturnValue(false);
+    mockIsBlockedTLD.mockResolvedValue(false);
   });
 
   it('accepts an eligible unknown email', async () => {
@@ -91,7 +91,7 @@ describe('isNewAccountEligibleForMagicLink', () => {
   });
 
   it('rejects a blocked TLD', async () => {
-    mockIsBlockedTLD.mockReturnValue(true);
+    mockIsBlockedTLD.mockResolvedValue(true);
 
     await expect(isNewAccountEligibleForMagicLink('new@example.top')).resolves.toBe(false);
   });
@@ -120,7 +120,7 @@ describe('checkEmailSignInEligibility send budgets', () => {
     jest.clearAllMocks();
     mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
     mockIsEmailBlacklistedByDomainAsync.mockResolvedValue(false);
-    mockIsBlockedTLD.mockReturnValue(false);
+    mockIsBlockedTLD.mockResolvedValue(false);
     mockFindUserByNormalizedEmail.mockResolvedValue(undefined);
     mockResolveSsoAuthorityForDomain.mockImplementation(async domain => ({
       status: 'not_required',

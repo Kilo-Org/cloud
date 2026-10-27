@@ -185,44 +185,62 @@ const BLACKLISTED_DOMAINS_FULL_READ_INTERVAL_MS = 10 * 60_000;
 
 export const BlacklistDomainsConfigSchema = z.object({
   domains: z.array(z.string()),
+  // TLDs whose new signups are refused. Optional because configs written
+  // before this field existed must keep parsing; readers fall back to the
+  // deployment default in that case. An empty array means "no TLD blocked".
+  blocked_signup_tlds: z.array(z.string()).optional(),
   updated_at: z.string().nullable(),
   updated_by: z.string().nullable(),
   updated_by_email: z.string().nullable(),
 });
 
-export type BlacklistedDomainsSnapshot = {
-  domains: string[];
-  updatedAt: string | null;
+export type BlacklistDomainsConfig = z.infer<typeof BlacklistDomainsConfigSchema>;
+
+export type BlacklistDomainsConfigSnapshot = {
+  config: BlacklistDomainsConfig | null;
   fullReadAt: number;
 };
 
 /**
- * Re-reads the blocked domains, downloading the list only when it may have changed. An imported
- * list is megabytes and every process refreshes it each minute, so an unchanged list costs one
- * read of the small updated_at key instead. Returns `previous` itself when it is still current,
- * which keeps the domain index built for that array.
+ * Re-reads the admin blocklist config, downloading it only when it may have changed. An imported
+ * domain list is megabytes and every process refreshes it each minute, so an unchanged config
+ * costs one read of the small updated_at key instead. Returns `previous` itself when it is still
+ * current, which keeps the domain index built for its array.
  */
-export async function refreshBlacklistedDomains(
+export async function refreshBlacklistDomainsConfig(
   redisGet: (key: string) => Promise<string | null>,
-  previous: BlacklistedDomainsSnapshot | null,
-  fallbackDomains: string[],
+  previous: BlacklistDomainsConfigSnapshot | null,
   now: number
-): Promise<BlacklistedDomainsSnapshot> {
+): Promise<BlacklistDomainsConfigSnapshot> {
+  const previousUpdatedAt = previous?.config?.updated_at;
   if (
-    previous?.updatedAt != null &&
+    previous &&
+    previousUpdatedAt != null &&
     now - previous.fullReadAt < BLACKLISTED_DOMAINS_FULL_READ_INTERVAL_MS &&
-    (await redisGet(BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY)) === previous.updatedAt
+    (await redisGet(BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY)) === previousUpdatedAt
   ) {
     return previous;
   }
 
   const raw = await redisGet(BLACKLISTED_DOMAINS_REDIS_KEY);
-  const config = raw ? BlacklistDomainsConfigSchema.parse(JSON.parse(raw)) : null;
   return {
-    domains: config && config.domains.length > 0 ? config.domains : fallbackDomains,
-    updatedAt: config?.updated_at ?? null,
+    config: raw ? BlacklistDomainsConfigSchema.parse(JSON.parse(raw)) : null,
     fullReadAt: now,
   };
+}
+
+export function blacklistedDomainsFromConfig(
+  config: BlacklistDomainsConfig | null,
+  fallbackDomains: string[]
+): string[] {
+  return config && config.domains.length > 0 ? config.domains : fallbackDomains;
+}
+
+export function blockedSignupTldsFromConfig(
+  config: BlacklistDomainsConfig | null,
+  fallbackTlds: string[]
+): string[] {
+  return config?.blocked_signup_tlds ?? fallbackTlds;
 }
 
 // The admin config is cached for a minute, so auth checks keep re-using the same

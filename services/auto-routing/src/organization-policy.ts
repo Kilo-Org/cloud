@@ -5,8 +5,9 @@ import {
 } from '@kilocode/auto-routing-contracts';
 import { formatError, getCachedSecret } from '@kilocode/worker-utils';
 import {
-  refreshBlacklistedDomains,
-  type BlacklistedDomainsSnapshot,
+  blacklistedDomainsFromConfig,
+  refreshBlacklistDomainsConfig,
+  type BlacklistDomainsConfigSnapshot,
 } from '@kilocode/worker-utils/account-access';
 import * as z from 'zod';
 
@@ -21,7 +22,11 @@ type GatewayPolicyEnv = Pick<Env, 'INTERNAL_API_SECRET_PROD' | 'KILO_AI_GATEWAY_
 type BlacklistEnv = Pick<Env, 'UPSTASH_REDIS_REST_URL' | 'UPSTASH_REDIS_REST_TOKEN'>;
 
 const deniedModelsCache = new Map<string, { expiresAt: number; value: Promise<string[] | null> }>();
-let blacklistedDomains: { expiresAt: number; snapshot: BlacklistedDomainsSnapshot } | null = null;
+let blacklistedDomains: {
+  expiresAt: number;
+  snapshot: BlacklistDomainsConfigSnapshot;
+  domains: string[];
+} | null = null;
 
 export function clearOrganizationPolicyCache(): void {
   deniedModelsCache.clear();
@@ -138,18 +143,16 @@ async function readRedisKey(env: BlacklistEnv, key: string): Promise<string | nu
 // one. The gateway's BLACKLIST_DOMAINS fallback is a Vercel env var this worker does not have.
 export async function getBlacklistedDomains(env: BlacklistEnv): Promise<string[] | null> {
   const now = Date.now();
-  if (blacklistedDomains && blacklistedDomains.expiresAt > now) {
-    return blacklistedDomains.snapshot.domains;
-  }
+  if (blacklistedDomains && blacklistedDomains.expiresAt > now) return blacklistedDomains.domains;
   try {
-    const snapshot = await refreshBlacklistedDomains(
+    const snapshot = await refreshBlacklistDomainsConfig(
       key => readRedisKey(env, key),
       blacklistedDomains?.snapshot ?? null,
-      [],
       now
     );
-    blacklistedDomains = { expiresAt: now + POLICY_CACHE_TTL_MS, snapshot };
-    return snapshot.domains;
+    const domains = blacklistedDomainsFromConfig(snapshot.config, []);
+    blacklistedDomains = { expiresAt: now + POLICY_CACHE_TTL_MS, snapshot, domains };
+    return domains;
   } catch (error) {
     console.warn(
       JSON.stringify({
@@ -157,6 +160,6 @@ export async function getBlacklistedDomains(env: BlacklistEnv): Promise<string[]
         ...formatError(error),
       })
     );
-    return blacklistedDomains?.snapshot.domains ?? null;
+    return blacklistedDomains?.domains ?? null;
   }
 }

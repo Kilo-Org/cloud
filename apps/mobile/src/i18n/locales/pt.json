@@ -53,6 +53,7 @@
     "connected": "Ligado",
     "couldNotLoadModels": "Não foi possível carregar os modelos.",
     "couldNotLoadRepositories": "Não foi possível carregar os repositórios.",
+    "noRepositoriesFound": "Nenhum repositório encontrado",
     "critical": "Crítico",
     "delete": "Eliminar",
     "deleted": "Eliminado",
@@ -87,6 +88,7 @@
     "connect": "Ligar",
     "connectBitbucket": "Ligar ao Bitbucket",
     "connectGitlab": "Ligar ao GitLab",
+    "connectProvider": "Ligar um fornecedor",
     "contentTruncated": "Conteúdo truncado",
     "copyLink": "Copiar ligação",
     "couldNotLoadOrganizations": "Não foi possível carregar as organizações.",
@@ -145,7 +147,8 @@
     "agent": "Agente",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Alterações"
+    "changes": "Alterações",
+    "organizationTrialEnded": "O período de teste da organização terminou e esta não tem um plano ativo. O proprietário da organização pode atualizar a faturação em kilo.ai e, em seguida, tentar novamente."
   },
   "language": {
     "restarting": "A reiniciar para aplicar o idioma",
@@ -224,7 +227,6 @@
     "hideBalance": "Ocultar saldo",
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
-    "bonusCreditsExpiring": "Os créditos no valor de {{amount}} expiram em {{date}}.",
     "signOutTitle": "Terminar sessão?",
     "signOutMessage": "Terás de iniciar sessão novamente para aceder ao teu espaço de trabalho.",
     "deleteAccountTitle": "Eliminar conta?",
@@ -1429,7 +1431,6 @@
       "gitlabNoRepositoriesDescription": "Podes precisar de conceder acesso a mais grupos ou projetos no GitLab.",
       "installGithubApp": "Instalar a aplicação do GitHub nos repositórios",
       "installGithubAppDescription": "Dá à aplicação do Kilo no GitHub acesso aos repositórios que queres rever.",
-      "noRepositoriesFound": "Nenhum repositório encontrado",
       "repositoryAccess": "acesso ao repositório"
     },
     "style": {
@@ -1504,6 +1505,22 @@
       "loadingProposals": "A carregar propostas",
       "couldNotLoadProposals": "Não foi possível carregar as propostas.",
       "noProposals": "Sem propostas",
+      "proposalDetails": "Detalhes da proposta",
+      "proposalTitle": "Título da proposta",
+      "rationale": "Justificação",
+      "saveFirst": "Guarda as tuas alterações antes de abrir um pull request.",
+      "proposalSaved": "Proposta guardada",
+      "proposalDismissed": "Proposta rejeitada",
+      "dismissProposalTitle": "Rejeitar proposta?",
+      "dismissProposalMessage": "Esta proposta será removida da lista de propostas ativas e não poderá ser restaurada.",
+      "prOpened": "Pull request para o REVIEW.md aberto",
+      "alreadyPresent": "As orientações já constam do REVIEW.md",
+      "status": {
+        "edited": "Editada",
+        "opening_change_request": "A abrir PR",
+        "change_request_failed": "Falha ao abrir PR",
+        "superseded": "Já existe"
+      },
       "noProposalsDescription": "As propostas da memória de revisão aparecem aqui depois de o Kilo analisar as respostas dos responsáveis pelo projeto."
     },
     "manualReview": {
@@ -1511,7 +1528,6 @@
       "invalidUrl": "Introduz um URL válido de um pedido de integração.",
       "couldNotCheckProviderStatus": "Não foi possível verificar o estado do fornecedor.",
       "couldNotLoadProviders": "Não foi possível carregar os teus fornecedores ligados. Tenta novamente.",
-      "connectProvider": "Ligar um fornecedor",
       "connectProviderDescription": "Liga o GitHub para iniciar a revisão manual de um pedido de integração.",
       "pullRequestUrl": "URL do pedido de integração",
       "instructions": "Instruções (opcionais)",
@@ -1639,8 +1655,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Sem filtros disponíveis",
-      "noFiltersDescription": "Volta à lista de ocorrências e abre novamente os filtros.",
       "title": "Filtrar ocorrências",
       "reset": "Limpar",
       "severity": "Gravidade",
@@ -2204,8 +2218,8 @@
       "title": "Sessão",
       "copyErrorDetails": "Copiar detalhes do erro",
       "backToSessions": "Voltar às sessões",
-      "follow": "Seguir no ecrã bloqueado",
-      "unfollow": "Deixar de seguir no ecrã bloqueado",
+      "follow": "Seguir sessão",
+      "unfollow": "Deixar de seguir sessão",
       "couldNotLoad": "Não foi possível carregar a sessão.",
       "failedToLoadDetails": "Não foi possível carregar os detalhes da sessão.",
       "failedToStopExecution": "Não foi possível interromper a execução.",
@@ -2613,7 +2627,9 @@
       "retrying": "A tentar novamente…",
       "retryDeny": "Tentar negar novamente",
       "retryAllowOnce": "Tentar permitir uma vez novamente",
-      "retryAlwaysAllow": "Tentar permitir sempre novamente"
+      "retryAlwaysAllow": "Tentar permitir sempre novamente",
+      "unreadableTitle": "Não foi possível ler o pedido de permissão",
+      "unreadableBody": "O agente está à espera de uma decisão de permissão que esta aplicação não consegue mostrar. Atualize a aplicação ou o CLI, ou responda ao pedido no CLI para continuar."
     },
     "questionCard": {
       "title": "Resposta necessária",
@@ -2996,7 +3012,6 @@
   },
   "voiceInput": {
     "listening": "A ouvir...",
-    "staysOff": "O ditado fica desativado até permitires a transcrição pela Internet.",
     "onlineTitle": "O ditado é processado pela Internet",
     "onlineMessage": "Este dispositivo não consegue transcrever sem ligação à Internet. A tua gravação é enviada para {{provider}} para ser convertida em texto. O Kilo não guarda o áudio.",
     "allow": "Permitir",
@@ -3013,8 +3028,9 @@
     "unavailableDevice": "O ditado não está disponível neste dispositivo.",
     "unavailableLanguage": "O ditado não está disponível para o idioma deste dispositivo.",
     "languageNotInstalledTitle": "O ditado para {{language}} ainda não está pronto",
-    "languageNotInstalledMessage": "Os ficheiros de voz offline de {{language}} não estão instalados neste telemóvel. Descarrega-os e tenta o ditado novamente.",
+    "languageNotInstalledMessage": "Os ficheiros de voz offline para {{language}} não estão instalados e a transcrição online está desativada. Descarrega os ficheiros ou volta a ativar a transcrição online para poderes usar o ditado.",
     "downloadOfflineModel": "Descarregar",
+    "useOnlineTranscription": "Permitir transcrição online",
     "offlineModelDownloadScheduled": "Os ficheiros de voz offline serão descarregados em segundo plano. Tenta o ditado novamente mais tarde.",
     "listeningStopped": "O ditado foi interrompido.",
     "transcribing": "A transcrever...",
@@ -3189,7 +3205,7 @@
     "creditActivity": {
       "emptyDescription": "As compras, a utilização e os ajustes de créditos desta organização aparecem aqui à medida que ocorrem.",
       "emptyTitle": "Sem movimentos de créditos",
-      "expires": "Expira em {{date}}",
+      "expiresUtc": "Expira em {{date}} (UTC)",
       "title": "Movimentos de créditos",
       "transactionFallback": "Transação de créditos",
       "category": {
@@ -3212,7 +3228,9 @@
       "sendInvite": "Enviar convite",
       "title": "Convidar membro",
       "alreadyInvited": "O utilizador já foi convidado ou já é membro.",
-      "sendError": "Não foi possível enviar o convite."
+      "sendError": "Não foi possível enviar o convite.",
+      "pendingInvitation": "Este email já tem um convite pendente.",
+      "alreadyMember": "Esta pessoa já é membro desta organização."
     },
     "invoices": {
       "downloadA11y": "Transferir fatura {{number}}",
@@ -3282,7 +3300,12 @@
       "pendingInvitations": "Convites pendentes",
       "resendInvite": "Reenviar convite",
       "shareInviteLink": "Partilhar ligação de convite",
-      "resendInviteError": "Não foi possível reenviar o convite."
+      "resendInviteError": "Não foi possível reenviar o convite.",
+      "inviteNotResendable": "Este convite não pode mais ser reenviado.",
+      "ownerAuthority": "Apenas um proprietário da organização pode gerenciar proprietários.",
+      "ownRoleChange": "Você não pode alterar sua própria função.",
+      "inviteExpired": "Este convite expirou.",
+      "inviteAccepted": "Este convite já foi aceito."
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",
@@ -3396,7 +3419,7 @@
     "activityKitDisabledBody": "Ativa as atividades em direto nas definições para ver os agentes ativos no ecrã bloqueado.",
     "openSession": "Abrir",
     "finished": "Terminado",
-    "followFailed": "Não foi possível mostrar este agente no ecrã bloqueado.",
+    "followFailed": "Não foi possível seguir esta sessão.",
     "approveFailed": "Não foi possível aprovar. Toque em $t(common.approve) para tentar novamente.",
     "checked": "Verificado",
     "lastKnown": "Último estado conhecido",
@@ -3771,6 +3794,7 @@
     "title": "Perfis",
     "entrySubtitle": "Reutilizar definições de ambiente entre sessões",
     "newProfile": "Novo perfil",
+    "openHint": "Abre o perfil",
     "emptyTitle": "Ainda não há perfis",
     "emptyDescription": "Crie um perfil para reutilizar variáveis de ambiente, comandos de configuração e competências entre sessões.",
     "loadFailed": "Não foi possível carregar perfis",
@@ -3869,6 +3893,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Os valores apresentados como •••• mantêm o segredo armazenado; substitua um valor para o renovar. Alterar a linha de comando exige novamente todos os valores",
+      "headersHint": "Os valores apresentados como •••• mantêm o segredo armazenado; substitua um valor para o renovar. Alterar o URL exige novamente todos os valores",
       "nameRequired": "Introduza um nome de servidor",
       "nameInvalid": "O nome pode usar apenas letras ASCII, números, sublinhados e hífenes, até 100 caracteres",
       "commandRequired": "Introduza um comando",
@@ -3967,6 +3993,10 @@
   "credits": {
     "title": "Comprar créditos",
     "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de programação com IA na aplicação Kilo. A loja cobra na sua conta e os créditos são adicionados depois de a loja confirmar o pagamento.",
+    "nextExpiry": "Os créditos no valor de {{amount}} expiram em {{date}} (UTC). Os créditos com a data de expiração mais próxima são utilizados primeiro.",
+    "appStoreExpiry": "Os créditos comprados através da App Store não expiram.",
+    "playOneYearExpiry": "Estes créditos expiram um ano civil após a compra.",
+    "playNonexpiring": "Estes créditos não expiram.",
     "packLabel": "Adicionar {{amount}} em créditos",
     "priceUnavailable": "Preço indisponível",
     "purchased": "Créditos adicionados ao seu saldo.",
@@ -4009,11 +4039,13 @@
       "namePlaceholder": "Erros, ideias, versão…",
       "emoji": "Emoji",
       "mode": "Modo",
-      "defaultsHint": "As sessões iniciadas a partir desta lista usam estas predefinições."
+      "defaultsHint": "As sessões iniciadas a partir desta lista usam estas predefinições.",
+      "saveFailed": "Não foi possível guardar a lista. Verifica a tua ligação e tenta novamente."
     },
     "list": {
       "addPlaceholder": "Adiciona uma tarefa",
       "add": "Adicionar tarefa",
+      "addFailed": "Não foi possível adicionar a tarefa. Verifica a tua ligação e tenta novamente.",
       "empty": "Ainda sem tarefas",
       "setDefaults": "Definir repositório, modo e modelo",
       "completed_one": "Concluídas ({{count}})",
@@ -4052,7 +4084,9 @@
       "startNewSession": "Iniciar nova sessão",
       "startNewSessionHint": "Mantenha premido para iniciar uma nova sessão.",
       "linkSession": "Associar sessão",
-      "linkFailed": "Não foi possível associar a sessão à tarefa"
+      "linkFailed": "Não foi possível associar a sessão à tarefa",
+      "moveToAnotherTodo": "Mover para outra tarefa",
+      "startRefreshFailed": "A sessão iniciou, mas esta lista não foi atualizada."
     },
     "linkSession": {
       "title": "Associar a uma sessão",
@@ -4061,6 +4095,7 @@
     },
     "upNext": "A seguir",
     "sessionTodo": "Tarefa: {{title}}",
+    "openTodoHint": "Abre a tarefa.",
     "linkToTodo": "Associar a tarefa",
     "candidates": {
       "empty": "Sem tarefas em aberto"

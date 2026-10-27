@@ -18,6 +18,14 @@ current render time. Elapsed grants and non-expiring credits do not contribute t
 its amount or earliest expiry, for both personal and organization accounts.
 The balance continues to come from the balance query.
 
+## Session restoration
+
+The first auth-provider mount uses the credentials preloaded when JavaScript
+starts. Later mounts read secure storage again: Android can recreate the activity
+without restarting JavaScript, so the initial snapshot may predate sign-in.
+Back-exit and force-stop preserve the stored session; explicit sign-out clears it.
+The existing bootstrap loading and retryable-error surfaces cover restoration.
+
 ## Runtime recovery
 
 Retry on the runtime-error screen restores the last focused route for the
@@ -41,6 +49,17 @@ Unavailable usage and low-balance settings expose Retry. The low-balance row
 retries its settings read until data is available, then opens configuration.
 Cached settings remain visible during offline pauses and refresh failures.
 
+## Sheet list gestures and actions
+
+Vertical scroll containers inside native route sheets and `Sheet` surfaces enable
+`nestedScrollEnabled` so Android scrolls the list before handing a downward drag
+to the sheet at the top. Keep self-scrolling picker lists outside the shell's
+`ScrollView`.
+
+Shared `SheetHeader` actions use explicit 48px minimum width and height, not
+rem-based sizes: native rem is 14dp. Labels retain their intrinsic size as text
+scales; the title takes the remaining space.
+
 ## Selectable row accessibility
 
 Use `selectableRowA11y` from `@/lib/a11y/selectable-row` for custom checkbox and
@@ -48,6 +67,22 @@ radio rows. It exposes button/selected traits on iOS and checkbox or radio roles
 with checked state on Android. `ChoiceRow` and `radioItemA11y` use this mapping.
 Verify both the native role and state transitions in device accessibility trees;
 a rendered checkmark alone does not verify accessibility.
+
+## Review memory proposals
+
+Code Reviewer review-memory rows show the proposal status and open full proposal
+details. Personal owners and organization owners, admins, and billing managers can
+edit or dismiss open, edited, and failed proposals, or open a REVIEW.md pull request.
+Save edits before opening the pull request. Other members can inspect the same
+details without mutation controls.
+Dismissal asks for confirmation before removing a proposal from the active list.
+
+For local device verification, run
+`pnpm dev:seed app:mobile-review-memory kilo-<name>-<timestamp>@example.com`.
+The fixture requires a localhost database and `SKIP_STRIPE_API=true`, returns mobile
+deep links, and creates no provider integration. It covers editable, opened, failed,
+and member-only proposals; successful provider pull-request creation requires a
+separate integration fixture.
 
 ## PR merge sheet
 
@@ -69,6 +104,14 @@ A response that fails before producing any content still shows its failure and
 Retry action, including after reopening the session. Retry resends the original
 user prompt as a new turn in the same session; the original prompt remains in
 the transcript.
+
+## Email sign-in
+
+The email form validates syntax and a 254-character maximum after trimming and
+lowercasing. Invalid addresses stay on the email step with localized inline
+feedback. The code-step destination abbreviates addresses longer than 48
+characters with a middle ellipsis; delivery and verification use the full address.
+The code input and Verify action remain available below the destination prompt.
 
 ## Transcript action targets
 
@@ -118,8 +161,13 @@ Every build localizes the local-network prompt, because Chat can connect to a lo
 Changes require a new iOS build; an over-the-air update cannot change the native permission prompt.
 
 1. obtain Expo access
-2. `pnpx eas-cli login -b`
+2. `pnpm exec eas login -b`
 3. obtain Apple access (developer)
+
+Run these commands from `apps/mobile` after `pnpm install --frozen-lockfile`.
+When updating EAS CLI, keep the `eas-cli` development dependency and `eas.json`'s
+`cli.version` aligned, regenerate the workspace dependency graph, and verify with
+`pnpm exec eas --version`.
 
 ### Android
 
@@ -133,7 +181,7 @@ their default resource classes. The production builder requires a paid EAS plan.
 
 ### iOS
 
-1. add your device to the list of internal devices using `pnpx eas-cli device:create`
+1. add your device to the list of internal devices using `pnpm exec eas device:create`
 2. install the provisioning profile from step 1 on your device (it may involve a 1hr wait)
 3. create a new dev build using `pnpm build:ios`
 4. `pnpm start`
@@ -314,6 +362,21 @@ Storage is checked before download and again when the server supplies a length.
 Credit packs retain their native App Store and Google Play purchase flow.
 They require a development or production build with in-app purchases enabled;
 Expo Go is not supported.
+
+The app uses `expo-iap` v6 through a single `CreditNativeIapOwner`. Purchase
+completion comes from its `onPurchaseSuccess` callback, not the resolved value of
+`requestPurchase`. The backend verifies and grants the credits before the app calls
+`finishTransaction` with `isConsumable: true`. A failed store finish leaves the
+transaction available for a later recovery pass.
+
+Recovery reads unfinished StoreKit transactions with `getPendingTransactionsIOS`
+and Play purchases with `getAvailablePurchases`; these are not interchangeable
+for consumable credit packs.
+
+The Expo plugin disables Horizon and Fire OS through `modules.horizon` and
+`modules.amazon.fireOS`. The Amazon peer packages are optional for Apple/Play
+builds. Rebuild the native development client after changing `expo-iap`; a Metro
+reload alone does not update its native billing implementation.
 
 Kilo Pass has no native purchase, restore, or store-management flow in the app.
 The Profile card and `/kilo-pass` route render the backend

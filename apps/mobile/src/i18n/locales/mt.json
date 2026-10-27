@@ -53,6 +53,7 @@
     "connected": "Imqabbad",
     "couldNotLoadModels": "Ma stajniex ngħabbu l-mudelli.",
     "couldNotLoadRepositories": "Ma stajniex ngħabbu r-repożitorji.",
+    "noRepositoriesFound": "L-ebda repożitorju misjub",
     "critical": "Kritiku",
     "delete": "Ħassar",
     "deleted": "Imħassar",
@@ -87,6 +88,7 @@
     "connect": "Qabbad",
     "connectBitbucket": "Qabbad Bitbucket",
     "connectGitlab": "Qabbad GitLab",
+    "connectProvider": "Ikkonnettja fornitur",
     "contentTruncated": "Il-kontenut tqassar",
     "copyLink": "Ikkopja l-ħolqa",
     "couldNotLoadOrganizations": "Ma stajniex ngħabbu l-organizzazzjonijiet.",
@@ -145,7 +147,8 @@
     "agent": "Aġent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Bidliet"
+    "changes": "Bidliet",
+    "organizationTrialEnded": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Sid l-organizzazzjoni jista' jaġġorna l-fatturazzjoni fuq kilo.ai, imbagħad jerġa' jipprova."
   },
   "language": {
     "restarting": "L-app qed terġa' tibda biex tapplika l-lingwa",
@@ -224,7 +227,6 @@
     "hideBalance": "Aħbi l-bilanċ",
     "showBalance": "Uri l-bilanċ",
     "balanceHidden": "Il-bilanċ huwa moħbi",
-    "bonusCreditsExpiring": "{{amount}} fi krediti jiskadu: {{date}}.",
     "signOutTitle": "Toħroġ mill-kont?",
     "signOutMessage": "Ikollok terġa' tidħol biex taċċessa l-ispazju tax-xogħol tiegħek.",
     "deleteAccountTitle": "Tħassar il-kont?",
@@ -1473,7 +1475,6 @@
       "gitlabNoRepositoriesDescription": "Jista' jkollok bżonn tagħti aċċess għal aktar gruppi jew proġetti fuq GitLab.",
       "installGithubApp": "Installa l-app ta' GitHub fuq ir-repożitorji",
       "installGithubAppDescription": "Agħti lill-app ta' Kilo fuq GitHub aċċess għar-repożitorji li trid jiġu riveduti.",
-      "noRepositoriesFound": "L-ebda repożitorju misjub",
       "repositoryAccess": "aċċess għar-repożitorju"
     },
     "style": {
@@ -1548,6 +1549,22 @@
       "loadingProposals": "Qed jitgħabbew il-proposti",
       "couldNotLoadProposals": "Ma setgħux jitgħabbew il-proposti.",
       "noProposals": "L-ebda proposta",
+      "proposalDetails": "Dettalji tal-proposta",
+      "proposalTitle": "Titlu tal-proposta",
+      "rationale": "Raġuni",
+      "saveFirst": "Issejvja l-bidliet tiegħek qabel tiftaħ pull request.",
+      "proposalSaved": "Il-proposta ġiet issejvjata",
+      "proposalDismissed": "Il-proposta twarrbet",
+      "dismissProposalTitle": "Twarrab il-proposta?",
+      "dismissProposalMessage": "Din il-proposta se titneħħa mil-lista attiva u ma tkunx tista’ tiġi rrestawrata.",
+      "prOpened": "Infetħet pull request għal REVIEW.md",
+      "alreadyPresent": "Il-linji gwida diġà jinsabu f'REVIEW.md",
+      "status": {
+        "edited": "Editjata",
+        "opening_change_request": "Qed tinfetaħ PR",
+        "change_request_failed": "Il-PR falliet",
+        "superseded": "Diġà preżenti"
+      },
       "noProposalsDescription": "Il-proposti tal-memorja tar-reviżjoni jidhru hawn wara li Kilo janalizza t-tweġibiet tal-manutenturi."
     },
     "manualReview": {
@@ -1555,7 +1572,6 @@
       "invalidUrl": "Daħħal URL validu għal PR.",
       "couldNotCheckProviderStatus": "Ma setax jiġi ċċekkjat l-istat tal-fornitur.",
       "couldNotLoadProviders": "Ma stajniex ngħabbu l-fornituri konnessi tiegħek. Jekk jogħġbok erġa' pprova.",
-      "connectProvider": "Ikkonnettja fornitur",
       "connectProviderDescription": "Ikkonnettja GitHub biex tibda reviżjoni manwali ta' PR.",
       "pullRequestUrl": "URL tal-PR",
       "instructions": "Struzzjonijiet (mhux obbligatorji)",
@@ -1683,8 +1699,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "L-ebda filtru disponibbli",
-      "noFiltersDescription": "Mur lura u erġa' iftaħ il-filtri mil-lista tas-sejbiet.",
       "title": "Filtri tas-sejbiet",
       "reset": "Irrisettja l-filtri",
       "severity": "Severità",
@@ -2268,8 +2282,8 @@
       "title": "Sessjoni",
       "copyErrorDetails": "Ikkopja d-dettalji tal-iżball",
       "backToSessions": "Lura għas-sessjonijiet",
-      "follow": "Segwi fuq l-iskrin tal-qfil",
-      "unfollow": "Ieqaf segwi fuq l-iskrin tal-qfil",
+      "follow": "Segwi s-sessjoni",
+      "unfollow": "Ieqaf segwi s-sessjoni",
       "couldNotLoad": "Ma setgħetx titgħabba s-sessjoni.",
       "failedToLoadDetails": "Ma setgħux jitgħabbew id-dettalji tas-sessjoni.",
       "failedToStopExecution": "Ma setgħetx titwaqqaf l-eżekuzzjoni.",
@@ -2685,7 +2699,9 @@
       "retrying": "Qed jerġa' jipprova…",
       "retryDeny": "Erġa' pprova tiċħad",
       "retryAllowOnce": "Erġa' pprova tippermetti darba biss",
-      "retryAlwaysAllow": "Erġa' pprova tippermetti dejjem"
+      "retryAlwaysAllow": "Erġa' pprova tippermetti dejjem",
+      "unreadableTitle": "It-talba għall-permess ma setgħetx inqrat",
+      "unreadableBody": "L-agent qed jistenna deċiżjoni dwar il-permess li din l-app ma tistax turi. Aġġorna l-app jew il-CLI, jew wieġeb it-talba fil-CLI biex tkompli."
     },
     "questionCard": {
       "title": "L-aġent jeħtieġ it-tweġiba tiegħek",
@@ -3082,7 +3098,6 @@
   },
   "voiceInput": {
     "listening": "Qed nisimgħu…",
-    "staysOff": "Id-dħul bil-vuċi jibqa' diżattivat sakemm tippermetti t-traskrizzjoni onlajn.",
     "onlineTitle": "Id-diskors jiġi pproċessat onlajn",
     "onlineMessage": "Dan l-apparat ma jistax jittraskrivi offlajn. Ir-reġistrazzjoni tiegħek tintbagħat lil {{provider}} biex tinbidel f'test. Kilo ma jaħżinx l-awdjo.",
     "allow": "Ippermetti",
@@ -3099,8 +3114,9 @@
     "unavailableDevice": "Id-dħul bil-vuċi mhux disponibbli fuq dan l-apparat.",
     "unavailableLanguage": "Id-dħul bil-vuċi mhux disponibbli għal-lingwa ta' dan l-apparat.",
     "languageNotInstalledTitle": "Id-dħul bil-vuċi għal {{language}} għadux lest",
-    "languageNotInstalledMessage": "Il-fajls tad-diskors offline għal {{language}} mhumiex installati fuq dan it-telefon. Niżżelhom, imbagħad erġa' pprova d-dħul bil-vuċi.",
+    "languageNotInstalledMessage": "Il-fajls tad-diskors offline għal {{language}} mhumiex installati, u t-traskrizzjoni onlajn hija mitfija. Biex tkun tista' tuża d-dħul bil-vuċi, trid jew tagħmel dawn il-fajls installati jew terġa' tattiva t-traskrizzjoni onlajn.",
     "downloadOfflineModel": "Niżżel",
+    "useOnlineTranscription": "Ippermetti t-traskrizzjoni onlajn",
     "offlineModelDownloadScheduled": "Il-fajls tad-diskors offline se jinżżlu fl-isfond. Erġa' pprova d-dħul bil-vuċi iktar 'il quddiem.",
     "listeningStopped": "Is-smigħ waqaf.",
     "transcribing": "Qed nitraskrivi…",
@@ -3277,7 +3293,7 @@
     "creditActivity": {
       "emptyDescription": "Ix-xiri, l-użu u l-aġġustamenti tal-krediti ta' din l-organizzazzjoni se jidhru hawn hekk kif iseħħu.",
       "emptyTitle": "L-ebda attività tal-krediti",
-      "expires": "Jiskadi: {{date}}",
+      "expiresUtc": "Jiskadi: {{date}} (UTC)",
       "title": "Attività tal-krediti",
       "transactionFallback": "Tranżazzjoni tal-krediti",
       "category": {
@@ -3300,7 +3316,9 @@
       "sendInvite": "Ibgħat stedina",
       "title": "Stieden membru",
       "alreadyInvited": "Din il-persuna diġà hija mistiedna jew diġà membru.",
-      "sendError": "L-istedina ma setgħetx tintbagħat."
+      "sendError": "L-istedina ma setgħetx tintbagħat.",
+      "pendingInvitation": "Dan l-indirizz tal-posta elettronika diġà għandu stedina pendenti.",
+      "alreadyMember": "Din il-persuna diġà hija membru ta' din l-organizzazzjoni."
     },
     "invoices": {
       "downloadA11y": "Niżżel l-fattura {{number}}",
@@ -3370,7 +3388,12 @@
       "pendingInvitations": "Stediniet pendenti",
       "resendInvite": "Erġa' ibgħat l-istedina",
       "shareInviteLink": "Aqsam ir-rabta tal-istedina",
-      "resendInviteError": "L-istedina ma setgħetx tintbagħat mill-ġdid."
+      "resendInviteError": "L-istedina ma setgħetx tintbagħat mill-ġdid.",
+      "inviteNotResendable": "Din l-istedina ma tistax terġa' tintbagħat.",
+      "ownerAuthority": "Biss min huwa sid tal-organizzazzjoni jista' jamministra lis-sidien.",
+      "ownRoleChange": "Ma tistax tibdel ir-rwol tiegħek.",
+      "inviteExpired": "Din l-istedina skadiet.",
+      "inviteAccepted": "Din l-istedina diġà ġiet aċċettata."
     },
     "usageStats": {
       "inputTokens": "Unitajiet tat-test tad-dħul",
@@ -3486,7 +3509,7 @@
     "activityKitDisabledBody": "Attiva l-attivitajiet diretti fl-issettjar biex tara l-aġenti attivi fuq l-iskrin imsakkar.",
     "openSession": "Iftaħ",
     "finished": "Spiċċa",
-    "followFailed": "Ma stajniex nuru dan l-aġent fuq l-iskrin tal-qfil.",
+    "followFailed": "Ma stajniex insegwu din is-sessjoni.",
     "approveFailed": "Ma setax jiġi approvat. Tektek $t(common.approve) biex terġa' tipprova.",
     "checked": "Iċċekkjat",
     "lastKnown": "L-aħħar magħruf",
@@ -3863,6 +3886,7 @@
     "title": "Profili",
     "entrySubtitle": "Uża mill-ġdid is-settings tal-ambjent matul is-sessjonijiet",
     "newProfile": "Profil ġdid",
+    "openHint": "Jiftaħ il-profil",
     "emptyTitle": "Għadu l-ebda profil",
     "emptyDescription": "Oħloq profil biex tuża mill-ġdid il-varjabbli ambjentali, il-kmandi tas-setup, u l-ħiliet matul is-sessjonijiet.",
     "loadFailed": "Ma setgħetx tagħbija profili",
@@ -3971,6 +3995,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Il-valuri murija bħala •••• iżommu s-sigriet maħżun tagħhom; sostitwixxi valur biex iddawru. Il-bdil tal-linja tal-kmand jeħtieġ kull valur mill-ġdid",
+      "headersHint": "Il-valuri murija bħala •••• iżommu s-sigriet maħżun tagħhom; sostitwixxi valur biex iddawru. Il-bdil tal-URL jeħtieġ kull valur mill-ġdid",
       "nameRequired": "Daħħal isem server",
       "nameInvalid": "Isem jista' juża biss ittri ASCII, numri, underscores, u sings, sa 100 karattru",
       "commandRequired": "Daħħal kmand",
@@ -4069,6 +4095,10 @@
   "credits": {
     "title": "Ixtri krediti",
     "description": "Il-krediti huma xiri ta' darba li jiżdied mal-bilanċ Kilo tiegħek biex imexxi sessjonijiet ta' kodifikazzjoni bl-AI fl-App Kilo. Il-ħanut jaddebita l-kont tiegħek u l-krediti jiżdiedu wara li l-ħanut jikkonferma l-ħlas.",
+    "nextExpiry": "{{amount}} fi krediti jiskadu: {{date}} (UTC). Il-krediti li jiskadu l-ewwel jintużaw l-ewwel.",
+    "appStoreExpiry": "Il-krediti mixtrija permezz tal-App Store ma jiskadux.",
+    "playOneYearExpiry": "Dawn il-krediti jiskadu sena kalendarja wara x-xiri.",
+    "playNonexpiring": "Dawn il-krediti ma jiskadux.",
     "packLabel": "Żid {{amount}} f'krediti",
     "priceUnavailable": "Prezz mhux disponibbli",
     "purchased": "Il-krediti ġew miżjuda mal-bilanċ tiegħek.",
@@ -4115,11 +4145,13 @@
       "namePlaceholder": "Żbalji, Ideat, Ħruġ…",
       "emoji": "Emoji",
       "mode": "Mod",
-      "defaultsHint": "Is-sessjonijiet li jinbdew minn din il-lista jużaw dawn id-defaults."
+      "defaultsHint": "Is-sessjonijiet li jinbdew minn din il-lista jużaw dawn id-defaults.",
+      "saveFailed": "Il-lista ma ġietx salvata. Iċċekkja l-konnessjoni tiegħek u erġa’ pprova."
     },
     "list": {
       "addPlaceholder": "Kompitu ġdid",
       "add": "Żid kompitu",
+      "addFailed": "Il-kompitu ma ġiex miżjud. Iċċekkja l-konnessjoni tiegħek u erġa’ pprova.",
       "empty": "S'issa m'hemmx kompiti",
       "setDefaults": "Issettja repożitorju, mod u mudell",
       "completed_one": "Lest ({{count}})",
@@ -4162,7 +4194,9 @@
       "startNewSession": "Ibda sessjoni ġdida",
       "startNewSessionHint": "Agħfas fit-tul biex tibda sessjoni ġdida.",
       "linkSession": "Qabbad sessjoni",
-      "linkFailed": "Ma setgħetx tiġi marbuta s-sessjoni mal-kompitu"
+      "linkFailed": "Ma setgħetx tiġi marbuta s-sessjoni mal-kompitu",
+      "moveToAnotherTodo": "Mexxi għal kompitu ieħor",
+      "startRefreshFailed": "Is-sessjoni bdiet, imma din il-lista ma ġietx aġġornata."
     },
     "linkSession": {
       "title": "Agħżel sessjoni",
@@ -4171,6 +4205,7 @@
     },
     "upNext": "Li jmiss",
     "sessionTodo": "Kompitu: {{title}}",
+    "openTodoHint": "Jiftaħ il-kompitu.",
     "linkToTodo": "Qabbad mal-kompitu",
     "candidates": {
       "empty": "L-ebda kompitu miftuħ"

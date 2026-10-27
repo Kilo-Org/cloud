@@ -53,6 +53,7 @@
     "connected": "Disambungkan",
     "couldNotLoadModels": "Tidak dapat memuatkan model.",
     "couldNotLoadRepositories": "Tidak dapat memuatkan repositori.",
+    "noRepositoriesFound": "Tiada repositori ditemui",
     "critical": "Kritikal",
     "delete": "Padam",
     "deleted": "Dipadam",
@@ -87,6 +88,7 @@
     "connect": "Sambungkan",
     "connectBitbucket": "Sambungkan Bitbucket",
     "connectGitlab": "Sambungkan GitLab",
+    "connectProvider": "Sambungkan penyedia",
     "contentTruncated": "Kandungan dipotong",
     "copyLink": "Salin pautan",
     "couldNotLoadOrganizations": "Tidak dapat memuatkan organisasi.",
@@ -145,7 +147,8 @@
     "agent": "ejen",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Perubahan"
+    "changes": "Perubahan",
+    "organizationTrialEnded": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Pemilik organisasi boleh mengemas kini bil di kilo.ai, kemudian cuba lagi."
   },
   "language": {
     "restarting": "Memulakan semula apl untuk menukar bahasa",
@@ -224,7 +227,6 @@
     "hideBalance": "Sembunyikan baki",
     "showBalance": "Tunjukkan baki",
     "balanceHidden": "Baki disembunyikan",
-    "bonusCreditsExpiring": "Kredit sebanyak {{amount}} akan tamat tempoh pada {{date}}.",
     "signOutTitle": "Log keluar?",
     "signOutMessage": "Anda perlu log masuk semula untuk mengakses ruang kerja anda.",
     "deleteAccountTitle": "Padam akaun?",
@@ -1407,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "Anda mungkin perlu memberikan akses kepada lebih banyak kumpulan atau projek di GitLab.",
       "installGithubApp": "Pasang apl GitHub pada repositori",
       "installGithubAppDescription": "Benarkan apl GitHub Kilo mengakses repositori yang anda mahu disemak.",
-      "noRepositoriesFound": "Tiada repositori ditemui",
       "repositoryAccess": "akses repositori"
     },
     "style": {
@@ -1482,6 +1483,22 @@
       "loadingProposals": "Memuatkan cadangan",
       "couldNotLoadProposals": "Tidak dapat memuatkan cadangan.",
       "noProposals": "Tiada cadangan",
+      "proposalDetails": "Butiran cadangan",
+      "proposalTitle": "Tajuk cadangan",
+      "rationale": "Rasional",
+      "saveFirst": "Simpan suntingan anda sebelum membuka pull request.",
+      "proposalSaved": "Cadangan disimpan",
+      "proposalDismissed": "Cadangan ditolak",
+      "dismissProposalTitle": "Tolak cadangan?",
+      "dismissProposalMessage": "Cadangan ini akan dikeluarkan daripada senarai aktif dan tidak boleh dipulihkan.",
+      "prOpened": "Pull request REVIEW.md dibuka",
+      "alreadyPresent": "Panduan sudah ada dalam REVIEW.md",
+      "status": {
+        "edited": "Disunting",
+        "opening_change_request": "Membuka PR",
+        "change_request_failed": "PR gagal",
+        "superseded": "Sudah ada"
+      },
       "noProposalsDescription": "Cadangan memori semakan muncul di sini selepas Kilo menganalisis balasan penyelenggara."
     },
     "manualReview": {
@@ -1489,7 +1506,6 @@
       "invalidUrl": "Masukkan URL permintaan penarikan yang sah.",
       "couldNotCheckProviderStatus": "Tidak dapat menyemak status penyedia.",
       "couldNotLoadProviders": "Kami tidak dapat memuatkan penyedia yang telah anda sambungkan. Sila cuba lagi.",
-      "connectProvider": "Sambungkan penyedia",
       "connectProviderDescription": "Sambungkan GitHub untuk memulakan semakan manual bagi permintaan penarikan.",
       "pullRequestUrl": "URL permintaan penarikan",
       "instructions": "Arahan (pilihan)",
@@ -1617,8 +1633,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Tiada penapis tersedia",
-      "noFiltersDescription": "Kembali dan buka semula penapis daripada senarai penemuan.",
       "title": "Penapisan penemuan",
       "reset": "Set semula",
       "severity": "Keterukan",
@@ -2172,8 +2186,8 @@
       "title": "Sesi",
       "copyErrorDetails": "Salin butiran ralat",
       "backToSessions": "Kembali ke sesi",
-      "follow": "Ikuti pada Skrin Kunci",
-      "unfollow": "Berhenti mengikuti pada Skrin Kunci",
+      "follow": "Ikuti sesi",
+      "unfollow": "Berhenti mengikuti sesi",
       "couldNotLoad": "Tidak dapat memuatkan sesi.",
       "failedToLoadDetails": "Gagal memuatkan butiran sesi.",
       "failedToStopExecution": "Gagal menghentikan pelaksanaan.",
@@ -2577,7 +2591,9 @@
       "retrying": "Mencuba semula…",
       "retryDeny": "Cuba tolak semula",
       "retryAllowOnce": "Cuba benarkan sekali semula",
-      "retryAlwaysAllow": "Cuba sentiasa benarkan semula"
+      "retryAlwaysAllow": "Cuba sentiasa benarkan semula",
+      "unreadableTitle": "Permintaan kebenaran tidak dapat dibaca",
+      "unreadableBody": "Ejen sedang menunggu keputusan kebenaran yang tidak dapat ditunjukkan oleh aplikasi ini. Kemas kini aplikasi atau CLI, atau jawab permintaan itu dalam CLI untuk meneruskan."
     },
     "questionCard": {
       "title": "Ejen memerlukan maklumat",
@@ -2953,7 +2969,6 @@
   },
   "voiceInput": {
     "listening": "Mendengar...",
-    "staysOff": "Input suara kekal dinyahdayakan sehingga anda membenarkan transkripsi dalam talian.",
     "onlineTitle": "Pertuturan diproses dalam talian",
     "onlineMessage": "Peranti ini tidak boleh menukar pertuturan kepada teks di luar talian. Rakaman anda dihantar kepada {{provider}} untuk ditukar kepada teks. Kilo tidak menyimpan audio tersebut.",
     "allow": "Benarkan",
@@ -2970,8 +2985,9 @@
     "unavailableDevice": "Input suara tidak tersedia pada peranti ini.",
     "unavailableLanguage": "Input suara tidak tersedia untuk bahasa peranti ini.",
     "languageNotInstalledTitle": "Input suara untuk {{language}} belum sedia",
-    "languageNotInstalledMessage": "Fail pertuturan luar talian untuk {{language}} tidak dipasang pada telefon ini. Muat turun fail itu, kemudian cuba input suara lagi.",
+    "languageNotInstalledMessage": "Fail pertuturan luar talian {{language}} belum dipasang, dan transkripsi dalam talian dimatikan. Muat turun fail tersebut, atau hidupkan semula transkripsi dalam talian, untuk menggunakan input suara.",
     "downloadOfflineModel": "Muat turun",
+    "useOnlineTranscription": "Benarkan transkripsi dalam talian",
     "offlineModelDownloadScheduled": "Fail pertuturan luar talian akan dimuat turun di latar belakang. Cuba input suara lagi kemudian.",
     "listeningStopped": "Input suara telah dihentikan.",
     "transcribing": "Mentranskripsi...",
@@ -3145,7 +3161,7 @@
     "creditActivity": {
       "emptyDescription": "Pembelian, penggunaan dan pelarasan kredit organisasi ini akan dipaparkan di sini apabila berlaku.",
       "emptyTitle": "Tiada aktiviti kredit",
-      "expires": "Tamat tempoh pada {{date}}",
+      "expiresUtc": "Tamat tempoh pada {{date}} (UTC)",
       "title": "Aktiviti kredit",
       "transactionFallback": "Transaksi kredit",
       "category": {
@@ -3168,7 +3184,9 @@
       "sendInvite": "Hantar jemputan",
       "title": "Jemput ahli",
       "alreadyInvited": "E-mel itu sudah dijemput atau sudah menjadi ahli.",
-      "sendError": "Tidak dapat menghantar jemputan."
+      "sendError": "Tidak dapat menghantar jemputan.",
+      "pendingInvitation": "E-mel ini sudah mempunyai jemputan yang belum selesai.",
+      "alreadyMember": "Orang ini sudah menjadi ahli organisasi ini."
     },
     "invoices": {
       "downloadA11y": "Muat turun invois {{number}}",
@@ -3238,7 +3256,12 @@
       "pendingInvitations": "Jemputan menunggu jawapan",
       "resendInvite": "Hantar semula jemputan",
       "shareInviteLink": "Kongsi pautan jemputan",
-      "resendInviteError": "Tidak dapat menghantar semula jemputan."
+      "resendInviteError": "Tidak dapat menghantar semula jemputan.",
+      "inviteNotResendable": "Jemputan ini tidak boleh dihantar semula lagi.",
+      "ownerAuthority": "Hanya pemilik organisasi boleh mengurus pemilik.",
+      "ownRoleChange": "Anda tidak boleh menukar peranan anda sendiri.",
+      "inviteExpired": "Jemputan ini telah tamat tempoh.",
+      "inviteAccepted": "Jemputan ini telah pun diterima."
     },
     "usageStats": {
       "inputTokens": "Token masukan",
@@ -3351,7 +3374,7 @@
     "activityKitDisabledBody": "Dayakan Aktiviti Langsung dalam Tetapan untuk melihat ejen aktif pada Skrin Kunci.",
     "openSession": "Buka",
     "finished": "Selesai",
-    "followFailed": "Tidak dapat memaparkan ejen ini pada Skrin Kunci.",
+    "followFailed": "Tidak dapat mengikuti sesi ini.",
     "approveFailed": "Tidak dapat meluluskan. Ketik $t(common.approve) untuk mencuba semula.",
     "checked": "Disemak",
     "lastKnown": "Terakhir diketahui",
@@ -3725,6 +3748,7 @@
     "title": "Profil",
     "entrySubtitle": "Gunakan semula tetapan persekitaran merentas sesi",
     "newProfile": "Profil baharu",
+    "openHint": "Membuka profil",
     "emptyTitle": "Tiada profil lagi",
     "emptyDescription": "Buat profil untuk menggunakan semula pembolehubah persekitaran, arahan persediaan dan kemahiran merentas sesi.",
     "loadFailed": "Tidak dapat memuatkan profil",
@@ -3818,6 +3842,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Nilai yang dipaparkan sebagai •••• mengekalkan rahsia tersimpan; gantikan nilai untuk memutarkannya. Menukar baris perintah memerlukan setiap nilai sekali lagi",
+      "headersHint": "Nilai yang dipaparkan sebagai •••• mengekalkan rahsia tersimpan; gantikan nilai untuk memutarkannya. Menukar URL memerlukan setiap nilai sekali lagi",
       "nameRequired": "Masukkan nama pelayan",
       "nameInvalid": "Nama hanya boleh menggunakan huruf ASCII, nombor, garis bawah dan sempang, sehingga 100 aksara",
       "commandRequired": "Masukkan arahan",
@@ -3916,6 +3942,10 @@
   "credits": {
     "title": "Beli kredit",
     "description": "Kredit ialah pembelian sekali sahaja yang ditambah pada baki Kilo anda untuk menjalankan sesi pengekodan AI dalam Apl Kilo. Kedai mengenakan caj pada akaun anda dan kredit ditambah selepas kedai mengesahkan pembayaran.",
+    "nextExpiry": "Kredit sebanyak {{amount}} akan tamat tempoh pada {{date}} (UTC). Kredit yang paling awal tamat tempoh digunakan dahulu.",
+    "appStoreExpiry": "Kredit yang dibeli melalui App Store tidak tamat tempoh.",
+    "playOneYearExpiry": "Kredit ini tamat tempoh satu tahun kalendar selepas pembelian.",
+    "playNonexpiring": "Kredit ini tidak tamat tempoh.",
     "packLabel": "Tambah kredit {{amount}}",
     "priceUnavailable": "Harga tidak tersedia",
     "purchased": "Kredit telah ditambah pada baki anda.",
@@ -3956,11 +3986,13 @@
       "namePlaceholder": "Pepijat, Idea, Keluaran…",
       "emoji": "Emoji",
       "mode": "Mod",
-      "defaultsHint": "Sesi yang dimulakan daripada senarai ini menggunakan tetapan lalai ini."
+      "defaultsHint": "Sesi yang dimulakan daripada senarai ini menggunakan tetapan lalai ini.",
+      "saveFailed": "Senarai tidak dapat disimpan. Semak sambungan anda dan cuba lagi."
     },
     "list": {
       "addPlaceholder": "Tambah tugasan baharu",
       "add": "Tambah tugasan",
+      "addFailed": "Tugasan tidak dapat ditambah. Semak sambungan anda dan cuba lagi.",
       "empty": "Belum ada tugasan",
       "setDefaults": "Tetapkan repositori, mod dan model",
       "completed_one": "Selesai ({{count}})",
@@ -3997,7 +4029,9 @@
       "startNewSession": "Mulakan sesi baharu",
       "startNewSessionHint": "Tekan lama untuk memulakan sesi baharu.",
       "linkSession": "Pautkan sesi",
-      "linkFailed": "Tidak dapat memautkan sesi pada tugasan"
+      "linkFailed": "Tidak dapat memautkan sesi pada tugasan",
+      "moveToAnotherTodo": "Alihkan ke tugasan lain",
+      "startRefreshFailed": "Sesi telah dimulakan, tetapi senarai ini tidak dikemas kini."
     },
     "linkSession": {
       "title": "Pautkan satu sesi",
@@ -4006,6 +4040,7 @@
     },
     "upNext": "Seterusnya",
     "sessionTodo": "Tugasan: {{title}}",
+    "openTodoHint": "Membuka tugasan.",
     "linkToTodo": "Pautkan pada tugasan",
     "candidates": {
       "empty": "Tiada tugasan terbuka"

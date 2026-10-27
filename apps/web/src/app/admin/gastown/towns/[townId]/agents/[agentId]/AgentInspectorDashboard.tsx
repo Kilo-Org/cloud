@@ -54,7 +54,6 @@ export function AgentInspectorDashboard({ townId, agentId }: { townId: string; a
   const [eventSortDir, setEventSortDir] = useState<SortDir>('desc');
   const [eventLimit, setEventLimit] = useState(500);
 
-  // Fetch agent from list
   const agentsQuery = useQuery(trpc.admin.gastown.listAgents.queryOptions({ townId }));
   const agent = (agentsQuery.data ?? []).find(a => a.id === agentId) ?? null;
 
@@ -87,13 +86,10 @@ export function AgentInspectorDashboard({ townId, agentId }: { townId: string; a
   const allBeadEvents = beadEventsQuery.data ?? [];
   const dispatchAttempts = dispatchAttemptsQuery.data ?? [];
 
-  // Events related to this agent from bead events
   const agentBeadEvents = allBeadEvents.filter(e => e.agent_id === agentId);
 
-  // Deduplicated bead IDs that this agent was ever hooked to
   const hookedBeadIds = Array.from(new Set(agentBeadEvents.map(e => e.bead_id)));
 
-  // Filtered + sorted agent events
   const filteredAgentEvents = agentEvents
     .filter(e => {
       if (!eventSearch) return true;

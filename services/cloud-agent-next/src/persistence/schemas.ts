@@ -1,3 +1,4 @@
+import { setupCommandsSchema } from '@kilocode/cloud-agent-profile/setup-script';
 import {
   RuntimeSkillsSchema,
   RuntimeAgentsSchema,
@@ -82,26 +83,6 @@ export const AttachmentsSchema = z.object({
     .describe('Ordered array of specific UUID attachment filenames to download'),
 });
 export type Attachments = z.infer<typeof AttachmentsSchema>;
-
-const imageFilenameSchema = z
-  .string()
-  .min(1)
-  .max(128)
-  .regex(
-    /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.(png|jpg|jpeg|webp|gif)$/,
-    'Image filename must be a UUID with extension png, jpg, jpeg, webp, or gif'
-  );
-
-/** Legacy public image decoder retained only for API request compatibility. */
-export const ImagesSchema = z.object({
-  path: attachmentMessageUuidSchema,
-  files: z
-    .array(imageFilenameSchema)
-    .min(1)
-    .max(5)
-    .describe('Ordered array of specific UUID image filenames to download'),
-});
-export type Images = z.infer<typeof ImagesSchema>;
 
 /**
  * Schema for encrypted secret envelope (RSA + AES envelope encryption).
@@ -288,7 +269,7 @@ const SharedSessionProfileFields = {
     })
     .optional(),
   encryptedSecrets: EncryptedSecretsSchema.optional(),
-  setupCommands: z.array(z.string().max(500)).max(Limits.MAX_SETUP_COMMANDS).optional(),
+  setupCommands: setupCommandsSchema.optional(),
   mcpServers: z
     .record(z.string().max(100), MCPServerConfigSchema)
     .refine(obj => Object.keys(obj).length <= Limits.MAX_MCP_SERVERS, {

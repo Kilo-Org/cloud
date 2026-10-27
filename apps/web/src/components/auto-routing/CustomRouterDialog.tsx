@@ -12,7 +12,7 @@ import {
   type AutoRouter,
   type AutoRoutingMode,
   type CustomRouterEntry,
-  type CustomRouterScope,
+  type OwnerType,
   type CustomRouterSummary,
 } from '@kilocode/auto-routing-contracts';
 import { useMutation } from '@tanstack/react-query';
@@ -79,7 +79,7 @@ function initialDraft(router: CustomRouterSummary | undefined): Draft {
   };
 }
 
-export function slugError(scope: CustomRouterScope, slug: string): string | null {
+export function slugError(scope: OwnerType, slug: string): string | null {
   if (!CUSTOM_ROUTER_SLUG_PATTERN.test(slug)) {
     return 'Use 1–40 lowercase letters, digits, or hyphens. Start and end with a letter or digit.';
   }
@@ -90,7 +90,7 @@ export function slugError(scope: CustomRouterScope, slug: string): string | null
 }
 
 type Props = {
-  scope: CustomRouterScope;
+  scope: OwnerType;
   organizationId: string | undefined;
   router: CustomRouterSummary | undefined;
   onClose: () => void;
@@ -133,18 +133,19 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
         entries: draft.entries,
         defaultEntryKey: draft.defaultEntryKey,
       };
+      const entriesChanged =
+        router !== undefined &&
+        (draft.entries.length !== router.entries.length ||
+          draft.entries.some(
+            (entry, index) => customRouterEntryKey(entry) !== router.entries[index]?.key
+          ));
       const patch = router
         ? {
             name: fields.name,
             ...(draft.baseRouter !== router.baseRouter ? { baseRouter: draft.baseRouter } : {}),
             ...(draft.mode !== router.mode ? { mode: draft.mode } : {}),
-            ...(draft.entries.length !== router.entries.length ||
-            draft.entries.some(
-              (entry, index) => customRouterEntryKey(entry) !== router.entries[index]?.key
-            )
-              ? { entries: draft.entries }
-              : {}),
-            ...(draft.defaultEntryKey !== router.defaultEntryKey
+            ...(entriesChanged ? { entries: draft.entries } : {}),
+            ...(entriesChanged || draft.defaultEntryKey !== router.defaultEntryKey
               ? { defaultEntryKey: draft.defaultEntryKey }
               : {}),
           }

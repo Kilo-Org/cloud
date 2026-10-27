@@ -6,6 +6,7 @@ const {
   mockGetWorkerDb,
   mockGetMissingSnowflakeConfig,
   mockQueryKiloclawActiveUserIds,
+  mockReconcileCreditExpirations,
 } = vi.hoisted(() => ({
   mockFindLatestPreCutoffUserCommitSwitchQualification: vi.fn<
     () => Promise<DbModule.KiloClawCommitSwitchQualification | null>
@@ -13,6 +14,7 @@ const {
   mockGetWorkerDb: vi.fn(),
   mockGetMissingSnowflakeConfig: vi.fn<() => string[]>(() => []),
   mockQueryKiloclawActiveUserIds: vi.fn(),
+  mockReconcileCreditExpirations: vi.fn(async () => undefined),
 }));
 
 vi.mock('@kilocode/db', async importOriginal => {
@@ -24,6 +26,9 @@ vi.mock('@kilocode/db', async importOriginal => {
     getWorkerDb: mockGetWorkerDb,
   };
 });
+vi.mock('@kilocode/db/credit-expiration', () => ({
+  reconcileCreditExpirationsInTransaction: mockReconcileCreditExpirations,
+}));
 
 vi.mock('./snowflake.js', () => ({
   getMissingSnowflakeConfig: mockGetMissingSnowflakeConfig,
@@ -5511,6 +5516,10 @@ describe('credit renewal sweep affiliate tracking', () => {
       'f6f6f6f6-f6f6-4f6f-8f6f-f6f6f6f6f6f6'
     );
 
+    expect(mockReconcileCreditExpirations).toHaveBeenCalledWith(
+      { type: 'user', id: 'insufficient-user' },
+      expect.anything()
+    );
     expect(summary.credit_renewals_past_due).toBe(1);
     expect(summary.emails_sent).toBe(1);
     expect(summary.credit_renewals).toBe(0);
@@ -6131,6 +6140,62 @@ describe('credit renewal sweep affiliate tracking', () => {
         },
       },
     ]);
+  });
+
+  it('reconciles expired principal before deciding whether a recurring service needs opted-in funding', async () => {
+    const renewalAt = '2026-04-09T10:00:00.000Z';
+    const payer = creditRenewalRow({
+      credit_renewal_at: renewalAt,
+      current_period_end: renewalAt,
+      total_microdollars_acquired: 60_000_000,
+      auto_top_up_enabled: true,
+      kilo_pass_threshold: null,
+      next_credit_expiration_at: renewalAt,
+    });
+    const { db, txUpdates } = createMockDb([[payer]], {
+      updateReturningRows: [[{ ...payer, auto_top_up_triggered_for_period: renewalAt }]],
+    });
+    mockGetWorkerDb.mockReturnValue(db);
+    mockReconcileCreditExpirations.mockImplementationOnce(async () => {
+      payer.total_microdollars_acquired = 0;
+      payer.next_credit_expiration_at = null;
+    });
+    const fetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+    vi.spyOn(globalThis, 'fetch').mockImplementation(fetch);
+
+    const summary = await processCreditRenewalItem(
+      createEnv(vi.fn()),
+      creditRenewalItemMessage({ renewalBoundary: renewalAt }),
+      1
+    );
+    expect(summary.errors).toBe(0);
+    expect(summary.credit_renewals).toBe(0);
+    expect(summary.credit_renewals_auto_top_up).toBe(1);
+    expect(txUpdates.some(update => 'microdollars_used' in update)).toBe(false);
+    expect(fetch).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        body: JSON.stringify({
+          action: 'trigger_user_auto_top_up',
+          input: {
+            user: {
+              id: payer.user_id,
+              total_microdollars_acquired: 0,
+              microdollars_used: 0,
+              auto_top_up_enabled: true,
+              next_credit_expiration_at: null,
+              updated_at: payer.user_updated_at,
+            },
+          },
+        }),
+      })
+    );
   });
 
   it('marks auto-top-up-triggered period and writes changelog before triggering top-up', async () => {

@@ -53,6 +53,7 @@
     "connected": "ተገናኝቷል",
     "couldNotLoadModels": "ሞዴሎችን መጫን አልተቻለም።",
     "couldNotLoadRepositories": "ማከማቻዎችን መጫን አልተቻለም።",
+    "noRepositoriesFound": "ምንም ማከማቻዎች አልተገኙም",
     "critical": "እጅግ ከፍተኛ",
     "delete": "ሰርዝ",
     "deleted": "ተሰርዟል",
@@ -87,6 +88,7 @@
     "connect": "አገናኝ",
     "connectBitbucket": "Bitbucketን አገናኝ",
     "connectGitlab": "GitLabን አገናኝ",
+    "connectProvider": "አቅራቢን ያገናኙ",
     "contentTruncated": "ይዘቱ ተቆርጧል",
     "copyLink": "አገናኙን ቅዳ",
     "couldNotLoadOrganizations": "ድርጅቶችን መጫን አልተቻለም።",
@@ -145,7 +147,8 @@
     "agent": "ወኪል",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "ለውጦች"
+    "changes": "ለውጦች",
+    "organizationTrialEnded": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም። የድርጅት ባለቤት በkilo.ai ላይ የክፍያ መረጃን ማዘመን ይችላል፣ ከዚያ እንደገና ይሞክሩ።"
   },
   "language": {
     "restarting": "ቋንቋውን ለመቀየር እንደገና በመጀመር ላይ",
@@ -224,7 +227,6 @@
     "hideBalance": "ቀሪ ሂሳብ ደብቅ",
     "showBalance": "ቀሪ ሂሳብ አሳይ",
     "balanceHidden": "ቀሪ ሂሳብ ተደብቋል",
-    "bonusCreditsExpiring": "{{amount}} ክሬዲት በ{{date}} ጊዜው ያበቃል።",
     "signOutTitle": "ከመለያዎ መውጣት ይፈልጋሉ?",
     "signOutMessage": "የሥራ ቦታህን ለመጠቀም እንደገና መግባት ያስፈልግሃል።",
     "deleteAccountTitle": "መለያዎን መሰረዝ ይፈልጋሉ?",
@@ -1407,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "በGitLab ላይ ወደ ተጨማሪ ቡድኖች ወይም ፕሮጀክቶች የመድረስ ፈቃድ መስጠት ሊያስፈልግዎ ይችላል።",
       "installGithubApp": "የGitHub መተግበሪያን በማከማቻዎች ላይ ይጫኑ",
       "installGithubAppDescription": "ለKilo የGitHub መተግበሪያ እንዲገመገሙ ወደሚፈልጓቸው ማከማቻዎች የመድረስ ፈቃድ ይስጡ።",
-      "noRepositoriesFound": "ምንም ማከማቻዎች አልተገኙም",
       "repositoryAccess": "የማከማቻ መዳረሻ"
     },
     "style": {
@@ -1482,6 +1483,22 @@
       "loadingProposals": "የቀረቡ ሐሳቦችን በመጫን ላይ",
       "couldNotLoadProposals": "የቀረቡ ሐሳቦችን መጫን አልተቻለም።",
       "noProposals": "የቀረቡ ሐሳቦች የሉም",
+      "proposalDetails": "የቀረበው ሐሳብ ዝርዝሮች",
+      "proposalTitle": "የቀረበው ሐሳብ ርዕስ",
+      "rationale": "ምክንያት",
+      "saveFirst": "Pull request ከመክፈትዎ በፊት ለውጦችዎን ያስቀምጡ።",
+      "proposalSaved": "የቀረበው ሐሳብ ተቀምጧል",
+      "proposalDismissed": "የቀረበው ሐሳብ ተሰርዟል",
+      "dismissProposalTitle": "የቀረበው ሐሳብ ይሰረዝ?",
+      "dismissProposalMessage": "ይህ የቀረበው ሐሳብ ከንቁ ዝርዝሩ ይወገዳል፣ እንደገናም መመለስ አይቻልም።",
+      "prOpened": "የREVIEW.md pull request ተከፍቷል",
+      "alreadyPresent": "መመሪያዎቹ አስቀድመው በREVIEW.md ውስጥ አሉ",
+      "status": {
+        "edited": "ተስተካክሏል",
+        "opening_change_request": "PR በመክፈት ላይ",
+        "change_request_failed": "PR አልተሳካም",
+        "superseded": "አስቀድሞ አለ"
+      },
       "noProposalsDescription": "Kilo የፕሮጀክት ተንከባካቢዎችን ምላሾች ከተነተነ በኋላ የግምገማ ትውስታ ያቀረባቸው ሐሳቦች እዚህ ይታያሉ።"
     },
     "manualReview": {
@@ -1489,7 +1506,6 @@
       "invalidUrl": "ትክክለኛ የኮድ ውህደት ጥያቄ URL ያስገቡ።",
       "couldNotCheckProviderStatus": "የአቅራቢውን ሁኔታ መፈተሽ አልተቻለም።",
       "couldNotLoadProviders": "የተገናኙትን አቅራቢዎች መጫን አልቻልንም። እባክዎ እንደገና ይሞክሩ።",
-      "connectProvider": "አቅራቢን ያገናኙ",
       "connectProviderDescription": "የኮድ ውህደት ጥያቄ ግምገማን ራስዎ ለማስጀመር GitHubን ያገናኙ።",
       "pullRequestUrl": "የኮድ ውህደት ጥያቄ URL",
       "instructions": "መመሪያዎች (አማራጭ)",
@@ -1617,8 +1633,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "ምንም ማጣሪያዎች የሉም",
-      "noFiltersDescription": "ተመልሰው ከግኝቶች ዝርዝር ማጣሪያዎቹን እንደገና ይክፈቱ።",
       "title": "የግኝቶች ማጣሪያ",
       "reset": "ወደ መጀመሪያው ይመልሱ",
       "severity": "ክብደት",
@@ -2172,8 +2186,8 @@
       "title": "ክፍለ ጊዜ",
       "copyErrorDetails": "የስህተት ዝርዝሮችን ይቅዱ",
       "backToSessions": "ወደ ክፍለ ጊዜዎች ይመለሱ",
-      "follow": "በመቆለፊያ ማያ ገጽ ላይ ይከተሉ",
-      "unfollow": "በመቆለፊያ ማያ ገጽ ላይ መከተል ያቁሙ",
+      "follow": "ክፍለ ጊዜውን ይከተሉ",
+      "unfollow": "ክፍለ ጊዜውን መከተል ያቁሙ",
       "couldNotLoad": "ክፍለ ጊዜውን መጫን አልተቻለም።",
       "failedToLoadDetails": "የክፍለ ጊዜውን ዝርዝሮች መጫን አልተሳካም።",
       "failedToStopExecution": "ሂደቱን ማቆም አልተሳካም።",
@@ -2577,7 +2591,9 @@
       "retrying": "እንደገና በመሞከር ላይ…",
       "retryDeny": "ላለመፍቀድ እንደገና ይሞክሩ",
       "retryAllowOnce": "አንድ ጊዜ ለመፍቀድ እንደገና ይሞክሩ",
-      "retryAlwaysAllow": "ሁልጊዜ ለመፍቀድ እንደገና ይሞክሩ"
+      "retryAlwaysAllow": "ሁልጊዜ ለመፍቀድ እንደገና ይሞክሩ",
+      "unreadableTitle": "የፈቃድ ጥያቄ ማንበብ አልተቻለም",
+      "unreadableBody": "ወኪሉ ይህ መተግበሪያ ማሳየት የማይችለውን የፈቃድ ውሳኔ በመጠበቅ ላይ ነው። ለመቀጠል መተግበሪያውን ወይም CLI-ን ያሻሽሉ፣ ወይም ጥያቄውን በ CLI ውስጥ ይመልሱ።"
     },
     "questionCard": {
       "title": "ወኪሉ መልስ ይፈልጋል",
@@ -2953,7 +2969,6 @@
   },
   "voiceInput": {
     "listening": "በማዳመጥ ላይ...",
-    "staysOff": "በመስመር ላይ ንግግርን ወደ ጽሑፍ መቀየር እስኪፈቅዱ ድረስ የድምፅ ግብዓት ተሰናክሎ ይቆያል።",
     "onlineTitle": "ንግግር በመስመር ላይ ወደ ጽሑፍ ይቀየራል",
     "onlineMessage": "ይህ መሣሪያ ያለ በይነመረብ ግንኙነት ንግግርን ወደ ጽሑፍ መቀየር አይችልም። የተቀዳው ድምፅዎ ወደ ጽሑፍ እንዲቀየር ወደ {{provider}} ይላካል። Kilo ድምፁን አያከማችም።",
     "allow": "ይፍቀዱ",
@@ -2970,8 +2985,9 @@
     "unavailableDevice": "የድምፅ ግብዓት በዚህ መሣሪያ ላይ አይገኝም።",
     "unavailableLanguage": "የድምፅ ግብዓት መሣሪያው ለተዋቀረበት ቋንቋ አይገኝም።",
     "languageNotInstalledTitle": "የ{{language}} የድምፅ ግብዓት እስካሁን አልተዘጋጀም",
-    "languageNotInstalledMessage": "የ{{language}} ከመስመር ውጭ ያሉ የንግግር ፋይሎች በዚህ ስልክ ላይ አልተጫኑም። ያውርዱዋቸው፣ ከዚያ የድምፅ ግብዓትን እንደገና ይሞክሩ።",
+    "languageNotInstalledMessage": "የ{{language}} ከመስመር ውጭ ያሉ የንግግር ፋይሎች አልተጫኑም፣ እንዲሁም ንግግርን በመስመር ላይ ወደ ጽሑፍ መቀየር ጠፍቷል። ፋይሎቹን ማውረድ ወይም ንግግርን በመስመር ላይ ወደ ጽሑፍ መቀየርን እንደገና ማብራት የድምፅ ግብዓትን ያሰራል።",
     "downloadOfflineModel": "አውርድ",
+    "useOnlineTranscription": "ንግግርን በመስመር ላይ ይፍቀዱ",
     "offlineModelDownloadScheduled": "ከመስመር ውጭ ያሉ የንግግር ፋይሎች በጀርባ ይወርዳሉ። የድምፅ ግብዓትን በኋላ እንደገና ይሞክሩ።",
     "listeningStopped": "ማዳመጥ ቆሟል።",
     "transcribing": "ወደ ጽሑፍ በመቀየር ላይ...",
@@ -3145,7 +3161,7 @@
     "creditActivity": {
       "emptyDescription": "የዚህ ድርጅት ግዢዎች፣ አጠቃቀም እና የክሬዲት ማስተካከያዎች ሲኖሩ እዚህ ይታያሉ።",
       "emptyTitle": "ምንም የክሬዲት እንቅስቃሴ የለም",
-      "expires": "በ{{date}} ጊዜው ያበቃል",
+      "expiresUtc": "በ{{date}} (UTC) ጊዜው ያበቃል",
       "title": "የክሬዲት እንቅስቃሴ",
       "transactionFallback": "የክሬዲት ግብይት",
       "category": {
@@ -3168,7 +3184,9 @@
       "sendInvite": "ግብዣ ይላኩ",
       "title": "አባል ጋብዝ",
       "alreadyInvited": "አስቀድሞ ግብዣ ተልኳል ወይም አስቀድሞ አባል ነው።",
-      "sendError": "ግብዣውን መላክ አልተቻለም።"
+      "sendError": "ግብዣውን መላክ አልተቻለም።",
+      "pendingInvitation": "ይህ ኢሜይል አስቀድሞ በመጠባበቅ ላይ ያለ ግብዣ አለው።",
+      "alreadyMember": "ይህ ሰው አስቀድሞ የዚህ ድርጅት አባል ነው።"
     },
     "invoices": {
       "downloadA11y": "ደረሰኝ {{number}}ን ያውርዱ",
@@ -3238,7 +3256,12 @@
       "pendingInvitations": "ምላሽ የሚጠብቁ ግብዣዎች",
       "resendInvite": "ግብዣውን እንደገና ይላኩ",
       "shareInviteLink": "የግብዣውን አገናኝ ያጋሩ",
-      "resendInviteError": "ግብዣውን እንደገና መላክ አልተቻለም።"
+      "resendInviteError": "ግብዣውን እንደገና መላክ አልተቻለም።",
+      "inviteNotResendable": "ይህ ግብዣ ከአሁን በኋላ እንደገና መላክ አይቻልም።",
+      "ownerAuthority": "የድርጅት ባለቤት ብቻ ባለቤቶችን ማስተዳደር ይችላል።",
+      "ownRoleChange": "የራስዎን ሚና መቀየር አይችሉም።",
+      "inviteExpired": "ይህ ግብዣ ጊዜው አልፎበታል።",
+      "inviteAccepted": "ይህ ግብዣ አስቀድሞ ተቀብሏል።"
     },
     "usageStats": {
       "inputTokens": "የግብዓት ቶከኖች",
@@ -3351,7 +3374,7 @@
     "activityKitDisabledBody": "ንቁ ወኪሎችን በተቆለፈው ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን አንቃ።",
     "openSession": "ክፈት",
     "finished": "ተጠናቅቋል",
-    "followFailed": "ይህን ወኪል በመቆለፊያ ማያ ገጽ ላይ ማሳየት አልተቻለም።",
+    "followFailed": "ይህን ክፍለ ጊዜ መከተል አልተቻለም።",
     "approveFailed": "ማጽደቅ አልተቻለም። እንደገና ለመሞከር $t(common.approve) ይንኩ።",
     "checked": "የተረጋገጠ",
     "lastKnown": "ለመጨረሻ ጊዜ የታወቀ",
@@ -3725,6 +3748,7 @@
     "title": "መገለጫዎች",
     "entrySubtitle": "በክፍለ-ጊዜዎች ውስጥ የአካባቢ ቅንብሮችን እንደገና ይጠቀሙ",
     "newProfile": "አዲስ መገለጫ",
+    "openHint": "መገለጫውን ይከፍታል",
     "emptyTitle": "እስካሁን ምንም መገለጫዎች የሉም",
     "emptyDescription": "የአካባቢ ተለዋዋጮችን፣ የማዋቀር ትዕዛዞችን እና በክፍለ-ጊዜዎች ያሉ ክህሎቶችን እንደገና ለመጠቀም መገለጫ ይፍጠሩ።",
     "loadFailed": "መገለጫዎችን መጫን አልተቻለም",
@@ -3818,6 +3842,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "እንደ •••• የሚታዩ እሴቶች የተከማቸውን ሚስጥራቸውን ይይዛሉ፤ ሚስጥሩን ለማሽከረከር እሴቱን በአዲስ ይተኩ። የትእዛዝ መስመሩን መቀየር ሁሉንም እሴቶች እንደገና ያስፈልጋል",
+      "headersHint": "እንደ •••• የሚታዩ እሴቶች የተከማቸውን ሚስጥራቸውን ይይዛሉ፤ ሚስጥሩን ለማሽከረከር እሴቱን በአዲስ ይተኩ። URLን መቀየር ሁሉንም እሴቶች እንደገና ያስፈልጋል",
       "nameRequired": "የአገልጋይ ስም አስገባ",
       "nameInvalid": "ስም የASCII ፊደላትን፣ አሃዞችን፣ የስር መስመሮችን እና ሰረዞችን ብቻ መጠቀም ይችላል፣ እስከ 100 ቁምፊዎች።",
       "commandRequired": "ትእዛዝ አስገባ",
@@ -3916,6 +3942,10 @@
   "credits": {
     "title": "ክሬዲት ይግዙ",
     "description": "ክሬዲት በKilo App ውስጥ የAI ኮዲንግ ክፍለ-ጊዜዎችን ለማስኬድ ወደ Kilo ቀሪ ሂሳብዎ የሚጨመር የአንድ ጊዜ ግዢ ነው። መደብሩ ሂሳብዎን ይከፍላል፣ እና መደብሩ ክፍያውን ካረጋገጠ በኋላ ክሬዲት ይጨመራል።",
+    "nextExpiry": "{{amount}} ክሬዲት በ{{date}} (UTC) ጊዜው ያበቃል። ቀድሞ ጊዜው የሚያበቃው ክሬዲት መጀመሪያ ጥቅም ላይ ይውላል።",
+    "appStoreExpiry": "በApp Store የተገዙ ክሬዲቶች ጊዜያቸው አያበቃም።",
+    "playOneYearExpiry": "እነዚህ ክሬዲቶች ከተገዙ ከአንድ የቀን መቁጠሪያ ዓመት በኋላ ጊዜያቸው ያበቃል።",
+    "playNonexpiring": "እነዚህ ክሬዲቶች ጊዜያቸው አያበቃም።",
     "packLabel": "የ{{amount}} ክሬዲት ያክሉ",
     "priceUnavailable": "ዋጋ አይገኝም",
     "purchased": "ክሬዲት ወደ ቀሪ ሂሳብዎ ተጨምሯል።",
@@ -3956,11 +3986,13 @@
       "namePlaceholder": "ስህተቶች፣ ሀሳቦች፣ ልቀት…",
       "emoji": "ኢሞጂ",
       "mode": "ሁነታ",
-      "defaultsHint": "ከዚህ ዝርዝር የሚጀምሩ ክፍለ ጊዜዎች እነዚህን ነባሪዎች ይጠቀማሉ።"
+      "defaultsHint": "ከዚህ ዝርዝር የሚጀምሩ ክፍለ ጊዜዎች እነዚህን ነባሪዎች ይጠቀማሉ።",
+      "saveFailed": "ዝርዝሩን ማስቀመጥ አልተቻለም። ግንኙነትህን ፍተሽ እና እንደገና ሞክር።"
     },
     "list": {
       "addPlaceholder": "ተግባር ጨምር",
       "add": "ተግባር ጨምር",
+      "addFailed": "ተግባሩን ማከል አልተቻለም። ግንኙነትህን ፍተሽ እና እንደገና ሞክር።",
       "empty": "እስካሁን ተግባር የለም",
       "setDefaults": "ማከማቻ፣ ሁነታ እና ሞዴል ምረጥ",
       "completed_one": "የተጠናቀቁ ({{count}})",
@@ -3997,7 +4029,9 @@
       "startNewSession": "አዲስ ክፍለ-ጊዜ ጀምር",
       "startNewSessionHint": "አዲስ ክፍለ-ጊዜ ለመጀመር ረዘም ብለህ ተጫን።",
       "linkSession": "ክፍለ ጊዜ አገናኝ",
-      "linkFailed": "ክፍለ ጊዜውን ከተግባሩ ጋር ማገናኘት አልተቻለም"
+      "linkFailed": "ክፍለ ጊዜውን ከተግባሩ ጋር ማገናኘት አልተቻለም",
+      "moveToAnotherTodo": "ወደ ሌላ ተግባር ይለውጡ",
+      "startRefreshFailed": "ክፍለ ጊዜው ተጀምሯል፣ ነገር ግን ይህ ዝርዝር አልተዘምነም።"
     },
     "linkSession": {
       "title": "ክፍለ ጊዜ ማገናኘት",
@@ -4006,6 +4040,7 @@
     },
     "upNext": "ቀጣይ",
     "sessionTodo": "ተግባር፦ {{title}}",
+    "openTodoHint": "ተግባሩን ይከፍታል።",
     "linkToTodo": "ከተግባር ጋር አገናኝ",
     "candidates": {
       "empty": "ክፍት ተግባሮች የሉም"

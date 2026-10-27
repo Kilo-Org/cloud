@@ -53,6 +53,7 @@
     "connected": "Yhdistetty",
     "couldNotLoadModels": "Mallien lataaminen epäonnistui.",
     "couldNotLoadRepositories": "Koodivarastojen lataaminen epäonnistui.",
+    "noRepositoriesFound": "Koodivarastoja ei löytynyt",
     "critical": "Kriittinen",
     "delete": "Poista",
     "deleted": "Poistettu",
@@ -87,6 +88,7 @@
     "connect": "Yhdistä",
     "connectBitbucket": "Yhdistä Bitbucket-tili",
     "connectGitlab": "Yhdistä GitLab-tili",
+    "connectProvider": "Yhdistä palveluntarjoaja",
     "contentTruncated": "Sisältö katkaistu",
     "copyLink": "Kopioi linkki",
     "couldNotLoadOrganizations": "Organisaatioiden lataaminen epäonnistui.",
@@ -145,7 +147,8 @@
     "agent": "Agentti",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Muutokset"
+    "changes": "Muutokset",
+    "organizationTrialEnded": "Organisaation kokeilujakso on päättynyt, eikä sillä ole aktiivista suunnitelmaa. Organisaation omistaja voi päivittää laskutuksen osoitteessa kilo.ai ja yrittää sitten uudelleen."
   },
   "language": {
     "restarting": "Käynnistetään uudelleen kielen vaihtamiseksi",
@@ -224,7 +227,6 @@
     "hideBalance": "Piilota saldo",
     "showBalance": "Näytä saldo",
     "balanceHidden": "Saldo piilotettu",
-    "bonusCreditsExpiring": "Krediittejä vanhenee {{date}}: {{amount}}.",
     "signOutTitle": "Kirjaudutaanko ulos?",
     "signOutMessage": "Pääset takaisin työtilaasi kirjautumalla uudelleen sisään.",
     "deleteAccountTitle": "Poistetaanko tili?",
@@ -1407,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "Sinun on ehkä myönnettävä käyttöoikeus useampiin ryhmiin tai projekteihin GitLabissa.",
       "installGithubApp": "Asenna GitHub-sovellus koodivarastoihin",
       "installGithubAppDescription": "Anna Kilon GitHub-sovellukselle käyttöoikeus koodivarastoihin, jotka haluat katselmoida.",
-      "noRepositoriesFound": "Koodivarastoja ei löytynyt",
       "repositoryAccess": "koodivaraston käyttöoikeus"
     },
     "style": {
@@ -1482,6 +1483,22 @@
       "loadingProposals": "Ladataan ehdotuksia",
       "couldNotLoadProposals": "Ehdotuksia ei voitu ladata.",
       "noProposals": "Ei ehdotuksia",
+      "proposalDetails": "Ehdotuksen tiedot",
+      "proposalTitle": "Ehdotuksen otsikko",
+      "rationale": "Perustelut",
+      "saveFirst": "Tallenna muutoksesi ennen pull requestin avaamista.",
+      "proposalSaved": "Ehdotus tallennettu",
+      "proposalDismissed": "Ehdotus hylätty",
+      "dismissProposalTitle": "Hylätäänkö ehdotus?",
+      "dismissProposalMessage": "Tämä ehdotus poistetaan aktiivisten ehdotusten luettelosta, eikä sitä voi palauttaa.",
+      "prOpened": "REVIEW.md-tiedoston pull request avattu",
+      "alreadyPresent": "Ohjeet ovat jo REVIEW.md-tiedostossa",
+      "status": {
+        "edited": "Muokattu",
+        "opening_change_request": "Avataan PR:ää",
+        "change_request_failed": "PR:n avaaminen epäonnistui",
+        "superseded": "Jo olemassa"
+      },
       "noProposalsDescription": "Katselmointimuistin ehdotukset näkyvät tässä, kun Kilo on analysoinut ylläpitäjien vastaukset."
     },
     "manualReview": {
@@ -1489,7 +1506,6 @@
       "invalidUrl": "Anna kelvollinen muutospyynnön URL-osoite.",
       "couldNotCheckProviderStatus": "Palveluntarjoajan tilaa ei voitu tarkistaa.",
       "couldNotLoadProviders": "Yhdistettyjä palveluntarjoajia ei voitu ladata. Yritä uudelleen.",
-      "connectProvider": "Yhdistä palveluntarjoaja",
       "connectProviderDescription": "Yhdistä GitHub, niin voit käynnistää muutospyynnön katselmoinnin manuaalisesti.",
       "pullRequestUrl": "Muutospyynnön URL-osoite",
       "instructions": "Ohjeet (valinnaiset)",
@@ -1617,8 +1633,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Suodattimia ei ole saatavilla",
-      "noFiltersDescription": "Palaa takaisin ja avaa suodattimet uudelleen havaintolistasta.",
       "title": "Havaintojen suodatus",
       "reset": "Nollaa",
       "severity": "Vakavuus",
@@ -2172,8 +2186,8 @@
       "title": "Istunto",
       "copyErrorDetails": "Kopioi virheen tiedot",
       "backToSessions": "Takaisin istuntoihin",
-      "follow": "Seuraa lukitusnäytöllä",
-      "unfollow": "Lopeta seuraaminen lukitusnäytöllä",
+      "follow": "Seuraa istuntoa",
+      "unfollow": "Lopeta istunnon seuraaminen",
       "couldNotLoad": "Istuntoa ei voitu ladata",
       "failedToLoadDetails": "Istunnon tietojen lataus epäonnistui",
       "failedToStopExecution": "Suorituksen pysäyttäminen epäonnistui",
@@ -2577,7 +2591,9 @@
       "retrying": "Yritetään uudelleen…",
       "retryDeny": "Yritä kieltää uudelleen",
       "retryAllowOnce": "Yritä salli kerran uudelleen",
-      "retryAlwaysAllow": "Yritä salli aina uudelleen"
+      "retryAlwaysAllow": "Yritä salli aina uudelleen",
+      "unreadableTitle": "Lupapyyntöä ei voitu lukea",
+      "unreadableBody": "Agentti odottaa lupapäätöstä, jota tämä sovellus ei voi näyttää. Päivitä sovellus tai CLI tai vastaa pyyntöön CLI:ssä jatkaaksesi."
     },
     "questionCard": {
       "title": "Agentti tarvitsee vastauksesi",
@@ -2953,7 +2969,6 @@
   },
   "voiceInput": {
     "listening": "Kuunnellaan…",
-    "staysOff": "Puheentunnistus pysyy pois käytöstä, kunnes sallit puheen muuttamisen tekstiksi verkossa.",
     "onlineTitle": "Puhe käsitellään verkossa",
     "onlineMessage": "Tämä laite ei voi muuttaa puhetta tekstiksi ilman verkkoyhteyttä. Äänitteesi lähetetään palveluun {{provider}}, joka muuttaa sen tekstiksi. Kilo ei tallenna ääntä.",
     "allow": "Salli",
@@ -2970,8 +2985,9 @@
     "unavailableDevice": "Puheentunnistus ei ole käytettävissä tällä laitteella.",
     "unavailableLanguage": "Puheentunnistus ei ole käytettävissä laitteen nykyisellä kielellä. Asenna kielen offline-puhetiedostot tai käytä toista sovelluksen kieltä.",
     "languageNotInstalledTitle": "Puheentunnistus ei ole vielä valmis kielelle {{language}}",
-    "languageNotInstalledMessage": "Kielen {{language}} offline-puhetiedostoja ei ole asennettu tähän puhelimeen. Lataa ne ja kokeile puheentunnistusta uudelleen.",
+    "languageNotInstalledMessage": "Kielen {{language}} offline-puhetiedostot eivät ole asennettuna, ja online-puheentunnistus on poissa käytöstä. Lataa tiedostot tai ota online-puheentunnistus takaisin käyttöön, jotta äänisyöttö toimii.",
     "downloadOfflineModel": "Lataa",
+    "useOnlineTranscription": "Salli online-puheentunnistus",
     "offlineModelDownloadScheduled": "Offline-puhetiedostot ladataan taustalla. Kokeile puheentunnistusta myöhemmin uudelleen.",
     "listeningStopped": "Kuuntelu lopetettiin.",
     "transcribing": "Muunnetaan tekstiksi…",
@@ -3145,7 +3161,7 @@
     "creditActivity": {
       "emptyDescription": "Organisaation ostot, käyttö ja krediittien muutokset näkyvät tässä sitä mukaa kuin niitä kertyy.",
       "emptyTitle": "Ei krediittitapahtumia",
-      "expires": "Vanhenee {{date}}",
+      "expiresUtc": "Vanhenee {{date}} (UTC)",
       "title": "Krediittitapahtumat",
       "transactionFallback": "Krediittitapahtuma",
       "category": {
@@ -3168,7 +3184,9 @@
       "sendInvite": "Lähetä kutsu",
       "title": "Kutsu jäsen",
       "alreadyInvited": "Tämä sähköpostiosoite on jo kutsuttu tai kuuluu jo jäsenelle.",
-      "sendError": "Kutsun lähettäminen epäonnistui."
+      "sendError": "Kutsun lähettäminen epäonnistui.",
+      "pendingInvitation": "Tällä sähköpostiosoitteella on jo odottava kutsu.",
+      "alreadyMember": "Tämä henkilö on jo tämän organisaation jäsen."
     },
     "invoices": {
       "downloadA11y": "Lataa lasku {{number}}",
@@ -3238,7 +3256,12 @@
       "pendingInvitations": "Odottavat kutsut",
       "resendInvite": "Lähetä kutsu uudelleen",
       "shareInviteLink": "Jaa kutsulinkki",
-      "resendInviteError": "Kutsun lähettäminen uudelleen epäonnistui."
+      "resendInviteError": "Kutsun lähettäminen uudelleen epäonnistui.",
+      "inviteNotResendable": "Tätä kutsua ei voi enää lähettää uudelleen.",
+      "ownerAuthority": "Vain organisaation omistaja voi hallita omistajia.",
+      "ownRoleChange": "Et voi vaihtaa omaa rooliasi.",
+      "inviteExpired": "Tämä kutsu on vanhentunut.",
+      "inviteAccepted": "Tämä kutsu on jo hyväksytty."
     },
     "usageStats": {
       "inputTokens": "Syötetokenit",
@@ -3351,7 +3374,7 @@
     "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön asetuksissa, niin näet aktiiviset agentit lukitusnäytöllä.",
     "openSession": "Avaa",
     "finished": "Valmis",
-    "followFailed": "Tätä agenttia ei voitu näyttää lukitusnäytöllä.",
+    "followFailed": "Tätä istuntoa ei voitu seurata.",
     "approveFailed": "Hyväksyminen ei onnistunut. Yritä uudelleen napauttamalla $t(common.approve).",
     "checked": "Tarkistettu",
     "lastKnown": "Viimeisin tiedossa oleva",
@@ -3725,6 +3748,7 @@
     "title": "Profiilit",
     "entrySubtitle": "Käytä ympäristöasetuksia uudelleen istuntojen aikana",
     "newProfile": "Uusi profiili",
+    "openHint": "Avaa profiilin",
     "emptyTitle": "Ei vielä profiileja",
     "emptyDescription": "Luo profiili käyttääksesi uudelleen ympäristömuuttujia, asetuskomentoja ja taitoja istuntojen aikana.",
     "loadFailed": "Profiilien lataaminen epäonnistui",
@@ -3818,6 +3842,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Arvot, jotka näkyvät muodossa ••••, säilyttävät tallennetun salaisuutensa; korvaa arvo vaihtaaksesi sen. Komentorivin muuttaminen edellyttää kaikkien arvojen antamista uudelleen",
+      "headersHint": "Arvot, jotka näkyvät muodossa ••••, säilyttävät tallennetun salaisuutensa; korvaa arvo vaihtaaksesi sen. URL-osoitteen muuttaminen edellyttää kaikkien arvojen antamista uudelleen",
       "nameRequired": "Anna palvelimen nimi",
       "nameInvalid": "Nimessä voi käyttää vain ASCII-kirjaimia, numeroita, alaviivoja ja väliviivoja, enintään 100 merkkiä",
       "commandRequired": "Anna komento",
@@ -3916,6 +3942,10 @@
   "credits": {
     "title": "Osta krediittejä",
     "description": "Krediitit ovat kertaostos, joka lisätään Kilo-saldoosi AI-koodausistuntojen ajamista varten Kilo-sovelluksessa. Kauppa veloittaa tiliäsi ja krediitit lisätään, kun kauppa vahvistaa maksun.",
+    "nextExpiry": "Krediittejä vanhenee {{date}} (UTC): {{amount}}. Aikaisimmin vanhenevat krediitit käytetään ensin.",
+    "appStoreExpiry": "App Storen kautta ostetut krediitit eivät vanhene.",
+    "playOneYearExpiry": "Nämä krediitit vanhenevat yhden kalenterivuoden kuluttua ostosta.",
+    "playNonexpiring": "Nämä krediitit eivät vanhene.",
     "packLabel": "Lisää {{amount}} krediittejä",
     "priceUnavailable": "Hinta ei saatavilla",
     "purchased": "Krediitit on lisätty saldoosi.",
@@ -3956,11 +3986,13 @@
       "namePlaceholder": "Virheet, ideat, julkaisu…",
       "emoji": "Emoji",
       "mode": "Tila",
-      "defaultsHint": "Tästä listasta aloitetut istunnot käyttävät näitä oletusasetuksia."
+      "defaultsHint": "Tästä listasta aloitetut istunnot käyttävät näitä oletusasetuksia.",
+      "saveFailed": "Listaa ei voitu tallentaa. Tarkista yhteytesi ja yritä uudelleen."
     },
     "list": {
       "addPlaceholder": "Lisää uusi tehtävä",
       "add": "Lisää tehtävä",
+      "addFailed": "Tehtävää ei voitu lisätä. Tarkista yhteytesi ja yritä uudelleen.",
       "empty": "Ei vielä tehtäviä",
       "setDefaults": "Aseta koodivarasto, tila ja malli",
       "completed_one": "Valmis ({{count}})",
@@ -3997,7 +4029,9 @@
       "startNewSession": "Aloita uusi istunto",
       "startNewSessionHint": "Aloita uusi istunto pitämällä painettuna.",
       "linkSession": "Linkitä istunto",
-      "linkFailed": "Istunnon linkittäminen tehtävään ei onnistunut"
+      "linkFailed": "Istunnon linkittäminen tehtävään ei onnistunut",
+      "moveToAnotherTodo": "Siirrä toiseen tehtävään",
+      "startRefreshFailed": "Istunto aloitettiin, mutta tätä listaa ei päivitetty."
     },
     "linkSession": {
       "title": "Istunnon linkittäminen",
@@ -4006,6 +4040,7 @@
     },
     "upNext": "Seuraavaksi",
     "sessionTodo": "Tehtävä: {{title}}",
+    "openTodoHint": "Avaa tehtävän.",
     "linkToTodo": "Linkitä tehtävään",
     "candidates": {
       "empty": "Ei avoimia tehtäviä"

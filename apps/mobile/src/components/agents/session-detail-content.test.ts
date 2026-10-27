@@ -27,6 +27,7 @@ import {
   type StandalonePermission,
   type StoredMessage,
   type ToolPart,
+  type UnreadablePermissionState,
 } from '@kilocode/cloud-agent-sdk';
 import { cloudAgentId, kiloId, stubTextPart } from '@kilocode/cloud-agent-sdk/test-helpers';
 
@@ -43,12 +44,14 @@ import {
 } from '@/components/agents/exit-remote-session-with-feedback';
 import { RemoteSessionExitFailure } from '@/components/agents/remote-session-exit-failure';
 import { PermissionCard } from '@/components/agents/permission-card';
+import { PermissionUnreadableNotice } from '@/components/agents/permission-unreadable-notice';
 import { setSessionAutoApproveEnabled } from '@/components/agents/session-auto-approve';
 import {
   isSessionGoalCollapsed,
   setSessionGoalCollapsed,
 } from '@/components/agents/session-goal-collapse';
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
+import { AGENT_SESSION_NAV_GUARD_MS } from '@/components/agents/agent-session-nav-guard';
 import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SESSION_TITLE_MAX_LENGTH } from '@/components/agents/session-detail-rename-state';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
@@ -2354,6 +2357,51 @@ describe('session detail per-session auto-approve', () => {
   });
 });
 
+describe('session detail unreadable permission notice', () => {
+  const waiting: readonly UnreadablePermissionState[] = [{ requestId: 'perm-1' }];
+  const none: readonly UnreadablePermissionState[] = [];
+
+  /** An answerable session, so the composer claim is about the notice, not read-only mode. */
+  function makeAnswerable(view: Awaited<ReturnType<typeof mountDetails>>): void {
+    act(() => {
+      view.store.set(view.manager.atoms.activeSessionType, 'remote');
+      view.store.set(view.manager.atoms.isReadOnly, false);
+      view.store.set(view.manager.atoms.canSend, true);
+    });
+  }
+
+  it('explains the waiting request and leaves the composer usable', async () => {
+    const view = await mountDetails([]);
+    makeAnswerable(view);
+    act(() => {
+      view.store.set(view.manager.atoms.unreadablePermissions, waiting);
+    });
+
+    expect(view.renderer.root.findAllByType(PermissionUnreadableNotice)).toHaveLength(1);
+    expect(view.renderer.root.findAllByType(PermissionCard)).toHaveLength(0);
+    expect(renderedText(view.renderer.root)).toContain(
+      'The agent is waiting for a permission decision this app cannot show.'
+    );
+
+    const composer = view.renderer.root.findAll(node => Object.is(node.type, 'ChatComposer'));
+    expect(composer).toHaveLength(1);
+    expect(composer[0]?.parent?.parent?.props.className ?? '').not.toContain('hidden');
+    expect(composer[0]?.parent?.parent?.props.accessibilityElementsHidden).toBe(false);
+  });
+
+  it('renders nothing once the request is answered', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set(view.manager.atoms.unreadablePermissions, waiting);
+    });
+    act(() => {
+      view.store.set(view.manager.atoms.unreadablePermissions, none);
+    });
+
+    expect(view.renderer.root.findAllByType(PermissionUnreadableNotice)).toHaveLength(0);
+  });
+});
+
 describe.each([true, false])('session detail return with history=%s', hasHistory => {
   beforeEach(() => {
     if (hasHistory) {
@@ -4024,6 +4072,36 @@ describe('session detail read-only composer', () => {
     expect(renderedText(continueControl)).toContain(
       i18n.t('agentChat.session.continueInNewSession')
     );
+  });
+
+  it('opens the new-session composer once on a repeated continue press', async () => {
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    const continueControl = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') &&
+        node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+    );
+    const now = Date.now();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(now);
+    onTestFinished(() => {
+      nowSpy.mockRestore();
+    });
+
+    act(() => {
+      (continueControl.props.onPress as () => void)();
+      (continueControl.props.onPress as () => void)();
+    });
+    expect(
+      navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
+    ).toHaveLength(1);
+
+    nowSpy.mockReturnValue(now + AGENT_SESSION_NAV_GUARD_MS);
+    act(() => {
+      (continueControl.props.onPress as () => void)();
+    });
+    expect(
+      navigationRoutes.filter(route => route.startsWith('/(app)/agent-chat/new'))
+    ).toHaveLength(2);
   });
 });
 

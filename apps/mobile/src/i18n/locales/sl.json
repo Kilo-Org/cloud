@@ -53,6 +53,7 @@
     "connected": "Povezano",
     "couldNotLoadModels": "Modelov ni bilo mogoče naložiti.",
     "couldNotLoadRepositories": "Repozitorijev ni bilo mogoče naložiti.",
+    "noRepositoriesFound": "Ni najdenih skladišč",
     "critical": "Kritično",
     "delete": "Izbriši",
     "deleted": "Izbrisano",
@@ -87,6 +88,7 @@
     "connect": "Poveži",
     "connectBitbucket": "Poveži Bitbucket",
     "connectGitlab": "Poveži GitLab",
+    "connectProvider": "Poveži ponudnika",
     "contentTruncated": "Vsebina skrajšana",
     "copyLink": "Kopiraj povezavo",
     "couldNotLoadOrganizations": "Organizacij ni bilo mogoče naložiti.",
@@ -145,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Spremembe"
+    "changes": "Spremembe",
+    "organizationTrialEnded": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Lastnik organizacije lahko posodobi obračun na kilo.ai, nato poskusi znova."
   },
   "language": {
     "restarting": "Ponovni zagon za spremembo jezika",
@@ -224,7 +227,6 @@
     "hideBalance": "Skrij stanje",
     "showBalance": "Prikaži stanje",
     "balanceHidden": "Stanje je skrito",
-    "bonusCreditsExpiring": "Veljavnost kreditov v vrednosti {{amount}} poteče {{date}}.",
     "signOutTitle": "Želiš se odjaviti?",
     "signOutMessage": "Za dostop do delovnega prostora se moraš znova prijaviti.",
     "deleteAccountTitle": "Želiš izbrisati račun?",
@@ -1451,7 +1453,6 @@
       "gitlabNoRepositoriesDescription": "Morda moraš odobriti dostop do več skupin ali projektov na platformi GitLab.",
       "installGithubApp": "Namestitev aplikacije GitHub v skladišča",
       "installGithubAppDescription": "Aplikaciji Kilo za GitHub odobri dostop do skladišč, ki jih želiš pregledati.",
-      "noRepositoriesFound": "Ni najdenih skladišč",
       "repositoryAccess": "dostop do skladišč"
     },
     "style": {
@@ -1526,6 +1527,22 @@
       "loadingProposals": "Nalaganje predlogov",
       "couldNotLoadProposals": "Predlogov ni bilo mogoče naložiti.",
       "noProposals": "Ni predlogov",
+      "proposalDetails": "Podrobnosti predloga",
+      "proposalTitle": "Naslov predloga",
+      "rationale": "Utemeljitev",
+      "saveFirst": "Pred odpiranjem zahtevka za združitev shrani spremembe.",
+      "proposalSaved": "Predlog shranjen",
+      "proposalDismissed": "Predlog zavrnjen",
+      "dismissProposalTitle": "Želite zavrniti predlog?",
+      "dismissProposalMessage": "Ta predlog bo odstranjen s seznama aktivnih predlogov in ga ne bo mogoče obnoviti.",
+      "prOpened": "Zahtevek za združitev za REVIEW.md je odprt",
+      "alreadyPresent": "Smernice so že v datoteki REVIEW.md",
+      "status": {
+        "edited": "Urejeno",
+        "opening_change_request": "Odpiranje PR-ja",
+        "change_request_failed": "PR ni uspel",
+        "superseded": "Že obstaja"
+      },
       "noProposalsDescription": "Predlogi pomnjenja pregledov se prikažejo tukaj, ko Kilo analizira odgovore vzdrževalcev."
     },
     "manualReview": {
@@ -1533,7 +1550,6 @@
       "invalidUrl": "Vnesi veljaven URL zahteve za združitev.",
       "couldNotCheckProviderStatus": "Stanja ponudnika ni bilo mogoče preveriti.",
       "couldNotLoadProviders": "Povezanih ponudnikov ni bilo mogoče naložiti. Poskusi znova.",
-      "connectProvider": "Poveži ponudnika",
       "connectProviderDescription": "Poveži GitHub, da začneš ročni pregled zahteve za združitev.",
       "pullRequestUrl": "URL zahteve za združitev",
       "instructions": "Navodila (neobvezno)",
@@ -1661,8 +1677,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Ni razpoložljivih filtrov",
-      "noFiltersDescription": "Vrni se na seznam ugotovitev in znova odpri filtre.",
       "title": "Filtri ugotovitev",
       "reset": "Ponastavi",
       "severity": "Resnost",
@@ -2236,8 +2250,8 @@
       "title": "Seja",
       "copyErrorDetails": "Kopiraj podrobnosti napake",
       "backToSessions": "Nazaj na seje",
-      "follow": "Spremljaj na zaklenjenem zaslonu",
-      "unfollow": "Prenehaj spremljati na zaklenjenem zaslonu",
+      "follow": "Spremljaj sejo",
+      "unfollow": "Prenehaj spremljati sejo",
       "couldNotLoad": "Seje ni bilo mogoče naložiti.",
       "failedToLoadDetails": "Podrobnosti seje ni bilo mogoče naložiti.",
       "failedToStopExecution": "Izvajanja ni bilo mogoče ustaviti.",
@@ -2649,7 +2663,9 @@
       "retrying": "Ponovni poskus…",
       "retryDeny": "Znova zavrni",
       "retryAllowOnce": "Znova dovoli enkrat",
-      "retryAlwaysAllow": "Znova vedno dovoli"
+      "retryAlwaysAllow": "Znova vedno dovoli",
+      "unreadableTitle": "Zahteve za dovoljenje ni bilo mogoče prebrati",
+      "unreadableBody": "Agent čaka na odločitev o dovoljenju, ki je ta aplikacija ne more prikazati. Posodobite aplikacijo ali CLI ali pa na zahtevo odgovorite v CLI, da nadaljujete."
     },
     "questionCard": {
       "title": "Agent potrebuje tvoj odgovor",
@@ -3039,7 +3055,6 @@
   },
   "voiceInput": {
     "listening": "Poslušanje...",
-    "staysOff": "Glasovni vnos ostane izklopljen, dokler ne dovoliš spletnega prepisovanja.",
     "onlineTitle": "Govor se obdela na spletu",
     "onlineMessage": "Ta naprava ne more prepisovati govora brez povezave. Tvoj posnetek se pošlje ponudniku {{provider}}, da ga pretvori v besedilo. Kilo ne shranjuje zvoka.",
     "allow": "Dovoli",
@@ -3056,8 +3071,9 @@
     "unavailableDevice": "Glasovni vnos na tej napravi ni na voljo.",
     "unavailableLanguage": "Glasovni vnos ni na voljo za jezik, nastavljen v napravi.",
     "languageNotInstalledTitle": "Glasovni vnos za {{language}} še ni pripravljen",
-    "languageNotInstalledMessage": "Datoteke govora za delo brez povezave za {{language}} niso nameščene na tem telefonu. Prenesi jih, nato poskusi glasovni vnos znova.",
+    "languageNotInstalledMessage": "Datoteke govora za delo brez povezave za {{language}} niso nameščene, obdelava govora na spletu pa je izklopljena. Prenesi datoteke ali znova omogoči obdelavo govora na spletu, da boš lahko uporabil glasovni vnos.",
     "downloadOfflineModel": "Prenesi",
+    "useOnlineTranscription": "Dovoli obdelavo na spletu",
     "offlineModelDownloadScheduled": "Datoteke govora za delo brez povezave bodo prenesene v ozadju. Poskusi glasovni vnos znova pozneje.",
     "listeningStopped": "Poslušanje je ustavljeno.",
     "transcribing": "Prepisovanje...",
@@ -3233,7 +3249,7 @@
     "creditActivity": {
       "emptyDescription": "Tukaj se sproti prikazujejo nakupi, poraba in prilagoditve kreditov te organizacije.",
       "emptyTitle": "Ni transakcij s krediti",
-      "expires": "Poteče {{date}}",
+      "expiresUtc": "Poteče {{date}} (UTC)",
       "title": "Transakcije s krediti",
       "transactionFallback": "Transakcija s krediti",
       "category": {
@@ -3256,7 +3272,9 @@
       "sendInvite": "Pošlji povabilo",
       "title": "Povabi člana",
       "alreadyInvited": "Ta oseba je že povabljena ali že član organizacije.",
-      "sendError": "Povabila ni bilo mogoče poslati."
+      "sendError": "Povabila ni bilo mogoče poslati.",
+      "pendingInvitation": "Ta e-poštni naslov že ima čakajoče povabilo.",
+      "alreadyMember": "Ta oseba je že član te organizacije."
     },
     "invoices": {
       "downloadA11y": "Prenesi račun {{number}}",
@@ -3326,7 +3344,12 @@
       "pendingInvitations": "Čakajoča povabila",
       "resendInvite": "Ponovno pošlji povabilo",
       "shareInviteLink": "Deli povezavo do povabila",
-      "resendInviteError": "Povabila ni bilo mogoče ponovno poslati."
+      "resendInviteError": "Povabila ni bilo mogoče ponovno poslati.",
+      "inviteNotResendable": "Tega povabila ni več mogoče ponovno poslati.",
+      "ownerAuthority": "Samo lastnik organizacije lahko upravlja z lastniki.",
+      "ownRoleChange": "Svoje vloge ne morete spremeniti.",
+      "inviteExpired": "To povabilo je poteklo.",
+      "inviteAccepted": "To povabilo je bilo že sprejeto."
     },
     "usageStats": {
       "inputTokens": "Vhodni žetoni",
@@ -3441,7 +3464,7 @@
     "activityKitDisabledBody": "V nastavitvah vklopi dejavnosti v živo, da se aktivni agenti prikažejo na zaklenjenem zaslonu.",
     "openSession": "Odpri",
     "finished": "Zaključeno",
-    "followFailed": "Tega agenta ni bilo mogoče prikazati na zaklenjenem zaslonu.",
+    "followFailed": "Te seje ni bilo mogoče spremljati.",
     "approveFailed": "Odobritev ni uspela. Tapni $t(common.approve) za ponovni poskus.",
     "checked": "Preverjeno",
     "lastKnown": "Nazadnje znano",
@@ -3817,6 +3840,7 @@
     "title": "Profili",
     "entrySubtitle": "Ponovno uporabite nastavitve okolja med sejami",
     "newProfile": "Nov profil",
+    "openHint": "Odpre profil",
     "emptyTitle": "Še ni profilov",
     "emptyDescription": "Ustvarite profil za ponovno uporabo spremenljivk okolja, nastavitvenih ukazov in veščin med sejami.",
     "loadFailed": "Profilov ni bilo mogoče naložiti",
@@ -3920,6 +3944,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Vrednosti, prikazane kot ••••, obdržijo shranjeno skrivnost; zamenjajte vrednost, da jo rotirate. Sprememba ukazne vrstice znova zahteva vse vrednosti",
+      "headersHint": "Vrednosti, prikazane kot ••••, obdržijo shranjeno skrivnost; zamenjajte vrednost, da jo rotirate. Sprememba URL-ja znova zahteva vse vrednosti",
       "nameRequired": "Vnesite ime strežnika",
       "nameInvalid": "Ime lahko uporablja samo ASCII črke, številke, podčrtaje in pomišljaje, največ 100 znakov",
       "commandRequired": "Vnesite ukaz",
@@ -4018,6 +4044,10 @@
   "credits": {
     "title": "Kupi kredite",
     "description": "Krediti so enkraten nakup, ki se doda tvojemu Kilo stanju za izvajanje sej kodiranja z umetno inteligenco v aplikaciji Kilo. Trgovina obremeni tvoj račun in krediti se dodajo, ko trgovina potrdi plačilo.",
+    "nextExpiry": "Veljavnost kreditov v vrednosti {{amount}} poteče {{date}} (UTC). Najprej se porabijo krediti z najzgodnejšim potekom veljavnosti.",
+    "appStoreExpiry": "Krediti, kupljeni prek trgovine App Store, ne potečejo.",
+    "playOneYearExpiry": "Ti krediti potečejo eno koledarsko leto po nakupu.",
+    "playNonexpiring": "Ti krediti ne potečejo.",
     "packLabel": "Dodaj {{amount}} kreditov",
     "priceUnavailable": "Cena ni na voljo",
     "purchased": "Krediti so bili dodani tvojemu stanju.",
@@ -4062,11 +4092,13 @@
       "namePlaceholder": "Hrošči, ideje, izdaje…",
       "emoji": "Emoji",
       "mode": "Način",
-      "defaultsHint": "Seje, začete s tega seznama, uporabijo te privzete vrednosti."
+      "defaultsHint": "Seje, začete s tega seznama, uporabijo te privzete vrednosti.",
+      "saveFailed": "Seznama ni bilo mogoče shraniti. Preverite povezavo in poskusite znova."
     },
     "list": {
       "addPlaceholder": "Dodaj novo nalogo",
       "add": "Dodaj nalogo",
+      "addFailed": "Naloge ni bilo mogoče dodati. Preverite povezavo in poskusite znova.",
       "empty": "Ni še nalog",
       "setDefaults": "Nastavi repozitorij, način in model",
       "completed_one": "Dokončano ({{count}})",
@@ -4107,7 +4139,9 @@
       "startNewSession": "Začni novo sejo",
       "startNewSessionHint": "Za novo sejo pridržite.",
       "linkSession": "Poveži sejo",
-      "linkFailed": "Seje ni bilo mogoče povezati z nalogo"
+      "linkFailed": "Seje ni bilo mogoče povezati z nalogo",
+      "moveToAnotherTodo": "Premakni v drugo nalogo",
+      "startRefreshFailed": "Seja se je začela, vendar se ta seznam ni posodobil."
     },
     "linkSession": {
       "title": "Povezava seje",
@@ -4116,6 +4150,7 @@
     },
     "upNext": "Naslednje",
     "sessionTodo": "Naloga: {{title}}",
+    "openTodoHint": "Odpre nalogo.",
     "linkToTodo": "Poveži z nalogo",
     "candidates": {
       "empty": "Ni odprtih nalog"

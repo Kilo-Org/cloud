@@ -8,6 +8,7 @@ import {
   DEFAULT_KILO_SDK_MESSAGE_PAGE_SIZE,
   getSessionMessagesSchema,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
+  MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH,
   messageIdSchema,
   persistedKiloSdkMessageHistorySchema,
   sessionDiffReadSchema,
@@ -41,6 +42,11 @@ import { applyReportedSessionTitle, reportSessionTitleSchema } from '../services
 import { signSessionShareToken } from '../services/session-share-token';
 import { canCreateCliSessionForUser } from '../services/user-session-admission';
 import { isWorktreeSessionDeleting } from '../services/worktree-deletion';
+import { clearSessionLocalState } from '../services/session-local-state';
+import {
+  lockAndAssertWorkspaceRootSurvives,
+  HostedWorkspaceSessionDeleteError,
+} from '../services/hosted-workspace-session';
 
 export type ApiContext = {
   Bindings: Env;
@@ -93,28 +99,6 @@ function notifyUserSessionEventFromContext(
 
 type SessionDeleteRow = typeof cli_sessions_v2.$inferSelect;
 
-async function clearSessionLocalState(
-  env: Env,
-  kiloUserId: string,
-  sessionId: string
-): Promise<void> {
-  await withDORetry(
-    () => getSessionAccessCacheDO(env, { kiloUserId }),
-    sessionCache => sessionCache.remove(sessionId),
-    'SessionAccessCacheDO.remove'
-  );
-  await withDORetry(
-    () => getSessionIngestDO(env, { kiloUserId, sessionId }),
-    stub => stub.clear(),
-    'SessionIngestDO.clear'
-  );
-  await withDORetry(
-    () => getUserConnectionDO(env, { kiloUserId }),
-    stub => stub.clearSession(sessionId),
-    'UserConnectionDO.clearSession'
-  );
-}
-
 function notifySessionDeleted(
   c: Context<ApiContext>,
   kiloUserId: string,
@@ -164,55 +148,69 @@ async function deleteOwnedLeafSession(
     return c.json({ success: false, error: 'session_not_found', cleanup: 'done' }, 404);
   }
 
-  const outcome = await db.transaction(async (tx): Promise<'deleted' | 'gone' | 'not_leaf'> => {
-    if (existing.cloud_agent_session_scope_id) {
-      await tx
-        .select({ sessionId: cli_sessions_v2.session_id })
+  let outcome: 'deleted' | 'gone' | 'not_leaf';
+  try {
+    outcome = await db.transaction(async (tx): Promise<'deleted' | 'gone' | 'not_leaf'> => {
+      if (existing.cloud_agent_session_scope_id) {
+        await tx
+          .select({ sessionId: cli_sessions_v2.session_id })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.cloud_agent_session_id, existing.cloud_agent_session_scope_id),
+              eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+              isNull(cli_sessions_v2.parent_session_id)
+            )
+          )
+          .limit(1)
+          .for('update');
+      }
+
+      const lockedRows = await tx
+        .select()
         .from(cli_sessions_v2)
         .where(
           and(
-            eq(cli_sessions_v2.cloud_agent_session_id, existing.cloud_agent_session_scope_id),
-            eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-            isNull(cli_sessions_v2.parent_session_id)
+            eq(cli_sessions_v2.session_id, sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
           )
         )
         .limit(1)
         .for('update');
-    }
+      if (!lockedRows[0]) {
+        return 'gone';
+      }
 
-    const lockedRows = await tx
-      .select()
-      .from(cli_sessions_v2)
-      .where(
-        and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-      )
-      .limit(1)
-      .for('update');
-    if (!lockedRows[0]) {
-      return 'gone';
-    }
-
-    const childRows = await tx
-      .select({ session_id: cli_sessions_v2.session_id })
-      .from(cli_sessions_v2)
-      .where(
-        and(
-          eq(cli_sessions_v2.parent_session_id, sessionId),
-          eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+      const childRows = await tx
+        .select({ session_id: cli_sessions_v2.session_id })
+        .from(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.parent_session_id, sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
         )
-      )
-      .limit(1);
-    if (childRows[0]) {
-      return 'not_leaf';
-    }
+        .limit(1);
+      if (childRows[0]) {
+        return 'not_leaf';
+      }
 
-    await tx
-      .delete(cli_sessions_v2)
-      .where(
-        and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, kiloUserId))
-      );
-    return 'deleted';
-  });
+      await tx
+        .delete(cli_sessions_v2)
+        .where(
+          and(
+            eq(cli_sessions_v2.session_id, sessionId),
+            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+          )
+        );
+      return 'deleted';
+    });
+  } catch (error) {
+    if (error instanceof HostedWorkspaceSessionDeleteError) {
+      return c.json({ success: false, error: error.code }, 409);
+    }
+    throw error;
+  }
 
   if (outcome === 'not_leaf') {
     return c.json({ success: false, error: 'session_not_leaf' }, 409);
@@ -420,35 +418,54 @@ api.delete('/session/:sessionId', async c => {
   const deletionSessionScopeId = deletedRows.find(
     row => row.session_id === parsed.data
   )?.cloud_agent_session_scope_id;
+  const deletionTarget = deletedRows.find(row => row.session_id === parsed.data);
 
-  await db.transaction(async tx => {
-    if (deletionSessionScopeId) {
-      // Bootstrap and metadata mutations lock the session scope root before children.
-      // Match that order even when deleting a subtree rooted at a child.
-      await tx
-        .select({ sessionId: cli_sessions_v2.session_id })
-        .from(cli_sessions_v2)
-        .where(
-          and(
-            eq(cli_sessions_v2.cloud_agent_session_id, deletionSessionScopeId),
-            eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-            isNull(cli_sessions_v2.parent_session_id)
+  try {
+    await db.transaction(async tx => {
+      if (deletionTarget) {
+        await lockAndAssertWorkspaceRootSurvives(tx, {
+          kiloUserId,
+          row: {
+            session_id: deletionTarget.session_id,
+            cloud_agent_session_id: deletionTarget.cloud_agent_session_id,
+            cloud_agent_worktree_id: deletionTarget.cloud_agent_worktree_id,
+            parent_session_id: deletionTarget.parent_session_id,
+          },
+        });
+      }
+      if (deletionSessionScopeId) {
+        // Bootstrap and metadata mutations lock the session scope root before children.
+        // Match that order even when deleting a subtree rooted at a child.
+        await tx
+          .select({ sessionId: cli_sessions_v2.session_id })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.cloud_agent_session_id, deletionSessionScopeId),
+              eq(cli_sessions_v2.kilo_user_id, kiloUserId),
+              isNull(cli_sessions_v2.parent_session_id)
+            )
           )
-        )
-        .limit(1)
-        .for('update');
+          .limit(1)
+          .for('update');
+      }
+      for (const sessionId of orderedSessionIds) {
+        await tx
+          .delete(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.session_id, sessionId),
+              eq(cli_sessions_v2.kilo_user_id, kiloUserId)
+            )
+          );
+      }
+    });
+  } catch (error) {
+    if (error instanceof HostedWorkspaceSessionDeleteError) {
+      return c.json({ success: false, error: error.code }, 409);
     }
-    for (const sessionId of orderedSessionIds) {
-      await tx
-        .delete(cli_sessions_v2)
-        .where(
-          and(
-            eq(cli_sessions_v2.session_id, sessionId),
-            eq(cli_sessions_v2.kilo_user_id, kiloUserId)
-          )
-        );
-    }
-  });
+    throw error;
+  }
 
   const deletedAt = new Date().toISOString();
   const deletedRowsBySessionId = new Map(deletedRows.map(row => [row.session_id, row]));
@@ -613,7 +630,7 @@ api.get('/session/:sessionId/messages', async c => {
   const beforeParsed =
     beforeParam === undefined
       ? { success: true as const, data: undefined }
-      : z.string().min(1).max(1024).safeParse(beforeParam);
+      : z.string().min(1).max(MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH).safeParse(beforeParam);
   if (!beforeParsed.success) {
     return c.json({ success: false, error: 'Invalid before' }, 400);
   }

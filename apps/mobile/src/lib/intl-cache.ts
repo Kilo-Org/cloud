@@ -158,6 +158,40 @@ export function numberFormat(locale: string, options: Intl.NumberFormatOptions):
   return format;
 }
 
+/** Memoized answer of the device locale read below; `undefined` until it runs. */
+let deviceDecimalSeparatorValue: string | null | undefined = undefined;
+
+/**
+ * The decimal separator of the device's own number keyboard.
+ *
+ * iOS and Android draw `decimal-pad` with the *device* locale's separator, not
+ * the app language's, so a typed amount can carry the device's character while
+ * the rest of the field follows the active language: a German app language on a
+ * `.` keypad offers only `.`. `expo-localization` reports the first preferred
+ * locale's separator, which is the locale the keypad follows.
+ *
+ * Read lazily: the module is native, so the Node test projects cannot import it
+ * at load time. A runtime that cannot answer reports no separator, which leaves
+ * the language-only behaviour. Memoized because a region change does not reach
+ * an open app on either platform; the field reads it on every keystroke.
+ */
+export function deviceDecimalSeparator(): string | null {
+  if (deviceDecimalSeparatorValue !== undefined) {
+    return deviceDecimalSeparatorValue;
+  }
+  try {
+    // eslint-disable-next-line typescript-eslint/no-require-imports, unicorn/prefer-module -- the native module is absent from the Node test projects, so it cannot be a top-level import
+    const { getLocales } = require('expo-localization') as {
+      getLocales: () => readonly { decimalSeparator: string | null }[];
+    };
+    const separator = getLocales()[0]?.decimalSeparator;
+    deviceDecimalSeparatorValue = separator?.length === 1 ? separator : null;
+  } catch {
+    deviceDecimalSeparatorValue = null;
+  }
+  return deviceDecimalSeparatorValue;
+}
+
 export function dateTimeFormat(
   /** Omitted only to read the device's own resolved options, e.g. its time zone. */
   locale: string | undefined,

@@ -53,6 +53,7 @@
     "connected": "Nakakonekta",
     "couldNotLoadModels": "Hindi ma-load ang mga modelo.",
     "couldNotLoadRepositories": "Hindi ma-load ang mga repositoryo.",
+    "noRepositoriesFound": "Walang nahanap na repository",
     "critical": "Kritikal",
     "delete": "Burahin",
     "deleted": "Nabura",
@@ -87,6 +88,7 @@
     "connect": "Kumonekta",
     "connectBitbucket": "Ikonekta ang Bitbucket",
     "connectGitlab": "Ikonekta ang GitLab",
+    "connectProvider": "Ikonekta ang isang provider",
     "contentTruncated": "Pinaikli ang nilalaman",
     "copyLink": "Kopyahin ang link",
     "couldNotLoadOrganizations": "Hindi ma-load ang mga organisasyon.",
@@ -145,7 +147,8 @@
     "agent": "Ahente",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Mga pagbabago"
+    "changes": "Mga pagbabago",
+    "organizationTrialEnded": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update ng may-ari ng organisasyon ang billing sa kilo.ai, pagkatapos ay subukan muli."
   },
   "language": {
     "restarting": "Ini-restart para ilapat ang wika",
@@ -224,7 +227,6 @@
     "hideBalance": "Itago ang balanse",
     "showBalance": "Ipakita ang balanse",
     "balanceHidden": "Nakatago ang balanse",
-    "bonusCreditsExpiring": "Mawawalan ng bisa sa {{date}} ang {{amount}} na kredito.",
     "signOutTitle": "Mag-sign out?",
     "signOutMessage": "Kailangan mong mag-sign in muli para mabuksan ang workspace mo.",
     "deleteAccountTitle": "Burahin ang akawnt?",
@@ -1407,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "Maaaring kailangan mong magbigay ng access sa mas maraming grupo o proyekto sa GitLab.",
       "installGithubApp": "I-install ang GitHub app sa mga repository",
       "installGithubAppDescription": "Bigyan ang Kilo GitHub App ng access sa mga repository na gusto mong suriin.",
-      "noRepositoriesFound": "Walang nahanap na repository",
       "repositoryAccess": "access sa repository"
     },
     "style": {
@@ -1482,6 +1483,22 @@
       "loadingProposals": "Nilo-load ang mga mungkahi",
       "couldNotLoadProposals": "Hindi ma-load ang mga mungkahi.",
       "noProposals": "Walang mungkahi",
+      "proposalDetails": "Mga detalye ng mungkahi",
+      "proposalTitle": "Pamagat ng mungkahi",
+      "rationale": "Paliwanag",
+      "saveFirst": "I-save ang mga pagbabago mo bago magbukas ng pull request.",
+      "proposalSaved": "Na-save ang mungkahi",
+      "proposalDismissed": "Ibinasura ang mungkahi",
+      "dismissProposalTitle": "Ibasura ang mungkahi?",
+      "dismissProposalMessage": "Aalisin ang mungkahing ito sa listahan ng mga aktibong mungkahi at hindi na ito maibabalik.",
+      "prOpened": "Nabuksan ang pull request para sa REVIEW.md",
+      "alreadyPresent": "Nasa REVIEW.md na ang gabay",
+      "status": {
+        "edited": "Na-edit",
+        "opening_change_request": "Binubuksan ang PR",
+        "change_request_failed": "Nabigong buksan ang PR",
+        "superseded": "Naroon na"
+      },
       "noProposalsDescription": "Lalabas dito ang mga mungkahi mula sa memorya ng pagsusuri kapag nasuri na ng Kilo ang mga tugon ng tagapangalaga ng code."
     },
     "manualReview": {
@@ -1489,7 +1506,6 @@
       "invalidUrl": "Maglagay ng wastong URL ng pull request.",
       "couldNotCheckProviderStatus": "Hindi masuri ang katayuan ng provider.",
       "couldNotLoadProviders": "Hindi namin ma-load ang mga nakakonektang provider mo. Pakisubukang muli.",
-      "connectProvider": "Ikonekta ang isang provider",
       "connectProviderDescription": "Ikonekta ang GitHub para magsimula ng manu-manong pagsusuri ng isang pull request.",
       "pullRequestUrl": "URL ng pull request",
       "instructions": "Mga tagubilin (opsyonal)",
@@ -1617,8 +1633,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Walang magagamit na filter",
-      "noFiltersDescription": "Bumalik at buksan muli ang mga filter mula sa listahan ng mga natukoy na isyu.",
       "title": "Mga filter ng natukoy na isyu",
       "reset": "Ibalik sa dati",
       "severity": "Kalubhaan",
@@ -2172,8 +2186,8 @@
       "title": "Sesyon",
       "copyErrorDetails": "Kopyahin ang mga detalye ng error",
       "backToSessions": "Bumalik sa mga sesyon",
-      "follow": "Subaybayan sa naka-lock na screen",
-      "unfollow": "Ihinto ang pagsubaybay sa naka-lock na screen",
+      "follow": "Subaybayan ang sesyon",
+      "unfollow": "Ihinto ang pagsubaybay sa sesyon",
       "couldNotLoad": "Hindi ma-load ang sesyon.",
       "failedToLoadDetails": "Hindi ma-load ang mga detalye ng sesyon.",
       "failedToStopExecution": "Hindi maihinto ang pagpapatakbo.",
@@ -2577,7 +2591,9 @@
       "retrying": "Muling sinusubukan…",
       "retryDeny": "Subukang tanggihan muli",
       "retryAllowOnce": "Subukang payagan nang isang beses muli",
-      "retryAlwaysAllow": "Subukang laging payagan muli"
+      "retryAlwaysAllow": "Subukang laging payagan muli",
+      "unreadableTitle": "Hindi mabasa ang hiling ng pahintulot",
+      "unreadableBody": "Naghihintay ang agent ng desisyon sa pahintulot na hindi maipakita ng app na ito. I-update ang app o ang CLI, o sagutin ang hiling sa CLI upang magpatuloy."
     },
     "questionCard": {
       "title": "Kailangan ng ahente ng sagot",
@@ -2953,7 +2969,6 @@
   },
   "voiceInput": {
     "listening": "Nakikinig...",
-    "staysOff": "Hindi magagamit ang pagdikta hangga't hindi mo pinapayagan ang online na pagsasalin ng boses sa teksto.",
     "onlineTitle": "Pinoproseso online ang boses",
     "onlineMessage": "Hindi kayang isalin ng device na ito ang boses sa teksto nang walang internet. Ipinapadala ang iyong rekording sa {{provider}} para gawing teksto. Hindi iniimbak ng Kilo ang audio.",
     "allow": "Payagan",
@@ -2970,8 +2985,9 @@
     "unavailableDevice": "Hindi magagamit ang pagdikta sa device na ito.",
     "unavailableLanguage": "Hindi magagamit ang pagdikta sa wikang nakatakda sa device na ito.",
     "languageNotInstalledTitle": "Hindi pa handa ang pagdikta para sa {{language}}",
-    "languageNotInstalledMessage": "Hindi naka-install ang mga offline na speech file para sa {{language}} sa teleponong ito. I-download muna ang mga ito, pagkatapos ay subukang muli ang pagdikta.",
+    "languageNotInstalledMessage": "Hindi pa naka-install ang mga offline na speech file para sa {{language}}, at nakasara ang online transcription. Ida-download ang mga file o buksan muli ang online transcription para magamit ang voice input.",
     "downloadOfflineModel": "I-download",
+    "useOnlineTranscription": "Payagan ang online transcription",
     "offlineModelDownloadScheduled": "Ida-download sa background ang mga offline na speech file. Subukang muli ang pagdikta mamaya.",
     "listeningStopped": "Huminto ang pakikinig.",
     "transcribing": "Nagsasalin ng boses sa teksto...",
@@ -3145,7 +3161,7 @@
     "creditActivity": {
       "emptyDescription": "Lalabas dito ang mga pagbili, paggamit, at pagsasaayos ng kredito para sa organisasyong ito habang nangyayari ang mga ito.",
       "emptyTitle": "Walang aktibidad sa kredito",
-      "expires": "Mawawalan ng bisa sa {{date}}",
+      "expiresUtc": "Mawawalan ng bisa sa {{date}} (UTC)",
       "title": "Aktibidad sa kredito",
       "transactionFallback": "Transaksyon sa kredito",
       "category": {
@@ -3168,7 +3184,9 @@
       "sendInvite": "Ipadala ang imbitasyon",
       "title": "Mag-imbita ng miyembro",
       "alreadyInvited": "Imbitado na sila o miyembro na.",
-      "sendError": "Hindi naipadala ang imbitasyon."
+      "sendError": "Hindi naipadala ang imbitasyon.",
+      "pendingInvitation": "May nakabinbing imbitasyon na ang email na ito.",
+      "alreadyMember": "Miembro na ng organisasyong ito ang taong ito."
     },
     "invoices": {
       "downloadA11y": "I-download ang talaan ng singil {{number}}",
@@ -3238,7 +3256,12 @@
       "pendingInvitations": "Mga nakabinbing imbitasyon",
       "resendInvite": "Ipadala muli ang imbitasyon",
       "shareInviteLink": "Ibahagi ang link ng imbitasyon",
-      "resendInviteError": "Hindi naipadala muli ang imbitasyon."
+      "resendInviteError": "Hindi naipadala muli ang imbitasyon.",
+      "inviteNotResendable": "Hindi na maaaring ipadala muli ang imbitasyong ito.",
+      "ownerAuthority": "Ang may-ari lamang ng organisasyon ang maaaring mamahala ng mga may-ari.",
+      "ownRoleChange": "Hindi mo maaaring baguhin ang iyong sariling tungkulin.",
+      "inviteExpired": "Nag-expire na ang imbitasyong ito.",
+      "inviteAccepted": "Tinanggap na ang imbitasyong ito."
     },
     "usageStats": {
       "inputTokens": "Mga papasok na token",
@@ -3351,7 +3374,7 @@
     "activityKitDisabledBody": "Paganahin ang mga live na aktibidad sa mga setting para makita ang mga aktibong agent sa naka-lock na screen.",
     "openSession": "Buksan",
     "finished": "Natapos",
-    "followFailed": "Hindi maipakita ang ahenteng ito sa naka-lock na screen.",
+    "followFailed": "Hindi masubaybayan ang sesyon na ito.",
     "approveFailed": "Hindi maaprubahan. I-tap ang $t(common.approve) para subukang muli.",
     "checked": "Nakumpirma",
     "lastKnown": "Huling nalaman",
@@ -3725,6 +3748,7 @@
     "title": "Mga profile",
     "entrySubtitle": "Muling gamitin ang mga setting ng kapaligiran sa mga session",
     "newProfile": "Bagong profile",
+    "openHint": "Binubuksan ang profile",
     "emptyTitle": "Wala pang mga profile",
     "emptyDescription": "Gumawa ng profile para magamit muli ang mga variable ng kapaligiran, mga command sa pag-setup, at mga kasanayan sa mga session.",
     "loadFailed": "Hindi ma-load ang mga profile",
@@ -3818,6 +3842,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Pinapanatili ng mga value na ipinapakita bilang •••• ang kanilang nakaimbak na lihim; palitan ang isang value para i-rotate ito. Kinakailangan ang bawat value muli kapag nagbago ang command line",
+      "headersHint": "Pinapanatili ng mga value na ipinapakita bilang •••• ang kanilang nakaimbak na lihim; palitan ang isang value para i-rotate ito. Kinakailangan ang bawat value muli kapag nagbago ang URL",
       "nameRequired": "Maglagay ng pangalan ng server",
       "nameInvalid": "Ang pangalan ay maaari lamang gumamit ng mga ASCII na titik, numero, underscore, at gitling, hanggang 100 na character",
       "commandRequired": "Maglagay ng command",
@@ -3916,6 +3942,10 @@
   "credits": {
     "title": "Bumili ng kredito",
     "description": "Ang kredito ay isang besesang pagbili na idinaragdag sa iyong Kilo balance para sa pagpapatakbo ng mga AI coding session sa Kilo App. Sinisingil ng store ang iyong account at idinaragdag ang kredito pagkatapos kumpirmahin ng store ang bayad.",
+    "nextExpiry": "Mawawalan ng bisa sa {{date}} (UTC) ang {{amount}} na kredito. Unang ginagamit ang mga kreditong pinakamaagang mawawalan ng bisa.",
+    "appStoreExpiry": "Hindi nawawalan ng bisa ang mga kreditong binili sa App Store.",
+    "playOneYearExpiry": "Mawawalan ng bisa ang mga kreditong ito isang taon ng kalendaryo pagkatapos ng pagbili.",
+    "playNonexpiring": "Hindi nawawalan ng bisa ang mga kreditong ito.",
     "packLabel": "Magdagdag ng {{amount}} na kredito",
     "priceUnavailable": "Hindi available ang presyo",
     "purchased": "Naidagdag na ang kredito sa iyong balance.",
@@ -3956,11 +3986,13 @@
       "namePlaceholder": "Mga bug, ideya, release…",
       "emoji": "Emoji",
       "mode": "Mode",
-      "defaultsHint": "Gagamitin ng mga sesyong sisimulan mula sa listahang ito ang mga default na ito."
+      "defaultsHint": "Gagamitin ng mga sesyong sisimulan mula sa listahang ito ang mga default na ito.",
+      "saveFailed": "Hindi ma-save ang listahan. I-check ang iyong koneksyon at subukang muli."
     },
     "list": {
       "addPlaceholder": "Magdagdag ng gagawin",
       "add": "Idagdag ang gagawin",
+      "addFailed": "Hindi maidagdag ang gagawin. I-check ang iyong koneksyon at subukang muli.",
       "empty": "Wala pang gagawin",
       "setDefaults": "Itakda ang repositoryo, mode at modelo",
       "completed_one": "Nakumpleto ({{count}})",
@@ -3997,7 +4029,9 @@
       "startNewSession": "Magsimula ng bagong session",
       "startNewSessionHint": "Mahabang pindot para magsimula ng bagong session.",
       "linkSession": "I-link ang sesyon",
-      "linkFailed": "Hindi na-link ang sesyon sa gagawin"
+      "linkFailed": "Hindi na-link ang sesyon sa gagawin",
+      "moveToAnotherTodo": "Ilipat sa ibang gagawin",
+      "startRefreshFailed": "Nagsimula na ang sesyon, pero hindi na-update ang listahang ito."
     },
     "linkSession": {
       "title": "Mag-link ng sesyon",
@@ -4006,6 +4040,7 @@
     },
     "upNext": "Susunod",
     "sessionTodo": "Gagawin: {{title}}",
+    "openTodoHint": "Binubuksan ang gagawin.",
     "linkToTodo": "I-link sa gagawin",
     "candidates": {
       "empty": "Walang bukas na gagawin"

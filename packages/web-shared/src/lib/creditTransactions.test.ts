@@ -18,6 +18,7 @@ import {
   KiloPassIssuanceSource,
   KiloPassTier,
 } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { retireCreditBalance, transferCreditLots } from './creditAdjustments';
 
 describe('Credit Transactions', () => {
   describe('getCreditTransactionsSummaryByUserId', () => {
@@ -62,6 +63,77 @@ describe('Credit Transactions', () => {
       expect(summary.total_promotional_musd).toBe(20500000); // 5.00 + 15.50
       expect(summary.total_purchased_musd).toBe(35750000); // 25.00 + 10.75
       expect(summary.credit_transaction_count).toBe(4);
+    });
+
+    test('reports refund principal without counting expiration or internal movements as payments', async () => {
+      const user = await insertTestUser();
+      await db.insert(credit_transactions).values([
+        {
+          kilo_user_id: user.id,
+          is_free: false,
+          amount_microdollars: 100_000_000,
+        },
+        {
+          kilo_user_id: user.id,
+          is_free: false,
+          amount_microdollars: -60_000_000,
+          credit_category: 'credits_expired',
+        },
+        {
+          kilo_user_id: user.id,
+          is_free: false,
+          amount_microdollars: 0,
+          refund_principal_microdollars: -10_000_000,
+          source_transaction_id: crypto.randomUUID(),
+          credit_category: 'store-credit-refund:google_play:synthetic',
+        },
+        {
+          kilo_user_id: user.id,
+          is_free: false,
+          amount_microdollars: 100_000_000,
+          paid_credit_policy: 'settlement',
+        },
+        {
+          kilo_user_id: user.id,
+          is_free: true,
+          amount_microdollars: 100_000_000,
+          paid_credit_policy: 'one_year',
+          source_transaction_id: crypto.randomUUID(),
+          credit_category: 'parent_to_child_transfer_in',
+        },
+      ]);
+
+      const summary = await getCreditTransactionsSummaryByUserId(user.id);
+      expect(summary.total_purchased_musd).toBe(90_000_000);
+      expect(summary.total_promotional_musd).toBe(0);
+      expect(summary.credit_transaction_count).toBe(5);
+    });
+
+    test('does not report untracked legacy balance movements as negative purchases', async () => {
+      const source = await insertTestUser({ total_microdollars_acquired: 100_000_000 });
+      const target = await insertTestUser();
+      await db.transaction(tx =>
+        transferCreditLots(tx, {
+          from: { type: 'user', id: source.id },
+          to: { type: 'user', id: target.id },
+          actorId: source.id,
+          amountMicrodollars: 40_000_000,
+          incomingCategory: 'parent_to_child_transfer_in',
+          outgoingCategory: 'parent_to_child_transfer_out',
+          incomingDescription: 'Incoming legacy credit',
+          outgoingDescription: 'Outgoing legacy credit',
+        })
+      );
+      await db.transaction(tx =>
+        retireCreditBalance(tx, {
+          owner: { type: 'user', id: source.id },
+          actorId: source.id,
+          creditCategory: 'organization_custom',
+          description: 'Retire remaining legacy credit',
+        })
+      );
+      expect((await getCreditTransactionsSummaryByUserId(source.id)).total_purchased_musd).toBe(0);
+      expect((await getCreditTransactionsSummaryByUserId(target.id)).total_purchased_musd).toBe(0);
     });
 
     test('should return zeros for user with no transactions', async () => {

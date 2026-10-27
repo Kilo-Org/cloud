@@ -53,6 +53,7 @@
     "connected": "Conectado",
     "couldNotLoadModels": "Não foi possível carregar os modelos.",
     "couldNotLoadRepositories": "Não foi possível carregar os repositórios.",
+    "noRepositoriesFound": "Nenhum repositório encontrado",
     "critical": "Nível crítico",
     "delete": "Excluir",
     "deleted": "Excluído",
@@ -87,6 +88,7 @@
     "connect": "Conectar",
     "connectBitbucket": "Conectar Bitbucket",
     "connectGitlab": "Conectar GitLab",
+    "connectProvider": "Conectar um provedor",
     "contentTruncated": "Conteúdo exibido parcialmente",
     "copyLink": "Copiar link",
     "couldNotLoadOrganizations": "Não foi possível carregar as organizações.",
@@ -145,7 +147,8 @@
     "agent": "Agente",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Alterações"
+    "changes": "Alterações",
+    "organizationTrialEnded": "O período de teste da organização terminou e ela não tem nenhum plano ativo. Um proprietário da organização pode atualizar o faturamento em kilo.ai e tentar novamente."
   },
   "language": {
     "restarting": "Reiniciando para aplicar o idioma",
@@ -224,7 +227,6 @@
     "hideBalance": "Ocultar saldo",
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
-    "bonusCreditsExpiring": "{{amount}} em créditos expiram em {{date}}.",
     "signOutTitle": "Sair?",
     "signOutMessage": "Você precisará entrar novamente para acessar seu espaço de trabalho.",
     "deleteAccountTitle": "Excluir conta?",
@@ -854,7 +856,6 @@
       "gitlabNoRepositoriesDescription": "Talvez você precise conceder acesso a mais grupos ou projetos no GitLab.",
       "installGithubApp": "Instalar o app do GitHub nos repositórios",
       "installGithubAppDescription": "Conceda ao app do Kilo no GitHub acesso aos repositórios que você quer revisar.",
-      "noRepositoriesFound": "Nenhum repositório encontrado",
       "repositoryAccess": "acesso ao repositório"
     },
     "style": {
@@ -878,7 +879,6 @@
     "followReviewMd": "Seguir REVIEW.md",
     "followReviewMdSubtitle": "Seguir as instruções do arquivo REVIEW.md de cada repositório",
     "manualReview": {
-      "connectProvider": "Conectar um provedor",
       "connectProviderDescription": "Conecte o GitHub para iniciar a revisão manual de um PR.",
       "couldNotCheckProviderStatus": "Não foi possível verificar o status do provedor.",
       "couldNotLoadProviders": "Não foi possível carregar seus provedores conectados. Tente novamente.",
@@ -984,6 +984,22 @@
       "loading": "Carregando memória de revisão",
       "loadingProposals": "Carregando propostas",
       "noProposals": "Nenhuma proposta",
+      "proposalDetails": "Detalhes da proposta",
+      "proposalTitle": "Título da proposta",
+      "rationale": "Justificativa",
+      "saveFirst": "Salve suas alterações antes de abrir um pull request.",
+      "proposalSaved": "Proposta salva",
+      "proposalDismissed": "Proposta dispensada",
+      "dismissProposalTitle": "Dispensar proposta?",
+      "dismissProposalMessage": "Esta proposta será removida da lista de propostas ativas e não poderá ser restaurada.",
+      "prOpened": "Pull request para o REVIEW.md aberto",
+      "alreadyPresent": "As orientações já estão no REVIEW.md",
+      "status": {
+        "edited": "Editada",
+        "opening_change_request": "Abrindo PR",
+        "change_request_failed": "Falha ao abrir PR",
+        "superseded": "Já existe"
+      },
       "noProposalsDescription": "As propostas da memória de revisão aparecem aqui depois que o Kilo analisa as respostas dos mantenedores.",
       "off": "A memória de revisão está desativada.",
       "on": "A memória de revisão está ativada.",
@@ -1064,8 +1080,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Nenhum filtro disponível",
-      "noFiltersDescription": "Volte à lista de ocorrências e abra os filtros novamente.",
       "title": "Filtrar ocorrências",
       "fixed": "Corrigido",
       "outcome": "Resultado",
@@ -1629,8 +1643,8 @@
       "title": "Sessão",
       "copyErrorDetails": "Copiar detalhes do erro",
       "backToSessions": "Voltar para as sessões",
-      "follow": "Acompanhar na tela de bloqueio",
-      "unfollow": "Parar de acompanhar na tela de bloqueio",
+      "follow": "Acompanhar sessão",
+      "unfollow": "Parar de acompanhar sessão",
       "couldNotLoad": "Não foi possível carregar a sessão.",
       "failedToLoadDetails": "Não foi possível carregar os detalhes da sessão.",
       "failedToStopExecution": "Não foi possível interromper a execução.",
@@ -2038,7 +2052,9 @@
       "retrying": "Tentando novamente…",
       "retryDeny": "Tentar negar novamente",
       "retryAllowOnce": "Tentar permitir uma vez novamente",
-      "retryAlwaysAllow": "Tentar permitir sempre novamente"
+      "retryAlwaysAllow": "Tentar permitir sempre novamente",
+      "unreadableTitle": "Não foi possível ler a solicitação de permissão",
+      "unreadableBody": "O agente está aguardando uma decisão de permissão que este app não consegue exibir. Atualize o app ou o CLI, ou responda à solicitação no CLI para continuar."
     },
     "questionCard": {
       "title": "O agente precisa de uma resposta",
@@ -2456,7 +2472,6 @@
     "allow": "Permitir",
     "onlineMessage": "Este dispositivo não consegue transcrever sem conexão com a internet. Sua gravação é enviada para {{provider}} para ser convertida em texto. O Kilo não armazena o áudio.",
     "onlineTitle": "A fala é processada online",
-    "staysOff": "A digitação por voz permanece desativada até você permitir a transcrição online.",
     "start": "Iniciar digitação por voz",
     "stop": "Parar digitação por voz",
     "restricted": "A digitação por voz está restrita neste dispositivo.",
@@ -2470,8 +2485,9 @@
     "unavailableDevice": "A digitação por voz não está disponível neste dispositivo.",
     "unavailableLanguage": "A digitação por voz não está disponível no idioma do dispositivo.",
     "languageNotInstalledTitle": "A digitação por voz para {{language}} ainda não está pronta",
-    "languageNotInstalledMessage": "Os arquivos de fala off-line de {{language}} não estão instalados neste celular. Baixe-os e tente a digitação por voz novamente.",
+    "languageNotInstalledMessage": "Os arquivos de fala off-line de {{language}} não estão instalados e a transcrição online está desativada. Baixe os arquivos ou ative novamente a transcrição online para usar a digitação por voz.",
     "downloadOfflineModel": "Baixar",
+    "useOnlineTranscription": "Permitir transcrição online",
     "offlineModelDownloadScheduled": "Os arquivos de fala off-line serão baixados em segundo plano. Tente a digitação por voz novamente mais tarde.",
     "listeningStopped": "A captação de voz foi interrompida.",
     "transcribing": "Transcrevendo...",
@@ -3181,7 +3197,7 @@
     "creditActivity": {
       "emptyDescription": "As compras, o uso e os ajustes de créditos desta organização aparecerão aqui conforme ocorrerem.",
       "emptyTitle": "Nenhuma movimentação de créditos",
-      "expires": "Expira em {{date}}",
+      "expiresUtc": "Expira em {{date}} (UTC)",
       "title": "Movimentação de créditos",
       "transactionFallback": "Transação de créditos",
       "category": {
@@ -3211,7 +3227,9 @@
       "sendInvite": "Enviar convite",
       "title": "Convidar membro",
       "alreadyInvited": "A pessoa já foi convidada ou já é membro.",
-      "sendError": "Não foi possível enviar o convite."
+      "sendError": "Não foi possível enviar o convite.",
+      "pendingInvitation": "Este e-mail já tem um convite pendente.",
+      "alreadyMember": "Esta pessoa já é membro desta organização."
     },
     "invoices": {
       "downloadA11y": "Baixar fatura {{number}}",
@@ -3281,7 +3299,12 @@
       "pendingInvitations": "Convites pendentes",
       "resendInvite": "Reenviar convite",
       "shareInviteLink": "Compartilhar link de convite",
-      "resendInviteError": "Não foi possível reenviar o convite."
+      "resendInviteError": "Não foi possível reenviar o convite.",
+      "inviteNotResendable": "Este convite não pode mais ser reenviado.",
+      "ownerAuthority": "Apenas um proprietário da organização pode gerenciar proprietários.",
+      "ownRoleChange": "Você não pode alterar sua própria função.",
+      "inviteExpired": "Este convite expirou.",
+      "inviteAccepted": "Este convite já foi aceito."
     },
     "usageStats": {
       "inputTokens": "Tokens de entrada",
@@ -3396,7 +3419,7 @@
     "activityKitDisabledBody": "Ative as Atividades ao Vivo nos Ajustes para ver os agentes ativos na tela bloqueada.",
     "openSession": "Abrir",
     "finished": "Concluído",
-    "followFailed": "Não foi possível mostrar este agente na tela de bloqueio.",
+    "followFailed": "Não foi possível acompanhar esta sessão.",
     "approveFailed": "Não foi possível aprovar. Toque em $t(common.approve) para tentar novamente.",
     "checked": "Verificado",
     "lastKnown": "Último status conhecido",
@@ -3771,6 +3794,7 @@
     "title": "Perfis",
     "entrySubtitle": "Reutilizar configurações de ambiente entre sessões",
     "newProfile": "Novo perfil",
+    "openHint": "Abre o perfil",
     "emptyTitle": "Ainda não há perfis",
     "emptyDescription": "Crie um perfil para reutilizar variáveis de ambiente, comandos de configuração e habilidades entre sessões.",
     "loadFailed": "Não foi possível carregar perfis",
@@ -3869,6 +3893,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Valores exibidos como •••• mantêm o segredo armazenado; substitua um valor para rotacioná-lo. Alterar a linha de comando exige todos os valores novamente",
+      "headersHint": "Valores exibidos como •••• mantêm o segredo armazenado; substitua um valor para rotacioná-lo. Alterar a URL exige todos os valores novamente",
       "nameRequired": "Insira um nome de servidor",
       "nameInvalid": "O nome pode usar apenas letras ASCII, números, sublinhados e travessões, com até 100 caracteres",
       "commandRequired": "Digite um comando",
@@ -3967,6 +3993,10 @@
   "credits": {
     "title": "Comprar créditos",
     "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de codificação com IA no Kilo App. A loja cobra na sua conta e os créditos são adicionados depois que a loja confirma o pagamento.",
+    "nextExpiry": "{{amount}} em créditos expiram em {{date}} (UTC). Os créditos com vencimento mais próximo são usados primeiro.",
+    "appStoreExpiry": "Créditos comprados pela App Store não expiram.",
+    "playOneYearExpiry": "Estes créditos expiram um ano-calendário após a compra.",
+    "playNonexpiring": "Estes créditos não expiram.",
     "packLabel": "Adicionar {{amount}} em créditos",
     "priceUnavailable": "Preço indisponível",
     "purchased": "Créditos adicionados ao seu saldo.",
@@ -4009,11 +4039,13 @@
       "namePlaceholder": "Bugs, Ideias, Versão…",
       "emoji": "Emoji",
       "mode": "Modo",
-      "defaultsHint": "As sessões iniciadas a partir desta lista usam estes padrões."
+      "defaultsHint": "As sessões iniciadas a partir desta lista usam estes padrões.",
+      "saveFailed": "Não foi possível salvar a lista. Verifique sua conexão e tente novamente."
     },
     "list": {
       "addPlaceholder": "Adicionar uma tarefa",
       "add": "Adicionar tarefa",
+      "addFailed": "Não foi possível adicionar a tarefa. Verifique sua conexão e tente novamente.",
       "empty": "Ainda não há tarefas",
       "setDefaults": "Definir repositório, modo e modelo",
       "completed_one": "Concluídas ({{count}})",
@@ -4052,7 +4084,9 @@
       "startNewSession": "Iniciar nova sessão",
       "startNewSessionHint": "Toque e segure para iniciar uma nova sessão.",
       "linkSession": "Vincular sessão",
-      "linkFailed": "Não foi possível vincular a sessão à tarefa"
+      "linkFailed": "Não foi possível vincular a sessão à tarefa",
+      "moveToAnotherTodo": "Mover para outra tarefa",
+      "startRefreshFailed": "A sessão foi iniciada, mas esta lista não foi atualizada."
     },
     "linkSession": {
       "title": "Vincular uma sessão",
@@ -4061,6 +4095,7 @@
     },
     "upNext": "A seguir",
     "sessionTodo": "Tarefa: {{title}}",
+    "openTodoHint": "Abre a tarefa.",
     "linkToTodo": "Vincular a uma tarefa",
     "candidates": {
       "empty": "Não há tarefas abertas"

@@ -479,7 +479,10 @@ describe('CloudAgentTransport event routing', () => {
     ['question.asked', { id: 'request-1' }],
     ['question.replied', { requestID: 'request-1' }],
     ['question.rejected', { requestID: 'request-1' }],
-    ['permission.asked', { id: 'request-1', permission: 'bash' }],
+    [
+      'permission.asked',
+      { id: 'request-1', permission: 'bash', patterns: [], metadata: {}, always: [] },
+    ],
     ['permission.replied', { requestID: 'request-1' }],
   ])(
     'suppresses historical %s until connected, then delivers current interactions',
@@ -886,6 +889,7 @@ describe('CloudAgentTransport command delegation', () => {
     const { transport } = createTransportWithSinks(undefined, undefined, api);
 
     await transport.send!({
+      messageId: 'msg_123456789abc123456789AB005',
       payload: {
         type: 'prompt',
         prompt: 'hello',
@@ -896,6 +900,7 @@ describe('CloudAgentTransport command delegation', () => {
 
     expect(api.send).toHaveBeenCalledWith({
       sessionId: 'ses-1',
+      messageId: 'msg_123456789abc123456789AB005',
       payload: {
         type: 'prompt',
         prompt: 'hello',
@@ -913,6 +918,7 @@ describe('CloudAgentTransport command delegation', () => {
 
     await expect(
       transport.send!({
+        messageId: 'msg_123456789abc123456789AB006',
         payload: {
           type: 'prompt',
           prompt: 'hello',
@@ -935,6 +941,7 @@ describe('CloudAgentTransport command delegation', () => {
     };
 
     await transport.send!({
+      messageId: 'msg_123456789abc123456789AB007',
       payload: {
         type: 'prompt',
         prompt: 'read it',
@@ -946,6 +953,7 @@ describe('CloudAgentTransport command delegation', () => {
 
     expect(api.send).toHaveBeenCalledWith({
       sessionId: 'ses-1',
+      messageId: 'msg_123456789abc123456789AB007',
       payload: {
         type: 'prompt',
         prompt: 'read it',

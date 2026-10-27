@@ -53,6 +53,7 @@
     "connected": "Wedi cysylltu",
     "couldNotLoadModels": "Doedd dim modd llwytho'r modelau.",
     "couldNotLoadRepositories": "Doedd dim modd llwytho'r ystorfeydd.",
+    "noRepositoriesFound": "Heb ddod o hyd i unrhyw ystorfeydd",
     "critical": "Critigol",
     "delete": "Dileu",
     "deleted": "Dilëwyd",
@@ -87,6 +88,7 @@
     "connect": "Cysylltu",
     "connectBitbucket": "Cysylltu â Bitbucket",
     "connectGitlab": "Cysylltu â GitLab",
+    "connectProvider": "Cysylltu darparwr",
     "contentTruncated": "Cynnwys wedi'i gwtogi",
     "copyLink": "Copïo dolen",
     "couldNotLoadOrganizations": "Doedd dim modd llwytho'r sefydliadau.",
@@ -145,7 +147,8 @@
     "agent": "Asiant",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Newidiadau"
+    "changes": "Newidiadau",
+    "organizationTrialEnded": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gall perchennog sefydliad ddiweddaru bilio ar kilo.ai, ac yna rhoi cynnig arall arni."
   },
   "language": {
     "restarting": "Yn ailgychwyn i newid yr iaith",
@@ -224,7 +227,6 @@
     "hideBalance": "Cuddio'r balans",
     "showBalance": "Dangos y balans",
     "balanceHidden": "Balans wedi'i guddio",
-    "bonusCreditsExpiring": "Mae {{amount}} o gredydau yn dod i ben ar {{date}}.",
     "signOutTitle": "Allgofnodi?",
     "signOutMessage": "Bydd angen i ti fewngofnodi eto i gael mynediad i dy weithle.",
     "deleteAccountTitle": "Dileu cyfrif?",
@@ -1495,7 +1497,6 @@
       "gitlabNoRepositoriesDescription": "Efallai y bydd angen i chi ganiatáu mynediad i fwy o grwpiau neu brosiectau ar GitLab.",
       "installGithubApp": "Gosod yr ap GitHub ar ystorfeydd",
       "installGithubAppDescription": "Rhowch fynediad i ap GitHub Kilo at yr ystorfeydd rydych am eu hadolygu.",
-      "noRepositoriesFound": "Heb ddod o hyd i unrhyw ystorfeydd",
       "repositoryAccess": "mynediad i ystorfa"
     },
     "style": {
@@ -1570,6 +1571,22 @@
       "loadingProposals": "Llwytho cynigion",
       "couldNotLoadProposals": "Ni ellid llwytho'r cynigion.",
       "noProposals": "Dim cynigion",
+      "proposalDetails": "Manylion y cynnig",
+      "proposalTitle": "Teitl y cynnig",
+      "rationale": "Sail resymegol",
+      "saveFirst": "Cadwch eich newidiadau cyn agor cais tynnu.",
+      "proposalSaved": "Cynnig wedi'i gadw",
+      "proposalDismissed": "Cynnig wedi'i ddiystyru",
+      "dismissProposalTitle": "Diystyru'r cynnig?",
+      "dismissProposalMessage": "Bydd y cynnig hwn yn cael ei dynnu o'r rhestr weithredol ac ni fydd modd ei adfer.",
+      "prOpened": "Cais tynnu REVIEW.md wedi'i agor",
+      "alreadyPresent": "Mae'r canllawiau eisoes yn REVIEW.md",
+      "status": {
+        "edited": "Wedi'i olygu",
+        "opening_change_request": "Agor PR",
+        "change_request_failed": "PR wedi methu",
+        "superseded": "Eisoes yn bodoli"
+      },
       "noProposalsDescription": "Bydd cynigion y cof adolygu yn ymddangos yma ar ôl i Kilo ddadansoddi ymatebion y cynhalwyr."
     },
     "manualReview": {
@@ -1577,7 +1594,6 @@
       "invalidUrl": "Rhowch URL dilys ar gyfer cais tynnu.",
       "couldNotCheckProviderStatus": "Ni ellid gwirio statws y darparwr.",
       "couldNotLoadProviders": "Ni allem lwytho'r darparwyr rydych wedi'u cysylltu. Ceisiwch eto.",
-      "connectProvider": "Cysylltu darparwr",
       "connectProviderDescription": "Cysylltwch GitHub i ddechrau adolygiad â llaw o gais tynnu.",
       "pullRequestUrl": "URL cais tynnu",
       "instructions": "Cyfarwyddiadau (dewisol)",
@@ -1705,8 +1721,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Dim hidlwyr ar gael",
-      "noFiltersDescription": "Ewch yn ôl ac agorwch yr hidlwyr eto o'r rhestr canfyddiadau.",
       "title": "Hidlo canfyddiadau",
       "reset": "Ailosod",
       "severity": "Difrifoldeb",
@@ -2300,8 +2314,8 @@
       "title": "Sesiwn",
       "copyErrorDetails": "Copïo manylion gwall",
       "backToSessions": "Yn ôl i sesiynau",
-      "follow": "Dilyn ar y sgrin glo",
-      "unfollow": "Peidio â dilyn ar y sgrin glo",
+      "follow": "Dilyn y sesiwn",
+      "unfollow": "Peidio â dilyn y sesiwn",
       "couldNotLoad": "Methu llwytho'r sesiwn.",
       "failedToLoadDetails": "Methu llwytho manylion y sesiwn.",
       "failedToStopExecution": "Methu atal y gweithrediad.",
@@ -2721,7 +2735,9 @@
       "retrying": "Yn ceisio eto…",
       "retryDeny": "Ceisio gwrthod eto",
       "retryAllowOnce": "Ceisio caniatáu unwaith eto",
-      "retryAlwaysAllow": "Ceisio caniatáu bob tro eto"
+      "retryAlwaysAllow": "Ceisio caniatáu bob tro eto",
+      "unreadableTitle": "Methwyd darllen y cais am ganiatâd",
+      "unreadableBody": "Mae'r asiant yn aros am benderfyniad ganiatâd na all yr ap hwn ei ddangos. Diweddarwch yr ap neu'r CLI, neu atebwch y cais yn y CLI i barhau."
     },
     "questionCard": {
       "title": "Mae angen mewnbwn ar yr asiant",
@@ -3125,7 +3141,6 @@
   },
   "voiceInput": {
     "listening": "Yn gwrando...",
-    "staysOff": "Bydd mewnbwn llais yn aros wedi'i ddiffodd nes i chi ganiatáu trawsgrifio ar-lein.",
     "onlineTitle": "Prosesir lleferydd ar-lein",
     "onlineMessage": "Ni all y ddyfais hon drawsgrifio all-lein. Anfonir eich recordiad at {{provider}} i'w droi'n destun. Nid yw Kilo yn storio'r sain.",
     "allow": "Caniatáu",
@@ -3142,8 +3157,9 @@
     "unavailableDevice": "Nid yw mewnbwn llais ar gael ar y ddyfais hon.",
     "unavailableLanguage": "Nid yw mewnbwn llais ar gael ar gyfer iaith y ddyfais hon.",
     "languageNotInstalledTitle": "Nid yw mewnbwn llais ar gyfer {{language}} yn barod eto",
-    "languageNotInstalledMessage": "Nid yw ffeiliau lleferydd all-lein {{language}} wedi'u gosod ar y ffôn hon. Llwythwch nhw i lawr, yna ceisiwch fewnbwn llais eto.",
+    "languageNotInstalledMessage": "Nid yw ffeiliau lleferydd all-lein {{language}} wedi'u gosod, a mae trawsgrifio ar-lein wedi'i ddiffodd. Llwythwch y ffeiliau i lawr neu trowch trawsgrifio ar-lein ymlaen eto er mwyn defnyddio mewnbwn llais.",
     "downloadOfflineModel": "Llwytho i lawr",
+    "useOnlineTranscription": "Caniatáu trawsgrifio ar-lein",
     "offlineModelDownloadScheduled": "Bydd y ffeiliau lleferydd all-lein yn cael eu llwytho i lawr yn y cefndir. Ceisiwch fewnbwn llais eto yn nes ymlaen.",
     "listeningStopped": "Daeth y gwrando i ben.",
     "transcribing": "Yn trawsgrifio...",
@@ -3321,7 +3337,7 @@
     "creditActivity": {
       "emptyDescription": "Bydd pryniannau, defnydd ac addasiadau credyd y sefydliad hwn yn ymddangos yma wrth iddynt ddigwydd.",
       "emptyTitle": "Dim gweithgaredd credyd",
-      "expires": "Yn dod i ben {{date}}",
+      "expiresUtc": "Yn dod i ben {{date}} (UTC)",
       "title": "Gweithgaredd credyd",
       "transactionFallback": "Trafodiad credyd",
       "category": {
@@ -3344,7 +3360,9 @@
       "sendInvite": "Anfon gwahoddiad",
       "title": "Gwahodd aelod",
       "alreadyInvited": "Mae'r cyfeiriad e-bost hwn eisoes wedi cael gwahoddiad neu'n eisoes yn perthyn i aelod.",
-      "sendError": "Ni lwyddwyd i anfon y gwahoddiad."
+      "sendError": "Ni lwyddwyd i anfon y gwahoddiad.",
+      "pendingInvitation": "Mae gwahoddiad ar y gweill eisoes ar gyfer yr e-bost hwn.",
+      "alreadyMember": "Mae'r person hwn eisoes yn aelod o'r sefydliad hwn."
     },
     "invoices": {
       "downloadA11y": "Lawrlwytho anfoneb {{number}}",
@@ -3414,7 +3432,12 @@
       "pendingInvitations": "Gwahoddiadau sy'n aros",
       "resendInvite": "Ailanfon y gwahoddiad",
       "shareInviteLink": "Rhannu dolen gwahoddiad",
-      "resendInviteError": "Ni lwyddwyd i ailanfon y gwahoddiad."
+      "resendInviteError": "Ni lwyddwyd i ailanfon y gwahoddiad.",
+      "inviteNotResendable": "Ni ellir ailanfon y gwahoddiad hwn mwyach.",
+      "ownerAuthority": "Dim ond perchennog sefydliad sy'n gallu rheoli perchnogion.",
+      "ownRoleChange": "Ni allwch newid eich rôl eich hun.",
+      "inviteExpired": "Mae'r gwahoddiad hwn wedi dod i ben.",
+      "inviteAccepted": "Mae'r gwahoddiad hwn eisoes wedi'i dderbyn."
     },
     "usageStats": {
       "inputTokens": "Tocynnau mewnbwn",
@@ -3531,7 +3554,7 @@
     "activityKitDisabledBody": "Trowch weithgareddau byw ymlaen yn y gosodiadau i weld asiantau gweithredol ar y sgrin glo.",
     "openSession": "Agor",
     "finished": "Wedi gorffen",
-    "followFailed": "Methu dangos yr asiant hwn ar y sgrin glo.",
+    "followFailed": "Methu dilyn y sesiwn hon.",
     "approveFailed": "Methu cymeradwyo. Tapiwch $t(common.approve) i geisio eto.",
     "checked": "Gwiriwyd",
     "lastKnown": "Hysbys diwethaf",
@@ -3909,6 +3932,7 @@
     "title": "Proffiliau",
     "entrySubtitle": "Ailddefnyddio gosodiadau amgylchedd ar draws sesiynau",
     "newProfile": "Proffil newydd",
+    "openHint": "Yn agor y proffil",
     "emptyTitle": "Dim proffiliau eto",
     "emptyDescription": "Creu proffil i ailddefnyddio newidynnau amgylchedd, gorchmynion gosod, a sgiliau ar draws sesiynau.",
     "loadFailed": "Methu llwytho proffiliau",
@@ -4022,6 +4046,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Mae gwerthoedd a ddangosir fel •••• yn cadw eu cyfrinach storio; disodlwch werth i'w gylchdroi. Mae newid y llinell orchymyn yn gofyn am bob gwerth eto",
+      "headersHint": "Mae gwerthoedd a ddangosir fel •••• yn cadw eu cyfrinach storio; disodlwch werth i'w gylchdroi. Mae newid yr URL yn gofyn am bob gwerth eto",
       "nameRequired": "Rhowch enw gweinydd",
       "nameInvalid": "Dim ond llythrennau ASCII, rhifau, tanlinellau a llinellau toriad y gall enw eu defnyddio, hyd at 100 nod",
       "commandRequired": "Rhowch orchymyn",
@@ -4120,6 +4146,10 @@
   "credits": {
     "title": "Prynu credydau",
     "description": "Mae credydau yn bryniant un-tro sy'n cael ei ychwanegu at eich balans Kilo ar gyfer rhedeg sesiynau codio AI yn Kilo App. Mae'r siop yn codi eich cyfrif ac mae credydau'n cael eu hychwanegu ar ôl i'r siop gadarnhau'r taliad.",
+    "nextExpiry": "Mae {{amount}} o gredydau yn dod i ben ar {{date}} (UTC). Defnyddir y credydau sy'n dod i ben gyntaf yn gyntaf.",
+    "appStoreExpiry": "Nid yw credydau a brynwyd drwy'r App Store yn dod i ben.",
+    "playOneYearExpiry": "Mae'r credydau hyn yn dod i ben un flwyddyn galendr ar ôl eu prynu.",
+    "playNonexpiring": "Nid yw'r credydau hyn yn dod i ben.",
     "packLabel": "Ychwanegu {{amount}} o gredydau",
     "priceUnavailable": "Pris ddim ar gael",
     "purchased": "Ychwanegwyd credydau at eich balans.",
@@ -4168,11 +4198,13 @@
       "namePlaceholder": "Bygiau, Syniadau, Rhyddhau…",
       "emoji": "Emoji",
       "mode": "Modd",
-      "defaultsHint": "Mae sesiynau sy'n dechrau o'r rhestr hon yn defnyddio'r rhagosodiadau hyn."
+      "defaultsHint": "Mae sesiynau sy'n dechrau o'r rhestr hon yn defnyddio'r rhagosodiadau hyn.",
+      "saveFailed": "Ni fu modd cadw'r rhestr. Gwiriwch eich cysylltiad a rhowch gynnig arall."
     },
     "list": {
       "addPlaceholder": "Ychwanegu tasg",
       "add": "Ychwanegu tasg",
+      "addFailed": "Ni fu modd ychwanegu'r dasg. Gwiriwch eich cysylltiad a rhowch gynnig arall.",
       "empty": "Dim tasgau eto",
       "setDefaults": "Gosod ystorfa, modd a model",
       "completed_zero": "Wedi'u cwblhau ({{count}})",
@@ -4217,7 +4249,9 @@
       "startNewSession": "Dechrau sesiwn newydd",
       "startNewSessionHint": "Gwasga'n hir i ddechrau sesiwn newydd.",
       "linkSession": "Cysylltu sesiwn",
-      "linkFailed": "Methu cysylltu'r sesiwn â'r dasg"
+      "linkFailed": "Methu cysylltu'r sesiwn â'r dasg",
+      "moveToAnotherTodo": "Symud i dasg arall",
+      "startRefreshFailed": "Dechreuodd y sesiwn, ond ni fu modd diweddaru'r rhestr hon."
     },
     "linkSession": {
       "title": "Cysylltu sesiwn",
@@ -4226,6 +4260,7 @@
     },
     "upNext": "Nesaf",
     "sessionTodo": "Tasg: {{title}}",
+    "openTodoHint": "Yn agor y dasg.",
     "linkToTodo": "Cysylltu â thasg",
     "candidates": {
       "empty": "Dim tasgau ar agor"

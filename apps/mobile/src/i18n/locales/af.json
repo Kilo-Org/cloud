@@ -53,6 +53,7 @@
     "connected": "Gekoppel",
     "couldNotLoadModels": "Die modelle kon nie gelaai word nie.",
     "couldNotLoadRepositories": "Die bewaarplekke kon nie gelaai word nie.",
+    "noRepositoriesFound": "Geen bewaarplekke gevind nie",
     "critical": "Krities",
     "delete": "Skrap",
     "deleted": "Geskrap",
@@ -87,6 +88,7 @@
     "connect": "Koppel",
     "connectBitbucket": "Koppel Bitbucket",
     "connectGitlab": "Koppel GitLab",
+    "connectProvider": "Koppel 'n verskaffer",
     "contentTruncated": "Inhoud afgekap",
     "copyLink": "Kopieer skakel",
     "couldNotLoadOrganizations": "Die organisasies kon nie gelaai word nie.",
@@ -145,7 +147,8 @@
     "agent": "Agent",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Wysigings"
+    "changes": "Wysigings",
+    "organizationTrialEnded": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. 'n Organisasie-eienaar kan die fakturering by kilo.ai opdateer en dan weer probeer."
   },
   "language": {
     "restarting": "Herbegin om die taal toe te pas",
@@ -224,7 +227,6 @@
     "hideBalance": "Versteek saldo",
     "showBalance": "Wys saldo",
     "balanceHidden": "Saldo versteek",
-    "bonusCreditsExpiring": "Krediete ter waarde van {{amount}} verval op {{date}}.",
     "signOutTitle": "Teken uit?",
     "signOutMessage": "Jy sal weer moet aanmeld om toegang tot jou werkruimte te kry.",
     "deleteAccountTitle": "Skrap rekening?",
@@ -1407,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "Jy moet dalk toegang tot meer groepe of projekte op GitLab verleen.",
       "installGithubApp": "Installeer die GitHub-app op bewaarplekke",
       "installGithubAppDescription": "Gee die Kilo GitHub-app toegang tot die bewaarplekke wat jy wil laat hersien.",
-      "noRepositoriesFound": "Geen bewaarplekke gevind nie",
       "repositoryAccess": "bewaarplektoegang"
     },
     "style": {
@@ -1482,6 +1483,22 @@
       "loadingProposals": "Laai voorstelle",
       "couldNotLoadProposals": "Die voorstelle kon nie gelaai word nie.",
       "noProposals": "Geen voorstelle",
+      "proposalDetails": "Voorstelbesonderhede",
+      "proposalTitle": "Voorsteltitel",
+      "rationale": "Motivering",
+      "saveFirst": "Stoor jou wysigings voordat jy 'n pull request oopmaak.",
+      "proposalSaved": "Voorstel gestoor",
+      "proposalDismissed": "Voorstel verwerp",
+      "dismissProposalTitle": "Voorstel verwerp?",
+      "dismissProposalMessage": "Hierdie voorstel sal uit die aktiewe lys verwyder word en kan nie herstel word nie.",
+      "prOpened": "Pull request vir REVIEW.md oopgemaak",
+      "alreadyPresent": "Riglyne is reeds in REVIEW.md",
+      "status": {
+        "edited": "Gewysig",
+        "opening_change_request": "Maak PR oop",
+        "change_request_failed": "PR het misluk",
+        "superseded": "Reeds teenwoordig"
+      },
       "noProposalsDescription": "Voorstelle uit die hersieningsgeheue verskyn hier nadat Kilo instandhouers se antwoorde ontleed het."
     },
     "manualReview": {
@@ -1489,7 +1506,6 @@
       "invalidUrl": "Voer 'n geldige URL vir 'n trekversoek in.",
       "couldNotCheckProviderStatus": "Die verskafferstatus kon nie nagegaan word nie.",
       "couldNotLoadProviders": "Ons kon nie jou gekoppelde verskaffers laai nie. Probeer asseblief weer.",
-      "connectProvider": "Koppel 'n verskaffer",
       "connectProviderDescription": "Koppel GitHub om 'n handmatige hersiening van 'n trekversoek te begin.",
       "pullRequestUrl": "Trekversoek-URL",
       "instructions": "Instruksies (opsioneel)",
@@ -1617,8 +1633,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Geen filters beskikbaar",
-      "noFiltersDescription": "Gaan terug en maak die filters weer vanuit die bevindingslys oop.",
       "title": "Filtreer bevindings",
       "reset": "Stel terug",
       "severity": "Ernsgraad",
@@ -2172,8 +2186,8 @@
       "title": "Sessie",
       "copyErrorDetails": "Kopieer foutbesonderhede",
       "backToSessions": "Terug na sessies",
-      "follow": "Volg op die sluitskerm",
-      "unfollow": "Hou op volg op die sluitskerm",
+      "follow": "Volg die sessie",
+      "unfollow": "Hou op om die sessie te volg",
       "couldNotLoad": "Die sessie kon nie gelaai word nie.",
       "failedToLoadDetails": "Die sessiebesonderhede kon nie gelaai word nie.",
       "failedToStopExecution": "Die uitvoering kon nie gestop word nie.",
@@ -2577,7 +2591,9 @@
       "retrying": "Probeer weer…",
       "retryDeny": "Probeer weer weier",
       "retryAllowOnce": "Probeer weer laat een keer toe",
-      "retryAlwaysAllow": "Probeer weer laat altyd toe"
+      "retryAlwaysAllow": "Probeer weer laat altyd toe",
+      "unreadableTitle": "Toestemmingsversoek kon nie gelees word nie",
+      "unreadableBody": "Die agent wag op 'n toestemmingsbeslissing wat hierdie app nie kan wys nie. Dateer die app of die CLI op, of beantwoord die versoek in die CLI om voort te gaan."
     },
     "questionCard": {
       "title": "Agent benodig insette",
@@ -2953,7 +2969,6 @@
   },
   "voiceInput": {
     "listening": "Luister...",
-    "staysOff": "Steminvoer bly af totdat jy aanlyn transkripsie toelaat.",
     "onlineTitle": "Spraak word aanlyn verwerk",
     "onlineMessage": "Hierdie toestel kan nie vanlyn transkribeer nie. Jou opname word na {{provider}} gestuur om dit in teks te verander. Kilo stoor nie die klank nie.",
     "allow": "Laat toe",
@@ -2970,8 +2985,9 @@
     "unavailableDevice": "Steminvoer is nie op hierdie toestel beskikbaar nie.",
     "unavailableLanguage": "Steminvoer is nie vir die toestel se taal beskikbaar nie.",
     "languageNotInstalledTitle": "Steminvoer vir {{language}} is nog nie gereed nie",
-    "languageNotInstalledMessage": "Die vanlyn-spraaklêers vir {{language}} is nie op hierdie foon geïnstalleer nie. Laai hulle af en probeer steminvoer weer.",
+    "languageNotInstalledMessage": "Die vanlyn-spraaklêers vir {{language}} is nie geïnstalleer nie, en aanlyn transkripsie is afgeskakel. Laai die lêers af, of skakel aanlyn transkripsie weer aan, om steminvoer te gebruik.",
     "downloadOfflineModel": "Laai af",
+    "useOnlineTranscription": "Laat aanlyn transkripsie toe",
     "offlineModelDownloadScheduled": "Die vanlyn-spraaklêers sal op die agtergrond afgelaai word. Probeer steminvoer later weer.",
     "listeningStopped": "Die toestel luister nie meer nie.",
     "transcribing": "Transkribeer...",
@@ -3145,7 +3161,7 @@
     "creditActivity": {
       "emptyDescription": "Aankope, gebruik en kredietaanpassings vir hierdie organisasie sal hier verskyn namate dit plaasvind.",
       "emptyTitle": "Geen kredietaktiwiteit nie",
-      "expires": "Verval op {{date}}",
+      "expiresUtc": "Verval op {{date}} (UTC)",
       "title": "Kredietaktiwiteit",
       "transactionFallback": "Krediettransaksie",
       "category": {
@@ -3168,7 +3184,9 @@
       "sendInvite": "Stuur uitnodiging",
       "title": "Nooi lid uit",
       "alreadyInvited": "Hulle is reeds genooi of is reeds 'n lid.",
-      "sendError": "Kon nie die uitnodiging stuur nie."
+      "sendError": "Kon nie die uitnodiging stuur nie.",
+      "pendingInvitation": "Hierdie e-posadres het reeds 'n hangende uitnodiging.",
+      "alreadyMember": "Hierdie persoon is reeds 'n lid van hierdie organisasie."
     },
     "invoices": {
       "downloadA11y": "Laai faktuur {{number}} af",
@@ -3238,7 +3256,12 @@
       "pendingInvitations": "Hangende uitnodigings",
       "resendInvite": "Stuur uitnodiging weer",
       "shareInviteLink": "Deel uitnodigingskakel",
-      "resendInviteError": "Kon nie die uitnodiging weer stuur nie."
+      "resendInviteError": "Kon nie die uitnodiging weer stuur nie.",
+      "inviteNotResendable": "Hierdie uitnodiging kan nie meer weer gestuur word nie.",
+      "ownerAuthority": "Slegs 'n organisasie-eienaar kan eienaars bestuur.",
+      "ownRoleChange": "Jy kan nie jou eie rol verander nie.",
+      "inviteExpired": "Hierdie uitnodiging het verval.",
+      "inviteAccepted": "Hierdie uitnodiging is reeds aanvaar."
     },
     "usageStats": {
       "inputTokens": "Invoertekens",
@@ -3351,7 +3374,7 @@
     "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien.",
     "openSession": "Oop",
     "finished": "Voltooi",
-    "followFailed": "Kon nie hierdie agent op die sluitskerm wys nie.",
+    "followFailed": "Kon nie hierdie sessie volg nie.",
     "approveFailed": "Kon nie goedkeur nie. Tik op $t(common.approve) om weer te probeer.",
     "checked": "Gekontroleer",
     "lastKnown": "Laas bekend",
@@ -3725,6 +3748,7 @@
     "title": "Profiele",
     "entrySubtitle": "Hergebruik omgewingsinstellings oor sessies heen",
     "newProfile": "Nuwe profiel",
+    "openHint": "Maak die profiel oop",
     "emptyTitle": "Nog geen profiele nie",
     "emptyDescription": "Skep 'n profiel om omgewingsveranderlikes, opstelopdragte en vaardighede oor sessies te hergebruik.",
     "loadFailed": "Kon nie profiele laai nie",
@@ -3818,6 +3842,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Waardes wat as •••• vertoon word, behou hul gestoorde geheim; vervang 'n waarde om dit te roteer. Wanneer die opdragreël verander word, word elke waarde weer vereis",
+      "headersHint": "Waardes wat as •••• vertoon word, behou hul gestoorde geheim; vervang 'n waarde om dit te roteer. Wanneer die URL verander word, word elke waarde weer vereis",
       "nameRequired": "Voer 'n bedienernaam in",
       "nameInvalid": "Naam kan slegs ASCII-letters, syfers, onderstrepe en strepe tot 100 karakters gebruik",
       "commandRequired": "Voer 'n opdrag in",
@@ -3916,6 +3942,10 @@
   "credits": {
     "title": "Koop krediete",
     "description": "Krediete is 'n eenmalige aankoop wat by jou Kilo-saldo gevoeg word om AI-koderingsessies in Kilo App te laat loop. Die winkel hef jou rekening en krediete word bygevoeg nadat die winkel betaling bevestig.",
+    "nextExpiry": "{{amount}} aan krediete verval op {{date}} (UTC). Krediete met die vroegste vervaldatum word eerste gebruik.",
+    "appStoreExpiry": "Krediete wat deur die App Store gekoop is, verval nie.",
+    "playOneYearExpiry": "Hierdie krediete verval een kalenderjaar na aankoop.",
+    "playNonexpiring": "Hierdie krediete verval nie.",
     "packLabel": "Voeg {{amount}} se krediete by",
     "priceUnavailable": "Prys nie beskikbaar nie",
     "purchased": "Krediete is by jou saldo gevoeg.",
@@ -3956,11 +3986,13 @@
       "namePlaceholder": "Foute, Idees, Vrystelling…",
       "emoji": "Emoji",
       "mode": "Modus",
-      "defaultsHint": "Sessies wat uit hierdie lys begin word, gebruik hierdie verstekwaardes."
+      "defaultsHint": "Sessies wat uit hierdie lys begin word, gebruik hierdie verstekwaardes.",
+      "saveFailed": "Kon die lys nie stoor nie. Kontroleer jou verbinding en probeer weer."
     },
     "list": {
       "addPlaceholder": "Voeg 'n taak by",
       "add": "Voeg taak by",
+      "addFailed": "Kon die taak nie byvoeg nie. Kontroleer jou verbinding en probeer weer.",
       "empty": "Nog geen take nie",
       "setDefaults": "Stel bewaarplek, modus en model",
       "completed_one": "Voltooi ({{count}})",
@@ -3997,7 +4029,9 @@
       "startNewSession": "Begin nuwe sessie",
       "startNewSessionHint": "Druk lank om 'n nuwe sessie te begin.",
       "linkSession": "Koppel sessie",
-      "linkFailed": "Kon nie die sessie aan die taak koppel nie"
+      "linkFailed": "Kon nie die sessie aan die taak koppel nie",
+      "moveToAnotherTodo": "Skuif na 'n ander taak",
+      "startRefreshFailed": "Die sessie het begin, maar hierdie lys is nie opgedateer nie."
     },
     "linkSession": {
       "title": "Koppel 'n sessie",
@@ -4006,6 +4040,7 @@
     },
     "upNext": "Volgende",
     "sessionTodo": "Taak: {{title}}",
+    "openTodoHint": "Maak die taak oop.",
     "linkToTodo": "Koppel aan taak",
     "candidates": {
       "empty": "Geen oop take nie"

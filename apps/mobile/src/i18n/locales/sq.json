@@ -53,6 +53,7 @@
     "connected": "Lidhur",
     "couldNotLoadModels": "Modelet nuk u ngarkuan.",
     "couldNotLoadRepositories": "Depot nuk u ngarkuan.",
+    "noRepositoriesFound": "Nuk u gjet asnjë depo",
     "critical": "Kritike",
     "delete": "Fshi",
     "deleted": "Fshirë",
@@ -87,6 +88,7 @@
     "connect": "Lidhu",
     "connectBitbucket": "Lidhu me Bitbucket",
     "connectGitlab": "Lidhu me GitLab",
+    "connectProvider": "Lidh një ofrues",
     "contentTruncated": "Përmbajtja u shkurtua",
     "copyLink": "Kopjo lidhjen",
     "couldNotLoadOrganizations": "Organizatat nuk u ngarkuan.",
@@ -145,7 +147,8 @@
     "agent": "Agjenti",
     "durationMinuteShort": "min",
     "durationHourShort": "orë",
-    "changes": "Ndryshimet"
+    "changes": "Ndryshimet",
+    "organizationTrialEnded": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv. Një pronar i organizatës mund të përditësojë faturimin në kilo.ai dhe më pas të provojë përsëri."
   },
   "language": {
     "restarting": "Po riniset për të zbatuar ndryshimin e gjuhës",
@@ -224,7 +227,6 @@
     "hideBalance": "Fshih gjendjen",
     "showBalance": "Shfaq gjendjen",
     "balanceHidden": "Gjendja është e fshehur",
-    "bonusCreditsExpiring": "Kredite në vlerën {{amount}} skadojnë më {{date}}.",
     "signOutTitle": "Do të dalësh nga llogaria?",
     "signOutMessage": "Do të duhet të hysh përsëri për të pasur qasje në hapësirën tënde të punës.",
     "deleteAccountTitle": "Të fshihet llogaria?",
@@ -1407,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "Mund të të duhet të japësh qasje në më shumë grupe ose projekte në GitLab.",
       "installGithubApp": "Instalo aplikacionin GitHub në depot",
       "installGithubAppDescription": "Jepi aplikacionit Kilo për GitHub qasje në depot që dëshiron të shqyrtohen.",
-      "noRepositoriesFound": "Nuk u gjet asnjë depo",
       "repositoryAccess": "qasja në depot"
     },
     "style": {
@@ -1482,6 +1483,22 @@
       "loadingProposals": "Duke ngarkuar propozimet",
       "couldNotLoadProposals": "Nuk u ngarkuan propozimet.",
       "noProposals": "Asnjë propozim",
+      "proposalDetails": "Detajet e propozimit",
+      "proposalTitle": "Titulli i propozimit",
+      "rationale": "Arsyetimi",
+      "saveFirst": "Ruaji ndryshimet para se të hapësh një pull request.",
+      "proposalSaved": "Propozimi u ruajt",
+      "proposalDismissed": "Propozimi u hodh poshtë",
+      "dismissProposalTitle": "Të hidhet poshtë propozimi?",
+      "dismissProposalMessage": "Ky propozim do të hiqet nga lista aktive dhe nuk mund të rikthehet.",
+      "prOpened": "U hap pull request për REVIEW.md",
+      "alreadyPresent": "Udhëzimet janë tashmë në REVIEW.md",
+      "status": {
+        "edited": "Redaktuar",
+        "opening_change_request": "Duke hapur PR",
+        "change_request_failed": "PR dështoi",
+        "superseded": "Tashmë i pranishëm"
+      },
       "noProposalsDescription": "Propozimet e kujtesës së shqyrtimit shfaqen këtu pasi Kilo analizon përgjigjet e mirëmbajtësve."
     },
     "manualReview": {
@@ -1489,7 +1506,6 @@
       "invalidUrl": "Shkruaj një URL të vlefshme për PR.",
       "couldNotCheckProviderStatus": "Nuk u kontrollua statusi i ofruesit.",
       "couldNotLoadProviders": "Nuk u ngarkuan ofruesit që ke lidhur. Provo përsëri.",
-      "connectProvider": "Lidh një ofrues",
       "connectProviderDescription": "Lidh GitHub për të filluar shqyrtimin manual të një PR.",
       "pullRequestUrl": "URL-ja e PR",
       "instructions": "Udhëzimet (opsionale)",
@@ -1617,8 +1633,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "Nuk ka filtra të disponueshëm",
-      "noFiltersDescription": "Kthehu dhe rihapi filtrat nga lista e gjetjeve.",
       "title": "Filtrimi i gjetjeve",
       "reset": "Rivendos",
       "severity": "Niveli i rrezikut",
@@ -2172,8 +2186,8 @@
       "title": "Seanca",
       "copyErrorDetails": "Kopjo detajet e gabimit",
       "backToSessions": "Kthehu te seancat",
-      "follow": "Ndiq në ekranin e kyçjes",
-      "unfollow": "Ndalo ndjekjen në ekranin e kyçjes",
+      "follow": "Ndiq seancën",
+      "unfollow": "Ndalo ndjekjen e seancës",
       "couldNotLoad": "Nuk u ngarkua seanca.",
       "failedToLoadDetails": "Nuk u ngarkuan detajet e seancës.",
       "failedToStopExecution": "Nuk u ndal ekzekutimi.",
@@ -2577,7 +2591,9 @@
       "retrying": "Duke u provuar përsëri…",
       "retryDeny": "Provo ta refuzosh përsëri",
       "retryAllowOnce": "Provo ta lejosh një herë përsëri",
-      "retryAlwaysAllow": "Provo ta lejosh gjithmonë përsëri"
+      "retryAlwaysAllow": "Provo ta lejosh gjithmonë përsëri",
+      "unreadableTitle": "Kërkesa për leje nuk mund të lexohej",
+      "unreadableBody": "Agjenti po pret një vendim për leje që ky aplikacion nuk mund ta shfaqë. Përditëso aplikacionin ose CLI, ose përgjigju kërkesës në CLI për të vazhduar."
     },
     "questionCard": {
       "title": "Agjenti kërkon përgjigjen tënde",
@@ -2953,7 +2969,6 @@
   },
   "voiceInput": {
     "listening": "Po dëgjon...",
-    "staysOff": "Diktimi mbetet i çaktivizuar derisa të lejosh transkriptimin në internet.",
     "onlineTitle": "Të folurit përpunohet në internet",
     "onlineMessage": "Kjo pajisje nuk mund të transkriptojë pa internet. Regjistrimi yt dërgohet te {{provider}} për t'u kthyer në tekst. Kilo nuk e ruan audion.",
     "allow": "Lejo",
@@ -2970,8 +2985,9 @@
     "unavailableDevice": "Diktimi nuk është i disponueshëm në këtë pajisje.",
     "unavailableLanguage": "Diktimi nuk është i disponueshëm për gjuhën e caktuar në këtë pajisje.",
     "languageNotInstalledTitle": "Diktimi për {{language}} nuk është gati ende",
-    "languageNotInstalledMessage": "Skedarët e të folurit jashtë interneti për {{language}} nuk janë të instaluar në këtë telefon. Shkarkoji dhe pastaj provo diktimin përsëri.",
+    "languageNotInstalledMessage": "Skedarët e të folurit jashtë internetit për {{language}} nuk janë instaluar dhe transkriptimi në internet është i fikur. Shkarko skedarët ose aktivizo përsëri transkriptimin në internet, që të përdorësh futjen me zë.",
     "downloadOfflineModel": "Shkarko",
+    "useOnlineTranscription": "Lejo transkriptimin në internet",
     "offlineModelDownloadScheduled": "Skedarët e të folurit jashtë interneti do të shkarkohen në sfond. Provo diktimin përsëri më vonë.",
     "listeningStopped": "Dëgjimi u ndal.",
     "transcribing": "Duke transkriptuar...",
@@ -3145,7 +3161,7 @@
     "creditActivity": {
       "emptyDescription": "Blerjet, përdorimi dhe rregullimet e krediteve të kësaj organizate do të shfaqen këtu sapo të ndodhin.",
       "emptyTitle": "Nuk ka aktivitet kreditesh",
-      "expires": "Skadon më {{date}}",
+      "expiresUtc": "Skadon më {{date}} (UTC)",
       "title": "Aktiviteti i krediteve",
       "transactionFallback": "Transaksion kreditesh",
       "category": {
@@ -3168,7 +3184,9 @@
       "sendInvite": "Dërgo ftesën",
       "title": "Fto anëtar",
       "alreadyInvited": "Ky person është ftuar tashmë ose është tashmë anëtar.",
-      "sendError": "Ftesa nuk u dërgua."
+      "sendError": "Ftesa nuk u dërgua.",
+      "pendingInvitation": "Ky email ka tashmë një ftesë në pritje.",
+      "alreadyMember": "Ky person është tashmë anëtar i kësaj organizate."
     },
     "invoices": {
       "downloadA11y": "Shkarko faturën {{number}}",
@@ -3238,7 +3256,12 @@
       "pendingInvitations": "Ftesat në pritje",
       "resendInvite": "Ridërgo ftesën",
       "shareInviteLink": "Ndaj lidhjen e ftesës",
-      "resendInviteError": "Ftesa nuk u ridërgua."
+      "resendInviteError": "Ftesa nuk u ridërgua.",
+      "inviteNotResendable": "Kjo ftesë nuk mund të ridërgohet më.",
+      "ownerAuthority": "Vetëm pronari i organizatës mund të menaxhojë pronarët.",
+      "ownRoleChange": "Nuk mund të ndryshosh rolin tënd.",
+      "inviteExpired": "Kjo ftesë ka skaduar.",
+      "inviteAccepted": "Kjo ftesë është pranuar tashmë."
     },
     "usageStats": {
       "inputTokens": "Tokenët hyrës",
@@ -3351,7 +3374,7 @@
     "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes.",
     "openSession": "Hap",
     "finished": "Përfundoi",
-    "followFailed": "Ky agjent nuk mund të shfaqej në ekranin e kyçjes.",
+    "followFailed": "Kjo seancë nuk mund të ndiqej.",
     "approveFailed": "Nuk u arrit të miratohej. Trokit $t(common.approve) për të provuar përsëri.",
     "checked": "Kontrolluar",
     "lastKnown": "Gjendja e fundit e njohur",
@@ -3725,6 +3748,7 @@
     "title": "Profilet",
     "entrySubtitle": "Ripërdorni cilësimet e mjedisit nëpër sesione",
     "newProfile": "Profili i ri",
+    "openHint": "Hap profilin",
     "emptyTitle": "Nuk ka ende profile",
     "emptyDescription": "Krijo një profil për të ripërdorur variablat e mjedisit, komandat e konfigurimit dhe aftësitë nëpër sesione.",
     "loadFailed": "Profilet nuk mund të ngarkoheshin",
@@ -3818,6 +3842,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Vlerat e shfaqura si •••• mbajnë sekretin e tyre të ruajtur; zëvendëso një vlerë për ta rrotulluar. Ndryshimi i linjës së komandës kërkon përsëri të gjitha vlerat",
+      "headersHint": "Vlerat e shfaqura si •••• mbajnë sekretin e tyre të ruajtur; zëvendëso një vlerë për ta rrotulluar. Ndryshimi i URL-së kërkon përsëri të gjitha vlerat",
       "nameRequired": "Futni një emër serveri",
       "nameInvalid": "Emri mund të përdorë vetëm shkronja ASCII, numra, nënvizime dhe viza, deri në 100 karaktere",
       "commandRequired": "Futni një komandë",
@@ -3916,6 +3942,10 @@
   "credits": {
     "title": "Bli kredite",
     "description": "Kreditet janë një blerje e njëhershme që shtohet në bilancin tuaj Kilo për të drejtuar seanca kodimi me AI në Kilo App. Dyqani të faturova llogarinë dhe kreditet shtohen pasi dyqani konfirmon pagesën.",
+    "nextExpiry": "Kredite në vlerën {{amount}} skadojnë më {{date}} (UTC). Kreditet që skadojnë më herët përdoren të parat.",
+    "appStoreExpiry": "Kreditet e blera përmes App Store nuk skadojnë.",
+    "playOneYearExpiry": "Këto kredite skadojnë një vit kalendarik pas blerjes.",
+    "playNonexpiring": "Këto kredite nuk skadojnë.",
     "packLabel": "Shto {{amount}} në kredite",
     "priceUnavailable": "Çmimi nuk disponohet",
     "purchased": "Kreditet u shtuan në bilancin tuaj.",
@@ -3956,11 +3986,13 @@
       "namePlaceholder": "Gabime, Ide, Publikime…",
       "emoji": "Emoji",
       "mode": "Mënyra",
-      "defaultsHint": "Seancat e nisura nga kjo listë përdorin këto parazgjedhje."
+      "defaultsHint": "Seancat e nisura nga kjo listë përdorin këto parazgjedhje.",
+      "saveFailed": "Nuk u ruajt lista. Kontrollo lidhjen dhe provo përsëri."
     },
     "list": {
       "addPlaceholder": "Shto një detyrë",
       "add": "Shto detyrë",
+      "addFailed": "Nuk u shtua detyra. Kontrollo lidhjen dhe provo përsëri.",
       "empty": "Ende pa detyra",
       "setDefaults": "Cakto depon, mënyrën dhe modelin",
       "completed_one": "Përfunduar ({{count}})",
@@ -3997,7 +4029,9 @@
       "startNewSession": "Nis sesion të ri",
       "startNewSessionHint": "Shtyp gjatë për të nisur një sesion të ri.",
       "linkSession": "Lidh seancën",
-      "linkFailed": "Seanca nuk u lidh me detyrën"
+      "linkFailed": "Seanca nuk u lidh me detyrën",
+      "moveToAnotherTodo": "Zhvendos në një detyrë tjetër",
+      "startRefreshFailed": "Seanca nisi, por kjo listë nuk u përditësua."
     },
     "linkSession": {
       "title": "Lidh një seancë",
@@ -4006,6 +4040,7 @@
     },
     "upNext": "Në vazhdim",
     "sessionTodo": "Detyrë: {{title}}",
+    "openTodoHint": "Hap detyrën.",
     "linkToTodo": "Lidh me detyrën",
     "candidates": {
       "empty": "Pa detyra të hapura"

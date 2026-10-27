@@ -44,8 +44,10 @@ report unfinished events and DLQ arrivals rather than dropping them from totals.
 In staging, every invocation of the shared `saveUsageRelatedDataLocally`
 persistence boundary attempts to emit `usage_record_completion`. Both Frankfurt
 gateway direct writes and the HTTP writer called by the consumer use this boundary.
-Production samples recorded/duplicate completions uniformly at 1%, while null/error
-completions remain at 100%. See the [deployment sampling rules](README.md#observability),
+Production logs recorded/duplicate completions at 100% by default,
+configurable with the server-only `USAGE_RECORD_COMPLETION_SAMPLE_RATE` (`0`–`1`)
+and a redeploy of the gateway and HTTP writer apps. Null/error completions remain
+at 100%. See the [deployment sampling rules](README.md#observability),
 and confirm hosted log retention, ingestion and sampling cover the test window.
 
 | Field | Meaning |
@@ -53,7 +55,7 @@ and confirm hosted log retention, ingestion and sampling cover the test window.
 | `usage_id` | Correlates a delivery with consumer/gateway logs; repeated attempts share the ID |
 | `outcome` | `recorded`, `duplicate`, `not_recorded` (null result), or `error` (thrown exception) |
 | `level` | `info` for recorded/duplicate; `warn` for null/exception |
-| `sample_rate` | Application selection probability: `1` for full logging, `0.01` for production recorded/duplicate completions |
+| `sample_rate` | Application selection probability: `1` for full logging; configured production recorded/duplicate probability, default `1` |
 | `duration_ms` | Rounded monotonic elapsed time around the shared persistence operation, including first-usage checks, the write and awaited follow-up work; excludes caller HTTP/queue waiting |
 | `event_age_ms` | Age of the event at operation completion, clamped at zero; omitted if timestamp cannot be parsed |
 | `execution_region` | Function region from `VERCEL_REGION`, restricted to `fra1`, `sfo1`, or `unknown` |
@@ -69,7 +71,8 @@ and persistence regions, grouping by `entrypoint` and `writer_caller` and separa
 recorded and duplicate outcomes. In a full staging run, count attempts by outcome
 and completed **distinct** usage IDs with recorded/duplicate outcomes; count null
 and exception outcomes separately. For sampled production data, estimate attempt
-counts with `sum(1 / sample_rate)` per outcome; do not scale distinct-ID counts
+counts with `sum(1 / sample_rate)` per outcome when the rate is nonzero; no success
+estimate is available with success sampling disabled. Do not scale distinct-ID counts
 or treat estimates as exact accounting. This weight covers application sampling
 only, not platform sampling or missing logs. Keep success latency percentiles
 within comparable groups with the same sampling rate; mixing fully logged failures
@@ -87,13 +90,27 @@ Consumer `usage_ingest_processing` events additionally expose:
 
 - `writer_duration_ms`: the HTTP writer attempt, including response validation;
   omitted when the writer is skipped.
-- `queue_wait_ms`: age of the platform queue message at the start of handling that
-  message, before its writer attempt, including backlog and redelivery delay.
-  Both environments use `max_batch_size: 1`; waiting behind earlier messages in
-  the same batch would apply only if batching were enabled.
+- `queue_wait_ms`: age of the platform queue message at the start of processing
+  that individual message, before its writer attempt. It includes time before
+  invocation and any wait for a processing slot within the delivered batch,
+  including backlog and redelivery delay; it is not a pure queue-delivery metric.
+  Staging uses batch size 2 and parallelism 2, allowing two messages to start
+  concurrently. `USAGE_INGEST_PARALLELISM=1` keeps batch size 2 but processes it
+  serially, so the second message's value includes waiting for the first message
+  to settle. Production keeps batch size 1 and receipt mode by default; receipt
+  logs are not processing/persistence completions.
 - `event_age_ms`: creation through consumer outcome logging, including writer wait.
 - `delivery_attempts`, categorical `reason`, and `queue_action`: diagnose retries;
   `retry` does not confirm DLQ storage.
+
+Record the deployed batch size, processing parallelism, invocation cap and mode
+with each run. Staging cap 200 with parallelism 2 allows at most 400 concurrent
+writer calls; parallelism 1 allows at most 200 and does not restore a batch-1
+baseline. Changing these Worker variables/config settings requires redeployment.
+Timeout 0 does not guarantee two-message batches. With main's diagnostics enabled
+(`USAGE_INGEST_DIAGNOSTICS=all` in staging), the shared handler-entry timestamp
+measures invocation entry, while `queue_wait_ms` still measures age at each
+message's own processing start; keep those boundaries separate.
 
 Use the queue's backlog and DLQ monitoring to observe growth, exhaustion and drain
 time. A quiet database alongside an increasing backlog is not equivalent throughput.

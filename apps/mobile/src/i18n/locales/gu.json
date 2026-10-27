@@ -53,6 +53,7 @@
     "connected": "જોડાયેલું",
     "couldNotLoadModels": "મોડેલ લોડ કરી શકાયા નહીં.",
     "couldNotLoadRepositories": "રિપોઝિટરીઓ લોડ કરી શકાઈ નહીં.",
+    "noRepositoriesFound": "કોઈ રિપોઝિટરી મળી નહીં",
     "critical": "ગંભીર",
     "delete": "કાઢી નાખો",
     "deleted": "કાઢી નાખેલી",
@@ -87,6 +88,7 @@
     "connect": "જોડો",
     "connectBitbucket": "Bitbucket જોડો",
     "connectGitlab": "GitLab જોડો",
+    "connectProvider": "સેવા પ્રદાતા જોડો",
     "contentTruncated": "સામગ્રીનો અમુક ભાગ જ બતાવ્યો છે",
     "copyLink": "લિંક કૉપિ કરો",
     "couldNotLoadOrganizations": "સંસ્થાઓ લોડ કરી શકાઈ નહીં.",
@@ -145,7 +147,8 @@
     "agent": "એજન્ટ",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "ફેરફારો"
+    "changes": "ફેરફારો",
+    "organizationTrialEnded": "સંસ્થાનો ટ્રાયલ સમાપ્ત થઈ ગયો છે અને તેની પાસે કોઈ સક્રિય પ્લાન નથી. સંસ્થાનો માલિક kilo.ai પર બિલિંગ અપડેટ કરી શકે છે, પછી ફરીથી પ્રયાસ કરો."
   },
   "language": {
     "restarting": "ભાષા લાગુ કરવા ઍપ ફરી શરૂ થઈ રહી છે",
@@ -224,7 +227,6 @@
     "hideBalance": "બેલેન્સ છુપાવો",
     "showBalance": "બેલેન્સ બતાવો",
     "balanceHidden": "બેલેન્સ છુપાયેલ છે",
-    "bonusCreditsExpiring": "{{amount}}ના ક્રેડિટની મુદત {{date}}ના રોજ પૂરી થાય છે.",
     "signOutTitle": "સાઇન આઉટ કરવું છે?",
     "signOutMessage": "તમારા વર્કસ્પેસનો ઉપયોગ કરવા માટે તમારે ફરી સાઇન ઇન કરવું પડશે.",
     "deleteAccountTitle": "એકાઉન્ટ કાઢી નાખવું છે?",
@@ -1407,7 +1409,6 @@
       "gitlabNoRepositoriesDescription": "તમારે GitLab પર વધુ જૂથો અથવા પ્રોજેક્ટની ઍક્સેસ આપવાની જરૂર પડી શકે છે.",
       "installGithubApp": "રિપોઝિટરીઓ પર GitHub ઍપ ઇન્સ્ટોલ કરો",
       "installGithubAppDescription": "જે રિપોઝિટરીઓની સમીક્ષા કરાવવી હોય તેમની ઍક્સેસ Kilo GitHub ઍપને આપો.",
-      "noRepositoriesFound": "કોઈ રિપોઝિટરી મળી નહીં",
       "repositoryAccess": "રિપોઝિટરીની ઍક્સેસ"
     },
     "style": {
@@ -1482,6 +1483,22 @@
       "loadingProposals": "દરખાસ્તો લોડ થઈ રહી છે",
       "couldNotLoadProposals": "દરખાસ્તો લોડ કરી શકાઈ નહીં.",
       "noProposals": "કોઈ દરખાસ્ત નથી",
+      "proposalDetails": "દરખાસ્તની વિગતો",
+      "proposalTitle": "દરખાસ્તનું શીર્ષક",
+      "rationale": "કારણ",
+      "saveFirst": "પુલ રિક્વેસ્ટ ખોલતાં પહેલાં તમારા ફેરફારો સાચવો.",
+      "proposalSaved": "દરખાસ્ત સાચવાઈ",
+      "proposalDismissed": "દરખાસ્ત ફગાવાઈ",
+      "dismissProposalTitle": "દરખાસ્ત ફગાવવી છે?",
+      "dismissProposalMessage": "આ દરખાસ્ત સક્રિય સૂચિમાંથી દૂર થઈ જશે અને તેને પુનઃસ્થાપિત કરી શકાશે નહીં.",
+      "prOpened": "REVIEW.md માટે પુલ રિક્વેસ્ટ ખોલાઈ",
+      "alreadyPresent": "માર્ગદર્શિકા REVIEW.md માં પહેલેથી જ છે",
+      "status": {
+        "edited": "સંપાદિત",
+        "opening_change_request": "PR ખોલાઈ રહી છે",
+        "change_request_failed": "PR ખોલવામાં નિષ્ફળતા",
+        "superseded": "પહેલેથી હાજર"
+      },
       "noProposalsDescription": "Kilo મેન્ટેનરના જવાબોનું વિશ્લેષણ કરે પછી સમીક્ષા મેમરીની દરખાસ્તો અહીં દેખાશે."
     },
     "manualReview": {
@@ -1489,7 +1506,6 @@
       "invalidUrl": "પુલ રિક્વેસ્ટનું માન્ય URL દાખલ કરો.",
       "couldNotCheckProviderStatus": "સેવા પ્રદાતાની સ્થિતિ ચકાસી શકાઈ નહીં.",
       "couldNotLoadProviders": "તમે જોડેલા સેવા પ્રદાતાઓની માહિતી લોડ કરી શકાઈ નહીં. કૃપા કરીને ફરી પ્રયાસ કરો.",
-      "connectProvider": "સેવા પ્રદાતા જોડો",
       "connectProviderDescription": "પુલ રિક્વેસ્ટની સમીક્ષા જાતે શરૂ કરવા GitHub જોડો.",
       "pullRequestUrl": "પુલ રિક્વેસ્ટનું URL",
       "instructions": "સૂચનાઓ (વૈકલ્પિક)",
@@ -1617,8 +1633,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "કોઈ ફિલ્ટર ઉપલબ્ધ નથી",
-      "noFiltersDescription": "પાછા જાઓ અને તારણોની યાદીમાંથી ફિલ્ટર ફરી ખોલો.",
       "title": "તારણો માટેના ફિલ્ટર",
       "reset": "રીસેટ કરો",
       "severity": "ગંભીરતા",
@@ -2172,8 +2186,8 @@
       "title": "સત્ર",
       "copyErrorDetails": "ભૂલની વિગતોની નકલ કરો",
       "backToSessions": "સત્રો પર પાછા જાઓ",
-      "follow": "લૉક સ્ક્રીન પર ફૉલો કરો",
-      "unfollow": "લૉક સ્ક્રીન પર ફૉલો કરવાનું બંધ કરો",
+      "follow": "સત્ર ફૉલો કરો",
+      "unfollow": "સત્ર ફૉલો કરવાનું બંધ કરો",
       "couldNotLoad": "સત્ર લોડ કરી શકાયું નહીં.",
       "failedToLoadDetails": "સત્રની વિગતો લોડ કરી શકાઈ નહીં.",
       "failedToStopExecution": "ચાલી રહેલું કાર્ય રોકી શકાયું નહીં.",
@@ -2577,7 +2591,9 @@
       "retrying": "ફરી પ્રયાસ થઈ રહ્યો છે…",
       "retryDeny": "નકારવાનો ફરી પ્રયાસ કરો",
       "retryAllowOnce": "એકવાર મંજૂરી આપવાનો ફરી પ્રયાસ કરો",
-      "retryAlwaysAllow": "હંમેશા મંજૂરી આપવાનો ફરી પ્રયાસ કરો"
+      "retryAlwaysAllow": "હંમેશા મંજૂરી આપવાનો ફરી પ્રયાસ કરો",
+      "unreadableTitle": "પરવાનગી વિનંતી વાંચી શકાઈ નથી",
+      "unreadableBody": "એજન્ટ પરવાનગીના નિર્ણયની રાહમાં છે જે આ એપ બતાવી શકતી નથી. ચાલુ રાખવા માટે એપ અથવા CLI અપડેટ કરો, અથવા CLI માં વિનંતીનો જવાબ આપો."
     },
     "questionCard": {
       "title": "એજન્ટને તમારો જવાબ જોઈએ છે",
@@ -2953,7 +2969,6 @@
   },
   "voiceInput": {
     "listening": "સાંભળી રહ્યા છીએ...",
-    "staysOff": "તમે અવાજને ઑનલાઇન લખાણમાં ફેરવવાની મંજૂરી ન આપો ત્યાં સુધી વૉઇસ ઇનપુટ બંધ રહેશે.",
     "onlineTitle": "અવાજ પર ઑનલાઇન પ્રક્રિયા થાય છે",
     "onlineMessage": "આ ઉપકરણ અવાજને ઑફલાઇન લખાણમાં ફેરવી શકતું નથી. તમારું રેકોર્ડિંગ લખાણમાં ફેરવવા {{provider}} ને મોકલાય છે. Kilo અવાજનો સંગ્રહ કરતું નથી.",
     "allow": "મંજૂરી આપો",
@@ -2970,8 +2985,9 @@
     "unavailableDevice": "આ ઉપકરણ પર વૉઇસ ઇનપુટ ઉપલબ્ધ નથી.",
     "unavailableLanguage": "આ ઉપકરણની ભાષા માટે વૉઇસ ઇનપુટ ઉપલબ્ધ નથી.",
     "languageNotInstalledTitle": "{{language}} માટે વૉઇસ ઇનપુટ હજી તૈયાર નથી",
-    "languageNotInstalledMessage": "{{language}} માટેની ઓફલાઇન સ્પીચ ફાઇલો આ ફોન પર ઇન્સ્ટોલ કરેલી નથી. તેમને ડાઉનલોડ કરો, પછી વૉઇસ ઇનપુટ ફરી અજમાવો.",
+    "languageNotInstalledMessage": "{{language}} ની ઓફલાઇન સ્પીચ ફાઇલો ઇન્સ્ટોલ થયેલી નથી અને ઑનલાઇન લખાણ બંધ છે. વૉઇસ ઇનપુટ વાપરવા ફાઇલો ડાઉનલોડ કરો અથવા ઑનલાઇન લખાણ ફરી ચાલુ કરો.",
     "downloadOfflineModel": "ડાઉનલોડ",
+    "useOnlineTranscription": "ઑનલાઇન લખાણ મંજૂર કરો",
     "offlineModelDownloadScheduled": "ઓફલાઇન સ્પીચ ફાઇલો બેકગ્રાઉન્ડમાં ડાઉનલોડ થશે. પછી વૉઇસ ઇનપુટ ફરી અજમાવો.",
     "listeningStopped": "સાંભળવાનું બંધ થયું.",
     "transcribing": "લખાણમાં ફેરવી રહ્યાં છીએ...",
@@ -3145,7 +3161,7 @@
     "creditActivity": {
       "emptyDescription": "આ સંસ્થાની ખરીદી, વપરાશ અને ક્રેડિટમાં થતા ફેરફારો અહીં દેખાશે.",
       "emptyTitle": "ક્રેડિટનો કોઈ વ્યવહાર નથી",
-      "expires": "{{date}}ના રોજ મુદત પૂરી થાય છે",
+      "expiresUtc": "{{date}} (UTC)ના રોજ મુદત પૂરી થાય છે",
       "title": "ક્રેડિટના વ્યવહારો",
       "transactionFallback": "ક્રેડિટનો વ્યવહાર",
       "category": {
@@ -3168,7 +3184,9 @@
       "sendInvite": "આમંત્રણ મોકલો",
       "title": "સભ્યને આમંત્રિત કરો",
       "alreadyInvited": "તેઓ પહેલેથી આમંત્રિત છે અથવા પહેલેથી સભ્ય છે.",
-      "sendError": "આમંત્રણ મોકલી શકાયું નહીં."
+      "sendError": "આમંત્રણ મોકલી શકાયું નહીં.",
+      "pendingInvitation": "આ ઇમેઇલ પર પહેલેથી જ એક આમંત્રણ બાકી છે.",
+      "alreadyMember": "આ વ્યક્તિ પહેલેથી જ આ સંસ્થાના સભ્ય છે."
     },
     "invoices": {
       "downloadA11y": "ઇનવોઇસ {{number}} ડાઉનલોડ કરો",
@@ -3238,7 +3256,12 @@
       "pendingInvitations": "બાકી આમંત્રણો",
       "resendInvite": "આમંત્રણ ફરી મોકલો",
       "shareInviteLink": "આમંત્રણની લિંક શેર કરો",
-      "resendInviteError": "આમંત્રણ ફરી મોકલી શકાયું નહીં."
+      "resendInviteError": "આમંત્રણ ફરી મોકલી શકાયું નહીં.",
+      "inviteNotResendable": "આ આમંત્રણ હવે ફરી મોકલી શકાતું નથી.",
+      "ownerAuthority": "ફક્ત સંસ્થાના માલિક જ માલિકોનું સંચાલન કરી શકે છે.",
+      "ownRoleChange": "તમે તમારી પોતાની ભૂમિકા બદલી શકતા નથી.",
+      "inviteExpired": "આ આમંત્રણની મુદત પૂરી થઈ ગઈ છે.",
+      "inviteAccepted": "આ આમંત્રણ પહેલેથી જ સ્વીકારવામાં આવ્યું છે."
     },
     "usageStats": {
       "inputTokens": "ઇનપુટ ટોકન",
@@ -3351,7 +3374,7 @@
     "activityKitDisabledBody": "લૉક સ્ક્રીન પર સક્રિય એજન્ટો જોવા માટે સેટિંગ્સમાં લાઇવ પ્રવૃત્તિઓ ચાલુ કરો.",
     "openSession": "ખોલો",
     "finished": "સમાપ્ત",
-    "followFailed": "આ એજન્ટને લૉક સ્ક્રીન પર બતાવી શકાયો નથી.",
+    "followFailed": "આ સત્રને ફૉલો કરી શકાયું નથી.",
     "approveFailed": "મંજૂર કરી શકાયું નહીં. ફરી પ્રયાસ કરવા $t(common.approve) પર ટૅપ કરો.",
     "checked": "ચકાસ્યું",
     "lastKnown": "છેલ્લે જાણીતું",
@@ -3725,6 +3748,7 @@
     "title": "પ્રોફાઇલ્સ",
     "entrySubtitle": "સમગ્ર સત્રોમાં પર્યાવરણ સેટિંગ્સનો ફરીથી ઉપયોગ કરો",
     "newProfile": "નવી પ્રોફાઇલ",
+    "openHint": "પ્રોફાઇલ ખોલે છે",
     "emptyTitle": "હજુ સુધી કોઈ પ્રોફાઇલ નથી",
     "emptyDescription": "સમગ્ર સત્રોમાં પર્યાવરણ ચલો, સેટઅપ કમાન્ડ અને કૌશલ્યોનો ફરીથી ઉપયોગ કરવા માટે પ્રોફાઇલ બનાવો.",
     "loadFailed": "પ્રોફાઇલ લોડ કરી શકાઈ નથી",
@@ -3818,6 +3842,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "•••• તરીકે દર્શાવેલ મૂલ્યો તેમની સંગ્રહિત ગુપ્તતા જાળવી રાખે છે; તેને ફેરવવા માટે મૂલ્ય બદલો. કમાન્ડ લાઇન બદલાય ત્યારે દરેક મૂલ્ય ફરીથી જરૂરી છે",
+      "headersHint": "•••• તરીકે દર્શાવેલ મૂલ્યો તેમની સંગ્રહિત ગુપ્તતા જાળવી રાખે છે; તેને ફેરવવા માટે મૂલ્ય બદલો. URL બદલાય ત્યારે દરેક મૂલ્ય ફરીથી જરૂરી છે",
       "nameRequired": "સર્વર નામ દાખલ કરો",
       "nameInvalid": "નામ માત્ર ASCII અક્ષરો, સંખ્યાઓ, અન્ડરસ્કોર અને ડેશનો ઉપયોગ કરી શકે છે, વધુમાં વધુ 100 અક્ષરો",
       "commandRequired": "આદેશ દાખલ કરો",
@@ -3916,6 +3942,10 @@
   "credits": {
     "title": "ક્રેડિટ ખરીદો",
     "description": "ક્રેડિટ એ Kilo એપમાં AI કોડિંગ સત્રો ચલાવવા માટે તમારા Kilo બેલેન્સમાં ઉમેરાતી એકવારની ખરીદી છે. સ્ટોર તમારા ખાતામાંથી ચાર્જ લે છે અને સ્ટોર ચુકવણીની પુષ્ટિ કર્યા પછી ક્રેડિટ ઉમેરાય છે.",
+    "nextExpiry": "{{amount}}ના ક્રેડિટની મુદત {{date}} (UTC)ના રોજ પૂરી થાય છે. સૌથી વહેલી મુદત પૂરી થતા ક્રેડિટ પહેલા વપરાય છે.",
+    "appStoreExpiry": "App Store દ્વારા ખરીદેલા ક્રેડિટની મુદત પૂરી થતી નથી.",
+    "playOneYearExpiry": "આ ક્રેડિટની મુદત ખરીદીના એક કેલેન્ડર વર્ષ પછી પૂરી થાય છે.",
+    "playNonexpiring": "આ ક્રેડિટની મુદત પૂરી થતી નથી.",
     "packLabel": "{{amount}} ના ક્રેડિટ ઉમેરો",
     "priceUnavailable": "કિંમત ઉપલબ્ધ નથી",
     "purchased": "તમારા બેલેન્સમાં ક્રેડિટ ઉમેરાઈ છે.",
@@ -3956,11 +3986,13 @@
       "namePlaceholder": "બગ્સ, વિચારો, રિલીઝ…",
       "emoji": "ઇમોજી",
       "mode": "મોડ",
-      "defaultsHint": "આ યાદીમાંથી શરૂ થતાં સત્રો આ મૂળભૂત સેટિંગ્સ વાપરે છે."
+      "defaultsHint": "આ યાદીમાંથી શરૂ થતાં સત્રો આ મૂળભૂત સેટિંગ્સ વાપરે છે.",
+      "saveFailed": "યાદી સાચવી શકાઈ નહીં. તમારું કનેક્શન ચેક કરો અને ફરી પ્રયાસ કરો."
     },
     "list": {
       "addPlaceholder": "કાર્ય ઉમેરો",
       "add": "કાર્ય ઉમેરો",
+      "addFailed": "કાર્ય ઉમેરી શકાયું નહીં. તમારું કનેક્શન ચેક કરો અને ફરી પ્રયાસ કરો.",
       "empty": "હજુ કોઈ કાર્ય નથી",
       "setDefaults": "રિપોઝિટરી, મોડ અને મોડલ સેટ કરો",
       "completed_one": "પૂર્ણ ({{count}})",
@@ -3997,7 +4029,9 @@
       "startNewSession": "નવું સેશન શરૂ કરો",
       "startNewSessionHint": "નવું સેશન શરૂ કરવા લાંબુ દબાવો.",
       "linkSession": "સત્ર જોડો",
-      "linkFailed": "સત્રને કાર્ય સાથે જોડી શકાયું નહીં"
+      "linkFailed": "સત્રને કાર્ય સાથે જોડી શકાયું નહીં",
+      "moveToAnotherTodo": "અન્ય કાર્ય પર ખસેડો",
+      "startRefreshFailed": "સત્ર શરૂ થયું, પરંતુ આ યાદી અપડેટ થઈ નહીં."
     },
     "linkSession": {
       "title": "સત્ર જોડો",
@@ -4006,6 +4040,7 @@
     },
     "upNext": "આગળ",
     "sessionTodo": "કાર્ય: {{title}}",
+    "openTodoHint": "કાર્ય ખોલે છે.",
     "linkToTodo": "કાર્ય સાથે જોડો",
     "candidates": {
       "empty": "કોઈ ખુલ્લું કાર્ય નથી"

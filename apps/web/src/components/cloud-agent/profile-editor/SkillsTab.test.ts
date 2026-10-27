@@ -21,9 +21,14 @@ const { SkillsTab, skillsShSourceError, skillsShSubmitError } =
 
 Object.assign(globalThis, { React });
 
-function renderSkillsTab(skills: ProfileSkill[]): string {
+function renderSkillsTab(skills: ProfileSkill[], readOnly = false): string {
   return renderToStaticMarkup(
-    createElement(SkillsTab, { profileId: 'profile-1', organizationId: undefined, skills })
+    createElement(SkillsTab, {
+      profileId: 'profile-1',
+      organizationId: undefined,
+      skills,
+      readOnly,
+    })
   );
 }
 
@@ -85,6 +90,16 @@ describe('SkillsTab', () => {
     expect(markup).toContain('href="https://skills.sh/anthropics/skills/frontend-design"');
     expect(markup).toContain('skills.sh/anthropics/skills/frontend-design');
     expect(markup).toContain('aria-label="Disable skill frontend-design"');
+  });
+
+  it('hides add controls and instructions for read-only profiles', () => {
+    const markup = renderSkillsTab([], true);
+
+    expect(markup).toContain('No skills yet.');
+    expect(markup).not.toContain('Add from skills.sh');
+    expect(markup).not.toContain('Add skill manually');
+    expect(markup).not.toContain('drop a skill folder');
+    expect(markup).not.toContain('Drag and drop');
   });
 
   it('does not offer manual editing for remote skills', () => {

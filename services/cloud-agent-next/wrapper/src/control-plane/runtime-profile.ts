@@ -57,6 +57,8 @@ async function stageRuntimeProfile(
     await writeRuntimeSkills(staging, profile.runtimeSkills, options);
     const stagedSkills = path.join(staging, '.kilocode', 'skills');
     await fs.mkdir(stagedSkills, { recursive: true });
+    // Write config before the skills swap so a failed write leaves the previous skills live.
+    await writeRuntimeProfileConfig(home, profile);
     const skills = path.join(home, '.kilocode', 'skills');
     const backup = path.join(staging, 'previous-skills');
     await fs.mkdir(path.dirname(skills), { recursive: true });
@@ -84,7 +86,6 @@ async function stageRuntimeProfile(
       }
       throw error;
     }
-    await writeRuntimeProfileConfig(home, profile);
   } finally {
     if (!preserveBackup) await fs.rm(staging, { recursive: true, force: true });
   }

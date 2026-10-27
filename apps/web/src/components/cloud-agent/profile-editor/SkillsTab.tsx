@@ -132,11 +132,13 @@ export function SkillsTab({ profileId, organizationId, skills, readOnly = false 
 
       {skills.length === 0 && !isAdding && !importing && (
         <p className="text-muted-foreground py-2 text-center text-sm">
-          No skills yet. Add one from skills.sh below, or drop a skill folder .zip here.
+          {readOnly
+            ? 'No skills yet.'
+            : 'No skills yet. Add one from skills.sh below, or drop a skill folder .zip here.'}
         </p>
       )}
 
-      <SkillsShForm profileId={profileId} organizationId={organizationId} />
+      {!readOnly && <SkillsShForm profileId={profileId} organizationId={organizationId} />}
 
       {isAdding ? (
         <SkillForm
@@ -162,11 +164,13 @@ export function SkillsTab({ profileId, organizationId, skills, readOnly = false 
         )
       )}
 
-      <p className="text-muted-foreground text-center text-xs">
-        Drag and drop a skill folder{' '}
-        <code className="bg-muted rounded px-1 py-0.5 font-mono">.zip</code> here to add it as a new
-        skill. Up to {MAX_COMPANION_FILES} companion files per skill.
-      </p>
+      {!readOnly && (
+        <p className="text-muted-foreground text-center text-xs">
+          Drag and drop a skill folder{' '}
+          <code className="bg-muted rounded px-1 py-0.5 font-mono">.zip</code> here to add it as a
+          new skill. Up to {MAX_COMPANION_FILES} companion files per skill.
+        </p>
+      )}
 
       {/* Spacer makes the rest of the tab a drop target too. */}
       <div className="flex-1" />

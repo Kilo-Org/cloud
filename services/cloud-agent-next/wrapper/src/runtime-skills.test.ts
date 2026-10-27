@@ -9,6 +9,15 @@ import type { ExecResult, ProcessOptions } from './utils.js';
 
 const success: ExecResult = { exitCode: 0, stdout: '', stderr: '' };
 
+async function captureRejection(promise: Promise<unknown>): Promise<unknown> {
+  return promise.then(
+    () => {
+      throw new Error('Expected operation to reject');
+    },
+    (error: unknown) => error
+  );
+}
+
 async function installFixture(options?: ProcessOptions): Promise<void> {
   const home = options?.env?.HOME;
   if (!home) throw new Error('Missing isolated installation home');
@@ -57,12 +66,12 @@ describe('skills.sh container installation', () => {
             runtimeSkills: [{ name: 'next', rawMarkdown: 'Next' }],
           });
           if (rollbackFails) {
-            expect(replacing).rejects.toMatchObject({
+            expect(await captureRejection(replacing)).toMatchObject({
               errors: [replacementError, rollbackError],
               message: expect.stringContaining('backup preserved at'),
             });
           } else {
-            expect(replacing).rejects.toBe(replacementError);
+            expect(await captureRejection(replacing)).toBe(replacementError);
           }
         } finally {
           renameSpy.mockRestore();
@@ -80,6 +89,32 @@ describe('skills.sh container installation', () => {
       }
     }
   );
+
+  it('keeps previous skills when writing the profile config fails', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-skills-config-'));
+    try {
+      await materializeRuntimeProfile(home, {
+        runtimeSkills: [{ name: 'previous', rawMarkdown: 'Keep me' }],
+      });
+      const config = path.join(home, '.config', 'kilo', 'profile.json');
+      await fs.mkdir(config, { recursive: true });
+      expect(
+        await captureRejection(
+          materializeRuntimeProfile(home, {
+            runtimeSkills: [{ name: 'next', rawMarkdown: 'Next' }],
+            kiloCommands: [{ name: 'review', template: 'Review' }],
+          })
+        )
+      ).toMatchObject({ code: 'EISDIR' });
+      expect(await fs.readFile(path.join(home, '.kilocode/skills/previous/SKILL.md'), 'utf8')).toBe(
+        'Keep me'
+      );
+      expect(existsSync(path.join(home, '.kilocode/skills/next'))).toBe(false);
+      expect((await fs.readdir(home)).some(name => name.startsWith('.profile-'))).toBe(false);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
 
   it('preserves live skills until installation succeeds, then replaces them with the full bundle', async () => {
     const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-skills-test-'));
@@ -180,17 +215,20 @@ describe('skills.sh container installation', () => {
     const progress: string[] = [];
     try {
       expect(
-        writeRuntimeSkills(home, [{ name: 'find-skills', source: 'vercel-labs/skills' }], {
-          onProgress: detail => progress.push(detail),
-          run: async (_command, _args, options) => {
-            attempts++;
-            staging = options?.cwd;
-            return { ...success, exitCode: 1, stderr: 'do-not-expose-this-output' };
-          },
-        })
-      ).rejects.toThrow(
-        'Failed to install skills.sh skill vercel-labs/skills@find-skills: termination nonzero exit, exit code 1'
-      );
+        await captureRejection(
+          writeRuntimeSkills(home, [{ name: 'find-skills', source: 'vercel-labs/skills' }], {
+            onProgress: detail => progress.push(detail),
+            run: async (_command, _args, options) => {
+              attempts++;
+              staging = options?.cwd;
+              return { ...success, exitCode: 1, stderr: 'do-not-expose-this-output' };
+            },
+          })
+        )
+      ).toMatchObject({
+        message:
+          'Failed to install skills.sh skill vercel-labs/skills@find-skills: termination nonzero exit, exit code 1',
+      });
       expect(attempts).toBe(2);
       expect(progress.at(-1)).toBe(
         'Failed to install skills.sh skill vercel-labs/skills@find-skills'
@@ -206,13 +244,15 @@ describe('skills.sh container installation', () => {
     let attempts = 0;
     try {
       expect(
-        writeRuntimeSkills(home, [{ name: 'find-skills', source: 'vercel-labs/skills' }], {
-          run: async () => {
-            attempts++;
-            return success;
-          },
-        })
-      ).rejects.toThrow('did not install a SKILL.md');
+        await captureRejection(
+          writeRuntimeSkills(home, [{ name: 'find-skills', source: 'vercel-labs/skills' }], {
+            run: async () => {
+              attempts++;
+              return success;
+            },
+          })
+        )
+      ).toMatchObject({ message: expect.stringContaining('did not install a SKILL.md') });
       expect(attempts).toBe(1);
     } finally {
       await fs.rm(home, { recursive: true, force: true });
@@ -225,15 +265,17 @@ describe('skills.sh container installation', () => {
     let attempts = 0;
     try {
       expect(
-        writeRuntimeSkills(home, [{ name: 'find-skills', source: 'vercel-labs/skills' }], {
-          signal: controller.signal,
-          run: async () => {
-            attempts++;
-            controller.abort(new Error('session stopped'));
-            return success;
-          },
-        })
-      ).rejects.toThrow('session stopped');
+        await captureRejection(
+          writeRuntimeSkills(home, [{ name: 'find-skills', source: 'vercel-labs/skills' }], {
+            signal: controller.signal,
+            run: async () => {
+              attempts++;
+              controller.abort(new Error('session stopped'));
+              return success;
+            },
+          })
+        )
+      ).toMatchObject({ message: 'session stopped' });
       expect(attempts).toBe(1);
     } finally {
       await fs.rm(home, { recursive: true, force: true });
@@ -308,21 +350,23 @@ describe('skills.sh container installation', () => {
     const sources: string[] = [];
     try {
       expect(
-        writeRuntimeSkills(
-          home,
-          [
-            { name: 'find-skills', source: 'vercel-labs/skills' },
-            { name: 'find-skills', source: 'acme/skills' },
-          ],
-          {
-            run: async (_command, args, options) => {
-              sources.push(args[3]);
-              if (sources.length === 1) await installFixture(options);
-              return success;
-            },
-          }
+        await captureRejection(
+          writeRuntimeSkills(
+            home,
+            [
+              { name: 'find-skills', source: 'vercel-labs/skills' },
+              { name: 'find-skills', source: 'acme/skills' },
+            ],
+            {
+              run: async (_command, args, options) => {
+                sources.push(args[3]);
+                if (sources.length === 1) await installFixture(options);
+                return success;
+              },
+            }
+          )
         )
-      ).rejects.toThrow('did not install a SKILL.md');
+      ).toMatchObject({ message: expect.stringContaining('did not install a SKILL.md') });
       expect(sources).toEqual(['vercel-labs/skills', 'acme/skills']);
     } finally {
       await fs.rm(home, { recursive: true, force: true });
@@ -336,8 +380,10 @@ describe('skills.sh container installation', () => {
     const timeout = spyOn(AbortSignal, 'timeout').mockReturnValue(deadline.signal);
     try {
       expect(
-        writeRuntimeSkills(home, [{ name: 'find-skills', rawMarkdown: '# Find skills' }])
-      ).rejects.toMatchObject({ subtype: 'setup_command_timeout' });
+        await captureRejection(
+          writeRuntimeSkills(home, [{ name: 'find-skills', rawMarkdown: '# Find skills' }])
+        )
+      ).toMatchObject({ subtype: 'setup_command_timeout' });
       expect(existsSync(path.join(home, '.kilocode/skills/find-skills'))).toBe(false);
     } finally {
       timeout.mockRestore();
@@ -354,11 +400,13 @@ describe('skills.sh container installation', () => {
     });
     try {
       expect(
-        writeRuntimeSkills(home, [
-          { name: 'find-skills', rawMarkdown: '# Find skills' },
-          { name: 'code-review', rawMarkdown: '# Code review' },
-        ])
-      ).rejects.toMatchObject({ subtype: 'setup_command_timeout' });
+        await captureRejection(
+          writeRuntimeSkills(home, [
+            { name: 'find-skills', rawMarkdown: '# Find skills' },
+            { name: 'code-review', rawMarkdown: '# Code review' },
+          ])
+        )
+      ).toMatchObject({ subtype: 'setup_command_timeout' });
       expect(writeFile).toHaveBeenCalledTimes(1);
     } finally {
       writeFile.mockRestore();
@@ -376,8 +424,10 @@ describe('skills.sh container installation', () => {
     });
     try {
       expect(
-        writeRuntimeSkills(home, [{ name: 'find-skills', rawMarkdown: '# Find skills' }])
-      ).rejects.toMatchObject({ subtype: 'setup_command_timeout' });
+        await captureRejection(
+          writeRuntimeSkills(home, [{ name: 'find-skills', rawMarkdown: '# Find skills' }])
+        )
+      ).toMatchObject({ subtype: 'setup_command_timeout' });
     } finally {
       writeFile.mockRestore();
       timeout.mockRestore();
@@ -393,10 +443,12 @@ describe('skills.sh container installation', () => {
     });
     try {
       expect(
-        writeRuntimeSkills(home, [{ name: 'find-skills', rawMarkdown: '# Find skills' }], {
-          signal: controller.signal,
-        })
-      ).rejects.toThrow('session stopped');
+        await captureRejection(
+          writeRuntimeSkills(home, [{ name: 'find-skills', rawMarkdown: '# Find skills' }], {
+            signal: controller.signal,
+          })
+        )
+      ).toMatchObject({ message: 'session stopped' });
     } finally {
       writeFile.mockRestore();
       await fs.rm(home, { recursive: true, force: true });
@@ -414,20 +466,22 @@ describe('skills.sh container installation', () => {
       const timeout = spyOn(AbortSignal, 'timeout').mockReturnValue(deadline.signal);
       try {
         expect(
-          materializeRuntimeProfile(
-            home,
-            {
-              runtimeSkills: [{ name: 'find-skills', source: 'vercel-labs/skills' }],
-            },
-            {
-              onProgress: detail => progress.push(detail),
-              run: async () => {
-                deadline.abort(new Error('batch timeout'));
-                return success;
+          await captureRejection(
+            materializeRuntimeProfile(
+              home,
+              {
+                runtimeSkills: [{ name: 'find-skills', source: 'vercel-labs/skills' }],
               },
-            }
+              {
+                onProgress: detail => progress.push(detail),
+                run: async () => {
+                  deadline.abort(new Error('batch timeout'));
+                  return success;
+                },
+              }
+            )
           )
-        ).rejects.toMatchObject({ subtype: 'setup_command_timeout' });
+        ).toMatchObject({ subtype: 'setup_command_timeout' });
       } finally {
         timeout.mockRestore();
       }

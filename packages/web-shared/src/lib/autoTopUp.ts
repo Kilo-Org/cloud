@@ -422,7 +422,7 @@ async function performAutoTopUpForEntity(
     // These are expected user-facing events, not engineering problems.
     const isCardDecline = error instanceof Stripe.errors.StripeCardError;
     const code = isCardDecline
-      ? (error.decline_code ?? error.code ?? 'unknown_error')
+      ? error.decline_code || error.code || 'unknown_error'
       : 'unknown_error';
 
     if (isCardDecline) {

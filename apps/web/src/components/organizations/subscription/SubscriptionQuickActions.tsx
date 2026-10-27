@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Edit, CreditCard, Download, AlertTriangle, Loader2, Repeat } from 'lucide-react';
-import type Stripe from 'stripe';
 import { toast } from 'sonner';
 import {
   useCancelOrganizationSubscription,
@@ -24,7 +23,7 @@ export function SubscriptionQuickActions({
   organizationId,
   userRole,
 }: {
-  subscription: Stripe.Subscription;
+  subscription: SubscriptionWithPeriod;
   organizationId: string;
   userRole: string;
 }) {

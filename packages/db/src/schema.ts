@@ -4096,6 +4096,8 @@ export const organization_user_usage = pgTable(
 
 export type OrganizationUserDailyUsage = typeof organization_user_usage.$inferSelect;
 
+// The column stores the subscription status the provider reports, which is an
+// open set, plus the local 'pending_cancel' and 'ended' markers.
 type SubscriptionStatus =
   | 'active'
   | 'pending_cancel'
@@ -4106,7 +4108,8 @@ type SubscriptionStatus =
   | 'past_due'
   | 'canceled'
   | 'unpaid'
-  | 'paused';
+  | 'paused'
+  | (string & {});
 export type BillingCycle = 'monthly' | 'yearly';
 
 export const organization_seats_purchases = pgTable(
@@ -5793,6 +5796,12 @@ export const cloud_agent_code_reviews = pgTable(
       .on(table.started_at)
       .concurrently()
       .where(isNotNull(table.started_at)),
+    index('idx_cloud_agent_code_reviews_started_at_effective')
+      .on(sql`COALESCE(${table.started_at}, ${table.updated_at}, ${table.created_at})`)
+      .concurrently()
+      .where(
+        sql`${table.status} NOT IN ('pending', 'queued') AND COALESCE(${table.terminal_reason}, '') <> 'abandoned'`
+      ),
     index('idx_cloud_agent_code_reviews_terminal_missing_completed_at')
       .on(table.status)
       .concurrently()

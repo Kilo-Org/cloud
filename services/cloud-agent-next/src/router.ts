@@ -13,6 +13,7 @@ import { createSessionTerminalHandlers } from './router/handlers/session-termina
 import { createSessionStartHandlers } from './router/handlers/session-start.js';
 import { createSessionSendHandlers } from './router/handlers/session-send.js';
 import { createSessionWorktreeHandlers } from './router/handlers/session-worktree.js';
+import { createHostedWorkspaceMutationHandlers } from './router/handlers/hosted-workspace-mutations.js';
 import { deleteWorktree } from './router/handlers/worktree-deletion.js';
 import { createSessionWorktreeChangesHandlers } from './router/handlers/session-worktree-changes.js';
 import { getSandboxSelectionOptions } from './router/handlers/sandbox-selection.js';
@@ -50,6 +51,7 @@ export const appRouter = router({
   ...createSessionStartHandlers(),
   ...createSessionSendHandlers(),
   ...createSessionWorktreeHandlers(),
+  ...createHostedWorkspaceMutationHandlers(),
   ...createSessionWorktreeChangesHandlers(),
 });
 

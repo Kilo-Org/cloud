@@ -27,6 +27,75 @@ function bufferHeartbeat(diagnostics: ReturnType<typeof createControlDiagnostics
 }
 
 describe('control log upload credential rotation', () => {
+  it.each([
+    ['diagnostics', 204, false],
+    ['files', 204, false],
+    ['diagnostics', 401, false],
+    ['files', 401, false],
+    ['diagnostics', 204, true],
+    ['files', 204, true],
+  ] as const)(
+    'retries final %s after a late 401, then %s, delayed rotation %s',
+    async (kind, finalStatus, delayed) => {
+      const dir = await mkdtemp(join(tmpdir(), 'control-final-late-rejection-'));
+      const headers: string[] = [];
+      const urls: string[] = [];
+      const auth = createControlLogUploadAuth({ initialGrant: 'old-token', send() {} });
+      auth.connected();
+      auth.receive({
+        type: 'logs.credentials',
+        grant: 'old-token',
+        expiresAt: Date.now() + 4 * 60 * 60_000,
+      });
+      const fetch = async (_url: string, init: RequestInit) => {
+        urls.push(_url);
+        headers.push(new Headers(init.headers).get('Authorization') ?? '');
+        if (headers.length === 1) {
+          const rotate = () =>
+            auth.receive({
+              type: 'logs.credentials',
+              grant: 'new-token',
+              expiresAt: Date.now() + 4 * 60 * 60_000,
+            });
+          if (delayed) setTimeout(rotate, 20);
+          else rotate();
+          return new Response(null, { status: 401 });
+        }
+        return new Response(null, { status: finalStatus });
+      };
+      try {
+        const started = performance.now();
+        if (kind === 'diagnostics') {
+          const diagnostics = createControlDiagnostics({ uploadUrl: UPLOAD_URL, auth, fetch });
+          bufferHeartbeat(diagnostics);
+          await diagnostics.finalize(1000);
+        } else {
+          const wrapperLogPath = join(dir, 'wrapper.log');
+          await writeFile(wrapperLogPath, 'final log');
+          const files = createControlFileLogUploader({
+            uploadUrl: UPLOAD_URL,
+            auth,
+            fetch,
+            wrapperLogPath,
+            homeRoots: [],
+          });
+          await files.finalize(1000);
+        }
+        expect(performance.now() - started).toBeLessThan(1500);
+        if (kind === 'diagnostics' && finalStatus === 204) {
+          expect(headers).toEqual(['Bearer old-token', 'Bearer new-token', 'Bearer new-token']);
+          expect(urls[0]).toBe(urls[1]);
+          expect(urls[2]).not.toBe(urls[0]);
+        } else {
+          expect(headers).toEqual(['Bearer old-token', 'Bearer new-token']);
+        }
+      } finally {
+        auth.stop();
+        await rm(dir, { recursive: true, force: true });
+      }
+    }
+  );
+
   it.each([true, false])(
     'bounds both final uploads while credential renewal replies %s',
     async replies => {

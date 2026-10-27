@@ -358,9 +358,9 @@ export function createControlDiagnostics(options: Options): ControlDiagnostics {
             await options.auth.waitForCurrent?.(stop.signal);
             if (stopped || options.auth.current() === undefined) break;
           }
+          const attemptedToken = options.auth?.current()?.token;
           await flush();
-          if (pending && !(options.auth?.waitForCurrent && options.auth.current() === undefined))
-            break;
+          if (pending && (!options.auth || options.auth.current()?.token === attemptedToken)) break;
         }
       } finally {
         clearTimeout(deadline);

@@ -253,23 +253,32 @@ export function createControlFileLogUploader(options: Options): ControlFileLogUp
             // Read the shared owner only when the archive is ready to send: a
             // queued upload must use the newest token, not the one captured
             // before waiting for its predecessor.
-            const credentials = options.auth
+            let credentials = options.auth
               ? options.auth.current()
               : options.uploadGrant
                 ? { token: options.uploadGrant, expiresAt: Number.POSITIVE_INFINITY }
                 : undefined;
             if (!credentials) return;
-            const response = await upload(archiveUrl, {
-              method: 'PUT',
-              headers: {
-                Authorization: `Bearer ${credentials.token}`,
-                'Content-Type': 'application/gzip',
-                'Content-Length': String(payload.byteLength),
-              },
-              body: payload,
-              redirect: 'error',
-              signal: abort.signal,
-            });
+            const put = (token: string) =>
+              upload(archiveUrl, {
+                method: 'PUT',
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/gzip',
+                  'Content-Length': String(payload.byteLength),
+                },
+                body: payload,
+                redirect: 'error',
+                signal: abort.signal,
+              });
+            let response = await put(credentials.token);
+            const replacement = options.auth?.current();
+            if (response.status === 401 && replacement && replacement.token !== credentials.token) {
+              void response.body?.cancel().catch(() => undefined);
+              abort.signal.throwIfAborted();
+              credentials = replacement;
+              response = await put(credentials.token);
+            }
             if (!abort.signal.aborted && response.status !== 204) {
               logToFile(`Control file log upload failed: ${response.status}`);
               reportFailure('http_rejection', response.status);
@@ -334,6 +343,15 @@ export function createControlFileLogUploader(options: Options): ControlFileLogUp
       if (options.auth?.current() === undefined && options.auth?.waitForCurrent)
         await options.auth.waitForCurrent(abort.signal);
       if (!abort.signal.aborted) await queueUpload();
+      if (
+        !stopped &&
+        !abort.signal.aborted &&
+        options.auth?.current() === undefined &&
+        options.auth?.waitForCurrent
+      ) {
+        await options.auth.waitForCurrent(abort.signal);
+        if (!abort.signal.aborted && options.auth.current() !== undefined) await queueUpload();
+      }
     };
     finalUpload = withTimeoutAndAbort(uploadFinal(), {
       signal: abort.signal,

@@ -32,8 +32,8 @@ catalog:
   '@types/jsonwebtoken': 9.0.10
   '@types/node': 24.12.4
   '@typescript/native-preview': 7.0.0-dev.20260707.2
-  '@vitest/coverage-v8': 4.1.11
-  '@vitest/ui': 4.1.11
+  '@vitest/coverage-v8': 4.1.12
+  '@vitest/ui': 4.1.12
   '@workos-inc/node': 11.0.0
   aws4fetch: 1.0.20
   drizzle-kit: 0.31.11
@@ -51,7 +51,7 @@ catalog:
   # its own instead of a second pin here.
   typescript: 7.0.2
   ulid: 3.0.2
-  vitest: 4.1.11
+  vitest: 4.1.12
   workers-tagged-logger: 1.0.0
   wrangler: 4.135.0
   zod: 4.6.7
@@ -141,18 +141,24 @@ overrides:
   '@babel/plugin-transform-modules-systemjs': 7.29.7
   '@babel/core': 7.29.7
   mdast-util-to-hast: 13.2.1
-  storybook: 10.4.6
-  next: 16.3.8
+  storybook: 10.6.2
+  next: 16.4.2
   preact: 10.28.4
   adm-zip: 0.6.1
   baseline-browser-mapping: 2.11.20
   browserslist: 4.28.7
-  glob: '>=13.0.1'
+  # An entry added or changed here names a reviewed version: an exact pin for the
+  # version the lockfile carries, or a range that also states its upper bound, so
+  # the entry moves only through a reviewed change to this file and the lockfile.
+  # esbuild below keeps a floor without an upper bound; see its own note.
+  glob: 13.0.6
   google-auth-library: 10.6.2
+  # Two 0.28.x copies are in the tree as peer variants of the vite/vitest/storybook
+  # graph, so a bound here re-points those dependents. Not narrowed in this change.
   esbuild: '>=0.28.1'
-  lodash: '>=4.18.1'
-  diff: '>=8.0.3'
-  fast-xml-parser: '>=5.7.3'
+  lodash: 4.18.1
+  diff: 8.0.3
+  fast-xml-parser: 5.7.3
   fflate@^0.4.8: 0.4.9
   fflate@^0.8.2: 0.8.3
   vite: '>=8.1.6 <8.2.0'
@@ -161,7 +167,7 @@ overrides:
   ws@^7: 7.5.11
   ws@^8: 8.21.0
   tmp: 0.2.7
-  dompurify: 3.4.16
+  dompurify: 3.4.17
   handlebars: 4.7.10
   brace-expansion: 5.0.12
   node-forge: 1.4.0
@@ -169,7 +175,7 @@ overrides:
   compression: 1.8.2
   source-map-js: 1.2.2
   tinypool: 2.1.2
-  postcss: '>=8.5.23'
+  postcss: 8.5.30
   # @modelcontextprotocol/sdk declares zod as a peer and packages/harness-sdk
   # relies on the auto-installed peer. Without this line, a dependency that
   # brings a newer zod into the dev graph (knip) would silently change the zod
@@ -179,18 +185,20 @@ overrides:
   picomatch@^2: 2.3.2
   picomatch@^4: 4.0.4
   yaml: 2.8.4
-  undici@^7: 7.29.1
+  undici@^7: 7.30.1
   path-to-regexp: 8.4.2
   ip-address: 10.7.1
   image-size@^1: npm:image-size-next@1.2.2
   image-size@^2: npm:image-size-next@2.1.1
   drizzle-orm: 0.45.2
-  lodash-es: '>=4.18.1'
+  lodash-es: 4.18.1
   '@xmldom/xmldom': 0.8.15
   qs: 6.16.0
   smol-toml: 1.9.0
   uuid@<11.1.1: 11.1.1
-  serialize-javascript: '>=7.0.3'
+  # Nothing in the tree depends on serialize-javascript today; the spec stays for a
+  # future dependent, bounded to the reviewed major.
+  serialize-javascript: '>=7.0.3 <8'
   hono: 4.13.13
   '@modelcontextprotocol/sdk@1.29.0': 1.32.1
   '@modelcontextprotocol/sdk@1.32.1>@hono/node-server': 2.0.10
@@ -203,8 +211,25 @@ overrides:
   # assertion was refused. Scope the newer copy to this dependency only.
   '@simplewebauthn/server>@peculiar/asn1-schema': 2.9.4
   '@simplewebauthn/server>@peculiar/asn1-x509': 2.9.4
-  undici@^6: 6.28.1
-  undici@^8: 8.10.2
+  undici@^6: 6.29.1
+  undici@^8: 8.12.2
+  # The root vercel CLI pins undici 5.28.4 through @vercel/node. The 5.x line has
+  # no release for the advisories fixed in 6.24.0-6.28.1, so it moves to the
+  # same 6.x copy as above, which also drops its @fastify/busboy dependency.
+  undici@^5: 6.29.1
+  # Further vercel CLI transitives with exact vulnerable pins: @vercel/fun,
+  # @vercel/python-analysis and @vercel/backends respectively. eas-cli likewise
+  # pins vulnerable minimatch 5, nanoid 3 and ajv 8 (ajv also via
+  # @vercel/static-config).
+  '@tootallnate/once@^2': 2.0.1
+  minimatch@^5: 5.1.9
+  nanoid@^3: 3.3.20
+  ajv@^8: 8.20.0
+  minimatch@^10: 10.2.6
+  '@vercel/backends>srvx': 0.11.22
+  # zod 4 below 4.6.6 grows issue lists without bound on oversized arrays.
+  # Exact pins in @kilocode/plugin and the vercel CLI follow the catalog instead.
+  'zod@>=4.0.0 <4.6.6': 'catalog:'
   # 1.30.2+ regresses var() round-trip through JS visitors, breaking
   # react-native-css's metro transformer. Upstream issue:
   # https://github.com/parcel-bundler/lightningcss/issues/1081
@@ -215,7 +240,7 @@ overrides:
   postcss-selector-parser@^7.0.0: 7.1.6
   postcss-selector-parser@6.0.10: 7.1.6
   webpack-dev-middleware@^6: 7.4.6
-  toml: 4.2.0
+  toml: 5.0.1
   '@opentelemetry/core': 2.8.0
   body-parser: 2.3.0
   js-yaml: 4.3.2
@@ -235,19 +260,23 @@ overrides:
   '@expo/ui': 58.0.17
 packageExtensions:
   # Undeclared upstream deps that break config evaluation outside the Expo CLI
-  # under pnpm's isolated linker (autoInstallPeers is false).
+  # under pnpm's isolated linker (autoInstallPeers is false). An injected
+  # dependency selects a version at install, so each one is pinned to the copy its
+  # package already resolves.
   '@sentry/react-native':
     dependencies:
-      '@expo/config-plugins': '*'
+      '@expo/config-plugins': 58.0.9
       # React Native does not expose Metro to Sentry's vendored require calls.
       # Pin the exact Metro used by the SDK 58 @expo/metro graph.
       metro: 0.87.1
   expo-share-intent:
     dependencies:
-      '@expo/plist': '*'
+      '@expo/plist': 0.10.1
   react-native-appsflyer:
     dependencies:
-      '@expo/config-plugins': '*'
+      # This package's own Expo SDK line resolves 57.x; pin that copy, not the
+      # 58.x one the other injection uses.
+      '@expo/config-plugins': 57.0.9
   # Native ref declarations must use the app's React type identity.
   react-native-screens:
     peerDependencies:
@@ -268,6 +297,14 @@ patchedDependencies:
   # The dialog key listener covers Back before Compose's lifecycle handler starts.
   '@expo/ui@58.0.17': patches/@expo+ui@58.0.17.patch
   expo-dev-launcher@58.0.14: patches/expo-dev-launcher@58.0.14.patch
+  # The app owns the layout direction: the picker forces RTL for an RTL language
+  # and relaunches, and the unset build-time template value must not reset that
+  # choice before React renders, or the relaunched app comes back in the other
+  # direction on every launch. Android links the package's published AAR unless
+  # apps/mobile/package.json lists expo-localization under
+  # expo.autolinking.android.buildFromSource, so this patch only takes effect
+  # there while that entry stays.
+  expo-localization@58.0.4: patches/expo-localization@58.0.4.patch
   # A zero badge count must not cancel every app notification: upstream called
   # cancelAll(), which removed the ongoing Active Agents card on Android.
   expo-notifications@58.1.4: patches/expo-notifications@58.1.4.patch
@@ -324,6 +361,9 @@ patchedDependencies:
   # React Native installs on-device JSI bindings through its TurboModule runtime hook.
   llama.rn@0.12.9: patches/llama.rn@0.12.9.patch
   '@expo/react-native-action-sheet@4.1.1': patches/@expo+react-native-action-sheet@4.1.1.patch
+  # Android: a hugged markdown node re-measures its height at the width its view
+  # actually receives, so a line that the display view wraps is inside the box.
+  react-native-enriched-markdown@1.1.1: patches/react-native-enriched-markdown@1.1.1.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'
@@ -331,14 +371,26 @@ publicHoistPattern:
   - metro
 autoInstallPeers: false
 allowBuilds:
+  # Verifies the resolved native binding, and only when it is absent installs the
+  # matching @swc/wasm through npm. Never fetches a bare binary.
   '@swc/core': true
+  # No install hook in the versions the lockfile resolves; the native binary is an
+  # optional platform package. Kept so a future release that adds a build step stays
+  # gated behind this list.
   '@tailwindcss/oxide': true
+  # Uses the @esbuild/<platform> optional dependency, and otherwise downloads the
+  # binary from the registry and checks it against `esbuild.binaryHashes`.
   esbuild: true
+  # Compiles the PostgreSQL client binding with node-gyp against the system libpq.
   libpq: true
+  # Uses the @cloudflare/workerd-<platform> optional dependency; when it is missing,
+  # downloads that platform package from the registry.
   workerd: true
   # Downloads its prebuilt iOS xcframework and Android JNI libraries from the
   # matching GitHub release and verifies each archive's SHA-256 (Quick Chat GGUF).
   llama.rn: true
+  # Downloads the vendored tree-sitter grammar sources and the iOS math xcframework
+  # from their upstream releases; a missing manifest is a no-op.
   react-native-enriched-markdown: true
   '@sentry/cli': false
   bufferutil: false
@@ -357,6 +409,9 @@ allowBuilds:
   '@openrouter/sdk': false
   spawn-sync: false
   tree-sitter-bash: false
+  # WebDriver binary for the extension's Firefox e2e suite; the postinstall
+  # downloads the driver for the current platform from its GitHub release.
   geckodriver: true
+  dtrace-provider: false
   '@scarf/scarf': false
   '@parcel/watcher': false

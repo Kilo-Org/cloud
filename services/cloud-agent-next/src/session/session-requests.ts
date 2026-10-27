@@ -7,6 +7,7 @@ import type {
   SessionFinalization,
 } from '../execution/types.js';
 import type { SessionProfileBundle } from '../session-profile.js';
+import type { SessionEnvironmentReference } from '../environment-build/reference.js';
 
 export type ProfileOverrides = {
   envVars?: Record<string, string>;
@@ -72,6 +73,19 @@ export type SessionCreateRequest = {
     /** Inclusive cut: copy source messages up to and including this ID. */
     cloneUpToMessageId?: string;
   };
+  /**
+   * The authorized reference of the repository's environment, set only by
+   * preflight after it resolved the environment from the owner and the
+   * repository. Persisted on session metadata and carried DO-private to the
+   * Sandbox DO for snapshot selection.
+   */
+  environment?: SessionEnvironmentReference;
+  /**
+   * The environment's saved allocation key, set only by preflight and never by
+   * a client. It is the first saved candidate; eligibility is checked when the
+   * saved allocation is resolved.
+   */
+  environmentSandboxAllocation?: string;
   profile?: {
     id?: string;
     overrides?: ProfileOverrides;

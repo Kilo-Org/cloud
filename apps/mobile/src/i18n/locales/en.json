@@ -58,7 +58,7 @@
     "estimateSpendLimitTooLow": "Raise the spend safeguard to allow this summary.",
     "confirmPaid": "Enable paid summaries for {{context}}?",
     "confirmGeneration": "Generate a paid summary?",
-    "paidDisclosure": "{{estimate}} estimated, up to {{maximum}}, with a {{minutes}} minute limit. Charges apply even if generation fails.",
+    "paidDisclosure": "{{estimate}} estimated, up to {{maximum}}, with a {{minutes}}-minute limit. Charges apply even if generation fails.",
     "enable": "Enable paid summaries",
     "contextSettings": "AI settings · {{context}}",
     "allContexts": "Personal and organization briefs stay separate.",
@@ -91,7 +91,13 @@
     "estimatePermissionUnavailable": "You do not have permission to use this context’s balance.",
     "createFailed": "Could not create this brief.",
     "reviewFailed": "Could not review this brief.",
-    "saved": "Briefing settings saved"
+    "saved": "Brief settings saved",
+    "preparing": "Preparing your brief…",
+    "preparationHint": "You can leave and return while activity is collected. No AI work or charge starts until you review and confirm the estimate.",
+    "resumeReview": "Continue review",
+    "preparationFailed": "Could not collect activity for this brief. Try again.",
+    "preparationTimedOut": "Collecting activity took too long. Try again.",
+    "preparationDrafts": "Unconfirmed briefs"
   },
   "common": {
     "cancel": "Cancel",
@@ -147,6 +153,7 @@
     "connected": "Connected",
     "couldNotLoadModels": "Could not load models",
     "couldNotLoadRepositories": "Could not load repositories",
+    "noRepositoriesFound": "No repositories found",
     "critical": "Critical",
     "delete": "Delete",
     "deleted": "Deleted",
@@ -181,6 +188,7 @@
     "connect": "Connect",
     "connectBitbucket": "Connect Bitbucket",
     "connectGitlab": "Connect GitLab",
+    "connectProvider": "Connect a provider",
     "contentTruncated": "Content truncated",
     "copyLink": "Copy link",
     "couldNotLoadOrganizations": "Could not load organizations",
@@ -239,7 +247,8 @@
     "dismissed": "Dismissed",
     "durationMinuteShort": "min",
     "durationHourShort": "h",
-    "changes": "Changes"
+    "changes": "Changes",
+    "organizationTrialEnded": "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again."
   },
   "language": {
     "restarting": "Restarting to apply language",
@@ -318,7 +327,6 @@
     "hideBalance": "Hide balance",
     "showBalance": "Show balance",
     "balanceHidden": "Balance hidden",
-    "bonusCreditsExpiring": "{{amount}} in credits expiring {{date}}",
     "signOutTitle": "Sign out?",
     "signOutMessage": "You will need to sign in again to access your workspace.",
     "deleteAccountTitle": "Delete account?",
@@ -1501,7 +1509,6 @@
       "gitlabNoRepositoriesDescription": "You may need to grant access to more groups or projects on GitLab.",
       "installGithubApp": "Install the GitHub app on repositories",
       "installGithubAppDescription": "Grant the Kilo GitHub App access to the repositories you want reviewed.",
-      "noRepositoriesFound": "No repositories found",
       "repositoryAccess": "repository access"
     },
     "style": {
@@ -1531,6 +1538,8 @@
       "showMore": "Show more",
       "created": "Created",
       "started": "Started",
+      "reviewEnded": "Review ended",
+      "severityNitpick": "Nitpick",
       "tokens": "Tokens",
       "tokensInOut": "{{input}} in / {{output}} out",
       "transcriptWaiting": "Waiting for the review transcript.",
@@ -1574,6 +1583,22 @@
       "loadingProposals": "Loading proposals",
       "couldNotLoadProposals": "Could not load proposals",
       "noProposals": "No proposals",
+      "proposalDetails": "Proposal details",
+      "proposalTitle": "Proposal title",
+      "rationale": "Rationale",
+      "saveFirst": "Save your edits before opening a pull request.",
+      "proposalSaved": "Proposal saved",
+      "proposalDismissed": "Proposal dismissed",
+      "dismissProposalTitle": "Dismiss proposal?",
+      "dismissProposalMessage": "This proposal will leave the active list and cannot be restored.",
+      "prOpened": "REVIEW.md pull request opened",
+      "alreadyPresent": "Guidance is already present in REVIEW.md",
+      "status": {
+        "edited": "Edited",
+        "opening_change_request": "Opening PR",
+        "change_request_failed": "PR failed",
+        "superseded": "Already present"
+      },
       "noProposalsDescription": "Review memory proposals appear here after Kilo analyzes maintainer replies."
     },
     "manualReview": {
@@ -1581,7 +1606,6 @@
       "invalidUrl": "Enter a valid pull request URL",
       "couldNotCheckProviderStatus": "Couldn't check provider status",
       "couldNotLoadProviders": "We couldn't load your connected providers. Please try again.",
-      "connectProvider": "Connect a provider",
       "connectProviderDescription": "Connect GitHub to start a manual review of a pull request.",
       "pullRequestUrl": "Pull request URL",
       "instructions": "Instructions (optional)",
@@ -1709,8 +1733,6 @@
   },
   "securityAgent": {
     "filter": {
-      "noFilters": "No filters available",
-      "noFiltersDescription": "Go back and reopen filters from the findings list.",
       "title": "Filter findings",
       "reset": "Reset",
       "severity": "Severity",
@@ -2024,11 +2046,17 @@
         "remediationCancelled": "Cancelled",
         "findingDeleted": "Deleted"
       },
+      "eventConfidence": "Confidence: {{confidence}}",
+      "eventReason": "Reason: {{reason}}",
+      "eventsCount_one": "{{displayCount}} event",
+      "eventsCount_other": "{{displayCount}} events",
       "generated": "Generated {{generatedAt}}",
       "noActivity": "No recorded activity",
       "noActivityDescription": "Kilo has no reportable Security Finding activity from {{start}} to {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
+      "reasonUnknown": "Unrecognized reason",
       "repositoryNotRecorded": "Repository not recorded",
+      "severityCount": "{{displayCount}} {{label}}",
       "summary": "Report summary",
       "title": "Audit report",
       "unavailable": "Audit report unavailable",
@@ -2258,8 +2286,8 @@
       "title": "Session",
       "copyErrorDetails": "Copy error details",
       "backToSessions": "Back to sessions",
-      "follow": "Follow on Lock Screen",
-      "unfollow": "Stop following on Lock Screen",
+      "follow": "Follow session",
+      "unfollow": "Unfollow session",
       "couldNotLoad": "Could not load session",
       "failedToLoadDetails": "Failed to load session details",
       "failedToStopExecution": "Failed to stop execution",
@@ -2679,7 +2707,12 @@
       "allowOnceAccessibility": "Allow once",
       "alwaysAllow": "Always Allow",
       "alwaysAllowAccessibility": "Always allow",
-      "retrying": "Retrying…"
+      "retrying": "Retrying…",
+      "retryDeny": "Retry deny",
+      "retryAllowOnce": "Retry allow once",
+      "retryAlwaysAllow": "Retry always allow",
+      "unreadableTitle": "Permission request could not be read",
+      "unreadableBody": "The agent is waiting for a permission decision this app cannot show. Update the app or the CLI, or answer the request in the CLI to continue."
     },
     "questionCard": {
       "title": "Agent needs input",
@@ -3050,7 +3083,6 @@
   "voiceInput": {
     "listening": "Listening...",
     "listeningStopped": "Listening stopped.",
-    "staysOff": "Speech stays off until you allow online transcription.",
     "onlineTitle": "Speech is processed online",
     "onlineMessage": "This device cannot transcribe offline. Your recording is sent to {{provider}} to turn it into text. Kilo does not store the audio.",
     "allow": "Allow",
@@ -3067,8 +3099,9 @@
     "unavailableDevice": "Voice input isn't available on this device.",
     "unavailableLanguage": "Voice input isn't available for this device language. Install its offline speech files or use another app language.",
     "languageNotInstalledTitle": "Voice input for {{language}} isn't ready",
-    "languageNotInstalledMessage": "The {{language}} offline speech files aren't installed on this phone. Download them, then try voice input again.",
+    "languageNotInstalledMessage": "The {{language}} offline speech files aren't installed, and online transcription is off. Download the files, or turn online transcription back on, to use voice input.",
     "downloadOfflineModel": "Download",
+    "useOnlineTranscription": "Allow online transcription",
     "offlineModelDownloadScheduled": "The offline speech files will download in the background. Try voice input again later.",
     "transcribing": "Transcribing...",
     "gatewayUnreachable": "Couldn't reach the Kilo gateway. Check your connection and try again.",
@@ -3241,7 +3274,7 @@
     "creditActivity": {
       "emptyDescription": "Purchases, usage, and credit adjustments for this organization will appear here as they happen.",
       "emptyTitle": "No credit activity",
-      "expires": "Expires {{date}}",
+      "expiresUtc": "Expires {{date}} (UTC)",
       "title": "Credit activity",
       "transactionFallback": "Credit transaction",
       "truncated": "Older credit activity is available.",
@@ -3264,7 +3297,9 @@
       "sendInvite": "Send invite",
       "title": "Invite member",
       "alreadyInvited": "They're already invited or already a member.",
-      "sendError": "Couldn't send the invite."
+      "sendError": "Couldn't send the invite.",
+      "pendingInvitation": "This email already has a pending invitation.",
+      "alreadyMember": "This person is already a member of this organization."
     },
     "invoices": {
       "downloadA11y": "Download invoice {{number}}",
@@ -3334,7 +3369,12 @@
       "pendingInvitations": "Pending invitations",
       "resendInvite": "Resend invite",
       "shareInviteLink": "Share invite link",
-      "resendInviteError": "Couldn't resend the invite."
+      "resendInviteError": "Couldn't resend the invite.",
+      "inviteNotResendable": "This invitation can no longer be resent.",
+      "ownerAuthority": "Only an organization owner can manage owners.",
+      "ownRoleChange": "You cannot change your own role.",
+      "inviteExpired": "This invitation has expired.",
+      "inviteAccepted": "This invitation has already been accepted."
     },
     "usageStats": {
       "inputTokens": "Input Tokens",
@@ -3434,7 +3474,7 @@
     "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen.",
     "openSession": "Open",
     "finished": "Finished",
-    "followFailed": "Couldn't show this agent on the Lock Screen.",
+    "followFailed": "Couldn't follow this session.",
     "approveFailed": "Couldn't approve. Tap $t(common.approve) to try again.",
     "checked": "Checked",
     "lastKnown": "Last known",
@@ -3655,7 +3695,7 @@
       "loadingModel": "Loading model details",
       "couldNotLoadModel": "Couldn't load this model",
       "noFiles": "No files this app can run",
-      "noFilesDescription": "This app runs models that are one GGUF file.",
+      "noFilesDescription": "This app runs models that are one complete GGUF file, and this repository offers none.",
       "tooLargeTitle": "This model may not run",
       "tooLargeMessage": "{{name}} likely needs more memory than this device has. The app can close while the model answers. Download it anyway?",
       "downloadAnyway": "Download anyway"
@@ -3808,6 +3848,7 @@
     "title": "Profiles",
     "entrySubtitle": "Reuse environment settings across sessions",
     "newProfile": "New profile",
+    "openHint": "Opens the profile",
     "emptyTitle": "No profiles yet",
     "emptyDescription": "Create a profile to reuse environment variables, setup commands, and skills across sessions.",
     "loadFailed": "Couldn't load profiles",
@@ -3901,6 +3942,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Values shown as •••• keep their stored secret; replace a value to rotate it. Changing the command line requires every value again",
+      "headersHint": "Values shown as •••• keep their stored secret; replace a value to rotate it. Changing the URL requires every value again",
       "nameRequired": "Enter a server name",
       "nameInvalid": "Name can use only ASCII letters, numbers, underscores, and dashes, up to 100 characters",
       "commandRequired": "Enter a command",
@@ -3999,6 +4042,10 @@
   "credits": {
     "title": "Buy credits",
     "description": "Credits are a one-time purchase added to your Kilo balance for running AI coding sessions in Kilo App. The store charges your account and credits are added after the store confirms payment.",
+    "nextExpiry": "{{amount}} in credits expires {{date}} (UTC). Credits with the earliest expiry are used first.",
+    "appStoreExpiry": "Credits purchased through the App Store do not expire.",
+    "playOneYearExpiry": "These credits expire one calendar year after purchase.",
+    "playNonexpiring": "These credits do not expire.",
     "packLabel": "Add {{amount}} of credits",
     "priceUnavailable": "Price unavailable",
     "purchased": "Credits added to your balance.",
@@ -4039,11 +4086,13 @@
       "namePlaceholder": "Bugs, Ideas, Release…",
       "emoji": "Emoji",
       "mode": "Mode",
-      "defaultsHint": "Sessions started from this list use these defaults."
+      "defaultsHint": "Sessions started from this list use these defaults.",
+      "saveFailed": "Couldn’t save the list. Check your connection and try again."
     },
     "list": {
       "addPlaceholder": "Add a to-do",
       "add": "Add to-do",
+      "addFailed": "Couldn’t add the to-do. Check your connection and try again.",
       "empty": "No to-dos yet",
       "setDefaults": "Set repository, mode and model",
       "completed_one": "Completed ({{count}})",
@@ -4080,7 +4129,9 @@
       "startNewSession": "Start new session",
       "startNewSessionHint": "Long-press to start a new session.",
       "linkSession": "Link session",
-      "linkFailed": "Couldn’t link the session to the to-do"
+      "linkFailed": "Couldn’t link the session to the to-do",
+      "moveToAnotherTodo": "Move to another to-do",
+      "startRefreshFailed": "The session started, but this list didn’t update."
     },
     "linkSession": {
       "title": "Link a session",
@@ -4089,6 +4140,7 @@
     },
     "upNext": "Up next",
     "sessionTodo": "To-do: {{title}}",
+    "openTodoHint": "Opens the to-do.",
     "linkToTodo": "Link to to-do",
     "candidates": {
       "empty": "No open to-dos"

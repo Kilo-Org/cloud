@@ -17,6 +17,7 @@ function fixture() {
       {
         kiloSessionId: sessionId,
         cloudAgentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+        workspaceId: 'worktree_11111111-1111-4111-8111-111111111111',
         userId: 'untrusted-service-owner',
         organizationId: null,
         title: 'Hosted session',
@@ -55,7 +56,13 @@ describe('listHostedSessions', () => {
     const test = fixture();
 
     await expect(test.caller.listHostedSessions({ limit: 25, cursor })).resolves.toMatchObject({
-      items: [{ kiloSessionId: sessionId, userId }],
+      items: [
+        {
+          kiloSessionId: sessionId,
+          workspaceId: 'worktree_11111111-1111-4111-8111-111111111111',
+          userId,
+        },
+      ],
       nextCursor: cursor,
     });
     expect(test.listCloudAgentRootSessions).toHaveBeenCalledWith({

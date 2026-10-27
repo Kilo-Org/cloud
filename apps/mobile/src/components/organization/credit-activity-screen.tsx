@@ -96,14 +96,16 @@ const CreditRow = memo(function CreditRow({
           {formatMoney(Math.abs(amount), i18n.language)}
         </Text>
       </View>
-      <View className="flex-row items-center justify-between">
+      <View className="flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <Text className="text-xs text-muted-foreground">
           {formatDate(parseTimestamp(transaction.created_at), i18n.language)}
         </Text>
         {transaction.expiry_date != null && (
           <Text className="text-xs text-muted-foreground">
-            {t('organization.creditActivity.expires', {
-              date: formatDate(parseTimestamp(transaction.expiry_date), i18n.language),
+            {t('organization.creditActivity.expiresUtc', {
+              date: formatDate(parseTimestamp(transaction.expiry_date), i18n.language, {
+                timeZone: 'UTC',
+              }),
             })}
           </Text>
         )}

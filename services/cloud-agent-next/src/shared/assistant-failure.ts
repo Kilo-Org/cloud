@@ -1,3 +1,4 @@
+import type { KiloSdkAssistantError } from '@kilocode/session-ingest-contracts';
 import { z } from 'zod';
 import type {
   CloudAgentAssistantFailureReason,
@@ -78,6 +79,47 @@ export function projectSafeAssistantError(source: unknown): string | undefined {
   const failure = classifyAssistantFailure(source);
   const message = isAssistantInterrupt(source) ? ASSISTANT_INTERRUPT_MESSAGE : failure.safeMessage;
   return failure.providerOwnership === 'byok' ? `[BYOK] ${message}` : message;
+}
+
+const EXECUTION_STOPPED_MESSAGES = {
+  agent_unresponsive:
+    'Execution stopped because Kilo was not responding and was restarted. You can continue in this chat.',
+  agent_restarted: 'Execution stopped because the agent restarted. You can continue in this chat.',
+  no_progress: 'Execution stopped because it made no progress. You can continue in this chat.',
+  execution_limit:
+    'Execution stopped because it reached its time limit. You can continue in this chat.',
+} as const;
+
+export function executionStoppedMessage(
+  reason: keyof typeof EXECUTION_STOPPED_MESSAGES,
+  safeRetryMessage?: string
+): string {
+  return safeRetryMessage === undefined
+    ? EXECUTION_STOPPED_MESSAGES[reason]
+    : `Execution stopped while the model request kept retrying: ${safeRetryMessage}. You can continue in this chat.`;
+}
+
+const EXECUTION_RETRY_MESSAGES: ReadonlySet<string> = new Set(
+  [...Object.values(ASSISTANT_FAILURE_MESSAGES), BYOK_INVALID_REQUEST_MESSAGE].map(message =>
+    executionStoppedMessage('no_progress', message)
+  )
+);
+
+export function projectSafeSessionError(source: unknown, reason: unknown): string {
+  const safeError = projectSafeAssistantError(source) ?? classifyAssistantFailureMessage(source);
+  if (
+    typeof source === 'string' &&
+    (reason === 'agent_unresponsive' ||
+      reason === 'agent_restarted' ||
+      reason === 'no_progress' ||
+      reason === 'execution_limit') &&
+    (source === executionStoppedMessage(reason) ||
+      ((reason === 'no_progress' || reason === 'execution_limit') &&
+        EXECUTION_RETRY_MESSAGES.has(source)))
+  ) {
+    return source;
+  }
+  return safeError;
 }
 
 export function isAssistantInterrupt(source: unknown): boolean {
@@ -452,4 +494,53 @@ export function assistantReportsNoActionableOutput(parts: readonly unknown[]): b
   }
   const text = texts.join('\n');
   return /no actionable output/i.test(text) && /(?:output|token) limit/i.test(text);
+}
+
+export function projectSafeSdkAssistantError(source: unknown): KiloSdkAssistantError | undefined {
+  const message = projectSafeAssistantError(source);
+  if (message === undefined) return undefined;
+  if (isAssistantInterrupt(source)) return { name: 'MessageAbortedError', data: { message } };
+  if (typeof source === 'object' && source !== null && !Array.isArray(source) && 'name' in source) {
+    const data =
+      'data' in source &&
+      typeof source.data === 'object' &&
+      source.data !== null &&
+      !Array.isArray(source.data)
+        ? source.data
+        : {};
+    switch (source.name) {
+      case 'ProviderAuthError':
+        return { name: source.name, data: { providerID: 'unknown', message } };
+      case 'MessageOutputLengthError':
+      case 'ContextOverflowError':
+        return { name: source.name, data: { message } };
+      case 'APIError': {
+        if (!('isRetryable' in data) || typeof data.isRetryable !== 'boolean') break;
+        const statusCode = 'statusCode' in data ? data.statusCode : undefined;
+        return {
+          name: source.name,
+          data: {
+            message,
+            isRetryable: data.isRetryable,
+            ...(typeof statusCode === 'number' &&
+            Number.isInteger(statusCode) &&
+            statusCode >= 100 &&
+            statusCode <= 599
+              ? { statusCode }
+              : {}),
+          },
+        };
+      }
+      case 'StructuredOutputError':
+        if (
+          'retries' in data &&
+          typeof data.retries === 'number' &&
+          Number.isSafeInteger(data.retries) &&
+          data.retries >= 0
+        ) {
+          return { name: source.name, data: { message, retries: data.retries } };
+        }
+    }
+  }
+  return { name: 'UnknownError', data: { message } };
 }

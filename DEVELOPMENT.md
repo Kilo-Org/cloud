@@ -162,9 +162,9 @@ pnpm web:env set EXAMPLE_API_TOKEN
 
 Prerequisites:
 
-- Sign in with `vercel login` and have access to the projects in the `kilocode` scope.
+- Sign in with `pnpm exec vercel login` and have access to the projects in the `kilocode` scope.
 - Install the 1Password CLI and have write access to the `Kilo Web ENV Production` vault. If needed, the CLI prompts you to sign in with Touch ID.
-- Have `pnpm` available; the command runs the pinned Vercel CLI with `pnpm dlx`.
+- Run `pnpm install --frozen-lockfile` in the checkout first. The command uses the workspace Vercel CLI via `pnpm exec vercel`; verify access with `pnpm exec vercel whoami --scope kilocode --format=json`.
 
 The command asks whether the variable is sensitive, defaulting to yes. Sensitive Production and Staging values use Vercel's sensitive type, while Development remains encrypted but exportable through `vercel env pull`. The Production and Staging values are also stored in one concealed, exact-name item in `Kilo Web ENV Production`: Production uses the built-in `password` field and Staging uses `password (staging)`. Either field can be created before the other. The item's notes identify the local user and computer that last updated it.
 
@@ -244,6 +244,34 @@ pnpm test
 
 This runs the web, web environment, and local development-tool tests. They
 should pass against the local PostgreSQL database.
+
+### Credit expiration checks
+
+Single-account expiration locks the primary account before reading its credit transactions.
+It returns current usage, acquired credits, and the next expiration.
+Balance callers use these fields together.
+Closure checks follow the unique original-transaction link.
+The canonical database reconciler remains unconditional by default.
+Lazy balance checks opt into `onlyIfDue`.
+Forced checks pass `{ force: true }`, including checks with no expiration hint.
+
+Use synthetic accounts and a local PostgreSQL database for expiration checks.
+
+```bash
+pnpm test:db
+pnpm --filter web exec env NODE_ENV=test jest --runInBand \
+  ../../packages/web-shared/src/lib/creditExpiration.test.ts \
+  ../../packages/web-shared/src/lib/creditExpirationOrg.test.ts \
+  ../../packages/web-shared/src/lib/creditExpiration.concurrent.test.ts \
+  ../../packages/web-shared/src/lib/paidCreditAccounting.test.ts \
+  ../../packages/web-shared/src/lib/balance-funding.test.ts \
+  ../../packages/web-shared/src/lib/creditAdjustments.test.ts \
+  ../../packages/web-shared/src/lib/organizations/organization-usage.test.ts \
+  src/tests/profile-balance.test.ts \
+  src/lib/recomputeNextCreditExpiration.test.ts \
+  src/routers/organizations/organization-router.test.ts
+```
+
 
 ## Common Development Commands
 
@@ -602,11 +630,16 @@ Dismissal restores live status across devices; report history remains available.
 The backend owns scheduling, report revisions, optional paid summaries, and notification dispatch.
 AI summaries and briefing notifications require separate opt-ins.
 Summary settings include a model override and finite generation time and spend limits.
+Summary estimates and gateway spend admission use the model picker’s configured preferred-provider price, falling back to catalog pricing when no matching route exists.
+Bounded OpenRouter requests enforce `provider.max_price` for prompt/completion rates (USD per million tokens) and per-request fees, preserving provider allow-lists, exclusions, and stricter caller price caps. Bounded requests routed through providers that cannot enforce that ceiling are refused before upstream generation, unless the quoted price is zero.
+Tiered custom and Kilo-exclusive pricing uses the highest tier reachable from the request’s bounded input length.
 The default summary model is `~deepseek/deepseek-flash-latest`.
 Pricing estimates and gateway spend checks resolve latest-model aliases through the stored catalog target.
 An alias remains unavailable when its target is missing or has no usable pricing.
 The gateway rejects an alias request if provider routing selects a different target from the priced catalog target.
 The structured report remains available when generation fails or reaches a limit.
+Summary charges accumulate across a report's generations: each generation keeps its settlement record, a pending update preserves the reconciled total, and retry becomes available only when every tracked generation's usage is final.
+The settlement record also keeps the gateway's delivery outcome: a queued usage event keeps its generation open for the usage queue's delivery window, because queue acceptance precedes the committed row, while a failed accounting closes its generation at once.
 
 Apply database migrations before deploying the session-ingest, notification, gateway, and web changes.
 The CLI status producer must send occurrence timestamps and transition identities for reliable historical blocker counts.
@@ -620,6 +653,22 @@ Scorecards describe the collected evidence. Scheduled refresh replaces facts usi
 One-off period sampling and the summary model's 16-source/24-session selection remain independent.
 History pages allow up to 100 reports within a 3 MB JSON response budget.
 Stored reports must satisfy the shared contract; unreadable records are skipped during pagination.
+
+Manual preparation persists an unpublished draft through `startOneOffPreparation` before collecting evidence in `after()`.
+`oneOffPreparation` returns preparation progress or the completed report and a fresh cost estimate.
+`oneOffDrafts` lists resumable, unconfirmed drafts after navigation or an app restart.
+Attempt claims prevent concurrent or stale workers from overwriting a newer attempt.
+Interrupted preparation reaches a terminal failure and requires explicit retry.
+The summary cron recovers pending preparation independently of paid summary work.
+Preparation scheduler failures are logged without discarding completed summary job results.
+Preparations use the existing indexed `next_refresh_at` marker: pending work is immediately due,
+running work is due at its deadline, and terminal attempts clear the marker.
+Expiry checks use this due index, and each preparation collection batch selects at most five drafts.
+Scheduled refresh excludes one-off drafts.
+Preparation does not publish a report, invoke inference, or authorize a charge.
+`createOneOff` remains the explicit cost-confirmation step.
+Deploy the backend before releasing the new mobile client.
+The synchronous `prepareOneOff` endpoint remains supported for released clients.
 
 The protected cron routes are `/api/cron/agent-briefing` and `/api/cron/agent-briefing-summaries`.
 They use the existing cron authorization, database, gateway, and notification configuration.

@@ -376,6 +376,12 @@ export const REMOTE_COMMAND_MAX_STRING_LENGTH = 2_000;
 export const REMOTE_COMMAND_MAX_HINTS = 32;
 export const REMOTE_COMMAND_CATALOG_MAX_SERIALIZED_BYTES = 512 * 1024;
 
+export const PREPARATION_MAX_MESSAGE_LENGTH = 16_384;
+export const PREPARATION_MAX_DETAIL_LENGTH = 16_384;
+export const PREPARATION_MAX_SETUP_LOG_ENTRIES = 100;
+export const PREPARATION_MAX_ATTEMPTS = 10;
+export const PREPARATION_MAX_STEPS = 100;
+
 /** Most message IDs a `session.queue.changed` snapshot may carry. */
 export const SESSION_QUEUE_MAX_IDS = 1_000;
 /** Most questions a `question.asked` event may carry. */
@@ -699,13 +705,66 @@ export const kilocodePayloadSchema = z.object({
 });
 export type KilocodePayload = z.infer<typeof kilocodePayloadSchema>;
 
-export const messageUpdatedDataSchema = z.object({
-  info: z.object({ id: z.string(), sessionID: z.string() }).passthrough(),
-});
+/**
+ * The time a message carries on the wire: `created` on every message, and the
+ * assistant's `completed` once the turn finishes. Both the transcript's
+ * timestamp and the streaming check read it, so a payload without a readable
+ * `created` has nothing to render.
+ */
+const wireMessageTimeSchema = z
+  .object({ created: z.number(), completed: z.number().optional() })
+  .passthrough();
+
+/**
+ * The message fields this SDK reads, at the single validation boundary: the
+ * identity, the `role` consumers branch on, and the `time` they render. The
+ * generated `Message` union declares all three, but only this schema makes them
+ * true for a payload that arrives from the wire or a replay.
+ *
+ * Mirrored for the history/replay shape in `sessionSnapshotSchema`.
+ */
+const wireMessageInfoSchema = z
+  .object({ id: z.string(), sessionID: z.string(), role: z.string().min(1) })
+  .passthrough()
+  .refine(info => wireMessageTimeSchema.safeParse(info['time']).success, {
+    message: 'a message requires a time with a numeric created',
+    path: ['time'],
+  });
+
+export const messageUpdatedDataSchema = z.object({ info: wireMessageInfoSchema });
 export type MessageUpdatedData = z.infer<typeof messageUpdatedDataSchema>;
 
+/**
+ * The shape of a part as it arrives from the wire or a replay, before the SDK
+ * reads anything off it. Validates the part's identity for every type, and for
+ * a `tool` part additionally requires a `state` object carrying a non-empty
+ * string `status` — the one field every reader of a tool part needs
+ * (`part-utils.ts` ranks `state.status`, the transcript renders the completed
+ * output). A part without a usable state has nothing to show, so it is rejected
+ * at this boundary.
+ *
+ * The state is validated for its identity only, not its contents: attachments
+ * stay unchecked here (`part-utils.ts` filters the non-conforming entries at the
+ * chat-processor seam) because dropping the whole part over one bad attachment
+ * entry would lose a tool call the transcript can still render.
+ *
+ * Mirrored for the history/replay shape in `sessionSnapshotSchema`.
+ */
+const wireMessagePartSchema = z
+  .object({ id: z.string(), sessionID: z.string(), messageID: z.string() })
+  .passthrough()
+  .refine(
+    part =>
+      part['type'] !== 'tool' ||
+      z
+        .object({ status: z.string().min(1) })
+        .passthrough()
+        .safeParse(part['state']).success,
+    { message: 'a tool part requires a state with a non-empty string status', path: ['state'] }
+  );
+
 export const messagePartUpdatedDataSchema = z.object({
-  part: z.object({ id: z.string(), sessionID: z.string(), messageID: z.string() }).passthrough(),
+  part: wireMessagePartSchema,
   time: z.number().optional(),
 });
 export type MessagePartUpdatedData = z.infer<typeof messagePartUpdatedDataSchema>;
@@ -858,15 +917,37 @@ export const questionRejectedDataSchema = z.object({
 });
 export type QuestionRejectedData = z.infer<typeof questionRejectedDataSchema>;
 
+/**
+ * A permission request as it arrives from the wire or a pending-interaction
+ * replay. `id` and `permission` identify the request; `patterns`, `metadata`
+ * and `always` are the scope the consent surface shows before an allow
+ * decision, so each is required and kept only when it parses. A request whose
+ * scope is not the declared shape fails here and is never forwarded with an
+ * empty or partial scope — an approval must never be offered for a scope the
+ * app could not read.
+ */
 export const permissionAskedDataSchema = z.object({
   id: z.string().min(1),
   permission: z.string(),
   tool: z.object({ callID: z.string() }).optional(),
-  patterns: z.array(z.string()).catch([]),
-  metadata: z.record(z.string(), z.unknown()).catch({}),
-  always: z.array(z.string()).catch([]),
+  patterns: z.array(z.string()),
+  metadata: z.record(z.string(), z.unknown()),
+  always: z.array(z.string()),
 });
 export type PermissionAskedData = z.infer<typeof permissionAskedDataSchema>;
+
+/**
+ * The part of a permission request that still identifies it when its scope does
+ * not parse. The consent surface cannot offer a decision for such a request,
+ * but the user must learn that one is waiting, so the event boundary forwards
+ * this identity instead of dropping the request silently. A payload with no
+ * readable `id` has nothing to key the notice to and no `permission.replied`
+ * that could clear it, so it is still dropped.
+ */
+export const permissionAskedIdentitySchema = z.object({
+  id: z.string().min(1),
+});
+export type PermissionAskedIdentity = z.infer<typeof permissionAskedIdentitySchema>;
 
 export const permissionRepliedDataSchema = z.object({
   requestID: z.string(),
@@ -935,7 +1016,7 @@ const preparationStepSchema = z.object({
   parentStepId: z.string().optional(),
   completedAt: z.number().optional(),
   revision: z.number(),
-  latestDetail: z.string().optional(),
+  latestDetail: z.string().max(PREPARATION_MAX_DETAIL_LENGTH).optional(),
   safeError: z.string().optional(),
   command: z.string().optional(),
   commandIndex: z.number().optional(),
@@ -958,7 +1039,7 @@ const preparationAttemptSchema = z.object({
 export const preparingDataSchema = z
   .object({
     step: z.string(),
-    message: z.string(),
+    message: z.string().max(PREPARATION_MAX_MESSAGE_LENGTH),
     branch: z.string().optional(),
     version: z.literal(2).optional(),
     attemptId: z.string().optional(),
@@ -986,7 +1067,7 @@ export const preparingDataSchema = z
     command: z.string().optional(),
     commandIndex: z.number().optional(),
     commandCount: z.number().optional(),
-    detail: z.string().optional(),
+    detail: z.string().max(PREPARATION_MAX_DETAIL_LENGTH).optional(),
     output: z.string().max(PREPARATION_OUTPUT_MAX_LENGTH).optional(),
     safeError: z.string().optional(),
     exitCode: z.number().optional(),
@@ -1128,8 +1209,8 @@ export const sessionSnapshotSchema = z.object({
   info: z.object({ id: z.unknown() }).passthrough(),
   messages: z.array(
     z.object({
-      info: z.object({ id: z.string() }).passthrough(),
-      parts: z.array(z.object({ id: z.string() }).passthrough()),
+      info: wireMessageInfoSchema,
+      parts: z.array(wireMessagePartSchema),
     })
   ),
 });

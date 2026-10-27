@@ -103,19 +103,23 @@ describe('shared tap-target geometry', () => {
     expect(ICON_TARGET_BOX_CLASS).toContain('justify-center');
   });
 
-  it('renders a text-only action frame at the platform minimum from whole pixels', async () => {
+  it('renders a text-only action frame at the platform minimum on both axes', async () => {
     // The regression this guards: a text link whose only child is one label
     // line reports that line's height as its own rect, and `hitSlop` never
-    // lifts the rect an audit reads. `min-h-11` would be 38.5pt on device.
+    // lifts the rect an audit reads. `min-h-11` would be 38.5pt on device. The
+    // width floor is needed because the caller drops its hit slop: a short
+    // label is only a couple of glyphs wide.
     platform.OS = 'ios';
     const ios = textActionTargetClass();
     expect(ios).toContain('min-h-[44px]');
     expect(await compiledDp(ios, 'minHeight')).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
+    expect(await compiledDp(ios, 'minWidth')).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
 
     platform.OS = 'android';
     const android = textActionTargetClass();
     expect(android).toContain('min-h-[48px]');
     expect(await compiledDp(android, 'minHeight')).toBeGreaterThanOrEqual(ICON_TARGET_DP);
+    expect(await compiledDp(android, 'minWidth')).toBeGreaterThanOrEqual(ICON_TARGET_DP);
 
     platform.OS = 'ios';
   });

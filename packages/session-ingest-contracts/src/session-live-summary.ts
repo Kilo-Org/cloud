@@ -72,24 +72,66 @@ export const sessionLiveSummarySchema = z.object({
 export type SessionLiveSummary = z.infer<typeof sessionLiveSummarySchema>;
 
 /**
- * One line of display text: control characters and line breaks become spaces,
- * runs of white space collapse, and text longer than `limit` ends with an
- * ellipsis inside the limit. The cut never splits a UTF-16 surrogate pair.
- * Empty text gives null.
+ * Whether the code point is a layout format control: a code point with no glyph
+ * of its own that does not shape adjacent characters either. Display text keeps
+ * the code points that draw themselves and the joiners that shape their
+ * neighbours, so these are removed. Compared numerically because a character
+ * class naming them reads in the source as the characters themselves.
  */
-export function sessionLiveText(raw: unknown, limit: number): string | null {
-  if (typeof raw !== 'string') return null;
+function isFormatControl(code: number): boolean {
+  return (
+    code === 0x061c ||
+    code === 0x200b ||
+    code === 0x200e ||
+    code === 0x200f ||
+    (code >= 0x202a && code <= 0x202e) ||
+    code === 0x2060 ||
+    (code >= 0x2066 && code <= 0x2069) ||
+    code === 0xfeff
+  );
+}
+
+/**
+ * Display text as one line of what it draws: control characters and line breaks
+ * become spaces, layout format controls are left out, and the joiners that
+ * shape adjacent characters are kept. Every display surface that shows stored
+ * text reads it through this, so one string cannot read two ways. White space
+ * is left as it is; `sessionLiveText` collapses and bounds it.
+ */
+export function sessionDisplayLine(raw: string): string {
   // Iterating code points keeps a surrogate pair whole while the control set is
   // applied. The set is compared numerically: a character class that names the
   // control range reads as a control character in the source itself.
-  const flattened = [...raw]
+  return [...raw]
     .map(char => {
       const code = char.codePointAt(0) ?? 0;
+      if (isFormatControl(code)) return '';
       return code <= 0x1f || code === 0x7f || code === 0x2028 || code === 0x2029 ? ' ' : char;
     })
     .join('');
-  const line = flattened.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * One line of display text: control characters and line breaks become spaces,
+ * layout format controls are removed, the joiners that shape adjacent
+ * characters are kept, runs of white space collapse, and text longer than
+ * `limit` ends with an ellipsis inside the limit. The cut never splits a UTF-16
+ * surrogate pair. Empty text, white space, and text made only of joiners give
+ * null.
+ */
+export function sessionLiveText(raw: unknown, limit: number): string | null {
+  if (typeof raw !== 'string') return null;
+  const line = sessionDisplayLine(raw).replace(/\s+/g, ' ').trim();
   if (line === '') return null;
+  // Joiners alone draw nothing, so they are empty display text like blanks.
+  if (
+    [...line].every(char => {
+      const code = char.codePointAt(0);
+      return code === 0x200c || code === 0x200d;
+    })
+  ) {
+    return null;
+  }
   if (line.length <= limit) return line;
   let cut = line.slice(0, limit - 1);
   const last = cut.charCodeAt(cut.length - 1);

@@ -582,6 +582,13 @@ type CloudAgentNextTRPCClient = {
   deleteSession: {
     mutate: (input: { sessionId: string }) => Promise<{ success: boolean; message?: string }>;
   };
+  deleteHostedWorkspaceSession: {
+    mutate: (input: {
+      workspaceId: string;
+      sessionId: string;
+      operationKey: string;
+    }) => Promise<{ success: true; workspaceId: string; sessionId: string }>;
+  };
   deleteWorktree: {
     mutate: (input: DeleteWorktreeInput) => Promise<DeleteWorktreeOutput>;
   };
@@ -739,6 +746,8 @@ export class CloudAgentNextClient {
         error instanceof TRPCClientError &&
         (error.data?.code === 'NOT_FOUND' ||
           error.shape?.data?.code === 'NOT_FOUND' ||
+          error.data?.code === 'CONFLICT' ||
+          error.shape?.data?.code === 'CONFLICT' ||
           error.data?.httpStatus === 404 ||
           error.shape?.data?.httpStatus === 404)
       ) {
@@ -752,6 +761,14 @@ export class CloudAgentNextClient {
       });
       return { success: false };
     }
+  }
+
+  async deleteHostedWorkspaceSession(input: {
+    workspaceId: string;
+    sessionId: string;
+    operationKey: string;
+  }): Promise<{ success: true; workspaceId: string; sessionId: string }> {
+    return this.client.deleteHostedWorkspaceSession.mutate(input);
   }
 
   async deleteWorktree(input: DeleteWorktreeInput): Promise<DeleteWorktreeOutput> {

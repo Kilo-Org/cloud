@@ -61,6 +61,7 @@ import {
   unresolveThread as gitlabUnresolveThread,
 } from '@/lib/provider-review/gitlab-write';
 import * as bitbucketRead from '@/lib/provider-review/bitbucket-read';
+import { providerReviewErrorToTrpcError } from '@/lib/provider-review/error-mapping';
 import {
   BITBUCKET_AUTO_MERGE_UNSUPPORTED_REASON,
   BITBUCKET_PR_REVIEW_CAPABILITIES,
@@ -383,28 +384,7 @@ function providerRef(input: ProviderRefIdentity): ProviderPrRef {
  */
 function toProviderTrpcError(error: unknown): TRPCError {
   if (error instanceof TRPCError) return error;
-  if (error instanceof ProviderReviewError) {
-    switch (error.kind) {
-      case 'not_found':
-        return new TRPCError({ code: 'NOT_FOUND', message: error.message });
-      case 'forbidden':
-        return new TRPCError({ code: 'FORBIDDEN', message: error.message });
-      case 'reconnect':
-        // The provider connection must be re-established; the caller's Kilo
-        // access is not the problem. This is the mobile reconnect state.
-        return new TRPCError({ code: 'PRECONDITION_FAILED', message: error.message });
-      case 'stale_head':
-        return new TRPCError({ code: 'CONFLICT', message: error.message });
-      case 'bad_request':
-        return new TRPCError({ code: 'BAD_REQUEST', message: error.message });
-      case 'too_large':
-        // The file is outside the review read budget, so no retry helps; the
-        // distinct code lets the caller tell it from a malformed request.
-        return new TRPCError({ code: 'PAYLOAD_TOO_LARGE', message: error.message });
-      case 'retryable':
-        return new TRPCError({ code: 'BAD_GATEWAY', message: error.message });
-    }
-  }
+  if (error instanceof ProviderReviewError) return providerReviewErrorToTrpcError(error);
   return new TRPCError({
     code: 'INTERNAL_SERVER_ERROR',
     message: 'The review request failed. Please try again.',

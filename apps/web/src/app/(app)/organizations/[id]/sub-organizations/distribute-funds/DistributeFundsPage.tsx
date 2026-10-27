@@ -44,7 +44,6 @@ export function DistributeFundsPage({ organizationId }: Props) {
   const [amounts, setAmounts] = useState<Record<string, string>>({});
 
   const parentBalance = data?.parentBalanceMicrodollars ?? 0;
-  const hasExpiringCredits = data?.hasExpiringCredits ?? false;
   const children = useMemo(() => data?.children ?? [], [data]);
 
   const rows = useMemo(
@@ -60,12 +59,7 @@ export function DistributeFundsPage({ organizationId }: Props) {
   const remainingMicrodollars = parentBalance - totalMicrodollars;
   const overBudget = remainingMicrodollars < 0;
   const hasFieldError = rows.some(row => row.error != null);
-  const canSubmit =
-    !hasExpiringCredits &&
-    !hasFieldError &&
-    !overBudget &&
-    totalMicrodollars > 0 &&
-    !distribute.isPending;
+  const canSubmit = !hasFieldError && !overBudget && totalMicrodollars > 0 && !distribute.isPending;
 
   const handleSubmit = () => {
     const allocations = rows
@@ -130,20 +124,11 @@ export function DistributeFundsPage({ organizationId }: Props) {
               <CardTitle>Distribute funds to child organizations</CardTitle>
               <CardDescription>
                 Move available balance to child organizations. The total you distribute can&apos;t
-                exceed the available balance.
+                exceed the available balance. Transferred credits keep their original expiration
+                dates.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {hasExpiringCredits && (
-                <Alert variant="warning">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertDescription>
-                    Distributing funds isn&apos;t available while this organization has expiring
-                    credits.
-                  </AlertDescription>
-                </Alert>
-              )}
-
               <div className="border-border flex items-baseline justify-between gap-4 border-b pb-4">
                 <span className="text-muted-foreground text-sm">Available to distribute</span>
                 <span className="text-lg font-semibold tabular-nums">
@@ -184,7 +169,7 @@ export function DistributeFundsPage({ organizationId }: Props) {
                                 aria-label={`Amount to move to ${row.child.name}`}
                                 aria-invalid={row.error != null}
                                 aria-describedby={row.error ? errorId : undefined}
-                                disabled={hasExpiringCredits || distribute.isPending}
+                                disabled={distribute.isPending}
                                 onChange={event =>
                                   setAmounts(previous => ({
                                     ...previous,

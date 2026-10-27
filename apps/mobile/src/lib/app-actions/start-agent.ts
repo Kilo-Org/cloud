@@ -46,7 +46,30 @@ export type StartAgentInput = {
   model?: string;
   variant?: string;
   organizationId?: string;
+  /** A repository value already prepared for the session start. */
+  resolvedRepository?: NewSessionRepository;
 };
+/** Result of resolving a repository for a start request. */
+export type StartAgentRepositoryResolution =
+  | { ok: true; repository: NewSessionRepository }
+  | { ok: false; result: AppActionResult };
+
+/** Resolve one action repository into the shape used by session creation. */
+export async function resolveStartAgentRepository(
+  input: Pick<StartAgentInput, 'prompt' | 'repository' | 'sessionId'>
+): Promise<StartAgentRepositoryResolution> {
+  const preflight = preflightStartAgent(input);
+  if (!preflight.ok) {
+    return { ok: false, result: preflight.result };
+  }
+  try {
+    // Keep secure storage and the native outbox out of the shared in-app import graph.
+    const runtime = await import('@/lib/app-actions/start-agent-runtime');
+    return await resolveActionRepository(preflight.named, runtime);
+  } catch {
+    return { ok: false, result: retryableStartFailure() };
+  }
+}
 
 /**
  * Run one `StartAgent` intent: resolve the repository, the model, the
@@ -65,7 +88,9 @@ export async function startAgent(input: StartAgentInput): Promise<AppActionResul
     // Lazy: the in-app creators import this module, so the native half of the
     // action path must never enter their graph.
     const runtime = await import('@/lib/app-actions/start-agent-runtime');
-    const repository = await resolveActionRepository(preflight.named, runtime);
+    const repository: ActionRepositoryResolution = input.resolvedRepository
+      ? { ok: true, repository: input.resolvedRepository }
+      : await resolveActionRepository(preflight.named, runtime);
     if (!repository.ok) {
       return repository.result;
     }

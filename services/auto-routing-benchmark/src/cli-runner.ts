@@ -7,6 +7,10 @@ import { materializeLongContext } from './datasets/long-context';
 export type CliRunResult = {
   text: string;
   costUsd: number | null;
+  inputTokens: number | null;
+  cachedInputTokens: number | null;
+  outputTokens: number | null;
+  reasoningTokens: number | null;
   latencyMs: number;
   exitCode: number;
   stderrTail: string;
@@ -15,6 +19,22 @@ export type CliRunResult = {
   timedOut: boolean;
   unavailableModelId?: string;
 };
+
+export type AttemptUsage = Pick<
+  CliRunResult,
+  'costUsd' | 'inputTokens' | 'cachedInputTokens' | 'outputTokens' | 'reasoningTokens'
+>;
+
+// A retried case bills both attempts, so its cost and token totals cover both.
+export function addPriorAttempt(result: CliRunResult, prior: AttemptUsage): void {
+  const add = (current: number | null, previous: number | null) =>
+    current === null && previous === null ? null : (current ?? 0) + (previous ?? 0);
+  result.costUsd = add(result.costUsd, prior.costUsd);
+  result.inputTokens = add(result.inputTokens, prior.inputTokens);
+  result.cachedInputTokens = add(result.cachedInputTokens, prior.cachedInputTokens);
+  result.outputTokens = add(result.outputTokens, prior.outputTokens);
+  result.reasoningTokens = add(result.reasoningTokens, prior.reasoningTokens);
+}
 
 export const DECIDER_CLI_TIMEOUT_MS = 180_000;
 
@@ -131,7 +151,11 @@ export async function runDeciderCaseViaCli(
     reasoningEffort?: string | null;
     resultCallback?: {
       url: string;
-      execution: PaidExecutionKey & { retried?: boolean; priorCostUsd?: number | null };
+      execution: PaidExecutionKey & {
+        retried?: boolean;
+        priorCostUsd?: number | null;
+        priorUsage?: Omit<AttemptUsage, 'costUsd'> | null;
+      };
     };
   }
 ): Promise<CliRunResult> {
@@ -171,7 +195,16 @@ export function parseContainerRunResponse(
   startedAt: number,
   requestedModel: string
 ): CliRunResult {
-  const { text, costUsd, eventCount, lastEventTypes } = parseKiloRunEvents(body.stdoutLines ?? []);
+  const {
+    text,
+    costUsd,
+    inputTokens,
+    cachedInputTokens,
+    outputTokens,
+    reasoningTokens,
+    eventCount,
+    lastEventTypes,
+  } = parseKiloRunEvents(body.stdoutLines ?? []);
   const providerThrottled = (body.stdoutLines ?? []).some(line => {
     try {
       const event: unknown = JSON.parse(line);
@@ -241,6 +274,10 @@ export function parseContainerRunResponse(
   const result: CliRunResult = {
     text,
     costUsd,
+    inputTokens,
+    cachedInputTokens,
+    outputTokens,
+    reasoningTokens,
     latencyMs: body.durationMs ?? Date.now() - startedAt,
     exitCode: body.exitCode,
     stderrTail: providerThrottled

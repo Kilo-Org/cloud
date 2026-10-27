@@ -17,7 +17,7 @@ export async function isFreeModel(modelId: string): Promise<boolean> {
 
 /**
  * The built-in free model rules, without custom LLMs. Use `isFreeModel` unless
- * custom LLMs must be excluded outright, as for `kilo-auto/free` candidates.
+ * custom LLMs need separate handling, as for `kilo-auto/free` candidates.
  */
 export function isFreeModelExcludingCustomLlms(model: string): boolean {
   const modelId = model ?? '';

@@ -41,9 +41,10 @@
     "dev:infra-env": "tsx dev/local/infra-env.ts",
     "dev:env:mobile": "tsx dev/local/mobile-env.ts",
     "dev:mock-github": "tsx dev/mock-github/server.ts",
+    "dev:byok-kms": "tsx dev/byok-kms/server.ts",
     "dev:mobile:android": "tsx dev/local/mobile-android.ts",
     "dev:mobile:ios": "tsx dev/local/mobile-ios-build.ts",
-    "test:dev-local": "tsx --test dev/local/*.test.ts dev/local/env-sync/*.test.ts dev/local/scripts/*.test.ts dev/seed/lib/*.test.ts",
+    "test:dev-local": "tsx --test dev/local/*.test.ts dev/local/env-sync/*.test.ts dev/local/scripts/*.test.ts dev/byok-kms/*.test.ts dev/seed/lib/*.test.ts",
     "test:mobile-workflow": "tsx --test dev/local/mobile-native-gate.test.ts dev/local/mobile-native-build.test.ts dev/local/mobile-ios-build.test.ts dev/local/mobile-android-build.test.ts dev/local/mobile-android.test.ts dev/local/mobile-workflow.test.ts",
     "dev:setup-env": "tsx dev/local/setup-env.ts",
     "dev:seed": "tsx dev/seed/index.ts",
@@ -62,10 +63,12 @@
     "@types/proper-lockfile": "4.1.4",
     "@types/react": "19.2.14",
     "@typescript/native-preview": "catalog:",
+    "aws4fetch": "catalog:",
     "drizzle-orm": "catalog:",
     "eslint-plugin-zod-utils": "1.0.11",
     "husky": "9.1.7",
     "ink": "6.8.0",
+    "jose": "catalog:",
     "js-yaml": "4.3.2",
     "oxfmt": "0.73.0",
     "oxlint": "1.88.0",
@@ -75,6 +78,7 @@
     "react": "19.2.6",
     "tsx": "catalog:",
     "typescript": "catalog:",
-    "vercel": "53.3.1"
+    "vercel": "53.3.1",
+    "zod": "catalog:"
   }
 }

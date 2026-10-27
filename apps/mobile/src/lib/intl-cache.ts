@@ -294,3 +294,23 @@ export function prewarmIntl(locale: string): void {
     // at the real call site, so a failure must not block the app.
   }
 }
+
+/**
+ * Install the grapheme segmenter for text a headless surface cuts itself.
+ *
+ * Session card titles, targets and commands are cut on character boundaries
+ * through `@kilocode/session-ingest-contracts`, which reads `Intl.Segmenter`
+ * when the runtime has one. Hermes does not, so a headless process that draws a
+ * widget or a notification before the root layout has run would cut those
+ * strings by code unit and could end one inside an emoji sequence. The widget,
+ * Approve and notification entries apply the stored language before they build
+ * any text, and this fills the same lazy polyfill the foreground path warms.
+ */
+export function prewarmSegmenter(locale: string): void {
+  try {
+    segmenter(locale, { granularity: 'grapheme' });
+  } catch {
+    // A prewarm is only a cache fill: a failed install leaves the cut on its
+    // code unit boundary, which is what a runtime without one has today.
+  }
+}

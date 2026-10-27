@@ -104,6 +104,28 @@ describe('sessionLiveText', () => {
     }
   });
 
+  it('reads a segmenter that arrives after an earlier cut', async () => {
+    const actual = globalThis.Intl;
+    try {
+      vi.stubGlobal('Intl', { Segmenter: undefined });
+      vi.resetModules();
+      // A dynamic import re-evaluates the module, which is the only way to give
+      // this case a process that has not built a segmenter yet.
+      const { sessionLiveText: cut } = await import(
+        '@kilocode/session-ingest-contracts/session-live-summary'
+      );
+      // The first cut runs before the runtime has a segmenter, so it keeps code
+      // units: the app installs that polyfill into the same process it draws in.
+      expect(cut('ab🇷🇸cd', 5)).toBe('ab🇷…');
+      vi.stubGlobal('Intl', actual);
+      // Same module instance, so only a fresh look at `Intl` can see it.
+      expect(cut('ab🇷🇸cd', 5)).toBe('ab…');
+    } finally {
+      vi.stubGlobal('Intl', actual);
+      vi.resetModules();
+    }
+  });
+
   it('returns null for non-strings, blanks, and joiner-only text', () => {
     expect(sessionLiveText(null, 40)).toBeNull();
     expect(sessionLiveText('\u200B\uFEFF\n', 40)).toBeNull();

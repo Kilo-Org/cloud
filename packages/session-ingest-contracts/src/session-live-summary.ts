@@ -115,16 +115,20 @@ let graphemeSegmenter: Intl.Segmenter | null | undefined;
 
 /**
  * The segmenter the cut reads character boundaries from, or null when the
- * runtime does not provide one. Built once: a segmenter is stateless, and the
- * granularity is the same for every language, so no locale is needed.
+ * runtime does not provide one. A built segmenter is kept: it is stateless, and
+ * the granularity is the same for every language, so no locale is needed.
+ *
+ * A missing one is not remembered. Hermes ships no `Intl.Segmenter` and the
+ * mobile app installs the polyfill into the running process, so a caller that
+ * cuts text before that install must read the next cut through the segmenter
+ * that is there now, not keep a code-unit cut for the rest of the process.
  */
 function characterSegmenter(): Intl.Segmenter | null {
-  if (graphemeSegmenter === undefined) {
-    graphemeSegmenter =
-      typeof Intl === 'object' && Intl !== null && typeof Intl.Segmenter === 'function'
-        ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
-        : null;
+  if (graphemeSegmenter) return graphemeSegmenter;
+  if (typeof Intl !== 'object' || Intl === null || typeof Intl.Segmenter !== 'function') {
+    return null;
   }
+  graphemeSegmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
   return graphemeSegmenter;
 }
 

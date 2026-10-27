@@ -19,6 +19,8 @@ import {
   addSsoUserToOrganization,
   updateUserRoleInOrganization,
   inviteUserToOrganization,
+  CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER,
+  CHILD_ORGANIZATION_ACCEPT_REQUIRES_PARENT_MEMBER,
   getOrganizationMembers,
   acceptOrganizationInvite,
   updateOrganizationSettings,
@@ -1022,7 +1024,7 @@ describe('Organizations', () => {
       ).rejects.toThrow('User must join this organization through SSO');
     });
 
-    test('rejects invitations into a child organization', async () => {
+    test('rejects inviting someone who is not a parent organization member', async () => {
       const owner = await insertTestUser();
       const parent = await createOrganization('Parent Org', owner.id);
       const child = await createOrganization('Child Org', owner.id);
@@ -1033,7 +1035,89 @@ describe('Organizations', () => {
 
       await expect(
         inviteUserToOrganization(child.id, owner.id, 'member@example.com', 'member')
-      ).rejects.toThrow('Child organizations cannot invite members');
+      ).rejects.toThrow(CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER);
+    });
+
+    test('invites a parent organization member into a child organization', async () => {
+      const owner = await insertTestUser();
+      const parentMember = await insertTestUser({
+        google_user_email: 'Parent.Member@example.com',
+      });
+      const parent = await createOrganization('Parent Org', owner.id);
+      const child = await createOrganization('Child Org', owner.id);
+      await addUserToOrganization(parent.id, parentMember.id, 'member');
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+
+      const invitation = await inviteUserToOrganization(
+        child.id,
+        owner.id,
+        'parent.member@example.com',
+        'member'
+      );
+
+      expect(invitation.organization_id).toBe(child.id);
+      expect(invitation.email).toBe('parent.member@example.com');
+    });
+
+    test('matches a parent member by normalized email when the invite uses an alias', async () => {
+      const owner = await insertTestUser();
+      const parentMember = await insertTestUser({
+        google_user_email: 'user@gmail.com',
+        normalized_email: 'user@gmail.com',
+      });
+      const parent = await createOrganization('Parent Org', owner.id);
+      const child = await createOrganization('Child Org', owner.id);
+      await addUserToOrganization(parent.id, parentMember.id, 'member');
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+
+      const invitation = await inviteUserToOrganization(
+        child.id,
+        owner.id,
+        'user+team@gmail.com',
+        'member'
+      );
+
+      expect(invitation.email).toBe('user+team@gmail.com');
+    });
+
+    test('does not treat a pending parent invitation as parent membership', async () => {
+      const owner = await insertTestUser();
+      const parent = await createOrganization('Parent Org', owner.id);
+      const child = await createOrganization('Child Org', owner.id);
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+      await inviteUserToOrganization(parent.id, owner.id, 'pending-parent@example.com', 'member');
+
+      await expect(
+        inviteUserToOrganization(child.id, owner.id, 'pending-parent@example.com', 'member')
+      ).rejects.toThrow(CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER);
+    });
+
+    test('does not invite a parent organization service account', async () => {
+      const owner = await insertTestUser();
+      const bot = await insertTestUser({
+        is_bot: true,
+        google_user_email: 'child-invite-bot@example.com',
+      });
+      const parent = await createOrganization('Parent Org', owner.id);
+      const child = await createOrganization('Child Org', owner.id);
+      await addUserToOrganization(parent.id, bot.id, 'member');
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+
+      await expect(
+        inviteUserToOrganization(child.id, owner.id, bot.google_user_email, 'member')
+      ).rejects.toThrow(CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER);
     });
   });
 
@@ -1502,13 +1586,11 @@ describe('Organizations', () => {
         expect(updatedInvitee?.customer_source).toBe('GitHub');
       });
 
-      test('rejects accepting a pre-existing invitation into a child organization', async () => {
+      test('rejects accepting a child invitation when the user is not a parent member', async () => {
         const owner = await insertTestUser();
         const invitee = await insertTestUser({ google_user_email: 'legacy@example.com' });
         const parent = await createOrganization('Parent Org', owner.id);
         const child = await createOrganization('Child Org', owner.id);
-        // Invites can no longer be created for child orgs through the normal flow,
-        // so insert a pending invite directly, then reparent the org afterwards.
         const token = 'legacy-child-invitation';
         await db.insert(organization_invitations).values({
           organization_id: child.id,
@@ -1527,11 +1609,70 @@ describe('Organizations', () => {
 
         expect(result).toEqual({
           success: false,
-          error: 'Child organizations cannot accept invitations',
+          error: CHILD_ORGANIZATION_ACCEPT_REQUIRES_PARENT_MEMBER,
         });
 
         const userOrgs = await getUserOrganizationsWithSeats(invitee.id);
         expect(userOrgs).toHaveLength(0);
+      });
+
+      test('accepts a child invitation for a current parent member', async () => {
+        const owner = await insertTestUser();
+        const invitee = await insertTestUser({ google_user_email: 'child-join@example.com' });
+        const parent = await createOrganization('Parent Org', owner.id);
+        const child = await createOrganization('Child Org', owner.id);
+        await addUserToOrganization(parent.id, invitee.id, 'member');
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: parent.id })
+          .where(eq(organizations.id, child.id));
+
+        const invitation = await inviteUserToOrganization(
+          child.id,
+          owner.id,
+          invitee.google_user_email,
+          'member'
+        );
+        const result = await acceptOrganizationInvite(invitee.id, invitation.token);
+
+        expect(result.success).toBe(true);
+        const userOrgs = await getUserOrganizationsWithSeats(invitee.id);
+        expect(userOrgs.map(org => org.organizationId).sort()).toEqual(
+          [parent.id, child.id].sort()
+        );
+      });
+
+      test('rejects a child invitation after the invitee leaves the parent', async () => {
+        const owner = await insertTestUser();
+        const invitee = await insertTestUser({ google_user_email: 'left-parent@example.com' });
+        const parent = await createOrganization('Parent Org', owner.id);
+        const child = await createOrganization('Child Org', owner.id);
+        await addUserToOrganization(parent.id, invitee.id, 'member');
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: parent.id })
+          .where(eq(organizations.id, child.id));
+        const invitation = await inviteUserToOrganization(
+          child.id,
+          owner.id,
+          invitee.google_user_email,
+          'member'
+        );
+        await db
+          .delete(organization_memberships)
+          .where(
+            and(
+              eq(organization_memberships.organization_id, parent.id),
+              eq(organization_memberships.kilo_user_id, invitee.id)
+            )
+          );
+
+        const result = await acceptOrganizationInvite(invitee.id, invitation.token);
+
+        expect(result).toEqual({
+          success: false,
+          error: CHILD_ORGANIZATION_ACCEPT_REQUIRES_PARENT_MEMBER,
+        });
       });
 
       test('should accept invitation with owner role', async () => {

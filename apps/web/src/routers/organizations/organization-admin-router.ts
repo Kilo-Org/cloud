@@ -1025,6 +1025,28 @@ export const organizationAdminRouter = createTRPCRouter({
       });
     }
 
+    if (organization.parent_organization_id) {
+      const [parentMembership] = await db
+        .select({ id: organization_memberships.id })
+        .from(organization_memberships)
+        .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+        .where(
+          and(
+            eq(organization_memberships.organization_id, organization.parent_organization_id),
+            eq(organization_memberships.kilo_user_id, userId),
+            eq(kilocode_users.is_bot, false)
+          )
+        )
+        .limit(1);
+      if (!parentMembership || existingUser.is_bot) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message:
+            'Child organizations can only add people who are already members of the parent organization.',
+        });
+      }
+    }
+
     const ssoPolicy = await resolveEffectiveOrganizationSsoPolicy(organizationId);
     if (ssoPolicy.status === 'misconfigured') {
       throw new TRPCError({

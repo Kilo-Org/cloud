@@ -3315,7 +3315,8 @@
       "alreadyInvited": "They're already invited or already a member.",
       "sendError": "Couldn't send the invite.",
       "pendingInvitation": "This email already has a pending invitation.",
-      "alreadyMember": "This person is already a member of this organization."
+      "alreadyMember": "This person is already a member of this organization.",
+      "parentMemberRequired": "Only people already in the parent organization can be invited."
     },
     "invoices": {
       "downloadA11y": "Download invoice {{number}}",

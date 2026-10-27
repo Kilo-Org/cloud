@@ -187,6 +187,7 @@ export const ARTIFICIAL_ANALYSIS_API_KEY = getEnvVariable('ARTIFICIAL_ANALYSIS_A
 export const ENKRYPT_API_KEY = getEnvVariable('ENKRYPT_API_KEY');
 export const ENKRYPT_SYNC_ENABLED = getEnvVariable('ENKRYPT_SYNC_ENABLED') === 'true';
 export const ENKRYPT_PUBLICATION_ENABLED = getEnvVariable('ENKRYPT_PUBLICATION_ENABLED') === 'true';
+export const ENKRYPT_GUARDRAILS_API_KEY = getEnvVariable('ENKRYPT_GUARDRAILS_API_KEY');
 
 // Cron jobs
 export const CRON_SECRET = getEnvVariable('CRON_SECRET');

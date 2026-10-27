@@ -1,6 +1,6 @@
 {
-  "id": "53a48f7f-7f1f-47c1-9607-259103016378",
-  "prevId": "3ef93f9d-c2d8-4ef7-87ce-4876b6dba5de",
+  "id": "22f9636f-dc52-4e48-b714-57ed907efdec",
+  "prevId": "10c95306-8ba5-41f3-a005-0eecd50742d4",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -4129,6 +4129,13 @@
           "notNull": true,
           "default": true
         },
+        "settings": {
+          "name": "settings",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -4322,6 +4329,13 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
+        },
+        "is_fork": {
+          "name": "is_fork",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "parent_session_id": {
           "name": "parent_session_id",
@@ -5729,6 +5743,22 @@
           ],
           "isUnique": false,
           "where": "\"cloud_agent_code_reviews\".\"started_at\" is not null",
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_cloud_agent_code_reviews_started_at_effective": {
+          "name": "idx_cloud_agent_code_reviews_started_at_effective",
+          "columns": [
+            {
+              "expression": "COALESCE(\"started_at\", \"updated_at\", \"created_at\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"cloud_agent_code_reviews\".\"status\" NOT IN ('pending', 'queued') AND COALESCE(\"cloud_agent_code_reviews\".\"terminal_reason\", '') <> 'abandoned'",
           "concurrently": true,
           "method": "btree",
           "with": {}
@@ -11191,6 +11221,44 @@
           "primaryKey": false,
           "notNull": false
         },
+        "consumed_microdollars": {
+          "name": "consumed_microdollars",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "retired_microdollars": {
+          "name": "retired_microdollars",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "paid_credit_policy": {
+          "name": "paid_credit_policy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "credit_source": {
+          "name": "credit_source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_transaction_id": {
+          "name": "source_transaction_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "refund_principal_microdollars": {
+          "name": "refund_principal_microdollars",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
         "is_free": {
           "name": "is_free",
           "type": "boolean",
@@ -11378,6 +11446,21 @@
           ],
           "isUnique": false,
           "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_credit_transactions_source_transaction_id": {
+          "name": "IDX_credit_transactions_source_transaction_id",
+          "columns": [
+            {
+              "expression": "source_transaction_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -22133,6 +22216,22 @@
           "method": "btree",
           "with": {}
         },
+        "IDX_kilocode_users_next_credit_expiration_at": {
+          "name": "IDX_kilocode_users_next_credit_expiration_at",
+          "columns": [
+            {
+              "expression": "next_credit_expiration_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"kilocode_users\".\"next_credit_expiration_at\" IS NOT NULL",
+          "concurrently": true,
+          "method": "btree",
+          "with": {}
+        },
         "IDX_kilocode_users_blocked_at": {
           "name": "IDX_kilocode_users_blocked_at",
           "columns": [
@@ -23085,6 +23184,12 @@
         },
         "market_cost": {
           "name": "market_cost",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "non_inference_cost": {
+          "name": "non_inference_cost",
           "type": "bigint",
           "primaryKey": false,
           "notNull": false
@@ -25901,6 +26006,22 @@
           ],
           "isUnique": false,
           "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_organizations_next_credit_expiration_at": {
+          "name": "IDX_organizations_next_credit_expiration_at",
+          "columns": [
+            {
+              "expression": "next_credit_expiration_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"organizations\".\"next_credit_expiration_at\" IS NOT NULL",
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },
@@ -31953,6 +32074,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "pending_copy_ids": {
+          "name": "pending_copy_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -31981,6 +32109,21 @@
           ],
           "isUnique": false,
           "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_shared_cli_sessions_kilo_user_id": {
+          "name": "IDX_shared_cli_sessions_kilo_user_id",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },

@@ -1,4 +1,4 @@
-/* eslint-disable eslint-plugin-import/no-nodejs-modules, eslint-plugin-unicorn/prefer-module -- this test reads the Kotlin sources from disk, the only place their contract is observable without an Android build */
+/* eslint-disable eslint-plugin-import/no-nodejs-modules, eslint-plugin-unicorn/prefer-module, max-lines -- this test reads the Kotlin sources from disk, the only place their contract is observable without an Android build */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -227,6 +227,7 @@ describe('the quiet moment of a Working card', () => {
 describe('ActiveAgentsActionReceiver', () => {
   const receive = body(RECEIVER, 'override fun onReceive(');
   const dismiss = receive.slice(receive.indexOf('if (action == ACTION_DISMISS)'));
+  const quiet = receive.slice(receive.indexOf('if (action == ACTION_QUIET)'));
 
   it('routes a dismissal to the headless unfollow, after dropping the stored card', () => {
     const cancel = dismiss.indexOf('SessionNotifications.cancel(context, sessionId)');
@@ -234,6 +235,21 @@ describe('ActiveAgentsActionReceiver', () => {
     expect(cancel, 'the stored card must be dropped').toBeGreaterThan(-1);
     expect(enqueue, 'the dismissal must reach headless JS').toBeGreaterThan(cancel);
     expect(dismiss.slice(enqueue)).toMatch(/enqueueDismiss\(context, sessionId\)/);
+  });
+
+  it('keeps the card writes off the broadcast thread', () => {
+    // The receiver's own contract is that it only enqueues: the prefs fsync,
+    // the notify and the alarm calls belong to the process's durable queue.
+    for (const [branch, call] of [
+      [quiet, 'SessionNotifications.postQuiet('],
+      [dismiss, 'SessionNotifications.cancel('],
+    ] as const) {
+      const queued = branch.indexOf('enqueueDurableWrite {');
+      expect(queued, `${call} must be queued`).toBeGreaterThan(-1);
+      expect(branch.indexOf(call), `${call} must run inside the queued body`).toBeGreaterThan(
+        queued
+      );
+    }
   });
 
   it('gives each dismissed session its own work, so a clear-all unfollows all of them', () => {
@@ -305,8 +321,54 @@ describe('the Approve presence gate', () => {
     expect(receive.slice(receive.indexOf('ApprovalGate.isDeviceLocked'))).toContain(
       'ApprovalGate.enqueue(context, intent)'
     );
-    expect(body(GATE, 'fun enqueue(')).toContain(
-      'enqueueUniqueWork(\n        ActiveAgentsApproveWorker.UNIQUE_WORK_NAME,'
+  });
+
+  it('names each ask its own work, so a different approval is not dropped', () => {
+    const enqueue = body(GATE, 'fun enqueue(');
+    expect(enqueue).toContain('workName(sessionId, approvalKey)');
+    expect(enqueue).not.toContain('ActiveAgentsApproveWorker.UNIQUE_WORK_NAME');
+
+    const name = body(GATE, 'private fun workName(');
+    // A session card names the ask it answers; the aggregate card, which passes
+    // neither extra, keeps the one name its recorded ask already scopes.
+    expect(name).toContain('if (sessionId == null || approvalKey == null) {');
+    expect(name).toContain('return ActiveAgentsApproveWorker.UNIQUE_WORK_NAME');
+    expect(name).toContain('APPROVE_WORK_PREFIX');
+    expect(name).toMatch(/\$\{sessionId\.length\}:\$sessionId\$approvalKey/);
+    expect(GATE).toContain('private const val APPROVE_WORK_PREFIX = "active-agents-approve:"');
+  });
+});
+
+describe('ActiveAgentsDeadlineReceiver', () => {
+  const DEADLINE = kotlin('ActiveAgentsDeadlineReceiver.kt');
+
+  it('reports a refused commit and keeps the process alive', () => {
+    // Both commits run on a broadcast and on the JS bridge; neither has an
+    // error surface, and a throw on the broadcast thread ends the process.
+    expect(DEADLINE).not.toContain('check(');
+    expect(DEADLINE).toContain(
+      'Log.e(ACTIVE_AGENTS_TAG, "Cannot persist the active agents deadline")'
     );
+    expect(DEADLINE).toContain(
+      'Log.e(ACTIVE_AGENTS_TAG, "Cannot consume the active agents deadline")'
+    );
+    expect(body(DEADLINE, 'private fun replace(')).toMatch(
+      /if \(!editor\.commit\(\)\) \{\s+Log\.e\([\s\S]*?\n\s+return\n\s+\}/
+    );
+    expect(body(DEADLINE, 'private fun expire(')).toMatch(
+      /if \(!preferences\.edit\(\)[\s\S]*?commit\(\)\) \{\s+Log\.e\([\s\S]*?\n\s+return\n\s+\}/
+    );
+  });
+
+  it('runs both broadcast branches on the durable queue', () => {
+    const receive = body(DEADLINE, 'override fun onReceive(');
+    expect(receive).toMatch(/enqueueDurableWrite \{ restoreWidgetDeadline\(context\) \}/);
+    expect(receive).toMatch(/enqueueDurableWrite \{ expire\(context, intent\) \}/);
+  });
+
+  it('stores the deadline before it arms the alarm', () => {
+    const replace = body(DEADLINE, 'private fun replace(');
+    expect(replace.indexOf('if (!editor.commit())')).toBeLessThan(replace.indexOf('AlarmManager'));
+    expect(replace).toContain('if (deadline <= System.currentTimeMillis())');
   });
 });

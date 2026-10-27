@@ -13,16 +13,12 @@ import android.os.Build
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
-import android.util.Log
 import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import expo.modules.kotlin.records.Field
 import expo.modules.kotlin.records.Record
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.asCoroutineDispatcher
 import org.json.JSONObject
 
 /**
@@ -75,10 +71,12 @@ class ActiveAgentsLiveUpdateModule : Module() {
     // (a synchronous fsync), arm or cancel the OS alarm, and post the
     // notification, so they run on the module queue rather than the JavaScript
     // thread. The JS bridge (`src/glanceable-android/live-update.ts`) declares
-    // them `void` and never consumes the promise, which is why `durable` logs a
-    // failure instead of letting it become an unhandled rejection.
+    // them `void` and never consumes the promise, which is why
+    // `DurableWrites.durable` logs a failure instead of letting it become an
+    // unhandled rejection. The queue is the receivers' too: a card write from a
+    // broadcast lands in the same one order as a write from here.
     AsyncFunction("start") { card: LiveUpdateCard, channelId: String, alerting: Boolean, promotion: Boolean ->
-      durable {
+      DurableWrites.durable {
         post(card, channelId, alerting, promotion, 0)
       }
     }.runOnQueue(moduleQueue)
@@ -87,13 +85,13 @@ class ActiveAgentsLiveUpdateModule : Module() {
     // flag. The flag is redundant on this path: `post` gates promotion on
     // `isPromotionCapable()` itself, which is the value the JS side passes.
     AsyncFunction("update") { card: LiveUpdateCard, channelId: String, alerting: Boolean, timeoutMs: Double ->
-      durable {
+      DurableWrites.durable {
         post(card, channelId, alerting, isPromotionCapable(), timeoutMs.toLong())
       }
     }.runOnQueue(moduleQueue)
 
     AsyncFunction("end") {
-      durable {
+      DurableWrites.durable {
         dismiss()
       }
     }.runOnQueue(moduleQueue)
@@ -104,19 +102,19 @@ class ActiveAgentsLiveUpdateModule : Module() {
     // argument, and the card carries nullable fields. The durable bodies run on
     // the same queue as the aggregate card's, for the same prefs-fsync reason.
     AsyncFunction("postSession") { cardJson: String, dismissAfterMs: Double ->
-      durable {
+      DurableWrites.durable {
         SessionNotifications.post(context, sessionCardFromJson(cardJson), dismissAfterMs.toLong())
       }
     }.runOnQueue(moduleQueue)
 
     AsyncFunction("restoreSession") { sessionId: String ->
-      durable {
+      DurableWrites.durable {
         SessionNotifications.restore(context, sessionId)
       }
     }.runOnQueue(moduleQueue)
 
     AsyncFunction("dismissSession") { sessionId: String ->
-      durable {
+      DurableWrites.durable {
         SessionNotifications.cancel(context, sessionId)
       }
     }.runOnQueue(moduleQueue)
@@ -124,7 +122,7 @@ class ActiveAgentsLiveUpdateModule : Module() {
     // The JS side calls this after a restart or a scope change: every stored
     // session card whose id is not in the list is cancelled and forgotten.
     AsyncFunction("pruneSessions") { keepJson: String ->
-      durable {
+      DurableWrites.durable {
         SessionNotifications.prune(context, keepJson)
       }
     }.runOnQueue(moduleQueue)
@@ -147,8 +145,8 @@ class ActiveAgentsLiveUpdateModule : Module() {
     // the prefs fsync and the `AlarmManager` round-trip — to the module queue.
     Function("setWidgetSnapshot") { snapshot: String, expiresAt: Double ->
       widgetSnapshot = snapshot
-      durableQueue.execute {
-        durable {
+      DurableWrites.queue.execute {
+        DurableWrites.durable {
           ActiveAgentsDeadlineReceiver.setWidgetSnapshot(context, snapshot, expiresAt.toLong())
         }
       }
@@ -175,10 +173,10 @@ class ActiveAgentsLiveUpdateModule : Module() {
   }
 
   /**
-   * The module's one serial queue for the durable write path, shared by every
-   * module instance in the process (see `durableQueue`).
+   * The module's one serial queue for the durable write path, shared with the
+   * receivers through `DurableWrites`.
    */
-  private val moduleQueue = CoroutineScope(durableQueue.asCoroutineDispatcher())
+  private val moduleQueue = CoroutineScope(DurableWrites.dispatcher)
 
   /**
    * The snapshot this JS runtime most recently handed to `setWidgetSnapshot`, or
@@ -190,22 +188,6 @@ class ActiveAgentsLiveUpdateModule : Module() {
    * thread, so no synchronization is needed.
    */
   private var widgetSnapshot: String? = null
-
-  /**
-   * Run one durable write on the module queue and log a failure instead of
-   * throwing it. The JS bridge declares these entry points `void` and never
-   * consumes the promise an `AsyncFunction` returns, so a thrown error would
-   * surface only as an unhandled promise rejection nobody can catch. The
-   * durable bodies keep their `check(...)` guards and their exact order; this
-   * only decides where the failure is reported.
-   */
-  private fun durable(block: () -> Unit) {
-    try {
-      block()
-    } catch (error: Throwable) {
-      Log.e(TAG, "Active agents live update failed", error)
-    }
-  }
 
   // `AppContext` exposes only the React context. Every entry point here runs
   // from a JS call, so losing it means the module cannot work at all.
@@ -525,7 +507,6 @@ class ActiveAgentsLiveUpdateModule : Module() {
   }
 
   private companion object {
-    const val TAG = "ActiveAgentsLiveUpdate"
     const val HAS_TIMEOUT = "has_timeout"
     const val OPEN_REQUEST_CODE = 1002
     const val OPEN_URL = "open_url"
@@ -541,33 +522,6 @@ class ActiveAgentsLiveUpdateModule : Module() {
     const val PRIMARY_NIGHT = "#FFDD00"
     const val ERROR_DAY = "#B0483A"
     const val ERROR_NIGHT = "#F28B7A"
-
-    /**
-     * The module's one serial queue for the durable write path, shared by every
-     * module instance in the process.
-     *
-     * The JS thread must not pay the prefs fsync and binder round-trips these
-     * writes make, and neither default queue fits: `Queues.DEFAULT` is a thread
-     * pool (the writes would race each other and the order `post` depends on
-     * would not hold) and `Queues.MAIN` would put the fsync on the UI thread. A
-     * single-thread executor wrapped as a scope is what `runOnQueue` accepts for
-     * a custom queue.
-     *
-     * It is a process-wide singleton rather than a per-instance executor:
-     * `OnDestroy` cannot drain a queue, so a replaced module's already-queued
-     * write would otherwise land after the replacement's newer write and
-     * persist a stale snapshot or deadline. One queue keeps every durable write
-     * in submission order across instances, and one thread for the process
-     * replaces the per-instance thread a shutdown used to guard against.
-     *
-     * The queue is Android's alone, like the SharedPreferences fsync and the
-     * `AlarmManager` round-trip it carries: iOS's counterpart card is the
-     * ActivityKit Live Activity driven from `src/glanceable-ios/ios-sink.ts`,
-     * whose snapshot is persisted in JS, so that side has no synchronous native
-     * write to move off the JS thread.
-     */
-    val durableQueue: ExecutorService =
-      Executors.newSingleThreadExecutor { Thread(it, "active-agents-live-update") }
   }
 }
 

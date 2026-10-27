@@ -3440,6 +3440,8 @@ describe('Enkrypt shadow guardrail scanning', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockEnkryptGuardrailsApiKey = 'enkrypt-test-key';
+    mockedIsCustomLlm.mockResolvedValue(false);
+    mockedFindCustomLlm.mockResolvedValue(null);
     mockedGetProvider.mockResolvedValue({
       kind: 'provider',
       provider,

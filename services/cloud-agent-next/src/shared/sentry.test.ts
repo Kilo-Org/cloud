@@ -37,6 +37,71 @@ describe('Cloud Agent Sentry configuration', () => {
 });
 
 describe('Cloud Agent Sentry privacy', () => {
+  it('keeps safe local paths and valid credential-free absolute frame URLs', () => {
+    const filenames = [
+      '/usr/local/bin/kilocode-control-plane-wrapper.js',
+      './dist/app.js',
+      '../src/app.ts',
+      'src/@kilo/app.ts',
+      'C:/runtime/app.js',
+      'node:internal/process/task_queues',
+      'https://frames.invalid/app.js',
+      'http://frames.invalid:8080/app.js',
+      'file:///usr/local/bin/app.js',
+      'webpack://runtime/src/app.js',
+      'a'.repeat(256),
+    ];
+    const sanitized = sanitizeSentryEvent({
+      type: undefined,
+      exception: {
+        values: [{ stacktrace: { frames: filenames.map(filename => ({ filename })) } }],
+      },
+    });
+    expect(
+      sanitized?.exception?.values?.[0]?.stacktrace?.frames?.map(frame => frame.filename)
+    ).toEqual(filenames);
+  });
+
+  it('rejects unsafe frame URLs including protocol-relative credentials without retaining userinfo', () => {
+    const credentialedUrl = new URL('https://frames.invalid/app.js');
+    credentialedUrl.username = 'synthetic-user';
+    credentialedUrl.password = 'synthetic-password';
+    const usernameOnlyUrl = new URL('https://frames.invalid/app.js');
+    usernameOnlyUrl.username = 'synthetic-user';
+    const filenames = [
+      credentialedUrl.href,
+      credentialedUrl.href.replace('://', ':'),
+      credentialedUrl.href.replace('://', ':/'),
+      credentialedUrl.href.replace('https:', ''),
+      usernameOnlyUrl.href,
+      usernameOnlyUrl.href.replace('://', ':'),
+      usernameOnlyUrl.href.replace('://', ':/'),
+      usernameOnlyUrl.href.replace('https:', ''),
+      '//frames.invalid/app.js',
+      '//frames.invalid',
+      'https://',
+      '/app.js?token=synthetic-token',
+      '/app.js#synthetic-fragment',
+      'https://frames.invalid/app.js?token=synthetic-token',
+      'https://frames.invalid/app.js#synthetic-fragment',
+      '//frames.invalid/app.js?token=synthetic-token',
+      '//frames.invalid/app.js#synthetic-fragment',
+      'https://synthetic-user%40frames.invalid/app.js',
+      'app with spaces.js',
+      'a'.repeat(257),
+    ];
+    const sanitized = sanitizeSentryEvent({
+      type: undefined,
+      exception: {
+        values: [{ stacktrace: { frames: filenames.map(filename => ({ filename })) } }],
+      },
+    });
+    const frames = sanitized?.exception?.values?.[0]?.stacktrace?.frames;
+    expect(frames).toHaveLength(filenames.length);
+    expect(frames?.every(frame => frame.filename === undefined)).toBe(true);
+    expect(JSON.stringify(sanitized).includes('synthetic-')).toBe(false);
+  });
+
   it('keeps exception stacks and correlation IDs without customer content', () => {
     const frameUrl = new URL('https://host/file.js');
     frameUrl.username = 'user';

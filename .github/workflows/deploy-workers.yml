@@ -169,6 +169,7 @@ jobs:
 
       - name: Upload Cloud Agent Sentry source maps
         if: inputs.worker == 'services/cloud-agent-next'
+        continue-on-error: true
         working-directory: ${{ inputs.worker }}
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
@@ -471,6 +472,7 @@ jobs:
 
       - name: Upload Cloud Agent Sentry source maps
         if: matrix.worker == 'services/cloud-agent-next'
+        continue-on-error: true
         working-directory: ${{ matrix.worker }}
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}

@@ -463,6 +463,24 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 
 ### Cloud Agent Services
 
+Cloud Agent Sentry coverage is explicit, not blanket Durable Object instrumentation.
+It captures unexpected Worker HTTP/tRPC, queue and scheduled exceptions,
+control-plane wrapper startup/crash failures, and exceptions from the instrumented
+exports in
+`services/cloud-agent-next/src/index.ts`: `SandboxSession`, `SandboxControl`,
+`SandboxContainers`, `StreamTicketNonceDO`, `UserKiloFacade`, and the retained
+`CloudAgentSession` compatibility stub.
+
+`EnvironmentBuild` and `VercelSnapshotBuild` are outside this rollout. Their build
+status, failure records and structured logs remain the investigation path;
+unexpected standalone RPC/alarm exceptions in those classes are not guaranteed to
+reach Sentry. Raw `Sandbox`, `SandboxSmall`, `SandboxDIND`, `SandboxCodeReview`,
+their containment variants, and `ContainerProxy` exports are also excluded: they
+retain the SDK container lifecycle, billing hooks and outbound-handler registration
+without Sentry wrapping. The control-plane wrapper's own crash reporting is
+independent of these exports.
+Abrupt OOM/SIGKILL failures and synthetic session failure events are not captured.
+
 - `CREDENTIAL_CONTAINMENT_ENABLED` - Controls GitHub, GitLab, Bitbucket, and Kilo credential containment together for new non-devcontainer Cloud Agent sessions. Enabled unless set to `false`; local dev defaults to `false`. Existing sessions retain their persisted containment flags. [SERVER]
 - `KILOCODE_TOKEN` - Auth token for KiloCode/Session service identity; used by the Cloud Agent Next wrapper and Gastown containers. `[SECRET]`
 - `KILOCODE_TOKEN_FILE` - Path to a file containing the KiloCode token (alternative to the env var). [SERVER]

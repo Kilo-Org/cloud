@@ -55,8 +55,10 @@ const CONTEXT_KEYS = [
 ] as const;
 
 function safeFrameFilename(filename: string | undefined): string | undefined {
-  if (!filename || !/^[a-zA-Z0-9_./@:-]{1,256}$/.test(filename)) return undefined;
-  if (!filename.includes('://')) return filename;
+  if (!filename || filename.startsWith('//') || !/^[a-zA-Z0-9_./@:-]{1,256}$/.test(filename)) {
+    return undefined;
+  }
+  if (!/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(filename)) return filename;
   try {
     const url = new URL(filename);
     return url.username || url.password ? undefined : filename;

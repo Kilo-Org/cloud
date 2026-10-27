@@ -19,6 +19,32 @@ const gate = workflow('check-deployment-changes');
 const workers = workflow('deploy-workers');
 const ci = workflow('ci');
 
+test('Cloud Agent source-map uploads are best-effort without masking build or deploy failures', () => {
+  for (const [job, selector] of [
+    ['deploy-manual', 'inputs.worker'],
+    ['deploy-changed', 'matrix.worker'],
+  ]) {
+    const steps = workers.jobs[job].steps;
+    const deploy = steps.find(step => step.id === 'deploy');
+    const retry = steps.find(step => step.name === 'Deploy to Cloudflare Workers (retry)');
+    const maps = steps.find(step => step.name === 'Upload Cloud Agent Sentry source maps');
+    assert.equal(maps['continue-on-error'], true);
+    assert.equal(maps.if, `${selector} == 'services/cloud-agent-next'`);
+    assert.doesNotMatch(maps.if, /always\(|failure\(/);
+    assert.ok(steps.indexOf(maps) > steps.indexOf(retry));
+    assert.equal(maps.run, 'pnpm run sentry:sourcemaps');
+    assert.equal(retry.if, "steps.deploy.outcome == 'failure'");
+    assert.equal(retry['continue-on-error'], undefined);
+    assert.equal(deploy['continue-on-error'], true);
+    for (const upload of [deploy, retry]) {
+      assert.equal(
+        upload.with.preCommands.trim(),
+        'if [ "$(jq -r \'.scripts.predeploy // empty\' package.json)" != "" ]; then pnpm run predeploy; fi'
+      );
+    }
+  }
+});
+
 test('both Worker deployment paths deploy the private relay before the staging usage consumer', () => {
   for (const [job, selector] of [
     ['deploy-manual', 'inputs.worker'],

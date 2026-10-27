@@ -229,6 +229,7 @@ function makeDbFakes() {
     from: vi.fn(() => select),
     leftJoin: vi.fn(() => select),
     where: vi.fn((_condition: unknown) => select),
+    orderBy: vi.fn(() => select),
     limit: vi.fn(() => select),
     for: vi.fn(() => select),
     then: vi.fn((resolve: (v: unknown) => unknown) => resolve(selectResult())),
@@ -2616,6 +2617,8 @@ describe('api routes', () => {
       git_branch: null,
       created_on_platform: null,
       cloud_agent_session_scope_id: null,
+      cloud_agent_session_id: 'workspace_12345678-1234-4234-9234-123456789abc',
+      cloud_agent_worktree_id: 'worktree_12345678-1234-4234-9234-123456789abc',
     };
     fns.selectResult
       .mockResolvedValueOnce([orgSession])

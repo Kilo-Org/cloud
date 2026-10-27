@@ -514,6 +514,96 @@ export async function createWorktreeChat(
   return created;
 }
 
+export type HostedWorkspaceCreateResult = {
+  workspaceId: string;
+  cloudAgentSessionId: string;
+  kiloSessionId: string;
+  messageId: string;
+  replayed?: boolean;
+};
+
+/**
+ * Create a hosted workspace and its first root session through the
+ * `agent-manager` mutation. Requires an explicit, authorized Cloud profile.
+ */
+export async function createHostedWorkspace(
+  config: DriverConfig,
+  input: {
+    operationKey?: string;
+    profileId: string;
+    prompt: string;
+  },
+  signal?: AbortSignal
+): Promise<HostedWorkspaceCreateResult> {
+  const created = await trpcCall<HostedWorkspaceCreateResult>(
+    config,
+    'createHostedWorkspace',
+    {
+      operationKey: input.operationKey ?? randomUUID(),
+      clientProvenance: 'agent-manager',
+      repository: config.githubRepo
+        ? { type: 'github', repo: config.githubRepo }
+        : { type: 'git', url: config.gitUrl },
+      profile: { id: input.profileId },
+      message: { prompt: input.prompt },
+      agent: { mode: 'code', model: config.model },
+      ...(config.kilocodeOrganizationId
+        ? { options: { kilocodeOrganizationId: config.kilocodeOrganizationId } }
+        : {}),
+    },
+    { internalApiSecret: config.internalApiSecret, signal }
+  );
+  config.onSessionCreated?.(created.cloudAgentSessionId, created.kiloSessionId);
+  return created;
+}
+
+/**
+ * Add a root session to an existing hosted workspace by workspace id only.
+ * The workspace supplies repository, ref, profile, environment, sandbox and
+ * clone; the caller supplies only session-scoped agent/model/prompt.
+ */
+export async function createHostedWorkspaceSession(
+  config: DriverConfig,
+  input: { workspaceId: string; operationKey?: string; prompt: string },
+  signal?: AbortSignal
+): Promise<HostedWorkspaceCreateResult> {
+  const created = await trpcCall<HostedWorkspaceCreateResult>(
+    config,
+    'createHostedWorkspaceSession',
+    {
+      workspaceId: input.workspaceId,
+      operationKey: input.operationKey ?? randomUUID(),
+      clientProvenance: 'agent-manager',
+      message: { prompt: input.prompt },
+      agent: { mode: 'code', model: config.model },
+      ...(config.kilocodeOrganizationId
+        ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
+        : {}),
+    },
+    { internalApiSecret: config.internalApiSecret, signal }
+  );
+  config.onSessionCreated?.(created.cloudAgentSessionId, created.kiloSessionId);
+  return created;
+}
+
+/** Delete one hosted root session while preserving its workspace and siblings. */
+export async function deleteHostedWorkspaceSession(
+  config: DriverConfig,
+  input: { workspaceId: string; sessionId: string; operationKey?: string },
+  signal?: AbortSignal
+): Promise<{ success: true; workspaceId: string; sessionId: string }> {
+  return trpcCall<{ success: true; workspaceId: string; sessionId: string }>(
+    config,
+    'deleteHostedWorkspaceSession',
+    {
+      workspaceId: input.workspaceId,
+      sessionId: input.sessionId,
+      operationKey: input.operationKey ?? randomUUID(),
+    },
+    { internalApiSecret: config.internalApiSecret, ...(signal ? { signal } : {}) }
+  );
+}
+
 /**
  * Set or clear the callback target of an existing session through the internal
  * `updateSession` endpoint.

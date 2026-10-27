@@ -133,18 +133,19 @@ export function CustomRouterDialog({ scope, organizationId, router, onClose, onS
         entries: draft.entries,
         defaultEntryKey: draft.defaultEntryKey,
       };
+      const entriesChanged =
+        router !== undefined &&
+        (draft.entries.length !== router.entries.length ||
+          draft.entries.some(
+            (entry, index) => customRouterEntryKey(entry) !== router.entries[index]?.key
+          ));
       const patch = router
         ? {
             name: fields.name,
             ...(draft.baseRouter !== router.baseRouter ? { baseRouter: draft.baseRouter } : {}),
             ...(draft.mode !== router.mode ? { mode: draft.mode } : {}),
-            ...(draft.entries.length !== router.entries.length ||
-            draft.entries.some(
-              (entry, index) => customRouterEntryKey(entry) !== router.entries[index]?.key
-            )
-              ? { entries: draft.entries }
-              : {}),
-            ...(draft.defaultEntryKey !== router.defaultEntryKey
+            ...(entriesChanged ? { entries: draft.entries } : {}),
+            ...(entriesChanged || draft.defaultEntryKey !== router.defaultEntryKey
               ? { defaultEntryKey: draft.defaultEntryKey }
               : {}),
           }

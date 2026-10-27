@@ -1,5 +1,5 @@
 {
-  "id": "6f387507-79d3-4929-ab4c-1ec40cb8a8a6",
+  "id": "22f9636f-dc52-4e48-b714-57ed907efdec",
   "prevId": "10c95306-8ba5-41f3-a005-0eecd50742d4",
   "version": "7",
   "dialect": "postgresql",
@@ -4329,6 +4329,13 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
+        },
+        "is_fork": {
+          "name": "is_fork",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "parent_session_id": {
           "name": "parent_session_id",
@@ -22415,13 +22422,6 @@
           "notNull": true,
           "default": 0
         },
-        "legacy_attempts": {
-          "name": "legacy_attempts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
         "reserved_until": {
           "name": "reserved_until",
           "type": "timestamp with time zone",
@@ -32074,6 +32074,13 @@
           "primaryKey": false,
           "notNull": false
         },
+        "pending_copy_ids": {
+          "name": "pending_copy_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -32102,6 +32109,21 @@
           ],
           "isUnique": false,
           "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "IDX_shared_cli_sessions_kilo_user_id": {
+          "name": "IDX_shared_cli_sessions_kilo_user_id",
+          "columns": [
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },

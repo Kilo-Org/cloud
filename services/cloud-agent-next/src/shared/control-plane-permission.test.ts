@@ -7,6 +7,9 @@ describe('isInteractiveSessionOrigin', () => {
     // A hosted IDE session has a person who can answer a question or approve a
     // CLI-enforced human permission, so the runtime must wait for them.
     expect(isInteractiveSessionOrigin('desktop')).toBe(true);
+    // IDE sessions created by the Agent Manager Session Host are supervised by
+    // a local user who can answer questions and approve permissions.
+    expect(isInteractiveSessionOrigin('agent-manager')).toBe(true);
   });
 
   it('keeps unattended origins non-interactive', () => {

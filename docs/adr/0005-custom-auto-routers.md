@@ -80,6 +80,9 @@ The entry key is `gateway:<model>` or `client:<provider>/<model>`. The CLI regis
 entries from its own configuration (`kilo auto router add`). The web editor manages gateway
 entries and can remove client entries.
 
+Pool updates must include `defaultEntryKey`, even when the selected default does not change.
+The web editor sends both fields when it changes the pool.
+
 Write requests carry an explicit entry budget: model IDs up to 200 characters, provider IDs up to
 100, at most 20 variants of up to 100 characters, at most 10 input modalities of up to 50
 characters, context lengths up to 10,000,000, per-million-token prices that are finite and at most

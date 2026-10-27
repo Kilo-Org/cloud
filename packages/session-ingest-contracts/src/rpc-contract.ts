@@ -25,6 +25,7 @@ export const cloudAgentWorktreeDeletionManifestSchema = z
         })
         .strict()
     ),
+    completedRuntimeLocations: z.array(cloudAgentWorktreeLocationSchema).optional(),
   })
   .strict();
 export type CloudAgentWorktreeDeletionManifest = z.infer<
@@ -72,6 +73,7 @@ export const recordCloudAgentWorktreeCleanupSchema = cloudAgentWorktreeDeletionS
     runtimeLocations: z.array(cloudAgentWorktreeLocationSchema).optional(),
     directory: z.string().min(1).max(4096).optional(),
     sessionIds: z.array(sessionIdSchema).optional(),
+    completedRuntimeLocation: cloudAgentWorktreeLocationSchema.optional(),
     childSessions: z
       .array(
         cloudAgentChildSessionLineageSchema.extend({
@@ -215,6 +217,51 @@ export const deleteSessionForCloudAgentSchema = z.object({
   cloneSourceSessionId: sessionIdSchema.optional(),
 });
 export type DeleteSessionForCloudAgentParams = z.input<typeof deleteSessionForCloudAgentSchema>;
+
+/**
+ * Stable conflict returned when a destructive session delete would remove the
+ * last hosted root session of an active workspace. Removing the final root is
+ * only allowed through the separate whole-workspace deletion operation.
+ */
+export const WORKSPACE_REQUIRES_ROOT_SESSION = 'workspace_requires_root_session';
+/** Stable conflict returned while a workspace is being destructively deleted. */
+export const WORKSPACE_DELETING = 'workspace_deleting';
+/** Stable conflict returned when a workspace cannot serve another root session. */
+export const WORKSPACE_UNAVAILABLE = 'workspace_unavailable';
+/** Stable conflict returned when a workspace's derived identity is inconsistent. */
+export const WORKSPACE_IDENTITY_CONFLICT = 'workspace_identity_conflict';
+
+export const deleteHostedWorkspaceSessionSchema = z
+  .object({
+    kiloUserId: z.string().min(1),
+    workspaceId: cloudAgentWorktreeIdSchema,
+    sessionId: sessionIdSchema,
+    cloudAgentSessionId: z.templateLiteral(['workspace_', z.uuid()]),
+  })
+  .strict();
+export type DeleteHostedWorkspaceSessionParams = z.input<typeof deleteHostedWorkspaceSessionSchema>;
+
+export type DeleteHostedWorkspaceSessionResult = {
+  success: true;
+  sessionId: string;
+  deletedSessionIds: string[];
+};
+
+export const assertHostedWorkspaceSessionDeletableSchema = z
+  .object({
+    kiloUserId: z.string().min(1),
+    sessionId: sessionIdSchema,
+    cloudAgentSessionId: z.templateLiteral(['workspace_', z.uuid()]),
+  })
+  .strict();
+export type AssertHostedWorkspaceSessionDeletableParams = z.input<
+  typeof assertHostedWorkspaceSessionDeletableSchema
+>;
+
+export type AssertHostedWorkspaceSessionDeletableResult = {
+  /** The workspace whose final-root invariant was checked, if any. */
+  workspaceId: CloudAgentWorktreeId | null;
+};
 
 export const resolveCloudAgentRootSessionSchema = z.object({
   kiloUserId: z.string().min(1),
@@ -531,6 +578,51 @@ export type CloudAgentWorkspacesPage = {
 };
 
 export type GetCloudAgentWorkspaceResult = CloudAgentWorkspaceSummary | null;
+
+export const getCloudAgentWorkspaceStatusSchema = z
+  .object({
+    kiloUserId: z.string().min(1),
+    workspaceId: cloudAgentWorktreeIdSchema,
+    authorizedWorkspace: z
+      .object({
+        userId: z.string().min(1),
+        organizationId: z.string().nullable(),
+        deletionState: z.enum(['active', 'deleting', 'deleted']),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+export type GetCloudAgentWorkspaceStatusParams = z.input<typeof getCloudAgentWorkspaceStatusSchema>;
+
+/**
+ * Passive, workspace-keyed lifecycle projection. Every value is read from
+ * stored catalog/journal rows or the non-idle stored turn status of a hosted
+ * root session; computing it allocates no compute, prepares no runtime and
+ * opens no billing interval.
+ */
+export type CloudAgentWorkspaceStatus = {
+  workspaceId: CloudAgentWorktreeId;
+  userId: string;
+  organizationId: string | null;
+  deletionState: 'active' | 'deleting' | 'deleted';
+  /** Hosted root or descendant sessions whose stored turn status is not idle. */
+  activeSessionCount: number;
+  deletion: {
+    started: boolean;
+    completed: boolean;
+    startedAt: number | null;
+    phase: 'not_started' | 'runtime_cleanup' | 'finalizing' | 'completed';
+    /** Sessions the journal manifest will remove, including descendants. */
+    sessionCount: number;
+    runtimeLocationCount: number;
+    completedRuntimeLocationCount: number;
+    remainingRuntimeLocationCount: number;
+    /** Populated only by a completed tombstone. */
+    deletedSessionIds: string[];
+  };
+};
+export type GetCloudAgentWorkspaceStatusResult = CloudAgentWorkspaceStatus | null;
 
 export const sdkApiErrorSchema = z.object({
   name: z.literal('APIError'),
@@ -1211,6 +1303,12 @@ export type SessionIngestRpcMethods = {
     params: CreateSessionForCloudAgentParams
   ) => Promise<CreateSessionForCloudAgentResult>;
   deleteSessionForCloudAgent: (params: DeleteSessionForCloudAgentParams) => Promise<void>;
+  deleteHostedWorkspaceSession: (
+    params: DeleteHostedWorkspaceSessionParams
+  ) => Promise<DeleteHostedWorkspaceSessionResult>;
+  assertHostedWorkspaceSessionDeletable: (
+    params: AssertHostedWorkspaceSessionDeletableParams
+  ) => Promise<AssertHostedWorkspaceSessionDeletableResult>;
   resolveCloudAgentRootSessionForKiloSession: (
     params: ResolveCloudAgentRootSessionForKiloSessionParams
   ) => Promise<ResolveCloudAgentRootSessionForKiloSessionResult>;
@@ -1226,6 +1324,9 @@ export type SessionIngestRpcMethods = {
   getCloudAgentWorkspace: (
     params: GetCloudAgentWorkspaceParams
   ) => Promise<GetCloudAgentWorkspaceResult>;
+  getCloudAgentWorkspaceStatus: (
+    params: GetCloudAgentWorkspaceStatusParams
+  ) => Promise<GetCloudAgentWorkspaceStatusResult>;
   getCloudAgentRootSessionMessages: (
     params: GetCloudAgentRootSessionMessagesParams
   ) => Promise<GetCloudAgentRootSessionMessagesResult>;

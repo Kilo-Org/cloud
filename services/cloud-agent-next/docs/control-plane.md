@@ -952,6 +952,23 @@ Sandbox DO → Session DO (RPC notifications): `onRoute(update)` where the updat
 Other callers of the Sandbox DO keep their current RPC: contained outbound credential lookup
 (`resolveCredential`), runtime credential proxy, worktree deletion, sandbox status.
 
+### Hosted workspace status and deletion
+
+The Worker exposes workspace-keyed `listHostedWorkspaces`, `getHostedWorkspace` and
+`getHostedWorkspaceStatus` reads plus the `deleteWorktree` mutation. The reads are passive: they
+project stored catalog and journal rows, the Sandbox DO's allocation snapshot, stored per-provider
+billing state and the immutable billing-SKU rate. They allocate no compute, prepare no runtime,
+admit no work and open no billing interval, so a sleeping workspace keeps its stored state and a
+later prompt still wakes it through the normal Cloud path. A workspace reports one compute rate
+from its sandbox SKU, never one per hosted session.
+
+Whole-workspace deletion is idempotent and runs over the existing journal; a retry resumes from the
+recorded manifest. It fences new prompts and session creation, interrupts active child work and
+removes every hosted root and descendant route, transcript and workspace file, including the last
+root, before recording a content-free tombstone. `getHostedWorkspaceStatus` reports journal progress
+while a deletion is in flight. Removing a workspace from one IDE's Agent Manager is a client-local
+action: it performs no Cloud mutation, and only `deleteWorktree` destroys Cloud state.
+
 Bootstrap → Worker (HTTPS on the `WORKER_URL` host, `downloaded` mode only): `GET` one payload with
 the artifact grant, and `POST` one startup-failure report with the wrapper launch credential. The
 Worker forwards an admitted report to the Sandbox DO as `startup-failed`.

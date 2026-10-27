@@ -237,6 +237,27 @@ its turn, or when the user loses access to the session.
    unregister MUST run before the device session is revoked, as it does
    for the aggregate card.
 
+### Follow scope
+
+1. A followed session card MUST be stored with the account and the
+   organization that followed it. The scope is not part of the card's
+   data (see "Card data contract"): the server rebuilds that data on
+   every update, so the app keeps the scope beside the card on the
+   device.
+2. A launch or foreground restore MUST register a card's push token only
+   when both its recorded account and its recorded organization match the
+   signed-in account and its selected organization, and MUST end every
+   other card.
+3. A card with no recorded scope — one stored by a build that did not
+   keep it — is outside that scope and MUST end at the next restore.
+4. A restore that cannot read the keychain or the records themselves MUST
+   leave the cards as they are: only a scope the app can read may end a
+   card.
+5. An Approve on a session notification MUST answer under the account and
+   the organization recorded on that card, read from the persisted card
+   set, and MUST answer nothing when that scope cannot be read or does
+   not match the signed-in account and its selected organization.
+
 ### Privacy
 
 1. This spec changes the glanceable privacy rule for session cards only:
@@ -477,3 +498,13 @@ observable behavior is the same.
   authentication requirement from Android 12, and on every version the approval
   starts after the keyguard is dismissed. A declined unlock leaves the
   permission request waiting with Approve in place.
+
+### 2026-10-23 -- A followed card names its account and scope
+
+- A followed session card is stored with the account and organization that
+  followed it, on both platforms.
+- A launch or foreground restore registers a card only for the account and
+  organization it was followed in and ends every other card, including a card
+  stored without that record.
+- A session notification's Approve answers under the card's recorded scope, and
+  answers nothing when that scope cannot be read.

@@ -1,4 +1,5 @@
 import { WorkerEntrypoint } from 'cloudflare:workers';
+import { z } from 'zod';
 import {
   eq,
   and,
@@ -34,7 +35,9 @@ import { queryAccessibleKiloSession } from '@kilocode/worker-utils/cloud-agent-s
 import {
   createSessionForCloudAgentSchema,
   cloudAgentWorktreeIdSchema,
+  cloudAgentWorktreeDeletionManifestSchema,
   cloudAgentWorktreeDeletionSchema,
+  cloudAgentWorktreeLocationSchema,
   recordCloudAgentWorktreeCleanupSchema,
   canDestroyCloudAgentWorktreeSandboxSchema,
   retireCloudAgentWorktreeIfSoleMemberSchema,
@@ -43,11 +46,18 @@ import {
   type CanDestroyCloudAgentWorktreeSandboxParams,
   type RetireCloudAgentWorktreeIfSoleMemberParams,
   deleteSessionForCloudAgentSchema,
+  deleteHostedWorkspaceSessionSchema,
+  assertHostedWorkspaceSessionDeletableSchema,
+  type AssertHostedWorkspaceSessionDeletableParams,
+  type AssertHostedWorkspaceSessionDeletableResult,
+  type DeleteHostedWorkspaceSessionParams,
+  type DeleteHostedWorkspaceSessionResult,
   decodeCloudAgentRootSessionsCursor,
   decodeCloudAgentWorkspacesCursor,
   encodeCloudAgentRootSessionsCursor,
   encodeCloudAgentWorkspacesCursor,
   getCloudAgentWorkspaceSchema,
+  getCloudAgentWorkspaceStatusSchema,
   getCloudAgentRootSessionMessagesSchema,
   getSessionMessagesSchema,
   kiloSdkSessionSnapshotOutcomeSchema,
@@ -55,6 +65,7 @@ import {
   listCloudAgentWorkspacesSchema,
   persistedKiloSdkMessageHistorySchema,
   resolveCloudAgentRootSessionSchema,
+  sessionIdSchema,
   type CloudAgentRootSessionSnapshot,
   type CloudAgentRootSessionsPage,
   type CloudAgentRootSessionSummary,
@@ -69,6 +80,8 @@ import {
   type GetCloudAgentRootSessionSnapshotResult,
   type GetCloudAgentWorkspaceParams,
   type GetCloudAgentWorkspaceResult,
+  type GetCloudAgentWorkspaceStatusParams,
+  type GetCloudAgentWorkspaceStatusResult,
   type GetSessionMessagesParams,
   type GetSessionMessagesResult,
   type ListCloudAgentRootSessionsParams,
@@ -105,6 +118,12 @@ import {
   isWorktreeSessionDeleting,
   WORKTREE_DELETING,
 } from './services/worktree-deletion';
+import {
+  assertHostedWorkspaceSessionDeletable as checkHostedWorkspaceSessionDeletable,
+  deleteHostedWorkspaceSessionRows,
+  HostedWorkspaceSessionDeleteError,
+} from './services/hosted-workspace-session';
+import { clearSessionLocalState } from './services/session-local-state';
 
 const MAX_CLOUD_AGENT_ROOT_SESSION_TITLE_CHARACTERS = 512;
 const CLOUD_AGENT_ROOT_SESSION_IDENTITY_CONFLICT_ERROR =
@@ -864,6 +883,100 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     return { ...workspace, sessions: sessions.items, nextSessionCursor: sessions.nextCursor };
   }
 
+  /**
+   * Passive workspace lifecycle projection. Authorization is the catalog's
+   * owner/current-organization rule; everything else is a stored row read.
+   */
+  async getCloudAgentWorkspaceStatus(
+    params: GetCloudAgentWorkspaceStatusParams
+  ): Promise<GetCloudAgentWorkspaceStatusResult> {
+    const parsed = getCloudAgentWorkspaceStatusSchema.parse(params);
+    const workspace =
+      parsed.authorizedWorkspace === undefined
+        ? await this.getCloudAgentWorkspace({
+            kiloUserId: parsed.kiloUserId,
+            workspaceId: parsed.workspaceId,
+            sessionLimit: 1,
+          })
+        : { workspaceId: parsed.workspaceId, ...parsed.authorizedWorkspace };
+    if (!workspace) return null;
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    const [row] = await db
+      .select({
+        deletionStartedAt: cloud_agent_worktrees.deletion_started_at,
+        deletionCompletedAt: cloud_agent_worktrees.deletion_completed_at,
+        deletionManifest: cloud_agent_worktrees.deletion_manifest,
+        runtimeLocations: cloud_agent_worktrees.runtime_locations,
+        deletedSessionIds: cloud_agent_worktrees.deleted_session_ids,
+      })
+      .from(cloud_agent_worktrees)
+      // The catalog above authorized the caller (owner or current organization
+      // member), so the journal belongs to the requesting scope; the row owner
+      // may be a different member of the same organization.
+      .where(eq(cloud_agent_worktrees.worktree_id, parsed.workspaceId))
+      .limit(1);
+    const completed = row?.deletionCompletedAt != null;
+    const manifest = row?.deletionManifest
+      ? cloudAgentWorktreeDeletionManifestSchema.parse(row.deletionManifest)
+      : null;
+    const runtimeLocations = row?.runtimeLocations
+      ? z.array(cloudAgentWorktreeLocationSchema).parse(row.runtimeLocations)
+      : [];
+    const completedRuntimeLocationCount = completed
+      ? 0
+      : (manifest?.completedRuntimeLocations?.length ?? 0);
+    const remainingRuntimeLocationCount = completed
+      ? 0
+      : Math.max(0, runtimeLocations.length - completedRuntimeLocationCount);
+    const [activity] = completed
+      ? [{ activeSessionCount: 0 }]
+      : await db
+          .select({
+            activeSessionCount: sql<number>`count(*) filter (
+              where ${cli_sessions_v2.status} in ('busy', 'question', 'permission', 'retry')
+            )::int`,
+          })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.kilo_user_id, workspace.userId),
+              eq(cli_sessions_v2.cloud_agent_worktree_id, parsed.workspaceId),
+              isNotNull(cli_sessions_v2.cloud_agent_session_scope_id)
+            )
+          );
+    return {
+      workspaceId: cloudAgentWorktreeIdSchema.parse(workspace.workspaceId),
+      userId: workspace.userId,
+      organizationId: workspace.organizationId,
+      deletionState: workspace.deletionState,
+      activeSessionCount: Number(activity?.activeSessionCount ?? 0),
+      deletion: {
+        started: row?.deletionStartedAt != null,
+        completed,
+        startedAt:
+          row?.deletionStartedAt == null
+            ? null
+            : databaseTimestampToMilliseconds(row.deletionStartedAt),
+        phase: completed
+          ? 'completed'
+          : row?.deletionStartedAt == null
+            ? 'not_started'
+            : remainingRuntimeLocationCount > 0
+              ? 'runtime_cleanup'
+              : 'finalizing',
+        sessionCount: completed
+          ? (row?.deletedSessionIds?.length ?? 0)
+          : (manifest?.sessions.length ?? 0),
+        runtimeLocationCount: completed ? 0 : runtimeLocations.length,
+        completedRuntimeLocationCount,
+        remainingRuntimeLocationCount,
+        deletedSessionIds: completed
+          ? sessionIdSchema.array().parse(row?.deletedSessionIds ?? [])
+          : [],
+      },
+    };
+  }
+
   private async getDeletedCloudAgentWorkspace(
     kiloUserId: string,
     workspaceId: GetCloudAgentWorkspaceParams['workspaceId']
@@ -1225,6 +1338,81 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
         kiloUserId: parsed.kiloUserId,
         errors: cacheErrors,
       });
+    }
+  }
+
+  /**
+   * RPC method: delete one hosted root session (and its descendants) from a
+   * workspace without touching the workspace or its other roots.
+   *
+   * The final-root invariant and the row deletions share one transaction, so a
+   * concurrent final-root delete cannot leave an active workspace rootless.
+   * Ingest storage and caches are cleared after the commit. A missing row is
+   * treated as already deleted so same-intent retries converge.
+   */
+  async deleteHostedWorkspaceSession(
+    params: DeleteHostedWorkspaceSessionParams
+  ): Promise<DeleteHostedWorkspaceSessionResult> {
+    const parsed = deleteHostedWorkspaceSessionSchema.parse(params);
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    let outcome: Awaited<ReturnType<typeof deleteHostedWorkspaceSessionRows>>;
+    try {
+      outcome = await deleteHostedWorkspaceSessionRows(db, parsed);
+    } catch (error) {
+      if (error instanceof HostedWorkspaceSessionDeleteError) throw new Error(error.code);
+      throw error;
+    }
+
+    if (outcome.deleted) {
+      const deletedAt = new Date().toISOString();
+      for (const row of outcome.rows) {
+        notifyUserSessionEvent(
+          this.env,
+          parsed.kiloUserId,
+          {
+            type: 'session.deleted',
+            data: {
+              source: 'v2',
+              sessionId: row.session_id,
+              parentSessionId: row.parent_session_id,
+              organizationId: row.organization_id,
+              gitUrl: row.git_url,
+              gitBranch: row.git_branch,
+              createdOnPlatform: row.created_on_platform,
+              deletedAt,
+            },
+          },
+          this.ctx
+        );
+      }
+    }
+
+    for (const sessionId of outcome.deleted ? outcome.deletedSessionIds : [parsed.sessionId]) {
+      await clearSessionLocalState(this.env, parsed.kiloUserId, sessionId);
+    }
+
+    return {
+      success: true,
+      sessionId: parsed.sessionId,
+      deletedSessionIds: outcome.deletedSessionIds,
+    };
+  }
+
+  /**
+   * RPC method: answer whether a destructive session delete would remove the
+   * final hosted root of an active workspace. Authorization stays with the
+   * caller; this only enforces the workspace invariant before runtime teardown.
+   */
+  async assertHostedWorkspaceSessionDeletable(
+    params: AssertHostedWorkspaceSessionDeletableParams
+  ): Promise<AssertHostedWorkspaceSessionDeletableResult> {
+    const parsed = assertHostedWorkspaceSessionDeletableSchema.parse(params);
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    try {
+      return await checkHostedWorkspaceSessionDeletable(db, parsed);
+    } catch (error) {
+      if (error instanceof HostedWorkspaceSessionDeleteError) throw new Error(error.code);
+      throw error;
     }
   }
 

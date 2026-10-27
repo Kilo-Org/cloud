@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
+  clampAssistantCostUsd,
   computeRunningAssistantCostUsd,
   computeSessionMetrics,
   decideLivePersist,
+  MAX_ASSISTANT_COST_USD,
   type DecideLivePersistArgs,
 } from '../dos/session-metrics';
 
@@ -337,6 +339,111 @@ describe('computeSessionMetrics', () => {
   });
 });
 
+describe('computeSessionMetrics cost aggregation', () => {
+  it('aggregates cost and token metrics independently', () => {
+    const items = [
+      makeItem('message', {
+        role: 'assistant',
+        time: { created: 1000 },
+        tokens: { input: 100, output: 50, reasoning: 10, cache: { read: 20, write: 5 } },
+        cost: -100,
+      }),
+      makeItem('message', {
+        role: 'assistant',
+        time: { created: 2000 },
+        tokens: { input: 10, output: 5, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost: 0.05,
+      }),
+    ];
+    const result = computeSessionMetrics(items, 'completed');
+    expect(result.totalCost).toBeCloseTo(0.05);
+    expect(result.totalTokens.input).toBe(110);
+    expect(result.totalErrors).toBe(0);
+  });
+
+  it('uses bounded per-message cost contributions', () => {
+    const items = [
+      makeItem('message', {
+        role: 'assistant',
+        time: { created: 1000 },
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost: 0.5,
+      }),
+      makeItem('message', {
+        role: 'assistant',
+        time: { created: 2000 },
+        tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost: -1000,
+      }),
+    ];
+    expect(computeSessionMetrics(items, 'completed').totalCost).toBeCloseTo(0.5);
+  });
+
+  it('applies the per-message cost maximum', () => {
+    const items = [
+      makeItem('message', {
+        role: 'assistant',
+        time: { created: 1000 },
+        tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost: 1e308,
+      }),
+    ];
+    expect(computeSessionMetrics(items, 'completed').totalCost).toBe(1000);
+  });
+
+  it('uses non-negative token contributions', () => {
+    const items = [
+      makeItem('message', {
+        role: 'assistant',
+        time: { created: 1000 },
+        tokens: { input: 100, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost: 0,
+      }),
+      makeItem('message', {
+        role: 'assistant',
+        time: { created: 2000 },
+        tokens: { input: -500, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost: 0,
+      }),
+    ];
+    expect(computeSessionMetrics(items, 'completed').totalTokens.input).toBe(100);
+  });
+
+  it('allows aggregate cost above the per-message maximum', () => {
+    const items = [
+      makeItem('message', {
+        role: 'assistant',
+        time: { created: 1000 },
+        tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost: 5000,
+      }),
+      makeItem('message', {
+        role: 'assistant',
+        time: { created: 2000 },
+        tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
+        cost: 500,
+      }),
+    ];
+    expect(computeSessionMetrics(items, 'completed').totalCost).toBe(1500);
+  });
+});
+
+describe('clampAssistantCostUsd', () => {
+  it('passes normal costs through', () => {
+    expect(clampAssistantCostUsd(0.05)).toBe(0.05);
+  });
+
+  it('normalizes assistant-message cost values', () => {
+    expect(clampAssistantCostUsd(-0.5)).toBe(0);
+    expect(clampAssistantCostUsd(Number.NaN)).toBe(0);
+    expect(clampAssistantCostUsd(Number.POSITIVE_INFINITY)).toBe(0);
+  });
+
+  it('applies the maximum assistant-message cost', () => {
+    expect(clampAssistantCostUsd(5000)).toBe(1000);
+  });
+});
+
 function assistantMessage(cost: number) {
   return makeItem('message', {
     role: 'assistant',
@@ -369,8 +476,17 @@ describe('computeRunningAssistantCostUsd', () => {
     expect(computeRunningAssistantCostUsd([{ item_data: '{}' }])).toBe(0);
   });
 
-  it('clamps negative totals to 0', () => {
+  it('returns a non-negative cost total', () => {
     expect(computeRunningAssistantCostUsd([assistantMessage(-0.5)])).toBe(0);
+  });
+
+  it('adds bounded message cost contributions', () => {
+    const rows = [assistantMessage(0.5), assistantMessage(-1000)];
+    expect(computeRunningAssistantCostUsd(rows)).toBeCloseTo(0.5);
+  });
+
+  it('applies the maximum message cost before summing', () => {
+    expect(computeRunningAssistantCostUsd([assistantMessage(1e308)])).toBe(MAX_ASSISTANT_COST_USD);
   });
 
   it('converts to microdollars with the close-path formula (0.15 USD → 150_000)', () => {

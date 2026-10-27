@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { getAutoFreeCandidates } from './resolution';
 import { getOpenRouterModelsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
@@ -11,6 +11,12 @@ import { getConfiguredAutoFreeModels } from '@kilocode/web-shared/lib/ai-gateway
 import type * as AutoFreeConfigModule from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
 import type * as ExclusiveModelsModule from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  customLlmDefinition,
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+  publicCustomLlmDefinition,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config', () => ({
   ...jest.requireActual<typeof AutoFreeConfigModule>(
@@ -105,6 +111,46 @@ describe('getAutoFreeCandidates', () => {
     configure(['test/present:free', 'test/paid', 'anthropic/claude-free:free', 'kilo-auto/free']);
 
     expect(await getAutoFreeCandidates('chat_completions')).toEqual(['test/present:free']);
+  });
+
+  describe('custom LLMs', () => {
+    const customLlmIds = ['acme/chat-free', 'acme/multi-free', 'acme/private-free'];
+
+    beforeEach(async () => {
+      await insertCustomLlmForTest('acme/chat-free', publicCustomLlmDefinition(['acme']));
+      await insertCustomLlmForTest(
+        'acme/multi-free',
+        publicCustomLlmDefinition(['acme'], { api_kinds: ['chat_completions', 'messages'] })
+      );
+      await insertCustomLlmForTest('acme/private-free', customLlmDefinition());
+      configure(customLlmIds);
+    });
+
+    afterEach(async () => {
+      for (const id of customLlmIds) await deleteCustomLlmForTest(id);
+      await deleteCustomLlmForTest(glyph_cluster_stealth_free_model.public_id);
+    });
+
+    it.each([
+      ['chat_completions', ['acme/chat-free', 'acme/multi-free']],
+      ['messages', ['acme/multi-free']],
+      ['responses', ['openrouter/free']],
+      [null, ['acme/chat-free', 'acme/multi-free']],
+    ] as const)('includes public custom LLMs that serve %s', async (apiKind, expected) => {
+      expect(await getAutoFreeCandidates(apiKind)).toEqual(expected);
+    });
+
+    it('keeps the Kilo-exclusive model in charge of an id a custom LLM claims', async () => {
+      await insertCustomLlmForTest(
+        glyph_cluster_stealth_free_model.public_id,
+        publicCustomLlmDefinition(['acme'])
+      );
+      configure([glyph_cluster_stealth_free_model.public_id]);
+
+      expect(await getAutoFreeCandidates('responses')).toEqual([
+        glyph_cluster_stealth_free_model.public_id,
+      ]);
+    });
   });
 
   it('falls back to openrouter/free when nothing is configured or the config is invalid', async () => {

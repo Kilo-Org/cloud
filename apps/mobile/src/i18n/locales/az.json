@@ -227,7 +227,6 @@
     "hideBalance": "Balansı gizlət",
     "showBalance": "Balansı göstər",
     "balanceHidden": "Balans gizlidir",
-    "bonusCreditsExpiring": "{{amount}} məbləğində kreditin müddəti {{date}} tarixində bitir.",
     "signOutTitle": "Hesabdan çıxılsın?",
     "signOutMessage": "İş sahənə daxil olmaq üçün hesabına yenidən giriş etməlisən.",
     "deleteAccountTitle": "Hesab silinsin?",
@@ -876,6 +875,18 @@
       "securityFindingsUnavailable": "Təhlükəsizlik aşkarlamaları üçün Kilo Təhlükəsizlik agentini bir əhatə dairəsində aktivləşdirin.",
       "spendAlertsSubtitle": "hədd aşmaları və saatlıq sıçrayışlar",
       "spendAlertsToggle": "Xərc bildirişləri kateqoriyası"
+    },
+    "history": {
+      "title": "Bildiriş tarixçəsi",
+      "subtitle": "Bu hesabın aldığı bildirişlər",
+      "bannerBody": "Bu cihaz üçün push bildirişlər deaktivdir, ona görə də yeni bildirişlər bura gəlməyəcək.",
+      "bannerAction": "Bildiriş parametrləri",
+      "emptyTitle": "Hələ bildiriş yoxdur",
+      "emptyCategoryTitle": "Bu kateqoriyada bildiriş yoxdur",
+      "emptyBody": "Bu hesabın aldığı bildirişlər burada görünür. Onlar {{days}} gün saxlanılır.",
+      "capped": "Ən son bildirişlər göstərilir.",
+      "loadError": "Bildiriş tarixçəsini yükləmək mümkün olmadı.",
+      "openFailed": "Bu bildiriş artıq heç yerdə açılmır."
     },
     "action": {
       "openSession": "Sessiyanı aç"
@@ -2592,7 +2603,9 @@
       "retrying": "Yenidən cəhd edilir…",
       "retryDeny": "Yenidən rədd etməyə çalış",
       "retryAllowOnce": "Yenidən bir dəfə icazə verməyə çalış",
-      "retryAlwaysAllow": "Yenidən həmişə icazə verməyə çalış"
+      "retryAlwaysAllow": "Yenidən həmişə icazə verməyə çalış",
+      "unreadableTitle": "İcazə tələbi oxuna bilmədi",
+      "unreadableBody": "Agent bu tətbiqin göstərə bilmədiyi icazə qərarını gözləyir. Davam etmək üçün tətbiqi və ya CLI-ni yeniləyin, yaxud tələbə CLI-də cavab verin."
     },
     "questionCard": {
       "title": "Agent cavab gözləyir",
@@ -2984,8 +2997,9 @@
     "unavailableDevice": "Bu cihazda səslə daxiletmə dəstəklənmir.",
     "unavailableLanguage": "Cihazın seçilmiş dili üçün səslə daxiletmə dəstəklənmir.",
     "languageNotInstalledTitle": "{{language}} üçün səslə daxiletmə hazır deyil",
-    "languageNotInstalledMessage": "{{language}} dilinin oflayn nitq faylları bu telefonda quraşdırılmayıb. Onları endir, sonra səslə daxiletməni yenidən sına.",
+    "languageNotInstalledMessage": "{{language}} üçün oflayn nitq faylları quraşdırılmayıb və onlayn emal söndürülüb. Səslə daxiletməni işlətmək üçün faylları endir və ya onlayn emalı yenidən aktivləşdir.",
     "downloadOfflineModel": "Endir",
+    "useOnlineTranscription": "Onlayn emala icazə ver",
     "offlineModelDownloadScheduled": "Oflayn nitq faylları fonda endiriləcək. Səslə daxiletməni daha sonra yenidən sına.",
     "listeningStopped": "Dinləmə dayandı.",
     "transcribing": "Mətnə çevrilir...",
@@ -3159,7 +3173,7 @@
     "creditActivity": {
       "emptyDescription": "Bu təşkilatın alışları, kredit istifadəsi və kredit düzəlişləri baş verdikcə burada görünəcək.",
       "emptyTitle": "Kredit əməliyyatı yoxdur",
-      "expires": "{{date}} tarixində müddəti bitir",
+      "expiresUtc": "{{date}} (UTC) tarixində müddəti bitir",
       "title": "Kredit əməliyyatları",
       "transactionFallback": "Kredit əməliyyatı",
       "category": {
@@ -3840,6 +3854,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "•••• kimi göstərilən dəyərlər öz saxlanılan gizlisini qoruyur; yeniləmək üçün dəyəri dəyişin. Komanda xəttini dəyişdikdə bütün dəyərlər yenidən tələb olunur",
+      "headersHint": "•••• kimi göstərilən dəyərlər öz saxlanılan gizlisini qoruyur; yeniləmək üçün dəyəri dəyişin. URL-i dəyişdikdə bütün dəyərlər yenidən tələb olunur",
       "nameRequired": "Server adını daxil edin",
       "nameInvalid": "Ad yalnız ASCII hərflərindən, rəqəmlərdən, alt xəttlərindən və tirelərdən istifadə edə bilər, maksimum 100 simvol",
       "commandRequired": "Komanda daxil edin",
@@ -3938,6 +3954,10 @@
   "credits": {
     "title": "Kredit al",
     "description": "Kredit Kilo App-də AI kodlaşdırma sessiyalarını işə salmaq üçün Kilo balansına əlavə olunan birdəfəlik alışdır. Mağaza hesabından ödəniş alır və mağaza ödənişi təsdiqlədikdən sonra kredit əlavə olunur.",
+    "nextExpiry": "{{amount}} məbləğində kreditin müddəti {{date}} (UTC) tarixində bitir. Müddəti ən tez bitən kreditlər ilk istifadə olunur.",
+    "appStoreExpiry": "App Store vasitəsilə alınan kreditlərin müddəti bitmir.",
+    "playOneYearExpiry": "Bu kreditlərin müddəti alışdan bir təqvim ili sonra bitir.",
+    "playNonexpiring": "Bu kreditlərin müddəti bitmir.",
     "packLabel": "{{amount}} dəyərində kredit əlavə et",
     "priceUnavailable": "Qiymət mövcud deyil",
     "purchased": "Kredit balansına əlavə edildi.",
@@ -4076,6 +4096,10 @@
     "generate": "Xülasə yarat",
     "retrySummary": "Ödənişli xülasəni təkrarla",
     "sources": "Sübutlar və artefaktlar",
+    "sessionsShown_one": "{{total}} sessiyadan {{shown}} göstərilir",
+    "sessionsShown_other": "{{total}} sessiyadan {{shown}} göstərilir",
+    "itemsShown_one": "{{total}} elementdən {{shown}} göstərilir",
+    "itemsShown_other": "{{total}} elementdən {{shown}} göstərilir",
     "timezone": "Hesabat saat qurşağı",
     "deviceTimezone": "Cihazın saat qurşağından istifadə et",
     "timezoneHint": "IANA saat qurşağı, məsələn Europe/Berlin. Cədvəl dəyişiklikləri gələcək hesabatlara tətbiq olunur.",

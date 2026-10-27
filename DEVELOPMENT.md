@@ -245,6 +245,56 @@ pnpm test
 This runs the web, web environment, and local development-tool tests. They
 should pass against the local PostgreSQL database.
 
+### CLI session storage verification
+
+After migrating the local database, run the session-copy and account-cleanup
+regressions with:
+
+```bash
+pnpm --filter web exec jest --runInBand src/routers/cli-sessions-router.test.ts src/lib/r2/cli-sessions.test.ts src/lib/user/deletion-queue/handlers/cli-v1.test.ts
+```
+
+Share publication refreshes a stable link with the current session snapshot.
+The blob URL columns identify the current copy folder. `pending_copy_ids`
+records folders awaiting deletion; later publication and deletion lifecycle
+calls retry that work before admitting another copy.
+
+For migration verification, run `pnpm drizzle:verify-bootstrap` to apply the
+complete chain to a disposable empty database. Also verify an upgrade from the
+base branch's migration chain with existing session and share rows: `is_fork`
+is backfilled from `forked_from`, `pending_copy_ids` defaults to an empty list,
+and `IDX_shared_cli_sessions_kilo_user_id` must be valid after the concurrent
+index build. Run `pnpm drizzle check` and `pnpm drizzle generate` to confirm the
+journal and schema agree after synchronizing the branch with `main`.
+
+
+### Credit expiration checks
+
+Single-account expiration locks the primary account before reading its credit transactions.
+It returns current usage, acquired credits, and the next expiration.
+Balance callers use these fields together.
+Closure checks follow the unique original-transaction link.
+The canonical database reconciler remains unconditional by default.
+Lazy balance checks opt into `onlyIfDue`.
+Forced checks pass `{ force: true }`, including checks with no expiration hint.
+
+Use synthetic accounts and a local PostgreSQL database for expiration checks.
+
+```bash
+pnpm test:db
+pnpm --filter web exec env NODE_ENV=test jest --runInBand \
+  ../../packages/web-shared/src/lib/creditExpiration.test.ts \
+  ../../packages/web-shared/src/lib/creditExpirationOrg.test.ts \
+  ../../packages/web-shared/src/lib/creditExpiration.concurrent.test.ts \
+  ../../packages/web-shared/src/lib/paidCreditAccounting.test.ts \
+  ../../packages/web-shared/src/lib/balance-funding.test.ts \
+  ../../packages/web-shared/src/lib/creditAdjustments.test.ts \
+  ../../packages/web-shared/src/lib/organizations/organization-usage.test.ts \
+  src/tests/profile-balance.test.ts \
+  src/lib/recomputeNextCreditExpiration.test.ts \
+  src/routers/organizations/organization-router.test.ts
+```
+
 ## Common Development Commands
 
 | Command | Description |

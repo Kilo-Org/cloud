@@ -1,7 +1,5 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import { getAutoRoutingSettings } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
-import { findEffectiveLegacyPoolRouter } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   getDataCollectionRequiredModelIds,
@@ -12,24 +10,16 @@ import {
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import {
-  candidateModelIdsFromSources,
+  candidateModelIdsFromTable,
   collectDataCollectionRequiredAutoRoutingModelIds,
   collectDeniedAutoRoutingModelIds,
   deniedAutoRoutingModelIdsForMember,
   deniedModelIdsForCandidates,
   policyNeedsCandidateEvaluation,
-  loadAutoRoutingCandidateModelIds,
-  loadEffectivePoolModelIds,
 } from './auto-routing-denied-models';
 
-jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client', () => ({
-  getAutoRoutingSettings: jest.fn(),
-}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache', () => ({
   getCachedRoutingTable: jest.fn(),
-}));
-jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
-  findEffectiveLegacyPoolRouter: jest.fn().mockResolvedValue(null),
 }));
 jest.mock(
   '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server',
@@ -57,8 +47,6 @@ function policy(
     ...overrides,
   };
 }
-
-const owner = { userId: 'user-1', organizationId: 'org-1' };
 
 describe('policyNeedsCandidateEvaluation', () => {
   it('is false for an unrestricted policy with an inactive baseline deny list', () => {
@@ -103,9 +91,34 @@ describe('policyNeedsCandidateEvaluation', () => {
 
 describe('collectDeniedAutoRoutingModelIds', () => {
   it('returns no denials without loading when the policy cannot deny anything', async () => {
-    await expect(collectDeniedAutoRoutingModelIds(policy(), owner, 'efficient')).resolves.toEqual(
-      []
-    );
+    await expect(collectDeniedAutoRoutingModelIds(policy(), 'efficient')).resolves.toEqual([]);
+    expect(getCachedRoutingTable).not.toHaveBeenCalled();
+  });
+
+  it('denies platform routing-table candidates outside the member grant', async () => {
+    jest.mocked(getCachedRoutingTable).mockResolvedValue({
+      routes: {
+        'implementation/code_generation': [
+          { model: 'anthropic/claude-sonnet-4.6' },
+          { model: 'openai/gpt-5' },
+          { model: 'kilo-auto/balanced' },
+        ],
+      },
+    } as never);
+
+    await expect(
+      collectDeniedAutoRoutingModelIds(
+        policy({
+          memberGrant: {
+            mode: 'selected',
+            includeOrganizationBaseline: false,
+            modelAllowList: ['anthropic/claude-sonnet-4.6'],
+            providerAllowList: [],
+          },
+        }),
+        'efficient'
+      )
+    ).resolves.toEqual(['openai/gpt-5']);
   });
 
   it('ignores the organization deny list for an unrestricted grant without loading candidates', async () => {
@@ -113,7 +126,6 @@ describe('collectDeniedAutoRoutingModelIds', () => {
     await expect(
       collectDeniedAutoRoutingModelIds(
         policy({ organizationModelDenyList: ['openai/gpt-4o'] }),
-        owner,
         'efficient'
       )
     ).resolves.toEqual([]);
@@ -136,11 +148,6 @@ describe('collectDeniedAutoRoutingModelIds', () => {
                 routes: { 'implementation/code_generation': [{ model: 'anthropic/claude' }] },
               }) as never
       );
-      jest.mocked(getAutoRoutingSettings).mockReset();
-      jest.mocked(getAutoRoutingSettings).mockResolvedValue({
-        status: 200,
-        body: { configuredPool: [{ model: 'anthropic/claude' }] },
-      } as never);
       jest
         .mocked(getProviderSlugsForModel)
         .mockImplementation(async modelId =>
@@ -150,61 +157,23 @@ describe('collectDeniedAutoRoutingModelIds', () => {
 
     it('denies a frontier table model blocked by the provider allowlist and absent from the efficient table', async () => {
       await expect(
-        collectDeniedAutoRoutingModelIds(providerCeilingPolicy, owner, 'frontier')
+        collectDeniedAutoRoutingModelIds(providerCeilingPolicy, 'frontier')
       ).resolves.toEqual(['openai/gpt-5']);
       expect(getCachedRoutingTable).toHaveBeenCalledWith('frontier');
       expect(getCachedRoutingTable).not.toHaveBeenCalledWith('efficient');
     });
 
-    it('ignores the efficient custom pool for frontier', async () => {
+    it('uses the efficient platform table instead of the frontier table', async () => {
       await expect(
-        collectDeniedAutoRoutingModelIds(providerCeilingPolicy, owner, 'frontier')
-      ).resolves.toEqual(['openai/gpt-5']);
-      expect(getAutoRoutingSettings).not.toHaveBeenCalled();
-    });
-
-    it('uses the custom pool for efficient instead of the frontier table', async () => {
-      await expect(
-        collectDeniedAutoRoutingModelIds(providerCeilingPolicy, owner, 'efficient')
+        collectDeniedAutoRoutingModelIds(providerCeilingPolicy, 'efficient')
       ).resolves.toEqual([]);
-      expect(getAutoRoutingSettings).toHaveBeenCalled();
       expect(getCachedRoutingTable).toHaveBeenCalledWith('efficient');
     });
   });
 });
 
-describe('migrated pool candidates', () => {
-  it('uses the canonical edited gateway entries rather than the legacy snapshot', async () => {
-    jest.mocked(findEffectiveLegacyPoolRouter).mockResolvedValueOnce({
-      id: '00000000-0000-4000-8000-000000000001',
-      ownerType: 'user',
-      ownerId: owner.userId,
-      slug: 'efficient',
-      name: 'Efficient',
-      baseRouter: 'efficient',
-      mode: 'best_accuracy',
-      entries: [{ kind: 'gateway', model: 'openai/edited-model' }],
-      defaultEntryKey: 'gateway:openai/edited-model',
-      legacyPool: true,
-    });
-    jest.mocked(getAutoRoutingSettings).mockClear();
-
-    await expect(loadEffectivePoolModelIds(owner)).resolves.toEqual(['openai/edited-model']);
-    expect(getAutoRoutingSettings).not.toHaveBeenCalled();
-  });
-
-  it('propagates a canonical lookup failure instead of using a stale snapshot', async () => {
-    jest
-      .mocked(findEffectiveLegacyPoolRouter)
-      .mockRejectedValueOnce(new Error('database unavailable'));
-
-    await expect(loadEffectivePoolModelIds(owner)).rejects.toThrow('database unavailable');
-  });
-});
-
 describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
   it('returns routing candidates that cannot be served without data collection', async () => {
-    jest.mocked(getAutoRoutingSettings).mockResolvedValue({ status: 404, body: {} } as never);
     jest.mocked(getCachedRoutingTable).mockResolvedValue({
       routes: {
         'implementation/code_generation': [
@@ -219,13 +188,13 @@ describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
       .mocked(getDataCollectionRequiredModelIds)
       .mockResolvedValue(new Set(['meta/muse-spark-1.3-contributor', 'unrelated/model']));
 
-    await expect(
-      collectDataCollectionRequiredAutoRoutingModelIds(owner, 'efficient')
-    ).resolves.toEqual(['meta/muse-spark-1.3-contributor', 'provider/free-model:free']);
+    await expect(collectDataCollectionRequiredAutoRoutingModelIds('efficient')).resolves.toEqual([
+      'meta/muse-spark-1.3-contributor',
+      'provider/free-model:free',
+    ]);
   });
 
-  it('uses frontier candidates for privacy denials rather than the efficient table or custom pool', async () => {
-    jest.mocked(getAutoRoutingSettings).mockClear();
+  it('uses frontier candidates for privacy denials rather than the efficient table', async () => {
     jest.mocked(getCachedRoutingTable).mockReset();
     jest.mocked(getCachedRoutingTable).mockImplementation(
       async router =>
@@ -246,14 +215,11 @@ describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
       .mocked(getDataCollectionRequiredModelIds)
       .mockResolvedValue(new Set(['frontier/private-model', 'efficient/private-model']));
 
-    await expect(loadAutoRoutingCandidateModelIds(owner, 'frontier')).resolves.toEqual([
+    await expect(collectDataCollectionRequiredAutoRoutingModelIds('frontier')).resolves.toEqual([
       'frontier/private-model',
-      'frontier/ordinary-model',
     ]);
-    await expect(
-      collectDataCollectionRequiredAutoRoutingModelIds(owner, 'frontier')
-    ).resolves.toEqual(['frontier/private-model']);
-    expect(getAutoRoutingSettings).not.toHaveBeenCalled();
+    expect(getCachedRoutingTable).toHaveBeenCalledWith('frontier');
+    expect(getCachedRoutingTable).not.toHaveBeenCalledWith('efficient');
   });
 });
 
@@ -383,7 +349,7 @@ describe('deniedModelIdsForCandidates', () => {
     ).toEqual(['example/model', 'example/model:suffix']);
   });
 
-  it('denies a custom-pool-only model excluded by a selected member grant', () => {
+  it('denies a candidate excluded by a selected member grant', () => {
     expect(
       deniedModelIdsForCandidates(
         policy({
@@ -394,50 +360,29 @@ describe('deniedModelIdsForCandidates', () => {
             providerAllowList: [],
           },
         }),
-        ['pool/only-model', 'anthropic/claude'],
+        ['other/model', 'anthropic/claude'],
         modelId => modelId === 'anthropic/claude'
       )
-    ).toEqual(['pool/only-model']);
+    ).toEqual(['other/model']);
   });
 });
 
-describe('candidateModelIdsFromSources', () => {
-  it('uses the custom pool instead of the platform table when a pool is configured', () => {
-    const ids = candidateModelIdsFromSources(
-      {
+describe('candidateModelIdsFromTable', () => {
+  it('includes each concrete routing-table model once', () => {
+    expect(
+      candidateModelIdsFromTable({
         routes: {
-          'implementation/code_generation': [{ model: 'google/gemini-2.5-flash' }],
+          'implementation/code_generation': [
+            { model: 'google/gemini-2.5-flash' },
+            { model: 'kilo-auto/balanced' },
+          ],
+          'implementation/debugging': [{ model: 'google/gemini-2.5-flash' }],
         },
-      },
-      ['pool/only-model']
-    );
-    expect(ids).toEqual(['pool/only-model']);
-    expect(ids).not.toContain('google/gemini-2.5-flash');
+      })
+    ).toEqual(['google/gemini-2.5-flash']);
   });
 
-  it('includes only concrete routing-table models when no pool is configured', () => {
-    expect(
-      candidateModelIdsFromSources(
-        {
-          routes: {
-            'implementation/code_generation': [
-              { model: 'google/gemini-2.5-flash' },
-              { model: 'kilo-auto/balanced' },
-            ],
-          },
-        },
-        null
-      )
-    ).toEqual(['google/gemini-2.5-flash']);
-    const ids = candidateModelIdsFromSources(
-      {
-        routes: {
-          'implementation/code_generation': [{ model: 'kilo-auto/balanced' }],
-        },
-      },
-      null
-    );
-    expect(ids).not.toContain('kilo-auto/balanced');
-    expect(ids).not.toContain('moonshotai/kimi-k3');
+  it('returns no candidates without a routing table', () => {
+    expect(candidateModelIdsFromTable(null)).toEqual([]);
   });
 });

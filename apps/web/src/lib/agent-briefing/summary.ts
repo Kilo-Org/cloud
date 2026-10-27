@@ -23,9 +23,11 @@ import {
   pickerModelPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { applyCustomPricingToPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
 import {
+  applyTieredPricingRates,
   textPricingRates,
   type TextPricingRates,
 } from '@kilocode/web-shared/lib/ai-gateway/request-cost-limit';
@@ -78,6 +80,10 @@ const responseSchema = z.object({
   choices: z.array(z.object({ message: z.object({ content: z.string().max(32_000) }) })).min(1),
 });
 const MAX_INPUT_BYTES = 32_000;
+const MAX_OUTPUT_TOKENS = 2048;
+// A reasoning model spends output tokens on hidden reasoning before the answer, so its cap must
+// leave room for both. Other models keep the smaller cap, which every model's output limit fits.
+const REASONING_MAX_OUTPUT_TOKENS = 16_384;
 const summaryAuthorizationSchema = z.object({
   model: z.string(),
   maxSpendMicrodollars: z.number().int().positive(),
@@ -217,13 +223,18 @@ export function briefingPrompt(row: BriefingReportRow, language: string): string
  * batch variant, or one missing from a populated model snapshot - is refused as
  * not allowed, so a quote is never issued for a model the picker never offers.
  * The entries the picker builds from code win over a catalog row with the same
- * id and keep their own price, as the picker does.
+ * id and keep their own price, as the picker does. Exclusive and custom pricing
+ * tiers are selected at the input token bound, as gateway admission does.
  */
-async function briefingPriceRates(model: string): Promise<TextPricingRates> {
+async function briefingPriceRates(
+  model: string,
+  inputTokensBound: number
+): Promise<TextPricingRates & { reasoning: boolean }> {
   const extra = pickerExtraModel(model);
-  const [endpointsMetadata, preferredProviderOrderConfig] = await Promise.all([
+  const [endpointsMetadata, preferredProviderOrderConfig, customPricingConfig] = await Promise.all([
     getOpenRouterModelsMetadataFromDatabase().catch((): StoredModelMap => ({})),
     getPreferredProviderOrderConfig(),
+    getCustomPricingConfig(),
   ]);
   const unavailable = await getUnavailableModelIds();
   const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
@@ -249,13 +260,19 @@ async function briefingPriceRates(model: string): Promise<TextPricingRates> {
   let rates: TextPricingRates[];
   try {
     rates = [entry, ...(targetExtra ? [targetExtra] : target ? [target] : [])].map(item =>
-      textPricingRates(
-        applyCustomPricingToPricing(
-          item.id,
-          item === extra || item === targetExtra
-            ? item.pricing
-            : pickerModelPricing(item, endpointsMetadata, preferredProviderOrderConfig)
-        )
+      applyTieredPricingRates(
+        item.id,
+        textPricingRates(
+          applyCustomPricingToPricing(
+            customPricingConfig,
+            item.id,
+            item === extra || item === targetExtra
+              ? item.pricing
+              : pickerModelPricing(item, endpointsMetadata, preferredProviderOrderConfig)
+          )
+        ),
+        customPricingConfig,
+        inputTokensBound
       )
     );
   } catch {
@@ -265,6 +282,7 @@ async function briefingPriceRates(model: string): Promise<TextPricingRates> {
     inputRate: Math.max(...rates.map(rate => rate.inputRate)),
     outputRate: Math.max(...rates.map(rate => rate.outputRate)),
     requestCost: Math.max(...rates.map(rate => rate.requestCost)),
+    reasoning: Boolean(endpointsMetadata[aliasTarget ?? model]?.reasoning),
   };
 }
 
@@ -274,13 +292,17 @@ export async function briefingPriceBound(
   maxSpendMicrodollars: number
 ) {
   if (Buffer.byteLength(prompt, 'utf8') > MAX_INPUT_BYTES) throw new Error('input_too_large');
-  const { inputRate, outputRate, requestCost } = await briefingPriceRates(model);
   const inputTokensBound = Buffer.byteLength(prompt, 'utf8') + 4096;
+  const { inputRate, outputRate, requestCost, reasoning } = await briefingPriceRates(
+    model,
+    inputTokensBound
+  );
   const inputCost = Math.ceil((inputTokensBound * inputRate + requestCost) * 1_000_000);
   const available = maxSpendMicrodollars - inputCost;
+  const outputCeiling = reasoning ? REASONING_MAX_OUTPUT_TOKENS : MAX_OUTPUT_TOKENS;
   const maxTokens = Math.min(
-    2048,
-    outputRate > 0 ? Math.floor(available / (outputRate * 1_000_000)) : 2048
+    outputCeiling,
+    outputRate > 0 ? Math.floor(available / (outputRate * 1_000_000)) : outputCeiling
   );
   if (available < 0 || maxTokens < 64) throw new Error('spend_limit_too_low');
   const upperBound = Math.ceil(inputCost + maxTokens * outputRate * 1_000_000);

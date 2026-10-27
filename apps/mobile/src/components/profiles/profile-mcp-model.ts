@@ -90,8 +90,6 @@ export type McpFormState = Readonly<{
 
 /**
  * Seed the form from the server being edited, or blank defaults for an add.
- * The masked env/header values round-trip verbatim (`formatRecord`), so the
- * user sees every key and rotates only the ones they retype.
  */
 export function initialMcpFormState(server?: McpServerSource): McpFormState {
   if (server === undefined) {

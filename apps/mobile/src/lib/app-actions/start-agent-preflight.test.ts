@@ -1,3 +1,5 @@
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
+
 import { describe, expect, it } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -25,6 +27,25 @@ describe('preflightStartAgent', () => {
         code: 'empty-prompt',
         retryable: false,
         message: i18n.t('appActions.start.promptRequired'),
+      },
+    });
+  });
+  it('accepts the shared prompt limit', () => {
+    expect(preflightStartAgent({ prompt: 'x'.repeat(CLOUD_AGENT_PROMPT_MAX_LENGTH) })).toEqual({
+      ok: true,
+      named: null,
+    });
+  });
+
+  it('enforces the shared prompt limit', () => {
+    expect(preflightStartAgent({ prompt: 'x'.repeat(CLOUD_AGENT_PROMPT_MAX_LENGTH + 1) })).toEqual({
+      ok: false,
+      result: {
+        ok: false,
+        action: 'StartAgent',
+        code: 'prompt-too-long',
+        retryable: false,
+        message: i18n.t('chat.errors.messageTooLong', { limit: CLOUD_AGENT_PROMPT_MAX_LENGTH }),
       },
     });
   });

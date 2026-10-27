@@ -27,6 +27,8 @@ describe('getBalanceForUser (migrated users)', () => {
     const result = await getBalanceForUser(user);
     expect(result).toEqual({
       balance: expectedBalance,
+      microdollars_used,
+      total_microdollars_acquired,
     });
   });
 
@@ -41,7 +43,11 @@ describe('getBalanceForUser (migrated users)', () => {
     });
 
     const result = await getBalanceForUser(user);
-    expect(result).toEqual({ balance: userBalance });
+    expect(result).toEqual({
+      balance: userBalance,
+      microdollars_used,
+      total_microdollars_acquired,
+    });
   });
 
   test('should calculate balance locally even with stale cache', async () => {
@@ -57,6 +63,8 @@ describe('getBalanceForUser (migrated users)', () => {
     const result = await getBalanceForUser(user);
     expect(result).toEqual({
       balance: expectedBalance,
+      microdollars_used,
+      total_microdollars_acquired,
     });
   });
 });
@@ -116,7 +124,7 @@ describe('getBalanceForUser credit expiry cut-off', () => {
   test('processes a credit that expired before the cut-off and reports the reduced balance', async () => {
     const user = await insertUserWithDueCredit();
 
-    const result = await getBalanceForUser(user, { now, expiryJitterHours: 0 });
+    const result = await getBalanceForUser(user, { now });
 
     expect(result.balance).toBe(0);
     expect(await readExpirationState(user.id)).toEqual({

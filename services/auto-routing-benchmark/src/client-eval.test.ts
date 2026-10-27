@@ -151,6 +151,41 @@ describe('client eval (real SQLite)', () => {
     expect(resumed.staleEntries).toEqual([]);
   });
 
+  it('omits linked variants from the plan and rejects their uploads without reading the catalog', async () => {
+    sqlite
+      .prepare(`INSERT INTO benchmark_profiles (router, model, variant, engine_identity,
+      repetitions, status, run_id, requested_at, updated_at)
+      VALUES ('efficient', 'vendor/platform', 'low', ?, 1, 'ready', 'platform-run', 'a', 'a')`)
+      .run(ENGINE);
+    const entries = [{ ...localModel, measuredAs: 'vendor/platform' }];
+    deps.source.fetchImpl = async () => new Response('catalog unavailable', { status: 503 });
+    const plan = await planClientEval(db, CONFIG, { ...context, entries }, deps.source);
+    expect(new Set(plan.items.map(item => item.variant))).toEqual(new Set(['high']));
+    await expect(
+      gradeClientEvalResult(db, CONFIG, upload({ entries }), deps)
+    ).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(
+      await gradeClientEvalResult(db, CONFIG, upload({ entries, variant: 'high' }), deps)
+    ).toEqual({ score: 1 });
+    expect(judge).not.toHaveBeenCalled();
+    expect(writeUsage).not.toHaveBeenCalled();
+  });
+
+  it('keeps a removed-catalog linked variant out of client eval when platform history exists', async () => {
+    sqlite
+      .prepare(`INSERT INTO benchmark_profiles (router, model, variant, engine_identity,
+      repetitions, status, run_id, requested_at, updated_at)
+      VALUES ('efficient', 'vendor/platform', 'low', 'old', 1, 'ready', 'old-run', 'a', 'a')`)
+      .run();
+    const entries = [{ ...localModel, measuredAs: 'vendor/platform' }];
+    deps.source.fetchImpl = async () => Response.json({ data: [] });
+    const plan = await planClientEval(db, CONFIG, { ...context, entries }, deps.source);
+    expect(new Set(plan.items.map(item => item.variant))).toEqual(new Set(['high']));
+    await expect(
+      gradeClientEvalResult(db, CONFIG, upload({ entries }), deps)
+    ).rejects.toMatchObject({ code: 'invalid_request' });
+  });
+
   it('re-plans an older-engine measurement in full and reports it stale', async () => {
     await gradeClientEvalResult(db, CONFIG, upload(), deps);
     sqlite.exec(`UPDATE client_profiles SET engine_identity = 'efficient:v0:old'`);
@@ -292,10 +327,11 @@ describe('client eval (real SQLite)', () => {
     expect(response.status).toBe(401);
   });
 
-  it('re-plans a case that did not run and lets a new upload replace it', async () => {
-    expect(
-      await gradeClientEvalResult(db, CONFIG, upload({ exitCode: 1, output: 'down' }), deps)
-    ).toEqual({ score: 0 });
+  it.each([
+    { exitCode: 1, output: 'down' },
+    { exitCode: 0, output: '' },
+  ])('re-plans an unsuccessful case and lets a new upload replace it: %j', async failedRun => {
+    expect(await gradeClientEvalResult(db, CONFIG, upload(failedRun), deps)).toEqual({ score: 0 });
     const plan = await planClientEval(db, CONFIG, context, deps.source);
     expect(plan.items).toContainEqual(
       expect.objectContaining({ variant: 'low', caseId: exactCase.id, rep: 0 })

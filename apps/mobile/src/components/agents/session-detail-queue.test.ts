@@ -612,6 +612,7 @@ function makeManager() {
       activeSuggestion: { value: null },
       pendingQuestions: { value: [] },
       pendingPermissions: { value: [] },
+      unreadablePermissions: { value: [] },
       totalCost: { value: null },
       childMessages: { value: () => new Map() },
       childSessionHydrationState: { value: () => ({ status: 'idle' }) },

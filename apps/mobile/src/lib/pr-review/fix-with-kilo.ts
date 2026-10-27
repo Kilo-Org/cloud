@@ -13,6 +13,7 @@
 // render the staged text on its first render.
 
 import {
+  type ProviderPrLink,
   type ProviderPrPlatform,
   type ProviderPrRef,
   providerPrRepoPath,
@@ -60,16 +61,17 @@ export function prCommentAnchor(
 
 /**
  * The provider page URL for one comment, anchored. `null` when either half
- * is unavailable: a GitLab MR deep-linked with no instance hint has no host
- * to name, and `providerPrWebUrl` deliberately refuses to guess gitlab.com.
+ * is unavailable: the anchor vocabulary has no form for the kind, or the
+ * loaded PR/MR has no URL to anchor onto. `link` carries the ref of the row
+ * and the URL its read returned.
  */
 export function prCommentWebUrl(
-  ref: ProviderPrRef,
+  link: ProviderPrLink,
   kind: PrCommentKind,
   commentId: number
 ): string | null {
-  const base = providerPrWebUrl(ref);
-  const anchor = prCommentAnchor(ref.platform, kind, commentId);
+  const base = providerPrWebUrl(link);
+  const anchor = prCommentAnchor(link.ref.platform, kind, commentId);
   if (base === null || anchor === null) {
     return null;
   }

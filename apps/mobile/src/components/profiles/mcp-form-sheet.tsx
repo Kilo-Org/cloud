@@ -73,11 +73,6 @@ type McpFormSheetProps = Readonly<{
  * The add/edit MCP server sheet. Mounted only while open, so every open seeds
  * fresh fields from the server it edits. Text fields are uncontrolled (refs),
  * per the app's iOS text-input rule; the type and enabled controls are state.
- *
- * Save validates through `validateMcpForm`; a refused input shows the matching
- * `profiles.mcp.*` message under the field at fault and persists nothing. A
- * local server's env values arrive masked, so the untouched keys round-trip and
- * only retyped values rotate.
  */
 export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<McpFormSheetProps>) {
   const { t } = useTranslation();
@@ -213,23 +208,29 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
           />
         )}
 
-        <FormField
-          label={type === 'local' ? t('profiles.mcp.environment') : t('profiles.mcp.headers')}
-          defaultValue={initial.configJson}
-          error={errorKeyFor(t, error, ['json-invalid', 'record-too-large'])}
-          disabled={isSaving}
-          multiline
-          textAlignVertical="top"
-          className="min-h-28 max-h-52 leading-[1.25rem]"
-          autoCapitalize="none"
-          autoCorrect={false}
-          placeholder={t('profiles.mcp.jsonPlaceholder')}
-          containerOnLayout={fieldLayout('config')}
-          onChangeText={value => {
-            configRef.current = value;
-            setError(null);
-          }}
-        />
+        <View className="gap-1.5" onLayout={fieldLayout('config')}>
+          <FormField
+            label={type === 'local' ? t('profiles.mcp.environment') : t('profiles.mcp.headers')}
+            defaultValue={initial.configJson}
+            error={errorKeyFor(t, error, ['json-invalid', 'record-too-large'])}
+            disabled={isSaving}
+            multiline
+            textAlignVertical="top"
+            className="min-h-28 max-h-52 leading-[1.25rem]"
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder={t('profiles.mcp.jsonPlaceholder')}
+            onChangeText={value => {
+              configRef.current = value;
+              setError(null);
+            }}
+          />
+          {server !== null ? (
+            <Text className="text-xs text-muted-foreground">
+              {type === 'local' ? t('profiles.mcp.environmentHint') : t('profiles.mcp.headersHint')}
+            </Text>
+          ) : null}
+        </View>
 
         <FormField
           label={t('profiles.mcp.timeout')}

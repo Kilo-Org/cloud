@@ -72,6 +72,7 @@ import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organizat
 import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import { organizationReviewAgentRouter } from '@/routers/organizations/organization-code-reviews-router';
 import { organizationCloudAgentNextRouter } from '@/routers/organizations/organization-cloud-agent-next-router';
+import { organizationVercelComputeRouter } from '@/routers/organizations/organization-vercel-compute-router';
 import { organizationSecurityAgentRouter } from '@/routers/organizations/organization-security-agent-router';
 import { organizationSecurityAuditLogRouter } from '@/routers/organizations/organization-security-audit-log-router';
 import { organizationAutoTopUpRouter } from '@/routers/organizations/organization-auto-top-up-router';
@@ -145,6 +146,7 @@ export const organizationsRouter = createTRPCRouter({
   modes: organizationModesRouter,
   reviewAgent: organizationReviewAgentRouter,
   cloudAgentNext: organizationCloudAgentNextRouter,
+  vercelCompute: organizationVercelComputeRouter,
   securityAgent: organizationSecurityAgentRouter,
   securityAuditLog: organizationSecurityAuditLogRouter,
   autoTopUp: organizationAutoTopUpRouter,
@@ -263,18 +265,8 @@ export const organizationsRouter = createTRPCRouter({
         organization.next_credit_expiration_at &&
         new Date() >= new Date(organization.next_credit_expiration_at)
       ) {
-        const expiryResult = await processOrganizationExpirations(
-          {
-            id: input.organizationId,
-            microdollars_used: organization.microdollars_used,
-            next_credit_expiration_at: organization.next_credit_expiration_at,
-            total_microdollars_acquired: organization.total_microdollars_acquired,
-          },
-          new Date()
-        );
-        if (expiryResult) {
-          organization = (await getOrganizationById(input.organizationId)) ?? organization;
-        }
+        const expiryResult = await processOrganizationExpirations(input.organizationId, new Date());
+        organization = { ...organization, ...expiryResult };
       }
 
       return {
@@ -318,18 +310,12 @@ export const organizationsRouter = createTRPCRouter({
         organization.next_credit_expiration_at &&
         new Date() >= new Date(organization.next_credit_expiration_at)
       ) {
-        const expiryResult = await processOrganizationExpirations(
-          {
-            id: organizationId,
-            microdollars_used: organization.microdollars_used,
-            next_credit_expiration_at: organization.next_credit_expiration_at,
-            total_microdollars_acquired: organization.total_microdollars_acquired,
-          },
-          new Date()
-        );
-        if (expiryResult) {
-          organization = (await getOrganizationById(organizationId)) ?? organization;
+        await processOrganizationExpirations(organizationId, new Date());
+        const refreshedOrganization = await getOrganizationById(organizationId);
+        if (!refreshedOrganization) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
         }
+        organization = refreshedOrganization;
       }
 
       const [members, ssoPolicy, childOrganizations] = await Promise.all([

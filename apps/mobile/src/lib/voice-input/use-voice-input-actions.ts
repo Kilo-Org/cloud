@@ -21,6 +21,7 @@ import {
   voiceInputLanguageDisplayName,
 } from './voice-input-language';
 import {
+  classifyVoiceInputError,
   shouldAbortVoiceInput,
   type VoiceInputFeedback,
   type VoiceInputLifecycleInput,
@@ -34,6 +35,7 @@ import { isGatewayTranscriptionEnabled } from './gateway/gateway-transcription-p
 type VoiceInputControllerLike = {
   abort: (owner?: string) => Promise<boolean>;
   getSnapshot: () => VoiceInputControllerSnapshot;
+  refreshAvailability: () => void;
   start: (options: VoiceInputStartOptions) => Promise<boolean>;
   stop: (owner: string) => Promise<boolean>;
   subscribe: (listener: (snapshot: VoiceInputControllerSnapshot) => void) => () => void;
@@ -195,6 +197,13 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
     if (getDisabled()) {
       return;
     }
+    // The recognizer's availability is a live OS answer, not a constant: on iOS
+    // `SFSpeechRecognizer.isAvailable` goes false while the service is busy and
+    // on Android the platform answer goes false when no recognition service is
+    // bound. Every tap re-reads it, so a stale verdict taken when this surface
+    // was built can neither hide a working microphone nor send the user into the
+    // consent disclosure for a recognizer that cannot start.
+    controller.refreshAvailability();
     const owner = getOwner();
     const snapshot = controller.getSnapshot();
     const view = resolveOwnerVoiceInputView(snapshot, owner);
@@ -212,6 +221,14 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
     }
 
     if (view.isActive) {
+      return;
+    }
+
+    if (!view.available) {
+      // The microphone stays in place while the recognizer is unavailable, so
+      // the tap is the one place the reason can be given: say what is wrong
+      // instead of raising a consent question a start could not honour.
+      showFeedback(classifyVoiceInputError('service-not-allowed'));
       return;
     }
 
@@ -309,22 +326,26 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
     // mode === 'blocked'
     if (consent === 'declined' && supportsOnDeviceByService) {
       // The device can recognize on-device, but the offline model for the
-      // resolved language is missing. Say what is wrong and offer the
-      // download instead of a bare error; the user declined network
-      // transcription, so do not re-raise that disclosure. Only a service
+      // resolved language is missing and network transcription was declined.
+      // Both ways out stay reachable from the microphone: the download, and the
+      // same online disclosure the declined branch raises — the answer to a
+      // consent question belongs where the user can change it. Only a service
       // that distinguishes supported from installed locales reaches this
       // branch, and on iOS every supported locale reports as installed, so
-      // Android is the only platform that gets here in practice; the
-      // remediation below triggers the Android-only
-      // `androidTriggerOfflineModelDownload`, and if a service without that
-      // capability ever reports a missing model, the download tap degrades
-      // through the catch to the same actionable toast.
+      // Android is the only platform that gets here in practice; the download
+      // triggers the Android-only `androidTriggerOfflineModelDownload`, and if
+      // a service without that capability ever reports a missing model, the
+      // download tap degrades through the catch to the same actionable toast.
       const languageName = voiceInputLanguageDisplayName(languageTag);
       Alert.alert(
         i18n.t('voiceInput.languageNotInstalledTitle', { language: languageName }),
         i18n.t('voiceInput.languageNotInstalledMessage', { language: languageName }),
         [
           { text: i18n.t('common.notNow'), style: 'cancel' },
+          {
+            text: i18n.t('voiceInput.useOnlineTranscription'),
+            onPress: raiseOnlineConsentDisclosure,
+          },
           {
             text: i18n.t('voiceInput.downloadOfflineModel'),
             onPress: () => {

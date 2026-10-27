@@ -227,7 +227,6 @@
     "hideBalance": "Slēpt atlikumu",
     "showBalance": "Rādīt atlikumu",
     "balanceHidden": "Atlikums ir paslēpts",
-    "bonusCreditsExpiring": "Kredītu {{amount}} apmērā derīguma termiņš beidzas {{date}}.",
     "signOutTitle": "Izrakstīties?",
     "signOutMessage": "Lai piekļūtu savai darbvietai, tev būs jāpierakstās vēlreiz.",
     "deleteAccountTitle": "Dzēst kontu?",
@@ -2628,7 +2627,9 @@
       "retrying": "Mēģina vēlreiz…",
       "retryDeny": "Mēģināt liegt vēlreiz",
       "retryAllowOnce": "Mēģināt atļaut vienreiz vēlreiz",
-      "retryAlwaysAllow": "Mēģināt vienmēr atļaut vēlreiz"
+      "retryAlwaysAllow": "Mēģināt vienmēr atļaut vēlreiz",
+      "unreadableTitle": "Atļaujas pieprasījumu nevarēja nolasīt",
+      "unreadableBody": "Aģents gaida atļaujas lēmumu, ko šī lietotne nevar parādīt. Atjaunināt lietotni vai CLI, vai atbildēt uz pieprasījumu CLI, lai turpinātu."
     },
     "questionCard": {
       "title": "Aģents gaida atbildi",
@@ -3027,8 +3028,9 @@
     "unavailableDevice": "Balss ievade šajā ierīcē nav pieejama.",
     "unavailableLanguage": "Balss ievade nav pieejama ierīcē izvēlētajā valodā.",
     "languageNotInstalledTitle": "Balss ievade valodai {{language}} vēl nav gatava",
-    "languageNotInstalledMessage": "{{language}} valodas bezsauses runas faili šajā tālrunī nav instalēti. Lejupielādē tos un pēc tam mēģini balss ievadi vēlreiz.",
+    "languageNotInstalledMessage": "Bezsaistes runas faili valodai {{language}} nav instalēti, un tiešsaistes transkribēšana ir izslēgta. Lai izmantotu balss ievadi, lejupielādē failus vai atkal ieslēdz tiešsaistes transkribēšanu.",
     "downloadOfflineModel": "Lejupielādēt",
+    "useOnlineTranscription": "Atļaut tiešsaistes transkribēšanu",
     "offlineModelDownloadScheduled": "Bezsauses runas faili tiks lejupielādēti fonā. Vēlāk mēģini balss ievadi vēlreiz.",
     "listeningStopped": "Klausīšanās apturēta.",
     "transcribing": "Transkribē…",
@@ -3203,7 +3205,7 @@
     "creditActivity": {
       "emptyDescription": "Šeit parādīsies informācija par šīs organizācijas kredītu pirkumiem, patēriņu un korekcijām.",
       "emptyTitle": "Nav kredītu darījumu",
-      "expires": "Derīguma termiņš: {{date}}",
+      "expiresUtc": "Derīguma termiņš: {{date}} (UTC)",
       "title": "Kredītu darījumi",
       "transactionFallback": "Kredītu darījums",
       "category": {
@@ -3792,6 +3794,7 @@
     "title": "Profili",
     "entrySubtitle": "Atkārtoti izmantojiet vides iestatījumus sesijās",
     "newProfile": "Jauns profils",
+    "openHint": "Atver profilu",
     "emptyTitle": "Vēl nav neviena profila",
     "emptyDescription": "Izveidojiet profilu, lai sesijās atkārtoti izmantotu vides mainīgos, iestatīšanas komandas un prasmes.",
     "loadFailed": "Nevarēja ielādēt profilus",
@@ -3890,6 +3893,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Vērtības, kas parādītas kā ••••, saglabā savu esošo noslēpumu; aizstājiet vērtību, lai to nomainītu. Mainot komandrindu, atkal ir nepieciešamas visas vērtības",
+      "headersHint": "Vērtības, kas parādītas kā ••••, saglabā savu esošo noslēpumu; aizstājiet vērtību, lai to nomainītu. Mainot URL, atkal ir nepieciešamas visas vērtības",
       "nameRequired": "Ievadiet servera nosaukumu",
       "nameInvalid": "Nosaukumā var izmantot tikai ASCII burtus, ciparus, pasvītras un domuzīmes, līdz 100 rakstzīmēm",
       "commandRequired": "Ievadiet komandu",
@@ -3988,6 +3993,10 @@
   "credits": {
     "title": "Pirkt kredītus",
     "description": "Kredīti ir vienreizējs pirkums, kas tiek pievienots tavam Kilo bilancei AI kodēšanas sesiju vadīšanai Kilo App. Veikals iekasē maksu no tava konta, un kredīti tiek pievienoti pēc tam, kad veikals apstiprina maksājumu.",
+    "nextExpiry": "Kredītu {{amount}} apmērā derīguma termiņš beidzas {{date}} (UTC). Vispirms tiek izmantoti kredīti ar agrāko derīguma termiņu.",
+    "appStoreExpiry": "Ar App Store starpniecību iegādātajiem kredītiem nav derīguma termiņa.",
+    "playOneYearExpiry": "Šo kredītu derīguma termiņš beidzas vienu kalendāro gadu pēc pirkuma.",
+    "playNonexpiring": "Šiem kredītiem nav derīguma termiņa.",
     "packLabel": "Pievienot {{amount}} kredītos",
     "priceUnavailable": "Cena nav pieejama",
     "purchased": "Kredīti ir pievienoti tavai bilancei.",
@@ -4030,11 +4039,13 @@
       "namePlaceholder": "Kļūdas, idejas, laidieni…",
       "emoji": "Emocijzīme",
       "mode": "Režīms",
-      "defaultsHint": "Sesijas, kas sāktas no šī saraksta, izmanto šos noklusējumus."
+      "defaultsHint": "Sesijas, kas sāktas no šī saraksta, izmanto šos noklusējumus.",
+      "saveFailed": "Neizdevās saglabāt sarakstu. Pārbaudiet savienojumu un mēģiniet vēlreiz."
     },
     "list": {
       "addPlaceholder": "Pievienot jaunu uzdevumu",
       "add": "Pievienot uzdevumu",
+      "addFailed": "Neizdevās pievienot uzdevumu. Pārbaudiet savienojumu un mēģiniet vēlreiz.",
       "empty": "Vēl nav uzdevumu",
       "setDefaults": "Iestatīt repozitoriju, režīmu un modeli",
       "completed_one": "Pabeigti ({{count}})",
@@ -4073,7 +4084,9 @@
       "startNewSession": "Sākt jaunu sesiju",
       "startNewSessionHint": "Turiet nospiestu, lai sāktu jaunu sesiju.",
       "linkSession": "Saistīt sesiju",
-      "linkFailed": "Neizdevās saistīt sesiju ar uzdevumu"
+      "linkFailed": "Neizdevās saistīt sesiju ar uzdevumu",
+      "moveToAnotherTodo": "Pārvietot uz citu uzdevumu",
+      "startRefreshFailed": "Sesija tika sākta, bet šis saraksts neatjaunojās."
     },
     "linkSession": {
       "title": "Sesijas saistīšana",
@@ -4082,6 +4095,7 @@
     },
     "upNext": "Nākamais",
     "sessionTodo": "Uzdevums: {{title}}",
+    "openTodoHint": "Atver uzdevumu.",
     "linkToTodo": "Saistīt ar uzdevumu",
     "candidates": {
       "empty": "Nav atvērtu uzdevumu"

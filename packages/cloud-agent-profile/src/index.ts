@@ -149,6 +149,7 @@ export {
   MAX_KILO_COMMAND_DESCRIPTION_LENGTH,
   BUILTIN_COMMAND_NAMES,
   kiloCommandNameSchema,
+  kiloCommandReorderIdsSchema,
   kiloCommandCreateInputSchema,
   kiloCommandUpdateInputSchema,
   listKiloCommandsForProfile,
@@ -241,7 +242,9 @@ export {
   type EnvironmentSecretChange,
   type EnvironmentUpdateInput,
   type EnvironmentSessionLayer,
+  type EnvironmentReference,
   type EnvironmentForSession,
+  type EnvironmentBuildInput,
   type EnvironmentResponse,
   type EnvironmentSummary,
 } from './environment-contracts';
@@ -253,6 +256,8 @@ export {
   listEnvironments,
   listEnvironmentsForOwner,
   loadEnvironmentForSession,
+  loadEnvironmentBuildInput,
+  readEnvironmentReference,
   lockActiveOrganization,
   type EnvironmentTransaction,
 } from './environment-service';

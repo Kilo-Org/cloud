@@ -8,6 +8,10 @@ import { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kilo-pas
 import { cn } from '@/lib/utils';
 
 import { getTierName } from './utils';
+import {
+  CreditExpiryNotice,
+  usePaidCreditPolicyReady,
+} from '@/components/payment/CreditExpiryNotice';
 
 const TIERS: KiloPassTier[] = [KiloPassTier.Tier19, KiloPassTier.Tier49, KiloPassTier.Tier199];
 
@@ -112,6 +116,7 @@ export function UpdatePanel(props: UpdatePanelProps) {
         </div>
         <p className="text-muted-foreground text-sm">{updateSummary.body}</p>
       </div>
+      <CreditExpiryNotice purchase="pass" />
 
       {planChangeBlockedReason ? (
         <Alert variant="warning">
@@ -148,6 +153,7 @@ type UpdateFooterProps = {
 };
 
 export function UpdateFooter(props: UpdateFooterProps) {
+  const policyReady = usePaidCreditPolicyReady();
   const {
     onBack,
     onCancelPendingChange,
@@ -177,8 +183,10 @@ export function UpdateFooter(props: UpdateFooterProps) {
         ) : null}
         {!hasPendingChange ? (
           <Button
-            onClick={onScheduleChange}
-            disabled={isSameSelection || isMutating || isPlanChangeBlocked}
+            onClick={() => {
+              if (policyReady) onScheduleChange();
+            }}
+            disabled={isSameSelection || isMutating || !policyReady || isPlanChangeBlocked}
           >
             {isSchedulingChange ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -5,7 +5,8 @@ import { Pressable, View } from 'react-native';
 import Sortable from 'react-native-sortables';
 
 import { TodoSwipeRow } from '@/components/todos/todo-swipe-row';
-import { Archive, ArchiveRestore, ChevronRight, ListTodo, Trash2 } from '@/components/ui/icons';
+import { DirectionalChevronRight } from '@/components/ui/directional-icons';
+import { Archive, ArchiveRestore, ListTodo, Trash2 } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type TodoList } from '@/lib/todos/todo-types';
@@ -52,7 +53,7 @@ export const TodoListRow = memo(function TodoListRow({
         </Text>
       </View>
       <Text className="text-sm tabular-nums text-muted-foreground">{openCount}</Text>
-      <ChevronRight size={16} color={colors.mutedForeground} />
+      <DirectionalChevronRight size={16} color={colors.mutedForeground} />
     </>
   );
   const a11y = {

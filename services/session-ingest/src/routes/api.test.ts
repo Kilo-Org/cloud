@@ -34,8 +34,19 @@ vi.mock('../services/session-access', () => ({
   resolveAccessibleKiloSession: vi.fn(),
 }));
 
+const { TEST_STAGING_MAX_BYTES } = vi.hoisted(() => ({ TEST_STAGING_MAX_BYTES: 8 * 1024 * 1024 }));
+
+// Real limit constants, except the staging ceiling: an 8 MiB test value
+// covers the declared cases, so the limit fixtures stay small.
+vi.mock('../util/ingest-limits', async importOriginal => {
+  const actual = await importOriginal<typeof IngestLimitsModule>();
+  return { ...actual, STAGING_MAX_BYTES: TEST_STAGING_MAX_BYTES };
+});
+
 import { getWorkerDb } from '@kilocode/db/client';
+import { MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH } from '@kilocode/session-ingest-contracts';
 import { getSessionIngestDO } from '../dos/SessionIngestDO';
+import type * as IngestLimitsModule from '../util/ingest-limits';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { getUserConnectionDO } from '../dos/UserConnectionDO';
 import { applyMetadataChanges } from '../ingest/metadata';
@@ -133,6 +144,42 @@ function r2StagingStub(env: Parameters<typeof getSessionIngestDO>[0]) {
       body: ReadableStream<Uint8Array> | Uint8Array
     ) => {
       await env.SESSION_INGEST_R2.put(params.key, body);
+      return true;
+    },
+    stageBoundedR2Object: async (
+      params: { key: string },
+      body: ReadableStream<Uint8Array> | Uint8Array,
+      maxBytes: number
+    ) => {
+      if (body instanceof Uint8Array) {
+        if (body.byteLength > maxBytes) return 'too_large' as const;
+        await env.SESSION_INGEST_R2.put(params.key, body);
+        return true;
+      }
+      const reader = body.getReader();
+      const chunks: Uint8Array[] = [];
+      let total = 0;
+      try {
+        while (true) {
+          const result = await reader.read();
+          if (result.done) break;
+          total += result.value.byteLength;
+          if (total > maxBytes) {
+            await reader.cancel();
+            return 'too_large' as const;
+          }
+          chunks.push(result.value);
+        }
+      } finally {
+        reader.releaseLock();
+      }
+      const bytes = new Uint8Array(total);
+      let offset = 0;
+      for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      await env.SESSION_INGEST_R2.put(params.key, bytes);
       return true;
     },
   };
@@ -940,15 +987,13 @@ describe('api routes', () => {
     });
 
     it.each([
-      ['missing', undefined, 'no_content_length', 'stream'],
-      ['negative', '-1', 'invalid_content_length', 'stream'],
-      ['fractional', '1.5', 'invalid_content_length', 'stream'],
-      ['non-numeric', 'abc', 'invalid_content_length', 'stream'],
-      ['zero', '0', 'empty_body', 'bytes'],
-      ['over cap', '4194305', 'oversized_body', 'stream'],
+      ['missing', undefined, 'no_content_length'],
+      ['negative', '-1', 'invalid_content_length'],
+      ['fractional', '1.5', 'invalid_content_length'],
+      ['non-numeric', 'abc', 'invalid_content_length'],
     ] as const)(
       'uses the legacy path for %s Content-Length',
-      async (_name, contentLength, reason, bodyShape) => {
+      async (_name, contentLength, reason) => {
         const { app, ingest } = prepareIngestRoute();
         const env = directIngestEnv();
         const headers =
@@ -964,17 +1009,133 @@ describe('api routes', () => {
         expect(response.status).toBe(200);
         expect(ingest).not.toHaveBeenCalled();
         expect(env.SESSION_INGEST_R2.put).toHaveBeenCalledTimes(1);
-        // A measured small body crosses the DO RPC by value; an unmeasured or
-        // over-budget body keeps streaming.
-        expect(env.SESSION_INGEST_R2.put.mock.calls[0][1]).toBeInstanceOf(
-          bodyShape === 'bytes' ? Uint8Array : ReadableStream
-        );
+        const staged = env.SESSION_INGEST_R2.put.mock.calls[0][1];
+        const stagedText =
+          staged instanceof Uint8Array
+            ? new TextDecoder().decode(staged)
+            : await new Response(staged).text();
+        expect(stagedText).toBe('{}');
         expect(info).toHaveBeenCalledWith(
           expect.objectContaining({ event: 'direct_ingest_legacy', reason })
         );
         info.mockRestore();
       }
     );
+
+    it('stages an empty body by value', async () => {
+      const { app, ingest } = prepareIngestRoute();
+      const env = directIngestEnv();
+      const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+      const request = new Request(
+        'http://local/session/ses_12345678901234567890123456/ingest?v=1',
+        { method: 'POST', headers: { 'content-length': '0' }, body: '{}' }
+      );
+
+      const response = await app.fetch(request, env);
+
+      expect(response.status).toBe(200);
+      expect(ingest).not.toHaveBeenCalled();
+      expect(env.SESSION_INGEST_R2.put).toHaveBeenCalledTimes(1);
+      expect(env.SESSION_INGEST_R2.put.mock.calls[0][1]).toBeInstanceOf(Uint8Array);
+      expect(info).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'direct_ingest_legacy', reason: 'empty_body' })
+      );
+      info.mockRestore();
+    });
+
+    it.each([
+      ['declared over cap', '4194305'],
+      ['declared far over cap', String(TEST_STAGING_MAX_BYTES)],
+    ] as const)('stages a %s body through the queue', async (_name, contentLength) => {
+      const { app, ingest } = prepareIngestRoute();
+      const env = directIngestEnv();
+      const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+      const body = JSON.stringify({ data: [] });
+
+      const response = await app.fetch(
+        new Request('http://local/session/ses_12345678901234567890123456/ingest?v=1', {
+          method: 'POST',
+          headers: { 'content-length': contentLength },
+          body,
+        }),
+        env
+      );
+
+      expect(response.status).toBe(200);
+      expect(ingest).not.toHaveBeenCalled();
+      expect(env.SESSION_INGEST_R2.put).toHaveBeenCalledTimes(1);
+      expect(env.INGEST_QUEUE.send).toHaveBeenCalledTimes(1);
+      expect(info).toHaveBeenCalledWith(
+        expect.objectContaining({ event: 'direct_ingest_legacy', reason: 'oversized_body' })
+      );
+      info.mockRestore();
+    });
+
+    it('enforces the staging ceiling without staging', async () => {
+      const { app, ingest } = prepareIngestRoute();
+      const env = directIngestEnv();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const response = await app.fetch(
+        new Request('http://local/session/ses_12345678901234567890123456/ingest?v=1', {
+          method: 'POST',
+          headers: { 'content-length': String(TEST_STAGING_MAX_BYTES + 1) },
+          body: 'x'.repeat(8),
+        }),
+        env
+      );
+
+      expect(response.status).toBe(413);
+      expect(await response.json()).toEqual({ success: false, error: 'payload_too_large' });
+      expect(ingest).not.toHaveBeenCalled();
+      expect(env.SESSION_INGEST_R2.put).not.toHaveBeenCalled();
+      expect(env.INGEST_QUEUE.send).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'direct_ingest_reject',
+          reason: 'staging_budget_exceeded',
+        })
+      );
+      warn.mockRestore();
+    });
+
+    it('enforces the staging ceiling for a streamed body without staging', async () => {
+      const { app, ingest } = prepareIngestRoute();
+      const env = directIngestEnv();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const drained: Uint8Array[] = [];
+      env.SESSION_INGEST_R2.put.mockImplementationOnce(async (_key, body) => {
+        try {
+          drained.push(await new Response(body).arrayBuffer().then(b => new Uint8Array(b)));
+        } catch {
+          drained.length = 0;
+        }
+        return undefined;
+      });
+      const chunk = new Uint8Array(TEST_STAGING_MAX_BYTES / 4).fill(1);
+      const body = new Blob([chunk, chunk, chunk, chunk, chunk]).stream();
+
+      const response = await app.fetch(
+        new Request('http://local/session/ses_12345678901234567890123456/ingest?v=1', {
+          method: 'POST',
+          body,
+          duplex: 'half',
+        } as RequestInit),
+        env
+      );
+
+      expect(response.status).toBe(413);
+      expect(await response.json()).toEqual({ success: false, error: 'payload_too_large' });
+      expect(ingest).not.toHaveBeenCalled();
+      expect(env.INGEST_QUEUE.send).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: 'direct_ingest_reject',
+          reason: 'staging_budget_exceeded',
+        })
+      );
+      warn.mockRestore();
+    });
 
     it('keeps gate-miss staging failures out of the direct fallback denominator', async () => {
       const { app } = prepareIngestRoute();
@@ -1509,6 +1670,22 @@ describe('api routes', () => {
     );
     expect(res.status).toBe(400);
     expect(await res.json()).toMatchObject({ success: false, error: 'Invalid paging input' });
+  });
+
+  it('GET /session/:sessionId/messages returns 400 for an over-length before cursor', async () => {
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request(
+        `http://local/session/ses_12345678901234567890123456/messages?limit=50&before=${'A'.repeat(
+          MAX_KILO_SDK_MESSAGES_CURSOR_LENGTH + 1
+        )}`,
+        { method: 'GET' }
+      ),
+      makeTestEnv()
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ success: false, error: 'Invalid before' });
+    expect(getSessionIngestDO).not.toHaveBeenCalled();
   });
 
   it('GET /session/:sessionId/messages returns 404 when the user does not own the session', async () => {

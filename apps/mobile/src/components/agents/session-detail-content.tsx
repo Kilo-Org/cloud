@@ -43,6 +43,7 @@ import { MessageErrorBoundary } from '@/components/agents/message-error-boundary
 import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
 import { nextHeldQueuedIds } from '@/components/agents/queued-badge-hold';
 import { PermissionCard } from '@/components/agents/permission-card';
+import { PermissionUnreadableNotice } from '@/components/agents/permission-unreadable-notice';
 import { QuestionCard } from '@/components/agents/question-card';
 import {
   type ContextSheetIdentity,
@@ -215,6 +216,7 @@ import {
   buildContinuePrefillParams,
 } from '@/components/agents/new-session-prefill';
 import { type ForkCut, resolveForkCut } from '@/components/agents/fork-cut';
+import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
 import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
 import { recordLastOpenedSession } from '@/lib/last-opened-session';
 import { resolveSessionContextInfo } from '@/lib/session-context-info';
@@ -281,6 +283,7 @@ export function SessionDetailContent({
   const manager = useSessionManager();
   const { t } = useTranslation();
   const router = useRouter();
+  const { openNewSessionHref } = useNewSessionNavigator();
   const { confirm, dialog } = useConfirmDialog();
   // Session-route navigation only: `replace` in one native-stack commit crashes
   // Android Fabric (KILO-APP-25). Other `router` uses here are unaffected.
@@ -327,6 +330,7 @@ export function SessionDetailContent({
   const activeSuggestion = useAtomValue(manager.atoms.activeSuggestion);
   const pendingQuestions = useAtomValue(manager.atoms.pendingQuestions);
   const pendingPermissions = useAtomValue(manager.atoms.pendingPermissions);
+  const unreadablePermissions = useAtomValue(manager.atoms.unreadablePermissions);
   const totalCost = useAtomValue(manager.atoms.totalCost);
   const { totalMicrodollars, breakdownCostUsd } = selectSessionCostInputs(
     fetchedData?.kiloSessionId === sessionId ? fetchedData.totalCostMicrodollars : null,
@@ -2211,7 +2215,7 @@ export function SessionDetailContent({
 
   const pushContinue = useCallback(
     (cut: ForkCut | null) => {
-      router.push(
+      openNewSessionHref(
         buildContinueHref({
           organizationId,
           cloneFromKiloSessionId: sessionId,
@@ -2229,7 +2233,7 @@ export function SessionDetailContent({
       );
     },
     [
-      router,
+      openNewSessionHref,
       organizationId,
       sessionId,
       rename.title,
@@ -2562,6 +2566,8 @@ export function SessionDetailContent({
             ) : null}
           </Animated.View>
         ) : null}
+
+        {unreadablePermissions.length > 0 ? <PermissionUnreadableNotice /> : null}
 
         {blockingInteraction === 'question' && activeQuestion ? (
           <QuestionCard

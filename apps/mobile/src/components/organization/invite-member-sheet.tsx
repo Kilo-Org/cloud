@@ -39,17 +39,50 @@ export function InviteMemberSheet() {
   const [canSubmit, setCanSubmit] = useState(false);
   const isBillingManager = myRole === 'billing_manager';
   const [role, setRole] = useState<OrgRole>('member');
+  const openedOnceRef = useRef(false);
+  const [formEpoch, setFormEpoch] = useState(0);
+  const resetInvite = mutations.invite.reset;
   // A rejected invite is rendered in localized copy, never as the server wrote
   // it: a schema rejection is a JSON issue array (internal code, raw pattern,
   // English message), not a sentence. Correcting the address drops the
   // rejection, so the field never sits under a stale one.
   const inviteError = mutations.invite.isError ? inviteErrorCopy(mutations.invite.error) : null;
-  const resetInvite = mutations.invite.reset;
   const clearInviteError = () => {
     if (mutations.invite.isError) {
       resetInvite();
     }
   };
+  // A reset would drop an in-flight invite's callbacks (its success toast and
+  // the members invalidation), so a reopen keeps observing one that is still
+  // running. Its outcome belongs to the previous open, so the error is only
+  // rendered for a submit made in the form that is open now.
+  const invitePendingRef = useRef(false);
+  invitePendingRef.current = mutations.invite.isPending;
+  const submittedThisOpenRef = useRef(false);
+  const visibleInviteError = submittedThisOpenRef.current ? inviteError : null;
+
+  // The route can stay mounted while its sheet is dismissed and presented
+  // again, so mount-time state is not a clean slate. Every later focus starts
+  // the form over: no text, no derived canSubmit, default role, a field
+  // instance without blur-validation, and no mutation error from the last
+  // open. The first focus of a fresh mount is already clean, so it is skipped
+  // rather than remounting the auto-focused field.
+  useFocusEffect(
+    useCallback(() => {
+      if (!openedOnceRef.current) {
+        openedOnceRef.current = true;
+        return;
+      }
+      emailRef.current = '';
+      setCanSubmit(false);
+      setRole('member');
+      setFormEpoch(epoch => epoch + 1);
+      submittedThisOpenRef.current = false;
+      if (!invitePendingRef.current) {
+        resetInvite();
+      }
+    }, [resetInvite])
+  );
 
   const { requestClose, dialog } = useSheetDismissGuard({
     isDirty: () => emailRef.current.trim().length > 0 || role !== 'member',
@@ -93,7 +126,11 @@ export function InviteMemberSheet() {
   }
 
   const onSubmit = () => {
+    if (!canSubmit) {
+      return;
+    }
     const email = emailRef.current.trim().toLowerCase();
+    submittedThisOpenRef.current = true;
     mutations.invite.mutate(
       { email, role: isBillingManager ? 'member' : role },
       {
@@ -126,6 +163,7 @@ export function InviteMemberSheet() {
         keyboardShouldPersistTaps="handled"
       >
         <FormField
+          key={formEpoch}
           label={t('common.email')}
           required
           placeholder={t('organization.inviteMember.emailPlaceholder')}
@@ -136,7 +174,7 @@ export function InviteMemberSheet() {
           textContentType="emailAddress"
           autoFocus
           validate={inviteEmailError}
-          error={inviteError?.field === 'email' ? inviteError.message : undefined}
+          error={visibleInviteError?.field === 'email' ? visibleInviteError.message : undefined}
           onChangeText={value => {
             emailRef.current = value;
             setCanSubmit(inviteEmailError(value) == null);
@@ -149,7 +187,7 @@ export function InviteMemberSheet() {
             P2), so AccessibleStatus is the single announcement owner here: one
             announcement per platform, visuals preserved (tone error). */}
         <AccessibleStatus
-          message={inviteError?.field === 'form' ? inviteError.message : null}
+          message={visibleInviteError?.field === 'form' ? visibleInviteError.message : null}
           className="text-sm"
         />
 

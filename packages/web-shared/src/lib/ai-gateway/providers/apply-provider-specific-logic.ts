@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { GEMINI_THOUGHT_TAG_MARKER } from '@kilocode/web-shared/lib/ai-gateway/reasoning-details-transform';
 import {
   isOpenRouterProviderConfig,
   type GatewayResponsesRequest,
@@ -45,6 +46,7 @@ import {
   addCacheBreakpoints,
   enableReasoningSummaries,
   fixResponsesRequest,
+  mapReasoningDetailsToReasoning,
   mapReasoningDetailsToReasoningContent,
   replaceReasoningObjectWithReasoningEffort,
   scrubOpenCodeSpecificProperties,
@@ -136,6 +138,10 @@ function applyGeminiReasoningTransform(request: OpenRouterChatCompletionRequest)
         ...(reasoningEffort !== undefined ? { thinking_level: reasoningEffort } : {}),
         include_thoughts: true,
       },
+      // Without streaming, thoughts and answer share one content string, and
+      // only these tags separate them. Streams flag thought chunks instead, and
+      // asking for tags there would also put the closing tag in the answer.
+      ...(request.stream !== true ? { thought_tag_marker: GEMINI_THOUGHT_TAG_MARKER } : {}),
     };
   }
 
@@ -261,11 +267,11 @@ export function removeUnsupportedRequestServiceTier(
 }
 
 /**
- * Inverse of the reasoning-content response transform: folds
- * client-supplied `reasoning_details` back into the `reasoning_content` string
- * the upstream speaks, so reasoning survives the round trip. Reasoning-content
- * upstreams are OpenAI-compatible, so OpenRouter's `reasoning` object is also
- * replaced with `reasoning_effort`.
+ * Inverse of the reasoning-content and reasoning response transforms: folds
+ * client-supplied `reasoning_details` back into the `reasoning_content` or
+ * `reasoning` string the upstream speaks, so reasoning survives the round trip.
+ * These upstreams are OpenAI-compatible, so OpenRouter's `reasoning` object is
+ * also replaced with `reasoning_effort`.
  */
 export function applyReasoningDetailsTransform(
   provider: Provider,
@@ -282,6 +288,10 @@ export function applyReasoningDetailsTransform(
     case ReasoningDetailsTransform.ReasoningContent:
       replaceReasoningObjectWithReasoningEffort(requestToMutate);
       mapReasoningDetailsToReasoningContent(requestToMutate.body);
+      break;
+    case ReasoningDetailsTransform.Reasoning:
+      replaceReasoningObjectWithReasoningEffort(requestToMutate);
+      mapReasoningDetailsToReasoning(requestToMutate.body);
       break;
     case null:
       break;
@@ -302,7 +312,7 @@ export async function applyProviderSpecificLogic(
   isNonTrialEnterprise: boolean
 ) {
   removeModelsFallback(requestedModel, requestToMutate);
-  if (isFreeModelExcludingCustomLlms(requestedModel)) {
+  if (isFreeModelExcludingCustomLlms(requestedModel) || userByok !== null) {
     removePaidServerFeatures(provider, requestedModel, requestToMutate, userId);
   }
   applyTrackingIds(requestToMutate, provider, userId, taskId);

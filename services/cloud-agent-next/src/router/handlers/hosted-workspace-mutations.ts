@@ -147,6 +147,7 @@ function createRequest(input: HostedWorkspaceCreate): SessionCreateRequest {
         : {}),
       createdOnPlatform: AGENT_MANAGER_ORIGIN,
       clientProvenance: 'agent-manager',
+      operationKey: input.operationKey,
     },
   };
 }

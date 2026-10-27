@@ -1154,7 +1154,7 @@ async function executeWorktreeCreate(
   source: WorktreeSource,
   ctx: TRPCContext,
   options: SiblingCreateOptions
-): Promise<WorktreeResult> {
+): Promise<OperationProgress> {
   const startedAt = Date.now();
   await assertNewDestinationRuntimeIsolation(ctx);
   const progress = operationProgressSchema.parse({
@@ -1203,7 +1203,7 @@ async function executeWorktreeCreate(
     result: 'new',
     durationMs: Date.now() - startedAt,
   });
-  return resultFromProgress(progress);
+  return progress;
 }
 
 async function reconcileWorktreeCreate(
@@ -1213,7 +1213,7 @@ async function reconcileWorktreeCreate(
   ctx: TRPCContext,
   progress: OperationProgress | undefined,
   options: SiblingCreateOptions
-): Promise<WorktreeResult> {
+): Promise<OperationProgress> {
   const startedAt = Date.now();
   const diagnostic = {
     operationRowId: row.id,
@@ -1346,7 +1346,7 @@ async function reconcileWorktreeCreate(
     result: 'replayed',
     durationMs: Date.now() - startedAt,
   });
-  return resultFromProgress(progress, true);
+  return progress;
 }
 
 type SiblingCreateRun = {
@@ -1458,7 +1458,10 @@ async function runSiblingCreate(
         );
         throw operationConflict();
       }
-      return executeWorktreeCreate(db, admission.row, source, ctx, options);
+      return run.mapProgress(
+        await executeWorktreeCreate(db, admission.row, source, ctx, options),
+        false
+      );
     case 'duplicate_settled':
       if (admission.row.status !== 'completed' || !progress) {
         logControlDiagnostic(
@@ -1491,7 +1494,10 @@ async function runSiblingCreate(
       throw creationInProgress();
     case 'takeover':
     case 'duplicate_reconcile_pending':
-      return reconcileWorktreeCreate(db, admission.row, source, ctx, progress, options);
+      return run.mapProgress(
+        await reconcileWorktreeCreate(db, admission.row, source, ctx, progress, options),
+        true
+      );
   }
 }
 

@@ -5,16 +5,20 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { formatPrice } from '@/components/models/util';
 import { getOfferingPricing } from '@/components/organizations/providers-and-models/offeringPricing';
+import { CUSTOM_PRICING_FALLBACK_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 
 describe('getOfferingPricing', () => {
   test('shows list prices for models without custom pricing', () => {
     expect(
-      getOfferingPricing('openai/gpt-x', { prompt: '0.000001', completion: '0.000005' })
+      getOfferingPricing(CUSTOM_PRICING_FALLBACK_CONFIG, 'openai/gpt-x', {
+        prompt: '0.000001',
+        completion: '0.000005',
+      })
     ).toEqual({ promptPrice: '0.000001', completionPrice: '0.000005' });
   });
 
   test('undoes the OpenRouter discount for models without custom pricing', () => {
-    const pricing = getOfferingPricing('openai/gpt-x', {
+    const pricing = getOfferingPricing(CUSTOM_PRICING_FALLBACK_CONFIG, 'openai/gpt-x', {
       prompt: '0.0000005',
       completion: '0.0000025',
       discount: 0.5,
@@ -26,10 +30,14 @@ describe('getOfferingPricing', () => {
   });
 
   test('shows the custom price with the list price as the original', () => {
-    const pricing = getOfferingPricing(GEMINI_FLASH_CURRENT_MODEL_ID, {
-      prompt: '0.0000015',
-      completion: '0.0000075',
-    });
+    const pricing = getOfferingPricing(
+      CUSTOM_PRICING_FALLBACK_CONFIG,
+      GEMINI_FLASH_CURRENT_MODEL_ID,
+      {
+        prompt: '0.0000015',
+        completion: '0.0000075',
+      }
+    );
     expect(formatPrice(pricing.promptPrice)).toBe('$0.75/1M tokens');
     expect(formatPrice(pricing.completionPrice)).toBe('$3.75/1M tokens');
     expect(pricing.originalPromptPrice).toBe('0.0000015');
@@ -37,7 +45,7 @@ describe('getOfferingPricing', () => {
   });
 
   test('compares the custom price against the undiscounted list price', () => {
-    const pricing = getOfferingPricing(GEMINI_4_ARGON_MODEL_ID, {
+    const pricing = getOfferingPricing(CUSTOM_PRICING_FALLBACK_CONFIG, GEMINI_4_ARGON_MODEL_ID, {
       prompt: '0.000002',
       completion: '0.00001',
       discount: 0.5,
@@ -48,10 +56,14 @@ describe('getOfferingPricing', () => {
   });
 
   test('omits the original price when the custom price is not lower', () => {
-    const pricing = getOfferingPricing(GEMINI_FLASH_CURRENT_MODEL_ID, {
-      prompt: '0.00000075',
-      completion: '0.000002',
-    });
+    const pricing = getOfferingPricing(
+      CUSTOM_PRICING_FALLBACK_CONFIG,
+      GEMINI_FLASH_CURRENT_MODEL_ID,
+      {
+        prompt: '0.00000075',
+        completion: '0.000002',
+      }
+    );
     expect(formatPrice(pricing.promptPrice)).toBe('$0.75/1M tokens');
     expect(pricing.originalPromptPrice).toBeUndefined();
     expect(formatPrice(pricing.completionPrice)).toBe('$3.75/1M tokens');
@@ -60,7 +72,10 @@ describe('getOfferingPricing', () => {
 
   test('does not apply custom pricing to other variants of the model', () => {
     expect(
-      getOfferingPricing(`${GEMINI_FLASH_CURRENT_MODEL_ID}:free`, { prompt: '0', completion: '0' })
+      getOfferingPricing(CUSTOM_PRICING_FALLBACK_CONFIG, `${GEMINI_FLASH_CURRENT_MODEL_ID}:free`, {
+        prompt: '0',
+        completion: '0',
+      })
     ).toEqual({ promptPrice: '0', completionPrice: '0' });
   });
 });

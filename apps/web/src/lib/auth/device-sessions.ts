@@ -1,5 +1,6 @@
 import 'server-only';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   device_sessions,
   device_refresh_tokens,
@@ -7,7 +8,7 @@ import {
   user_auth_provider,
 } from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
-import { eq, and, isNull, gt, sql, getTableColumns } from 'drizzle-orm';
+import { eq, and, isNull, gt, gte, lt, ne, inArray, desc, sql, getTableColumns } from 'drizzle-orm';
 import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { invalidateDeviceSession } from '@kilocode/web-shared/lib/auth/device-session-cache';
 import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
@@ -96,6 +97,52 @@ function generateRefreshToken(): string {
 }
 
 /**
+ * Live app sessions one account may keep. A sign-in beyond the cap signs out
+ * the least recently used session instead of being refused: an uninstalled
+ * app leaves its rows behind for the refresh-token lifetime, so refusing at
+ * the cap would lock the account out of every new device.
+ */
+export const MAX_LIVE_APP_SESSIONS = 20;
+
+/**
+ * Revoke the account's app sessions beyond {@link MAX_LIVE_APP_SESSIONS},
+ * least recently active first. Device-auth (CLI) sessions are neither counted
+ * nor revoked: this cap bounds the rows the app sign-in surfaces create.
+ *
+ * Runs in the transaction that inserted the new session, so a sign-in never
+ * leaves the account above the cap once it commits.
+ */
+async function enforceLiveAppSessionLimit(
+  executor: typeof db | DrizzleTransaction,
+  userId: string
+): Promise<string[]> {
+  const stale = await executor
+    .select({ id: device_sessions.id })
+    .from(device_sessions)
+    .where(
+      and(
+        eq(device_sessions.kilo_user_id, userId),
+        isNull(device_sessions.revoked_at),
+        isNull(device_sessions.device_auth_request_id)
+      )
+    )
+    .orderBy(desc(device_sessions.last_seen_at), desc(device_sessions.created_at))
+    .offset(MAX_LIVE_APP_SESSIONS);
+
+  if (stale.length === 0) {
+    return [];
+  }
+
+  const staleSessionIds = stale.map(session => session.id);
+  await executor
+    .update(device_sessions)
+    .set({ revoked_at: new Date().toISOString(), revoked_reason: 'session_limit' })
+    .where(inArray(device_sessions.id, staleSessionIds));
+
+  return staleSessionIds;
+}
+
+/**
  * Create a new device session.
  * @returns the created session ID.
  */
@@ -104,20 +151,35 @@ export async function createDeviceSession(params: {
   userAgent?: string;
   deviceAuthRequestId?: string;
 }): Promise<string> {
-  const [session] = await db
-    .insert(device_sessions)
-    .values({
-      kilo_user_id: params.userId,
-      user_agent: params.userAgent,
-      device_auth_request_id: params.deviceAuthRequestId,
-    })
-    .returning({ id: device_sessions.id });
+  const { sessionId, evictedSessionIds } = await db.transaction(async tx => {
+    const [session] = await tx
+      .insert(device_sessions)
+      .values({
+        kilo_user_id: params.userId,
+        user_agent: params.userAgent,
+        device_auth_request_id: params.deviceAuthRequestId,
+      })
+      .returning({ id: device_sessions.id });
 
-  if (!session) {
-    throw new Error('Failed to create device session');
+    if (!session) {
+      throw new Error('Failed to create device session');
+    }
+
+    // A device-auth session is minted by the CLI flow, so it neither counts
+    // toward the app-session cap nor evicts one.
+    const evictedSessionIds =
+      params.deviceAuthRequestId === undefined
+        ? await enforceLiveAppSessionLimit(tx, params.userId)
+        : [];
+
+    return { sessionId: session.id, evictedSessionIds };
+  });
+
+  for (const evictedSessionId of evictedSessionIds) {
+    invalidateDeviceSession(evictedSessionId);
   }
 
-  return session.id;
+  return sessionId;
 }
 
 /**
@@ -163,12 +225,13 @@ export async function issueSessionCredentials(
  * revoking. An unknown or expired token is refused without revocation.
  *
  * Reuse detection: a consumed token is a replay, and the session is revoked,
- * when the session chain has advanced past it (a later token was consumed) or
- * it was consumed more than `LOST_ROTATION_GRACE_MS` ago. Otherwise the pair
- * it was exchanged for was never used: the client lost the response. The
- * token then rotates again and the unused pair is retired. A retired token is
- * stamped with the original consume time, so a later use of it is a replay
- * and revokes the session. The session keeps one live refresh token.
+ * when the session chain has advanced past it (a later token was consumed),
+ * it was consumed more than `LOST_ROTATION_GRACE_MS` ago, or it was already
+ * recovered once. Otherwise the pair it was exchanged for was never used: the
+ * client lost the response. The token then rotates again and the unused pair
+ * is retired. A retired token is stamped with the original consume time, so a
+ * later use of it is a replay and revokes the session. The session keeps one
+ * live refresh token.
  *
  * Stale requests: a request that read the token before the consume that won
  * is refused without revocation and retires nothing. After a client timeout,
@@ -310,23 +373,30 @@ export async function rotateRefreshToken(
       }
 
       const consumedAt = current.consumed_at;
-      const [laterConsume] = await tx
+      // Recoveries stamp the retired rows with the presented token's consume
+      // time. Consume stamps are per-request database reads, so two rows of a
+      // session share a consume time only through such a recovery. A shared
+      // consume time on a later presentation therefore means this token was
+      // already recovered.
+      const [matchingConsume] = await tx
         .select({ token_hash: device_refresh_tokens.token_hash })
         .from(device_refresh_tokens)
         .where(
           and(
             eq(device_refresh_tokens.device_session_id, lockedSession.id),
-            gt(device_refresh_tokens.consumed_at, consumedAt)
+            gte(device_refresh_tokens.consumed_at, consumedAt),
+            ne(device_refresh_tokens.token_hash, tokenHash)
           )
         )
         .limit(1);
 
-      if (laterConsume || !isWithinLostRotationGrace(consumedAt)) {
+      if (matchingConsume || !isWithinLostRotationGrace(consumedAt)) {
         return { kind: 'reuse_detected' } as const;
       }
 
       // Lost rotation: retire the unused replacement with this token's
-      // consume time, then stamp this token again.
+      // consume time. This token keeps its consume time, so the recovery
+      // window stays anchored to it.
       await tx
         .update(device_refresh_tokens)
         .set({ consumed_at: consumedAt })
@@ -336,10 +406,6 @@ export async function rotateRefreshToken(
             isNull(device_refresh_tokens.consumed_at)
           )
         );
-      await tx
-        .update(device_refresh_tokens)
-        .set({ consumed_at: firstReadAt })
-        .where(eq(device_refresh_tokens.token_hash, tokenHash));
       console.info('[native-refresh] lost rotation recovered', {
         deviceSessionId: lockedSession.id,
       });
@@ -428,7 +494,7 @@ export async function createDeviceSessionWithAttestedKey(params: {
   user: User;
   verification: VerifyAdmissionOk;
 }): Promise<{ token: string; refreshToken: string; expiresIn: number; sessionId: string }> {
-  return await db.transaction(async tx => {
+  const { credentials, evictedSessionIds } = await db.transaction(async tx => {
     await persistAttestedKey(params.userId, params.verification, tx);
 
     const [session] = await tx
@@ -442,6 +508,8 @@ export async function createDeviceSessionWithAttestedKey(params: {
     if (!session) {
       throw new Error('Failed to create device session');
     }
+
+    const evictedSessionIds = await enforceLiveAppSessionLimit(tx, params.userId);
 
     const accessToken = generateApiToken(
       params.user,
@@ -460,12 +528,21 @@ export async function createDeviceSessionWithAttestedKey(params: {
     });
 
     return {
-      token: accessToken,
-      refreshToken,
-      expiresIn: TOKEN_EXPIRY.oneHour,
-      sessionId: session.id,
+      credentials: {
+        token: accessToken,
+        refreshToken,
+        expiresIn: TOKEN_EXPIRY.oneHour,
+        sessionId: session.id,
+      },
+      evictedSessionIds,
     };
   });
+
+  for (const evictedSessionId of evictedSessionIds) {
+    invalidateDeviceSession(evictedSessionId);
+  }
+
+  return credentials;
 }
 
 /**
@@ -480,4 +557,18 @@ export async function revokeDeviceSession(sessionId: string, reason: string): Pr
     })
     .where(eq(device_sessions.id, sessionId));
   invalidateDeviceSession(sessionId);
+}
+
+/**
+ * Delete refresh tokens whose expiry has passed. Expired tokens are refused
+ * before any other check, so removing them changes no rotation outcome.
+ * @returns the number of deleted rows.
+ */
+export async function cleanupExpiredDeviceRefreshTokens(): Promise<number> {
+  const deleted = await db
+    .delete(device_refresh_tokens)
+    .where(lt(device_refresh_tokens.expires_at, new Date().toISOString()))
+    .returning({ token_hash: device_refresh_tokens.token_hash });
+
+  return deleted.length;
 }

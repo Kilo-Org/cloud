@@ -184,6 +184,15 @@ describe('authoritative usage transaction configuration', () => {
 
 const sampleDir = join(process.cwd(), 'src/tests/sample');
 describe('parseMicrodollarUsageFromStream approval tests', () => {
+  // Usage processing times the response chunks; a fixed clock keeps the approved output stable.
+  let performanceNow: jest.SpiedFunction<typeof performance.now>;
+  beforeEach(() => {
+    performanceNow = jest.spyOn(performance, 'now').mockReturnValue(0);
+  });
+  afterEach(() => {
+    performanceNow.mockRestore();
+  });
+
   const normalAnthropic = 'normal-anthropic.log.resp.sse';
   test(normalAnthropic, async () => {
     const inputFile = join(sampleDir, normalAnthropic);
@@ -545,7 +554,6 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     expect(result.upstream_id).toBe('chatcmpl-ccebc94c526d4f8797cfe00023478a9a');
     expect(result.inference_provider).toBe('fireworks');
     expect(result.cost_mUsd).toBe(47482);
-    expect(result.generation_time).toBe(4287);
   });
 
   test('leaves upstream_id null when the Vercel gateway reports no provider request id', async () => {
@@ -568,7 +576,6 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
     );
 
     expect(result.upstream_id).toBeNull();
-    expect(result.generation_time).toBeNull();
   });
 
   test('records the Vercel upstream provider request id for non-streamed responses', () => {
@@ -617,7 +624,6 @@ describe('parseMicrodollarUsageFromStream approval tests', () => {
 
     expect(result.upstream_id).toBe('chatcmpl-non-streamed');
     expect(result.inference_provider).toBe('fireworks');
-    expect(result.generation_time).toBe(39303);
   });
 });
 
@@ -1492,9 +1498,17 @@ describe('logMicrodollarUsage', () => {
       generation_time: 2,
     };
 
+    const costMismatchWarning =
+      'Cost from provider generation lookup differs from cost computed from response usage data:';
+
     beforeEach(() => {
       jest.mocked(captureMessage).mockClear();
       jest.mocked(fetchGeneration).mockReset();
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      jest.mocked(console.warn).mockRestore();
     });
 
     test('reports the unresolved cost when the generation lookup fails', async () => {
@@ -1542,6 +1556,35 @@ describe('logMicrodollarUsage', () => {
       expect(result).not.toBeNull();
       expect((await findUserById(user.id))?.microdollars_used).toBe(200);
       expect(captureMessage).not.toHaveBeenCalled();
+      expect(console.warn).not.toHaveBeenCalledWith(costMismatchWarning, expect.anything());
+    });
+
+    test('warns when a non-BYOK generation cost differs from the response cost', async () => {
+      const user = await insertTestUser({
+        id: 'test-generation-cost-mismatch-user',
+        microdollars_used: 0,
+        google_user_email: 'generation-cost-mismatch@example.com',
+      });
+      jest.mocked(fetchGeneration).mockResolvedValue({
+        data: {
+          id: 'gen-stt-123',
+          model: 'openai/whisper-1',
+          is_byok: false,
+          total_cost: 0.00003,
+          provider_name: 'OpenAI',
+        },
+      } as OpenRouterGeneration);
+
+      await processTokenData(
+        { ...transcriptionStats },
+        { ...createBaseUsageContext(user), api_kind: 'audio_transcriptions' }
+      );
+
+      expect((await findUserById(user.id))?.microdollars_used).toBe(30);
+      expect(console.warn).toHaveBeenCalledWith(
+        costMismatchWarning,
+        expect.objectContaining({ cost_mUsd: { generation: 30, response: 10 } })
+      );
     });
   });
 
@@ -1735,6 +1778,67 @@ describe('logMicrodollarUsage', () => {
       }
     }
   );
+
+  test('stores latency and generation_time measured from the response body', async () => {
+    const user = await insertTestUser({
+      id: 'test-measured-timing-user',
+      microdollars_used: 0,
+      google_user_email: 'measured-timing@example.com',
+    });
+    const chunk = {
+      id: 'gen-measured-timing',
+      model: 'anthropic/claude-3.7-sonnet',
+      provider: 'Anthropic',
+      choices: [{ index: 0, delta: { content: 'hi' }, finish_reason: 'stop' }],
+      usage: {
+        prompt_tokens: 10,
+        completion_tokens: 2,
+        total_tokens: 12,
+        cost: 0.001,
+        is_byok: false,
+      },
+    };
+
+    let now = 0;
+    const performanceNow = jest.spyOn(performance, 'now').mockImplementation(() => now);
+    const chunks: [at: number, text: string][] = [
+      [100, ': OPENROUTER PROCESSING\n\n'],
+      [700, `data: ${JSON.stringify(chunk)}\n\n`],
+      [1000, 'data: [DONE]\n\n'],
+    ];
+    // With a high-water mark of 0 each chunk is produced, and the clock set to
+    // its arrival time, only when usage processing reads it.
+    const body = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          const next = chunks.shift();
+          if (!next) {
+            controller.close();
+            return;
+          }
+          now = next[0];
+          controller.enqueue(new TextEncoder().encode(next[1]));
+        },
+      },
+      { highWaterMark: 0 }
+    );
+
+    try {
+      const result = await countAndStoreUsage(
+        new Response(body),
+        { ...createBaseUsageContext(user), requestStartedAt: 50 },
+        undefined
+      );
+
+      assert(result);
+      const metadataRecord = await db.query.microdollar_usage_metadata.findFirst({
+        where: eq(microdollar_usage_metadata.id, result.usageId),
+      });
+      expect(metadataRecord).toMatchObject({ latency: 650, generation_time: 300 });
+    } finally {
+      performanceNow.mockRestore();
+    }
+  });
 
   test('preserves a paid snapshot when the requested id later becomes a custom model', async () => {
     const user = await insertTestUser({

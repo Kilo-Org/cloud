@@ -12,7 +12,11 @@ import {
   cloud_agent_webhook_triggers,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { bindProfileToRepo, MASKED_SECRET_VALUE } from '@kilocode/cloud-agent-profile';
+import {
+  bindProfileToRepo,
+  MASKED_SECRET_VALUE,
+  MAX_PROFILE_KILO_COMMANDS,
+} from '@kilocode/cloud-agent-profile';
 import type { User, Organization } from '@kilocode/db/schema';
 
 describe('Agent Profiles Router', () => {
@@ -601,6 +605,92 @@ describe('Agent Profiles Router', () => {
         expect(result.commands).toHaveLength(0);
       });
     });
+
+    describe('reorderKiloCommands', () => {
+      test('persists the requested order', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'Reorder Test' });
+
+        const one = await caller.agentProfiles.createKiloCommand({
+          profileId,
+          name: 'one',
+          template: 'One',
+        });
+        const two = await caller.agentProfiles.createKiloCommand({
+          profileId,
+          name: 'two',
+          template: 'Two',
+        });
+        const three = await caller.agentProfiles.createKiloCommand({
+          profileId,
+          name: 'three',
+          template: 'Three',
+        });
+
+        await caller.agentProfiles.reorderKiloCommands({
+          profileId,
+          orderedIds: [three.id, one.id, two.id],
+        });
+
+        const result = await caller.agentProfiles.get({ profileId });
+
+        expect(result.kiloCommands.map(command => command.id)).toEqual([three.id, one.id, two.id]);
+        expect(result.kiloCommands.map(command => command.sortOrder)).toEqual([0, 1, 2]);
+      });
+
+      test('rejects a list longer than the profile command limit', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'Reorder Limit Test' });
+
+        const orderedIds = Array.from(
+          { length: MAX_PROFILE_KILO_COMMANDS + 1 },
+          (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`
+        );
+
+        await expect(
+          caller.agentProfiles.reorderKiloCommands({ profileId, orderedIds })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      });
+
+      test('rejects a command from another profile and keeps the stored order', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'Reorder Owner Test' });
+        const { id: otherProfileId } = await caller.agentProfiles.create({
+          name: 'Reorder Other Test',
+        });
+
+        const first = await caller.agentProfiles.createKiloCommand({
+          profileId,
+          name: 'first',
+          template: 'First',
+        });
+        const second = await caller.agentProfiles.createKiloCommand({
+          profileId,
+          name: 'second',
+          template: 'Second',
+        });
+        const foreign = await caller.agentProfiles.createKiloCommand({
+          profileId: otherProfileId,
+          name: 'foreign',
+          template: 'Foreign',
+        });
+
+        await caller.agentProfiles.reorderKiloCommands({
+          profileId,
+          orderedIds: [second.id, first.id],
+        });
+
+        await expect(
+          caller.agentProfiles.reorderKiloCommands({
+            profileId,
+            orderedIds: [first.id, foreign.id],
+          })
+        ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.kiloCommands.map(command => command.id)).toEqual([second.id, first.id]);
+      });
+    });
   });
 
   describe('Organization Profiles', () => {
@@ -1052,6 +1142,22 @@ describe('Agent Profiles Router', () => {
           const ownerCaller = await createCallerForUser(ownerUser.id);
           const memberCaller = await createCallerForUser(memberUser.id);
           const profileId = await createOrgProfile();
+
+          await expectMemberRejected(
+            memberCaller.agentProfiles.createSkillsShSkill({
+              organizationId: organizationA.id,
+              profileId,
+              source: 'anthropics/skills@frontend-design',
+            })
+          );
+          const adminCaller = await createCallerForUser(adminUser.id);
+          await expect(
+            adminCaller.agentProfiles.createSkillsShSkill({
+              organizationId: organizationA.id,
+              profileId,
+              source: 'anthropics/skills@frontend-design',
+            })
+          ).resolves.toEqual({ id: expect.any(String) });
 
           await expectMemberRejected(
             memberCaller.agentProfiles.createCustomSkill({

@@ -62,7 +62,7 @@ export type ProfileSkill = {
   id: string;
   name: string;
   description: string | null;
-  sourceType: 'marketplace' | 'custom';
+  sourceType: 'marketplace' | 'custom' | 'skills-sh';
   sourceUrl: string | null;
   rawMarkdown: string;
   /** Companion files (excluding SKILL.md). Relative path → content. */
@@ -311,6 +311,13 @@ export function useProfileMutations(options: UseProfileMutationsOptions = {}) {
       },
     })
   );
+  const createSkillsShSkill = useMutation(
+    trpc.agentProfiles.createSkillsShSkill.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId);
+      },
+    })
+  );
   const updateSkill = useMutation(
     trpc.agentProfiles.updateSkill.mutationOptions({
       onSuccess: async (_data, variables) => {
@@ -417,6 +424,7 @@ export function useProfileMutations(options: UseProfileMutationsOptions = {}) {
     deleteMcp,
     setMcpEnabled,
     createCustomSkill,
+    createSkillsShSkill,
     updateSkill,
     deleteSkill,
     setSkillEnabled,
@@ -625,6 +633,13 @@ export function useCombinedProfileMutations(options: UseCombinedProfileMutations
       },
     })
   );
+  const createSkillsShSkill = useMutation(
+    trpc.agentProfiles.createSkillsShSkill.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await invalidateProfile(variables.profileId, variables.organizationId);
+      },
+    })
+  );
   const updateSkill = useMutation(
     trpc.agentProfiles.updateSkill.mutationOptions({
       onSuccess: async (_data, variables) => {
@@ -731,6 +746,7 @@ export function useCombinedProfileMutations(options: UseCombinedProfileMutations
     deleteMcp,
     setMcpEnabled,
     createCustomSkill,
+    createSkillsShSkill,
     updateSkill,
     deleteSkill,
     setSkillEnabled,

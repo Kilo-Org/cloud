@@ -103,7 +103,7 @@ export type SessionCreateRequest = {
     callbackTarget?: CallbackTarget;
     kilocodeOrganizationId?: string;
     createdOnPlatform?: string;
-    clientProvenance?: 'browser' | 'mobile';
+    clientProvenance?: 'browser' | 'mobile' | 'agent-manager';
     shallow?: boolean;
     /** Stable per-user-intent UUID; the handler admits it only with `autoInitiate` true. */
     operationKey?: string;

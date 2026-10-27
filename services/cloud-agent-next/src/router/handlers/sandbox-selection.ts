@@ -5,7 +5,10 @@ import {
   type SandboxSelectionCapabilities,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { getPgDb } from '../../db/pg.js';
-import { getSandboxSelectionCapabilities } from '../../sandbox-selection.js';
+import {
+  getSandboxSelectionCapabilities,
+  resolveVercelSelectionReadiness,
+} from '../../sandbox-selection.js';
 import { resolveSavedSandboxAllocation } from '../../session/sandbox-allocation-resolution.js';
 import { protectedProcedure } from '../auth.js';
 import { assertOrganizationMembership } from './organization-membership.js';
@@ -31,11 +34,11 @@ export const getSandboxSelectionOptions = protectedProcedure
       );
     }
     const owner = { userId: ctx.userId, orgId: input.kilocodeOrganizationId };
-    const capabilities = getSandboxSelectionCapabilities(
-      ctx.env,
-      owner,
-      input.repositoryType ? { repositoryType: input.repositoryType } : undefined
-    );
+    const readiness = await resolveVercelSelectionReadiness(ctx.env, owner);
+    const capabilities = getSandboxSelectionCapabilities(ctx.env, owner, {
+      ...(input.repositoryType ? { repositoryType: input.repositoryType } : {}),
+      ...readiness,
+    });
     if (!capabilities.enabled || !input.repositoryType) return capabilities;
 
     const { repositoryType, repositoryFullName } = input;
@@ -44,6 +47,7 @@ export const getSandboxSelectionOptions = protectedProcedure
       env: ctx.env,
       owner,
       repositoryType,
+      readiness,
       ...(repositoryFullName && (repositoryType === 'github' || repositoryType === 'gitlab')
         ? { target: { platform: repositoryType, fullName: repositoryFullName } }
         : {}),

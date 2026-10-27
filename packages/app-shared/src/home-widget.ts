@@ -1,4 +1,7 @@
-import { sessionDisplayLine } from '@kilocode/session-ingest-contracts/session-live-summary';
+import {
+  sessionDisplayLine,
+  sessionLiveCut,
+} from '@kilocode/session-ingest-contracts/session-live-summary';
 import { z } from 'zod';
 import {
   buildGlanceableSnapshot,
@@ -143,10 +146,7 @@ function safeTitle(value: string | undefined | null): string {
   const title = sessionDisplayLine(value ?? '')
     .replace(NON_PRINTING_TITLE_CHARACTERS, '')
     .trim();
-  const bounded = title.slice(0, HOME_WIDGET_TITLE_LIMIT);
-  // Do not end a truncated title in the middle of a UTF-16 surrogate pair.
-  const last = bounded.charCodeAt(bounded.length - 1);
-  return last >= 0xd800 && last <= 0xdbff ? bounded.slice(0, -1) : bounded;
+  return sessionLiveCut(title, HOME_WIDGET_TITLE_LIMIT);
 }
 
 /** Same authorized rows as counts, with stable ties and unknown times ranked last. */

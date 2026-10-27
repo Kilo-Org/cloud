@@ -166,6 +166,39 @@ function getGoogleClient(): OAuth2Client {
 /** Issuers Google uses for ID tokens, shared by every native Google path. */
 const GOOGLE_ISSUERS = ['accounts.google.com', 'https://accounts.google.com'];
 
+// Upper bound for the single-use record: the longest Google ID-token lifetime.
+const GOOGLE_TOKEN_TTL_CAP_SECONDS = 60 * 60;
+
+/**
+ * Consume a verified Google ID token so it signs in exactly once. The record
+ * lives as long as the token it binds (bounded by the longest Google ID-token
+ * lifetime), and a store write that cannot complete refuses the sign-in, so
+ * the acceptance rule never depends on the store being reachable.
+ */
+async function recordSingleUseGoogleToken(
+  idToken: string,
+  expiresAt: number | undefined
+): Promise<void> {
+  const digest = createHash('sha256').update(idToken).digest('hex');
+  const ttlSeconds = (() => {
+    if (typeof expiresAt !== 'number') return GOOGLE_TOKEN_TTL_CAP_SECONDS;
+    const remaining = Math.floor(expiresAt - Date.now() / 1000);
+    return Math.max(1, Math.min(remaining, GOOGLE_TOKEN_TTL_CAP_SECONDS));
+  })();
+  let recorded: string | null = null;
+  try {
+    recorded = await redisClient.set(`auth:google-signin-token:${digest}`, '1', {
+      nx: true,
+      ex: ttlSeconds,
+    });
+  } catch {
+    throw new NonceStoreUnavailableError('Google token record unavailable');
+  }
+  if (recorded !== 'OK') {
+    throw new NativeIdTokenError('Google ID token already used');
+  }
+}
+
 type GoogleVerificationMessages = {
   /** Message for a token the JWT verification rejects. */
   verificationFailed: string;
@@ -206,6 +239,11 @@ async function verifyGoogleIdTokenWith(
   if (!payload.email || !payload.sub) {
     throw new NativeIdTokenError('Google ID token missing email or sub');
   }
+
+  // Both Google paths — the legacy `idToken` field and the ID token returned
+  // by the server-auth-code exchange — run through here, so an assertion is
+  // accepted for one sign-in whichever path delivered it.
+  await recordSingleUseGoogleToken(idToken, payload.exp);
 
   return {
     sub: payload.sub,

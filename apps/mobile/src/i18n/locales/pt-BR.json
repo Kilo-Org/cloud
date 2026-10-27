@@ -227,7 +227,6 @@
     "hideBalance": "Ocultar saldo",
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
-    "bonusCreditsExpiring": "{{amount}} em créditos expiram em {{date}}.",
     "signOutTitle": "Sair?",
     "signOutMessage": "Você precisará entrar novamente para acessar seu espaço de trabalho.",
     "deleteAccountTitle": "Excluir conta?",
@@ -320,6 +319,18 @@
       "securityFindingsUnavailable": "Ative o Agente de segurança do Kilo em um escopo para receber ocorrências de segurança.",
       "spendAlertsSubtitle": "ultrapassagens de limites e picos por hora",
       "spendAlertsToggle": "Categoria de alertas de gastos"
+    },
+    "history": {
+      "title": "Histórico de notificações",
+      "subtitle": "Notificações recebidas por esta conta",
+      "bannerBody": "As notificações push estão desativadas neste dispositivo, então novas notificações não chegarão aqui.",
+      "bannerAction": "Configurações de notificações",
+      "emptyTitle": "Nenhuma notificação ainda",
+      "emptyCategoryTitle": "Nenhuma notificação nesta categoria",
+      "emptyBody": "As notificações que esta conta recebe aparecem aqui. Elas são mantidas por {{days}} dias.",
+      "capped": "Mostrando as notificações mais recentes.",
+      "loadError": "Não foi possível carregar o histórico de notificações.",
+      "openFailed": "Esta notificação não abre mais em lugar nenhum."
     },
     "action": {
       "openSession": "Abrir sessão"
@@ -2053,7 +2064,9 @@
       "retrying": "Tentando novamente…",
       "retryDeny": "Tentar negar novamente",
       "retryAllowOnce": "Tentar permitir uma vez novamente",
-      "retryAlwaysAllow": "Tentar permitir sempre novamente"
+      "retryAlwaysAllow": "Tentar permitir sempre novamente",
+      "unreadableTitle": "Não foi possível ler a solicitação de permissão",
+      "unreadableBody": "O agente está aguardando uma decisão de permissão que este app não consegue exibir. Atualize o app ou o CLI, ou responda à solicitação no CLI para continuar."
     },
     "questionCard": {
       "title": "O agente precisa de uma resposta",
@@ -2484,8 +2497,9 @@
     "unavailableDevice": "A digitação por voz não está disponível neste dispositivo.",
     "unavailableLanguage": "A digitação por voz não está disponível no idioma do dispositivo.",
     "languageNotInstalledTitle": "A digitação por voz para {{language}} ainda não está pronta",
-    "languageNotInstalledMessage": "Os arquivos de fala off-line de {{language}} não estão instalados neste celular. Baixe-os e tente a digitação por voz novamente.",
+    "languageNotInstalledMessage": "Os arquivos de fala off-line de {{language}} não estão instalados e a transcrição online está desativada. Baixe os arquivos ou ative novamente a transcrição online para usar a digitação por voz.",
     "downloadOfflineModel": "Baixar",
+    "useOnlineTranscription": "Permitir transcrição online",
     "offlineModelDownloadScheduled": "Os arquivos de fala off-line serão baixados em segundo plano. Tente a digitação por voz novamente mais tarde.",
     "listeningStopped": "A captação de voz foi interrompida.",
     "transcribing": "Transcrevendo...",
@@ -3195,7 +3209,7 @@
     "creditActivity": {
       "emptyDescription": "As compras, o uso e os ajustes de créditos desta organização aparecerão aqui conforme ocorrerem.",
       "emptyTitle": "Nenhuma movimentação de créditos",
-      "expires": "Expira em {{date}}",
+      "expiresUtc": "Expira em {{date}} (UTC)",
       "title": "Movimentação de créditos",
       "transactionFallback": "Transação de créditos",
       "category": {
@@ -3891,6 +3905,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Valores exibidos como •••• mantêm o segredo armazenado; substitua um valor para rotacioná-lo. Alterar a linha de comando exige todos os valores novamente",
+      "headersHint": "Valores exibidos como •••• mantêm o segredo armazenado; substitua um valor para rotacioná-lo. Alterar a URL exige todos os valores novamente",
       "nameRequired": "Insira um nome de servidor",
       "nameInvalid": "O nome pode usar apenas letras ASCII, números, sublinhados e travessões, com até 100 caracteres",
       "commandRequired": "Digite um comando",
@@ -3989,6 +4005,10 @@
   "credits": {
     "title": "Comprar créditos",
     "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de codificação com IA no Kilo App. A loja cobra na sua conta e os créditos são adicionados depois que a loja confirma o pagamento.",
+    "nextExpiry": "{{amount}} em créditos expiram em {{date}} (UTC). Os créditos com vencimento mais próximo são usados primeiro.",
+    "appStoreExpiry": "Créditos comprados pela App Store não expiram.",
+    "playOneYearExpiry": "Estes créditos expiram um ano-calendário após a compra.",
+    "playNonexpiring": "Estes créditos não expiram.",
     "packLabel": "Adicionar {{amount}} em créditos",
     "priceUnavailable": "Preço indisponível",
     "purchased": "Créditos adicionados ao seu saldo.",
@@ -4131,6 +4151,12 @@
     "generate": "Gerar resumo",
     "retrySummary": "Repetir resumo pago",
     "sources": "Evidências e artefatos",
+    "sessionsShown_one": "Exibindo {{shown}} de {{total}} sessão",
+    "sessionsShown_many": "Exibindo {{shown}} de {{total}} sessões",
+    "sessionsShown_other": "Exibindo {{shown}} de {{total}} sessões",
+    "itemsShown_one": "Exibindo {{shown}} de {{total}} item",
+    "itemsShown_many": "Exibindo {{shown}} de {{total}} itens",
+    "itemsShown_other": "Exibindo {{shown}} de {{total}} itens",
     "timezone": "Fuso horário do relatório",
     "deviceTimezone": "Usar fuso horário do dispositivo",
     "timezoneHint": "Fuso horário IANA, por exemplo Europe/Berlin. Alterações de horário valem para os próximos relatórios.",

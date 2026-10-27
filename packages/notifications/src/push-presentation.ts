@@ -11,6 +11,7 @@ import { translatePush } from './i18n';
 export const ANDROID_NOTIFICATION_CHANNELS = [
   { id: 'needs-input', name: 'Needs input', importance: 'high', bypassDnd: true },
   { id: 'agent-progress', name: 'Agent progress', importance: 'default', bypassDnd: false },
+  { id: 'agent-briefing', name: 'Agent brief', importance: 'default', bypassDnd: false },
   { id: 'kiloclaw', name: 'KiloClaw activity', importance: 'default', bypassDnd: false },
   { id: 'balance', name: 'Balance alerts', importance: 'default', bypassDnd: false },
   { id: 'security', name: 'Security findings', importance: 'high', bypassDnd: false },
@@ -55,11 +56,19 @@ export const AGENT_CHANNEL_SPLIT_APP_VERSION = '1.0.12';
 /** Both channel resolvers gate on the same first split-channel release. */
 export const ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION = AGENT_CHANNEL_SPLIT_APP_VERSION;
 
-/** The agent channels that only a build at or above the split's release creates. */
-const AGENT_KIND_ANDROID_CHANNELS: readonly AndroidNotificationChannelId[] = [
-  'needs-input',
-  'agent-progress',
-];
+/**
+ * The first mobile version whose every build creates `agent-briefing`. Builds of
+ * `1.0.15` shipped without it, so a lower version keeps the brief on
+ * `agent-progress` (see `androidChannelIdForPushDataToAppVersion`).
+ */
+export const AGENT_BRIEFING_CHANNEL_APP_VERSION = '1.0.16';
+
+/** Channels that only a build at or above the given version creates. */
+const ANDROID_CHANNEL_MIN_APP_VERSIONS: Partial<Record<AndroidNotificationChannelId, string>> = {
+  'needs-input': ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION,
+  'agent-progress': ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION,
+  'agent-briefing': AGENT_BRIEFING_CHANNEL_APP_VERSION,
+};
 
 /**
  * Compare dotted-numeric versions (`1.10.0` > `1.9.9`, missing segments count
@@ -120,6 +129,8 @@ export function androidChannelIdForPushDataToAppVersion(
       return 'chat';
     case 'active_agents_glanceable':
       return 'active-agents';
+    case 'agent_briefing':
+      return androidChannelIdForRegisteredClient('agent-progress', appVersion);
     default:
       return undefined;
   }
@@ -127,9 +138,9 @@ export function androidChannelIdForPushDataToAppVersion(
 
 /**
  * The Android channel a token's client can actually receive, or `undefined`
- * when the client predates channel creation or predates the named agent
- * channels. The caller omits `channelId` in that case; Android then posts to
- * the app's default channel instead of dropping the notification.
+ * when the client predates channel creation or predates that channel. The
+ * caller omits `channelId` in that case; Android then posts to the app's
+ * default channel instead of dropping the notification.
  */
 export function androidChannelIdForRegisteredClient(
   channelId: AndroidNotificationChannelId,
@@ -138,12 +149,11 @@ export function androidChannelIdForRegisteredClient(
   if (appVersion == null) {
     return undefined;
   }
-  if (!AGENT_KIND_ANDROID_CHANNELS.includes(channelId)) {
+  const minAppVersion = ANDROID_CHANNEL_MIN_APP_VERSIONS[channelId];
+  if (minAppVersion === undefined) {
     return channelId;
   }
-  return isPushAppVersionAtLeast(appVersion, ANDROID_AGENT_KIND_CHANNELS_MIN_APP_VERSION)
-    ? channelId
-    : undefined;
+  return isPushAppVersionAtLeast(appVersion, minAppVersion) ? channelId : undefined;
 }
 
 /**
@@ -279,7 +289,7 @@ export function androidChannelIdForPushData(data: PushData): AndroidNotification
     case 'security_lifecycle':
       return 'security';
     case 'agent_briefing':
-      return 'agent-progress';
+      return 'agent-briefing';
     case 'session_live_update':
       return 'followed-sessions-lock-screen';
     default: {

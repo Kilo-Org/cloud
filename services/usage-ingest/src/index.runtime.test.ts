@@ -1,6 +1,9 @@
-import { createTestHarness } from 'wrangler';
-import { expect, it, vi } from 'vitest';
-import { setTimeout } from 'node:timers/promises';
+import { createTestHarness, unstable_readConfig, unstable_startWorker } from 'wrangler';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { expect, it } from 'vitest';
 import { usage } from './usage.test-fixture';
 
 it('starts the configured Worker entry in workerd', async () => {
@@ -23,122 +26,76 @@ it('starts the configured Worker entry in workerd', async () => {
   }
 }, 20_000);
 
-it.each([undefined, 'staging'])(
-  'delivers HTTP events through the configured %s queue to the shipped receipt consumer',
-  async env => {
-    const server = createTestHarness({
-      workers: [
-        {
-          configPath: new URL('../wrangler.jsonc', import.meta.url),
-          env,
-          ...(env === 'staging' ? { vars: { USAGE_INGEST_MODE: 'receipt' } } : {}),
-          secrets: { USAGE_INGEST_PUBLISH_SECRET: 'synthetic-local-secret' },
-        },
-      ],
-    });
+it.each(['url', 'secret'])(
+  'retries valid and invalid messages in workerd with missing writer %s',
+  async missing => {
+    const directory = await mkdtemp(join(tmpdir(), 'usage-missing-config-'));
+    let worker: Awaited<ReturnType<typeof unstable_startWorker>> | undefined;
+    const logs: unknown[] = [];
     try {
-      const { url } = await server.listen();
-      const bindings = await server.getWorker<{ USAGE_INGEST_QUEUE: Queue<unknown> }>().getEnv();
-      const post = (body: string) =>
-        fetch(new URL('/usage', url), {
-          method: 'POST',
-          headers: { Authorization: 'Bearer synthetic-local-secret' },
+      const service = unstable_readConfig({
+        config: fileURLToPath(new URL('../wrangler.jsonc', import.meta.url).href),
+      });
+      const config = join(directory, 'wrangler.json');
+      await writeFile(
+        config,
+        JSON.stringify({
+          name: 'usage-missing-config',
+          main: fileURLToPath(new URL('./index.ts', import.meta.url).href),
+          compatibility_date: service.compatibility_date,
+          compatibility_flags: service.compatibility_flags,
+          vars: {
+            ...service.vars,
+            USAGE_WRITER_URL:
+              missing === 'url' ? undefined : 'http://127.0.0.1:1/api/internal/usage/record',
+            USAGE_WRITER_SECRET: missing === 'secret' ? undefined : 'synthetic-writer-secret',
+          },
+        })
+      );
+      worker = await unstable_startWorker({
+        config,
+        dev: {
+          remote: false,
+          persist: false,
+          server: { hostname: '127.0.0.1', port: 0 },
+          inspector: false,
+          watch: false,
+          structuredLogsHandler: (log: unknown) => logs.push(log),
+        },
+      });
+      expect((await worker.fetch('http://usage-ingest.test/')).status).toBe(404);
+      const runtime = worker.raw.runtimes.find(runtime => runtime.mf)?.mf;
+      if (!runtime) throw new Error('Expected local workerd runtime');
+      const entrypoint = await runtime.getWorker();
+      const result = await entrypoint.queue(
+        'local-usage',
+        [usage, null].map((body, index) => ({
+          id: `queue-${index}`,
+          timestamp: new Date(),
+          attempts: 1,
           body,
-        });
-      const secondId = '4f2504e0-4f89-11d3-9a0c-0305e82c3302';
-      const sentinel = 'SENSITIVE_SYNTHETIC_PROMPT_AND_METADATA';
-      const event = {
-        ...usage,
-        core: { ...usage.core, created_at: new Date().toISOString() },
-        metadata: { ...usage.metadata, user_prompt_prefix: sentinel, http_user_agent: sentinel },
-        posthog_distinct_id: sentinel,
-      };
-      expect((await post('{')).status).toBe(400);
-      expect(
-        (await post(JSON.stringify({ ...event, core: { ...event.core, cost: 1.5 } }))).status
-      ).toBe(400);
-      expect((await bindings.USAGE_INGEST_QUEUE.metrics()).backlogCount).toBe(0);
-      expect(server.getLogs()).toEqual([]);
-
-      for (const id of [usage.core.id, secondId]) {
-        expect((await post(JSON.stringify({ ...event, core: { ...event.core, id } }))).status).toBe(
-          202
-        );
-      }
-      // Runtime log capture and queue metrics observe the shipped handler without replacing it.
-      await vi.waitFor(
-        () =>
-          expect(
-            server.getLogs().filter(log => log.message.includes('usage_ingest_receipt')).length
-          ).toBeGreaterThanOrEqual(2),
-        {
-          timeout: 10_000,
-        }
+        }))
       );
-      const receipts = server
-        .getLogs()
-        .map(log => JSON.parse(log.message))
-        .filter(log => log.event === 'usage_ingest_receipt');
-      expect([...new Set(receipts.map(receipt => receipt.usage_id))].sort()).toEqual(
-        [usage.core.id, secondId].sort()
-      );
-      for (const receipt of receipts) {
-        expect(receipt).toEqual({
-          level: 'info',
-          event: 'usage_ingest_receipt',
-          outcome: 'received',
-          queue_action: 'ack',
-          usage_id: expect.any(String),
-          queue_message_id: expect.any(String),
-          delivery_attempts: expect.any(Number),
-          event_age_ms: expect.any(Number),
-        });
-        expect(receipt.event_age_ms).toBeGreaterThanOrEqual(0);
-        expect(receipt.delivery_attempts).toBeGreaterThanOrEqual(1);
-      }
-
-      // Bypass HTTP validation to exercise malformed-message discard in the shipped consumer.
-      await bindings.USAGE_INGEST_QUEUE.send(
-        { core: { id: sentinel }, token: 'synthetic-local-secret' },
-        { contentType: 'json' }
-      );
-      await vi.waitFor(
-        () =>
-          expect(
-            server
-              .getLogs()
-              .map(log => JSON.parse(log.message))
-              .some(receipt => receipt.outcome === 'invalid')
-          ).toBe(true),
-        { timeout: 10_000 }
-      );
-      await setTimeout(500);
-      for (const receipt of server
-        .getLogs()
-        .map(log => JSON.parse(log.message))
-        .filter(log => log.event === 'usage_ingest_receipt')) {
-        if (receipt.outcome === 'invalid') {
-          expect(receipt).toEqual({
-            level: 'info',
-            event: 'usage_ingest_receipt',
-            outcome: 'invalid',
-            queue_action: 'ack',
-            queue_message_id: expect.any(String),
-            delivery_attempts: expect.any(Number),
-          });
-        } else {
-          expect(receipt.outcome).toBe('received');
-          expect([usage.core.id, secondId]).toContain(receipt.usage_id);
-        }
-      }
-      expect(JSON.stringify(server.getLogs())).not.toContain(sentinel);
-      expect(JSON.stringify(server.getLogs())).not.toContain('synthetic-local-secret');
-      await vi.waitFor(async () =>
-        expect((await bindings.USAGE_INGEST_QUEUE.metrics()).backlogCount).toBe(0)
-      );
+      expect(result.outcome).toBe('ok');
+      expect(result.ackAll).toBe(false);
+      expect(result.explicitAcks).toEqual([]);
+      expect(result.retryMessages.map(message => message.msgId).toSorted()).toEqual([
+        'queue-0',
+        'queue-1',
+      ]);
+      const serialized = JSON.stringify(logs);
+      expect(serialized).toContain('missing_config');
+      expect(serialized).toContain('invalid_event');
+      expect(serialized).not.toContain('usage_ingest_receipt');
+      expect(serialized).not.toContain('synthetic-writer-secret');
+      expect(serialized).not.toContain(usage.metadata.user_prompt_prefix);
     } finally {
-      await server.close();
+      try {
+        await worker?.dispose();
+      } finally {
+        await rm(directory, { recursive: true, force: true });
+      }
     }
   },
-  25_000
+  20_000
 );

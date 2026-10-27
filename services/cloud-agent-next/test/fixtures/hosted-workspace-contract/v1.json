@@ -179,13 +179,7 @@
     },
     {
       "procedure": "createHostedWorkspace",
-      "fields": [
-        "cloudAgentSessionId",
-        "kiloSessionId",
-        "messageId",
-        "replayed",
-        "workspaceId"
-      ],
+      "fields": ["cloudAgentSessionId", "kiloSessionId", "messageId", "replayed", "workspaceId"],
       "example": {
         "workspaceId": "worktree_11111111-1111-4111-8111-111111111111",
         "cloudAgentSessionId": "workspace_11111111-1111-4111-8111-111111111111",
@@ -195,13 +189,7 @@
     },
     {
       "procedure": "createHostedWorkspaceSession",
-      "fields": [
-        "cloudAgentSessionId",
-        "kiloSessionId",
-        "messageId",
-        "replayed",
-        "workspaceId"
-      ],
+      "fields": ["cloudAgentSessionId", "kiloSessionId", "messageId", "replayed", "workspaceId"],
       "example": {
         "workspaceId": "worktree_11111111-1111-4111-8111-111111111111",
         "cloudAgentSessionId": "workspace_11111111-1111-4111-8111-111111111111",
@@ -248,12 +236,7 @@
     "providers": ["Cloudflare", "Cloudflare Containers", "Vercel", "Unknown"],
     "deletionStates": ["active", "deleting", "deleted"],
     "deletionPhases": ["not_started", "runtime_cleanup", "finalizing", "completed"],
-    "wakeBlockedReasons": [
-      "deleting",
-      "deleted",
-      "billing_blocked",
-      "billing_status_unavailable"
-    ]
+    "wakeBlockedReasons": ["deleting", "deleted", "billing_blocked", "billing_status_unavailable"]
   },
   "errorCodes": [
     "workspace_requires_root_session",

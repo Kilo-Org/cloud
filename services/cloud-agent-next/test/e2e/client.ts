@@ -312,12 +312,10 @@ export function deleteWorktree(
   input: { worktreeId: string; kilocodeOrganizationId?: string },
   signal?: AbortSignal
 ): Promise<{ success: true; deletedSessionIds: string[] }> {
-  return trpcCall<{ success: true; deletedSessionIds: string[] }>(
-    config,
-    'deleteWorktree',
-    input,
-    { internalApiSecret: config.internalApiSecret, ...(signal ? { signal } : {}) }
-  );
+  return trpcCall<{ success: true; deletedSessionIds: string[] }>(config, 'deleteWorktree', input, {
+    internalApiSecret: config.internalApiSecret,
+    ...(signal ? { signal } : {}),
+  });
 }
 
 export type StartSessionResult = {

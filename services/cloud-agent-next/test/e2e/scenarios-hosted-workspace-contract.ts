@@ -129,7 +129,9 @@ function assertSleepingPassiveStatus(status: HostedWorkspaceStatus, label: strin
     );
   }
   if (!status.wakeOnInput.available) {
-    throw new Error(`${label}: wakeOnInput unavailable (${status.wakeOnInput.blockedReason ?? 'none'})`);
+    throw new Error(
+      `${label}: wakeOnInput unavailable (${status.wakeOnInput.blockedReason ?? 'none'})`
+    );
   }
   if (status.activity.hasActiveTurn) {
     throw new Error(`${label}: passive read reported an active turn`);
@@ -304,7 +306,11 @@ export async function runHostedWorkspaceContract(
     const siblingOne = await deadline.within('sibling one', signal =>
       createHostedWorkspaceSession(
         config,
-        { workspaceId: workspaceId, operationKey: siblingKey, prompt: fakeDirective(`echo:${markers.siblingOne}`) },
+        {
+          workspaceId: workspaceId,
+          operationKey: siblingKey,
+          prompt: fakeDirective(`echo:${markers.siblingOne}`),
+        },
         signal
       )
     );
@@ -312,7 +318,11 @@ export async function runHostedWorkspaceContract(
     const replayedSibling = await deadline.within('sibling replay', signal =>
       createHostedWorkspaceSession(
         config,
-        { workspaceId: workspaceId, operationKey: siblingKey, prompt: fakeDirective(`echo:${markers.siblingOne}`) },
+        {
+          workspaceId: workspaceId,
+          operationKey: siblingKey,
+          prompt: fakeDirective(`echo:${markers.siblingOne}`),
+        },
         signal
       )
     );
@@ -326,7 +336,11 @@ export async function runHostedWorkspaceContract(
       expectFailure(
         createHostedWorkspaceSession(
           config,
-          { workspaceId: workspaceId, operationKey: siblingKey, prompt: fakeDirective(`echo:${markers.siblingTwo}`) },
+          {
+            workspaceId: workspaceId,
+            operationKey: siblingKey,
+            prompt: fakeDirective(`echo:${markers.siblingTwo}`),
+          },
           signal
         ),
         'operation_key_reuse_mismatch',
@@ -343,8 +357,20 @@ export async function runHostedWorkspaceContract(
       )
     );
     owned.register(siblingTwo);
-    await requireDurableCompletion(deadline, config, siblingOne, siblingOne.messageId, 'sibling one');
-    await requireDurableCompletion(deadline, config, siblingTwo, siblingTwo.messageId, 'sibling two');
+    await requireDurableCompletion(
+      deadline,
+      config,
+      siblingOne,
+      siblingOne.messageId,
+      'sibling one'
+    );
+    await requireDurableCompletion(
+      deadline,
+      config,
+      siblingTwo,
+      siblingTwo.messageId,
+      'sibling two'
+    );
 
     for (const sibling of [siblingOne, siblingTwo]) {
       if (sibling.workspaceId !== workspaceA) {
@@ -591,7 +617,9 @@ export async function runHostedWorkspaceContract(
     }
 
     const knownContainerIds = await containerInspection.snapshotContainerIds();
-    const statusBeforeReads = await deadline.within('sleeping status', signal => readStatus(signal));
+    const statusBeforeReads = await deadline.within('sleeping status', signal =>
+      readStatus(signal)
+    );
     assertSleepingPassiveStatus(statusBeforeReads, 'sleeping status before passive reads');
     const intervalBeforeReads = statusBeforeReads.billing.intervalStartedAt;
 
@@ -619,12 +647,19 @@ export async function runHostedWorkspaceContract(
     if (transcriptWhileSleeping.status !== 'completed') {
       throw new Error('durable transcript was not readable while the workspace slept');
     }
-    const statusAfterReads = await deadline.within('sleeping status after', signal => readStatus(signal));
+    const statusAfterReads = await deadline.within('sleeping status after', signal =>
+      readStatus(signal)
+    );
     assertSleepingPassiveStatus(statusAfterReads, 'sleeping status after passive reads');
     if (statusAfterReads.billing.intervalStartedAt !== intervalBeforeReads) {
       throw new Error('a passive read changed the workspace billing interval');
     }
-    const allocationAfterReads = await readAllocation(deadline, sandbox, root, 'post-read allocation');
+    const allocationAfterReads = await readAllocation(
+      deadline,
+      sandbox,
+      root,
+      'post-read allocation'
+    );
     if (allocationAfterReads !== null) {
       throw new Error('a passive workspace read allocated a runtime');
     }
@@ -643,7 +678,11 @@ export async function runHostedWorkspaceContract(
     if (createdContainer !== null) {
       throw new Error('a passive workspace read created a provider container');
     }
-    evidence.push(`idleStopAtMs=${absentAt}`, 'passiveReadsNoWake=true', 'noBillingIntervalStart=true');
+    evidence.push(
+      `idleStopAtMs=${absentAt}`,
+      'passiveReadsNoWake=true',
+      'noBillingIntervalStart=true'
+    );
 
     // 7. Ordinary input wakes the workspace through the existing lifecycle.
     const wake = await sendTurn(

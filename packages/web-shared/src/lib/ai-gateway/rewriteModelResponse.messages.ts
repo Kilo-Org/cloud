@@ -6,6 +6,10 @@ import {
   partialCapturedBody,
   readResponseText,
   rewriteSseStream,
+  rewriteResponseMetadata,
+  rewriteUsage,
+  type ResponseMetadata,
+  type ResponseUsage,
   type RewriteResponseParams,
 } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse.shared';
 import type { EventSourceMessage } from 'eventsource-parser';
@@ -13,16 +17,12 @@ import { createParser } from 'eventsource-parser';
 import { NextResponse } from 'next/server';
 import type Anthropic from '@anthropic-ai/sdk';
 
-type MessagesApiUsage = Anthropic.Messages.Usage & {
-  cost?: number;
-  is_byok?: boolean | null;
-  cost_details?: { upstream_inference_cost: number };
-};
+type MessagesApiUsage = ResponseUsage & Anthropic.Messages.MessageDeltaUsage;
 
 type MessagesApiMessageStart = {
   type: 'message_start';
-  message: Anthropic.Messages.Message & { usage: MessagesApiUsage };
-};
+  message: Anthropic.Messages.Message & ResponseMetadata & { usage: MessagesApiUsage };
+} & ResponseMetadata;
 
 type MessagesApiMessageDelta = {
   type: 'message_delta';
@@ -35,17 +35,9 @@ type MessagesApiError = {
   error: unknown;
 };
 
-function rewriteMessagesUsage(usage: MessagesApiUsage, removeCost: boolean) {
-  if (removeCost) {
-    delete usage.cost;
-    delete usage.cost_details;
-    delete usage.is_byok;
-  }
-}
-
 export async function rewriteModelResponse_Messages({
   response,
-  removeCost,
+  usageContext,
   capture,
   reasoningEffort,
   vercelRequestId,
@@ -66,11 +58,12 @@ export async function rewriteModelResponse_Messages({
     }
     capture?.setBody(textResult.text);
     const { text } = textResult;
-    let json: Anthropic.Messages.Message & { usage?: MessagesApiUsage };
+    let json: Anthropic.Messages.Message & ResponseMetadata & { usage?: MessagesApiUsage };
     try {
-      json = JSON.parse(text) as Anthropic.Messages.Message & {
-        usage?: MessagesApiUsage;
-      };
+      json = JSON.parse(text) as Anthropic.Messages.Message &
+        ResponseMetadata & {
+          usage?: MessagesApiUsage;
+        };
     } catch {
       // Upstream returned invalid/empty JSON body — pass through as-is
       return new NextResponse(text, {
@@ -80,8 +73,9 @@ export async function rewriteModelResponse_Messages({
       });
     }
     if (json.usage) {
-      rewriteMessagesUsage(json.usage, removeCost);
+      rewriteUsage(json.usage, usageContext, json.provider_metadata ?? json.providerMetadata);
     }
+    rewriteResponseMetadata(json, usageContext);
     return NextResponse.json(json, {
       status: response.status,
       statusText: response.statusText,
@@ -106,6 +100,8 @@ export async function rewriteModelResponse_Messages({
       let doneReceived = false;
       let terminalEventReceived = false;
       let generationId: string | undefined;
+      let startUsage: ResponseUsage | undefined;
+      let providerMetadata: ResponseMetadata['provider_metadata'];
       const progress = createStreamProgressLogger();
       const parser = createParser({
         onEvent(event: EventSourceMessage) {
@@ -118,14 +114,18 @@ export async function rewriteModelResponse_Messages({
             doneReceived = true;
             return;
           }
-          const json = JSON.parse(event.data) as
+          const json = JSON.parse(event.data) as (
             | MessagesApiMessageStart
             | MessagesApiMessageDelta
             | MessagesApiError
-            | Anthropic.Messages.MessageStreamEvent;
+            | Anthropic.Messages.MessageStreamEvent
+          ) &
+            ResponseMetadata;
 
           if (json.type === 'message_start') {
             const e = json as MessagesApiMessageStart;
+            providerMetadata =
+              e.message.provider_metadata ?? e.message.providerMetadata ?? providerMetadata;
             if (generationId === undefined && e.message.id) {
               generationId = e.message.id;
               logExceptInTest('[rewriteModelResponse] received generation ID', {
@@ -134,16 +134,20 @@ export async function rewriteModelResponse_Messages({
               });
             }
             if (e.message.usage) {
-              rewriteMessagesUsage(e.message.usage, removeCost);
+              startUsage = { ...e.message.usage };
+              rewriteUsage(e.message.usage, usageContext, providerMetadata);
             }
+            rewriteResponseMetadata(e.message, usageContext);
           }
 
           if (json.type === 'message_delta') {
             const e = json as MessagesApiMessageDelta;
+            providerMetadata = json.provider_metadata ?? json.providerMetadata ?? providerMetadata;
             if (e.usage) {
-              rewriteMessagesUsage(e.usage, removeCost);
+              rewriteUsage(e.usage, usageContext, providerMetadata, startUsage);
             }
           }
+          rewriteResponseMetadata(json, usageContext);
 
           const eventLine = event.event ? 'event: ' + event.event + '\n' : '';
           controller.enqueue(eventLine + 'data: ' + JSON.stringify(json) + '\n\n');

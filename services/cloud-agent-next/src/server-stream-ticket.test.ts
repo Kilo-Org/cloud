@@ -42,6 +42,14 @@ vi.mock('cloudflare:workers', () => ({
   },
 }));
 
+vi.mock('./byoc/vercel-runtime-identity.js', () => ({
+  getVercelRuntimeIdentity: vi.fn().mockResolvedValue({
+    wrapperVersion: 'test-wrapper',
+    releasedAt: '2026-10-24',
+    digest: 'test-runtime-digest',
+  }),
+}));
+
 vi.mock('./router.js', () => ({
   appRouter: {},
 }));

@@ -104,7 +104,6 @@ type ChatComposerInputRowProps = {
   sendDisabledReason?: string | null;
   textInputStyle: TextStyle;
   voiceDisabled: boolean;
-  voiceInputAvailable: boolean;
   voiceInputStatus: VoiceInputStatus;
 };
 
@@ -145,7 +144,6 @@ export function ChatComposerInputRow({
   sendDisabledReason,
   textInputStyle,
   voiceDisabled,
-  voiceInputAvailable,
   voiceInputStatus,
 }: Readonly<ChatComposerInputRowProps>) {
   const colors = useThemeColors();
@@ -167,12 +165,10 @@ export function ChatComposerInputRow({
     includeFontPadding: false,
     lineHeight: textInputStyle.lineHeight,
   };
-  const sendGapClass = voiceInputAvailable
-    ? COMPOSER_VOICE_SEND_GAP_CLASS
-    : COMPOSER_CONTROL_GAP_CLASS;
-  const sendHitSlop = voiceInputAvailable
-    ? composerFacingHitSlop(COMPOSER_CONTROL_HIT_SLOP_DP, 'start')
-    : COMPOSER_CONTROL_HIT_SLOP_DP;
+  // The microphone is always present, so the send control keeps the facing gap
+  // and the slop it shares with it.
+  const sendGapClass = COMPOSER_VOICE_SEND_GAP_CLASS;
+  const sendHitSlop = composerFacingHitSlop(COMPOSER_CONTROL_HIT_SLOP_DP, 'start');
 
   return (
     <View className="p-2.5 px-3">
@@ -275,17 +271,18 @@ export function ChatComposerInputRow({
           </View>
         ) : null}
 
-        {voiceInputAvailable ? (
-          <View className={COMPOSER_CONTROL_GAP_CLASS}>
-            <VoiceInputButton
-              disabled={voiceDisabled}
-              hitSlop={composerFacingHitSlop(VOICE_INPUT_LG_HIT_SLOP_DP, 'end')}
-              size="lg"
-              status={voiceInputStatus}
-              onPress={onToggleVoice}
-            />
-          </View>
-        ) : null}
+        {/* The toggle stays in the row whether or not the OS recognizer answers
+            available: a tap re-probes it and either starts a session or says why
+            it cannot, so the control never disappears without a word. */}
+        <View className={COMPOSER_CONTROL_GAP_CLASS}>
+          <VoiceInputButton
+            disabled={voiceDisabled}
+            hitSlop={composerFacingHitSlop(VOICE_INPUT_LG_HIT_SLOP_DP, 'end')}
+            size="lg"
+            status={voiceInputStatus}
+            onPress={onToggleVoice}
+          />
+        </View>
 
         <View className={sendGapClass}>
           {isStreaming && !hasSendableContent && !isSending ? (

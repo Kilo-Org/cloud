@@ -183,7 +183,8 @@ async function enhancedModelList(models: OpenRouterModel[]) {
     getCustomLlmsById(),
   ]);
   const publicCustomLlms = [...customLlmsById.values()].flatMap(customLlm =>
-    isPublicCustomLlm(customLlm.definition)
+    isPublicCustomLlm(customLlm.definition) &&
+    !unavailableModelIds.has(customLlm.public_id.toLowerCase())
       ? [{ ...customLlm, definition: customLlm.definition }]
       : []
   );

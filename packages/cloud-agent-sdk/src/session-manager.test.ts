@@ -48,6 +48,7 @@ import type {
   SessionInfo,
   SessionSnapshotPage,
   SessionSnapshotPageOutcome,
+  UnreadablePermissionState,
 } from './types';
 import type { RemoteModelState } from './remote-model-catalog';
 import type { RemoteCommandState } from './remote-command-catalog';
@@ -129,6 +130,7 @@ const mockSession = {
     getQuestion: jest.fn(() => null),
     getSessionInfo: jest.fn(() => null),
     getPermission: jest.fn(() => null),
+    getUnreadablePermissions: jest.fn<readonly UnreadablePermissionState[], []>(() => []),
     getSuggestion: jest.fn(() => null),
     getPendingMessages: jest.fn<ReadonlyMap<string, MessageDeliveryState>, []>(() => new Map()),
     clearFailedMessage: jest.fn(),
@@ -2932,7 +2934,6 @@ describe('createSessionManager', () => {
           mode: 'code',
           model: { providerID: 'kilo', modelID: 'claude-3-5-sonnet' },
         },
-        images: undefined,
       });
     });
 
@@ -2956,7 +2957,6 @@ describe('createSessionManager', () => {
           mode: 'code',
           model: { providerID: 'kilo', modelID: 'claude-3-5-sonnet' },
         },
-        images: undefined,
       });
     });
 
@@ -3397,7 +3397,6 @@ describe('createSessionManager', () => {
           model: { providerID: 'kilo', modelID: 'openai/gpt-5' },
           variant: 'high',
         },
-        images: undefined,
       });
 
       await mgr.switchSession(kiloId('ses-2'));
@@ -3440,7 +3439,6 @@ describe('createSessionManager', () => {
           variant: 'high',
         },
         remoteModelOverride: override,
-        images: undefined,
       });
 
       mgr.setRemoteModelOverride(null);
@@ -3461,7 +3459,6 @@ describe('createSessionManager', () => {
           prompt: 'without override',
           mode: 'code',
         },
-        images: undefined,
       });
     });
 
@@ -3480,7 +3477,6 @@ describe('createSessionManager', () => {
       expect(mockSession.send).toHaveBeenCalledWith({
         messageId: expect.stringMatching(/^msg_/),
         payload: { type: 'prompt', prompt: 'Hello', mode: 'code' },
-        images: undefined,
       });
       expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.messagesList)).toHaveLength(1);
     });
@@ -4000,33 +3996,6 @@ describe('createSessionManager', () => {
           model: { providerID: 'kilo', modelID: 'claude-3-5-sonnet' },
           variant: 'high',
         },
-        images: undefined,
-      });
-    });
-
-    it('passes images through to session.send for legacy Cloud Agent callers', async () => {
-      const config = createMockConfig();
-      const mgr = createSessionManager(config);
-      const images = { path: 'cloud-agent/message-1', files: ['image.png'] };
-
-      await mgr.switchSession(kiloId('ses-1'));
-
-      mockSession.send.mockResolvedValue(undefined);
-      const accepted = await mgr.send({
-        payload: { type: 'prompt', prompt: 'Hello', mode: 'code', model: 'claude-3-5-sonnet' },
-        images,
-      });
-
-      expect(accepted).toBe(true);
-      expect(mockSession.send).toHaveBeenCalledWith({
-        messageId: expect.stringMatching(/^msg_/),
-        payload: {
-          type: 'prompt',
-          prompt: 'Hello',
-          mode: 'code',
-          model: { providerID: 'kilo', modelID: 'claude-3-5-sonnet' },
-        },
-        images,
       });
     });
 
@@ -4056,7 +4025,6 @@ describe('createSessionManager', () => {
           model: { providerID: 'kilo', modelID: 'claude-3-5-sonnet' },
         },
         attachments,
-        images: undefined,
       });
     });
 
@@ -4158,7 +4126,6 @@ describe('createSessionManager', () => {
           mode: 'code',
           model: { providerID: 'kilo', modelID: 'claude-3-5-sonnet' },
         },
-        images: undefined,
       });
     });
 
@@ -6658,6 +6625,44 @@ describe('createSessionManager', () => {
 
       mockSessionCallbacks.onQuestionResolved?.('req-1');
       expect(atomValue(config.store, mgr.atoms.activeQuestion)).toBeNull();
+    });
+
+    it('tracks unreadable permission notices from the service state', async () => {
+      let notifyStateChange: (() => void) | undefined;
+      const unreadable = jest.fn<readonly { requestId: string }[], []>(() => []);
+      mockSession.state.subscribe.mockImplementation(callback => {
+        notifyStateChange = callback;
+        callback();
+        return () => {};
+      });
+      mockSession.state.getUnreadablePermissions.mockImplementation(unreadable);
+      try {
+        const config = createMockConfig();
+        const mgr = createSessionManager(config);
+        await mgr.switchSession(kiloId('ses-1'));
+        expect(atomValue(config.store, mgr.atoms.unreadablePermissions)).toEqual([]);
+
+        unreadable.mockReturnValue([{ requestId: 'perm-1' }, { requestId: 'perm-2' }]);
+        notifyStateChange?.();
+        expect(atomValue(config.store, mgr.atoms.unreadablePermissions)).toEqual([
+          { requestId: 'perm-1' },
+          { requestId: 'perm-2' },
+        ]);
+
+        // A fresh array with the same ids in the same order keeps the atom
+        // identity, so unrelated state notifications do not repaint the notice.
+        unreadable.mockImplementation(() => [{ requestId: 'perm-1' }, { requestId: 'perm-2' }]);
+        const stable = atomValue(config.store, mgr.atoms.unreadablePermissions);
+        notifyStateChange?.();
+        expect(atomValue(config.store, mgr.atoms.unreadablePermissions)).toBe(stable);
+
+        unreadable.mockReturnValue([]);
+        notifyStateChange?.();
+        expect(atomValue(config.store, mgr.atoms.unreadablePermissions)).toEqual([]);
+        mgr.destroy();
+      } finally {
+        mockSession.state.getUnreadablePermissions.mockImplementation(() => []);
+      }
     });
 
     it('onPermissionAsked queues asks and keeps the oldest active', async () => {
@@ -10057,7 +10062,6 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
           model: { providerID: 'kilo', modelID: 'claude-3-5-sonnet' },
         },
         attachments,
-        images: undefined,
       });
     });
 
@@ -10081,7 +10085,6 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
           mode: 'code',
           model: { providerID: 'kilo', modelID: 'claude-3-5-sonnet' },
         },
-        images: undefined,
       });
       expect(
         (
@@ -10266,7 +10269,6 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
           prompt: 'Hello',
           mode: 'code',
         },
-        images: undefined,
         attachmentParts,
       });
     });
@@ -10302,7 +10304,6 @@ describe('createSessionManager — paginated initial snapshot + loadOlderMessage
           prompt: 'Hello',
           mode: 'code',
         },
-        images: undefined,
         attachmentParts,
       });
     });

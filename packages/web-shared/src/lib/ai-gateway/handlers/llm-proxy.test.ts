@@ -1569,6 +1569,24 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     }
   });
 
+  it('rate-limits anonymous callers of a private custom LLM with a free model id', async () => {
+    setAnonymousAuth();
+    mockedFindCustomLlm.mockResolvedValue(rateLimitTestCustomLlm('stealth/private-alpha', false));
+    mockedIsFreeModelRateLimited.mockResolvedValue(true);
+
+    try {
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      const response = await handleLlmProxyRequest(
+        makeRequest(makeBody('stealth/private-alpha')) as never
+      );
+
+      expect(response.status).toBe(429);
+      expect(mockedGetProvider).not.toHaveBeenCalled();
+    } finally {
+      mockedFindCustomLlm.mockResolvedValue(null);
+    }
+  });
+
   it('returns the reconnect error instead of serving another billing path when the ChatGPT connection is dead', async () => {
     mockedGetProvider.mockResolvedValue({
       kind: 'chatgpt-reconnect',
@@ -3025,16 +3043,21 @@ describe('custom LLM requests', () => {
     expect(response.status).toBe(200);
   });
 
-  it('refuses an anonymous caller of a private custom LLM without reaching an upstream', async () => {
+  it('answers an anonymous caller of a private custom LLM like one of an unknown id', async () => {
     setAnonymousAuth();
     mockCustomLlm(customLlm('acme/private-model', false));
-    mockedGetProvider.mockResolvedValue({ kind: 'custom-llm-unavailable' });
 
-    const response = await handleLlmProxyRequest(
+    const privateResponse = await handleLlmProxyRequest(
       makeRequest(makeBody('acme/private-model')) as never
     );
+    mockedFindCustomLlm.mockResolvedValue(null);
+    const unknownResponse = await handleLlmProxyRequest(
+      makeRequest(makeBody('acme/unknown-model')) as never
+    );
 
-    expect(response.status).toBe(404);
+    expect(privateResponse.status).toBe(401);
+    expect(await privateResponse.json()).toEqual(await unknownResponse.json());
+    expect(mockedGetProvider).not.toHaveBeenCalled();
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 

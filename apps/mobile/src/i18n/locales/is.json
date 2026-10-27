@@ -227,7 +227,6 @@
     "hideBalance": "Fela inneign",
     "showBalance": "Sýna inneign",
     "balanceHidden": "Inneign falin",
-    "bonusCreditsExpiring": "Inneign að upphæð {{amount}} rennur út {{date}}.",
     "signOutTitle": "Skrá út?",
     "signOutMessage": "Þú þarft að skrá þig aftur inn til að fá aðgang að vinnusvæðinu þínu.",
     "deleteAccountTitle": "Eyða reikningi?",
@@ -2592,7 +2591,9 @@
       "retrying": "Reynir aftur…",
       "retryDeny": "Reyna að hafna aftur",
       "retryAllowOnce": "Reyna að leyfa einu sinni aftur",
-      "retryAlwaysAllow": "Reyna að leyfa alltaf aftur"
+      "retryAlwaysAllow": "Reyna að leyfa alltaf aftur",
+      "unreadableTitle": "Ekki tókst að lesa heimildarbeiðni",
+      "unreadableBody": "Agentinn bíður eftir heimildarákvörðun sem þetta forrit getur ekki sýnt. Uppfærðu forritið eða CLI, eða svaraðu beiðninni í CLI til að halda áfram."
     },
     "questionCard": {
       "title": "Fulltrúinn þarf svar",
@@ -2984,8 +2985,9 @@
     "unavailableDevice": "Raddinnsláttur er ekki í boði á þessu tæki.",
     "unavailableLanguage": "Raddinnsláttur er ekki í boði á tungumáli tækisins.",
     "languageNotInstalledTitle": "Raddinnsláttur fyrir {{language}} er ekki tilbúinn ennþá",
-    "languageNotInstalledMessage": "Ónettengdu talgagnaskrárnar fyrir {{language}} eru ekki uppsettar á þessum síma. Hladdu þeim niður og reyndu raddinnslátt aftur.",
+    "languageNotInstalledMessage": "Ónettengdu talgagnaskrárnar fyrir {{language}} eru ekki settar upp og umritun á netinu er óvirk. Hlaðið niður skránum eða kveiktu aftur á umritun á netinu til að geta notað raddinnslátt.",
     "downloadOfflineModel": "Hlaða niður",
+    "useOnlineTranscription": "Leyfa umritun á netinu",
     "offlineModelDownloadScheduled": "Ónettengdu talgagnaskrárnar verða hlaðnar niður í bakgrunni. Reyndu raddinnslátt aftur síðar.",
     "listeningStopped": "Hlustun stöðvuð.",
     "transcribing": "Umriti…",
@@ -3159,7 +3161,7 @@
     "creditActivity": {
       "emptyDescription": "Kaup, notkun og leiðréttingar á inneign félagsins birtast hér jafnóðum.",
       "emptyTitle": "Engar inneignarfærslur",
-      "expires": "Rennur út {{date}}",
+      "expiresUtc": "Rennur út {{date}} (UTC)",
       "title": "Inneignarfærslur",
       "transactionFallback": "Inneignarfærsla",
       "category": {
@@ -3746,6 +3748,7 @@
     "title": "Snið",
     "entrySubtitle": "Endurnotaðu umhverfisstillingar yfir lotur",
     "newProfile": "Nýtt snið",
+    "openHint": "Opnar sniðið",
     "emptyTitle": "Engir prófílar ennþá",
     "emptyDescription": "Búðu til prófíl til að endurnýta umhverfisbreytur, uppsetningarskipanir og færni yfir lotur.",
     "loadFailed": "Ekki tókst að hlaða prófílum",
@@ -3839,6 +3842,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Gildi sem birtast sem •••• varðveita geymt leyndarmál sitt; skiptu um gildi til að endurnýja það. Breyting á skipanalínu krefst þess að öll gildi séu slegin inn aftur",
+      "headersHint": "Gildi sem birtast sem •••• varðveita geymt leyndarmál sitt; skiptu um gildi til að endurnýja það. Breyting á URL krefst þess að öll gildi séu slegin inn aftur",
       "nameRequired": "Sláðu inn nafn netþjóns",
       "nameInvalid": "Nafn má aðeins innihalda ASCII-bókstafi, tölustafi, undirstrik og strik, allt að 100 stafir",
       "commandRequired": "Sláðu inn skipun",
@@ -3937,6 +3942,10 @@
   "credits": {
     "title": "Kaupa inneign",
     "description": "Inneign er einstakt kaup sem bætist við Kilo-stöðuna þína til að keyra AI-forritunarlotur í Kilo App. Verslunin rukkar reikninginn þinn og inneign bætist við eftir að verslunin staðfestir greiðsluna.",
+    "nextExpiry": "Inneign að upphæð {{amount}} rennur út {{date}} (UTC). Inneign sem rennur fyrst út er notuð fyrst.",
+    "appStoreExpiry": "Inneign sem keypt er í App Store rennur ekki út.",
+    "playOneYearExpiry": "Þessi inneign rennur út einu almanaksári eftir kaup.",
+    "playNonexpiring": "Þessi inneign rennur ekki út.",
     "packLabel": "Bæta við {{amount}} í inneign",
     "priceUnavailable": "Verð ekki tiltækt",
     "purchased": "Inneign hefur verið bætt við stöðuna þína.",
@@ -3977,11 +3986,13 @@
       "namePlaceholder": "Villur, Hugmyndir, Útgáfa…",
       "emoji": "Emoji",
       "mode": "Hamur",
-      "defaultsHint": "Lotur sem hefjast úr þessum lista nota þessi sjálfgefnu gildi."
+      "defaultsHint": "Lotur sem hefjast úr þessum lista nota þessi sjálfgefnu gildi.",
+      "saveFailed": "Gat ekki vistað listann. Athugaðu nettenginguna þína og reyndu aftur."
     },
     "list": {
       "addPlaceholder": "Bæta við verkefni",
       "add": "Bæta við",
+      "addFailed": "Gat ekki bætt við verkefninu. Athugaðu nettenginguna þína og reyndu aftur.",
       "empty": "Engin verkefni enn",
       "setDefaults": "Stilltu kóðasafn, ham og líkan",
       "completed_one": "Lokið ({{count}})",
@@ -4018,7 +4029,9 @@
       "startNewSession": "Byrja nýja lotu",
       "startNewSessionHint": "Haltu inni til að byrja nýja lotu.",
       "linkSession": "Tengja lotu",
-      "linkFailed": "Ekki tókst að tengja lotuna við verkefnið"
+      "linkFailed": "Ekki tókst að tengja lotuna við verkefnið",
+      "moveToAnotherTodo": "Færa yfir í annað verkefni",
+      "startRefreshFailed": "Lotan hófst, en listinn uppfærðist ekki."
     },
     "linkSession": {
       "title": "Tengja lotu við verkefni",
@@ -4027,6 +4040,7 @@
     },
     "upNext": "Næst í röðinni",
     "sessionTodo": "Verkefni: {{title}}",
+    "openTodoHint": "Opnar verkefnið.",
     "linkToTodo": "Tengja við verkefni",
     "candidates": {
       "empty": "Engin opin verkefni"

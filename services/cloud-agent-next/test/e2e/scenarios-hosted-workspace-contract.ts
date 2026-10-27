@@ -73,6 +73,8 @@ const IDLE_POLL_INTERVAL_MS = 15_000;
 /** Negative window for a provider create after a passive read. */
 const NO_WAKE_WINDOW_MS = 10_000;
 const CLEANUP_REQUEST_TIMEOUT_MS = 30_000;
+/** Allowed skew between the reported idle deadline and the observed stop. */
+const IDLE_SLEEP_GRACE_MS = 20_000;
 const FOREIGN_USER_EMAIL = 'e2e-hosted-workspace-foreign@example.com';
 const DEFAULT_SECOND_GIT_URL = 'https://github.com/octocat/Spoon-Knife.git';
 const PROFILE_CREATE_FAILED = 'persistent_profile_unavailable';
@@ -117,6 +119,10 @@ async function expectFailure(
     return message;
   }
   throw new Error(`${label}: expected failure containing "${fragment}", but it succeeded`);
+}
+
+function observationEndFor(startedAt: number): number {
+  return startedAt + IDLE_OBSERVATION_BUDGET_MS;
 }
 
 function assertSleepingPassiveStatus(status: HostedWorkspaceStatus, label: string): void {
@@ -300,6 +306,24 @@ export async function runHostedWorkspaceContract(
       BOOT_TURN_BUDGET_MS
     );
     if (rootContainer === null) throw new Error('root did not expose a physical allocation');
+
+    // A warm workspace status reports the real idle deadline and an open interval.
+    const warmStatus = await deadline.within('warm status', signal => readStatus(signal));
+    if (warmStatus.compute.status !== 'active') {
+      throw new Error(
+        `warm status compute=${warmStatus.compute.status}/${warmStatus.compute.detailCode}; expected active`
+      );
+    }
+    if (warmStatus.compute.estimatedSleepAt === null) {
+      throw new Error('warm status did not report an idle-stop deadline');
+    }
+    if (warmStatus.billing.intervalStartedAt === null) {
+      throw new Error('warm status did not report the open billing interval');
+    }
+    evidence.push(
+      `warmIdleDeadlineAt=${warmStatus.compute.estimatedSleepAt}`,
+      'warmBillingInterval=true'
+    );
 
     // 2. Siblings are created by workspace id only and share the workspace.
     const siblingKey = randomUUID();
@@ -553,6 +577,30 @@ export async function runHostedWorkspaceContract(
         signal
       )
     );
+    const afterChildDeletes = await deadline.within('status after child deletes', signal =>
+      readStatus(signal)
+    );
+    if (
+      afterChildDeletes.billing.intervalStartedAt !== warmStatus.billing.intervalStartedAt ||
+      afterChildDeletes.billing.payer === null
+    ) {
+      throw new Error(
+        'deleting non-final roots changed the workspace billing identity or interval'
+      );
+    }
+    // `deletion.sessionCount` is the journal manifest size, which an active
+    // workspace reports as zero until deletion starts.
+    if (
+      afterChildDeletes.deletion.started ||
+      afterChildDeletes.deletion.phase !== 'not_started' ||
+      afterChildDeletes.deletion.deletedSessionIds.length !== 0
+    ) {
+      throw new Error(
+        `status after child deletes reports deletion=${afterChildDeletes.deletion.phase}`
+      );
+    }
+    evidence.push('childDeletesKeptBillingInterval=true');
+
     const afterSecond = await deadline.within('catalog after second', signal =>
       getHostedWorkspace(config, workspaceId, signal)
     );
@@ -582,7 +630,14 @@ export async function runHostedWorkspaceContract(
     evidence.push('catalog3to2to1=true', 'finalRootRejected=true');
 
     // 6. Passive reads must not wake the idle-stopped workspace.
+    const idleDeadline = warmStatus.compute.estimatedSleepAt;
+    if (idleDeadline === null) throw new Error('warm status lost its idle-stop deadline');
     const baselineAt = Date.now();
+    if (idleDeadline > observationEndFor(baselineAt)) {
+      throw new Error(
+        `idle deadline ${idleDeadline} is beyond the ${IDLE_OBSERVATION_BUDGET_MS}ms observation budget`
+      );
+    }
     const presentBeforeIdle = await waitForPresentAllocation(
       deadline,
       sandbox,
@@ -615,6 +670,16 @@ export async function runHostedWorkspaceContract(
         `workspace allocation was still present after ${IDLE_OBSERVATION_BUDGET_MS}ms of idleness`
       );
     }
+    const observedIdleDeadline = idleDeadline - baselineAt;
+    if (observedIdleDeadline > 0 && absentAt + IDLE_SLEEP_GRACE_MS < observedIdleDeadline) {
+      throw new Error(
+        `workspace stopped ${observedIdleDeadline - absentAt}ms before the idle deadline reported by status`
+      );
+    }
+    evidence.push(
+      `statusIdleDeadlineAt=+${observedIdleDeadline}ms`,
+      `stoppedAfterDeadline=${absentAt >= observedIdleDeadline}`
+    );
 
     const knownContainerIds = await containerInspection.snapshotContainerIds();
     const statusBeforeReads = await deadline.within('sleeping status', signal =>
@@ -810,6 +875,16 @@ export async function runHostedWorkspaceContract(
     ) {
       throw new Error(
         `workspace delete left state=${deletedStatus.deletionState} phase=${deletedStatus.deletion.phase}`
+      );
+    }
+    if (
+      deletedStatus.deletion.sessionCount !== deletion.deletedSessionIds.length ||
+      deletedStatus.deletion.remainingRuntimeLocationCount !== 0 ||
+      deletedStatus.deletion.completedRuntimeLocationCount !==
+        deletedStatus.deletion.runtimeLocationCount
+    ) {
+      throw new Error(
+        `deleted tombstone has sessions=${deletedStatus.deletion.sessionCount} locations ${deletedStatus.deletion.completedRuntimeLocationCount}/${deletedStatus.deletion.runtimeLocationCount} done and ${deletedStatus.deletion.remainingRuntimeLocationCount} remaining`
       );
     }
     if (!deletedStatus.deletion.deletedSessionIds.includes(root.kiloSessionId)) {

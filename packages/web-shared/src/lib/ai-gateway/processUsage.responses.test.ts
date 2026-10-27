@@ -207,6 +207,61 @@ describe('processResponsesApiUsage', () => {
     expect(result.is_byok).toBe(true);
     expect(result.cost_mUsd).toBe(100);
   });
+
+  test('extracts is_byok=false from Vercel system credentialType with cost fallback', () => {
+    const usage = {
+      input_tokens: 10,
+      output_tokens: 5,
+      total_tokens: 15,
+      input_tokens_details: { cached_tokens: 4, cache_write_tokens: 2 },
+      output_tokens_details: { reasoning_tokens: 0 },
+    };
+    const providerMetadata = {
+      gateway: {
+        routing: {
+          finalProvider: 'openai',
+          modelAttempts: [
+            {
+              success: true,
+              providerAttempts: [{ provider: 'openai', credentialType: 'system', success: true }],
+            },
+          ],
+        },
+        cost: '0.0002',
+      },
+    };
+
+    const result = processResponsesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
+
+    expect(result).toEqual({
+      inputTokens: 10,
+      outputTokens: 5,
+      cacheHitTokens: 4,
+      cacheWriteTokens: 2,
+      cost_mUsd: 200,
+      is_byok: false,
+    });
+  });
+
+  test('prefers OpenRouter zero cost over Vercel metadata', () => {
+    const usage = {
+      input_tokens: 10,
+      output_tokens: 5,
+      total_tokens: 15,
+      input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 },
+      output_tokens_details: { reasoning_tokens: 0 },
+      cost: 0,
+      is_byok: false,
+    };
+    const providerMetadata = {
+      gateway: { routing: { finalProvider: 'openai' }, marketCost: '0.5' },
+    };
+
+    const result = processResponsesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
+
+    expect(result.cost_mUsd).toBe(0);
+    expect(result.is_byok).toBe(false);
+  });
 });
 
 describe('parseMicrodollarUsageFromStream approval tests', () => {

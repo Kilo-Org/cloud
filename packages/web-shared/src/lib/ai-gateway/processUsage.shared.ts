@@ -81,6 +81,33 @@ export function computeVercelCostMicrodollars(
 }
 
 /**
+ * Selects the cost source for a Messages or Responses usage payload: OpenRouter
+ * `usage.cost`/`usage.is_byok` first, then Vercel `provider_metadata.gateway`
+ * `marketCost`/`cost`, else zero cost with unknown BYOK status.
+ */
+export function selectUsageCostFields(
+  usage: OpenRouterCostFields | null | undefined,
+  providerMetadata: VercelProviderMetaData | null | undefined,
+  coreProps: NotYetCostedUsageStats,
+  source: string,
+  provider: ProviderId
+): { cost_mUsd: number; is_byok: boolean | null } {
+  if (usage?.cost != null || usage?.is_byok != null) {
+    return computeOpenRouterCostFields(usage, coreProps, source, providerReportsIsByok(provider));
+  }
+
+  const vercelGateway = providerMetadata?.gateway;
+  if (vercelGateway?.marketCost != null || vercelGateway?.cost != null) {
+    return {
+      cost_mUsd: computeVercelCostMicrodollars(vercelGateway),
+      is_byok: extractVercelIsByok(vercelGateway),
+    };
+  }
+
+  return { cost_mUsd: 0, is_byok: null };
+}
+
+/**
  * Finds the provider attempt that served the request in the Vercel AI Gateway
  * routing metadata: the successful provider attempt within the successful model
  * attempt, falling back to the last attempt of each when none reports success.

@@ -1,4 +1,5 @@
 import { captureMessage } from '@sentry/nextjs';
+import type { CustomPricingConfig } from '@kilocode/db/schema-types';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { JustTheCostsUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import {
@@ -27,18 +28,22 @@ function applyPricing(pricing: OpenRouterModel['pricing'], customPricing: Pricin
 }
 
 export function applyCustomPricingToPricing(
+  config: CustomPricingConfig,
   modelId: string,
   pricing: OpenRouterModel['pricing']
 ): OpenRouterModel['pricing'] {
-  const customPricing = getCustomPricing(modelId);
+  const customPricing = getCustomPricing(config, modelId);
   return customPricing && !customPricing.fallbackOnly
     ? applyPricing(pricing, customPricing.pricing[0].pricing)
     : pricing;
 }
 
-export function applyCustomPricingToModel(model: OpenRouterModel): OpenRouterModel {
-  const customPricing = getCustomPricing(model.id);
-  if (!customPricing) return model;
+export function applyCustomPricingToModel(
+  config: CustomPricingConfig,
+  model: OpenRouterModel
+): OpenRouterModel {
+  const customPricing = getCustomPricing(config, model.id);
+  if (!customPricing || customPricing.fallbackOnly) return model;
 
   const discountSuffix =
     customPricing.discountPercentage === undefined
@@ -53,10 +58,11 @@ export function applyCustomPricingToModel(model: OpenRouterModel): OpenRouterMod
 }
 
 export function calculateCustomCost_mUsd(
+  config: CustomPricingConfig,
   modelId: string,
   usage: JustTheCostsUsageStats
 ): number | undefined {
-  const customPricing = getCustomPricing(modelId);
+  const customPricing = getCustomPricing(config, modelId);
   if (!customPricing || (customPricing.fallbackOnly && usage.cost_mUsd > 0)) return undefined;
 
   const uncachedInputTokens = usage.inputTokens - usage.cacheHitTokens - usage.cacheWriteTokens;

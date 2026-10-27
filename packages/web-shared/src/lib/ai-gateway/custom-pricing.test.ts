@@ -1,5 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
 import { captureMessage } from '@sentry/nextjs';
+import type { CustomPricingConfig } from '@kilocode/db/schema-types';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   GEMINI_4_ARGON_MODEL_ID,
@@ -10,6 +11,7 @@ import {
   applyCustomPricingToModel,
   calculateCustomCost_mUsd,
 } from './custom-pricing';
+import { CUSTOM_PRICING_FALLBACK_CONFIG } from './custom-pricing.constants';
 
 jest.mock('@sentry/nextjs', () => ({ captureMessage: jest.fn() }));
 
@@ -35,7 +37,7 @@ function makeModel(id: string): OpenRouterModel {
   };
 }
 
-const makeUsage = (overrides: Partial<Parameters<typeof calculateCustomCost_mUsd>[1]> = {}) => ({
+const makeUsage = (overrides: Partial<Parameters<typeof calculateCustomCost_mUsd>[2]> = {}) => ({
   cost_mUsd: 0,
   inputTokens: 0,
   outputTokens: 0,
@@ -45,9 +47,11 @@ const makeUsage = (overrides: Partial<Parameters<typeof calculateCustomCost_mUsd
   ...overrides,
 });
 
+const config = CUSTOM_PRICING_FALLBACK_CONFIG;
+
 describe('custom model pricing', () => {
   test('replaces upstream Gemini 3.8 Flash pricing with the promotional rates', () => {
-    const model = applyCustomPricingToModel({
+    const model = applyCustomPricingToModel(config, {
       ...makeModel(GEMINI_FLASH_CURRENT_MODEL_ID),
       name: 'Google: Gemini 3.8 Flash',
     });
@@ -61,6 +65,7 @@ describe('custom model pricing', () => {
     });
     expect(
       calculateCustomCost_mUsd(
+        config,
         GEMINI_FLASH_CURRENT_MODEL_ID,
         makeUsage({ inputTokens: 100, cost_mUsd: 999 })
       )
@@ -68,7 +73,7 @@ describe('custom model pricing', () => {
   });
 
   test('replaces upstream Gemini 4 Argon pricing with the promotional rates', () => {
-    const model = applyCustomPricingToModel({
+    const model = applyCustomPricingToModel(config, {
       ...makeModel(GEMINI_4_ARGON_MODEL_ID),
       name: 'Google: Gemini 4 Argon',
     });
@@ -82,6 +87,7 @@ describe('custom model pricing', () => {
     });
     expect(
       calculateCustomCost_mUsd(
+        config,
         GEMINI_4_ARGON_MODEL_ID,
         makeUsage({
           inputTokens: 1_000,
@@ -99,9 +105,9 @@ describe('custom model pricing', () => {
     modelId => {
       const model = makeModel(modelId);
 
-      expect(applyCustomPricingToModel(model)).toBe(model);
-      expect(applyCustomPricingToPricing(model.id, model.pricing)).toBe(model.pricing);
-      expect(calculateCustomCost_mUsd(model.id, makeUsage())).toBeUndefined();
+      expect(applyCustomPricingToModel(config, model)).toBe(model);
+      expect(applyCustomPricingToPricing(config, model.id, model.pricing)).toBe(model.pricing);
+      expect(calculateCustomCost_mUsd(config, model.id, makeUsage())).toBeUndefined();
     }
   );
 
@@ -116,10 +122,12 @@ describe('custom model pricing', () => {
         cacheWriteTokens: 30,
       });
 
-      expect(applyCustomPricingToModel(model)).toBe(model);
-      expect(applyCustomPricingToPricing(model.id, model.pricing)).toBe(model.pricing);
-      expect(calculateCustomCost_mUsd(model.id, usage)).toBeUndefined();
-      expect(calculateCustomCost_mUsd(model.id, { ...usage, cost_mUsd: 123 })).toBeUndefined();
+      expect(applyCustomPricingToModel(config, model)).toBe(model);
+      expect(applyCustomPricingToPricing(config, model.id, model.pricing)).toBe(model.pricing);
+      expect(calculateCustomCost_mUsd(config, model.id, usage)).toBeUndefined();
+      expect(
+        calculateCustomCost_mUsd(config, model.id, { ...usage, cost_mUsd: 123 })
+      ).toBeUndefined();
     }
   );
 
@@ -128,6 +136,7 @@ describe('custom model pricing', () => {
     captureMessageMock.mockClear();
 
     const cost_mUsd = calculateCustomCost_mUsd(
+      config,
       GEMINI_FLASH_CURRENT_MODEL_ID,
       makeUsage({ inputTokens: 10, cacheHitTokens: 20 })
     );
@@ -145,7 +154,58 @@ describe('custom model pricing', () => {
   test('leaves models without custom pricing unchanged', () => {
     const model = makeModel('qwen/another-model');
 
-    expect(applyCustomPricingToModel(model)).toBe(model);
-    expect(calculateCustomCost_mUsd(model.id, makeUsage())).toBeUndefined();
+    expect(applyCustomPricingToModel(config, model)).toBe(model);
+    expect(calculateCustomCost_mUsd(config, model.id, makeUsage())).toBeUndefined();
+  });
+
+  test('applies a configured entry and its context-length tiers', () => {
+    const tieredConfig: CustomPricingConfig = {
+      models: [
+        {
+          model: 'qwen/qwen3.7-max',
+          fallbackOnly: true,
+          pricing: [
+            {
+              start_context_length: 0,
+              pricing: {
+                prompt_per_million: 1,
+                completion_per_million: 2,
+                input_cache_read_per_million: null,
+                input_cache_write_per_million: null,
+              },
+            },
+            {
+              start_context_length: 1_000,
+              pricing: {
+                prompt_per_million: 10,
+                completion_per_million: 20,
+                input_cache_read_per_million: null,
+                input_cache_write_per_million: null,
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const model = makeModel('qwen/qwen3.7-max');
+
+    expect(applyCustomPricingToPricing(tieredConfig, model.id, model.pricing)).toBe(model.pricing);
+    expect(applyCustomPricingToModel(tieredConfig, model)).toBe(model);
+    expect(
+      calculateCustomCost_mUsd(tieredConfig, model.id, makeUsage({ cost_mUsd: 5 }))
+    ).toBeUndefined();
+    expect(calculateCustomCost_mUsd(tieredConfig, model.id, makeUsage({ inputTokens: 999 }))).toBe(
+      999
+    );
+    expect(
+      calculateCustomCost_mUsd(
+        tieredConfig,
+        model.id,
+        makeUsage({ inputTokens: 1_000, outputTokens: 10 })
+      )
+    ).toBe(10_000 + 200);
+    expect(
+      calculateCustomCost_mUsd(tieredConfig, GEMINI_FLASH_CURRENT_MODEL_ID, makeUsage())
+    ).toBeUndefined();
   });
 });

@@ -8,6 +8,8 @@ import { getRawOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/prov
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
 import { enforceRequestCostLimit } from '@kilocode/web-shared/lib/ai-gateway/request-cost-limit';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
+import { CUSTOM_PRICING_FALLBACK_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { briefingPriceBound, briefingPrompt } from './summary';
 import type { BriefingReportRow } from './store';
 
@@ -23,6 +25,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/unavailable-models', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config', () => ({
   getPreferredProviderOrderConfig: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-pricing-config', () => ({
+  getCustomPricingConfig: jest.fn(),
 }));
 
 function catalogModel(id: string, pricing: OpenRouterModel['pricing']): OpenRouterModel {
@@ -48,9 +53,48 @@ describe('briefing model pricing', () => {
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
     jest.mocked(getUnavailableModelIds).mockResolvedValue(new Set<string>());
     jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue({ rules: [] });
+    jest.mocked(getCustomPricingConfig).mockResolvedValue(CUSTOM_PRICING_FALLBACK_CONFIG);
     jest
       .mocked(getRawOpenRouterModels)
       .mockResolvedValue({ data: [aion] } satisfies OpenRouterModelsResponse);
+  });
+
+  it('quotes the custom pricing tier that applies at the input token bound', async () => {
+    const tier = (start_context_length: number, prompt_per_million: number) => ({
+      start_context_length,
+      pricing: {
+        prompt_per_million,
+        completion_per_million: prompt_per_million * 2,
+        input_cache_read_per_million: null,
+        input_cache_write_per_million: null,
+      },
+    });
+    jest.mocked(getCustomPricingConfig).mockResolvedValue({
+      models: [{ model: aion.id, pricing: [tier(0, 1), tier(5_000, 10)] }],
+    });
+    const longPrompt = 'x'.repeat(1_000);
+
+    const shortQuote = await briefingPriceBound(aion.id, 'Overnight activity', 2_000_000);
+    const longQuote = await briefingPriceBound(aion.id, longPrompt, 2_000_000);
+
+    // Null cache prices bill at the prompt price, and the input rate adds the worse cache rate.
+    expect(shortQuote.inputRate).toBe(0.000002);
+    expect(shortQuote.outputRate).toBe(0.000002);
+    expect(longQuote.inputRate).toBe(0.00002);
+    expect(longQuote.outputRate).toBe(0.00002);
+    await expect(
+      enforceRequestCostLimit(
+        String(longQuote.upperBound),
+        aion.id,
+        {
+          messages: [{ role: 'user', content: longPrompt }],
+          max_tokens: longQuote.maxTokens,
+          stream: false,
+        },
+        2_000_000,
+        { id: 'openrouter', userFunded: false }
+      )
+    ).resolves.toMatchObject({ refusal: null });
   });
 
   it('quotes a model the picker prices even when the snapshot does not carry it', async () => {

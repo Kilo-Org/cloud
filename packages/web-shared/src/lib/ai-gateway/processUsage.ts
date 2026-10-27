@@ -97,6 +97,7 @@ import {
   readResponseText,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { enqueueDailyUsageRollupRepair } from './usage-daily-rollup-repairs';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
 import { maybePerformAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
@@ -1490,7 +1491,7 @@ export async function processTokenData(
     usageStats.model = usageContext.requested_model;
   }
 
-  applyUsagePricing(usageStats, usageContext);
+  applyUsagePricing(usageStats, usageContext, await getCustomPricingConfig());
 
   return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
 }

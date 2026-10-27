@@ -43,6 +43,7 @@ import {
   resolveOpenRouterModelAlias,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { systemOneRequestCostBound } from '@kilocode/web-shared/lib/ai-gateway/request-cost-limit';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
 import {
   bareIpLiteral,
@@ -111,10 +112,13 @@ export async function handleSystemOneRequest(request: NextRequest) {
   // Admit the request when the balance covers the cost bound: the schema bounds the bytes it can
   // carry, and the bound prices those bytes plus the answer generation at the model's current
   // rates.
-  const catalog = await getOpenRouterModelsMetadataFromDatabase();
+  const [catalog, customPricingConfig] = await Promise.all([
+    getOpenRouterModelsMetadataFromDatabase(),
+    getCustomPricingConfig(),
+  ]);
   const metadata = catalog[resolvedModel] ?? catalog[requestedModel];
   const estimatedMaxCostMicrodollars = metadata
-    ? systemOneRequestCostBound(metadata, parsed.data)
+    ? systemOneRequestCostBound(metadata, parsed.data, customPricingConfig)
     : null;
   if (estimatedMaxCostMicrodollars === null) {
     errorExceptInTest(

@@ -12,6 +12,7 @@ import { SYSTEM_ONE_MAX_QUESTIONS, SYSTEM_ONE_MAX_STATE_BYTES } from './typesafe
 import { addCacheBreakpoints } from './providers/openrouter/request-helpers';
 import type { GatewayRequest } from './providers/openrouter/types';
 import { getVercelModelIdOverrides } from './providers/vercel/mapModelIdToVercel';
+import { CUSTOM_PRICING_FALLBACK_CONFIG } from './custom-pricing.constants';
 
 jest.mock('./providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
@@ -521,7 +522,11 @@ describe('System One request cost bound', () => {
     state: unknown,
     askedQuestions: Record<string, unknown> = questions
   ): number {
-    const bound = systemOneRequestCostBound(metadata, { state, questions: askedQuestions });
+    const bound = systemOneRequestCostBound(
+      metadata,
+      { state, questions: askedQuestions },
+      CUSTOM_PRICING_FALLBACK_CONFIG
+    );
     if (bound === null) throw new Error('Expected a cost bound');
     return bound;
   }
@@ -610,10 +615,18 @@ describe('System One request cost bound', () => {
 
   it('returns null for a model without usable pricing', () => {
     expect(
-      systemOneRequestCostBound({ ...model, endpoints: [] }, { state: null, questions })
+      systemOneRequestCostBound(
+        { ...model, endpoints: [] },
+        { state: null, questions },
+        CUSTOM_PRICING_FALLBACK_CONFIG
+      )
     ).toBeNull();
     expect(
-      systemOneRequestCostBound({ ...model, endpoints: [{}] }, { state: null, questions })
+      systemOneRequestCostBound(
+        { ...model, endpoints: [{}] },
+        { state: null, questions },
+        CUSTOM_PRICING_FALLBACK_CONFIG
+      )
     ).toBeNull();
   });
 
@@ -626,6 +639,8 @@ describe('System One request cost bound', () => {
       },
     } as unknown as StoredModel;
 
-    expect(() => systemOneRequestCostBound(broken, { state: null, questions })).toThrow(TypeError);
+    expect(() =>
+      systemOneRequestCostBound(broken, { state: null, questions }, CUSTOM_PRICING_FALLBACK_CONFIG)
+    ).toThrow(TypeError);
   });
 });

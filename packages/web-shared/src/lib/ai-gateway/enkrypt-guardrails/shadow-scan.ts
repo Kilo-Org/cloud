@@ -1,7 +1,11 @@
 import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { isEnkryptShadowGuardrailsEnabled } from '@kilocode/web-shared/lib/organizations/enkrypt-shadow-guardrails';
-import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import {
+  isDataCollectionExplicitlyDisallowed,
+  type GatewayRequest,
+  type OpenRouterProviderConfig,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { MicrodollarUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import {
   callEnkryptDetect,
@@ -24,10 +28,12 @@ export function shouldRunEnkryptShadowScan(params: {
   settings: OrganizationSettings | undefined;
   balance: number;
   responseStatus: number;
+  providerPrivacy: Pick<OpenRouterProviderConfig, 'data_collection' | 'zdr'>;
 }): boolean {
   return (
     !!params.apiKey &&
     params.responseStatus < 400 &&
+    !isDataCollectionExplicitlyDisallowed(params.providerPrivacy) &&
     isEnkryptShadowGuardrailsEnabled(params.organizationId, params.settings) &&
     canSpendPaidUsage(params.balance)
   );

@@ -3420,15 +3420,19 @@ describe('Enkrypt shadow guardrail scanning', () => {
   const mockedRunEnkryptShadowScan = jest.mocked(runEnkryptShadowScan);
   const upstreamBody = { id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] };
 
-  function setOrganizationAuth(organizationId: string, enabled: boolean, balance = 1_000) {
+  function setOrganizationAuth(
+    organizationId: string,
+    enabled: boolean,
+    dataCollection?: 'allow' | 'deny'
+  ) {
     mockedGetUserFromAuth.mockResolvedValue({
       user: { id: 'user-123', google_user_email: 'test@example.com', microdollars_used: 0 } as User,
       authFailedResponse: null,
       organizationId,
     });
     mockedGetBalanceAndOrgSettings.mockResolvedValue({
-      balance,
-      settings: { enkrypt_shadow_guardrails_enabled: enabled },
+      balance: 1_000,
+      settings: { enkrypt_shadow_guardrails_enabled: enabled, data_collection: dataCollection },
       plan: 'enterprise',
     });
   }
@@ -3536,6 +3540,26 @@ describe('Enkrypt shadow guardrail scanning', () => {
 
     await handleLlmProxyRequest(makeRequest(makeBody()));
 
+    expect(mockedRunEnkryptShadowScan).not.toHaveBeenCalled();
+  });
+
+  it('does not scan a request that requires zero data retention', async () => {
+    setOrganizationAuth(KILO_ORGANIZATION_ID, true);
+
+    const response = await handleLlmProxyRequest(
+      makeRequest({ ...makeBody(), provider: { zdr: true } })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedRunEnkryptShadowScan).not.toHaveBeenCalled();
+  });
+
+  it('does not scan when the organization denies data collection', async () => {
+    setOrganizationAuth(KILO_ORGANIZATION_ID, true, 'deny');
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+    expect(response.status).toBe(200);
     expect(mockedRunEnkryptShadowScan).not.toHaveBeenCalled();
   });
 });

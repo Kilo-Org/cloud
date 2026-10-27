@@ -31,6 +31,7 @@ describe('shouldRunEnkryptShadowScan', () => {
     settings: { enkrypt_shadow_guardrails_enabled: true },
     balance: 10,
     responseStatus: 200,
+    providerPrivacy: {},
   };
 
   it('runs for an allowlisted organization that enabled the setting', () => {
@@ -48,6 +49,8 @@ describe('shouldRunEnkryptShadowScan', () => {
     ['the API key is unset', { apiKey: undefined }],
     ['the upstream request failed', { responseStatus: 500 }],
     ['the organization cannot pay', { balance: 0 }],
+    ['the request requires zero data retention', { providerPrivacy: { zdr: true } }],
+    ['data collection is denied', { providerPrivacy: { data_collection: 'deny' as const } }],
   ])('does not run when %s', (_label, override) => {
     expect(shouldRunEnkryptShadowScan({ ...base, ...override })).toBe(false);
   });

@@ -46,7 +46,8 @@ export function OrganizationGuardrailScanningCard({ organizationId, readonly }: 
         <CardDescription>
           After each chat response, send the new prompt, tool results, and response to Enkrypt AI
           for prompt-injection, PII, secret, and toxicity detection. Scans never block or delay
-          requests, and each scan uses organization credits.
+          requests, and each scan uses organization credits. Requests that deny data collection or
+          require zero data retention are not scanned.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">

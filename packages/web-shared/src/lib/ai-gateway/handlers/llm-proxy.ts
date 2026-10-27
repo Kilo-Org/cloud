@@ -1178,6 +1178,7 @@ export async function handleLlmProxyRequest(
       settings: organizationSettings,
       balance: organizationBalance,
       responseStatus: response.status,
+      providerPrivacy: effectivePrivacy,
     })
       ? Promise.withResolvers<MicrodollarUsageStats | null>()
       : null;

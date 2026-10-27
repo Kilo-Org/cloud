@@ -127,10 +127,11 @@ export function resolvePurchasePresentation(
 
 /**
  * Map a Kilo Pass subscription status (plus whether a subscription exists) to
- * a presentation status class.
+ * a presentation status class. `status` accepts the provider's value as-is: the
+ * listed statuses are the known ones and anything else presents as inactive.
  */
 export function mapKiloPassStatusToClass(
-  status: KiloPassSubscriptionStatus,
+  status: string,
   options: { hasSubscription: boolean }
 ): PurchaseStatusClass {
   if (!options.hasSubscription) return 'inactive';

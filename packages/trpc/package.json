@@ -32,6 +32,7 @@
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
     "@sentry/nextjs": "11.7.0",
+    "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "@typescript/typescript6": "6.0.2",
     "rollup": "4.64.7",

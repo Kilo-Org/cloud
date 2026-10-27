@@ -694,7 +694,12 @@ test('production deploys cloud-agent-next after a changed session-ingest contrac
   assert.match(ordered.if, /deploy-cloud-agent-after-session-ingest == 'true'/);
   const wait = ordered.steps.find(step => step.name === 'Wait for session-ingest deployment');
   assert.match(wait.run, /Deploy services\/session-ingest/);
+  assert.match(wait.run, /seq 1 360/);
+  assert.match(wait.run, /queued/);
+  assert.match(wait.run, /in_progress/);
   const prepare = ordered.steps.findIndex(step => step.id === 'runtime');
   const deploy = ordered.steps.findIndex(step => step.name === 'Deploy cloud-agent-next');
   assert.ok(prepare >= 0 && prepare < deploy);
+  assert.equal(ordered.steps[deploy].with.preCommands, 'pnpm run predeploy');
+  assert.equal(ordered.steps[deploy + 1].with.preCommands, 'pnpm run predeploy');
 });

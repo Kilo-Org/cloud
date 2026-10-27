@@ -203,6 +203,11 @@ describe('getHostedWorkspaceStatus', () => {
     expect(test.getCloudAgentWorkspaceStatus).toHaveBeenCalledWith({
       kiloUserId: userId,
       workspaceId,
+      authorizedWorkspace: {
+        userId,
+        organizationId: null,
+        deletionState: 'active',
+      },
     });
   });
 

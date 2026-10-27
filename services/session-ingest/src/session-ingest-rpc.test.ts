@@ -3387,6 +3387,36 @@ describe('SessionIngestRPC hosted workspace catalog', () => {
     expect(getSessionIngestDO).not.toHaveBeenCalled();
   });
 
+  it('reuses a caller-authorized workspace without repeating the catalog query', async () => {
+    const workspaceId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const { db, builders } = makeWorkspaceDbFakes([
+      [
+        {
+          deletionStartedAt: null,
+          deletionCompletedAt: null,
+          deletionManifest: null,
+          runtimeLocations: [],
+          deletedSessionIds: null,
+        },
+      ],
+      [{ activeSessionCount: 1 }],
+    ]);
+    const rpc = makeRpc(db);
+
+    await expect(
+      rpc.getCloudAgentWorkspaceStatus({
+        kiloUserId: 'usr_owner',
+        workspaceId,
+        authorizedWorkspace: {
+          userId: 'usr_owner',
+          organizationId: null,
+          deletionState: 'active',
+        },
+      })
+    ).resolves.toMatchObject({ workspaceId, activeSessionCount: 1 });
+    expect(builders).toHaveLength(2);
+  });
+
   it('reports incomplete journal progress without touching a deleted workspace twice', async () => {
     const workspaceId = 'worktree_11111111-1111-4111-8111-111111111111';
     const timestamp = '2026-05-28 09:13:37.651263+00';

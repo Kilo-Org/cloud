@@ -40,6 +40,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: deploy-workers-${{ inputs.target_environment }}
@@ -498,13 +499,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for attempt in $(seq 1 120); do
+          for attempt in $(seq 1 360); do
             conclusion=$(gh api \
               "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100" \
               --jq '.jobs[] | select(.name == "Deploy services/session-ingest") | (.conclusion // .status)' \
               | head -n 1)
             if [ "$conclusion" = success ]; then exit 0; fi
-            if [ "$conclusion" = failure ] || [ "$conclusion" = cancelled ]; then exit 1; fi
+            if [ -n "$conclusion" ] \
+              && [ "$conclusion" != queued ] \
+              && [ "$conclusion" != in_progress ]; then
+              exit 1
+            fi
             sleep 5
           done
           exit 1
@@ -543,6 +548,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: services/cloud-agent-next
+          preCommands: pnpm run predeploy
           command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }}
 
       - name: Deploy cloud-agent-next (retry)
@@ -551,4 +557,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: services/cloud-agent-next
+          preCommands: pnpm run predeploy
           command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }}

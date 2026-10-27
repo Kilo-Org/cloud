@@ -148,6 +148,11 @@ export const getHostedWorkspaceStatus = protectedProcedure
     const status = await ctx.env.SESSION_INGEST.getCloudAgentWorkspaceStatus({
       kiloUserId: ctx.userId,
       workspaceId: input.workspaceId,
+      authorizedWorkspace: {
+        userId: workspace.userId,
+        organizationId: workspace.organizationId,
+        deletionState: workspace.deletionState,
+      },
     });
     if (!status) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'Workspace not found' });

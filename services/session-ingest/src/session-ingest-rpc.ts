@@ -879,11 +879,14 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     params: GetCloudAgentWorkspaceStatusParams
   ): Promise<GetCloudAgentWorkspaceStatusResult> {
     const parsed = getCloudAgentWorkspaceStatusSchema.parse(params);
-    const workspace = await this.getCloudAgentWorkspace({
-      kiloUserId: parsed.kiloUserId,
-      workspaceId: parsed.workspaceId,
-      sessionLimit: 1,
-    });
+    const workspace =
+      parsed.authorizedWorkspace === undefined
+        ? await this.getCloudAgentWorkspace({
+            kiloUserId: parsed.kiloUserId,
+            workspaceId: parsed.workspaceId,
+            sessionLimit: 1,
+          })
+        : { workspaceId: parsed.workspaceId, ...parsed.authorizedWorkspace };
     if (!workspace) return null;
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
     const [row] = await db

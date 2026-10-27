@@ -538,6 +538,14 @@ export const getCloudAgentWorkspaceStatusSchema = z
   .object({
     kiloUserId: z.string().min(1),
     workspaceId: cloudAgentWorktreeIdSchema,
+    authorizedWorkspace: z
+      .object({
+        userId: z.string().min(1),
+        organizationId: z.string().nullable(),
+        deletionState: z.enum(['active', 'deleting', 'deleted']),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type GetCloudAgentWorkspaceStatusParams = z.input<typeof getCloudAgentWorkspaceStatusSchema>;

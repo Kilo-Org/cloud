@@ -227,7 +227,6 @@
     "hideBalance": "Itago ang balanse",
     "showBalance": "Ipakita ang balanse",
     "balanceHidden": "Nakatago ang balanse",
-    "bonusCreditsExpiring": "Mawawalan ng bisa sa {{date}} ang {{amount}} na kredito.",
     "signOutTitle": "Mag-sign out?",
     "signOutMessage": "Kailangan mong mag-sign in muli para mabuksan ang workspace mo.",
     "deleteAccountTitle": "Burahin ang akawnt?",
@@ -876,6 +875,18 @@
       "securityFindingsUnavailable": "I-enable ang Ahente sa seguridad ng Kilo sa isang saklaw para makakuha ng mga natuklasan sa seguridad.",
       "spendAlertsSubtitle": "mga paglampas sa hangganan at pagtaas bawat oras",
       "spendAlertsToggle": "Kategorya ng mga babala sa gastos"
+    },
+    "history": {
+      "title": "Kasaysayan ng notipikasyon",
+      "subtitle": "Mga notipikasyong natanggap ng account na ito",
+      "bannerBody": "Naka-off ang mga push notification para sa device na ito, kaya wala nang bagong darating dito.",
+      "bannerAction": "Mga setting ng notipikasyon",
+      "emptyTitle": "Wala pang mga notipikasyon",
+      "emptyCategoryTitle": "Wala pang mga notipikasyon sa kategoryang ito",
+      "emptyBody": "Lumalabas dito ang mga notipikasyong natatanggap ng account na ito. Itinatago ang mga ito sa loob ng {{days}} araw.",
+      "capped": "Ipinapakita ang mga pinakabagong notipikasyon.",
+      "loadError": "Hindi ma-load ang kasaysayan ng notipikasyon.",
+      "openFailed": "Hindi na mabubuksan kahit saan ang notipikasyong ito."
     },
     "action": {
       "openSession": "Buksan ang sesyon"
@@ -2592,7 +2603,9 @@
       "retrying": "Muling sinusubukan…",
       "retryDeny": "Subukang tanggihan muli",
       "retryAllowOnce": "Subukang payagan nang isang beses muli",
-      "retryAlwaysAllow": "Subukang laging payagan muli"
+      "retryAlwaysAllow": "Subukang laging payagan muli",
+      "unreadableTitle": "Hindi mabasa ang hiling ng pahintulot",
+      "unreadableBody": "Naghihintay ang agent ng desisyon sa pahintulot na hindi maipakita ng app na ito. I-update ang app o ang CLI, o sagutin ang hiling sa CLI upang magpatuloy."
     },
     "questionCard": {
       "title": "Kailangan ng ahente ng sagot",
@@ -2984,8 +2997,9 @@
     "unavailableDevice": "Hindi magagamit ang pagdikta sa device na ito.",
     "unavailableLanguage": "Hindi magagamit ang pagdikta sa wikang nakatakda sa device na ito.",
     "languageNotInstalledTitle": "Hindi pa handa ang pagdikta para sa {{language}}",
-    "languageNotInstalledMessage": "Hindi naka-install ang mga offline na speech file para sa {{language}} sa teleponong ito. I-download muna ang mga ito, pagkatapos ay subukang muli ang pagdikta.",
+    "languageNotInstalledMessage": "Hindi pa naka-install ang mga offline na speech file para sa {{language}}, at nakasara ang online transcription. Ida-download ang mga file o buksan muli ang online transcription para magamit ang voice input.",
     "downloadOfflineModel": "I-download",
+    "useOnlineTranscription": "Payagan ang online transcription",
     "offlineModelDownloadScheduled": "Ida-download sa background ang mga offline na speech file. Subukang muli ang pagdikta mamaya.",
     "listeningStopped": "Huminto ang pakikinig.",
     "transcribing": "Nagsasalin ng boses sa teksto...",
@@ -3159,7 +3173,7 @@
     "creditActivity": {
       "emptyDescription": "Lalabas dito ang mga pagbili, paggamit, at pagsasaayos ng kredito para sa organisasyong ito habang nangyayari ang mga ito.",
       "emptyTitle": "Walang aktibidad sa kredito",
-      "expires": "Mawawalan ng bisa sa {{date}}",
+      "expiresUtc": "Mawawalan ng bisa sa {{date}} (UTC)",
       "title": "Aktibidad sa kredito",
       "transactionFallback": "Transaksyon sa kredito",
       "category": {
@@ -3840,6 +3854,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Pinapanatili ng mga value na ipinapakita bilang •••• ang kanilang nakaimbak na lihim; palitan ang isang value para i-rotate ito. Kinakailangan ang bawat value muli kapag nagbago ang command line",
+      "headersHint": "Pinapanatili ng mga value na ipinapakita bilang •••• ang kanilang nakaimbak na lihim; palitan ang isang value para i-rotate ito. Kinakailangan ang bawat value muli kapag nagbago ang URL",
       "nameRequired": "Maglagay ng pangalan ng server",
       "nameInvalid": "Ang pangalan ay maaari lamang gumamit ng mga ASCII na titik, numero, underscore, at gitling, hanggang 100 na character",
       "commandRequired": "Maglagay ng command",
@@ -3938,6 +3954,10 @@
   "credits": {
     "title": "Bumili ng kredito",
     "description": "Ang kredito ay isang besesang pagbili na idinaragdag sa iyong Kilo balance para sa pagpapatakbo ng mga AI coding session sa Kilo App. Sinisingil ng store ang iyong account at idinaragdag ang kredito pagkatapos kumpirmahin ng store ang bayad.",
+    "nextExpiry": "Mawawalan ng bisa sa {{date}} (UTC) ang {{amount}} na kredito. Unang ginagamit ang mga kreditong pinakamaagang mawawalan ng bisa.",
+    "appStoreExpiry": "Hindi nawawalan ng bisa ang mga kreditong binili sa App Store.",
+    "playOneYearExpiry": "Mawawalan ng bisa ang mga kreditong ito isang taon ng kalendaryo pagkatapos ng pagbili.",
+    "playNonexpiring": "Hindi nawawalan ng bisa ang mga kreditong ito.",
     "packLabel": "Magdagdag ng {{amount}} na kredito",
     "priceUnavailable": "Hindi available ang presyo",
     "purchased": "Naidagdag na ang kredito sa iyong balance.",
@@ -4076,6 +4096,10 @@
     "generate": "Gumawa ng buod",
     "retrySummary": "Subukan muli ang bayad na buod",
     "sources": "Ebidensya at artifact",
+    "sessionsShown_one": "Ipinapakita ang {{shown}} sa {{total}} na session",
+    "sessionsShown_other": "Ipinapakita ang {{shown}} sa {{total}} na session",
+    "itemsShown_one": "Ipinapakita ang {{shown}} sa {{total}} na item",
+    "itemsShown_other": "Ipinapakita ang {{shown}} sa {{total}} na item",
     "timezone": "Time zone ng briefing",
     "deviceTimezone": "Gamitin ang time zone ng device",
     "timezoneHint": "IANA time zone, halimbawa Europe/Berlin. Sa mga susunod na briefing magagamit ang pagbabago sa iskedyul.",

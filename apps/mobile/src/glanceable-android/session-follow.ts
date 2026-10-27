@@ -29,6 +29,7 @@ import {
   postSessionCard,
   pruneSessionCards,
   restoreSessionCard,
+  type SessionCardScope,
 } from './session-notification';
 
 /**
@@ -43,7 +44,7 @@ import {
 /** A finished notification stays in the shade this long after it ends. */
 export const SESSION_FINISHED_DISMISS_MS = 15 * 60 * 1000;
 
-export type SessionFollowContext = { userId: string; organizationId: string | null };
+export type SessionFollowContext = SessionCardScope;
 export type SessionLiveUpdateContent = SessionLiveActivityContentState;
 export type FollowResult = 'started' | 'followed' | 'refused';
 
@@ -114,7 +115,7 @@ function render(content: SessionLiveActivityContentState, ctx: SessionFollowCont
     return;
   }
   followed.set(content.sessionId, { content, approvalKey: content.approvalKey, ctx });
-  postSessionCard(buildSessionNotificationCard(content, ctx.organizationId), 0);
+  postSessionCard(buildSessionNotificationCard(content, ctx), 0);
   emit();
 }
 
@@ -135,15 +136,17 @@ async function endFollow(sessionId: string): Promise<void> {
 function repost(sessionId: string): void {
   const stored = followed.get(sessionId);
   if (stored?.content != null) {
-    postSessionCard(buildSessionNotificationCard(stored.content, stored.ctx.organizationId), 0);
+    postSessionCard(buildSessionNotificationCard(stored.content, stored.ctx), 0);
   }
 }
 
 /**
- * Rebuild the followed set from native truth. A stored card of another scope is
- * cancelled and forgotten. A kept card is followed again — a fresh process
- * starts with an empty set, and a push or tray read for a followed session must
- * still find it — and its registration runs again.
+ * Rebuild the followed set from native truth. Each stored card carries the
+ * account and organization it was followed under; a card of another account or
+ * another scope — including one stored by a build that did not record the
+ * account — is cancelled and forgotten. A kept card is followed again — a fresh
+ * process starts with an empty set, and a push or tray read for a followed
+ * session must still find it — and its registration runs again.
  */
 export function restoreFollowedSessionCards(
   ctx: SessionFollowContext | null,
@@ -155,7 +158,7 @@ export function restoreFollowedSessionCards(
   // teardown, but no longer a follow.
   const finished: string[] = [];
   for (const card of stored) {
-    if (ctx === null || card.organizationId !== ctx.organizationId) {
+    if (ctx === null || card.userId !== ctx.userId || card.organizationId !== ctx.organizationId) {
       dismissSessionCard(card.sessionId);
     } else if (card.finishedUntil === undefined) {
       kept.set(card.sessionId, card.approvalKey);
@@ -253,7 +256,7 @@ export function unfollowSession(sessionId: string): void {
 
 /**
  * The user dismissed the notification: that is an Unfollow (spec "Android:
- * actions" rule 3). The native receiver already cancelled the card; this stops
+ * actions" rule 4). The native receiver already cancelled the card; this stops
  * following the session in this runtime and deletes its server row, so no later
  * update re-posts it. Runs headless, so it resolves only once the delete settled.
  */
@@ -320,7 +323,7 @@ export function syncFollowedSessionCards(
         render(content, stored.ctx);
       } else {
         postSessionCard(
-          buildSessionNotificationCard(content, stored.ctx.organizationId),
+          buildSessionNotificationCard(content, stored.ctx),
           SESSION_FINISHED_DISMISS_MS
         );
         void endFollow(sessionId);
@@ -349,7 +352,7 @@ export async function applySessionLiveUpdate(
       // A session that is gone or out of scope ends at once, with no content.
       dismissSessionCard(content.sessionId);
     } else {
-      postSessionCard(buildSessionNotificationCard(content, stored.ctx.organizationId), afterMs);
+      postSessionCard(buildSessionNotificationCard(content, stored.ctx), afterMs);
     }
     // The server retires its row on an accepted end; the release also covers an
     // end the app reached first, so no path leaves the row behind.
@@ -360,25 +363,27 @@ export async function applySessionLiveUpdate(
   return true;
 }
 
-/** Answer the exact request a followed card shows, revalidating it as iOS does. */
+/**
+ * Answer the exact request a followed card shows, revalidating it as iOS does.
+ *
+ * The card's recorded scope is the only scope this answers under, and only a
+ * card the rebuilt followed set holds can answer at all: a headless tap that
+ * found no such card — because the card belongs to another account or scope,
+ * or because the keychain could not be read and nothing was restored — answers
+ * nothing and leaves Approve in place for the next tap.
+ */
 export async function approveFollowedSession(
   sessionId: string,
   approvalKey: string
 ): Promise<boolean> {
-  // The stored card carries the scope it was followed in; a headless tap has no
-  // live context, so the stored scope is the fallback.
   const stored = followed.get(sessionId);
-  const fallback = stored === undefined ? await readStoredContext() : null;
-  const organizationId =
-    stored?.ctx.organizationId ??
-    (fallback === null || fallback === 'unavailable' ? null : fallback.organizationId);
-  const result = await runGlanceableApprove({
-    target: { kiloSessionId: sessionId, organizationId, approvalKey },
-    now: () => Date.now(),
-  });
   if (stored === undefined) {
     return false;
   }
+  const result = await runGlanceableApprove({
+    target: { kiloSessionId: sessionId, organizationId: stored.ctx.organizationId, approvalKey },
+    now: () => Date.now(),
+  });
   if (result.kind === 'approved' || result.kind === 'gone') {
     followed.set(sessionId, {
       content:

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { HOME_WIDGET_TITLE_LIMIT } from '@kilocode/app-shared/home-widget';
+
 import { LIVE_ACTIVITY_RELEVANCE, sessionLiveActivityContentStateSchema } from './push-data';
 import {
   aggregateLiveActivityRelevance,
@@ -25,6 +27,19 @@ describe('sessionLiveActivityTitle', () => {
     expect(sessionLiveActivityTitle('  Fix the login bug\n')).toBe('Fix the login bug');
     const capped = sessionLiveActivityTitle(`${'x'.repeat(119)}😀`);
     expect(capped).toBe('x'.repeat(119));
+  });
+
+  it('caps the title on a character boundary', () => {
+    const family = '👨‍👩‍👧';
+    expect(sessionLiveActivityTitle(`${'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 8)}${family}`)).toBe(
+      `${'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 8)}${family}`
+    );
+    expect(sessionLiveActivityTitle(`${'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 7)}${family}`)).toBe(
+      'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 7)
+    );
+    expect(sessionLiveActivityTitle(`${'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 2)}🇷🇸`)).toBe(
+      'x'.repeat(HOME_WIDGET_TITLE_LIMIT - 2)
+    );
   });
 
   it('keeps the title to the characters it draws', () => {

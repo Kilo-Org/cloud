@@ -42,7 +42,7 @@ catalog:
   jose: 6.2.12
   jsonwebtoken: 9.0.3
   p-limit: 7.3.0
-  stripe: 19.3.1
+  stripe: 23.0.0
   tsx: 4.23.15
   # TypeScript 7 is the native compiler and ships no compiler JS API. The
   # workspace typechecks with the @typescript/native-preview `tsgo` binary, so
@@ -344,6 +344,14 @@ patchedDependencies:
   # package ships TypeScript source, so its `typeof jest` guard (TS2708 here)
   # gets a ts-ignore.
   react-native-appsflyer@7.0.2-v2: patches/react-native-appsflyer@7.0.2-v2.patch
+  # Android accessibility: the virtual per-paragraph nodes that EnrichedMarkdownText
+  # publishes to TalkBack took their bounds from `getPrimaryHorizontal(start)` and
+  # `getPrimaryHorizontal(end)`, which run right-to-left in a right-to-left paragraph,
+  # so the pair collapsed to a zero-width rect and the node was unreachable. Bound the
+  # ordered offsets, and the painted line when they still coincide.
+  # Android: a hugged markdown node re-measures its height at the width its view
+  # actually receives, so a line that the display view wraps is inside the box.
+  react-native-enriched-markdown@1.1.1: patches/react-native-enriched-markdown@1.1.1.patch
   # Fabric mounting race: RCTComponentViewFactory registers component views from
   # the JS thread without the class-map mutex, so a mounting transaction can
   # dereference an unregistered handle and crash (EXC_BAD_ACCESS 0x18,
@@ -360,10 +368,8 @@ patchedDependencies:
   react-native-screens@4.30.0: patches/react-native-screens@4.30.0.patch
   # React Native installs on-device JSI bindings through its TurboModule runtime hook.
   llama.rn@0.12.9: patches/llama.rn@0.12.9.patch
+  stripe@23.0.0: patches/stripe@23.0.0.patch
   '@expo/react-native-action-sheet@4.1.1': patches/@expo+react-native-action-sheet@4.1.1.patch
-  # Android: a hugged markdown node re-measures its height at the width its view
-  # actually receives, so a line that the display view wraps is inside the box.
-  react-native-enriched-markdown@1.1.1: patches/react-native-enriched-markdown@1.1.1.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

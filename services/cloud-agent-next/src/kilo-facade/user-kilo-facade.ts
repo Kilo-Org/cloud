@@ -933,6 +933,7 @@ async function groupedPendingSessionDetailResponse(params: {
     projectPublicListedSession({
       kiloSessionId: ownership.kiloSessionId,
       cloudAgentSessionId: params.cloudAgentSessionId,
+      workspaceId: cloudAgentWorktreeIdSchema.parse(ownership.worktreeId),
       userId: ownership.userId,
       organizationId: ownership.organizationId,
       title:

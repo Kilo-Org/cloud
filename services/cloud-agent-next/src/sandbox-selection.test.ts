@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getSandboxAllocation,
   getSandboxAllocationRequest,
@@ -8,9 +8,26 @@ import {
   assertSandboxAllocationAvailable,
   getSandboxSelectionCapabilities,
   isSandboxAllocationAvailable,
+  resolveVercelSelectionReadiness,
 } from './sandbox-selection.js';
 import { classifySandboxId, selectSandboxForNewSession } from './sandbox-id.js';
-import type { Env } from './types.js';
+import { appRouter } from './router.js';
+import { ByocCredentialMissingError } from './byoc/vercel-credential-resolver.js';
+import type * as ByocCredentialResolverModule from './byoc/vercel-credential-resolver.js';
+import type { Env, TRPCContext } from './types.js';
+
+const { fetchByocVercelEnrollmentMock, fetchByocVercelEnrollmentForUserMock } = vi.hoisted(() => ({
+  fetchByocVercelEnrollmentMock: vi.fn(),
+  fetchByocVercelEnrollmentForUserMock: vi.fn(),
+}));
+vi.mock('./byoc/vercel-credential-resolver.js', async importActual => {
+  const actual = await importActual<typeof ByocCredentialResolverModule>();
+  return {
+    ...actual,
+    fetchByocVercelEnrollment: fetchByocVercelEnrollmentMock,
+    fetchByocVercelEnrollmentForUser: fetchByocVercelEnrollmentForUserMock,
+  };
+});
 
 const configured = Object.assign({} as Env, {
   SANDBOX_SELECTION_IDS: 'org-id',
@@ -34,6 +51,21 @@ const availableOptions = (capabilities: Capabilities) =>
         option.unavailableReason === undefined && option.repositoryUnavailableReason === undefined
     )
     .map(option => option.allocation);
+
+beforeEach(() => {
+  fetchByocVercelEnrollmentMock.mockReset();
+  fetchByocVercelEnrollmentForUserMock.mockReset();
+  fetchByocVercelEnrollmentMock.mockResolvedValue({
+    organizationId: owner.orgId,
+    credentialId: 'f47ac10b-58cc-4372-a567-0e02b2c3d4aa',
+    setupStatus: 'ready',
+  });
+  fetchByocVercelEnrollmentForUserMock.mockResolvedValue({
+    userId: owner.userId,
+    credentialId: 'f47ac10b-58cc-4372-a567-0e02b2c3d4ab',
+    setupStatus: 'ready',
+  });
+});
 
 describe('sandbox selection policy', () => {
   it.each([
@@ -269,39 +301,139 @@ describe('sandbox selection policy', () => {
     }
   );
 
-  it('makes only Vercel allocations available to BYOC-enrolled organizations', () => {
-    const env = { ...configured, BYOC_VERCEL_IDS: owner.orgId } as Env;
-    expect(getSandboxSelectionCapabilities(env, owner).defaultDestination).toEqual({
-      provider: { id: 'vercel', account: 'byoc' },
-      instanceType: 'small',
-    });
-    expect(
-      getSandboxSelectionCapabilities(env, owner)
-        .options.filter(option => !option.unavailableReason)
-        .map(option => option.allocation)
-    ).toEqual([
+  it('enables the picker from BYOC enrollment without the selection allowlist and keeps Cloudflare default', () => {
+    const env = {
+      ...configured,
+      SANDBOX_SELECTION_IDS: '',
+      BYOC_VERCEL_IDS: owner.orgId,
+    } as Env;
+    const capabilities = getSandboxSelectionCapabilities(env, owner);
+    expect(capabilities.enabled).toBe(true);
+    expect(capabilities.defaultDestination).toEqual(
+      getSandboxAllocationRequest('cloudflare-containers-standard-3')
+    );
+    expect(availableOptions(capabilities)).toEqual([
+      getSandboxAllocationRequest('cloudflare-containers-standard-3'),
+      getSandboxAllocationRequest('cloudflare-shared'),
       getSandboxAllocationRequest('vercel-small'),
       getSandboxAllocationRequest('vercel-large'),
     ]);
     for (const preset of ['cloudflare-single', 'cloudflare-shared'] as const) {
-      expect(() => assertSandboxAllocationAvailable(env, owner, preset)).toThrow(
-        'cannot select non-Vercel allocations'
-      );
+      expect(() => assertSandboxAllocationAvailable(env, owner, preset)).not.toThrow();
     }
     expect(() => assertSandboxAllocationAvailable(env, owner, 'vercel-small')).not.toThrow();
   });
 
-  it('offers only Vercel allocations for enrolled personal accounts without platform credentials', () => {
-    const env = { SANDBOX_SELECTION_IDS: '*', BYOC_VERCEL_IDS: '*' } as Env;
-    const capabilities = getSandboxSelectionCapabilities(env, { userId: owner.userId });
-    expect(capabilities.defaultDestination).toEqual({
-      provider: { id: 'vercel', account: 'byoc' },
-      instanceType: 'small',
+  it('resolves ready BYOC credentials without forcing Vercel over the Cloudflare default', async () => {
+    const env = {
+      ...configured,
+      SANDBOX_SELECTION_IDS: '',
+      BYOC_VERCEL_IDS: owner.orgId,
+    } as Env;
+
+    const readiness = await resolveVercelSelectionReadiness(env, owner);
+    expect(readiness).toEqual({});
+
+    const capabilities = getSandboxSelectionCapabilities(env, owner, readiness);
+    expect(capabilities.defaultDestination).toEqual(
+      getSandboxAllocationRequest('cloudflare-containers-standard-3')
+    );
+    expect(isSandboxAllocationAvailable(capabilities, 'vercel-small')).toBe(true);
+    expect(isSandboxAllocationAvailable(capabilities, 'cloudflare-containers-standard-3')).toBe(
+      true
+    );
+  });
+
+  it.each([
+    ['pending', { setupStatus: 'pending' }],
+    ['building', { setupStatus: 'building' }],
+    ['failed', { setupStatus: 'failed' }],
+  ] as const)(
+    'disables only Vercel when BYOC credential setup is %s',
+    async (_status, enrollment) => {
+      const env = {
+        ...configured,
+        SANDBOX_SELECTION_IDS: owner.orgId,
+        BYOC_VERCEL_IDS: owner.orgId,
+      } as Env;
+      fetchByocVercelEnrollmentMock.mockResolvedValue({
+        organizationId: owner.orgId,
+        credentialId: 'f47ac10b-58cc-4372-a567-0e02b2c3d4ac',
+        ...enrollment,
+      });
+
+      const readiness = await resolveVercelSelectionReadiness(env, owner);
+      expect(readiness.vercelUnavailableReason).toBeTruthy();
+
+      const capabilities = getSandboxSelectionCapabilities(env, owner, readiness);
+      expect(capabilities.defaultDestination).toEqual(
+        getSandboxAllocationRequest('cloudflare-containers-standard-3')
+      );
+      expect(availableOptions(capabilities)).toEqual([
+        getSandboxAllocationRequest('cloudflare-containers-standard-3'),
+        getSandboxAllocationRequest('cloudflare-shared'),
+      ]);
+      expect(isSandboxAllocationAvailable(capabilities, 'vercel-small')).toBe(false);
+      expect(isSandboxAllocationAvailable(capabilities, 'cloudflare-shared')).toBe(true);
+    }
+  );
+
+  it('disables only Vercel when BYOC credentials are missing', async () => {
+    const env = {
+      ...configured,
+      SANDBOX_SELECTION_IDS: owner.orgId,
+      BYOC_VERCEL_IDS: owner.orgId,
+    } as Env;
+    fetchByocVercelEnrollmentMock.mockRejectedValue(new ByocCredentialMissingError(owner.orgId));
+
+    const readiness = await resolveVercelSelectionReadiness(env, owner);
+    const capabilities = getSandboxSelectionCapabilities(env, owner, readiness);
+    expect(readiness.vercelUnavailableReason).toBeTruthy();
+    expect(isSandboxAllocationAvailable(capabilities, 'vercel-small')).toBe(false);
+    expect(isSandboxAllocationAvailable(capabilities, 'cloudflare-shared')).toBe(true);
+  });
+
+  it('disables only Vercel when BYOC credential lookup fails', async () => {
+    const env = {
+      ...configured,
+      SANDBOX_SELECTION_IDS: owner.orgId,
+      BYOC_VERCEL_IDS: owner.orgId,
+    } as Env;
+    fetchByocVercelEnrollmentMock.mockRejectedValue(new Error('credential service unavailable'));
+
+    const capabilities = getSandboxSelectionCapabilities(env, owner, {
+      ...(await resolveVercelSelectionReadiness(env, owner)),
     });
-    expect(availableOptions(capabilities)).toEqual([
-      getSandboxAllocationRequest('vercel-small'),
-      getSandboxAllocationRequest('vercel-large'),
-    ]);
+    expect(isSandboxAllocationAvailable(capabilities, 'vercel-small')).toBe(false);
+    expect(isSandboxAllocationAvailable(capabilities, 'cloudflare-containers-standard-3')).toBe(
+      true
+    );
+  });
+
+  it('keeps Vercel statically selectable for launch even when credentials are not ready', () => {
+    const env = {
+      ...configured,
+      SANDBOX_SELECTION_IDS: owner.orgId,
+      BYOC_VERCEL_IDS: owner.orgId,
+    } as Env;
+    expect(() => assertSandboxAllocationAvailable(env, owner, 'vercel-small')).not.toThrow();
+  });
+
+  it('uses the personal BYOC credential lookup without platform credentials', async () => {
+    const env = { SANDBOX_SELECTION_IDS: '*', BYOC_VERCEL_IDS: '*' } as Env;
+    const personal = { userId: owner.userId };
+
+    await expect(resolveVercelSelectionReadiness(env, personal)).resolves.toEqual({});
+    expect(fetchByocVercelEnrollmentForUserMock).toHaveBeenCalledWith(env, owner.userId);
+    expect(fetchByocVercelEnrollmentMock).not.toHaveBeenCalled();
+
+    const capabilities = getSandboxSelectionCapabilities(env, personal);
+    expect(capabilities.defaultDestination).toEqual(
+      getSandboxAllocationRequest('cloudflare-containers-standard-3')
+    );
+    expect(availableOptions(capabilities)).toContainEqual(
+      getSandboxAllocationRequest('vercel-small')
+    );
   });
 
   it('fails Vercel closed for enforced organization billing', () => {
@@ -458,5 +590,61 @@ describe('sandbox selection policy', () => {
     expect(isSandboxAllocationAvailable({ enabled: false, options: [] }, 'isolated-standard')).toBe(
       false
     );
+  });
+});
+
+describe('sandbox selection API', () => {
+  const caller = (env: Env) =>
+    appRouter.createCaller({
+      env,
+      userId: owner.userId,
+      authToken: 'test-token',
+      request: new Request('http://localhost'),
+    } as TRPCContext);
+
+  it('offers both providers when BYOC enrollment has ready credentials', async () => {
+    const env = {
+      ...configured,
+      SANDBOX_SELECTION_IDS: '',
+      BYOC_VERCEL_IDS: '*',
+    } as Env;
+
+    const result = await caller(env).getSandboxSelectionOptions({});
+    expect(result.enabled).toBe(true);
+    expect(result.defaultDestination).toEqual(
+      getSandboxAllocationRequest('cloudflare-containers-standard-3')
+    );
+    expect(availableOptions(result)).toEqual([
+      getSandboxAllocationRequest('cloudflare-containers-standard-3'),
+      getSandboxAllocationRequest('cloudflare-shared'),
+      getSandboxAllocationRequest('vercel-small'),
+      getSandboxAllocationRequest('vercel-large'),
+    ]);
+  });
+
+  it('keeps Cloudflare choices and disables only Vercel when credentials are not ready', async () => {
+    const env = {
+      ...configured,
+      SANDBOX_SELECTION_IDS: '',
+      BYOC_VERCEL_IDS: '*',
+    } as Env;
+    fetchByocVercelEnrollmentForUserMock.mockResolvedValue({
+      userId: owner.userId,
+      credentialId: 'f47ac10b-58cc-4372-a567-0e02b2c3d4ad',
+      setupStatus: 'pending',
+    });
+
+    const result = await caller(env).getSandboxSelectionOptions({});
+    expect(result.defaultDestination).toEqual(
+      getSandboxAllocationRequest('cloudflare-containers-standard-3')
+    );
+    expect(availableOptions(result)).toEqual([
+      getSandboxAllocationRequest('cloudflare-containers-standard-3'),
+      getSandboxAllocationRequest('cloudflare-shared'),
+    ]);
+    const vercel = result.options.find(
+      option => getSandboxAllocation(option.allocation) === 'vercel-small'
+    );
+    expect(vercel?.unavailableReason).toBeTruthy();
   });
 });

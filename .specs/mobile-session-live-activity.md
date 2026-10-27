@@ -237,6 +237,27 @@ its turn, or when the user loses access to the session.
    unregister MUST run before the device session is revoked, as it does
    for the aggregate card.
 
+### Follow scope
+
+1. A followed session card MUST be stored with the account and the
+   organization that followed it. The scope is not part of the card's
+   data (see "Card data contract"): the server rebuilds that data on
+   every update, so the app keeps the scope beside the card on the
+   device.
+2. A launch or foreground restore MUST register a card's push token only
+   when both its recorded account and its recorded organization match the
+   signed-in account and its selected organization, and MUST end every
+   other card.
+3. A card with no recorded scope — one stored by a build that did not
+   keep it — is outside that scope and MUST end at the next restore.
+4. A restore that cannot read the keychain or the records themselves MUST
+   leave the cards as they are: only a scope the app can read may end a
+   card.
+5. An Approve on a session notification MUST answer under the account and
+   the organization recorded on that card, read from the persisted card
+   set, and MUST answer nothing when that scope cannot be read or does
+   not match the signed-in account and its selected organization.
+
 ### Privacy
 
 1. This spec changes the glanceable privacy rule for session cards only:
@@ -274,6 +295,11 @@ The session card data MUST hold exactly these facts, and nothing else:
 | awaiting permission | True only when Approve can answer the request. |
 | approval key | Key of the request the card shows, or none. |
 | updated at | When the server confirmed this content. |
+
+Every capped text fact MUST be cut on a character boundary: a title, a current
+step's target, a plan step's name, and a permission command never end inside an
+emoji sequence, a flag, or a combining mark, and the cut MUST stay within the
+fact's length limit.
 
 ## Error Handling
 
@@ -340,9 +366,17 @@ observable behavior is the same.
 2. Approve MUST appear only for a permission wait that carries an approval key,
    and it MUST run the same revalidating approval the iOS card runs, for the
    explicit session and the exact request the card shows.
-3. A user dismissal of the notification MUST count as Unfollow: the app MUST
+3. Approve MUST run only for an unlocked device. From Android 12 the action
+   MUST carry the platform's authentication requirement; below it, and as the
+   rule on every version, the tap MUST start the approval only after the keyguard
+   is dismissed. A declined unlock MUST leave the request open with Approve in
+   place.
+4. A user dismissal of the notification MUST count as Unfollow: the app MUST
    stop following that session, MUST delete the session's server row, and MUST
    NOT re-post the notification for a later update of that session.
+5. Approve MUST answer at most once per request and MUST NOT be dropped because
+   another answer is in flight: a repeat tap of the same ask while its answer
+   runs MUST be suppressed, and a tap on a different ask MUST be answered.
 
 ### Android: updates and ending
 
@@ -383,6 +417,29 @@ observable behavior is the same.
    the notification's data for routing and approval only.
 
 ## Changelog
+
+### 2026-10-27 -- Android answers keep their own ask, and cards survive a failed write
+
+- Added Actions rule 5: a repeat tap of one ask is suppressed while its answer
+  runs, and a tap on a different ask is answered rather than dropped. A
+  notification action names the ask it answers, so only a genuine duplicate is
+  the one it holds back.
+- The card's own writes — the stored card, the quiet moment, the dismissal and
+  the widget deadline — run off the broadcast thread, and a refused write is
+  reported instead of ending the process: a card action never takes the app down
+  and never leaves the broadcast unfinished.
+
+### 2026-10-23 -- The aggregate Approve names its request
+
+- The aggregate ask records the pending request its surface shows, and the
+  Approve action answers only that request: a live request that differs leaves
+  the session waiting and MUST NOT be answered. This is the revalidation rule
+  Actions rule 2 states for the session card, applied to the aggregate surfaces.
+- Approve appears on an aggregate surface only while the ask names a request. A
+  record without one keeps Approve off that surface until a fresh selection
+  binds one.
+- A replaced request MUST NOT clear the session's needs-input mark: the session
+  still waits on the live request.
 
 ### 2026-10-21 -- Failure facts come from the row that reports them
 
@@ -453,3 +510,20 @@ observable behavior is the same.
   disabled so they appear on the Lock Screen with the default system settings.
 - Await a pushed end's own row release instead of superseding it with another.
 - Re-post the current scope's stored followed cards after a force-stop.
+
+### 2026-10-20 -- Approve requires an unlocked device
+
+- Approve runs for an unlocked device: the action carries the platform's
+  authentication requirement from Android 12, and on every version the approval
+  starts after the keyguard is dismissed. A declined unlock leaves the
+  permission request waiting with Approve in place.
+
+### 2026-10-23 -- A followed card names its account and scope
+
+- A followed session card is stored with the account and organization that
+  followed it, on both platforms.
+- A launch or foreground restore registers a card only for the account and
+  organization it was followed in and ends every other card, including a card
+  stored without that record.
+- A session notification's Approve answers under the card's recorded scope, and
+  answers nothing when that scope cannot be read.

@@ -84,6 +84,7 @@ jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({}));
 jest.mock('@/lib/bot-users/bot-user-service', () => ({}));
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: jest.fn(),
+  InsufficientCreditsError: class InsufficientCreditsError extends Error {},
 }));
 jest.mock('@/lib/web-config.server', () => ({ CALLBACK_TOKEN_SECRET: 'test-callback-secret' }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({

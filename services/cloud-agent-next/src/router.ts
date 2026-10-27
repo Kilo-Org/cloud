@@ -13,11 +13,17 @@ import { createSessionTerminalHandlers } from './router/handlers/session-termina
 import { createSessionStartHandlers } from './router/handlers/session-start.js';
 import { createSessionSendHandlers } from './router/handlers/session-send.js';
 import { createSessionWorktreeHandlers } from './router/handlers/session-worktree.js';
+import { createHostedWorkspaceMutationHandlers } from './router/handlers/hosted-workspace-mutations.js';
 import { deleteWorktree } from './router/handlers/worktree-deletion.js';
 import { createSessionWorktreeChangesHandlers } from './router/handlers/session-worktree-changes.js';
 import { getSandboxSelectionOptions } from './router/handlers/sandbox-selection.js';
 import { getPreviewOptions } from './router/handlers/preview-options.js';
 import { listHostedSessions } from './router/handlers/hosted-session-list.js';
+import {
+  getHostedWorkspace,
+  listHostedWorkspaces,
+} from './router/handlers/hosted-workspace-list.js';
+import { getHostedWorkspaceStatus } from './router/handlers/hosted-workspace-status.js';
 import {
   buildEnvironment,
   cancelEnvironmentBuild,
@@ -31,6 +37,9 @@ export const appRouter = router({
   getSandboxSelectionOptions,
   getPreviewOptions,
   listHostedSessions,
+  listHostedWorkspaces,
+  getHostedWorkspace,
+  getHostedWorkspaceStatus,
   buildEnvironment,
   getEnvironmentBuildStatus,
   getEnvironmentBuildLogs,
@@ -44,6 +53,7 @@ export const appRouter = router({
   ...createSessionStartHandlers(),
   ...createSessionSendHandlers(),
   ...createSessionWorktreeHandlers(),
+  ...createHostedWorkspaceMutationHandlers(),
   ...createSessionWorktreeChangesHandlers(),
 });
 

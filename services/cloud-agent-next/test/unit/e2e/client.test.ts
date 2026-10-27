@@ -47,8 +47,10 @@ import {
   fetchFakeRequests,
   fetchFakeScenarioStatus,
   fetchFakeWaiters,
+  getHostedWorkspace,
   getMessageResult,
   isMessageCompleted,
+  listHostedWorkspaces,
   openConnectedStream,
   openStream,
   prepareBrowserSession,
@@ -509,6 +511,40 @@ describe('trpcCall auth headers', () => {
     if (!headers) throw new Error('Expected a second request');
     expect(headers['x-skip-balance-check']).toBeUndefined();
     expect(headers.Authorization).toBe('Bearer token');
+  });
+});
+
+describe('hosted workspace catalog client', () => {
+  it('calls list and get through the public tRPC surface', async () => {
+    const workspaceId = 'worktree_11111111-1111-4111-8111-111111111111';
+    const fetchMock = vi.fn().mockResolvedValue(okEnvelope({ items: [], nextCursor: null }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await listHostedWorkspaces(baseConfig, {
+      repositoryUrl: baseConfig.gitUrl,
+      limit: 50,
+      sessionLimit: 100,
+    });
+    const listUrl = fetchMock.mock.calls[0]?.[0];
+    if (!(listUrl instanceof URL)) throw new Error('Expected a listHostedWorkspaces request');
+    expect(listUrl.origin + listUrl.pathname).toBe('http://worker.test/trpc/listHostedWorkspaces');
+    expect(JSON.parse(listUrl.searchParams.get('input') ?? '')).toEqual({
+      repositoryUrl: baseConfig.gitUrl,
+      limit: 50,
+      sessionLimit: 100,
+    });
+    expect((fetchMock.mock.calls[0]?.[1] as RequestInit | undefined)?.method).toBe('GET');
+
+    fetchMock.mockResolvedValueOnce(okEnvelope(null));
+    await getHostedWorkspace(baseConfig, workspaceId);
+    const getUrl = fetchMock.mock.calls[1]?.[0];
+    if (!(getUrl instanceof URL)) throw new Error('Expected a getHostedWorkspace request');
+    expect(getUrl.origin + getUrl.pathname).toBe('http://worker.test/trpc/getHostedWorkspace');
+    expect(JSON.parse(getUrl.searchParams.get('input') ?? '')).toEqual({
+      workspaceId,
+      sessionLimit: 100,
+    });
+    expect((fetchMock.mock.calls[1]?.[1] as RequestInit | undefined)?.method).toBe('GET');
   });
 });
 

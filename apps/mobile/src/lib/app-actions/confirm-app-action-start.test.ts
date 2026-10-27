@@ -58,12 +58,11 @@ describe('confirmAppActionStart', () => {
     expect(message).toContain('fix the build');
   });
 
-  it('bounds the repository label while the run keeps its full value', async () => {
-    const repository = 'owner/'.concat('r'.repeat(400));
+  it('renders repository text in full', async () => {
+    const repository = `gitlab: group/${'r'.repeat(400)}`;
     void confirmAppActionStart({ prompt: 'fix the build', repository });
     const { message } = await openedAlert();
-    expect(message).toContain(`${repository.slice(0, 240)}…`);
-    expect(message).not.toContain(repository);
+    expect(message).toContain(repository);
   });
 
   it('names the recent repository when the request names none', async () => {

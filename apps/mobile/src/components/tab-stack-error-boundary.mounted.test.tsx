@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createElement, type ReactElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import ChatLayout from '@/app/(app)/(tabs)/(4_chat)/_layout';
 import { TabStackErrorBoundary } from './tab-stack-error-boundary';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -18,6 +19,20 @@ vi.mock('react-native', () => ({
   Alert: { alert: vi.fn() },
   Platform: { OS: 'ios' },
   I18nManager: { isRTL: false },
+}));
+const chatStack = vi.hoisted(() => ({ shouldThrow: true }));
+
+vi.mock('expo-router', () => ({
+  Stack: () => {
+    if (chatStack.shouldThrow) {
+      throw new Error('chat stack render failed');
+    }
+    return createElement('ChatStackContent');
+  },
+}));
+vi.mock('@/components/app-screen-layout', () => ({ appSceneLayout: 'SceneLayout' }));
+vi.mock('@/components/tab-screen-input-gate', () => ({
+  TabSwitchInputSettle: ({ children }: { children: ReactNode }) => children,
 }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('react-i18next', () => ({
@@ -96,6 +111,7 @@ beforeEach(() => {
   setTelemetrySink(event => {
     events.push(event);
   });
+  chatStack.shouldThrow = true;
 });
 
 describe('TabStackErrorBoundary', () => {
@@ -113,6 +129,34 @@ describe('TabStackErrorBoundary', () => {
       'error.subsystem': 'agents',
       'error.operation': 'render_stack',
     });
+  });
+
+  it('contains a Chat stack render error and retries its list and model reads in place', async () => {
+    const { tree, client } = mount(createElement(ChatLayout));
+    const refetch = vi.spyOn(client, 'refetchQueries').mockResolvedValue(undefined);
+
+    expect(tree.root.findByType(ScreenHeader as never).props).toMatchObject({
+      title: 'common.chat',
+      showBackButton: false,
+    });
+    expect(events[0]?.tags).toEqual({
+      'error.subsystem': 'chat',
+      'error.operation': 'render_stack',
+    });
+
+    chatStack.shouldThrow = false;
+    await act(async () => {
+      pressRetry(tree);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(refetch.mock.calls.map(call => call[0]?.queryKey)).toEqual([
+      ['chats'],
+      ['available-models'],
+    ]);
+    expect(tree.root.findAllByType(QueryError as never)).toHaveLength(0);
+    expect(tree.root.findAll(node => String(node.type) === 'ChatStackContent')).toHaveLength(1);
   });
 
   it('refetches only this tab’s reads before remounting the stack', async () => {

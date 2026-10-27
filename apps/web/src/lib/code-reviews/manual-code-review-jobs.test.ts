@@ -9,6 +9,27 @@ const mockGetAgentConfigForOwner = jest.fn();
 const mockAssertCouncilCreationAllowed = jest.fn();
 const mockCreateCodeReview = jest.fn();
 const mockTryDispatchPendingReviews = jest.fn();
+const mockGetAllIntegrationsForOwner = jest.fn();
+const mockGetIntegrationForOwner = jest.fn();
+const mockGetValidGitLabToken = jest.fn();
+const mockFetchGitLabMergeRequest = jest.fn();
+
+jest.mock('@/lib/integrations/db/platform-integrations', () => ({
+  getAllIntegrationsForOwner: (...args: unknown[]) => mockGetAllIntegrationsForOwner(...args),
+  getIntegrationForOwner: (...args: unknown[]) => mockGetIntegrationForOwner(...args),
+}));
+
+jest.mock('@/lib/integrations/gitlab-service', () => ({
+  getValidGitLabToken: (...args: unknown[]) => mockGetValidGitLabToken(...args),
+}));
+
+// The adapter's GitLab transport binds the resolved address and bypasses
+// global fetch for self-managed hosts, so the connected path stubs the one
+// provider read it makes and asserts the call it was given.
+jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
+  ...jest.requireActual<object>('@/lib/integrations/platforms/gitlab/adapter'),
+  fetchGitLabMergeRequest: (...args: unknown[]) => mockFetchGitLabMergeRequest(...args),
+}));
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   isLocalCodeReviewDevelopmentEnabled: () => mockIsLocalCodeReviewDevelopmentEnabled(),
@@ -198,6 +219,188 @@ describe('createManualCodeReviewJob provider failures', () => {
     expect((error as TRPCError).code).toBe('BAD_GATEWAY');
     expect((error as TRPCError).message).toContain('unexpected response');
     expect((error as TRPCError).message).not.toContain('rate-limited');
+  });
+});
+
+describe('createManualCodeReviewJob connected GitLab source', () => {
+  const INSTANCE_URL = 'https://gitlab.example.com';
+  const PROJECT_PATH = 'group/project';
+  const MR_URL = `${INSTANCE_URL}/${PROJECT_PATH}/-/merge_requests/7`;
+
+  const orgOwner = { type: 'org' as const, id: 'org-1', userId: 'bot-1' };
+
+  function gitlabIntegration() {
+    return {
+      id: 'gitlab-integration-1',
+      platform: 'gitlab',
+      integration_status: 'active',
+      owned_by_user_id: OWNER.id,
+      owned_by_organization_id: null,
+      repositories: [
+        { id: 501, name: 'project', full_name: PROJECT_PATH, private: true },
+        { id: 502, name: 'other', full_name: 'group/other', private: false },
+      ],
+      metadata: { gitlab_instance_url: INSTANCE_URL },
+    };
+  }
+
+  function mergeRequest(overrides: Record<string, unknown> = {}) {
+    return {
+      iid: 7,
+      title: 'Harden the thing',
+      state: 'opened',
+      draft: false,
+      source_branch: 'feature',
+      target_branch: 'main',
+      sha: 'sha-7',
+      web_url: MR_URL,
+      author: { username: 'gl-user' },
+      // The provider's ids differ from the cached repository id (501) so the
+      // assertion pins which id the review row stores.
+      project_id: 999,
+      target_project_id: 999,
+      ...overrides,
+    };
+  }
+
+  function gitlabJob(url: string) {
+    return { platform: 'gitlab' as const, url, modelSlug: 'test-model' };
+  }
+
+  beforeEach(() => {
+    mockIsLocalCodeReviewDevelopmentEnabled.mockReturnValue(false);
+    mockGetAllIntegrationsForOwner.mockResolvedValue([gitlabIntegration()]);
+    mockGetIntegrationForOwner.mockResolvedValue(gitlabIntegration());
+    mockGetValidGitLabToken.mockResolvedValue('glpat-token');
+    mockFetchGitLabMergeRequest.mockResolvedValue(mergeRequest());
+    mockCreateCodeReview.mockResolvedValue('review-gitlab');
+  });
+
+  it('starts a review for a project inside the connection repository scope', async () => {
+    await expect(
+      createManualCodeReviewJob({ owner: OWNER, input: gitlabJob(MR_URL) })
+    ).resolves.toEqual({ reviewId: 'review-gitlab', outputMode: 'provider' });
+
+    expect(mockGetValidGitLabToken).toHaveBeenCalledWith(gitlabIntegration(), {
+      userId: OWNER.userId,
+    });
+    expect(mockFetchGitLabMergeRequest).toHaveBeenCalledWith({
+      accessToken: 'glpat-token',
+      projectId: PROJECT_PATH,
+      mrIid: 7,
+      instanceUrl: INSTANCE_URL,
+    });
+    expect(mockCreateCodeReview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platform: 'gitlab',
+        platformIntegrationId: 'gitlab-integration-1',
+        repoFullName: PROJECT_PATH,
+        platformProjectId: 501,
+        prNumber: 7,
+        prUrl: MR_URL,
+        prAuthor: 'gl-user',
+        baseRef: 'main',
+        headRef: 'refs/merge-requests/7/head',
+        headSha: 'sha-7',
+      })
+    );
+    expect(mockTryDispatchPendingReviews).toHaveBeenCalledWith(OWNER);
+  });
+
+  it('refuses a project outside the connection repository scope before any credential or provider call', async () => {
+    const error = await captureError(
+      gitlabJob(`${INSTANCE_URL}/other-org/private-project/-/merge_requests/1`)
+    );
+
+    expect(error).toBeInstanceOf(TRPCError);
+    expect((error as TRPCError).code).toBe('NOT_FOUND');
+    // The refusal happens before the connection's credential is minted or a
+    // provider request is made: no token, no read, no review row, no dispatch.
+    expect(mockGetValidGitLabToken).not.toHaveBeenCalled();
+    expect(mockFetchGitLabMergeRequest).not.toHaveBeenCalled();
+    expect(mockCreateCodeReview).not.toHaveBeenCalled();
+    expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+  });
+
+  it('matches the cached project path case-insensitively and reads only the canonical path', async () => {
+    const shoutyUrl = `${INSTANCE_URL}/GROUP/Project/-/merge_requests/7`;
+
+    await expect(
+      createManualCodeReviewJob({ owner: OWNER, input: gitlabJob(shoutyUrl) })
+    ).resolves.toEqual({ reviewId: 'review-gitlab', outputMode: 'provider' });
+
+    expect(mockFetchGitLabMergeRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: PROJECT_PATH })
+    );
+    expect(mockCreateCodeReview).toHaveBeenCalledWith(
+      expect.objectContaining({ repoFullName: PROJECT_PATH })
+    );
+  });
+
+  it('refuses a merge request URL on an instance other than the connected one', async () => {
+    const error = await captureError(
+      gitlabJob(`https://gitlab.com/${PROJECT_PATH}/-/merge_requests/7`)
+    );
+
+    expect(error).toBeInstanceOf(TRPCError);
+    expect((error as TRPCError).code).toBe('NOT_FOUND');
+    expect(mockGetValidGitLabToken).not.toHaveBeenCalled();
+    expect(mockFetchGitLabMergeRequest).not.toHaveBeenCalled();
+  });
+
+  it('keeps the connect-GitLab precondition when the owner has no active GitLab connection', async () => {
+    mockGetAllIntegrationsForOwner.mockResolvedValue([]);
+
+    const error = await captureError(gitlabJob(MR_URL));
+
+    expect(error).toBeInstanceOf(TRPCError);
+    expect((error as TRPCError).code).toBe('PRECONDITION_FAILED');
+    expect((error as TRPCError).message).toContain('Connect GitLab');
+    expect(mockGetIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockGetValidGitLabToken).not.toHaveBeenCalled();
+  });
+
+  it('maps a refused merge request read to a client error instead of a 500', async () => {
+    mockFetchGitLabMergeRequest.mockRejectedValue(new Error('GitLab MR fetch failed: 404'));
+
+    const error = await captureError(gitlabJob(MR_URL));
+
+    expect(error).toBeInstanceOf(TRPCError);
+    expect((error as TRPCError).code).toBe('NOT_FOUND');
+    expect(mockCreateCodeReview).not.toHaveBeenCalled();
+    expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+  });
+
+  it('maps a refused credential on the merge request read to the reconnect state', async () => {
+    mockFetchGitLabMergeRequest.mockRejectedValue(new Error('GitLab MR fetch failed: 401'));
+
+    const error = await captureError(gitlabJob(MR_URL));
+
+    expect(error).toBeInstanceOf(TRPCError);
+    expect((error as TRPCError).code).toBe('PRECONDITION_FAILED');
+    expect((error as TRPCError).message).toMatch(/reconnect/i);
+    expect(mockCreateCodeReview).not.toHaveBeenCalled();
+  });
+
+  it('passes the organization credential actor for an organization-owned connection', async () => {
+    mockGetAllIntegrationsForOwner.mockResolvedValue([
+      { ...gitlabIntegration(), owned_by_user_id: null, owned_by_organization_id: 'org-1' },
+    ]);
+    mockGetIntegrationForOwner.mockResolvedValue({
+      ...gitlabIntegration(),
+      owned_by_user_id: null,
+      owned_by_organization_id: 'org-1',
+    });
+
+    await expect(
+      createManualCodeReviewJob({ owner: orgOwner, input: gitlabJob(MR_URL) })
+    ).resolves.toEqual({ reviewId: 'review-gitlab', outputMode: 'provider' });
+
+    expect(mockGetIntegrationForOwner).toHaveBeenCalledWith({ type: 'org', id: 'org-1' }, 'gitlab');
+    expect(mockGetValidGitLabToken).toHaveBeenCalledWith(expect.anything(), {
+      userId: 'bot-1',
+      organizationId: 'org-1',
+    });
   });
 });
 

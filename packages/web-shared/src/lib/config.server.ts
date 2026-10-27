@@ -1,8 +1,14 @@
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { getEnvVariable, requireEnv } from '@kilocode/web-shared/lib/dotenvx';
 import 'server-only';
+import {
+  parseUsageQueueSfoExposure,
+  parseUsageQueueSfoUserIds,
+} from './ai-gateway/usage-queue-config';
 
 export const IS_IN_AUTOMATED_TEST = !!getEnvVariable('IS_IN_AUTOMATED_TEST');
+export const PAID_CREDIT_EXPIRATION_EFFECTIVE_AT =
+  getEnvVariable('PAID_CREDIT_EXPIRATION_EFFECTIVE_AT') || null;
 export const NEXTAUTH_URL = APP_URL;
 export const MAILGUN_API_KEY = getEnvVariable('MAILGUN_API_KEY');
 export const MAILGUN_DOMAIN = getEnvVariable('MAILGUN_DOMAIN');
@@ -61,14 +67,22 @@ export const MISTRAL_API_KEY = getEnvVariable('MISTRAL_API_KEY');
 export const INCEPTION_API_KEY = getEnvVariable('INCEPTION_API_KEY');
 export const EXA_API_KEY = getEnvVariable('EXA_API_KEY');
 export const INTERNAL_API_SECRET = getEnvVariable('INTERNAL_API_SECRET');
+export const CODE_REVIEW_HEALTH_SECRET = getEnvVariable('CODE_REVIEW_HEALTH_SECRET');
 export const USAGE_INGEST_URL = getEnvVariable('USAGE_INGEST_URL');
 export const USAGE_INGEST_PUBLISH_SECRET = getEnvVariable('USAGE_INGEST_PUBLISH_SECRET');
-export const USAGE_SHADOW_PUBLISH_ENABLED =
-  getEnvVariable('USAGE_SHADOW_PUBLISH_ENABLED') === 'true';
 export const USAGE_QUEUE_ONLY_ENABLED =
   getEnvVariable('USAGE_QUEUE_ONLY_ENABLED') === 'true' &&
   getEnvVariable('VERCEL_TARGET_ENV') === 'staging' &&
   getEnvVariable('VERCEL_ENV') !== 'production';
+export const USAGE_QUEUE_SFO_CONFIG = {
+  enabled:
+    getEnvVariable('USAGE_QUEUE_ONLY_ENABLED') === 'true' &&
+    getEnvVariable('VERCEL_ENV') === 'production' &&
+    getEnvVariable('VERCEL_TARGET_ENV') === 'production' &&
+    getEnvVariable('VERCEL_REGION') === 'sfo1',
+  exposure: parseUsageQueueSfoExposure(getEnvVariable('USAGE_QUEUE_SFO_EXPOSURE')),
+  userIds: parseUsageQueueSfoUserIds(getEnvVariable('USAGE_QUEUE_SFO_USER_IDS')),
+};
 // Shared secret with the MCP catalog CI job
 // (.github/workflows/kilo-mcp-catalog.yml). It authenticates only the mint in
 // app/api/internal/mcp-catalog/token; it is never accepted as a Kilo credential.

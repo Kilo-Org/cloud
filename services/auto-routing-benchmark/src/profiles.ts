@@ -13,7 +13,7 @@ import {
   benchmarkPairKey,
 } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
-import { and, asc, eq, gte, inArray, or, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
 import { benchmarkProfiles, profileRequestEvents } from './db-schema';
 import { variantFromStorage, variantToStorage } from './reasoning-effort';
@@ -185,6 +185,24 @@ export async function loadProfileRowsForPairs(
     .where(and(eq(benchmarkProfiles.router, router), inArray(benchmarkProfiles.model, models)));
   const wanted = new Set(pairs.map(benchmarkPairKey));
   return rows.filter(row => wanted.has(entryKeyFromRow(row)));
+}
+
+export async function listReadyPlatformMeasurements(
+  db: D1Database,
+  router: AutoRouter
+): Promise<BenchmarkPair[]> {
+  const rows = await drizzle(db)
+    .selectDistinct({ model: benchmarkProfiles.model, variant: benchmarkProfiles.variant })
+    .from(benchmarkProfiles)
+    .where(
+      and(
+        eq(benchmarkProfiles.router, router),
+        eq(benchmarkProfiles.status, 'ready'),
+        isNotNull(benchmarkProfiles.run_id)
+      )
+    )
+    .orderBy(asc(benchmarkProfiles.model), asc(benchmarkProfiles.variant));
+  return rows.map(row => ({ ...row, variant: variantFromStorage(row.variant) }));
 }
 
 function groupRowsByEntry(rows: readonly ProfileRow[]): Map<string, ProfileRow[]> {

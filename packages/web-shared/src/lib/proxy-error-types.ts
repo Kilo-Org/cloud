@@ -32,6 +32,8 @@ export const proxyErrorTypeSchema = z.enum([
   'invalid_auto_decision',
   'upstream_disconnect',
   'client_disconnect',
+  'guardrail_blocked',
+  'guardrail_unavailable',
 ]);
 
 export type ProxyErrorType = z.infer<typeof proxyErrorTypeSchema>;

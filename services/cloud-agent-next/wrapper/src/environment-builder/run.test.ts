@@ -8,6 +8,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { SYSTEM_GIT_CONFIG_ENV } from '../../../src/shared/runtime-environment.js';
 import { CONTROL_PLANE_SETUP_EVENTS } from '../../../src/shared/control-plane-protocol.js';
 import type {
   EnvironmentBuildEvents,
@@ -16,6 +17,7 @@ import type {
 import { createRepositoryPreparation } from '../control-plane/repository-preparation.js';
 import { directoryHome } from '../control-plane/workspace-home.js';
 import { readWorkspaceStamp, writeWorkspaceStamp } from '../control-plane/workspace-stamp.js';
+import { gitCredentialRecordPath } from '../control/git-credentials.js';
 import { git, runProcess } from '../utils.js';
 import { removeBuildCredentials, stopOtherProcesses } from './cleanup.js';
 import { createBuildReporter } from './reporter.js';
@@ -75,7 +77,12 @@ function buildInput(overrides: Partial<EnvironmentBuildInput> = {}): Environment
   };
 }
 
-function harness(options: { cleanup?: typeof removeBuildCredentials } = {}) {
+function harness(
+  options: {
+    cleanup?: typeof removeBuildCredentials;
+    onClone?: (home: string) => Promise<void>;
+  } = {}
+) {
   const lines: string[] = [];
   const steps: string[] = [];
   let stopped = 0;
@@ -98,12 +105,24 @@ function harness(options: { cleanup?: typeof removeBuildCredentials } = {}) {
       ),
     log: () => undefined,
   });
+  const runRepository = options.onClone
+    ? {
+        ...repository,
+        cloneRepository: async (cloneInput: Parameters<typeof repository.cloneRepository>[0]) => {
+          await options.onClone?.(directoryHome(directory, homeRoot));
+          return repository.cloneRepository({
+            ...cloneInput,
+            git: { ...cloneInput.git, url: pathToFileURL(origin).toString() },
+          });
+        },
+      }
+    : repository;
   const run = (input: EnvironmentBuildInput, signal = new AbortController().signal) =>
     runEnvironmentBuild({
       // The workspace path is fixed in the protocol; tests run it under a temp root.
       input: { ...input, directory } as EnvironmentBuildInput,
       reporter: { setStep: step => steps.push(step), line: line => lines.push(line) },
-      repository,
+      repository: runRepository,
       runGit: (args, opts) => git(args, opts),
       stopProcesses: async () => {
         stopped += 1;
@@ -177,6 +196,36 @@ describe('environment build run', () => {
     expect(await fs.readFile(path.join(directory, '.git', 'config'), 'utf8')).not.toContain(token);
     expect(gitIn(directory, 'reflog', '--all')).toBe('');
   });
+  it('prepares build authentication', async () => {
+    let recordPresentAtClone = false;
+    const h = harness({
+      onClone: async home => {
+        recordPresentAtClone = await fs.access(gitCredentialRecordPath(home)).then(
+          () => true,
+          () => false
+        );
+      },
+    });
+    const result = await h.run(
+      buildInput({
+        git: {
+          url: 'https://github.com/acme/widgets.git',
+          token: 'build-token',
+          platform: 'github',
+        },
+      })
+    );
+    const recordPath = gitCredentialRecordPath(directoryHome(directory, homeRoot));
+
+    expect(result.outcome).toBe('ready');
+    expect(recordPresentAtClone).toBe(true);
+    expect(
+      await fs.access(recordPath).then(
+        () => true,
+        () => false
+      )
+    ).toBe(false);
+  });
 
   it('fails cleanup instead of reporting ready when a credential remains', async () => {
     const h = harness({ cleanup: async () => 'a credential remained in Git metadata' });
@@ -188,6 +237,22 @@ describe('environment build run', () => {
       detail: 'a credential remained in Git metadata',
     });
     expect(await readWorkspaceStamp(directory, true)).toBeNull();
+  });
+  it('reports an unavailable cleanup', async () => {
+    const home = directoryHome(directory, homeRoot);
+    const recordPath = gitCredentialRecordPath(home);
+    await fs.mkdir(path.join(recordPath, 'child'), { recursive: true });
+
+    expect(
+      await removeBuildCredentials({
+        git: async () => ({ exitCode: 0, stdout: '', stderr: '' }),
+        directory,
+        home,
+        bareUrl: 'https://github.com/acme/widgets.git',
+        canaries: [],
+        logPath: undefined,
+      })
+    ).toBe('build Git credential record could not be removed');
   });
 
   it('reports a failing or timed-out setup command with its step', async () => {
@@ -231,8 +296,17 @@ describe('builder setup environment', () => {
         ENVIRONMENT_BUILD_CREDENTIAL: 'jwt',
         KILO_RUNTIME_CLI_PATH: '/opt/kilo',
         HOME: '/root',
+        GIT_CONFIG_COUNT: '1',
+        GIT_CONFIG_KEY_0: 'credential.helper',
+        GIT_CONFIG_VALUE_0: 'store',
       },
-      vars: { FOO: 'bar', XDG_CACHE_HOME: '/elsewhere' },
+      vars: {
+        FOO: 'bar',
+        XDG_CACHE_HOME: '/elsewhere',
+        GIT_CONFIG_COUNT: '1',
+        GIT_CONFIG_KEY_0: 'credential.helper',
+        GIT_CONFIG_VALUE_0: 'store',
+      },
       home: '/home/abc',
       directory: '/workspace/app',
     });
@@ -246,6 +320,7 @@ describe('builder setup environment', () => {
       XDG_CONFIG_HOME: '/home/abc/.config',
       XDG_CACHE_HOME: '/home/abc/.cache',
       XDG_STATE_HOME: '/home/abc/.local/state',
+      ...SYSTEM_GIT_CONFIG_ENV,
       GIT_TERMINAL_PROMPT: '0',
     });
   });

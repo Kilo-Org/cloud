@@ -11,9 +11,6 @@ import { Alert, AppState, type AppStateStatus } from 'react-native';
 
 import { i18n } from '@/i18n';
 
-/** Longest repository text the confirmation shows; the run uses the whole value. */
-const REPOSITORY_DISPLAY_LIMIT = 240;
-
 /** How long a backgrounded request waits for the app to reach an activity. */
 const ACTIVATION_TIMEOUT_MS = 10_000;
 
@@ -70,21 +67,13 @@ function displayPrompt(prompt: string): string {
   return prompt.replaceAll(/\s+/g, ' ').trim();
 }
 
-/** A display-only bound for one line of text, with an ellipsis when cut. */
-function boundForDisplay(value: string): string {
-  if (value.length <= REPOSITORY_DISPLAY_LIMIT) {
-    return value;
-  }
-  return `${value.slice(0, REPOSITORY_DISPLAY_LIMIT).trimEnd()}…`;
-}
-
 /** The repository the confirmation names: the request's, or the fallback. */
 function displayRepository(repository: string | undefined): string {
   const named = repository?.trim();
   if (named === undefined || named.length === 0) {
     return i18n.t('appActions.start.confirmMostRecentRepository');
   }
-  return boundForDisplay(named);
+  return named;
 }
 
 /**

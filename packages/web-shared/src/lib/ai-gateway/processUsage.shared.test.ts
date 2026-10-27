@@ -3,38 +3,15 @@ import {
   drainSseStream,
   readResponseText,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
+import { createControlledClock } from '@kilocode/web-shared/tests/helpers/timed-body.helper';
 
 const span = { end: () => {} } as Span;
 
-let now = 0;
-
-/**
- * A body whose chunks arrive at the given `performance.now()` times. With a
- * high-water mark of 0 a chunk is only produced once the reader asks for it, so
- * the clock reads the chunk's time while the reader processes it.
- */
-function bodyArrivingAt(chunks: [at: number, text: string][]) {
-  const encoder = new TextEncoder();
-  const queue = [...chunks];
-  return new ReadableStream<Uint8Array>(
-    {
-      pull(controller) {
-        const next = queue.shift();
-        if (!next) {
-          controller.close();
-          return;
-        }
-        now = next[0];
-        controller.enqueue(encoder.encode(next[1]));
-      },
-    },
-    { highWaterMark: 0 }
-  );
-}
+const clock = createControlledClock();
+const { bodyArrivingAt } = clock;
 
 beforeEach(() => {
-  now = 0;
-  jest.spyOn(performance, 'now').mockImplementation(() => now);
+  clock.install();
 });
 
 afterEach(() => {

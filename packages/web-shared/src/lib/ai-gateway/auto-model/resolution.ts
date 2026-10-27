@@ -45,6 +45,8 @@ import {
   isKiloExclusiveFreeModel,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { getOpenRouterModelsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { getCustomLlmsById } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { getCustomLlmApiKinds } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/api-kinds';
 import {
   getOrganizationAutoRoute,
   isOrganizationAutoTargetModel,
@@ -76,9 +78,9 @@ type ResolveAutoModelParams = {
  * configuration, falling back to `openrouter/free` when nothing is
  * configured, the configuration is invalid, or no configured model is eligible.
  *
- * Non-kilo-exclusive free models are only eligible when they appear in the
- * OpenRouter models cache. Kilo-exclusive free models are eligible when their
- * gateway supports the current `apiKind`; when `apiKind` is null no API-kind
+ * Other free models are only eligible when they appear in the OpenRouter
+ * models cache. Kilo-exclusive free models and public custom LLMs are eligible
+ * when they serve the current `apiKind`; when `apiKind` is null no API-kind
  * filtering is applied.
  */
 async function getEligibleAutoFreeModels(
@@ -87,9 +89,16 @@ async function getEligibleAutoFreeModels(
   const configuredModels = await getConfiguredAutoFreeModels();
   if (!configuredModels) return [AUTO_FREE_FALLBACK_MODEL];
 
-  const openRouterModels = await getOpenRouterModelsFromDatabase();
+  const [openRouterModels, customLlmsById] = await Promise.all([
+    getOpenRouterModelsFromDatabase(),
+    getCustomLlmsById(),
+  ]);
   const eligibleModels = configuredModels.filter(({ model }) => {
-    if (!isAutoFreeEligibleModelId(model)) return false;
+    const customLlm = customLlmsById.get(model.toLowerCase());
+    if (!isAutoFreeEligibleModelId(model, customLlm)) return false;
+    if (customLlm) {
+      return apiKind === null || getCustomLlmApiKinds(customLlm.definition).includes(apiKind);
+    }
     if (isKiloExclusiveFreeModel(model)) {
       const kiloModel = findKiloExclusiveModel(model);
       return (

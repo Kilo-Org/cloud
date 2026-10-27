@@ -167,6 +167,10 @@ import {
   startBouncerDecide,
 } from '@kilocode/web-shared/lib/bouncer/inference';
 import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
+import { startEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/input-guardrail';
+import { enkryptGuardrailRejectionResponse } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/responses';
+import { resolveEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
+import { extractTurnDeltaText } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/turn-delta';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
@@ -383,6 +387,25 @@ export async function handleLlmProxyRequest(
   // failure paths so a client disconnect can be correlated with the upstream
   // error it causes, and with the platform logs for the same invocation.
   const vercelRequestId = extractHeaderAndLimitLength(request, 'x-vercel-id');
+
+  // Like the bouncer decide, the organization's guardrail scan overlaps auth, balance, and routing
+  // work and is awaited just before the upstream call.
+  const enkryptGuardrailVerdictPromise = startEnkryptInputGuardrail(
+    Promise.all([authPromise, balanceAndSettingsPromise]).then(([auth, { settings }]) => {
+      if (!auth.user || auth.authFailedResponse || !auth.organizationId) return null;
+      const config = resolveEnkryptInputGuardrail(auth.organizationId, settings);
+      if (!config) return null;
+      return {
+        sessionId: taskId ?? sessionHeader ?? null,
+        organizationId: auth.organizationId,
+        kiloUserId: auth.user.id,
+        apiKind: requestBodyParsed.kind,
+        clientRequestId,
+        text: extractTurnDeltaText(requestBodyParsed),
+        config,
+      };
+    })
+  );
 
   const logClientDisconnect = () => {
     // The request signal is forwarded to the upstream fetch and to the response
@@ -1057,6 +1080,23 @@ export async function handleLlmProxyRequest(
   const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
   if (bouncerRejection) return bouncerRejection;
   if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
+  const guardrailWaitStartedAt = performance.now();
+  const guardrailVerdict = await enkryptGuardrailVerdictPromise;
+  if (guardrailVerdict.action !== 'skip') {
+    const guardrailWaitEndedAt = performance.now();
+    console.debug('[enkrypt-guardrail] verdict awaited', {
+      organization_id: organizationId,
+      session_id: taskId ?? sessionHeader ?? null,
+      action: guardrailVerdict.action,
+      waited_ms: Math.round(guardrailWaitEndedAt - guardrailWaitStartedAt),
+      request_elapsed_ms: Math.round(guardrailWaitEndedAt - requestStartedAt),
+    });
+  }
+  const guardrailRejection = enkryptGuardrailRejectionResponse(
+    requestBodyParsed.kind,
+    guardrailVerdict
+  );
+  if (guardrailRejection) return guardrailRejection;
   const requestCostBalance = requestCostLimit !== null ? await balanceAndSettingsPromise : null;
 
   const attempt = await sendUpstreamAttempt({

@@ -1443,7 +1443,10 @@ export async function processTokenData(
     genStats.hasError = usageStats.hasError; // retain by choice
     genStats.status_code = usageStats.status_code; // retain by choice
     genStats.streamed ??= usageContext.isStreaming;
-    if (genStats.cost_mUsd !== usageStats.cost_mUsd) {
+    // OpenRouter BYOK transcriptions report neither is_byok nor the upstream cost,
+    // so their response cost is only the BYOK fee and is expected to differ.
+    const responseCostIsOnlyByokFee = usageStats.is_byok == null && genStats.is_byok === true;
+    if (genStats.cost_mUsd !== usageStats.cost_mUsd && !responseCostIsOnlyByokFee) {
       // The provider's generation lookup and the response's own usage payload should
       // yield the same cost. A mismatch means inconsistent token or pricing data from
       // the provider; the generation lookup values win (see assignment below).

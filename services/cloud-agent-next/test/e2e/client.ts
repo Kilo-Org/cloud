@@ -246,6 +246,78 @@ export function getHostedWorkspace(
 
 export type { CloudAgentWorkspaceSummary };
 
+/**
+ * Passive, workspace-keyed status projection. Mirrors the fields the proof
+ * asserts; the full output schema is owned by
+ * `src/router/handlers/hosted-workspace-status.ts`.
+ */
+export type HostedWorkspaceStatus = {
+  workspaceId: string;
+  userId: string;
+  organizationId: string | null;
+  deletionState: 'active' | 'deleting' | 'deleted';
+  observedAt: number;
+  compute: {
+    status: string;
+    detailCode: string;
+    provider: string;
+    observedAt: number;
+    estimatedSleepAt: number | null;
+  };
+  activity: { activeSessionCount: number; hasActiveTurn: boolean };
+  wakeOnInput: {
+    available: boolean;
+    blockedReason: 'deleting' | 'deleted' | 'billing_blocked' | 'billing_status_unavailable' | null;
+  };
+  billing: {
+    payer: { type: 'user' | 'org'; id: string } | null;
+    actor: { type: 'user' | 'bot'; id: string } | null;
+    onBehalfOf: { type: 'user' | 'org'; id: string } | null;
+    sku: string | null;
+    blocked: boolean | null;
+    enforcementRequested: boolean;
+    intervalStartedAt: number | null;
+    rate: { rateCentsPerSecond: string; estimatedHourlyMicrodollars: number } | null;
+  };
+  deletion: {
+    started: boolean;
+    completed: boolean;
+    startedAt: number | null;
+    phase: 'not_started' | 'runtime_cleanup' | 'finalizing' | 'completed';
+    sessionCount: number;
+    runtimeLocationCount: number;
+    completedRuntimeLocationCount: number;
+    remainingRuntimeLocationCount: number;
+    deletedSessionIds: string[];
+  };
+};
+
+export function getHostedWorkspaceStatus(
+  config: DriverConfig,
+  input: { workspaceId: string; kilocodeOrganizationId?: string },
+  signal?: AbortSignal
+): Promise<HostedWorkspaceStatus> {
+  return trpcCall<HostedWorkspaceStatus>(config, 'getHostedWorkspaceStatus', input, {
+    method: 'GET',
+    signal,
+  });
+}
+
+/**
+ * Destroy one Cloud workspace and every remaining root through the journaled
+ * `deleteWorktree` operation. A completed workspace replays its tombstone.
+ */
+export function deleteWorktree(
+  config: DriverConfig,
+  input: { worktreeId: string; kilocodeOrganizationId?: string },
+  signal?: AbortSignal
+): Promise<{ success: true; deletedSessionIds: string[] }> {
+  return trpcCall<{ success: true; deletedSessionIds: string[] }>(config, 'deleteWorktree', input, {
+    internalApiSecret: config.internalApiSecret,
+    ...(signal ? { signal } : {}),
+  });
+}
+
 export type StartSessionResult = {
   cloudAgentSessionId: string;
   kiloSessionId: string;
@@ -522,9 +594,16 @@ export type HostedWorkspaceCreateResult = {
   replayed?: boolean;
 };
 
+export type HostedWorkspaceRepository =
+  | { type: 'github'; repo: string }
+  | { type: 'git'; url: string };
+
 /**
  * Create a hosted workspace and its first root session through the
  * `agent-manager` mutation. Requires an explicit, authorized Cloud profile.
+ *
+ * `repository` overrides the driver's repository so the proof can create a
+ * workspace for a second repository; omitted keeps the driver's repo.
  */
 export async function createHostedWorkspace(
   config: DriverConfig,
@@ -532,6 +611,7 @@ export async function createHostedWorkspace(
     operationKey?: string;
     profileId: string;
     prompt: string;
+    repository?: HostedWorkspaceRepository;
   },
   signal?: AbortSignal
 ): Promise<HostedWorkspaceCreateResult> {
@@ -541,9 +621,11 @@ export async function createHostedWorkspace(
     {
       operationKey: input.operationKey ?? randomUUID(),
       clientProvenance: 'agent-manager',
-      repository: config.githubRepo
-        ? { type: 'github', repo: config.githubRepo }
-        : { type: 'git', url: config.gitUrl },
+      repository:
+        input.repository ??
+        (config.githubRepo
+          ? { type: 'github', repo: config.githubRepo }
+          : { type: 'git', url: config.gitUrl }),
       profile: { id: input.profileId },
       message: { prompt: input.prompt },
       agent: { mode: 'code', model: config.model },

@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
-import { ai_gateway_config, type User } from '@kilocode/db/schema';
+import { ai_gateway_config, custom_llm2, type User } from '@kilocode/db/schema';
 import { AutoFreeConfigSchema, type AutoFreeConfig } from '@kilocode/db/schema-types';
 import { AUTO_FREE_FALLBACK_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
+import {
+  customLlmDefinition,
+  publicCustomLlmDefinition,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
+import { getCustomLlmsById } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 
 let admin: User;
 let nonAdmin: User;
@@ -149,4 +154,20 @@ describe('adminAutoFreeConfigRouter', () => {
       expect(await db.select().from(ai_gateway_config)).toEqual([]);
     }
   );
+  it('accepts a public custom LLM saved moments ago and rejects a private one', async () => {
+    const caller = await createCallerForUser(admin.id);
+    await getCustomLlmsById();
+    await db.insert(custom_llm2).values([
+      { public_id: 'acme/public-free', definition: publicCustomLlmDefinition(['acme']) },
+      { public_id: 'acme/private-free', definition: customLlmDefinition() },
+    ]);
+    const model = (id: string) => ({ model: id, weight: 1, reasoning: {} });
+
+    await expect(
+      caller.admin.autoFreeConfig.set({ config: { models: [model('acme/public-free')] } })
+    ).resolves.toMatchObject({ config: { models: [model('acme/public-free')] } });
+    await expect(
+      caller.admin.autoFreeConfig.set({ config: { models: [model('acme/private-free')] } })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
 });

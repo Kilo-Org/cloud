@@ -81,11 +81,14 @@ internal object ApprovalGate {
     (context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager).isDeviceLocked
 
   /**
-   * Run one answer as headless JS in a unique work order. `KEEP` means a double
-   * tap while one answer is in flight enqueues nothing, so the same ask cannot
-   * be answered twice.
+   * Run one answer as headless JS in a unique work order, named for the ask it
+   * answers (`workName`). `KEEP` means a double tap of that ask while its answer
+   * is in flight enqueues nothing, so it cannot be answered twice, while a
+   * different ask keeps its own order.
    */
   fun enqueue(context: Context, intent: Intent) {
+    val sessionId = intent.getStringExtra(ActiveAgentsApproveWorker.KEY_SESSION_ID)
+    val approvalKey = intent.getStringExtra(ActiveAgentsApproveWorker.KEY_APPROVAL_KEY)
     val request = OneTimeWorkRequest.Builder(ActiveAgentsApproveWorker::class.java)
       .setInputData(
         Data.Builder()
@@ -93,22 +96,37 @@ internal object ApprovalGate {
             ActiveAgentsApproveWorker.KEY_ACTION,
             ActiveAgentsActionReceiver.ACTION_APPROVE
           )
-          .putString(
-            ActiveAgentsApproveWorker.KEY_SESSION_ID,
-            intent.getStringExtra(ActiveAgentsApproveWorker.KEY_SESSION_ID)
-          )
-          .putString(
-            ActiveAgentsApproveWorker.KEY_APPROVAL_KEY,
-            intent.getStringExtra(ActiveAgentsApproveWorker.KEY_APPROVAL_KEY)
-          )
+          .putString(ActiveAgentsApproveWorker.KEY_SESSION_ID, sessionId)
+          .putString(ActiveAgentsApproveWorker.KEY_APPROVAL_KEY, approvalKey)
           .build()
       )
       .build()
     WorkManager.getInstance(context)
-      .enqueueUniqueWork(
-        ActiveAgentsApproveWorker.UNIQUE_WORK_NAME,
-        ExistingWorkPolicy.KEEP,
-        request
-      )
+      .enqueueUniqueWork(workName(sessionId, approvalKey), ExistingWorkPolicy.KEEP, request)
   }
+
+  /**
+   * The unique work name of the one ask this tap answers.
+   *
+   * A session card names its own session and the exact request it shows, so a
+   * repeat tap of that ask is the one `KEEP` suppresses, while a different ask —
+   * another session's, or a later request on the same session — gets its own
+   * order and is answered instead of being dropped while the first answer is
+   * still in flight. The approval key is the SHA-256 hex of the session and
+   * permission ids, so a length-prefixed pair is unique per ask and cannot be
+   * composed by two different pairs.
+   *
+   * The aggregate card records its ask in JS instead and passes neither extra,
+   * so it keeps the one name: a second aggregate tap during the answer is
+   * suppressed, which is the same rule for the ask that card shows.
+   */
+  private fun workName(sessionId: String?, approvalKey: String?): String {
+    if (sessionId == null || approvalKey == null) {
+      return ActiveAgentsApproveWorker.UNIQUE_WORK_NAME
+    }
+    return "$APPROVE_WORK_PREFIX${sessionId.length}:$sessionId$approvalKey"
+  }
+
+  /** Unique work per answered ask; see `workName`. */
+  private const val APPROVE_WORK_PREFIX = "active-agents-approve:"
 }

@@ -5,6 +5,7 @@ import {
 import { HOME_WIDGET_TITLE_LIMIT } from '@kilocode/app-shared/home-widget';
 import {
   isDefaultSessionTitle,
+  sessionLiveCut,
   sessionDisplayLine,
   sessionLiveText,
 } from '@kilocode/session-ingest-contracts';
@@ -35,10 +36,7 @@ export type SessionCardStatusKind = GlanceableStatusKind | 'failed';
 export function sessionLiveActivityTitle(raw: string | null | undefined): string | null {
   const title = sessionDisplayLine(raw ?? '').trim();
   if (title === '' || isDefaultSessionTitle(title)) return null;
-  const bounded = title.slice(0, HOME_WIDGET_TITLE_LIMIT);
-  // Do not end a truncated title in the middle of a UTF-16 surrogate pair.
-  const last = bounded.charCodeAt(bounded.length - 1);
-  return last >= 0xd800 && last <= 0xdbff ? bounded.slice(0, -1) : bounded;
+  return sessionLiveCut(title, HOME_WIDGET_TITLE_LIMIT);
 }
 
 /** The facts of one session row that the session card shows. */

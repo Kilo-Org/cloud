@@ -359,6 +359,11 @@ function compareEvidence(next: Evidence, previous: Evidence): number | null {
         const startedOrder = Date.parse(next.startedAt) - Date.parse(previous.startedAt);
         if (startedOrder !== 0) return startedOrder;
       }
+      if (
+        next.state === 'in_progress' &&
+        ['queued', 'waiting', 'requested', 'pending'].includes(previous.state)
+      )
+        return 1;
       if (next.state === 'queued' && previous.state !== 'queued' && !next.startedAt) return null;
       if (next.state === 'completed' && previous.state !== 'completed') return 1;
       if (previous.state === 'completed' && next.state !== 'completed') return -1;

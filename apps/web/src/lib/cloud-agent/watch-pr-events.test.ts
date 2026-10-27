@@ -435,6 +435,44 @@ describe('watch PR observation projection', () => {
     expect(project(current, check({ attempt: 1 }))).toBe(current);
   });
 
+  it.each(['queued', 'waiting', 'requested', 'pending'])(
+    'orders the same run from %s to in_progress even without timestamps',
+    state => {
+      const initial = project(
+        watch(),
+        check({ state, startedAt: null, updatedAt: null, conclusion: null })
+      );
+      const running = project(
+        initial,
+        check({ state: 'in_progress', startedAt: null, updatedAt: null, conclusion: null })
+      );
+      expect(projection(running)).toMatchObject({
+        ambiguous: false,
+        needsAttention: false,
+        evidence: [expect.objectContaining({ state: 'in_progress' })],
+      });
+    }
+  );
+
+  it('does not infer pre-start progression across different run identities without timestamps', () => {
+    const initial = project(
+      watch(),
+      check({ state: 'queued', startedAt: null, updatedAt: null, conclusion: null })
+    );
+    const uncertain = project(
+      initial,
+      check({
+        objectId: '11',
+        state: 'in_progress',
+        startedAt: null,
+        updatedAt: null,
+        conclusion: null,
+      })
+    );
+    expect(projection(uncertain)).toMatchObject({ ambiguous: true, needsAttention: true });
+    expect(projection(uncertain).evidence).toEqual(projection(initial).evidence);
+  });
+
   it('orders same-ID reruns by their start time before their completed state', () => {
     const failed = project(watch(), check());
     const running = project(

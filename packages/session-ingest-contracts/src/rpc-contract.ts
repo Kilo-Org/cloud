@@ -25,6 +25,7 @@ export const cloudAgentWorktreeDeletionManifestSchema = z
         })
         .strict()
     ),
+    completedRuntimeLocations: z.array(cloudAgentWorktreeLocationSchema).optional(),
   })
   .strict();
 export type CloudAgentWorktreeDeletionManifest = z.infer<
@@ -72,6 +73,7 @@ export const recordCloudAgentWorktreeCleanupSchema = cloudAgentWorktreeDeletionS
     runtimeLocations: z.array(cloudAgentWorktreeLocationSchema).optional(),
     directory: z.string().min(1).max(4096).optional(),
     sessionIds: z.array(sessionIdSchema).optional(),
+    completedRuntimeLocation: cloudAgentWorktreeLocationSchema.optional(),
     childSessions: z
       .array(
         cloudAgentChildSessionLineageSchema.extend({
@@ -576,6 +578,51 @@ export type CloudAgentWorkspacesPage = {
 };
 
 export type GetCloudAgentWorkspaceResult = CloudAgentWorkspaceSummary | null;
+
+export const getCloudAgentWorkspaceStatusSchema = z
+  .object({
+    kiloUserId: z.string().min(1),
+    workspaceId: cloudAgentWorktreeIdSchema,
+    authorizedWorkspace: z
+      .object({
+        userId: z.string().min(1),
+        organizationId: z.string().nullable(),
+        deletionState: z.enum(['active', 'deleting', 'deleted']),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+export type GetCloudAgentWorkspaceStatusParams = z.input<typeof getCloudAgentWorkspaceStatusSchema>;
+
+/**
+ * Passive, workspace-keyed lifecycle projection. Every value is read from
+ * stored catalog/journal rows or the non-idle stored turn status of a hosted
+ * root session; computing it allocates no compute, prepares no runtime and
+ * opens no billing interval.
+ */
+export type CloudAgentWorkspaceStatus = {
+  workspaceId: CloudAgentWorktreeId;
+  userId: string;
+  organizationId: string | null;
+  deletionState: 'active' | 'deleting' | 'deleted';
+  /** Hosted root or descendant sessions whose stored turn status is not idle. */
+  activeSessionCount: number;
+  deletion: {
+    started: boolean;
+    completed: boolean;
+    startedAt: number | null;
+    phase: 'not_started' | 'runtime_cleanup' | 'finalizing' | 'completed';
+    /** Sessions the journal manifest will remove, including descendants. */
+    sessionCount: number;
+    runtimeLocationCount: number;
+    completedRuntimeLocationCount: number;
+    remainingRuntimeLocationCount: number;
+    /** Populated only by a completed tombstone. */
+    deletedSessionIds: string[];
+  };
+};
+export type GetCloudAgentWorkspaceStatusResult = CloudAgentWorkspaceStatus | null;
 
 export const sdkApiErrorSchema = z.object({
   name: z.literal('APIError'),
@@ -1277,6 +1324,9 @@ export type SessionIngestRpcMethods = {
   getCloudAgentWorkspace: (
     params: GetCloudAgentWorkspaceParams
   ) => Promise<GetCloudAgentWorkspaceResult>;
+  getCloudAgentWorkspaceStatus: (
+    params: GetCloudAgentWorkspaceStatusParams
+  ) => Promise<GetCloudAgentWorkspaceStatusResult>;
   getCloudAgentRootSessionMessages: (
     params: GetCloudAgentRootSessionMessagesParams
   ) => Promise<GetCloudAgentRootSessionMessagesResult>;

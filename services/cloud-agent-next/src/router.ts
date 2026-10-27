@@ -23,6 +23,7 @@ import {
   getHostedWorkspace,
   listHostedWorkspaces,
 } from './router/handlers/hosted-workspace-list.js';
+import { getHostedWorkspaceStatus } from './router/handlers/hosted-workspace-status.js';
 import {
   buildEnvironment,
   cancelEnvironmentBuild,
@@ -38,6 +39,7 @@ export const appRouter = router({
   listHostedSessions,
   listHostedWorkspaces,
   getHostedWorkspace,
+  getHostedWorkspaceStatus,
   buildEnvironment,
   getEnvironmentBuildStatus,
   getEnvironmentBuildLogs,

@@ -630,9 +630,12 @@ export async function runHostedWorkspaceContract(
     evidence.push('catalog3to2to1=true', 'finalRootRejected=true');
 
     // 6. Passive reads must not wake the idle-stopped workspace.
-    const idleDeadline = warmStatus.compute.estimatedSleepAt;
-    if (idleDeadline === null) throw new Error('warm status lost its idle-stop deadline');
+    const idleDeadline = afterChildDeletes.compute.estimatedSleepAt;
+    if (idleDeadline === null) throw new Error('post-activity status lost its idle-stop deadline');
     const baselineAt = Date.now();
+    if (idleDeadline <= baselineAt) {
+      throw new Error('post-activity idle-stop deadline expired before observation started');
+    }
     if (idleDeadline > observationEndFor(baselineAt)) {
       throw new Error(
         `idle deadline ${idleDeadline} is beyond the ${IDLE_OBSERVATION_BUDGET_MS}ms observation budget`
@@ -671,7 +674,7 @@ export async function runHostedWorkspaceContract(
       );
     }
     const observedIdleDeadline = idleDeadline - baselineAt;
-    if (observedIdleDeadline > 0 && absentAt + IDLE_SLEEP_GRACE_MS < observedIdleDeadline) {
+    if (absentAt + IDLE_SLEEP_GRACE_MS < observedIdleDeadline) {
       throw new Error(
         `workspace stopped ${observedIdleDeadline - absentAt}ms before the idle deadline reported by status`
       );

@@ -166,10 +166,17 @@ describe('hosted workspace contract fixture', () => {
   it('covers every registered workspace procedure exactly once', async () => {
     const { fixture } = await loadFixture();
     const expected = Object.keys(fixture.procedures).sort();
+    const registered = Object.entries(appRouter._def.procedures)
+      .filter(([name]) => name.includes('HostedWorkspace') || name === 'deleteWorktree')
+      .map(([name]) => name)
+      .sort();
+    expect(registered).toEqual(expected);
     expect([...fixture.requests.map(entry => entry.procedure)].sort()).toEqual(expected);
     expect([...fixture.responses.map(entry => entry.procedure)].sort()).toEqual(expected);
     for (const name of expected) {
-      expect(appRouter[name as keyof typeof appRouter], `${name} must be registered`).toBeDefined();
+      const procedure = appRouter._def.procedures[name];
+      expect(procedure, `${name} must be registered`).toBeDefined();
+      expect(procedure?._def.type, `${name} procedure kind drift`).toBe(fixture.procedures[name]);
     }
   });
 

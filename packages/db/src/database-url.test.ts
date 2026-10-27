@@ -113,7 +113,7 @@ describe('getDatabaseClientConfig', () => {
       expect(config.ssl).toBe(false);
     });
 
-    it('does not treat Object.prototype keys as modes', () => {
+    it('accepts only the documented mode values', () => {
       expect(() =>
         getDatabaseClientConfig(
           'postgres://user:secret@db.example.com:5432/mydb?sslmode=constructor'
@@ -129,7 +129,7 @@ describe('getDatabaseClientConfig', () => {
       expect(config.ssl).toEqual({ rejectUnauthorized: false });
     });
 
-    it('fails startup on an unrecognized sslmode instead of guessing', () => {
+    it('rejects an unrecognized sslmode value', () => {
       expect(() =>
         getDatabaseClientConfig(
           'postgres://user:secret@db.example.com:5432/mydb?sslmode=re escalat'

@@ -68,8 +68,9 @@ const VERIFY_CERTIFICATE_BY_SSLMODE: Record<string, boolean> = {
 
 /**
  * `DATABASE_CA` is unset, so the connection string itself decides whether TLS is
- * used. Encrypted transport without a certificate check still defeats passive
- * eavesdropping; certificate verification relies on the Node system trust store.
+ * used. `require`, `prefer` and `no-verify` encrypt the session; `verify-ca` and
+ * `verify-full` also check the server certificate against the Node system trust
+ * store.
  */
 function resolveSslFromSslmode(databaseUrl: URL): ClientConfig['ssl'] {
   const sslmode = databaseUrl.searchParams.get('sslmode')?.trim().toLowerCase();

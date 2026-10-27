@@ -25,6 +25,7 @@ export type SessionRepositoryRequest =
       repo: string;
       githubIntegrationId?: string;
       githubAccessPurpose?: 'workflow' | 'agent';
+      allowUserAuthorization?: boolean;
       pullRequestNumber?: number;
       branch?: string;
     }

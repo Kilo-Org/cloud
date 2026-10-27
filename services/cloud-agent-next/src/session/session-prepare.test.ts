@@ -7096,4 +7096,22 @@ describe('prepareInputToSessionCreateRequest clone mapping', () => {
 
     expect(request.runtime).toEqual({ sandboxAllocation: 'isolated-standard' });
   });
+
+  it('maps allowUserAuthorization into the GitHub repository', () => {
+    const request = prepareInputToSessionCreateRequest({
+      prompt: 'Continue',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      allowUserAuthorization: true,
+      shallow: false,
+      devcontainer: false,
+    });
+
+    expect(request.repository).toMatchObject({
+      type: 'github',
+      repo: 'acme/repo',
+      allowUserAuthorization: true,
+    });
+  });
 });

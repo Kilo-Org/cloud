@@ -776,6 +776,7 @@ function assertRegisteredMetadata(
     (source.repository.type === 'github' &&
       (metadata.repository.type !== 'github' ||
         metadata.repository.githubIntegrationId !== source.repository.githubIntegrationId ||
+        metadata.repository.allowUserAuthorization !== source.repository.allowUserAuthorization ||
         (metadata.repository.githubAccessPurpose ?? 'workflow') !==
           (source.repository.githubAccessPurpose ?? 'workflow'))) ||
     metadata.repository.upstreamBranch !== source.repository.upstreamBranch

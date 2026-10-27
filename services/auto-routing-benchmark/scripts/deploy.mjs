@@ -298,8 +298,12 @@ async function deploy() {
     await runWrangler(['deploy'], deployTimeoutMs);
     report('completed');
     phase = 'verify';
+    // A renewal that started during deploy already observed the pre-completion
+    // lock. Wait it out, then read again so a pause change at the end of deploy
+    // is not hidden by that in-flight check.
+    await renewal?.catch(() => {});
     try {
-      await renew();
+      await renewOnce();
     } catch {
       failure = new DeploymentError(
         pauseToken === undefined

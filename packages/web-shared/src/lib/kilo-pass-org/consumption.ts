@@ -19,7 +19,7 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { recordRefundDebtRepayment } from '@kilocode/db/credit-refund-repayments';
 
-export type OrganizationConsumptionSource = 'ai-gateway' | 'exa';
+export type OrganizationConsumptionSource = 'ai-gateway' | 'exa' | 'enkrypt-guardrails';
 
 export type RecordOrganizationConsumptionInput = {
   organizationId: string;

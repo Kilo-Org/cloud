@@ -138,7 +138,14 @@ import {
   dataCollectionRequiredAutoRoutingCandidates,
   deniedAutoRoutingCandidates,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models';
-import { AUTO_ROUTING_DECISION_SECRET } from '@kilocode/web-shared/lib/config.server';
+import {
+  AUTO_ROUTING_DECISION_SECRET,
+  ENKRYPT_GUARDRAILS_API_KEY,
+} from '@kilocode/web-shared/lib/config.server';
+import {
+  runEnkryptShadowScan,
+  shouldRunEnkryptShadowScan,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrails/shadow-scan';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
@@ -1161,7 +1168,48 @@ export async function handleLlmProxyRequest(
 
   const clonedReponse = response.clone(); // reading from body is side-effectful
 
-  const accounting = accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
+  const { settings: organizationSettings, balance: organizationBalance } =
+    await balanceAndSettingsPromise;
+  const enkryptUsageStats =
+    !isAnonymousContext(user) &&
+    shouldRunEnkryptShadowScan({
+      apiKey: ENKRYPT_GUARDRAILS_API_KEY,
+      organizationId,
+      settings: organizationSettings,
+      balance: organizationBalance,
+      responseStatus: response.status,
+    })
+      ? Promise.withResolvers<MicrodollarUsageStats | null>()
+      : null;
+
+  const accounting = accountForMicrodollarUsage(
+    clonedReponse,
+    usageContext,
+    openrouterRequestSpan,
+    enkryptUsageStats?.resolve
+  );
+  if (enkryptUsageStats && organizationId && ENKRYPT_GUARDRAILS_API_KEY) {
+    const accountingSettled = accounting.then(
+      () => null,
+      () => null
+    );
+    after(
+      runEnkryptShadowScan({
+        apiKey: ENKRYPT_GUARDRAILS_API_KEY,
+        organizationId,
+        kiloUserId: user.id,
+        requestId: bouncerRequestId,
+        apiKind: requestBodyParsed.kind,
+        model: effectiveModelIdLowerCased,
+        requestBodyText,
+        usageStats: Promise.race([enkryptUsageStats.promise, accountingSettled]),
+        usageId: accounting.then(
+          result => result?.usageId ?? null,
+          () => null
+        ),
+      })
+    );
+  }
   const settlementToken = request.headers.get(BRIEFING_SETTLEMENT_HEADER);
   if (
     settlementToken &&

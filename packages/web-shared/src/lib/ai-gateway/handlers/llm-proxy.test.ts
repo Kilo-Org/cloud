@@ -78,6 +78,9 @@ import {
   isCustomLlm,
   type CustomLlm,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { runEnkryptShadowScan } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrails/shadow-scan';
+import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
+import type { MicrodollarUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { after, NextRequest, NextResponse } from 'next/server';
 import { handleLlmProxyRequest } from './llm-proxy';
 
@@ -201,11 +204,21 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-routers', () => ({
   findEffectiveLegacyPoolRouter: jest.fn().mockResolvedValue(null),
 }));
 let mockDecisionSecret = 'test-decision-secret';
+let mockEnkryptGuardrailsApiKey: string | undefined;
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   ...jest.requireActual<Record<string, unknown>>('@kilocode/web-shared/lib/config.server'),
   get AUTO_ROUTING_DECISION_SECRET() {
     return mockDecisionSecret;
   },
+  get ENKRYPT_GUARDRAILS_API_KEY() {
+    return mockEnkryptGuardrailsApiKey;
+  },
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrails/shadow-scan', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrails/shadow-scan'
+  ),
+  runEnkryptShadowScan: jest.fn(async () => undefined),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/processUsage', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/ai-gateway/processUsage');
@@ -531,7 +544,8 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
         user_byok: true,
         is_free: false,
       }),
-      expect.anything()
+      expect.anything(),
+      undefined
     );
   });
 
@@ -3399,5 +3413,129 @@ describe('briefing gateway accounting receipts', () => {
     expect(response.status).toBe(200);
     await finishAfterTasks();
     expect(await persistedSummary(prepared.report.id)).toEqual(prepared.report.summary);
+  });
+});
+
+describe('Enkrypt shadow guardrail scanning', () => {
+  const mockedRunEnkryptShadowScan = jest.mocked(runEnkryptShadowScan);
+  const upstreamBody = { id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] };
+
+  function setOrganizationAuth(organizationId: string, enabled: boolean, balance = 1_000) {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-123', google_user_email: 'test@example.com', microdollars_used: 0 } as User,
+      authFailedResponse: null,
+      organizationId,
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance,
+      settings: { enkrypt_shadow_guardrails_enabled: enabled },
+      plan: 'enterprise',
+    });
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockEnkryptGuardrailsApiKey = 'enkrypt-test-key';
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider,
+      userByok: null,
+      isFree: false,
+      bypassAccessCheck: false,
+    });
+    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedIsValidOpenRouterModelId.mockResolvedValue(true);
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'success',
+      response: upstreamJsonResponse(upstreamBody),
+    });
+    mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
+    mockedAccountForMicrodollarUsage.mockResolvedValue({
+      status: 'queued',
+      usageId: 'usage-123',
+      createdAt: new Date().toISOString(),
+    });
+  });
+
+  afterAll(() => {
+    mockEnkryptGuardrailsApiKey = undefined;
+  });
+
+  it('schedules a scan after the response for an allowlisted organization that enabled it', async () => {
+    setOrganizationAuth(KILO_ORGANIZATION_ID, true);
+    const accounting = Promise.withResolvers<UsageAccountingResult | null>();
+    mockedAccountForMicrodollarUsage.mockReturnValueOnce(accounting.promise);
+    const body = makeBody();
+
+    const response = await handleLlmProxyRequest(makeRequest(body));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(upstreamBody);
+    expect(mockedRunEnkryptShadowScan).toHaveBeenCalledTimes(1);
+    const params = mockedRunEnkryptShadowScan.mock.calls[0]?.[0];
+    expect(params).toMatchObject({
+      apiKey: 'enkrypt-test-key',
+      organizationId: KILO_ORGANIZATION_ID,
+      kiloUserId: 'user-123',
+      apiKind: 'chat_completions',
+      model: 'openai/gpt-4o',
+      requestBodyText: JSON.stringify(body),
+    });
+    expect(jest.mocked(after)).toHaveBeenCalledWith(
+      mockedRunEnkryptShadowScan.mock.results[0]?.value
+    );
+
+    const resolveUsageStats = mockedAccountForMicrodollarUsage.mock.calls[0]?.[3];
+    expect(resolveUsageStats).toEqual(expect.any(Function));
+    const stats = { responseContent: 'hi' } as MicrodollarUsageStats;
+    resolveUsageStats?.(stats);
+    await expect(params?.usageStats).resolves.toBe(stats);
+    accounting.resolve({ status: 'queued', usageId: 'usage-123', createdAt: 'now' });
+    await expect(params?.usageId).resolves.toBe('usage-123');
+  });
+
+  it('does not wait forever for usage stats when accounting never reports them', async () => {
+    setOrganizationAuth(KILO_ORGANIZATION_ID, true);
+
+    await handleLlmProxyRequest(makeRequest(makeBody()));
+
+    await expect(mockedRunEnkryptShadowScan.mock.calls[0]?.[0].usageStats).resolves.toBeNull();
+  });
+
+  it('never scans an organization outside the allowlist, even with the flag set', async () => {
+    setOrganizationAuth(randomUUID(), true);
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+    expect(response.status).toBe(200);
+    expect(mockedRunEnkryptShadowScan).not.toHaveBeenCalled();
+    expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[3]).toBeUndefined();
+  });
+
+  it.each([
+    ['the setting is off', () => setOrganizationAuth(KILO_ORGANIZATION_ID, false)],
+    [
+      'the API key is unset',
+      () => {
+        mockEnkryptGuardrailsApiKey = undefined;
+        setOrganizationAuth(KILO_ORGANIZATION_ID, true);
+      },
+    ],
+    [
+      'the upstream request failed',
+      () => {
+        setOrganizationAuth(KILO_ORGANIZATION_ID, true);
+        mockedUpstreamRequest.mockResolvedValue({
+          type: 'success',
+          response: upstreamJsonResponse({ error: 'bad' }, 400),
+        });
+      },
+    ],
+  ])('does not scan when %s', async (_label, arrange) => {
+    arrange();
+
+    await handleLlmProxyRequest(makeRequest(makeBody()));
+
+    expect(mockedRunEnkryptShadowScan).not.toHaveBeenCalled();
   });
 });

@@ -3,6 +3,7 @@ import {
   organizations,
   microdollar_usage,
   exa_usage_log,
+  enkrypt_guardrail_scan_log,
 } from '@kilocode/db/schema';
 import { recomputeOrganizationBalances } from './recomputeOrganizationBalances';
 import { db } from '@kilocode/web-shared/lib/drizzle';
@@ -40,6 +41,9 @@ describe('recomputeOrganizationBalances', () => {
         .where(eq(creditTransactionsTable.organization_id, orgId));
       await db.delete(microdollar_usage).where(eq(microdollar_usage.organization_id, orgId));
       await db.delete(exa_usage_log).where(eq(exa_usage_log.organization_id, orgId));
+      await db
+        .delete(enkrypt_guardrail_scan_log)
+        .where(eq(enkrypt_guardrail_scan_log.organization_id, orgId));
       await db.delete(organizations).where(eq(organizations.id, orgId));
     }
   });
@@ -364,5 +368,48 @@ describe('recomputeOrganizationBalances', () => {
     });
     // Recomputed microdollars_used should be LLM ($2) + Exa ($3) = $5
     expect(updatedOrg!.microdollars_used).toBe(5_000_000);
+  });
+
+  it('includes charged Enkrypt guardrail scans in recomputed microdollars_used', async () => {
+    const org = await createTestOrg(ownerId, {
+      total_microdollars_acquired: 100_000_000,
+      microdollars_used: 1_500,
+      microdollars_balance: 99_998_500,
+    });
+    orgId = org.id;
+
+    await db.insert(creditTransactionsTable).values({
+      kilo_user_id: ownerId,
+      organization_id: orgId,
+      amount_microdollars: 100_000_000,
+      is_free: true,
+      original_baseline_microdollars_used: 0,
+      description: 'Grant',
+      created_at: '2024-01-01T00:00:00Z',
+    });
+
+    const scan = {
+      organization_id: orgId,
+      kilo_user_id: ownerId,
+      request_id: randomUUID(),
+      api_kind: 'chat_completions',
+      model: 'anthropic/claude-sonnet-4',
+      text_chars: 10,
+      truncated: false,
+    };
+    await db.insert(enkrypt_guardrail_scan_log).values([
+      { ...scan, direction: 'input', cost_microdollars: 1_000, charged_to_balance: true },
+      { ...scan, direction: 'output', cost_microdollars: 500, charged_to_balance: true },
+      { ...scan, direction: 'input', cost_microdollars: 0, error: 'http_402' },
+    ]);
+
+    const result = await recomputeOrganizationBalances({ organizationId: orgId });
+    expect(result.success).toBe(true);
+
+    const updatedOrg = await db.query.organizations.findFirst({
+      where: eq(organizations.id, orgId),
+    });
+    expect(updatedOrg!.microdollars_used).toBe(1_500);
+    expect(result.success && result.accounting_error_mUsd).toBe(0);
   });
 });

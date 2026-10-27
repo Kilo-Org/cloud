@@ -18,6 +18,7 @@ import {
   microdollar_usage,
   exa_usage_log,
   compute_usage_charge,
+  enkrypt_guardrail_scan_log,
   type Organization,
 } from '@kilocode/db/schema';
 import { eq, and, asc, gt } from 'drizzle-orm';
@@ -99,7 +100,22 @@ export async function recomputeOrganizationBalances(args: {
     )
     .orderBy(asc(compute_usage_charge.created_at));
 
-  const usageRecords = mergeSortedByCreatedAt(llmUsage, exaUsage, computeUsage);
+  const guardrailUsage = await db
+    .select({
+      cost: enkrypt_guardrail_scan_log.cost_microdollars,
+      created_at: enkrypt_guardrail_scan_log.created_at,
+    })
+    .from(enkrypt_guardrail_scan_log)
+    .where(
+      and(
+        eq(enkrypt_guardrail_scan_log.organization_id, args.organizationId),
+        eq(enkrypt_guardrail_scan_log.charged_to_balance, true),
+        gt(enkrypt_guardrail_scan_log.cost_microdollars, 0)
+      )
+    )
+    .orderBy(asc(enkrypt_guardrail_scan_log.created_at));
+
+  const usageRecords = mergeSortedByCreatedAt(llmUsage, exaUsage, computeUsage, guardrailUsage);
 
   // Fetch all credit transactions for this org
   const creditTransactions = await db
@@ -139,7 +155,7 @@ export async function recomputeOrganizationBalances(args: {
       .map(t => t.id)
   );
   // Compute total usage AND original baselines in a single pass.
-  // usageRecords contains LLM, Exa, and metered-compute charges, merge-sorted
+  // usageRecords contains LLM, Exa, metered-compute, and guardrail-scan charges, merge-sorted
   // by created_at, so baselines are computed at the correct points in time.
   const computedOriginalBaselines = new Map<string, number>();
   let usageIdx = 0;

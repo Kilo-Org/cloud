@@ -6,6 +6,11 @@ const config = fileURLToPath(new URL('../wrangler.jsonc', import.meta.url).href)
 
 it('keeps production receipt-only with its original queue policy', () => {
   const production = unstable_readConfig({ config });
+  expect(production.services).toEqual([]);
+  expect(production.queues.producers).toEqual([
+    { binding: 'USAGE_INGEST_QUEUE', queue: 'usage-ingest-processing' },
+    { binding: 'USAGE_INGEST_DLQ', queue: 'usage-ingest-processing-dlq' },
+  ]);
   expect(production.vars.USAGE_INGEST_MODE).toBe('receipt');
   expect(production.vars.USAGE_INGEST_PARALLELISM).toBeUndefined();
   expect(production.vars.USAGE_INGEST_DIAGNOSTICS).toBeUndefined();
@@ -24,6 +29,14 @@ it('keeps production receipt-only with its original queue policy', () => {
 
 it('keeps staging on one EU queue with at most 400 concurrent writer calls', () => {
   const staging = unstable_readConfig({ config, env: 'staging' });
+  expect(staging.services).toEqual([]);
+  expect(staging.vars.USAGE_WRITER_URL).toBe(
+    'https://staging-app.kilo.ai/api/internal/usage/record'
+  );
+  expect(staging.queues.producers).toEqual([
+    { binding: 'USAGE_INGEST_QUEUE', queue: 'usage-ingest-processing-staging-eu' },
+    { binding: 'USAGE_INGEST_DLQ', queue: 'usage-ingest-processing-dlq-staging-eu' },
+  ]);
   expect(staging.vars.USAGE_INGEST_MODE).toBe('processing');
   expect(staging.vars.USAGE_INGEST_PARALLELISM).toBe('2');
   expect(staging.vars.USAGE_INGEST_DIAGNOSTICS).toBe('all');

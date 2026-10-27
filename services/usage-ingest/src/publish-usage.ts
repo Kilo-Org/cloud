@@ -12,8 +12,6 @@ export type Env = Omit<
   | 'USAGE_INGEST_PARALLELISM'
 > & {
   USAGE_INGEST_QUEUE: Queue<UsageRecordRequest>;
-  // Optional for the retained relay path; normal deployments use direct HTTP.
-  USAGE_WRITER_RELAY?: Fetcher;
   USAGE_INGEST_PUBLISH_SECRET?: string;
   USAGE_INGEST_MODE?: string;
   USAGE_INGEST_PARALLELISM?: string;

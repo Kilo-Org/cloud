@@ -169,6 +169,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
+      deploy-cloud-agent-after-session-ingest: ${{ steps.set-matrix.outputs.deploy-cloud-agent-after-session-ingest }}
     steps:
       - name: Checkout code
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
@@ -321,6 +322,23 @@ jobs:
             fi
           done
 
+          DEPLOY_CLOUD_AGENT_AFTER_SESSION_INGEST=false
+          if [ "$TARGET_ENVIRONMENT" = production ] && [ "$NARROW" = true ] \
+            && grep -Fxq services/session-ingest <<< "$AFFECTED_DIRS" \
+            && grep -Fxq services/cloud-agent-next <<< "$AFFECTED_DIRS"; then
+            DEPLOY_CLOUD_AGENT_AFTER_SESSION_INGEST=true
+          fi
+          echo "deploy-cloud-agent-after-session-ingest=$DEPLOY_CLOUD_AGENT_AFTER_SESSION_INGEST" >> "$GITHUB_OUTPUT"
+
+          FILTERED=()
+          for dir in "${CHANGED[@]}"; do
+            if [ "$DEPLOY_CLOUD_AGENT_AFTER_SESSION_INGEST" != true ] \
+              || [ "$dir" != services/cloud-agent-next ]; then
+              FILTERED+=("$dir")
+            fi
+          done
+          CHANGED=("${FILTERED[@]}")
+
           if [ ${#CHANGED[@]} -eq 0 ]; then
             echo "matrix=[]" >> "$GITHUB_OUTPUT"
           else
@@ -453,3 +471,84 @@ jobs:
           preCommands: |
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
           command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ steps.usage_relay.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
+
+  deploy-cloud-agent-after-session-ingest:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.deploy-cloud-agent-after-session-ingest == 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 100
+    environment: ${{ inputs.target_environment }}
+    name: Deploy cloud-agent-next after session-ingest
+    steps:
+      - name: Checkout code
+        uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'pnpm'
+
+      - name: Wait for session-ingest deployment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in $(seq 1 120); do
+            conclusion=$(gh api \
+              "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100" \
+              --jq '.jobs[] | select(.name == "Deploy services/session-ingest") | (.conclusion // .status)' \
+              | head -n 1)
+            if [ "$conclusion" = success ]; then exit 0; fi
+            if [ "$conclusion" = failure ] || [ "$conclusion" = cancelled ]; then exit 1; fi
+            sleep 5
+          done
+          exit 1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: 1.4.4
+
+      - name: Install cloud-agent-next dependencies
+        working-directory: services/cloud-agent-next
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare downloaded Cloud Agent runtime
+        id: runtime
+        working-directory: services/cloud-agent-next
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+          RUNTIME_R2_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
+          RUNTIME_R2_BUCKET: ${{ vars.CLOUD_AGENT_RUNTIME_BUCKET }}
+          RUNTIME_PUBLICATION_ENABLED: ${{ vars.CLOUD_AGENT_RUNTIME_PUBLICATION_ENABLED }}
+          RUNTIME_R2_ACCESS_KEY_ID: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_READ_ACCESS_KEY_ID }}
+          RUNTIME_R2_SECRET_ACCESS_KEY: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_READ_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -f scripts/prepare-runtime-deploy.ts ] || [ -f runtime-targets.json ]; then
+            pnpm exec tsx scripts/prepare-runtime-deploy.ts "$TARGET_ENVIRONMENT" "$SOURCE_SHA"
+          fi
+
+      - name: Deploy cloud-agent-next
+        id: deploy-cloud-agent
+        continue-on-error: true
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: services/cloud-agent-next
+          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }}
+
+      - name: Deploy cloud-agent-next (retry)
+        if: steps.deploy-cloud-agent.outcome == 'failure'
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: services/cloud-agent-next
+          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }}

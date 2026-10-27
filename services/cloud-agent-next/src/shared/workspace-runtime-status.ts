@@ -14,7 +14,7 @@ export type WorkspaceBillingProjection = {
   onBehalfOf: WorkspaceBillingPayer | null;
   /** The workspace's one metered SKU, or null when the provider has none. */
   sku: string | null;
-  blocked: boolean;
+  blocked: boolean | null;
   enforcementRequested: boolean;
   /** Start of the currently open metered interval, if any. */
   intervalStartedAt: number | null;

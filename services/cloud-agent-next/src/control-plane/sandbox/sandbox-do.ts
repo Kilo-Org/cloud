@@ -838,29 +838,21 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return this.enqueue(async () => {
       const pin = this.providerPin;
       if (pin === null) return null;
-      const state = await this.readAllocation();
       let projection: Awaited<ReturnType<NonNullable<ProviderAdapter['getBillingProjection']>>>;
       try {
-        projection = await this.provider.getBillingProjection?.(state.providerRef);
+        projection = await this.provider.getBillingProjection?.();
       } catch {
         projection = undefined;
       }
       const context = projection?.context;
-      let blocked = projection?.blocked ?? false;
-      if (projection === undefined) {
-        try {
-          blocked = (await this.provider.isBillingBlocked?.(state.providerRef)) ?? false;
-        } catch {
-          blocked = false;
-        }
-      }
+      const enforcementRequested = pin.billing?.enforcementRequested === true;
       return {
         payer: context?.subject ?? pin.billing?.subject ?? null,
         actor: context?.actor ?? pin.billing?.actor ?? null,
         onBehalfOf: context?.onBehalfOf ?? pin.billing?.onBehalfOf ?? null,
         sku: projection === undefined ? null : SANDBOX_USAGE_SKUS[projection.sandboxClassName],
-        blocked,
-        enforcementRequested: pin.billing?.enforcementRequested === true,
+        blocked: projection?.blocked ?? (enforcementRequested ? null : false),
+        enforcementRequested,
         intervalStartedAt: context?.startEpochMs ?? null,
         meterInstanceId: pin.billing?.sandboxId ?? null,
       };
@@ -5138,6 +5130,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       case 'cloudflare':
         return createCloudflareProviderAdapter({
           sandboxId: allocationName,
+          billingContainment: this.credentialContainmentEnabled(),
           getSandbox: (id, options) =>
             getSandbox(this.sandboxNamespace(pin, id, options.containment), id),
           destroy: (id, options) =>

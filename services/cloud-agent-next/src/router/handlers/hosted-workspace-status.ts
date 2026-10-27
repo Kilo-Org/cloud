@@ -49,14 +49,16 @@ export const getHostedWorkspaceStatusOutput = z
     compute: hostedWorkspaceComputeSchema,
     activity: z
       .object({
-        activeRootSessionCount: z.number().int().nonnegative(),
+        activeSessionCount: z.number().int().nonnegative(),
         hasActiveTurn: z.boolean(),
       })
       .strict(),
     wakeOnInput: z
       .object({
         available: z.boolean(),
-        blockedReason: z.enum(['deleting', 'deleted', 'billing_blocked']).nullable(),
+        blockedReason: z
+          .enum(['deleting', 'deleted', 'billing_blocked', 'billing_status_unavailable'])
+          .nullable(),
       })
       .strict(),
     billing: z
@@ -65,7 +67,7 @@ export const getHostedWorkspaceStatusOutput = z
         actor: workspaceActorSchema.nullable(),
         onBehalfOf: workspacePayerSchema.nullable(),
         sku: z.string().min(1).max(128).nullable(),
-        blocked: z.boolean(),
+        blocked: z.boolean().nullable(),
         enforcementRequested: z.boolean(),
         intervalStartedAt: z.number().int().nonnegative().nullable(),
         rate: z
@@ -82,8 +84,11 @@ export const getHostedWorkspaceStatusOutput = z
         started: z.boolean(),
         completed: z.boolean(),
         startedAt: z.number().int().nonnegative().nullable(),
+        phase: z.enum(['not_started', 'runtime_cleanup', 'finalizing', 'completed']),
         sessionCount: z.number().int().nonnegative(),
         runtimeLocationCount: z.number().int().nonnegative(),
+        completedRuntimeLocationCount: z.number().int().nonnegative(),
+        remainingRuntimeLocationCount: z.number().int().nonnegative(),
         deletedSessionIds: z.array(z.string().min(1)),
       })
       .strict(),
@@ -150,7 +155,9 @@ export const getHostedWorkspaceStatus = protectedProcedure
 
     const runtime =
       status.deletionState === 'deleted' ? null : await readWorkspaceRuntime(ctx, workspace);
-    const blocked = runtime?.billing?.blocked === true;
+    const billingBlocked = runtime?.billing?.blocked ?? null;
+    const billingStatusUnavailable =
+      runtime?.billing?.enforcementRequested === true && billingBlocked === null;
     const deleted = status.deletionState === 'deleted';
     const deleting = status.deletionState === 'deleting';
     return getHostedWorkspaceStatusOutput.parse({
@@ -161,18 +168,20 @@ export const getHostedWorkspaceStatus = protectedProcedure
       observedAt: Date.now(),
       compute: projectCompute(runtime?.sandbox ?? null),
       activity: {
-        activeRootSessionCount: status.activeRootSessionCount,
-        hasActiveTurn: status.activeRootSessionCount > 0,
+        activeSessionCount: status.activeSessionCount,
+        hasActiveTurn: status.activeSessionCount > 0,
       },
       wakeOnInput: {
-        available: !deleted && !deleting && !blocked,
+        available: !deleted && !deleting && billingBlocked !== true && !billingStatusUnavailable,
         blockedReason: deleted
           ? 'deleted'
           : deleting
             ? 'deleting'
-            : blocked
+            : billingBlocked === true
               ? 'billing_blocked'
-              : null,
+              : billingStatusUnavailable
+                ? 'billing_status_unavailable'
+                : null,
       },
       billing: await projectBilling(ctx, runtime),
       deletion: status.deletion,
@@ -239,7 +248,7 @@ async function projectBilling(
     actor: billing?.actor ?? null,
     onBehalfOf: billing?.onBehalfOf ?? null,
     sku: resolved?.sku ?? null,
-    blocked: billing?.blocked === true,
+    blocked: billing?.blocked ?? null,
     enforcementRequested: billing?.enforcementRequested === true,
     intervalStartedAt: billing?.intervalStartedAt ?? null,
     rate: resolved?.rate ?? null,

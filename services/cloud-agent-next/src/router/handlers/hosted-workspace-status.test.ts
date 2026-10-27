@@ -72,13 +72,16 @@ function status(overrides: Record<string, unknown> = {}) {
     userId,
     organizationId: null,
     deletionState: 'active' as const,
-    activeRootSessionCount: 1,
+    activeSessionCount: 1,
     deletion: {
       started: false,
       completed: false,
       startedAt: null,
+      phase: 'not_started',
       sessionCount: 1,
       runtimeLocationCount: 0,
+      completedRuntimeLocationCount: 0,
+      remainingRuntimeLocationCount: 0,
       deletedSessionIds: [],
     },
     ...overrides,
@@ -181,7 +184,7 @@ describe('getHostedWorkspaceStatus', () => {
         detailCode: 'sandbox_stopped',
         provider: 'Cloudflare Containers',
       },
-      activity: { activeRootSessionCount: 1, hasActiveTurn: true },
+      activity: { activeSessionCount: 1, hasActiveTurn: true },
       wakeOnInput: { available: true, blockedReason: null },
       billing: {
         payer: { type: 'user', id: userId },
@@ -263,6 +266,30 @@ describe('getHostedWorkspaceStatus', () => {
     expect(test.prepare).not.toHaveBeenCalled();
   });
 
+  it('fails closed when enforced billing state cannot be read', async () => {
+    const test = fixture({
+      runtime: {
+        sandbox: sleepSnapshot,
+        billing: {
+          payer: { type: 'user', id: userId },
+          actor: { type: 'user', id: userId },
+          onBehalfOf: null,
+          sku: null,
+          blocked: null,
+          enforcementRequested: true,
+          intervalStartedAt: null,
+          meterInstanceId: 'sbx-meter',
+        },
+      },
+      rate: null,
+    });
+
+    await expect(test.caller.getHostedWorkspaceStatus({ workspaceId })).resolves.toMatchObject({
+      wakeOnInput: { available: false, blockedReason: 'billing_status_unavailable' },
+      billing: { blocked: null, enforcementRequested: true },
+    });
+  });
+
   it('reports an in-flight deletion as wake-unavailable with journal progress', async () => {
     const test = fixture({
       status: status({
@@ -271,8 +298,11 @@ describe('getHostedWorkspaceStatus', () => {
           started: true,
           completed: false,
           startedAt: 1_760_000_003_000,
+          phase: 'runtime_cleanup',
           sessionCount: 4,
           runtimeLocationCount: 1,
+          completedRuntimeLocationCount: 0,
+          remainingRuntimeLocationCount: 1,
           deletedSessionIds: [],
         },
       }),
@@ -295,13 +325,16 @@ describe('getHostedWorkspaceStatus', () => {
       },
       status: status({
         deletionState: 'deleted',
-        activeRootSessionCount: 0,
+        activeSessionCount: 0,
         deletion: {
           started: true,
           completed: true,
           startedAt: 1_760_000_003_000,
+          phase: 'completed',
           sessionCount: 2,
           runtimeLocationCount: 0,
+          completedRuntimeLocationCount: 0,
+          remainingRuntimeLocationCount: 0,
           deletedSessionIds,
         },
       }),
@@ -313,9 +346,9 @@ describe('getHostedWorkspaceStatus', () => {
     expect(result).toMatchObject({
       deletionState: 'deleted',
       compute: { status: 'unknown', detailCode: 'status_unavailable' },
-      activity: { activeRootSessionCount: 0, hasActiveTurn: false },
+      activity: { activeSessionCount: 0, hasActiveTurn: false },
       wakeOnInput: { available: false, blockedReason: 'deleted' },
-      billing: { sku: null, blocked: false, rate: null },
+      billing: { sku: null, blocked: null, rate: null },
       deletion: { completed: true, deletedSessionIds },
     });
     expect(test.getWorkspaceRuntimeStatus).not.toHaveBeenCalled();

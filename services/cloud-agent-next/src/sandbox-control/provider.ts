@@ -147,7 +147,7 @@ export type ProviderAdapter = {
    * work or starting a container. A provider without readable billing state
    * omits this; callers then report no rate instead of inventing one.
    */
-  getBillingProjection?(ref: string | null): Promise<ProviderBillingProjection | undefined>;
+  getBillingProjection?(): Promise<ProviderBillingProjection | undefined>;
   create(intent: ProviderCreateIntent): Promise<{ providerRef: string } | { unresolved: true }>;
   launch(
     ref: string,

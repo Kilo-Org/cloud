@@ -25,6 +25,7 @@ export const cloudAgentWorktreeDeletionManifestSchema = z
         })
         .strict()
     ),
+    completedRuntimeLocations: z.array(cloudAgentWorktreeLocationSchema).optional(),
   })
   .strict();
 export type CloudAgentWorktreeDeletionManifest = z.infer<
@@ -72,6 +73,7 @@ export const recordCloudAgentWorktreeCleanupSchema = cloudAgentWorktreeDeletionS
     runtimeLocations: z.array(cloudAgentWorktreeLocationSchema).optional(),
     directory: z.string().min(1).max(4096).optional(),
     sessionIds: z.array(sessionIdSchema).optional(),
+    completedRuntimeLocation: cloudAgentWorktreeLocationSchema.optional(),
     childSessions: z
       .array(
         cloudAgentChildSessionLineageSchema.extend({
@@ -551,15 +553,18 @@ export type CloudAgentWorkspaceStatus = {
   userId: string;
   organizationId: string | null;
   deletionState: 'active' | 'deleting' | 'deleted';
-  /** Hosted root sessions whose stored turn status is not idle. */
-  activeRootSessionCount: number;
+  /** Hosted root or descendant sessions whose stored turn status is not idle. */
+  activeSessionCount: number;
   deletion: {
     started: boolean;
     completed: boolean;
     startedAt: number | null;
+    phase: 'not_started' | 'runtime_cleanup' | 'finalizing' | 'completed';
     /** Sessions the journal manifest will remove, including descendants. */
     sessionCount: number;
     runtimeLocationCount: number;
+    completedRuntimeLocationCount: number;
+    remainingRuntimeLocationCount: number;
     /** Populated only by a completed tombstone. */
     deletedSessionIds: string[];
   };

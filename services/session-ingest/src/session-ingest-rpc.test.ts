@@ -3353,7 +3353,7 @@ describe('SessionIngestRPC hosted workspace catalog', () => {
           deletedSessionIds: null,
         },
       ],
-      [{ activeRootSessionCount: 2 }],
+      [{ activeSessionCount: 2 }],
     ]);
     const rpc = makeRpc(db);
 
@@ -3364,20 +3364,26 @@ describe('SessionIngestRPC hosted workspace catalog', () => {
       userId: 'usr_owner',
       organizationId: null,
       deletionState: 'active',
-      activeRootSessionCount: 2,
+      activeSessionCount: 2,
       deletion: {
         started: false,
         completed: false,
         startedAt: null,
+        phase: 'not_started',
         sessionCount: 0,
         runtimeLocationCount: 0,
+        completedRuntimeLocationCount: 0,
+        remainingRuntimeLocationCount: 0,
         deletedSessionIds: [],
       },
     });
     const activityQuery = new PgDialect().sqlToQuery(whereConditions.at(-1)!);
+    expect(activityQuery.sql).toContain('"cli_sessions_v2"."kilo_user_id" = $');
     expect(activityQuery.sql).toContain('"cli_sessions_v2"."cloud_agent_worktree_id" = $');
-    expect(activityQuery.sql).toContain('"cli_sessions_v2"."parent_session_id" is null');
-    expect(activityQuery.params).toEqual(expect.arrayContaining([workspaceId]));
+    expect(activityQuery.sql).toContain(
+      '"cli_sessions_v2"."cloud_agent_session_scope_id" is not null'
+    );
+    expect(activityQuery.params).toEqual(expect.arrayContaining([workspaceId, 'usr_owner']));
     expect(getSessionIngestDO).not.toHaveBeenCalled();
   });
 
@@ -3414,12 +3420,18 @@ describe('SessionIngestRPC hosted workspace catalog', () => {
               },
               { sessionId: 'ses_22222222222222222222222222', cloudAgentSessionId: null },
             ],
+            completedRuntimeLocations: [
+              { sandboxId: 'usr-original-route', provider: 'cloudflare' },
+            ],
           },
-          runtimeLocations: [{ sandboxId: 'usr-original-route', provider: 'cloudflare' }],
+          runtimeLocations: [
+            { sandboxId: 'usr-original-route', provider: 'cloudflare' },
+            { sandboxId: 'usr-pending-route', provider: 'cloudflare' },
+          ],
           deletedSessionIds: null,
         },
       ],
-      [{ activeRootSessionCount: 0 }],
+      [{ activeSessionCount: 0 }],
     ]);
     const rpc = makeRpc(db);
 
@@ -3427,13 +3439,16 @@ describe('SessionIngestRPC hosted workspace catalog', () => {
       rpc.getCloudAgentWorkspaceStatus({ kiloUserId: 'usr_owner', workspaceId })
     ).resolves.toMatchObject({
       deletionState: 'deleting',
-      activeRootSessionCount: 0,
+      activeSessionCount: 0,
       deletion: {
         started: true,
         completed: false,
         startedAt: new Date(timestamp).getTime(),
+        phase: 'runtime_cleanup',
         sessionCount: 2,
-        runtimeLocationCount: 1,
+        runtimeLocationCount: 2,
+        completedRuntimeLocationCount: 1,
+        remainingRuntimeLocationCount: 1,
         deletedSessionIds: [],
       },
     });
@@ -3472,13 +3487,16 @@ describe('SessionIngestRPC hosted workspace catalog', () => {
       userId: 'usr_owner',
       organizationId: null,
       deletionState: 'deleted',
-      activeRootSessionCount: 0,
+      activeSessionCount: 0,
       deletion: {
         started: true,
         completed: true,
         startedAt: new Date(timestamp).getTime(),
+        phase: 'completed',
         sessionCount: 1,
         runtimeLocationCount: 0,
+        completedRuntimeLocationCount: 0,
+        remainingRuntimeLocationCount: 0,
         deletedSessionIds: [sdkSessionInfoFixture.id],
       },
     });

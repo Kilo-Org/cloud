@@ -679,12 +679,12 @@ describe('provider-specific contract differences', () => {
     'projects stored %s billing state without admitting or starting compute',
     async (_name, factory, sku) => {
       const harness = factory();
-      const ref = await harness.create();
+      await harness.create();
       const reads = harness.billingReads?.() ?? 0;
       const leases = harness.leaseCalls();
       const launches = harness.launchInputs?.().length ?? 0;
 
-      await expect(harness.adapter.getBillingProjection?.(ref)).resolves.toMatchObject({
+      await expect(harness.adapter.getBillingProjection?.()).resolves.toMatchObject({
         blocked: false,
         sandboxClassName: expect.any(String),
         context: {
@@ -695,19 +695,30 @@ describe('provider-specific contract differences', () => {
         },
       });
       harness.billingBlock?.(true);
-      await expect(harness.adapter.getBillingProjection?.(ref)).resolves.toMatchObject({
+      await expect(harness.adapter.getBillingProjection?.()).resolves.toMatchObject({
         blocked: true,
       });
       expect(harness.billingReads?.()).toBe(reads + 2);
       expect(harness.leaseCalls()).toBe(leases);
       expect(harness.launchInputs?.().length ?? 0).toBe(launches);
+    }
+  );
 
-      const afterReads = harness.billingReads?.();
-      await expect(
-        harness.adapter.getBillingProjection?.(harness.foreignRef())
-      ).resolves.toBeUndefined();
-      await expect(harness.adapter.getBillingProjection?.(null)).resolves.toBeUndefined();
-      expect(harness.billingReads?.()).toBe(afterReads);
+  it.each([
+    ['cloudflare', cloudflareHarness],
+    ['cloudflare-containers', containersHarness],
+  ] as const)(
+    'reads the stored %s billing projection after compute stops',
+    async (_name, factory) => {
+      const harness = factory();
+      const ref = await harness.create();
+      await harness.adapter.stop(ref);
+      harness.setRunning(false);
+      harness.billingBlock?.(true);
+
+      await expect(harness.adapter.getBillingProjection?.()).resolves.toMatchObject({
+        blocked: true,
+      });
     }
   );
 

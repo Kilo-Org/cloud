@@ -13,6 +13,7 @@ import type {
 import type { GatewayMessagesRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   computeOpenRouterCostFields,
+  providerReportsIsByok,
   computeVercelCostMicrodollars,
   drainSseStream,
   extractVercelGenerationTime,
@@ -84,7 +85,8 @@ function getVercelResolvedModel(
 export function processMessagesApiUsage(
   usage: MessagesApiUsage | null | undefined,
   providerMetadata: VercelProviderMetaData | null | undefined,
-  coreProps: NotYetCostedUsageStats
+  coreProps: NotYetCostedUsageStats,
+  provider: ProviderId
 ): JustTheCostsUsageStats {
   const cacheHitTokens = usage?.cache_read_input_tokens ?? 0;
   const cacheWriteTokens = usage?.cache_creation_input_tokens ?? 0;
@@ -96,7 +98,8 @@ export function processMessagesApiUsage(
     const { cost_mUsd, is_byok } = computeOpenRouterCostFields(
       usage,
       coreProps,
-      'messages_sse_processing'
+      'messages_sse_processing',
+      providerReportsIsByok(provider)
     );
     return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, cost_mUsd, is_byok };
   }
@@ -204,6 +207,12 @@ export async function parseMessagesMicrodollarUsageFromStream(
         if (openRouterProvider) {
           inference_provider = openRouterProvider;
         }
+        const meta = (json.message as MaybeHasVercelProviderMetadata).provider_metadata;
+        if (meta) {
+          providerMetadata = meta;
+          model = getVercelResolvedModel(meta) ?? model;
+          inference_provider = meta.gateway?.routing?.finalProvider ?? inference_provider;
+        }
       }
 
       if (
@@ -258,13 +267,14 @@ export async function parseMessagesMicrodollarUsageFromStream(
   } satisfies NotYetCostedUsageStats;
 
   const usage = deltaUsage ? mergeMessageDeltaUsage(startUsage, deltaUsage) : startUsage;
-  const costs = processMessagesApiUsage(usage, providerMetadata, coreProps);
+  const costs = processMessagesApiUsage(usage, providerMetadata, coreProps, provider);
   return { ...coreProps, ...costs };
 }
 
 export function parseMessagesMicrodollarUsageFromString(
   fullResponse: string,
-  statusCode: number
+  statusCode: number,
+  provider: ProviderId
 ): MicrodollarUsageStats {
   const responseJson = JSON.parse(fullResponse) as
     | (Anthropic.Messages.Message & MaybeHasVercelProviderMetadata & MaybeHasOpenRouterProvider)
@@ -297,7 +307,7 @@ export function parseMessagesMicrodollarUsageFromString(
     status_code: statusCode,
   } satisfies NotYetCostedUsageStats;
 
-  const costs = processMessagesApiUsage(usage, providerMetadata, coreProps);
+  const costs = processMessagesApiUsage(usage, providerMetadata, coreProps, provider);
   return { ...coreProps, ...costs };
 }
 

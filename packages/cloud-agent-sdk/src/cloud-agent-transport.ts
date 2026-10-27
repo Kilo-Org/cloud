@@ -345,6 +345,7 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
               event.type === 'question.replied' ||
               event.type === 'question.rejected' ||
               event.type === 'permission.asked' ||
+              event.type === 'permission.unreadable' ||
               event.type === 'permission.replied')
           ) {
             return;
@@ -494,7 +495,6 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
             payload: normalizeCloudAgentPayload(input.payload),
             messageId,
             ...(input.attachments ? { attachments: input.attachments } : {}),
-            ...(input.images ? { images: input.images } : {}),
           })
         );
       },

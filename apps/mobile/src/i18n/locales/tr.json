@@ -227,7 +227,6 @@
     "hideBalance": "Bakiyeyi gizle",
     "showBalance": "Bakiyeyi göster",
     "balanceHidden": "Bakiye gizli",
-    "bonusCreditsExpiring": "{{amount}} tutarındaki kredinin süresi {{date}} tarihinde dolacak.",
     "signOutTitle": "Oturum kapatılsın mı?",
     "signOutMessage": "Çalışma alanına erişmek için tekrar oturum açman gerekecek.",
     "deleteAccountTitle": "Hesap silinsin mi?",
@@ -1014,6 +1013,22 @@
       "loading": "İnceleme belleği yükleniyor",
       "loadingProposals": "Öneriler yükleniyor",
       "noProposals": "Öneri yok",
+      "proposalDetails": "Öneri ayrıntıları",
+      "proposalTitle": "Öneri başlığı",
+      "rationale": "Gerekçe",
+      "saveFirst": "Pull request açmadan önce düzenlemelerini kaydet.",
+      "proposalSaved": "Öneri kaydedildi",
+      "proposalDismissed": "Öneri göz ardı edildi",
+      "dismissProposalTitle": "Öneri göz ardı edilsin mi?",
+      "dismissProposalMessage": "Bu öneri etkin listeden kaldırılacak ve geri yüklenemeyecek.",
+      "prOpened": "REVIEW.md için pull request açıldı",
+      "alreadyPresent": "Yönergeler REVIEW.md dosyasında zaten mevcut",
+      "status": {
+        "edited": "Düzenlendi",
+        "opening_change_request": "PR açılıyor",
+        "change_request_failed": "PR başarısız oldu",
+        "superseded": "Zaten mevcut"
+      },
       "noProposalsDescription": "Kilo, proje sorumlularının yanıtlarını analiz ettikten sonra inceleme belleğinin önerileri burada görünür.",
       "off": "İnceleme belleği kapalı.",
       "on": "İnceleme belleği açık.",
@@ -2052,7 +2067,9 @@
       "retrying": "Tekrar deneniyor…",
       "retryDeny": "Reddetmeyi tekrar dene",
       "retryAllowOnce": "Bir kez izin vermeyi tekrar dene",
-      "retryAlwaysAllow": "Her zaman izin vermeyi tekrar dene"
+      "retryAlwaysAllow": "Her zaman izin vermeyi tekrar dene",
+      "unreadableTitle": "İzin isteği okunamadı",
+      "unreadableBody": "Aracı, bu uygulamanın gösteremediği bir izin kararını bekliyor. Devam etmek için uygulamayı veya CLI'yi güncelle ya da isteği CLI'de yanıtla."
     },
     "questionCard": {
       "title": "Ajan yanıt bekliyor",
@@ -2444,8 +2461,9 @@
     "unavailableDevice": "Sesli giriş bu cihazda kullanılamıyor.",
     "unavailableLanguage": "Cihazın seçili dilinde sesli giriş kullanılamıyor.",
     "languageNotInstalledTitle": "{{language}} için sesli giriş henüz hazır değil",
-    "languageNotInstalledMessage": "{{language}} dilinin çevrimdışı konuşma dosyaları bu telefonda yüklü değil. Dosyaları indir, ardından sesli girişi tekrar dene.",
+    "languageNotInstalledMessage": "{{language}} için çevrimdışı konuşma dosyaları yüklü değil ve çevrimiçi transkripsiyon kapalı. Sesli girişi kullanmak için dosyaları indirmen ya da çevrimiçi transkripsiyonu yeniden açman gerekiyor.",
     "downloadOfflineModel": "İndir",
+    "useOnlineTranscription": "Çevrimiçi transkripsiyona izin ver",
     "offlineModelDownloadScheduled": "Çevrimdışı konuşma dosyaları arka planda indirilecek. Sesli girişi daha sonra tekrar dene.",
     "listeningStopped": "Dinleme durdu.",
     "transcribing": "Metne dönüştürülüyor...",
@@ -3135,7 +3153,7 @@
     "creditActivity": {
       "emptyDescription": "Bu kuruluşun satın alımları, kullanımı ve kredi düzeltmeleri gerçekleştikçe burada görünür.",
       "emptyTitle": "Kredi hareketi yok",
-      "expires": "Son kullanma tarihi: {{date}}",
+      "expiresUtc": "Son kullanma tarihi: {{date}} (UTC)",
       "title": "Kredi hareketleri",
       "transactionFallback": "Kredi işlemi",
       "category": {
@@ -3730,6 +3748,7 @@
     "title": "Profiller",
     "entrySubtitle": "Oturumlar arasında ortam ayarlarını yeniden kullanma",
     "newProfile": "Yeni profil",
+    "openHint": "Profili açar",
     "emptyTitle": "Henüz profil yok",
     "emptyDescription": "Oturumlar arasında ortam değişkenlerini, kurulum komutlarını ve becerileri yeniden kullanmak için bir profil oluşturun.",
     "loadFailed": "Profiller yüklenemedi",
@@ -3823,6 +3842,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "•••• olarak gösterilen değerler kayıtlı gizliliklerini korur; döndürmek için bir değeri değiştirin. Komut satırını değiştirmek tüm değerlerin yeniden girilmesini gerektirir",
+      "headersHint": "•••• olarak gösterilen değerler kayıtlı gizliliklerini korur; döndürmek için bir değeri değiştirin. URL'yi değiştirmek tüm değerlerin yeniden girilmesini gerektirir",
       "nameRequired": "Bir sunucu adı girin",
       "nameInvalid": "Adda yalnızca ASCII harfleri, rakamlar, alt çizgi ve kısa çizgi kullanılabilir, en fazla 100 karakter",
       "commandRequired": "Bir komut girin",
@@ -3921,6 +3942,10 @@
   "credits": {
     "title": "Kredi satın al",
     "description": "Krediler, Kilo App'te AI kodlama oturumları yürütmek için Kilo bakiyenize eklenen tek seferlik bir satın alımdır. Mağaza hesabınızdan ücret alır ve mağaza ödemeyi onayladıktan sonra krediler eklenir.",
+    "nextExpiry": "{{amount}} tutarındaki kredinin süresi {{date}} (UTC) tarihinde dolacak. Süresi en erken dolan krediler önce kullanılır.",
+    "appStoreExpiry": "App Store üzerinden satın alınan kredilerin süresi dolmaz.",
+    "playOneYearExpiry": "Bu kredilerin süresi satın alma tarihinden bir takvim yılı sonra dolar.",
+    "playNonexpiring": "Bu kredilerin süresi dolmaz.",
     "packLabel": "{{amount}} değerinde kredi ekle",
     "priceUnavailable": "Fiyat kullanılamıyor",
     "purchased": "Krediler bakiyenize eklendi.",
@@ -3961,11 +3986,13 @@
       "namePlaceholder": "Hatalar, fikirler, sürüm…",
       "emoji": "Emoji",
       "mode": "Mod",
-      "defaultsHint": "Bu listeden başlatılan oturumlar bu varsayılanları kullanır."
+      "defaultsHint": "Bu listeden başlatılan oturumlar bu varsayılanları kullanır.",
+      "saveFailed": "Liste kaydedilemedi. Bağlantınızı kontrol edip tekrar deneyin."
     },
     "list": {
       "addPlaceholder": "Bir görev ekle",
       "add": "Görev ekle",
+      "addFailed": "Görev eklenemedi. Bağlantınızı kontrol edip tekrar deneyin.",
       "empty": "Henüz görev yok",
       "setDefaults": "Depo, mod ve model ayarla",
       "completed_one": "Tamamlandı ({{count}})",
@@ -4002,7 +4029,9 @@
       "startNewSession": "Yeni oturum başlat",
       "startNewSessionHint": "Yeni bir oturum başlatmak için uzun bas.",
       "linkSession": "Oturum bağla",
-      "linkFailed": "Oturum göreve bağlanamadı"
+      "linkFailed": "Oturum göreve bağlanamadı",
+      "moveToAnotherTodo": "Başka bir göreve taşı",
+      "startRefreshFailed": "Oturum başladı, ancak bu liste güncellenmedi."
     },
     "linkSession": {
       "title": "Bir oturum bağla",
@@ -4011,6 +4040,7 @@
     },
     "upNext": "Sıradaki",
     "sessionTodo": "Görev: {{title}}",
+    "openTodoHint": "Görevi açar.",
     "linkToTodo": "Göreve bağla",
     "candidates": {
       "empty": "Açık görev yok"

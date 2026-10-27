@@ -23,6 +23,7 @@ const mockRunBot = jest.fn<(input: BotRunInput) => Promise<BotRunResult>>();
 const mockRunSessionToCompletion = jest.fn<(input: RunSessionInput) => Promise<RunSessionResult>>();
 const mockGetGitHubTokenForUser = jest.fn<() => Promise<string | undefined>>();
 const mockGetGitHubTokenForOrganization = jest.fn<() => Promise<string | undefined>>();
+let mockDiscordContextForPrompt = '';
 
 // Factories delegate through lazy wrappers so the hoisted `jest.mock` calls do
 // not read the mock constants before this module initializes them.
@@ -32,7 +33,7 @@ jest.mock('@/lib/bots/core/run-bot', () => ({
 
 jest.mock('@/lib/discord-bot/discord-channel-context', () => ({
   getDiscordConversationContext: () => Promise.resolve({}),
-  formatDiscordConversationContextForPrompt: () => '',
+  formatDiscordConversationContextForPrompt: () => mockDiscordContextForPrompt,
 }));
 
 jest.mock('@/lib/cloud-agent-next/run-session', () => ({
@@ -147,6 +148,7 @@ describe('processDiscordBotMessage session start authorization', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockDiscordContextForPrompt = '';
     modelRequestedRepository = CONNECTED_REPOSITORY;
     mockRunBot.mockImplementation(async input => {
       if ((input.tools ?? []).length === 0) {
@@ -196,6 +198,20 @@ describe('processDiscordBotMessage session start authorization', () => {
     expect(toolResult.content).toContain('/connected-accounts');
     expect(mockRunSessionToCompletion).not.toHaveBeenCalled();
     expect(result.cloudAgentSessionId).toBeUndefined();
+  });
+  it('places Discord context in its named prompt section', async () => {
+    mockDiscordContextForPrompt = 'Channel topic: weekly update';
+
+    await processDiscordBotMessage(
+      `Change something in ${CONNECTED_REPOSITORY}`,
+      guildId,
+      eventContext(nextSnowflake())
+    );
+
+    const [runInput] = mockRunBot.mock.calls[0];
+    expect(runInput.systemPrompt).toContain('<platform_conversation_context platform="discord">');
+    expect(runInput.systemPrompt).toContain('Channel topic: weekly update');
+    expect(runInput.systemPrompt).toContain('</platform_conversation_context>');
   });
 
   it('answers without session tools when the linked account lacks workspace access', async () => {

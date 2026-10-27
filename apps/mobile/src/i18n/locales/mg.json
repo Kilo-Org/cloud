@@ -227,7 +227,6 @@
     "hideBalance": "Afeno ny ambim-bola",
     "showBalance": "Aseho ny ambim-bola",
     "balanceHidden": "Voafeno ny ambim-bola",
-    "bonusCreditsExpiring": "Kireditra {{amount}} ho lany daty amin'ny {{date}}.",
     "signOutTitle": "Hivoaka ve?",
     "signOutMessage": "Mila miditra indray ianao vao afaka mampiasa ny sehatra fiasanao.",
     "deleteAccountTitle": "Hofafana ve ny kaonty?",
@@ -1484,6 +1483,22 @@
       "loadingProposals": "Mampiditra soso-kevitra",
       "couldNotLoadProposals": "Tsy nety nampidirina ny soso-kevitra.",
       "noProposals": "Tsy misy soso-kevitra",
+      "proposalDetails": "Antsipirian'ny soso-kevitra",
+      "proposalTitle": "Lohatenin'ny soso-kevitra",
+      "rationale": "Antony",
+      "saveFirst": "Tehirizo ny fanovana nataonao alohan'ny hanokafana PR.",
+      "proposalSaved": "Voatahiry ny soso-kevitra",
+      "proposalDismissed": "Nolavina ny soso-kevitra",
+      "dismissProposalTitle": "Holavina ve ny soso-kevitra?",
+      "dismissProposalMessage": "Hesorina ao amin’ny lisitra mavitrika ity soso-kevitra ity ary tsy azo averina intsony.",
+      "prOpened": "Nosokafana ny PR ho an'ny REVIEW.md",
+      "alreadyPresent": "Efa ao amin'ny REVIEW.md ny torolalana",
+      "status": {
+        "edited": "Voahitsy",
+        "opening_change_request": "Manokatra PR",
+        "change_request_failed": "Tsy nety nosokafana ny PR",
+        "superseded": "Efa misy"
+      },
       "noProposalsDescription": "Hiseho eto ny soso-kevitry ny fitadidiana ny fanamarinana rehefa voafakafak'i Kilo ny valin'ny mpikojakoja."
     },
     "manualReview": {
@@ -2576,7 +2591,9 @@
       "retrying": "Manandrana indray…",
       "retryDeny": "Andramo lavino indray",
       "retryAllowOnce": "Andramo avelao indray mandeha indray",
-      "retryAlwaysAllow": "Andramo avelao foana indray"
+      "retryAlwaysAllow": "Andramo avelao foana indray",
+      "unreadableTitle": "Tsy afaka novakiana ny fangatahana alalana",
+      "unreadableBody": "Miandry fanapahan-kevitra momba ny alalana ny agent fa tsy afaka asehon'ity rindrankajy ity io fangatahana io. Havaozy ny rindrankajy na ny CLI, na valio ao amin'ny CLI ny fangatahana mba hahafahana manohy."
     },
     "questionCard": {
       "title": "Mila valiny ny mpanampy",
@@ -2968,8 +2985,9 @@
     "unavailableDevice": "Tsy azo ampiasaina amin'ity fitaovana ity ny fampidirana amin'ny feo.",
     "unavailableLanguage": "Tsy azo ampiasaina amin'ny fitenin'ity fitaovana ity ny fampidirana amin'ny feo.",
     "languageNotInstalledTitle": "Mbola tsy vonona ny fampidirana amin'ny feo ho an'ny {{language}}",
-    "languageNotInstalledMessage": "Tsy napetraka amin'ity finday ity ny rakitra feo offline ho an'ny {{language}}. Sintomy aloha izy ireo, avy eo andramo indray ny fampidirana amin'ny feo.",
+    "languageNotInstalledMessage": "Tsy voapetraka ny rakitra feo offline ho an'ny {{language}}, ary efa voatsipy ny famadihana feo ho soratra an-tserasera. Alaivo ireo rakitra, na alefaso indray ny famadihana feo ho soratra an-tserasera, mba hampiasa ny fampidirana amin'ny feo.",
     "downloadOfflineModel": "Sintomy",
+    "useOnlineTranscription": "Avelao ny famadihana an-tserasera",
     "offlineModelDownloadScheduled": "Ho sintomy ao amin'ny background ny rakitra feo offline. Andramo indray ny fampidirana amin'ny feo raha vao ela.",
     "listeningStopped": "Nijanona ny fihainoana.",
     "transcribing": "Manova feo ho soratra...",
@@ -3143,7 +3161,7 @@
     "creditActivity": {
       "emptyDescription": "Hiseho eto ny fividianana, ny fampiasana ary ny fanitsiana kireditra ho an'ity fikambanana ity rehefa mitranga.",
       "emptyTitle": "Tsy misy hetsika momba ny kireditra",
-      "expires": "Lany daty amin'ny {{date}}",
+      "expiresUtc": "Lany daty amin'ny {{date}} (UTC)",
       "title": "Hetsika momba ny kireditra",
       "transactionFallback": "Fifanakalozana kireditra",
       "category": {
@@ -3730,6 +3748,7 @@
     "title": "mombamomba",
     "entrySubtitle": "Ampiasao indray ny firafitry ny tontolo iainana mandritra ny fotoam-pivoriana",
     "newProfile": "Profil vaovao",
+    "openHint": "Manokatra ny mombamomba",
     "emptyTitle": "Tsy mbola misy mombamomba",
     "emptyDescription": "Mamorona mombamomba hampiasaina indray ny fari-piainan'ny tontolo iainana, baiko fanamboarana ary fahaiza-manao mandritra ny fotoam-pivoriana.",
     "loadFailed": "Tsy afaka mampiditra ny mombamomba",
@@ -3823,6 +3842,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Ny sanda aseho ho •••• dia mitazona ny tsiambaratelo voatahiry; soloy ny sanda iray raha tianao havaozina. Ilaina ny sanda rehetra rehefa miova ny andalana baiko",
+      "headersHint": "Ny sanda aseho ho •••• dia mitazona ny tsiambaratelo voatahiry; soloy ny sanda iray raha tianao havaozina. Ilaina ny sanda rehetra rehefa miova ny URL",
       "nameRequired": "Ampidiro anarana mpizara",
       "nameInvalid": "Ny anarana dia tsy afaka mampiasa afa-tsy litera ASCII, isa, tsipiho ambany ary tsipiho, hatramin'ny 100 tarehintsoratra",
       "commandRequired": "Ampidiro baiko",
@@ -3921,6 +3942,10 @@
   "credits": {
     "title": "Hividy kireditra",
     "description": "Ny kireditra dia fividianana indray mandeha ampiana amin'ny balan Kilo anao hanaovana session coding AI ao amin'ny Kilo App. Ny fivarotana no maka vola amin'ny kaontinao ary ampiana ny kireditra rehefa manamarina ny fandoavam-bola ny fivarotana.",
+    "nextExpiry": "Kireditra {{amount}} ho lany daty amin'ny {{date}} (UTC). Ny kireditra ho lany daty voalohany no ampiasaina aloha.",
+    "appStoreExpiry": "Tsy lany daty ny kireditra novidiana tamin'ny App Store.",
+    "playOneYearExpiry": "Lany daty herintaona ara-kalandrie aorian'ny fividianana ireo kireditra ireo.",
+    "playNonexpiring": "Tsy lany daty ireo kireditra ireo.",
     "packLabel": "Ampio kireditra {{amount}}",
     "priceUnavailable": "Tsy misy ny vidiny",
     "purchased": "Nampiana tao amin'ny balananao ny kireditra.",
@@ -3961,11 +3986,13 @@
       "namePlaceholder": "Olana, Hevitra, Fanontana…",
       "emoji": "Sary",
       "mode": "Fomba fiasa",
-      "defaultsHint": "Ny fotoam-piasana atomboka amin'ity lisitra ity dia mampiasa ireo safidy voafidy mialoha ireo."
+      "defaultsHint": "Ny fotoam-piasana atomboka amin'ity lisitra ity dia mampiasa ireo safidy voafidy mialoha ireo.",
+      "saveFailed": "Tsy azo notahirizina ny lisitra. Jereo ny fifandraisanao ary andramo indray."
     },
     "list": {
       "addPlaceholder": "Ampio asa hatao",
       "add": "Ampio",
+      "addFailed": "Tsy azo nampiana ny asa hatao. Jereo ny fifandraisanao ary andramo indray.",
       "empty": "Mbola tsy misy asa",
       "setDefaults": "Apetraho ny tahirin-kaody, ny fomba fiasa ary ny modely",
       "completed_one": "Vita ({{count}})",
@@ -4002,7 +4029,9 @@
       "startNewSession": "Manomboka sesiona vaovao",
       "startNewSessionHint": "Tsindrio ela hanombohana sesiona vaovao.",
       "linkSession": "Ampifandraiso fotoam-piasana",
-      "linkFailed": "Tsy afaka nampifandray ny fotoam-piasana tamin'ny asa"
+      "linkFailed": "Tsy afaka nampifandray ny fotoam-piasana tamin'ny asa",
+      "moveToAnotherTodo": "Afindrao amin'ny asa hafa",
+      "startRefreshFailed": "Natomboka ny fotoam-piasana, nefa tsy nohavaozina ity lisitra ity."
     },
     "linkSession": {
       "title": "Ampifandraiso fotoam-piasana",
@@ -4011,6 +4040,7 @@
     },
     "upNext": "Manaraka",
     "sessionTodo": "Asa: {{title}}",
+    "openTodoHint": "Manokatra ny asa.",
     "linkToTodo": "Ampifandraiso amin'ny asa",
     "candidates": {
       "empty": "Tsy misy asa misokatra"

@@ -227,7 +227,6 @@
     "hideBalance": "Amaga el saldo",
     "showBalance": "Mostra el saldo",
     "balanceHidden": "Saldo amagat",
-    "bonusCreditsExpiring": "{{amount}} en crèdits caduquen el {{date}}.",
     "signOutTitle": "Vols tancar la sessió?",
     "signOutMessage": "Hauràs de tornar a iniciar la sessió per accedir al teu espai de treball.",
     "deleteAccountTitle": "Vols eliminar el compte?",
@@ -1506,6 +1505,22 @@
       "loadingProposals": "S'estan carregant les propostes",
       "couldNotLoadProposals": "No s'han pogut carregar les propostes.",
       "noProposals": "Cap proposta",
+      "proposalDetails": "Detalls de la proposta",
+      "proposalTitle": "Títol de la proposta",
+      "rationale": "Justificació",
+      "saveFirst": "Desa els canvis abans d'obrir una pull request.",
+      "proposalSaved": "Proposta desada",
+      "proposalDismissed": "Proposta descartada",
+      "dismissProposalTitle": "Descartar la proposta?",
+      "dismissProposalMessage": "Aquesta proposta s'eliminarà de la llista de propostes actives i no es podrà restaurar.",
+      "prOpened": "Pull request de REVIEW.md oberta",
+      "alreadyPresent": "Les pautes ja són a REVIEW.md",
+      "status": {
+        "edited": "Editada",
+        "opening_change_request": "S'està obrint la PR",
+        "change_request_failed": "La PR ha fallat",
+        "superseded": "Ja hi és"
+      },
       "noProposalsDescription": "Les propostes de la memòria de revisió apareixeran aquí quan Kilo hagi analitzat les respostes dels mantenidors."
     },
     "manualReview": {
@@ -2612,7 +2627,9 @@
       "retrying": "Tornant-ho a provar…",
       "retryDeny": "Torna a provar de denegar",
       "retryAllowOnce": "Torna a provar de permetre-ho una vegada",
-      "retryAlwaysAllow": "Torna a provar de permetre-ho sempre"
+      "retryAlwaysAllow": "Torna a provar de permetre-ho sempre",
+      "unreadableTitle": "No s'ha pogut llegir la sol·licitud de permís",
+      "unreadableBody": "L'agent està esperant una decisió de permís que aquesta aplicació no pot mostrar. Actualitzeu l'aplicació o el CLI, o responeu la sol·licitud al CLI per continuar."
     },
     "questionCard": {
       "title": "L'agent necessita una resposta",
@@ -3011,8 +3028,9 @@
     "unavailableDevice": "El dictat no està disponible en aquest dispositiu.",
     "unavailableLanguage": "El dictat no està disponible per a l'idioma d'aquest dispositiu.",
     "languageNotInstalledTitle": "El dictat per a {{language}} encara no està a punt",
-    "languageNotInstalledMessage": "Els fitxers de veu fora de línia de {{language}} no estan instal·lats en aquest telèfon. Baixa'ls i torna-ho a provar amb el dictat.",
+    "languageNotInstalledMessage": "Els fitxers de veu fora de línia del {{language}} no estan instal·lats i la transcripció en línia està desactivada. Baixa els fitxers o torna a activar la transcripció en línia per utilitzar el dictat per veu.",
     "downloadOfflineModel": "Baixa",
+    "useOnlineTranscription": "Permet la transcripció en línia",
     "offlineModelDownloadScheduled": "Els fitxers de veu fora de línia es baixaran en segon pla. Torna a provar el dictat més tard.",
     "listeningStopped": "S'ha deixat d'escoltar.",
     "transcribing": "S'està transcrivint…",
@@ -3187,7 +3205,7 @@
     "creditActivity": {
       "emptyDescription": "Aquí apareixeran les compres, el consum i els ajustos de crèdits d'aquesta organització a mesura que es produeixin.",
       "emptyTitle": "No hi ha moviments de crèdits",
-      "expires": "Caduca el {{date}}",
+      "expiresUtc": "Caduca el {{date}} (UTC)",
       "title": "Moviments de crèdits",
       "transactionFallback": "Transacció de crèdits",
       "category": {
@@ -3776,6 +3794,7 @@
     "title": "Perfils",
     "entrySubtitle": "Reutilitza la configuració de l'entorn entre sessions",
     "newProfile": "Nou perfil",
+    "openHint": "Obre el perfil",
     "emptyTitle": "Encara no hi ha perfils",
     "emptyDescription": "Creeu un perfil per reutilitzar variables d'entorn, ordres de configuració i habilitats entre sessions.",
     "loadFailed": "No s'han pogut carregar els perfils",
@@ -3874,6 +3893,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Els valors mostrats com a •••• mantenen el seu secret desat; substituïu un valor per rotar-lo. Canviar la línia d'ordres requereix tots els valors de nou",
+      "headersHint": "Els valors mostrats com a •••• mantenen el seu secret desat; substituïu un valor per rotar-lo. Canviar l'URL requereix tots els valors de nou",
       "nameRequired": "Introduïu un nom de servidor",
       "nameInvalid": "El nom només pot utilitzar lletres ASCII, números, guions baixos i guions, fins a 100 caràcters",
       "commandRequired": "Introduïu una ordre",
@@ -3972,6 +3993,10 @@
   "credits": {
     "title": "Compra crèdits",
     "description": "Els crèdits són una compra única que s'afegeix al teu saldo de Kilo per executar sessions de programació amb IA a l'aplicació Kilo. La botiga cobra al teu compte i els crèdits s'afegeixen quan la botiga confirma el pagament.",
+    "nextExpiry": "{{amount}} en crèdits caduquen el {{date}} (UTC). Els crèdits amb la caducitat més propera s'utilitzen primer.",
+    "appStoreExpiry": "Els crèdits comprats a l'App Store no caduquen.",
+    "playOneYearExpiry": "Aquests crèdits caduquen un any natural després de la compra.",
+    "playNonexpiring": "Aquests crèdits no caduquen.",
     "packLabel": "Afegeix {{amount}} en crèdits",
     "priceUnavailable": "Preu no disponible",
     "purchased": "S'han afegit crèdits al teu saldo.",
@@ -4014,11 +4039,13 @@
       "namePlaceholder": "Errors, idees, versions…",
       "emoji": "Emoji",
       "mode": "Mode",
-      "defaultsHint": "Les sessions iniciades des d'aquesta llista utilitzen aquests valors per defecte."
+      "defaultsHint": "Les sessions iniciades des d'aquesta llista utilitzen aquests valors per defecte.",
+      "saveFailed": "No s’ha pogut desar la llista. Comprova la connexió i torna-ho a provar."
     },
     "list": {
       "addPlaceholder": "Afegeix una tasca",
       "add": "Afegeix la tasca",
+      "addFailed": "No s’ha pogut afegir la tasca. Comprova la connexió i torna-ho a provar.",
       "empty": "Encara no hi ha tasques",
       "setDefaults": "Defineix el repositori, el mode i el model",
       "completed_one": "Completades ({{count}})",
@@ -4057,7 +4084,9 @@
       "startNewSession": "Inicia una sessió nova",
       "startNewSessionHint": "Mantén premut per iniciar una sessió nova.",
       "linkSession": "Vincula una sessió",
-      "linkFailed": "No s'ha pogut vincular la sessió a la tasca"
+      "linkFailed": "No s'ha pogut vincular la sessió a la tasca",
+      "moveToAnotherTodo": "Mou a una altra tasca",
+      "startRefreshFailed": "La sessió s’ha iniciat, però aquesta llista no s’ha actualitzat."
     },
     "linkSession": {
       "title": "Vincular una sessió",
@@ -4066,6 +4095,7 @@
     },
     "upNext": "A continuació",
     "sessionTodo": "Tasca: {{title}}",
+    "openTodoHint": "Obre la tasca.",
     "linkToTodo": "Vincula a una tasca",
     "candidates": {
       "empty": "No hi ha tasques obertes"

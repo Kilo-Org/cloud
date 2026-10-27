@@ -2,6 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import React, { type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { SessionCostBreakdown } from './session-cost-breakdown';
+import type { SessionModelUsage, SessionTokenUsage } from './session-token-usage';
 
 jest.mock('./ShareSessionDialog', () => ({ ShareSessionDialog: () => null }));
 
@@ -27,7 +28,12 @@ import { SessionInfoDialog } from './SessionInfoDialog';
 
 Object.assign(globalThis, { React });
 
-function renderSessionInfo(sessionCostBreakdown?: SessionCostBreakdown): string {
+function renderSessionInfo(
+  sessionCostBreakdown?: SessionCostBreakdown,
+  sessionTokenUsage?: SessionTokenUsage,
+  hasIncompleteHistory = false,
+  sessionModelUsage?: SessionModelUsage[]
+): string {
   return renderToStaticMarkup(
     React.createElement(SessionInfoDialog, {
       open: true,
@@ -35,9 +41,20 @@ function renderSessionInfo(sessionCostBreakdown?: SessionCostBreakdown): string 
       sessionId: 'agent_session',
       model: 'anthropic/claude-sonnet-4',
       sessionCostBreakdown,
+      sessionTokenUsage,
+      sessionModelUsage,
+      hasIncompleteHistory,
     })
   );
 }
+
+const tokenUsage: SessionTokenUsage = {
+  input: 1_234_567,
+  output: 89,
+  reasoning: 7,
+  cacheRead: 12_345,
+  cacheWrite: 6_789,
+};
 
 describe('SessionInfoDialog session costs', () => {
   it('renders the inclusive total and every positive cost component', () => {
@@ -48,7 +65,7 @@ describe('SessionInfoDialog session costs', () => {
       olderActivityCostUsd: 0.23457,
     });
 
-    expect(markup).toContain('Token Usage');
+    expect(markup).toContain('Total cost');
     expect(markup).toContain('$1.23');
     expect(markup).toContain('Root session');
     expect(markup).toContain('$0.65');
@@ -57,6 +74,7 @@ describe('SessionInfoDialog session costs', () => {
     expect(markup).toContain('Older activity');
     expect(markup).toContain('$0.23');
     expect(markup).not.toContain('Model cost');
+    expect(markup).not.toContain('Token Usage');
   });
 
   it('formats boundary total, root, and older-activity costs using integer cents', () => {
@@ -67,7 +85,7 @@ describe('SessionInfoDialog session costs', () => {
       olderActivityCostUsd: 0.005,
     });
 
-    expect(markup).toContain('Token Usage');
+    expect(markup).toContain('Total cost');
     expect(markup).toContain('$5.01');
     expect(markup).toContain('Root session');
     expect(markup).toContain('$5.00');
@@ -84,7 +102,7 @@ describe('SessionInfoDialog session costs', () => {
       olderActivityCostUsd: 0,
     });
 
-    expect(markup).toContain('Token Usage');
+    expect(markup).toContain('Total cost');
     expect(markup).toContain('$0.11');
     expect(markup).toContain('Root session');
     expect(markup).toContain('$0.10');
@@ -101,7 +119,7 @@ describe('SessionInfoDialog session costs', () => {
       olderActivityCostUsd: 0,
     });
 
-    expect(markup).toContain('Token Usage');
+    expect(markup).toContain('Total cost');
     expect(markup).toContain('Root session');
     expect(markup).toContain('Subagents');
     expect([...markup.matchAll(/\$(\d+\.\d{2})/g)].map(match => match[1])).toEqual([
@@ -210,15 +228,19 @@ describe('SessionInfoDialog session costs', () => {
       subagentCostUsd: 0,
       olderActivityCostUsd: 0.004999,
     },
-  ])('omits the total-cost section for totals below display precision', sessionCostBreakdown => {
-    const markup = renderSessionInfo(sessionCostBreakdown);
+  ])(
+    'shows a sub-cent total for supplied breakdowns below display precision',
+    sessionCostBreakdown => {
+      const markup = renderSessionInfo(sessionCostBreakdown);
 
-    expect(markup).not.toContain('Token Usage');
-    expect(markup).not.toContain('$0.00');
-    expect(markup).not.toContain('Root session');
-    expect(markup).not.toContain('Subagents');
-    expect(markup).not.toContain('Older activity');
-  });
+      expect(markup).toContain('Total cost');
+      expect(markup).toContain('&lt;$0.01');
+      expect(markup).not.toContain('$0.00');
+      expect(markup).not.toContain('Root session');
+      expect(markup).not.toContain('Subagents');
+      expect(markup).not.toContain('Older activity');
+    }
+  );
 
   it('includes a zero-cost root session when subagents have a positive cost', () => {
     const markup = renderSessionInfo({
@@ -247,8 +269,16 @@ describe('SessionInfoDialog session costs', () => {
     expect(markup).toContain('Older activity');
   });
 
+  it('omits the total-cost section when the breakdown is absent', () => {
+    const markup = renderSessionInfo(undefined);
+
+    expect(markup).not.toContain('Total cost');
+    expect(markup).not.toContain('Root session');
+    expect(markup).not.toContain('Subagents');
+    expect(markup).not.toContain('Older activity');
+  });
+
   it.each([
-    undefined,
     {
       totalCostUsd: 0,
       rootCostUsd: 0,
@@ -261,14 +291,18 @@ describe('SessionInfoDialog session costs', () => {
       subagentCostUsd: 0.25,
       olderActivityCostUsd: 0.25,
     },
-  ])('omits the total-cost section when the total is absent or zero', sessionCostBreakdown => {
-    const markup = renderSessionInfo(sessionCostBreakdown);
+  ])(
+    'shows a zero total without component rows for a supplied zero breakdown',
+    sessionCostBreakdown => {
+      const markup = renderSessionInfo(sessionCostBreakdown);
 
-    expect(markup).not.toContain('Token Usage');
-    expect(markup).not.toContain('Root session');
-    expect(markup).not.toContain('Subagents');
-    expect(markup).not.toContain('Older activity');
-  });
+      expect(markup).toContain('Total cost');
+      expect(markup).toContain('$0.00');
+      expect(markup).not.toContain('Root session');
+      expect(markup).not.toContain('Subagents');
+      expect(markup).not.toContain('Older activity');
+    }
+  );
 
   it('shows a renderable total without misleading detail rows when component costs are absent', () => {
     const markup = renderSessionInfo({
@@ -278,10 +312,210 @@ describe('SessionInfoDialog session costs', () => {
       olderActivityCostUsd: 0,
     });
 
-    expect(markup).toContain('Token Usage');
+    expect(markup).toContain('Total cost');
     expect(markup).toContain('$0.25');
     expect(markup).not.toContain('Root session');
     expect(markup).not.toContain('Subagents');
     expect(markup).not.toContain('Older activity');
+  });
+});
+
+describe('SessionInfoDialog token usage', () => {
+  it('renders each main-agent token count with thousands separators', () => {
+    const markup = renderSessionInfo(undefined, tokenUsage);
+
+    expect(markup).toContain('Main agent tokens');
+    for (const [label, value] of [
+      ['Input', '1,234,567'],
+      ['Output', '89'],
+      ['Reasoning', '7'],
+      ['Cache read', '12,345'],
+      ['Cache write', '6,789'],
+    ]) {
+      expect(markup).toMatch(new RegExp(`${label}</dt><dd[^>]*>${value}</dd>`));
+    }
+    expect(markup).toContain('excluding subagents');
+  });
+
+  it('renders zero token counts when every count is zero', () => {
+    const markup = renderSessionInfo(undefined, {
+      input: 0,
+      output: 0,
+      reasoning: 0,
+      cacheRead: 0,
+      cacheWrite: 0,
+    });
+
+    expect(markup).toContain('Main agent tokens');
+    expect([...markup.matchAll(/>0<\/dd>/g)]).toHaveLength(5);
+  });
+
+  it('omits token usage when no token usage is supplied', () => {
+    const markup = renderSessionInfo(undefined, undefined, true);
+
+    expect(markup).not.toContain('Main agent tokens');
+    expect(markup).not.toContain('Token counts cover loaded activity only');
+  });
+
+  it('shows the partial-history notice when older history is not loaded', () => {
+    const markup = renderSessionInfo(undefined, tokenUsage, true);
+
+    expect(markup).toContain('Token counts cover loaded activity only');
+    expect(markup).toContain('role="status"');
+  });
+
+  it.each([0.004999, 0.05])(
+    'shows the partial-history notice when the breakdown includes older activity of %s USD',
+    olderActivityCostUsd => {
+      const markup = renderSessionInfo(
+        {
+          totalCostUsd: 0.25,
+          rootCostUsd: 0.25 - olderActivityCostUsd,
+          subagentCostUsd: 0,
+          olderActivityCostUsd,
+        },
+        tokenUsage
+      );
+
+      expect(markup).toContain('Token counts cover loaded activity only');
+    }
+  );
+
+  it('omits the partial-history notice when history is complete and no older activity exists', () => {
+    const markup = renderSessionInfo(
+      {
+        totalCostUsd: 0.25,
+        rootCostUsd: 0.25,
+        subagentCostUsd: 0,
+        olderActivityCostUsd: 0,
+      },
+      tokenUsage
+    );
+
+    expect(markup).not.toContain('Token counts cover loaded activity only');
+  });
+});
+
+const modelUsage: SessionModelUsage[] = [
+  {
+    providerID: 'anthropic',
+    modelID: 'claude-sonnet-4',
+    costUsd: 1.23456,
+    tokens: {
+      input: 1_234,
+      output: 89,
+      reasoning: 7,
+      cacheRead: 12_345,
+      cacheWrite: 6_789,
+    },
+  },
+  {
+    providerID: 'kilo',
+    modelID: 'anthropic/claude-opus-4.6',
+    costUsd: 0.05,
+    tokens: {
+      input: 2,
+      output: 3,
+      reasoning: 5,
+      cacheRead: 7,
+      cacheWrite: 11,
+    },
+  },
+];
+
+describe('SessionInfoDialog model usage', () => {
+  it('renders every model with its name, exact provider/model tuple, cost, and token counts', () => {
+    const markup = renderSessionInfo(undefined, undefined, false, modelUsage);
+
+    expect(markup).toContain('By model');
+    expect(markup).toContain('claude-sonnet-4');
+    expect(markup).toContain('anthropic / claude-sonnet-4');
+    expect(markup).toContain('$1.23');
+    expect(markup).toContain('claude-opus-4.6');
+    expect(markup).toContain('kilo / anthropic/claude-opus-4.6');
+    expect(markup).toContain('$0.05');
+
+    for (const [label, value] of [
+      ['Input', '1,234'],
+      ['Output', '89'],
+      ['Reasoning', '7'],
+      ['Cache read', '12,345'],
+      ['Cache write', '6,789'],
+      ['Input', '2'],
+      ['Output', '3'],
+      ['Reasoning', '5'],
+      ['Cache read', '7'],
+      ['Cache write', '11'],
+    ]) {
+      expect(markup).toMatch(new RegExp(`${label}</dt><dd[^>]*>${value}</dd>`));
+    }
+  });
+
+  it('uses native details and summary elements with five token buckets per model', () => {
+    const markup = renderSessionInfo(undefined, undefined, false, modelUsage);
+
+    expect(markup.match(/<details\b/g)).toHaveLength(2);
+    expect(markup.match(/<\/details>/g)).toHaveLength(2);
+    expect(markup.match(/<summary\b/g)).toHaveLength(2);
+    expect(markup.match(/<\/summary>/g)).toHaveLength(2);
+
+    for (const label of ['Input', 'Output', 'Reasoning', 'Cache read', 'Cache write']) {
+      expect(markup.match(new RegExp(`>${label}</dt>`, 'g'))).toHaveLength(2);
+    }
+  });
+
+  it.each([
+    { label: 'missing', sessionModelUsage: undefined },
+    { label: 'empty', sessionModelUsage: [] as SessionModelUsage[] },
+  ])('hides the By model section when usage is $label', ({ sessionModelUsage }) => {
+    const markup = renderSessionInfo(undefined, tokenUsage, false, sessionModelUsage);
+
+    expect(markup).not.toContain('By model');
+    expect(markup).not.toContain('Loaded main-agent activity only');
+  });
+
+  it('renders zero-cost and sub-cent models with their formatted costs', () => {
+    const markup = renderSessionInfo(undefined, undefined, false, [
+      {
+        providerID: 'provider-zero',
+        modelID: 'zero-cost-model',
+        costUsd: 0,
+        tokens: {
+          input: 0,
+          output: 0,
+          reasoning: 0,
+          cacheRead: 0,
+          cacheWrite: 0,
+        },
+      },
+      {
+        providerID: 'provider-subcent',
+        modelID: 'subcent-model',
+        costUsd: 0.004999,
+        tokens: {
+          input: 1,
+          output: 2,
+          reasoning: 3,
+          cacheRead: 4,
+          cacheWrite: 5,
+        },
+      },
+    ]);
+
+    expect(markup).toContain('zero-cost-model');
+    expect(markup).toContain('$0.00');
+    expect(markup).toContain('subcent-model');
+    expect(markup).toContain('&lt;$0.01');
+    expect(markup.match(/<details\b/g)).toHaveLength(2);
+  });
+
+  it('explains the loaded activity scope and labels the selected model', () => {
+    const markup = renderSessionInfo(undefined, tokenUsage, false, modelUsage);
+
+    expect(markup).toContain(
+      'Loaded main-agent activity only. Subagent and older-activity costs are not attributed to models.'
+    );
+    expect(markup).toMatch(/Selected model<\/dt>/);
+    expect(markup).not.toMatch(/>Model<\/dt>/);
   });
 });

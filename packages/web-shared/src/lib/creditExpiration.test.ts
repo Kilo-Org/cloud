@@ -3,15 +3,13 @@ import {
   credit_transactions as creditTransactionsTable,
   kilocode_users,
 } from '@kilocode/db/schema';
-import {
-  computeExpiration,
-  computeNextExpirationAmount,
-  processLocalExpirations,
-} from './creditExpiration';
+import { computeNextExpirationAmount, processLocalExpirations } from './creditExpiration';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
+import { computeExpiration } from '@kilocode/db/credit-expiration';
+import { grantCreditForCategory } from './promotionalCredits';
 
 const makeTransaction = (
   id: string,
@@ -506,7 +504,7 @@ describe('processLocalExpirations', () => {
     });
 
     const now = new Date('2024-01-15');
-    const result = await processLocalExpirations(user, now);
+    const result = await processLocalExpirations(user.id, now);
 
     expect(result).not.toBeNull();
 
@@ -519,6 +517,55 @@ describe('processLocalExpirations', () => {
     expect(expirationTxns).toHaveLength(1);
     expect(expirationTxns[0].amount_microdollars).toBe(-500); // 1000 - 500 used = 500 expired
     expect(expirationTxns[0].original_transaction_id).toBe(initialId);
+  });
+
+  it('expires against current persisted usage rather than a prior caller snapshot', async () => {
+    const user = await insertMigratedTestUser({
+      microdollars_used: 500,
+      total_microdollars_acquired: 1000,
+      next_credit_expiration_at: '2024-01-10T00:00:00Z',
+    });
+
+    const initialId = randomUUID();
+    await db.insert(creditTransactionsTable).values({
+      kilo_user_id: user.id,
+      amount_microdollars: 1000,
+      is_free: true,
+      expiry_date: '2024-01-10T00:00:00Z',
+      expiration_baseline_microdollars_used: 0,
+      original_baseline_microdollars_used: 0,
+      id: initialId,
+      description: 'Test credits',
+    });
+
+    await db
+      .update(kilocode_users)
+      .set({ microdollars_used: 900 })
+      .where(eq(kilocode_users.id, user.id));
+
+    const now = new Date('2024-01-15');
+    const result = await processLocalExpirations(user.id, now);
+
+    expect(result).toEqual({
+      microdollars_used: 900,
+      total_microdollars_acquired: 900,
+      next_credit_expiration_at: null,
+    });
+
+    const committed = await db
+      .select()
+      .from(creditTransactionsTable)
+      .where(eq(creditTransactionsTable.credit_category, 'credits_expired'));
+    expect(committed).toHaveLength(1);
+    expect(committed[0].amount_microdollars).toBe(-100);
+    expect(committed[0].original_baseline_microdollars_used).toBe(900);
+
+    const updatedUser = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(updatedUser!.total_microdollars_acquired).toBe(900);
+    expect(updatedUser!.microdollars_used).toBe(900);
+    expect(updatedUser!.next_credit_expiration_at).toBeNull();
   });
 
   it('is idempotent - calling twice does not create duplicate expirations', async () => {
@@ -539,21 +586,9 @@ describe('processLocalExpirations', () => {
 
     const now = new Date('2024-01-15');
 
-    // First call
-    await processLocalExpirations(user, now);
-
-    // Get updated next_credit_expiration_at
-    const updatedUser = await db.query.kilocode_users.findFirst({
-      where: eq(kilocode_users.id, user.id),
-      columns: { next_credit_expiration_at: true },
-    });
-
-    // Second call with updated user
-    const userForSecondCall = {
-      ...user,
-      next_credit_expiration_at: updatedUser?.next_credit_expiration_at ?? null,
-    };
-    await processLocalExpirations(userForSecondCall, now);
+    const first = await processLocalExpirations(user.id, now);
+    const second = await processLocalExpirations(user.id, now);
+    expect(second).toEqual(first);
 
     // Should still only have one expiration transaction
     const expirationTxns = await db
@@ -564,7 +599,7 @@ describe('processLocalExpirations', () => {
     expect(expirationTxns).toHaveLength(1);
   });
 
-  it('returns null when no expirations to process', async () => {
+  it('returns current state when no expirations are due', async () => {
     const user = await insertMigratedTestUser({
       microdollars_used: 0,
       next_credit_expiration_at: '2024-02-01T00:00:00Z', // Future date
@@ -581,12 +616,16 @@ describe('processLocalExpirations', () => {
     });
 
     const now = new Date('2024-01-15');
-    const result = await processLocalExpirations(user, now);
+    const result = await processLocalExpirations(user.id, now);
 
-    expect(result).toBeNull();
+    expect(result).toEqual({
+      microdollars_used: user.microdollars_used,
+      total_microdollars_acquired: user.total_microdollars_acquired,
+      next_credit_expiration_at: user.next_credit_expiration_at,
+    });
   });
 
-  it('handles concurrent execution - one succeeds, other returns null', async () => {
+  it('returns the same committed state to concurrent callers without duplicate expirations', async () => {
     const user = await insertMigratedTestUser({
       microdollars_used: 0,
       next_credit_expiration_at: '2024-01-10T00:00:00Z',
@@ -604,21 +643,18 @@ describe('processLocalExpirations', () => {
 
     const now = new Date('2024-01-15');
 
-    // Launch two concurrent processes
     const [result1, result2] = await Promise.all([
-      processLocalExpirations(user, now),
-      processLocalExpirations(user, now),
+      processLocalExpirations(user.id, now),
+      processLocalExpirations(user.id, now),
     ]);
 
-    // Exactly one should succeed, one should return null (optimistic lock failed)
-    const results = [result1, result2];
-    const successes = results.filter(r => r !== null);
-    const nulls = results.filter(r => r === null);
+    expect(result1).toEqual(result2);
+    expect(result1).toEqual({
+      microdollars_used: 0,
+      total_microdollars_acquired: user.total_microdollars_acquired - 1000,
+      next_credit_expiration_at: null,
+    });
 
-    expect(successes).toHaveLength(1);
-    expect(nulls).toHaveLength(1);
-
-    // Verify: Only ONE expiration transaction created (no duplicates)
     const expirations = await db
       .select()
       .from(creditTransactionsTable)
@@ -629,7 +665,7 @@ describe('processLocalExpirations', () => {
   });
 
   it('grantCreditForCategory sets next_credit_expiration_at correctly', async () => {
-    const { grantCreditForCategory } = await import('./promotionalCredits');
+    const year = new Date().getUTCFullYear() + 3;
 
     // Create user with no expiration date set
     const user = await insertMigratedTestUser({
@@ -639,7 +675,7 @@ describe('processLocalExpirations', () => {
     });
 
     // Grant credits with expiry - should set next_credit_expiration_at
-    const expiry1 = new Date('2024-02-15T00:00:00Z');
+    const expiry1 = new Date(Date.UTC(year, 1, 15));
     await grantCreditForCategory(user, {
       credit_category: 'custom',
       counts_as_selfservice: false,
@@ -654,7 +690,7 @@ describe('processLocalExpirations', () => {
     expect(new Date(userAfter1!.next_credit_expiration_at!).getTime()).toBe(expiry1.getTime());
 
     // Grant credits with earlier expiry - should update to earlier date
-    const expiry2 = new Date('2024-01-10T00:00:00Z');
+    const expiry2 = new Date(Date.UTC(year, 0, 10));
     await grantCreditForCategory(userAfter1!, {
       credit_category: 'custom',
       counts_as_selfservice: false,
@@ -669,7 +705,7 @@ describe('processLocalExpirations', () => {
     expect(new Date(userAfter2!.next_credit_expiration_at!).getTime()).toBe(expiry2.getTime());
 
     // Grant credits with later expiry - should NOT update (keep earlier date)
-    const expiry3 = new Date('2024-03-01T00:00:00Z');
+    const expiry3 = new Date(Date.UTC(year, 2, 1));
     await grantCreditForCategory(userAfter2!, {
       credit_category: 'custom',
       counts_as_selfservice: false,
@@ -695,16 +731,16 @@ describe('processLocalExpirations', () => {
     // 7. User spends $1 more (microdollars_used = 8_000_000)
     // 8. Jan 25: Expire B - verify original_baseline unchanged
 
-    // Import grantCreditForCategory
-    const { grantCreditForCategory } = await import('./promotionalCredits');
+    const year = new Date().getUTCFullYear() + 3;
 
     // Step 1: Create user with non-zero usage
     const user = await insertMigratedTestUser({
       microdollars_used: 2_000_000, // Start with $2 already spent
+      total_microdollars_acquired: 2_000_000,
     });
 
     // Step 2: Acquire credits A ($10, expires Jan 10) using production function
-    const expiryA = new Date('2024-01-10T00:00:00Z');
+    const expiryA = new Date(Date.UTC(year, 0, 10));
     const resultA = await grantCreditForCategory(user, {
       credit_category: 'custom',
       counts_as_selfservice: false,
@@ -740,7 +776,7 @@ describe('processLocalExpirations', () => {
     });
 
     // Step 4: Acquire credits B ($5, expires Jan 20) using production function
-    const expiryB = new Date('2024-01-20T00:00:00Z');
+    const expiryB = new Date(Date.UTC(year, 0, 20));
     const resultB = await grantCreditForCategory(userAfterUsage1!, {
       credit_category: 'custom',
       counts_as_selfservice: false,
@@ -768,9 +804,9 @@ describe('processLocalExpirations', () => {
     const userAtJan15 = await db.query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });
-    const jan15 = new Date('2024-01-15T00:00:00Z');
+    const jan15 = new Date(Date.UTC(year, 0, 15));
 
-    await processLocalExpirations(userAtJan15!, jan15);
+    await processLocalExpirations(userAtJan15!.id, jan15);
 
     // Verify: A expired, B's expiration_baseline shifted but original_baseline unchanged
     const txnsAfterFirstExpiry = await db
@@ -807,11 +843,9 @@ describe('processLocalExpirations', () => {
       where: eq(kilocode_users.id, user.id),
     });
     // Verify next_credit_expiration_at was updated to B's expiry after A expired
-    expect(new Date(userAtJan25!.next_credit_expiration_at!).getTime()).toBe(
-      new Date('2024-01-20T00:00:00Z').getTime()
-    );
-    const jan25 = new Date('2024-01-25T00:00:00Z');
-    await processLocalExpirations(userAtJan25!, jan25);
+    expect(new Date(userAtJan25!.next_credit_expiration_at!).getTime()).toBe(expiryB.getTime());
+    const jan25 = new Date(Date.UTC(year, 0, 25));
+    await processLocalExpirations(userAtJan25!.id, jan25);
 
     // Final verification
     const finalTxns = await db
@@ -837,7 +871,7 @@ describe('processLocalExpirations', () => {
     expect(expirationB!.amount_microdollars).toBe(-4_000_000);
   });
 
-  it('zero-amount expirations are created and do not affect balance', async () => {
+  it('zero-amount expirations are created, do not affect balance, and refresh the pointer', async () => {
     // Scenario: User has fully consumed credits before expiration
     // Should create a zero-amount expiration transaction and not affect balance
     const initialAcquired = 5_000_000; // $5
@@ -862,9 +896,13 @@ describe('processLocalExpirations', () => {
     });
 
     const now = new Date('2024-01-15');
-    const result = await processLocalExpirations(user, now);
+    const result = await processLocalExpirations(user.id, now);
 
-    expect(result).not.toBeNull();
+    expect(result).toEqual({
+      total_microdollars_acquired: initialAcquired,
+      microdollars_used: initialUsed,
+      next_credit_expiration_at: null,
+    });
 
     // Verify zero-amount expiration transaction was created
     const expirationTxns = await db

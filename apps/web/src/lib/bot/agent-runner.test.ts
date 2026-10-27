@@ -13,6 +13,8 @@ import {
   getGitLabInstanceUrlForOrganization,
   getGitLabTokenForOrganization,
   getGitLabTokenForUser,
+  validateGitLabRepoAccessForOrganization,
+  validateGitLabRepoAccessForUser,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import {
   formatGitHubRepositoriesForPrompt,
@@ -100,6 +102,8 @@ jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
   getGitLabInstanceUrlForOrganization: jest.fn(),
   getGitLabInstanceUrlForUser: jest.fn(),
   buildGitLabCloneUrl: jest.fn(),
+  validateGitLabRepoAccessForOrganization: jest.fn(),
+  validateGitLabRepoAccessForUser: jest.fn(),
 }));
 jest.mock('@/lib/bot-users/bot-user-service', () => ({
   getBotUserId: jest.fn(async () => 'bot-user-1'),
@@ -241,6 +245,8 @@ beforeEach(() => {
   });
   jest.mocked(getGitLabTokenForOrganization).mockResolvedValue('gitlab-token');
   jest.mocked(getGitLabTokenForUser).mockResolvedValue('gitlab-token');
+  jest.mocked(validateGitLabRepoAccessForOrganization).mockResolvedValue(true);
+  jest.mocked(validateGitLabRepoAccessForUser).mockResolvedValue(true);
   jest.mocked(getGitLabInstanceUrlForOrganization).mockResolvedValue('https://gitlab.com');
   jest.mocked(buildGitLabCloneUrl).mockReturnValue(`https://gitlab.com/${gitlabProject}.git`);
 });

@@ -32,6 +32,8 @@ const ASK: WaitingAsk = {
   organizationId: 'org_1',
   userId: 'u1',
   recordedAt: 1_750_000_000_000,
+  statusUpdatedAt: null,
+  boundPermissionId: 'perm_1',
 };
 
 /** The ActivityKit id the Live Activity's press reports as its source. */

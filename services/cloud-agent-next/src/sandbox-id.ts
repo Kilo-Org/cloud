@@ -11,12 +11,6 @@ import type { AgentSandboxProvider, SandboxId, Env } from './types.js';
 import { CODE_REVIEW_PLATFORM } from './session-identity.js';
 import type { Sandbox } from '@cloudflare/sandbox';
 import {
-  parseVercelSandboxEnrollment,
-  parseVercelSandboxRuntimeConfig,
-  type VercelSandboxEnrollmentEnv,
-  type VercelSandboxRuntimeConfigEnv,
-} from './agent-sandbox/vercel/vercel-runtime-config.js';
-import {
   isCloudflareContainersEnrolled,
   type CloudflareContainersEnrollmentEnv,
 } from './agent-sandbox/cloudflare-containers/cloudflare-containers-runtime-config.js';
@@ -232,9 +226,7 @@ export type SandboxSelection = {
 
 export type SandboxSelectionEnv = {
   PER_SESSION_SANDBOX_ORG_IDS?: string;
-} & VercelSandboxEnrollmentEnv &
-  VercelSandboxRuntimeConfigEnv &
-  CloudflareContainersEnrollmentEnv &
+} & CloudflareContainersEnrollmentEnv &
   Pick<
     Env,
     | 'CLOUD_AGENT_CONTAINER_BILLING_ENABLED'
@@ -253,10 +245,8 @@ type SelectSandboxForNewSessionInput = {
 };
 
 /**
- * Resolves the sandbox provider for an already-computed sandbox ID. Vercel
- * is call-home only: isolated `workspace_` sessions whose owner is on
- * `VERCEL_SANDBOX_ORG_IDS` (`*` includes personal) with complete operational
- * configuration. Other owners use Cloudflare.
+ * Resolves the platform provider or an explicitly selected allocation.
+ * Vercel admission belongs to BYOC registration; platform defaults use Cloudflare.
  */
 export function selectSandboxProvider(input: {
   env: SandboxSelectionEnv;
@@ -293,21 +283,6 @@ export function selectDefaultSandboxProvider(input: {
   });
   const eligible = (provider: AgentSandboxProvider): boolean =>
     !enforced || providerSupportsEnforcedBilling(provider);
-
-  const enrollment = parseVercelSandboxEnrollment(input.env);
-  const runtimeConfig = parseVercelSandboxRuntimeConfig(input.env);
-  const enrolled =
-    input.orgId !== undefined
-      ? enrollment.orgIds.has('*') || enrollment.orgIds.has(input.orgId)
-      : enrollment.allowPersonal;
-  const useVercel =
-    eligible('vercel') &&
-    input.isolated &&
-    enrollment.enabled &&
-    enrolled &&
-    runtimeConfig !== undefined;
-
-  if (useVercel) return 'vercel';
 
   const useContainers =
     eligible('cloudflare-containers') &&
@@ -390,9 +365,6 @@ export function getDefaultSandboxDestination(
     userId: owner.userId,
     isolated: true,
   });
-  if (provider === 'vercel') {
-    return { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' };
-  }
   if (provider === 'cloudflare-containers') {
     return getSandboxAllocationRequest(CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION);
   }

@@ -227,7 +227,6 @@
     "hideBalance": "Ficha salio",
     "showBalance": "Onyesha salio",
     "balanceHidden": "Salio limefichwa",
-    "bonusCreditsExpiring": "Muda wa salio la {{amount}} unaisha {{date}}.",
     "signOutTitle": "Ungependa kutoka kwenye akaunti?",
     "signOutMessage": "Utahitaji kuingia tena ili kufikia eneo lako la kazi.",
     "deleteAccountTitle": "Ungependa kufuta akaunti?",
@@ -1484,6 +1483,22 @@
       "loadingProposals": "Inapakia mapendekezo",
       "couldNotLoadProposals": "Imeshindikana kupakia mapendekezo.",
       "noProposals": "Hakuna mapendekezo",
+      "proposalDetails": "Maelezo ya pendekezo",
+      "proposalTitle": "Kichwa cha pendekezo",
+      "rationale": "Sababu",
+      "saveFirst": "Hifadhi mabadiliko yako kabla ya kufungua ombi la kuunganisha mabadiliko.",
+      "proposalSaved": "Pendekezo limehifadhiwa",
+      "proposalDismissed": "Pendekezo limeondolewa",
+      "dismissProposalTitle": "Ondoa pendekezo?",
+      "dismissProposalMessage": "Pendekezo hili litaondolewa kwenye orodha inayotumika na haliwezi kurejeshwa.",
+      "prOpened": "Ombi la kuunganisha mabadiliko ya REVIEW.md limefunguliwa",
+      "alreadyPresent": "Mwongozo tayari upo kwenye REVIEW.md",
+      "status": {
+        "edited": "Limehaririwa",
+        "opening_change_request": "Inafungua PR",
+        "change_request_failed": "PR imeshindikana",
+        "superseded": "Tayari upo"
+      },
       "noProposalsDescription": "Mapendekezo ya kumbukumbu ya ukaguzi yataonekana hapa baada ya Kilo kuchambua majibu ya watunzaji wa mradi."
     },
     "manualReview": {
@@ -2576,7 +2591,9 @@
       "retrying": "Inajaribu tena…",
       "retryDeny": "Jaribu tena kukataa",
       "retryAllowOnce": "Jaribu tena kuruhusu mara moja",
-      "retryAlwaysAllow": "Jaribu tena kuruhusu daima"
+      "retryAlwaysAllow": "Jaribu tena kuruhusu daima",
+      "unreadableTitle": "Ombi la ruhusa halikuweza kusomwa",
+      "unreadableBody": "Wakala anasubiri uamuzi wa ruhusa ambao programu hii haiwezi kuonyesha. Sasisha programu au CLI, au jibu ombi hilo kwenye CLI ili kuendelea."
     },
     "questionCard": {
       "title": "Wakala anahitaji jibu",
@@ -2968,8 +2985,9 @@
     "unavailableDevice": "Uingizaji kwa sauti haupatikani kwenye kifaa hiki.",
     "unavailableLanguage": "Uingizaji kwa sauti haupatikani kwa lugha ya kifaa hiki.",
     "languageNotInstalledTitle": "Uingizaji kwa sauti kwa {{language}} hauko tayari bado",
-    "languageNotInstalledMessage": "Mafaili ya sauti ya nje ya mtandao ya {{language}} hayajasakinishwa kwenye simu hii. Pakua mafaili hayo, kisha ujaribu tena uingizaji kwa sauti.",
+    "languageNotInstalledMessage": "Mafaili ya sauti ya nje ya mtandao ya {{language}} hayajawekwa, na uchakataji mtandaoni umezimwa. Kwa kupakua mafaili hayo au kuwasha uchakataji mtandaoni tena, utaweza kutumia uingizaji kwa sauti.",
     "downloadOfflineModel": "Pakua",
+    "useOnlineTranscription": "Ruhusu uchakataji mtandaoni",
     "offlineModelDownloadScheduled": "Mafaili ya sauti ya nje ya mtandao yatapakuliwa nyuma ya pazia. Jaribu tena uingizaji kwa sauti baadaye.",
     "listeningStopped": "Usikilizaji umesimama.",
     "transcribing": "Inanukuuza...",
@@ -3143,7 +3161,7 @@
     "creditActivity": {
       "emptyDescription": "Ununuzi, matumizi, na marekebisho ya salio kwa shirika hili yataonekana hapa yanapotokea.",
       "emptyTitle": "Hakuna shughuli za salio",
-      "expires": "Muda unaisha {{date}}",
+      "expiresUtc": "Muda unaisha {{date}} (UTC)",
       "title": "Shughuli za salio",
       "transactionFallback": "Muamala wa salio",
       "category": {
@@ -3730,6 +3748,7 @@
     "title": "Wasifu",
     "entrySubtitle": "Tumia tena mipangilio ya mazingira katika vipindi vyote",
     "newProfile": "Wasifu mpya",
+    "openHint": "Hufungua wasifu",
     "emptyTitle": "Bado hakuna wasifu",
     "emptyDescription": "Unda wasifu ili kutumia tena vigezo vya mazingira, amri za usanidi na ujuzi katika vipindi vyote.",
     "loadFailed": "Haikuweza kupakia wasifu",
@@ -3823,6 +3842,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Thamani zinazoonyeshwa kama •••• huhifadhi siri zake zilizohifadhiwa; badilisha thamani ili kuizungusha. Kubadilisha mstari wa amri kunahitaji kila thamani tena",
+      "headersHint": "Thamani zinazoonyeshwa kama •••• huhifadhi siri zake zilizohifadhiwa; badilisha thamani ili kuizungusha. Kubadilisha URL kunahitaji kila thamani tena",
       "nameRequired": "Ingiza jina la seva",
       "nameInvalid": "Jina linaweza kutumia herufi za ASCII, nambari, mistari chini na deshi pekee, hadi vibambo 100",
       "commandRequired": "Ingiza amri",
@@ -3921,6 +3942,10 @@
   "credits": {
     "title": "Nunua salio",
     "description": "Salio ni ununuzi wa mara moja unaoongezwa kwenye usawa wako wa Kilo kwa kuendesha vikao vya kuandika msimbo kwa AI katika Kilo App. Duka hukutoza akaunti yako na salio huongezwa baada ya duka kuthibitisha malipo.",
+    "nextExpiry": "Muda wa salio la {{amount}} unaisha {{date}} (UTC). Salio linaloisha muda mapema zaidi hutumika kwanza.",
+    "appStoreExpiry": "Salio lililonunuliwa kupitia App Store halina muda wa kuisha.",
+    "playOneYearExpiry": "Muda wa salio hili unaisha mwaka mmoja wa kalenda baada ya ununuzi.",
+    "playNonexpiring": "Salio hili halina muda wa kuisha.",
     "packLabel": "Ongeza salio la {{amount}}",
     "priceUnavailable": "Bei haipatikani",
     "purchased": "Salio limeongezwa kwenye usawa wako.",
@@ -3961,11 +3986,13 @@
       "namePlaceholder": "Hitilafu, Mawazo, Toleo…",
       "emoji": "Emoji",
       "mode": "Hali",
-      "defaultsHint": "Vikao vinavyoanzishwa kutoka orodha hii hutumia mipangilio hii chaguo-msingi."
+      "defaultsHint": "Vikao vinavyoanzishwa kutoka orodha hii hutumia mipangilio hii chaguo-msingi.",
+      "saveFailed": "Imeshindikana kuhifadhi orodha. Angalia muunganisho wako kisha ujaribu tena."
     },
     "list": {
       "addPlaceholder": "Ongeza kazi",
       "add": "Ongeza kazi",
+      "addFailed": "Imeshindikana kuongeza kazi. Angalia muunganisho wako kisha ujaribu tena.",
       "empty": "Hakuna kazi bado",
       "setDefaults": "Weka hazina, hali na modeli",
       "completed_one": "Zimekamilika ({{count}})",
@@ -4002,7 +4029,9 @@
       "startNewSession": "Anza kikao kipya",
       "startNewSessionHint": "Bonyeza kwa muda mrefu kuanza kikao kipya.",
       "linkSession": "Unganisha kikao",
-      "linkFailed": "Imeshindikana kuunganisha kikao na kazi"
+      "linkFailed": "Imeshindikana kuunganisha kikao na kazi",
+      "moveToAnotherTodo": "Hamisha kwenye kazi nyingine",
+      "startRefreshFailed": "Kikao kilianza, lakini orodha hii haikusasishwa."
     },
     "linkSession": {
       "title": "Kuunganisha kikao",
@@ -4011,6 +4040,7 @@
     },
     "upNext": "Kinachofuata",
     "sessionTodo": "Kazi: {{title}}",
+    "openTodoHint": "Hufungua kazi.",
     "linkToTodo": "Unganisha na kazi",
     "candidates": {
       "empty": "Hakuna kazi zilizo wazi"

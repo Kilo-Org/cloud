@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { useTRPC } from '@/lib/trpc/utils';
 import { KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { formatPercent, getMonthlyBonusPreview } from '@/components/profile/kilo-pass/utils';
+import { CreditExpiryNotice } from '@/components/payment/CreditExpiryNotice';
 import {
   createKiloClawSignupDisplay,
   formatMicrodollars,
@@ -807,6 +808,9 @@ export function WelcomePage() {
                 />
               )}
 
+              <div className="mb-3">
+                <CreditExpiryNotice purchase="pass" />
+              </div>
               <Button
                 onClick={handleKiloPassCheckout}
                 disabled={!kiloPassReady || kiloPassUpsell.isPending}

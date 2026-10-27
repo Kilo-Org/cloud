@@ -30,11 +30,6 @@ const attachments = (filename: string) => ({
   files: [filename],
 });
 
-const images = (filename: string) => ({
-  path: MESSAGE_UUID,
-  files: [filename],
-});
-
 describe('baseSendMessageNextSchema', () => {
   it('accepts an empty prompt with an attachment', () => {
     const result = baseSendMessageNextSchema.safeParse({
@@ -42,16 +37,6 @@ describe('baseSendMessageNextSchema', () => {
       messageId: MESSAGE_ID,
       payload: promptPayload(''),
       attachments: attachments(`${ATTACHMENT_ID}.png`),
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it('accepts an empty prompt with an image', () => {
-    const result = baseSendMessageNextSchema.safeParse({
-      cloudAgentSessionId: 'cloud-session-1',
-      messageId: MESSAGE_ID,
-      payload: promptPayload(''),
-      images: images(`${ATTACHMENT_ID}.png`),
     });
     expect(result.success).toBe(true);
   });

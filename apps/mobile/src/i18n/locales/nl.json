@@ -227,7 +227,6 @@
     "hideBalance": "Saldo verbergen",
     "showBalance": "Saldo tonen",
     "balanceHidden": "Saldo verborgen",
-    "bonusCreditsExpiring": "{{amount}} aan tegoed verloopt op {{date}}.",
     "signOutTitle": "Afmelden?",
     "signOutMessage": "Je moet je opnieuw aanmelden om toegang te krijgen tot je werkruimte.",
     "deleteAccountTitle": "Account verwijderen?",
@@ -1014,6 +1013,22 @@
       "loading": "Reviewgeheugen laden",
       "loadingProposals": "Voorstellen laden",
       "noProposals": "Geen voorstellen",
+      "proposalDetails": "Voorsteldetails",
+      "proposalTitle": "Titel van het voorstel",
+      "rationale": "Onderbouwing",
+      "saveFirst": "Sla je wijzigingen op voordat je een pull request opent.",
+      "proposalSaved": "Voorstel opgeslagen",
+      "proposalDismissed": "Voorstel afgewezen",
+      "dismissProposalTitle": "Voorstel afwijzen?",
+      "dismissProposalMessage": "Dit voorstel wordt uit de actieve lijst verwijderd en kan niet worden hersteld.",
+      "prOpened": "Pull request voor REVIEW.md geopend",
+      "alreadyPresent": "De richtlijnen staan al in REVIEW.md",
+      "status": {
+        "edited": "Bewerkt",
+        "opening_change_request": "PR openen",
+        "change_request_failed": "PR mislukt",
+        "superseded": "Al aanwezig"
+      },
       "noProposalsDescription": "Hier verschijnen voorstellen uit het reviewgeheugen nadat Kilo antwoorden van beheerders heeft geanalyseerd.",
       "off": "Het reviewgeheugen is uitgeschakeld.",
       "on": "Het reviewgeheugen is ingeschakeld.",
@@ -2052,7 +2067,9 @@
       "retrying": "Opnieuw proberen…",
       "retryDeny": "Opnieuw weigeren",
       "retryAllowOnce": "Opnieuw eenmalig toestaan",
-      "retryAlwaysAllow": "Opnieuw altijd toestaan"
+      "retryAlwaysAllow": "Opnieuw altijd toestaan",
+      "unreadableTitle": "Toestemmingsverzoek kon niet worden gelezen",
+      "unreadableBody": "De agent wacht op een toestemmingsbeslissing die deze app niet kan tonen. Werk de app of de CLI bij, of beantwoord het verzoek in de CLI om door te gaan."
     },
     "questionCard": {
       "title": "Invoer voor de agent nodig",
@@ -2444,8 +2461,9 @@
     "unavailableDevice": "Spraakinvoer is niet beschikbaar op dit apparaat.",
     "unavailableLanguage": "Spraakinvoer is niet beschikbaar voor de taal van dit apparaat.",
     "languageNotInstalledTitle": "Spraakinvoer voor {{language}} is nog niet gereed",
-    "languageNotInstalledMessage": "De offline spraakbestanden voor {{language}} zijn niet op deze telefoon geïnstalleerd. Download ze en probeer spraakinvoer opnieuw.",
+    "languageNotInstalledMessage": "De offline spraakbestanden voor {{language}} zijn niet geïnstalleerd en online transcriptie staat uit. Download de bestanden of zet online transcriptie weer aan om spraakinvoer te gebruiken.",
     "downloadOfflineModel": "Downloaden",
+    "useOnlineTranscription": "Online transcriptie toestaan",
     "offlineModelDownloadScheduled": "De offline spraakbestanden worden op de achtergrond gedownload. Probeer spraakinvoer later opnieuw.",
     "listeningStopped": "Het luisteren is gestopt.",
     "transcribing": "Transcriberen...",
@@ -3135,7 +3153,7 @@
     "creditActivity": {
       "emptyDescription": "Hier verschijnen aankopen, verbruik en aanpassingen van het tegoed van deze organisatie zodra ze plaatsvinden.",
       "emptyTitle": "Geen tegoedtransacties",
-      "expires": "Verloopt op {{date}}",
+      "expiresUtc": "Verloopt op {{date}} (UTC)",
       "title": "Tegoedtransacties",
       "transactionFallback": "Tegoedtransactie",
       "category": {
@@ -3730,6 +3748,7 @@
     "title": "Profielen",
     "entrySubtitle": "Hergebruik omgevingsinstellingen tussen sessies",
     "newProfile": "Nieuw profiel",
+    "openHint": "Opent het profiel",
     "emptyTitle": "Nog geen profielen",
     "emptyDescription": "Maak een profiel aan om omgevingsvariabelen, installatieopdrachten en vaardigheden tijdens sessies opnieuw te gebruiken.",
     "loadFailed": "Kan profielen niet laden",
@@ -3823,6 +3842,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Waarden weergegeven als •••• behouden hun opgeslagen geheim; vervang een waarde om deze te roteren. Het wijzigen van de opdrachtregel vereist opnieuw elke waarde",
+      "headersHint": "Waarden weergegeven als •••• behouden hun opgeslagen geheim; vervang een waarde om deze te roteren. Het wijzigen van de URL vereist opnieuw elke waarde",
       "nameRequired": "Voer een servernaam in",
       "nameInvalid": "De naam mag alleen ASCII-letters, cijfers, onderstrepingstekens en streepjes bevatten, tot maximaal 100 tekens",
       "commandRequired": "Voer een opdracht in",
@@ -3921,6 +3942,10 @@
   "credits": {
     "title": "Credits kopen",
     "description": "Credits zijn een eenmalige aankoop die aan je Kilo-saldo wordt toegevoegd voor AI-coderingssessies in Kilo App. De store belast je account en de credits worden toegevoegd nadat de store de betaling bevestigt.",
+    "nextExpiry": "{{amount}} aan credits verloopt op {{date}} (UTC). Credits die het eerst verlopen, worden eerst gebruikt.",
+    "appStoreExpiry": "Credits die via de App Store zijn gekocht, verlopen niet.",
+    "playOneYearExpiry": "Deze credits verlopen één kalenderjaar na aankoop.",
+    "playNonexpiring": "Deze credits verlopen niet.",
     "packLabel": "{{amount}} aan credits toevoegen",
     "priceUnavailable": "Prijs niet beschikbaar",
     "purchased": "Er zijn credits aan je saldo toegevoegd.",
@@ -3961,11 +3986,13 @@
       "namePlaceholder": "Fouten, ideeën, releases…",
       "emoji": "Emoji",
       "mode": "Modus",
-      "defaultsHint": "Sessies die je vanaf deze lijst start, gebruiken deze standaardwaarden."
+      "defaultsHint": "Sessies die je vanaf deze lijst start, gebruiken deze standaardwaarden.",
+      "saveFailed": "Kon de lijst niet opslaan. Controleer je verbinding en probeer het opnieuw."
     },
     "list": {
       "addPlaceholder": "Een taak toevoegen",
       "add": "Taak toevoegen",
+      "addFailed": "Kon de taak niet toevoegen. Controleer je verbinding en probeer het opnieuw.",
       "empty": "Nog geen taken",
       "setDefaults": "Coderepository, modus en model instellen",
       "completed_one": "Voltooid ({{count}})",
@@ -4002,7 +4029,9 @@
       "startNewSession": "Nieuwe sessie starten",
       "startNewSessionHint": "Houd ingedrukt om een nieuwe sessie te starten.",
       "linkSession": "Sessie koppelen",
-      "linkFailed": "De sessie kon niet aan de taak worden gekoppeld"
+      "linkFailed": "De sessie kon niet aan de taak worden gekoppeld",
+      "moveToAnotherTodo": "Naar een andere taak verplaatsen",
+      "startRefreshFailed": "De sessie is gestart, maar deze lijst is niet bijgewerkt."
     },
     "linkSession": {
       "title": "Een sessie koppelen",
@@ -4011,6 +4040,7 @@
     },
     "upNext": "Hierna",
     "sessionTodo": "Taak: {{title}}",
+    "openTodoHint": "Opent de taak.",
     "linkToTodo": "Aan een taak koppelen",
     "candidates": {
       "empty": "Geen open taken"

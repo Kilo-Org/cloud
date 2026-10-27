@@ -141,6 +141,23 @@ describe('mcp-catalog catalog', () => {
       expect(isDenylistedPath('activeSessions.getToken')).toBe(false);
     });
 
+    it('withholds Vercel secrets and resource mutations while retaining status reads', () => {
+      for (const prefix of ['vercelCompute', 'organizations.vercelCompute']) {
+        for (const method of [
+          'add',
+          'discoverTeams',
+          'discoverProjects',
+          'remove',
+          'retrySetup',
+          'upgradeRuntime',
+        ]) {
+          expect(isDenylistedPath(`${prefix}.${method}`)).toBe(true);
+        }
+        expect(isDenylistedPath(`${prefix}.getStatus`)).toBe(false);
+        expect(isDenylistedPath(`${prefix}.getEnrollment`)).toBe(false);
+      }
+    });
+
     it('withholds briefing cost confirmation while retaining preparation and read access', () => {
       const leaves = collectCatalogLeaves(rootRouter).filter(leaf =>
         leaf.path.startsWith('agentBriefing.')

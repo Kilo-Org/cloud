@@ -227,7 +227,6 @@
     "hideBalance": "Kache balans",
     "showBalance": "Montre balans",
     "balanceHidden": "Balans kache",
-    "bonusCreditsExpiring": "{{amount}} nan kredi ap ekspire {{date}}.",
     "signOutTitle": "Dekonekte?",
     "signOutMessage": "W ap bezwen konekte ankò pou jwenn aksè nan espas travay ou.",
     "deleteAccountTitle": "Efase kont?",
@@ -1484,6 +1483,22 @@
       "loadingProposals": "Ap chaje pwopozisyon yo",
       "couldNotLoadProposals": "Nou pa t ka chaje pwopozisyon yo.",
       "noProposals": "Pa gen pwopozisyon",
+      "proposalDetails": "Detay pwopozisyon an",
+      "proposalTitle": "Tit pwopozisyon an",
+      "rationale": "Rezon",
+      "saveFirst": "Anrejistre chanjman ou yo anvan ou ouvri yon pull request.",
+      "proposalSaved": "Pwopozisyon an anrejistre",
+      "proposalDismissed": "Pwopozisyon an rejte",
+      "dismissProposalTitle": "Rejte pwopozisyon an?",
+      "dismissProposalMessage": "Pwopozisyon sa a p ap nan lis aktif la ankò, epi ou p ap kapab retabli li.",
+      "prOpened": "Pull request pou REVIEW.md ouvri",
+      "alreadyPresent": "Direktiv yo deja nan REVIEW.md",
+      "status": {
+        "edited": "Modifye",
+        "opening_change_request": "Ap ouvri PR",
+        "change_request_failed": "Ouvèti PR la echwe",
+        "superseded": "Deja prezan"
+      },
       "noProposalsDescription": "Pwopozisyon memwa revizyon an parèt isit la apre Kilo analize repons moun ki responsab antretyen kòd la."
     },
     "manualReview": {
@@ -2576,7 +2591,9 @@
       "retrying": "Ap eseye ankò…",
       "retryDeny": "Eseye refize ankò",
       "retryAllowOnce": "Eseye pèmèt yon sèl fwa ankò",
-      "retryAlwaysAllow": "Eseye toujou pèmèt ankò"
+      "retryAlwaysAllow": "Eseye toujou pèmèt ankò",
+      "unreadableTitle": "Demann pèmisyon an pa t ka li",
+      "unreadableBody": "Ajan an ap tann yon desizyon pèmisyon a, men aplikasyon sa a pa ka montre demann lan. Mete aplikasyon an oswa CLI a ajou, oswa reponn demann lan nan CLI a pou w ka kontinye."
     },
     "questionCard": {
       "title": "Ajan an bezwen yon repons",
@@ -2968,8 +2985,9 @@
     "unavailableDevice": "Dikte a pa disponib sou aparèy sa a.",
     "unavailableLanguage": "Dikte a pa disponib nan lang aparèy sa a.",
     "languageNotInstalledTitle": "Dikte pou {{language}} poko pare",
-    "languageNotInstalledMessage": "Fichye lapawòl offline pou {{language}} pa enstale sou telefòn sa a. Telechaje yo, epi eseye dikte ankò.",
+    "languageNotInstalledMessage": "Fichye lapawòl offline pou {{language}} yo pa enstale, e transkripsyon sou entènèt a fèmen. Pou w ka sèvi ak dikte vwa a, ou dwe enstale fichye yo oswa reaktive transkripsyon sou entènèt la.",
     "downloadOfflineModel": "Telechaje",
+    "useOnlineTranscription": "Pèmèt transkripsyon sou entènèt",
     "offlineModelDownloadScheduled": "Fichye lapawòl offline yo ap telechaje nan background la. Eseye dikte ankò pita.",
     "listeningStopped": "Sistèm nan sispann koute.",
     "transcribing": "Ap transkripte...",
@@ -3143,7 +3161,7 @@
     "creditActivity": {
       "emptyDescription": "Acha, itilizasyon ak ajisteman kredi òganizasyon sa a ap parèt isit la chak fwa yo fèt.",
       "emptyTitle": "Pa gen aktivite kredi",
-      "expires": "Ekspire {{date}}",
+      "expiresUtc": "Ekspire {{date}} (UTC)",
       "title": "Aktivite kredi",
       "transactionFallback": "Transaksyon kredi",
       "category": {
@@ -3730,6 +3748,7 @@
     "title": "Pwofil yo",
     "entrySubtitle": "Reutilize anviwònman anviwònman atravè sesyon yo",
     "newProfile": "Nouvo pwofil",
+    "openHint": "Louvri pwofil la",
     "emptyTitle": "Pa gen pwofil ankò",
     "emptyDescription": "Kreye yon pwofil pou reitilize varyab anviwònman yo, lòd konfigirasyon, ak ladrès atravè sesyon yo.",
     "loadFailed": "Pa t 'kapab chaje pwofil yo",
@@ -3823,6 +3842,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Valè ki parèt kòm •••• kenbe sekrè ki sere yo; ranplase yon valè pou w renouvle l. Chanje liy kòmand la mande tout valè yo ankò",
+      "headersHint": "Valè ki parèt kòm •••• kenbe sekrè ki sere yo; ranplase yon valè pou w renouvle l. Chanje URL la mande tout valè yo ankò",
       "nameRequired": "Antre yon non sèvè",
       "nameInvalid": "Non ka itilize sèlman lèt ASCII, nimewo, tirè ba ak tire, jiska 100 karaktè",
       "commandRequired": "Antre yon lòd",
@@ -3921,6 +3942,10 @@
   "credits": {
     "title": "Achte kredi",
     "description": "Kredi se yon acha yon sèl fwa ki ajoute nan balans Kilo ou pou kouri sesyon kodaj AI nan Kilo App. Magazen an chaje kont ou epi kredi yo ajoute apre magazen an konfime peman an.",
+    "nextExpiry": "{{amount}} nan kredi ap ekspire {{date}} (UTC). Kredi ki ekspire pi bonè yo itilize an premye.",
+    "appStoreExpiry": "Kredi ou achte nan App Store pa ekspire.",
+    "playOneYearExpiry": "Kredi sa yo ekspire yon ane kalandriye apre acha a.",
+    "playNonexpiring": "Kredi sa yo pa ekspire.",
     "packLabel": "Ajoute {{amount}} an kredi",
     "priceUnavailable": "Pri pa disponib",
     "purchased": "Kredi yo ajoute nan balans ou.",
@@ -3961,11 +3986,13 @@
       "namePlaceholder": "Bug, Lide, Vèsyon…",
       "emoji": "Emoji",
       "mode": "Mòd",
-      "defaultsHint": "Sesyon ki kòmanse nan lis sa a itilize paramèt sa yo."
+      "defaultsHint": "Sesyon ki kòmanse nan lis sa a itilize paramèt sa yo.",
+      "saveFailed": "Pa t’ posib sove lis la. Verifye koneksyon w la epi eseye ankò."
     },
     "list": {
       "addPlaceholder": "Ajoute yon travay",
       "add": "Ajoute travay",
+      "addFailed": "Pa t’ posib ajoute travay la. Verifye koneksyon w la epi eseye ankò.",
       "empty": "Poko gen travay",
       "setDefaults": "Mete depo, mòd ak modèl",
       "completed_one": "Fini ({{count}})",
@@ -4002,7 +4029,9 @@
       "startNewSession": "Kòmanse nouvo sesyon",
       "startNewSessionHint": "Peze lontan pou kòmanse yon nouvo sesyon.",
       "linkSession": "Lye sesyon",
-      "linkFailed": "Nou pa t ka lye sesyon an ak travay la"
+      "linkFailed": "Nou pa t ka lye sesyon an ak travay la",
+      "moveToAnotherTodo": "Deplase nan yon lòt travay",
+      "startRefreshFailed": "Sesyon an te kòmanse, men lis sa a pa t’ mete ajou."
     },
     "linkSession": {
       "title": "Lye yon sesyon",
@@ -4011,6 +4040,7 @@
     },
     "upNext": "Pwochen",
     "sessionTodo": "Travay: {{title}}",
+    "openTodoHint": "Louvri travay la.",
     "linkToTodo": "Lye ak travay",
     "candidates": {
       "empty": "Pa gen travay ouvè"

@@ -2,14 +2,17 @@ import type { WorkerDb } from '@kilocode/db/client';
 import { getSandboxAllocationCandidates, type ProfileOwner } from '@kilocode/cloud-agent-profile';
 import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
 import {
+  getSandboxAllocationProvider,
   isSelectableSandboxAllocation,
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   getSandboxSelectionCapabilities,
   isSandboxAllocationAvailable,
+  resolveVercelSelectionReadiness,
   type SandboxAllocationCapability,
   type SessionRepositoryType,
+  type VercelSelectionReadiness,
 } from '../sandbox-selection.js';
 import { requiredProviderCapability } from '../session-identity.js';
 import type { Env } from '../types.js';
@@ -55,15 +58,21 @@ export async function resolveSavedSandboxAllocation(args: {
   target?: RepositoryAllocationTarget;
   capability?: SandboxAllocationCapability;
   environmentAllocation?: string;
+  readiness?: VercelSelectionReadiness;
 }): Promise<SandboxAllocation | undefined> {
   const { db, env, owner, repositoryType, target, capability, environmentAllocation } = args;
-  const capabilities = getSandboxSelectionCapabilities(env, owner, {
+  const selectionOptions = {
     repositoryType,
     ...(capability ? { capability } : {}),
-  });
+    ...(args.readiness?.vercelUnavailableReason
+      ? { vercelUnavailableReason: args.readiness.vercelUnavailableReason }
+      : {}),
+  };
+  let capabilities = getSandboxSelectionCapabilities(env, owner, selectionOptions);
   if (!capabilities.enabled) return undefined;
 
   const candidates = await getSandboxAllocationCandidates(db, profileOwner(owner), target);
+  let readiness = args.readiness;
   for (const candidate of [
     environmentAllocation,
     candidates.repositoryAllocation,
@@ -72,6 +81,15 @@ export async function resolveSavedSandboxAllocation(args: {
     if (candidate === undefined) continue;
     const allocation = candidate as SandboxAllocation;
     if (!isSelectableSandboxAllocation(allocation)) continue;
+    if (getSandboxAllocationProvider(allocation) === 'vercel' && readiness === undefined) {
+      readiness = await resolveVercelSelectionReadiness(env, owner);
+      capabilities = getSandboxSelectionCapabilities(env, owner, {
+        ...selectionOptions,
+        ...(readiness.vercelUnavailableReason
+          ? { vercelUnavailableReason: readiness.vercelUnavailableReason }
+          : {}),
+      });
+    }
     // The same check as the picker, so a saved choice that the picker offered is
     // never skipped here.
     if (isSandboxAllocationAvailable(capabilities, allocation)) return allocation;

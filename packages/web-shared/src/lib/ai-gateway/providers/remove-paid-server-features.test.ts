@@ -56,7 +56,7 @@ describe('removePaidServerFeatures', () => {
     expect(request.body.plugins).toEqual([{ id: 'response-healing' }, FREE_PDF_PARSER]);
     expect(request.body.tools).toEqual([functionTool]);
     expect(warn).toHaveBeenCalledWith(
-      '[applyProviderSpecificLogic] Removed paid server features from free request',
+      '[applyProviderSpecificLogic] Removed paid server features from free or BYOK request',
       {
         userId: 'user-1',
         model: MODEL,

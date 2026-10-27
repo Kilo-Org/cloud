@@ -227,7 +227,6 @@
     "hideBalance": "Egyenleg elrejtése",
     "showBalance": "Egyenleg megjelenítése",
     "balanceHidden": "Egyenleg elrejtve",
-    "bonusCreditsExpiring": "{{amount}} értékű kredit lejárati ideje: {{date}}.",
     "signOutTitle": "Kijelentkezel?",
     "signOutMessage": "A munkaterületed eléréséhez újra be kell jelentkezned.",
     "deleteAccountTitle": "Törlöd a fiókodat?",
@@ -1484,6 +1483,22 @@
       "loadingProposals": "Javaslatok betöltése",
       "couldNotLoadProposals": "Nem sikerült betölteni a javaslatokat.",
       "noProposals": "Nincsenek javaslatok",
+      "proposalDetails": "Javaslat részletei",
+      "proposalTitle": "Javaslat címe",
+      "rationale": "Indoklás",
+      "saveFirst": "Mentsd a módosításaidat a pull request megnyitása előtt.",
+      "proposalSaved": "Javaslat mentve",
+      "proposalDismissed": "Javaslat elvetve",
+      "dismissProposalTitle": "Elveti a javaslatot?",
+      "dismissProposalMessage": "Ez a javaslat eltűnik az aktív listáról, és nem állítható vissza.",
+      "prOpened": "Pull request megnyitva a REVIEW.md fájlhoz",
+      "alreadyPresent": "Az útmutatás már szerepel a REVIEW.md fájlban",
+      "status": {
+        "edited": "Szerkesztve",
+        "opening_change_request": "PR megnyitása",
+        "change_request_failed": "PR megnyitása sikertelen",
+        "superseded": "Már szerepel"
+      },
       "noProposalsDescription": "A kódellenőrzési memória javaslatai itt jelennek meg, miután a Kilo elemzi a karbantartók válaszait."
     },
     "manualReview": {
@@ -2576,7 +2591,9 @@
       "retrying": "Újrapróbálás…",
       "retryDeny": "Megtagadás újrapróbálása",
       "retryAllowOnce": "Egyszeri engedélyezés újrapróbálása",
-      "retryAlwaysAllow": "Mindig engedélyezés újrapróbálása"
+      "retryAlwaysAllow": "Mindig engedélyezés újrapróbálása",
+      "unreadableTitle": "Nem sikerült beolvasni az engedélykérést",
+      "unreadableBody": "Az ügynök egy engedélyezési döntésre vár, amelyet ez az alkalmazás nem tud megjeleníteni. Frissítse az alkalmazást vagy a CLI-t, illetve válaszoljon a kérésre a CLI-ben a folytatáshoz."
     },
     "questionCard": {
       "title": "Az ügynök válaszra vagy jóváhagyásra vár",
@@ -2968,8 +2985,9 @@
     "unavailableDevice": "A hangbevitel nem érhető el ezen az eszközön.",
     "unavailableLanguage": "A hangbevitel nem érhető el az eszközön beállított nyelven. Telepítsd a nyelv offline beszédfájljait, vagy használj másik alkalmazásnyelvet.",
     "languageNotInstalledTitle": "A hangbevitel {{language}} nyelven még nem áll készen",
-    "languageNotInstalledMessage": "A(z) {{language}} nyelv offline beszédfájljai nincsenek telepítve ezen a telefonon. Töltsd le őket, majd próbáld újra a hangbevitelt.",
+    "languageNotInstalledMessage": "A {{language}} nyelvű offline beszédfájlok nincsenek telepítve, és az online beszédfeldolgozás ki van kapcsolva. Töltsd le a fájlokat, vagy kapcsold vissza az online beszédfeldolgozást, hogy használhasd a hangbevitelt.",
     "downloadOfflineModel": "Letöltés",
+    "useOnlineTranscription": "Online beszédfeldolgozás engedélyezése",
     "offlineModelDownloadScheduled": "Az offline beszédfájlok a háttérben töltődnek le. Próbáld újra a hangbevitelt később.",
     "listeningStopped": "A beszéd figyelése leállt.",
     "transcribing": "Átírás folyamatban…",
@@ -3143,7 +3161,7 @@
     "creditActivity": {
       "emptyDescription": "Itt jelennek meg a szervezet kreditvásárlásai, kreditfelhasználása és egyenlegmódosításai.",
       "emptyTitle": "Még nincsenek kreditműveletek",
-      "expires": "Lejárat: {{date}}",
+      "expiresUtc": "Lejárat: {{date}} (UTC)",
       "title": "Kreditműveletek",
       "transactionFallback": "Kredittranzakció",
       "category": {
@@ -3730,6 +3748,7 @@
     "title": "Profilok",
     "entrySubtitle": "Használja újra a környezeti beállításokat a munkamenetek között",
     "newProfile": "Új profil",
+    "openHint": "Megnyitja a profilt",
     "emptyTitle": "Még nincsenek profilok",
     "emptyDescription": "Hozzon létre egy profilt a környezeti változók, a beállítási parancsok és a készségek munkamenetek közötti újrafelhasználásához.",
     "loadFailed": "Nem sikerült betölteni a profilokat",
@@ -3823,6 +3842,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "A ••••-ként megjelenő értékek megőrzik a tárolt titkot; egy érték cseréjével rotálhatja azt. A parancssor módosítása minden érték ismételt megadását igényli",
+      "headersHint": "A ••••-ként megjelenő értékek megőrzik a tárolt titkot; egy érték cseréjével rotálhatja azt. Az URL módosítása minden érték ismételt megadását igényli",
       "nameRequired": "Adja meg a szerver nevét",
       "nameInvalid": "A név csak ASCII betűket, számokat, aláhúzásjeleket és kötőjeleket tartalmazhat, legfeljebb 100 karakter lehet",
       "commandRequired": "Írjon be egy parancsot",
@@ -3921,6 +3942,10 @@
   "credits": {
     "title": "Kreditek vásárlása",
     "description": "A kreditek egyszeri vásárlás, amely a Kilo egyenlegedhez adódik AI kódolási munkamenetek futtatásához a Kilo alkalmazásban. Az áruház terheli a fiókodat, és a kreditek az áruház fizetésigazolása után kerülnek jóváírásra.",
+    "nextExpiry": "{{amount}} értékű kredit lejárati ideje: {{date}} (UTC). A legkorábban lejáró kreditek használódnak fel először.",
+    "appStoreExpiry": "Az App Store-on keresztül vásárolt kreditek nem járnak le.",
+    "playOneYearExpiry": "Ezek a kreditek a vásárlás után egy naptári évvel járnak le.",
+    "playNonexpiring": "Ezek a kreditek nem járnak le.",
     "packLabel": "{{amount}} értékű kredit hozzáadása",
     "priceUnavailable": "Az ár nem érhető el",
     "purchased": "A kreditek hozzáadva az egyenlegedhez.",
@@ -3961,11 +3986,13 @@
       "namePlaceholder": "Hibák, ötletek, kiadás…",
       "emoji": "Emodzsi",
       "mode": "Mód",
-      "defaultsHint": "Az ebből a listából indított munkamenetek ezeket az alapértékeket használják."
+      "defaultsHint": "Az ebből a listából indított munkamenetek ezeket az alapértékeket használják.",
+      "saveFailed": "Nem sikerült menteni a listát. Ellenőrizd a kapcsolatot, és próbáld újra."
     },
     "list": {
       "addPlaceholder": "Írj be egy teendőt",
       "add": "Teendő hozzáadása",
+      "addFailed": "Nem sikerült hozzáadni a teendőt. Ellenőrizd a kapcsolatot, és próbáld újra.",
       "empty": "Még nincsenek teendők",
       "setDefaults": "Adattár, mód és modell beállítása",
       "completed_one": "Befejezve ({{count}})",
@@ -4002,7 +4029,9 @@
       "startNewSession": "Új munkamenet indítása",
       "startNewSessionHint": "Hosszan nyomd meg új munkamenet indításához.",
       "linkSession": "Munkamenet társítása",
-      "linkFailed": "Nem sikerült a munkamenetet a teendőhöz társítani."
+      "linkFailed": "Nem sikerült a munkamenetet a teendőhöz társítani.",
+      "moveToAnotherTodo": "Áthelyezés másik teendőbe",
+      "startRefreshFailed": "A munkamenet elindult, de ez a lista nem frissült."
     },
     "linkSession": {
       "title": "Munkamenet hozzákapcsolása",
@@ -4011,6 +4040,7 @@
     },
     "upNext": "Következő",
     "sessionTodo": "Teendő: {{title}}",
+    "openTodoHint": "Megnyitja a teendőt.",
     "linkToTodo": "Teendőhöz kapcsolás",
     "candidates": {
       "empty": "Nincsenek nyitott teendők"

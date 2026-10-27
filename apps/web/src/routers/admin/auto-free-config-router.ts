@@ -25,11 +25,13 @@ export const adminAutoFreeConfigRouter = createTRPCRouter({
   }),
 
   set: adminProcedure.input(SetAutoFreeConfigSchema).mutation(async ({ input }) => {
-    const ineligibleModelIds = input.config ? getIneligibleAutoFreeModelIds(input.config) : [];
+    const ineligibleModelIds = input.config
+      ? await getIneligibleAutoFreeModelIds(input.config)
+      : [];
     if (ineligibleModelIds.length > 0) {
       throw new TRPCError({
         code: 'BAD_REQUEST',
-        message: `Not eligible for kilo-auto/free (must be a free model that uses the default AI SDK provider): ${ineligibleModelIds.join(', ')}`,
+        message: `Not eligible for kilo-auto/free (must be a free model that uses the default AI SDK provider, or a public custom LLM that serves Chat Completions): ${ineligibleModelIds.join(', ')}`,
       });
     }
 

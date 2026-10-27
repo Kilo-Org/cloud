@@ -32,6 +32,16 @@ import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/st
 const KILO_PASS_DUPLICATE_CARD_EMAIL_TYPE = 'kilo_pass_duplicate_card_canceled';
 
 function mayIndicateAlreadyCanceledStripeSubscriptionError(error: unknown): boolean {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'resource_missing' &&
+    'statusCode' in error &&
+    error.statusCode === 404
+  ) {
+    return true;
+  }
   const message = error instanceof Error ? error.message : String(error);
   const normalizedMessage = message.toLowerCase();
   return (
@@ -456,7 +466,10 @@ export async function attemptDuplicateCardProviderEnforcement(params: {
           });
           throw error;
         }
-        if (isStripeSubscriptionEnded(subscription.status)) {
+        if (
+          subscription.id === params.stripeSubscriptionId &&
+          isStripeSubscriptionEnded(subscription.status)
+        ) {
           canceledSubscription = { id: subscription.id };
         } else {
           throw error;

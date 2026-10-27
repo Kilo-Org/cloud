@@ -114,6 +114,8 @@ import {
   EnkryptBenchmarkSchema,
 } from './schema-types';
 import type {
+  EnkryptGuardrailApiKind,
+  EnkryptGuardrailDecision,
   EnkryptFailureCategory,
   EnkryptSyncCounts,
   EnkryptVerifications,
@@ -10288,6 +10290,34 @@ export const exa_usage_log = pgTable(
 );
 
 export type ExaUsageLog = typeof exa_usage_log.$inferSelect;
+
+// One row per Enkrypt guardrail detect call billed to an organization. Kept apart from
+// microdollar_usage so guardrail charges never alter inference usage records.
+export const enkrypt_guardrail_charges = pgTable(
+  'enkrypt_guardrail_charges',
+  {
+    id: uuid()
+      .notNull()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey(),
+    organization_id: uuid().notNull(),
+    kilo_user_id: text().notNull(),
+    session_id: text(),
+    api_kind: text().notNull().$type<EnkryptGuardrailApiKind>(),
+    decision: text().notNull().$type<EnkryptGuardrailDecision>(),
+    enkrypt_credits_cost: real(),
+    charged_microdollars: bigint({ mode: 'number' }).notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_enkrypt_guardrail_charges_organization_created_at').on(
+      table.organization_id,
+      table.created_at
+    ),
+  ]
+);
+
+export type EnkryptGuardrailCharge = typeof enkrypt_guardrail_charges.$inferSelect;
 
 // ============ SECURITY ADVISOR SCANS ============
 // Per-scan usage tracking for the security advisor feature.

@@ -104,29 +104,35 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: pnpm run deploy
 
-      - name: Check selected staging usage queues
+      - name: Check selected usage queues
         id: usage_queues
-        if: inputs.worker == 'services/usage-ingest' && inputs.target_environment == 'staging'
+        if: inputs.worker == 'services/usage-ingest' && (inputs.target_environment == 'staging' || inputs.target_environment == 'production')
         working-directory: services/usage-ingest
+        env:
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
         run: |
           node --input-type=commonjs <<'NODE'
           const { appendFileSync, existsSync } = require('node:fs');
           const { unstable_readConfig } = require('wrangler');
-          const config = unstable_readConfig({ config: 'wrangler.jsonc', env: 'staging' });
+          const environment = process.env.TARGET_ENVIRONMENT;
+          const config = unstable_readConfig({ config: 'wrangler.jsonc', env: environment === 'staging' ? 'staging' : undefined });
           if (config.services.some(service => service.binding === 'USAGE_WRITER_RELAY')) {
-            throw new Error('Selected staging source requires the retired usage writer relay; use a direct-writer revision or its historical deployment workflow');
+            throw new Error('Selected usage source requires the retired usage writer relay; use a direct-writer revision or its historical deployment workflow');
           }
           const queuesRequired = config.queues.producers.some(p => p.queue?.endsWith('-eu'));
           appendFileSync(process.env.GITHUB_OUTPUT, `queues_required=${queuesRequired}\n`);
-          appendFileSync(process.env.GITHUB_OUTPUT, `prepare_required=${queuesRequired || existsSync('scripts/provision-queues.mjs')}\n`);
+          const helper = 'scripts/provision-queues.mjs';
+          const supported = existsSync(helper) && (environment === 'staging' || require(`./${helper}`).supportedEnvironments?.includes('production') === true);
+          appendFileSync(process.env.GITHUB_OUTPUT, `prepare_required=${queuesRequired || supported}\n`);
           NODE
 
-      - name: Prepare staging usage queues
+      - name: Prepare usage queues
         if: steps.usage_queues.outputs.prepare_required == 'true'
         working-directory: services/usage-ingest
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: node scripts/provision-queues.mjs staging
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+        run: node scripts/provision-queues.mjs "$TARGET_ENVIRONMENT"
 
       - name: Deploy to Cloudflare Workers
         id: deploy
@@ -399,29 +405,35 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: pnpm run deploy
 
-      - name: Check selected staging usage queues
+      - name: Check selected usage queues
         id: usage_queues
-        if: matrix.worker == 'services/usage-ingest' && inputs.target_environment == 'staging'
+        if: matrix.worker == 'services/usage-ingest' && (inputs.target_environment == 'staging' || inputs.target_environment == 'production')
         working-directory: services/usage-ingest
+        env:
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
         run: |
           node --input-type=commonjs <<'NODE'
           const { appendFileSync, existsSync } = require('node:fs');
           const { unstable_readConfig } = require('wrangler');
-          const config = unstable_readConfig({ config: 'wrangler.jsonc', env: 'staging' });
+          const environment = process.env.TARGET_ENVIRONMENT;
+          const config = unstable_readConfig({ config: 'wrangler.jsonc', env: environment === 'staging' ? 'staging' : undefined });
           if (config.services.some(service => service.binding === 'USAGE_WRITER_RELAY')) {
-            throw new Error('Selected staging source requires the retired usage writer relay; use a direct-writer revision or its historical deployment workflow');
+            throw new Error('Selected usage source requires the retired usage writer relay; use a direct-writer revision or its historical deployment workflow');
           }
           const queuesRequired = config.queues.producers.some(p => p.queue?.endsWith('-eu'));
           appendFileSync(process.env.GITHUB_OUTPUT, `queues_required=${queuesRequired}\n`);
-          appendFileSync(process.env.GITHUB_OUTPUT, `prepare_required=${queuesRequired || existsSync('scripts/provision-queues.mjs')}\n`);
+          const helper = 'scripts/provision-queues.mjs';
+          const supported = existsSync(helper) && (environment === 'staging' || require(`./${helper}`).supportedEnvironments?.includes('production') === true);
+          appendFileSync(process.env.GITHUB_OUTPUT, `prepare_required=${queuesRequired || supported}\n`);
           NODE
 
-      - name: Prepare staging usage queues
+      - name: Prepare usage queues
         if: steps.usage_queues.outputs.prepare_required == 'true'
         working-directory: services/usage-ingest
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: node scripts/provision-queues.mjs staging
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+        run: node scripts/provision-queues.mjs "$TARGET_ENVIRONMENT"
 
       - name: Deploy to Cloudflare Workers
         id: deploy

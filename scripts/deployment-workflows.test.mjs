@@ -28,24 +28,31 @@ test('both Worker deployment paths prepare usage queues before direct consumer d
     const checkIndex = steps.findIndex(step => step.id === 'usage_queues');
     const consumerIndex = steps.findIndex(step => step.name === 'Deploy to Cloudflare Workers');
     assert.ok(checkIndex > steps.findIndex(step => step.name === 'Install dependencies'));
-    const prepareIndex = steps.findIndex(step => step.name === 'Prepare staging usage queues');
+    const prepareIndex = steps.findIndex(step => step.name === 'Prepare usage queues');
     assert.ok(checkIndex < prepareIndex && prepareIndex < consumerIndex);
     assert.equal(steps[prepareIndex].if, "steps.usage_queues.outputs.prepare_required == 'true'");
     assert.equal(
       steps[prepareIndex].env.CLOUDFLARE_API_TOKEN,
       '${{ secrets.CLOUDFLARE_API_TOKEN }}'
     );
+    assert.equal(steps[prepareIndex].env.TARGET_ENVIRONMENT, '${{ inputs.target_environment }}');
+    assert.equal(steps[checkIndex].env.TARGET_ENVIRONMENT, '${{ inputs.target_environment }}');
+    assert.equal(
+      steps[prepareIndex].run,
+      'node scripts/provision-queues.mjs "$TARGET_ENVIRONMENT"'
+    );
     assert.equal(
       steps[checkIndex].if,
-      `${selector} == 'services/usage-ingest' && inputs.target_environment == 'staging'`
+      `${selector} == 'services/usage-ingest' && (inputs.target_environment == 'staging' || inputs.target_environment == 'production')`
     );
     assert.equal(steps[checkIndex]['working-directory'], 'services/usage-ingest');
     assert.equal(steps[checkIndex]['continue-on-error'], undefined);
     for (const [worker, environment, expected] of [
       ['services/usage-ingest', 'staging', true],
-      ['services/usage-ingest', 'production', false],
+      ['services/usage-ingest', 'production', true],
       ['services/other-worker', 'staging', false],
       ['services/other-worker', 'production', false],
+      ['services/usage-ingest', 'preview', false],
     ]) {
       assert.equal(
         runInNewContext(steps[checkIndex].if, {
@@ -102,9 +109,7 @@ test('selected source prepares queues and rejects retired relay sources before d
     const calls = join(directory, 'calls');
     for (const job of ['deploy-manual', 'deploy-changed']) {
       const check = workers.jobs[job].steps.find(step => step.id === 'usage_queues');
-      const prepare = workers.jobs[job].steps.find(
-        step => step.name === 'Prepare staging usage queues'
-      );
+      const prepare = workers.jobs[job].steps.find(step => step.name === 'Prepare usage queues');
       for (const scenario of [
         'historical-direct',
         'direct-unused-file',
@@ -200,6 +205,7 @@ test('selected source prepares queues and rejects retired relay sources before d
             env: {
               ...process.env,
               GITHUB_OUTPUT: output,
+              TARGET_ENVIRONMENT: 'staging',
               DEPLOY_CALLS: calls,
               WRANGLER_SEND_METRICS: 'false',
               WRANGLER_LOG_PATH: join(directory, 'wrangler.log'),
@@ -221,6 +227,146 @@ test('selected source prepares queues and rejects retired relay sources before d
         } else {
           assert.equal(result.status, 0, `${job} ${scenario}: ${result.stderr}`);
           assert.deepEqual(deployed, [...(prepared ? ['prepare'] : []), 'deploy --env staging']);
+        }
+      }
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('production EU preparation, rollback and historical source use the selected helper capability', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'usage-production-selected-source-'));
+  try {
+    symlinkSync(
+      fileURLToPath(new URL('../services/usage-ingest/node_modules', import.meta.url)),
+      join(directory, 'node_modules')
+    );
+    mkdirSync(join(directory, 'scripts'));
+    const output = join(directory, 'output');
+    const calls = join(directory, 'calls');
+    const helper = join(directory, 'scripts/provision-queues.mjs');
+    for (const job of ['deploy-manual', 'deploy-changed']) {
+      const check = workers.jobs[job].steps.find(step => step.id === 'usage_queues');
+      const prepare = workers.jobs[job].steps.find(step => step.name === 'Prepare usage queues');
+      for (const scenario of [
+        'legacy-missing',
+        'legacy-staging-only',
+        'legacy-retired-relay',
+        'eu',
+        'global-rollback',
+        'eu-missing',
+        'eu-staging-only',
+        'eu-invalid',
+        'renamed-invalid',
+      ]) {
+        const eu = scenario.startsWith('eu');
+        const current = ['eu', 'global-rollback', 'eu-invalid', 'renamed-invalid'].includes(
+          scenario
+        );
+        writeFileSync(
+          join(directory, 'wrangler.jsonc'),
+          JSON.stringify({
+            name: 'usage-ingest',
+            compatibility_date: '2026-09-18',
+            ...(scenario === 'legacy-retired-relay'
+              ? {
+                  services: [
+                    { binding: 'USAGE_WRITER_RELAY', service: 'usage-writer-relay-staging' },
+                  ],
+                }
+              : {}),
+            queues: {
+              producers: [
+                {
+                  binding: 'USAGE_INGEST_QUEUE',
+                  queue: eu
+                    ? 'usage-ingest-processing-eu'
+                    : scenario === 'renamed-invalid'
+                      ? 'usage-ingest-renamed'
+                      : 'usage-ingest-processing',
+                },
+              ],
+            },
+          })
+        );
+        rmSync(helper, { force: true });
+        if (current)
+          writeFileSync(
+            helper,
+            `
+          import { appendFileSync } from 'node:fs';
+          export const supportedEnvironments = ['staging', 'production'];
+          if (process.argv[1]) appendFileSync(process.env.DEPLOY_CALLS, 'prepare production\\n');
+        `
+          );
+        if (scenario.endsWith('staging-only'))
+          writeFileSync(
+            helper,
+            `
+          export async function prepareQueues() {}
+          if (process.argv[1]) throw new Error('Historical helper supports staging only');
+        `
+          );
+        if (scenario.endsWith('invalid'))
+          writeFileSync(
+            helper,
+            readFileSync(
+              new URL('../services/usage-ingest/scripts/provision-queues.mjs', import.meta.url)
+            )
+          );
+        writeFileSync(output, '');
+        writeFileSync(calls, '');
+        const result = spawnSync(
+          'bash',
+          [
+            '-e',
+            '-c',
+            `
+          wrangler() { printf '%s\\n' "$*" >> "$DEPLOY_CALLS"; }
+          ${check.run}
+          if grep -q '^prepare_required=true$' "$GITHUB_OUTPUT"; then ${prepare.run}; fi
+          flag=''
+          if grep -q '^queues_required=true$' "$GITHUB_OUTPUT"; then flag='--experimental-provision=false'; fi
+          wrangler deploy $flag
+        `,
+          ],
+          {
+            cwd: directory,
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              TARGET_ENVIRONMENT: 'production',
+              GITHUB_OUTPUT: output,
+              DEPLOY_CALLS: calls,
+              WRANGLER_SEND_METRICS: 'false',
+              WRANGLER_LOG_PATH: join(directory, 'wrangler.log'),
+            },
+          }
+        );
+        const deployed = readFileSync(calls, 'utf8').trim().split('\n').filter(Boolean);
+        if (
+          [
+            'eu-missing',
+            'eu-staging-only',
+            'eu-invalid',
+            'renamed-invalid',
+            'legacy-retired-relay',
+          ].includes(scenario)
+        ) {
+          assert.notEqual(result.status, 0, `${job} ${scenario}: must fail before upload`);
+          assert.deepEqual(deployed, []);
+        } else {
+          assert.equal(result.status, 0, `${job} ${scenario}: ${result.stderr}`);
+          assert.deepEqual(deployed, [
+            ...(current ? ['prepare production'] : []),
+            `deploy${eu ? ' --experimental-provision=false' : ''}`,
+          ]);
+          assert.doesNotMatch(
+            readFileSync(output, 'utf8'),
+            /^required=/m,
+            'retired relay output is absent'
+          );
         }
       }
     }

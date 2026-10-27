@@ -77,7 +77,12 @@ function redactCredentials(value: string): string {
   return value
     .replace(/bearer\s+\S+/gi, 'Bearer [redacted]')
     .replace(/eyJ[\w-]+\.[\w-]+\.[\w-]*/g, '[redacted]')
-    .replace(/[A-Za-z0-9_-]{32,}/g, '[redacted]');
+    .replace(/\b(sk|pk|rk)-[\w-]+/gi, '[redacted]')
+    .replace(
+      /\b(api[_-]?key|token|secret|password|key|authorization)(["']?\s*[:=]\s*["']?)[^\s"',;&)]+/gi,
+      '$1$2[redacted]'
+    )
+    .replace(/[A-Za-z0-9_-]{24,}/g, '[redacted]');
 }
 
 async function readBodyPrefix(response: Response): Promise<string | null> {
@@ -131,7 +136,10 @@ function errorExcerpt(body: string, contentType: string | null): string | undefi
   }
   if (contentType?.includes('html')) {
     const title = /<title[^>]*>([^<]*)<\/title>/i.exec(body)?.[1];
-    return title ? boundedText(redactCredentials(title), MAX_EXCERPT_LENGTH) : undefined;
+    const text =
+      title ??
+      body.replace(/<(script|style)[^>]*>[\s\S]*?(<\/\1>|$)/gi, ' ').replace(/<[^>]*>?/g, ' ');
+    return boundedText(redactCredentials(text), MAX_EXCERPT_LENGTH);
   }
   return boundedText(redactCredentials(body), MAX_EXCERPT_LENGTH);
 }
@@ -151,7 +159,12 @@ export async function readUpstreamFailureEvidence(
     if (bounded) evidence[field] = bounded;
   }
   if (response.status === 401 || response.status === 403) {
-    const body = await readBodyPrefix(response.clone());
+    let body: string | null;
+    try {
+      body = await readBodyPrefix(response.clone());
+    } catch {
+      body = null;
+    }
     const excerpt = body ? errorExcerpt(body, response.headers.get('content-type')) : undefined;
     if (excerpt) evidence.upstreamErrorExcerpt = excerpt;
   }

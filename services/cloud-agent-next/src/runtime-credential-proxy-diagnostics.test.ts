@@ -60,6 +60,41 @@ describe('readUpstreamFailureEvidence', () => {
     expect(evidence.upstreamErrorExcerpt?.length).toBeLessThanOrEqual(160);
   });
 
+  it('redacts short provider keys and key-value secrets', async () => {
+    const response = new Response(
+      JSON.stringify({ error: 'invalid api key: sk-abc123 (token=short1; password: hunter2)' }),
+      { status: 401, headers: { 'Content-Type': 'application/json' } }
+    );
+
+    await expect(readUpstreamFailureEvidence(response)).resolves.toMatchObject({
+      upstreamErrorExcerpt: 'invalid api key: [redacted] (token=[redacted]; password: [redacted])',
+    });
+  });
+
+  it('falls back to visible text for HTML without a title', async () => {
+    const response = new Response(
+      '<html><head><style>body { color: red }</style></head><body><h1>Access denied</h1></body></html>',
+      { status: 403, headers: { 'Content-Type': 'text/html' } }
+    );
+
+    await expect(readUpstreamFailureEvidence(response)).resolves.toMatchObject({
+      upstreamErrorExcerpt: 'Access denied',
+    });
+  });
+
+  it('keeps headers when the body cannot be read', async () => {
+    const response = new Response('denied', {
+      status: 403,
+      headers: { 'Content-Type': 'text/plain', Server: 'Vercel' },
+    });
+    await response.text();
+
+    await expect(readUpstreamFailureEvidence(response)).resolves.toEqual({
+      upstreamServer: 'Vercel',
+      upstreamContentType: 'text/plain',
+    });
+  });
+
   it('does not read the body for other failure statuses', async () => {
     const response = new Response('rate limited', {
       status: 429,

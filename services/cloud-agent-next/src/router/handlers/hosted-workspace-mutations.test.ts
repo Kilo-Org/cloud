@@ -1,12 +1,33 @@
-import { describe, expect, it } from 'vitest';
+import type { WorkerDb } from '@kilocode/db/client';
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import { appRouter } from '../../router.js';
+import type { TRPCContext } from '../../types.js';
 import {
   CreateHostedWorkspaceInput,
   DeleteHostedWorkspaceSessionInput,
   hostedWorkspaceCreateRequest,
 } from './hosted-workspace-mutations.js';
 import { CreateHostedWorkspaceSessionInput } from './session-worktree.js';
+
+const mocks = vi.hoisted(() => ({
+  admitOperation: vi.fn(),
+  getOperation: vi.fn(),
+  markReconcilePending: vi.fn(),
+  recordOperationProgress: vi.fn(),
+  settleOperation: vi.fn(),
+  getPgDb: vi.fn(),
+}));
+
+vi.mock('@kilocode/db/operation-ledger', () => ({
+  admitOperation: mocks.admitOperation,
+  getOperation: mocks.getOperation,
+  markReconcilePending: mocks.markReconcilePending,
+  recordOperationProgress: mocks.recordOperationProgress,
+  settleOperation: mocks.settleOperation,
+}));
+
+vi.mock('../../db/pg.js', () => ({ getPgDb: mocks.getPgDb }));
 
 const workspaceId = 'worktree_11111111-1111-4111-8111-111111111111';
 const cloudAgentSessionId = 'workspace_11111111-1111-4111-8111-111111111111';
@@ -95,5 +116,88 @@ describe('hosted workspace mutation inputs', () => {
         operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       }).success
     ).toBe(false);
+  });
+});
+
+const RECONCILE_READY_ROW = {
+  id: 'ledger-row-1',
+  kilo_user_id: 'usr_test',
+  domain: 'session',
+  operation_key: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  intent: 'delete_workspace_session',
+  organization_id: null,
+  resource_key: workspaceId,
+  taxonomy: 'safe-retry',
+  status: 'reconcile_pending',
+  outcome_code: null,
+  canonical_result: { cloudAgentSessionId, kiloSessionId, workspaceId },
+  provider_ref: null,
+  created_at: '2026-10-27T10:00:00.000Z',
+  updated_at: '2026-10-27T10:00:00.000Z',
+  lease_expires_at: '2026-10-27T10:00:00.000Z',
+  expires_at: '2026-10-28T10:00:00.000Z',
+};
+
+function reconcileRetryContext(deleteHostedWorkspaceSession: Mock, deleteSession: Mock) {
+  return {
+    userId: 'usr_test',
+    authToken: 'test-token',
+    request: { headers: new Headers() } as unknown as Request,
+    env: {
+      SESSION_INGEST: { deleteHostedWorkspaceSession },
+      SANDBOX_SESSION: { idFromName: (name: string) => name, get: () => ({ deleteSession }) },
+    },
+  } as unknown as TRPCContext;
+}
+
+describe('deleteHostedWorkspaceSession retry after the ownership row is gone', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    const results = [[{ organizationId: null, deletionStartedAt: null }], []];
+    mocks.getPgDb.mockReturnValue({
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn(() => ({ limit: vi.fn(async () => results.shift() ?? []) })),
+        })),
+      })),
+    } as unknown as WorkerDb);
+  });
+
+  it('claims the reconcile lease and settles instead of reporting a permanent conflict', async () => {
+    mocks.getOperation.mockResolvedValue(RECONCILE_READY_ROW);
+    mocks.admitOperation.mockResolvedValue({
+      admission: 'duplicate_reconcile_pending',
+      row: RECONCILE_READY_ROW,
+    });
+    mocks.settleOperation.mockResolvedValue({ settled: true, row: RECONCILE_READY_ROW });
+    const deleteHostedWorkspaceSession = vi.fn().mockResolvedValue({ deleted: true });
+    const deleteSession = vi.fn().mockResolvedValue({ success: true });
+
+    const caller = appRouter.createCaller(
+      reconcileRetryContext(deleteHostedWorkspaceSession, deleteSession)
+    );
+    const result = await caller.deleteHostedWorkspaceSession({
+      workspaceId: workspaceId as `worktree_${string}`,
+      sessionId: cloudAgentSessionId as `workspace_${string}`,
+      operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    });
+
+    expect(result).toEqual({ success: true, workspaceId, sessionId: cloudAgentSessionId });
+    expect(mocks.admitOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ operationKey: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' })
+    );
+    expect(deleteHostedWorkspaceSession).toHaveBeenCalledWith({
+      kiloUserId: 'usr_test',
+      workspaceId,
+      sessionId: kiloSessionId,
+      cloudAgentSessionId,
+    });
+    expect(deleteSession).toHaveBeenCalledTimes(1);
+    expect(mocks.settleOperation).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ rowId: 'ledger-row-1', status: 'completed' })
+    );
+    expect(mocks.markReconcilePending).not.toHaveBeenCalled();
   });
 });

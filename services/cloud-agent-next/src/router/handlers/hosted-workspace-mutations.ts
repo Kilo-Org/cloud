@@ -27,6 +27,7 @@ import {
   createSessionWithLedger,
 } from '../../session/session-registration.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
+import type { Env } from '../../types.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { protectedProcedure } from '../auth.js';
 import {
@@ -50,6 +51,7 @@ const AGENT_MANAGER_ORIGIN = 'agent-manager';
 const DELETE_LEDGER_LEASE_SECONDS = 120;
 
 const workspaceSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
+type HostedWorkspaceSessionId = z.infer<typeof workspaceSessionIdSchema>;
 const RequiredProfileInput = ProfileInputSchema.unwrap()
   .extend({ id: z.uuid().describe('Existing Cloud profile to resolve for this workspace') })
   .strict();
@@ -283,6 +285,171 @@ function rpcErrorCode(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+async function deleteHostedWorkspaceSessionInIngest(input: {
+  db: WorkerDb;
+  env: Env;
+  rowId: string;
+  userId: string;
+  workspaceId: CloudAgentWorktreeId;
+  sessionId: HostedWorkspaceSessionId;
+  kiloSessionId: string;
+}): Promise<void> {
+  try {
+    await input.env.SESSION_INGEST.deleteHostedWorkspaceSession({
+      kiloUserId: input.userId,
+      workspaceId: input.workspaceId,
+      sessionId: input.kiloSessionId,
+      cloudAgentSessionId: input.sessionId,
+    });
+  } catch (error) {
+    const code = rpcErrorCode(error);
+    if (
+      code.includes(WORKSPACE_REQUIRES_ROOT_SESSION) ||
+      code.includes(WORKSPACE_DELETING) ||
+      code.includes(WORKSPACE_IDENTITY_CONFLICT)
+    ) {
+      await settleOperation(input.db, {
+        rowId: input.rowId,
+        status: 'failed',
+        outcomeCode: code.includes(WORKSPACE_REQUIRES_ROOT_SESSION)
+          ? WORKSPACE_REQUIRES_ROOT_SESSION
+          : code.includes(WORKSPACE_DELETING)
+            ? WORKSPACE_DELETING
+            : WORKSPACE_IDENTITY_CONFLICT,
+      }).catch(() => undefined);
+      throw deletionConflict(code);
+    }
+    await markReconcilePending(input.db, { rowId: input.rowId }).catch(() => undefined);
+    throw new TRPCError({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'session_deletion_unavailable',
+    });
+  }
+}
+
+/** Idempotent for a missing ingest row, so a reconcile retry may re-run it. */
+async function teardownHostedWorkspaceSession(input: {
+  db: WorkerDb;
+  env: Env;
+  rowId: string;
+  userId: string;
+  sessionId: HostedWorkspaceSessionId;
+}): Promise<void> {
+  try {
+    await withDORetry(
+      () => getSandboxSessionStub(input.env, input.userId, input.sessionId),
+      stub => stub.deleteSession(),
+      'deleteSession'
+    );
+  } catch {
+    await markReconcilePending(input.db, { rowId: input.rowId }).catch(() => undefined);
+    throw new TRPCError({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'session_deletion_incomplete',
+    });
+  }
+}
+
+async function settleHostedWorkspaceDeletion(input: {
+  db: WorkerDb;
+  rowId: string;
+  workspaceId: CloudAgentWorktreeId;
+  sessionId: HostedWorkspaceSessionId;
+  kiloSessionId: string;
+}) {
+  const settlement = await settleOperation(input.db, {
+    rowId: input.rowId,
+    status: 'completed',
+    outcomeCode: 'ok',
+    canonicalResult: {
+      workspaceId: input.workspaceId,
+      cloudAgentSessionId: input.sessionId,
+      kiloSessionId: input.kiloSessionId,
+    },
+  });
+  if (!settlement.settled && settlement.row?.status !== 'completed') {
+    throw new TRPCError({ code: 'CONFLICT', message: 'session_deletion_in_progress' });
+  }
+  return { success: true as const, workspaceId: input.workspaceId, sessionId: input.sessionId };
+}
+
+/**
+ * Resumes a delete whose ownership row is already gone.
+ *
+ * The Session Ingest delete commits before the Session DO teardown, so a
+ * teardown failure leaves no `cli_sessions_v2` row while the ledger is
+ * `reconcile_pending`. Admission is still required here: it is what claims the
+ * reconcile lease (which `markReconcilePending` makes claimable immediately),
+ * so a retry can re-run the idempotent RPC, retry the teardown and settle.
+ */
+async function resumeMissingSessionDeletion(input: {
+  db: WorkerDb;
+  env: Env;
+  userId: string;
+  organizationId: string | null;
+  operationKey: string;
+  workspaceId: CloudAgentWorktreeId;
+  sessionId: HostedWorkspaceSessionId;
+  kiloSessionId: string;
+}) {
+  const admission = await admitOperation(input.db, {
+    userId: input.userId,
+    orgId: input.organizationId ?? undefined,
+    domain: 'session',
+    intent: 'delete_workspace_session',
+    operationKey: input.operationKey,
+    resourceKey: input.workspaceId,
+    taxonomy: 'safe-retry',
+    leaseSeconds: DELETE_LEDGER_LEASE_SECONDS,
+  });
+  assertSessionOperationIdentity(admission.row, {
+    userId: input.userId,
+    intent: 'delete_workspace_session',
+    organizationId: input.organizationId ?? undefined,
+    resourceKey: input.workspaceId,
+  });
+  if (admission.admission === 'duplicate_settled') {
+    if (admission.row.status === 'completed') {
+      return {
+        success: true as const,
+        workspaceId: input.workspaceId,
+        sessionId: input.sessionId,
+      };
+    }
+    throw deletionConflict(admission.row.outcome_code);
+  }
+  if (
+    admission.admission === 'duplicate_in_flight' ||
+    admission.admission === 'duplicate_reconcile_in_progress'
+  ) {
+    throw new TRPCError({ code: 'CONFLICT', message: 'session_deletion_in_progress' });
+  }
+
+  await deleteHostedWorkspaceSessionInIngest({
+    db: input.db,
+    env: input.env,
+    rowId: admission.row.id,
+    userId: input.userId,
+    workspaceId: input.workspaceId,
+    sessionId: input.sessionId,
+    kiloSessionId: input.kiloSessionId,
+  });
+  await teardownHostedWorkspaceSession({
+    db: input.db,
+    env: input.env,
+    rowId: admission.row.id,
+    userId: input.userId,
+    sessionId: input.sessionId,
+  });
+  return settleHostedWorkspaceDeletion({
+    db: input.db,
+    rowId: admission.row.id,
+    workspaceId: input.workspaceId,
+    sessionId: input.sessionId,
+    kiloSessionId: input.kiloSessionId,
+  });
+}
+
 const deleteHostedWorkspaceSessionHandler = protectedProcedure
   .input(DeleteHostedWorkspaceSessionInput)
   .output(DeleteHostedWorkspaceSessionOutput)
@@ -321,28 +488,41 @@ const deleteHostedWorkspaceSessionHandler = protectedProcedure
         domain: 'session',
         operationKey: input.operationKey,
       });
-      if (existing) {
-        assertSessionOperationIdentity(existing, {
-          userId: ctx.userId,
-          intent: 'delete_workspace_session',
-          organizationId: workspace.organizationId ?? undefined,
-          resourceKey: input.workspaceId,
-        });
-        const recorded = readDeletionProgress(existing);
-        if (recorded?.cloudAgentSessionId !== input.sessionId) {
-          throw new TRPCError({ code: 'NOT_FOUND', message: 'workspace_session_not_found' });
-        }
-        if (existing.status === 'completed') {
-          return {
-            success: true as const,
-            workspaceId: input.workspaceId,
-            sessionId: input.sessionId,
-          };
-        }
-        if (existing.status === 'failed') throw deletionConflict(existing.outcome_code);
-        throw new TRPCError({ code: 'CONFLICT', message: 'session_deletion_in_progress' });
+      if (!existing) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'workspace_session_not_found' });
       }
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'workspace_session_not_found' });
+      assertSessionOperationIdentity(existing, {
+        userId: ctx.userId,
+        intent: 'delete_workspace_session',
+        organizationId: workspace.organizationId ?? undefined,
+        resourceKey: input.workspaceId,
+      });
+      const recorded = readDeletionProgress(existing);
+      if (recorded?.cloudAgentSessionId !== input.sessionId) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'workspace_session_not_found' });
+      }
+      if (existing.status === 'completed') {
+        return {
+          success: true as const,
+          workspaceId: input.workspaceId,
+          sessionId: input.sessionId,
+        };
+      }
+      if (existing.status === 'failed') throw deletionConflict(existing.outcome_code);
+      if (!recorded) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'workspace_session_not_found' });
+      }
+
+      return resumeMissingSessionDeletion({
+        db,
+        env: ctx.env,
+        userId: ctx.userId,
+        organizationId: workspace.organizationId,
+        operationKey: input.operationKey,
+        workspaceId: input.workspaceId,
+        sessionId: input.sessionId,
+        kiloSessionId: recorded.kiloSessionId,
+      });
     }
     if (row.worktreeId !== input.workspaceId || row.parentSessionId !== null) {
       throw new TRPCError({ code: 'NOT_FOUND', message: 'workspace_session_not_found' });
@@ -401,66 +581,30 @@ const deleteHostedWorkspaceSessionHandler = protectedProcedure
       });
     }
 
-    try {
-      await ctx.env.SESSION_INGEST.deleteHostedWorkspaceSession({
-        kiloUserId: ctx.userId,
-        workspaceId: input.workspaceId,
-        sessionId: recorded?.kiloSessionId ?? row.sessionId,
-        cloudAgentSessionId: input.sessionId,
-      });
-    } catch (error) {
-      const code = rpcErrorCode(error);
-      if (
-        code.includes(WORKSPACE_REQUIRES_ROOT_SESSION) ||
-        code.includes(WORKSPACE_DELETING) ||
-        code.includes(WORKSPACE_IDENTITY_CONFLICT)
-      ) {
-        await settleOperation(db, {
-          rowId: admission.row.id,
-          status: 'failed',
-          outcomeCode: code.includes(WORKSPACE_REQUIRES_ROOT_SESSION)
-            ? WORKSPACE_REQUIRES_ROOT_SESSION
-            : code.includes(WORKSPACE_DELETING)
-              ? WORKSPACE_DELETING
-              : WORKSPACE_IDENTITY_CONFLICT,
-        }).catch(() => undefined);
-        throw deletionConflict(code);
-      }
-      await markReconcilePending(db, { rowId: admission.row.id }).catch(() => undefined);
-      throw new TRPCError({
-        code: 'SERVICE_UNAVAILABLE',
-        message: 'session_deletion_unavailable',
-      });
-    }
-
-    try {
-      await withDORetry(
-        () => getSandboxSessionStub(ctx.env, ctx.userId, input.sessionId),
-        stub => stub.deleteSession(),
-        'deleteSession'
-      );
-    } catch {
-      await markReconcilePending(db, { rowId: admission.row.id }).catch(() => undefined);
-      throw new TRPCError({
-        code: 'SERVICE_UNAVAILABLE',
-        message: 'session_deletion_incomplete',
-      });
-    }
-
-    const settlement = await settleOperation(db, {
+    const kiloSessionId = recorded?.kiloSessionId ?? row.sessionId;
+    await deleteHostedWorkspaceSessionInIngest({
+      db,
+      env: ctx.env,
       rowId: admission.row.id,
-      status: 'completed',
-      outcomeCode: 'ok',
-      canonicalResult: {
-        workspaceId: input.workspaceId,
-        cloudAgentSessionId: input.sessionId,
-        kiloSessionId: recorded?.kiloSessionId ?? row.sessionId,
-      },
+      userId: ctx.userId,
+      workspaceId: input.workspaceId,
+      sessionId: input.sessionId,
+      kiloSessionId,
     });
-    if (!settlement.settled && settlement.row?.status !== 'completed') {
-      throw new TRPCError({ code: 'CONFLICT', message: 'session_deletion_in_progress' });
-    }
-    return { success: true as const, workspaceId: input.workspaceId, sessionId: input.sessionId };
+    await teardownHostedWorkspaceSession({
+      db,
+      env: ctx.env,
+      rowId: admission.row.id,
+      userId: ctx.userId,
+      sessionId: input.sessionId,
+    });
+    return settleHostedWorkspaceDeletion({
+      db,
+      rowId: admission.row.id,
+      workspaceId: input.workspaceId,
+      sessionId: input.sessionId,
+      kiloSessionId,
+    });
   });
 
 export function createHostedWorkspaceMutationHandlers(): {

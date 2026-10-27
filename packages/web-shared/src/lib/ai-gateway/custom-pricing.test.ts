@@ -190,7 +190,7 @@ describe('custom model pricing', () => {
     const model = makeModel('qwen/qwen3.7-max');
 
     expect(applyCustomPricingToPricing(tieredConfig, model.id, model.pricing)).toBe(model.pricing);
-    expect(applyCustomPricingToModel(tieredConfig, model).pricing.prompt).toBe('0.000001000000');
+    expect(applyCustomPricingToModel(tieredConfig, model)).toBe(model);
     expect(
       calculateCustomCost_mUsd(tieredConfig, model.id, makeUsage({ cost_mUsd: 5 }))
     ).toBeUndefined();

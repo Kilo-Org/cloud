@@ -28,14 +28,6 @@ export type VercelProviderAttempt = {
   providerRequestId?: string;
   /** The upstream provider's own response id; usually equal to `providerRequestId`. */
   providerResponseId?: string;
-  /**
-   * Gateway-clock milliseconds when this provider attempt started. Recent
-   * responses report epoch time, older ones a monotonic clock, so only the
-   * difference to `endTime` is meaningful.
-   */
-  startTime?: number;
-  /** Gateway-clock milliseconds when this provider attempt finished; see `startTime`. */
-  endTime?: number;
 };
 
 export type VercelModelAttempt = {
@@ -158,8 +150,16 @@ export type MicrodollarUsageContext = {
   auto_model: string | null;
   /** Bounded labels for the reasoning configuration requested by the client. */
   reasoning_setting: string | null;
-  /** Time to first byte from the upstream provider, in milliseconds. Set after the upstream request returns. */
+  /**
+   * Time until the upstream response headers arrived, in milliseconds. Stored as
+   * `latency` only when the usage stats do not carry a measured latency.
+   */
   ttfb_ms: number | null;
+  /**
+   * `performance.now()` when the gateway received the request. Usage processing
+   * measures `latency` from it until the first response chunk.
+   */
+  requestStartedAt?: number;
   /**
    * Client-supplied per-message id from the `x-kilo-request` header.
    * Joinable to PostHog `Feedback Submitted.parentMessageID`. Optional

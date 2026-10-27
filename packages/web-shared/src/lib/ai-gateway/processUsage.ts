@@ -19,7 +19,7 @@ import type { MicrodollarUsage } from '@kilocode/db/schema';
 import { microdollar_usage } from '@kilocode/db/schema';
 import { createTimer } from '@kilocode/web-shared/lib/timer';
 import type { OpenAI } from 'openai';
-import { createParser, type EventSourceMessage } from 'eventsource-parser';
+import type { EventSourceMessage } from 'eventsource-parser';
 import type {
   OpenRouterChatCompletionRequest,
   OpenRouterGeneration,
@@ -90,11 +90,11 @@ import {
   computeOpenRouterCostFields,
   providerReportsIsByok,
   drainSseStream,
-  extractVercelGenerationTime,
   extractVercelIsByok,
   extractVercelUpstreamId,
   isResponseInterruptedError,
   reportUpstreamStreamError,
+  readResponseText,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
 import { enqueueDailyUsageRollupRepair } from './usage-daily-rollup-repairs';
@@ -1101,12 +1101,15 @@ export function countAndStoreUsage(
   openrouterRequestSpan: Span | undefined
 ) {
   let usageStatsPromise: Promise<MicrodollarUsageStats | null> = Promise.resolve(null);
+  const { requestStartedAt } = usageContext;
 
   const parseResponseText = async (
+    body: ReadableStream<Uint8Array>,
     parse: (content: string) => MicrodollarUsageStats
   ): Promise<MicrodollarUsageStats | null> => {
     try {
-      return parse(await clonedReponse.text());
+      const { text, timing } = await readResponseText(body, requestStartedAt);
+      return { ...parse(text), ...timing };
     } catch (error) {
       if (isResponseInterruptedError(error)) return null;
       throw error;
@@ -1125,9 +1128,10 @@ export function countAndStoreUsage(
             openrouterRequestSpan,
             usageContext.provider,
             clonedReponse.status,
-            usesUserCredentials
+            usesUserCredentials,
+            requestStartedAt
           )
-        : parseResponseText(content =>
+        : parseResponseText(clonedReponse.body, content =>
             parseResponsesMicrodollarUsageFromString(
               content,
               clonedReponse.status,
@@ -1143,9 +1147,10 @@ export function countAndStoreUsage(
             openrouterRequestSpan,
             usageContext.provider,
             clonedReponse.status,
-            usesUserCredentials
+            usesUserCredentials,
+            requestStartedAt
           )
-        : parseResponseText(content =>
+        : parseResponseText(clonedReponse.body, content =>
             parseMicrodollarUsageFromString(
               content,
               usageContext.kiloUserId,
@@ -1162,9 +1167,10 @@ export function countAndStoreUsage(
             openrouterRequestSpan,
             usageContext.provider,
             clonedReponse.status,
-            usesUserCredentials
+            usesUserCredentials,
+            requestStartedAt
           )
-        : parseResponseText(content =>
+        : parseResponseText(clonedReponse.body, content =>
             parseMessagesMicrodollarUsageFromString(
               content,
               clonedReponse.status,
@@ -1210,7 +1216,8 @@ export async function parseMicrodollarUsageFromStream(
   openrouterRequestSpan: Span | undefined,
   provider: ProviderId,
   statusCode: number,
-  usesUserCredentials: boolean
+  usesUserCredentials: boolean,
+  requestStartedAt?: number
 ): Promise<MicrodollarUsageStats> {
   // End the request span immediately as this function starts
   openrouterRequestSpan?.end();
@@ -1235,76 +1242,73 @@ export async function parseMicrodollarUsageFromStream(
   let finish_reason: string | null = null;
   let vercelProviderMetadata: VercelProviderMetaData | null = null;
 
-  const sseStreamParser = createParser({
-    onEvent(event: EventSourceMessage) {
-      if (!firstTokenReceived) {
-        sentryRootSpan()?.setAttribute(
-          'openrouter.time_to_first_token_ms',
-          performance.now() - startedAt
-        );
-        firstTokenReceived = true;
-        timeToFirstTokenSpan.end();
+  const onEvent = (event: EventSourceMessage) => {
+    if (!firstTokenReceived) {
+      sentryRootSpan()?.setAttribute(
+        'openrouter.time_to_first_token_ms',
+        performance.now() - startedAt
+      );
+      firstTokenReceived = true;
+      timeToFirstTokenSpan.end();
+    }
+
+    if (event.data === '[DONE]') {
+      return;
+    }
+
+    const json = JSON.parse(event.data) as ChatCompletionChunk;
+
+    if (!json) {
+      captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
+        extra: { event },
+      });
+      return;
+    }
+
+    if ('error' in json) {
+      const error = json.error as OpenRouterError;
+      reportedError = true;
+      if (typeof error.code === 'number') {
+        effectiveStatusCode = error.code;
       }
+      reportUpstreamStreamError({
+        label: 'OpenRouter error',
+        source: 'sse_processing',
+        error,
+        usesUserCredentials,
+        logContext: {
+          provider,
+          inference_provider: json.provider ?? inference_provider,
+          messageId: json.id ?? messageId,
+          model: json.model ?? model,
+        },
+        sentryExtra: { json, event },
+      });
+    }
 
-      if (event.data === '[DONE]') {
-        return;
-      }
+    model = json.model ?? model;
+    messageId = json.id ?? messageId;
+    usage = json.usage ?? usage;
+    const choice = json.choices?.[0];
+    const chunkProviderMetadata = choice?.delta?.provider_metadata;
+    if (chunkProviderMetadata) {
+      vercelProviderMetadata = chunkProviderMetadata;
+    }
+    inference_provider =
+      json.provider ?? chunkProviderMetadata?.gateway?.routing?.finalProvider ?? inference_provider;
+    finish_reason = choice?.finish_reason ?? finish_reason;
 
-      const json = JSON.parse(event.data) as ChatCompletionChunk;
+    const contentDelta = choice?.delta?.content;
+    if (contentDelta) {
+      responseContent += contentDelta;
+    }
+  };
 
-      if (!json) {
-        captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
-          extra: { event },
-        });
-        return;
-      }
-
-      if ('error' in json) {
-        const error = json.error as OpenRouterError;
-        reportedError = true;
-        if (typeof error.code === 'number') {
-          effectiveStatusCode = error.code;
-        }
-        reportUpstreamStreamError({
-          label: 'OpenRouter error',
-          source: 'sse_processing',
-          error,
-          usesUserCredentials,
-          logContext: {
-            provider,
-            inference_provider: json.provider ?? inference_provider,
-            messageId: json.id ?? messageId,
-            model: json.model ?? model,
-          },
-          sentryExtra: { json, event },
-        });
-      }
-
-      model = json.model ?? model;
-      messageId = json.id ?? messageId;
-      usage = json.usage ?? usage;
-      const choice = json.choices?.[0];
-      const chunkProviderMetadata = choice?.delta?.provider_metadata;
-      if (chunkProviderMetadata) {
-        vercelProviderMetadata = chunkProviderMetadata;
-      }
-      inference_provider =
-        json.provider ??
-        chunkProviderMetadata?.gateway?.routing?.finalProvider ??
-        inference_provider;
-      finish_reason = choice?.finish_reason ?? finish_reason;
-
-      const contentDelta = choice?.delta?.content;
-      if (contentDelta) {
-        responseContent += contentDelta;
-      }
-    },
-  });
-
-  const wasAborted = await drainSseStream(
+  const { wasAborted, timing } = await drainSseStream(
     stream,
-    chunk => sseStreamParser.feed(chunk),
-    streamProcessingSpan
+    onEvent,
+    streamProcessingSpan,
+    requestStartedAt
   );
 
   if (!reportedError && !usage) {
@@ -1324,9 +1328,9 @@ export async function parseMicrodollarUsageFromStream(
     inference_provider,
     finish_reason,
     upstream_id: extractVercelUpstreamId(vercelProviderMetadata),
-    latency: null,
+    latency: timing.latency,
     moderation_latency: null,
-    generation_time: extractVercelGenerationTime(vercelProviderMetadata),
+    generation_time: timing.generation_time,
     streamed: true,
     cancelled: null,
     status_code: effectiveStatusCode,
@@ -1374,7 +1378,7 @@ export function parseMicrodollarUsageFromString(
     finish_reason,
     latency: null,
     moderation_latency: null,
-    generation_time: extractVercelGenerationTime(vercelProviderMetadata),
+    generation_time: null,
     streamed: false,
     cancelled: null,
     status_code: statusCode,
@@ -1432,7 +1436,8 @@ export async function processTokenData(
 
     genStats.model = usageStats.model; // openrouter bug?
     genStats.upstream_id ??= usageStats.upstream_id; // keep the id the response already reported
-    genStats.generation_time ??= usageStats.generation_time;
+    genStats.latency = usageStats.latency;
+    genStats.generation_time = usageStats.generation_time;
     genStats.finish_reason ??= usageStats.finish_reason;
     genStats.hasError = usageStats.hasError; // retain by choice
     genStats.status_code = usageStats.status_code; // retain by choice
@@ -1641,9 +1646,10 @@ export const mapToUsageStats = (
     inference_provider: data.provider_name ?? null,
     upstream_id: data.upstream_id ?? null,
     finish_reason: data.finish_reason ?? null,
-    latency: data.latency ?? null,
+    // The gateway measures latency and generation_time itself; see drainSseStream and readResponseText.
+    latency: null,
     moderation_latency: data.moderation_latency ?? null,
-    generation_time: data.generation_time ?? null,
+    generation_time: null,
     streamed: data.streamed ?? null,
     cancelled: data.cancelled ?? null,
     status_code: 200,

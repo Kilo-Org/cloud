@@ -426,6 +426,7 @@ export const controlPlaneCredentialSourceSchema = z
       .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)
       .optional(),
     createdOnPlatform: z.string().max(100).optional(),
+    clientProvenance: z.enum(['browser', 'mobile', 'agent-manager']).optional(),
     repository: controlPlaneCredentialRepositorySchema.optional(),
     /**
      * Worker-encrypted `profile.mcpServers` snapshot. Persisted only inside this

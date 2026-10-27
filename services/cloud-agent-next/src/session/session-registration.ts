@@ -1199,6 +1199,7 @@ function buildSessionRegistrationCommand(
       orgId: input.options?.kilocodeOrganizationId,
       botId: ctx.botId,
       createdOnPlatform: input.options?.createdOnPlatform,
+      clientProvenance: input.options?.clientProvenance,
       billingOrigin: options?.billingOrigin,
     },
     auth: {

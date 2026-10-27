@@ -30,6 +30,21 @@ const profile = {
 };
 
 describe('session metadata boundary', () => {
+  it.each(['browser', 'mobile'] as const)(
+    'preserves %s client provenance through serialization',
+    clientProvenance => {
+      const metadata = parseSessionMetadata({
+        metadataSchemaVersion: 2,
+        identity: { sessionId: 'workspace_test', userId: 'user', clientProvenance },
+        auth: {},
+        lifecycle: { version: 1, timestamp: 1 },
+      });
+      expect(metadata.identity.clientProvenance).toBe(clientProvenance);
+      expect(
+        parseSessionMetadata(serializeSessionMetadata(metadata)).identity.clientProvenance
+      ).toBe(clientProvenance);
+    }
+  );
   it.each(
     [undefined, [], ['Z.Example.COM.', 'EXAMPLE.COM', 'example.com']].map(egressAllowlist => ({
       egressAllowlist,

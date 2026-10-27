@@ -3,13 +3,13 @@
 The catalog at runtime-targets.json owns startup mode and native image selection. Its default is
 preinstalled on all-in-one. Named environments inherit that default unless the catalog names them.
 Keep startup variables out of checked-in Wrangler vars. Deployment renders the Worker vars and native
-image from the catalog. Manual mode, descriptor or image drift fails before Wrangler or its custom build.
+images from the catalog. Manual mode, descriptor, cohort or image drift fails before Wrangler or its custom build.
 
 | Mode | Native image | Deployment reference |
 |---|---|---|
 | preinstalled | all-in-one | Existing Dockerfile and pinned build variables |
 | downloaded | all-in-one | Existing Dockerfile, exact-SHA runtime descriptor |
-| downloaded | runtime-free | Verified immutable base digest, exact-SHA runtime descriptor |
+| downloaded | runtime-free | Separate `runtime-free` named image with verified immutable base digest, exact-SHA runtime descriptor |
 
 The runtime-free/preinstalled pair is invalid in the shared configuration schema and the Worker.
 Downloaded startup supports native Cloudflare Containers and BYOC Vercel. SDK pins keep preinstalled startup.
@@ -22,10 +22,26 @@ their installed release until a new allocation starts. Base dependency changes s
 upgrade. Upgrade older BYOC snapshots once before enabling downloaded mode, so they have the required
 fixed Node path. Native image selection does not change the Vercel snapshot.
 
+A downloaded target can scope its startup to an `interactiveOrgIds` list. No committed target uses it yet.
+Deployment renders this list as `RUNTIME_INTERACTIVE_ORG_IDS`.
+Only new isolated native allocations whose preparing routes all belong to one listed organization and have
+`createdOnPlatform: cloud-agent-web` and `clientProvenance: browser` select it. Other organizations,
+personal sessions, mobile and non-web sessions, code reviews and shared sandboxes retain preinstalled startup on the unchanged `app` image. SDK and
+Vercel selections are not moved to the native provider. A missing or mixed route identity stays on the baseline.
+Sessions persisted before client provenance was recorded remain on the baseline. These identity values
+are rollout metadata, not an authorization boundary.
+
+The renderer retains `app` alongside `runtime-free`; the allocation's selected startup mode and image
+are used together, including snapshot fallback. Existing allocations keep their running image and mode.
+An absent `interactiveOrgIds` means deployment-wide native startup selection; an empty catalog list is
+rejected. For a complete rollback, remove the production override so it inherits the preinstalled default.
+
 ## Approval and rollout order
 
-No real target changes in this PR. Publication credentials, trigger enablement and real-provider
-qualification need explicit approval. Use an isolated named environment first. Record its account,
+All committed targets use preinstalled startup on all-in-one. A downloaded catalog entry requires
+`CLOUD_AGENT_RUNTIME_PUBLICATION_ENABLED=true` and a published handoff for the deployed SHA: downloaded
+deployment fails promptly when publication is disabled. Real-provider
+qualification remains required. Use an isolated named environment first. Record its account,
 Worker name, exact source SHA, bucket and instance type before deployment.
 
 1. Provision and enable publication through the process in [runtime-publication.md](runtime-publication.md).
@@ -37,8 +53,8 @@ Worker name, exact source SHA, bucket and instance type before deployment.
    container captures under its start image. B1 is merged into main, and its regression test runs
    in CI.
 4. Approve runtime-free on the same isolated target. Change its catalog image only. Repeat qualification.
-5. Request production approval only after the isolated evidence passes. Production remains preinstalled
-   until that approval and a reviewed catalog change.
+5. Enroll production organizations through `interactiveOrgIds` in a separate reviewed catalog change.
+   Expanding the list or removing the cohort restriction requires qualification evidence.
 
 For a clean checkout, preview deployment preparation without running Wrangler:
 
@@ -84,6 +100,9 @@ The renderer applies each change to new allocations. It does not rewrite existin
 deadlines. Do not deploy an older Worker that cannot read stored startup modes. A mode rollback also
 removes the rendered `RUNTIME_RELEASE_BUCKET` binding. A downloaded allocation that is still
 bootstrapping then gets 503 for artifact reads and restarts on the preinstalled path.
+
+Rollback this rollout through the catalog, not by reverting the Worker code: persisted credential sources
+now contain optional client provenance, which older strict-schema readers cannot parse.
 
 Keep earlier descriptors, payloads, handoffs and image digests. Do not delete snapshots or publication
 objects during rollback. A mode change uses a separate repository snapshot namespace.

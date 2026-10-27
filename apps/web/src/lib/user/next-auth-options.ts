@@ -1049,7 +1049,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         // Block new signups from blocked TLDs (existing users can still sign in)
-        if (!existingUser && isBlockedTLD(accountInfo.google_user_email)) {
+        if (!existingUser && (await isBlockedTLD(accountInfo.google_user_email))) {
           return redirectUrlForCode(`BLOCKED`);
         }
 

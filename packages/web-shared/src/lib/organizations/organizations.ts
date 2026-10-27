@@ -942,6 +942,25 @@ export async function setOrganizationRecommendationsDigestEnabled(
   return row?.settings ?? {};
 }
 
+export async function setOrganizationEnkryptShadowGuardrailsEnabled(
+  organizationId: Organization['id'],
+  enabled: boolean
+): Promise<OrganizationSettings> {
+  const [row] = await db
+    .update(organizations)
+    .set({
+      settings: sql`jsonb_set(
+        COALESCE(${organizations.settings}, '{}'::jsonb),
+        '{enkrypt_shadow_guardrails_enabled}',
+        ${JSON.stringify(enabled)}::jsonb
+      )`,
+    })
+    .where(eq(organizations.id, organizationId))
+    .returning({ settings: organizations.settings });
+
+  return row?.settings ?? {};
+}
+
 export async function markOrganizationAsDeleted(
   organizationId: Organization['id'],
   txn?: DrizzleTransaction

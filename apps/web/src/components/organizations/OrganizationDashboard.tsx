@@ -25,6 +25,7 @@ import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { OrganizationProvidersAndModelsConfigurationCard } from '@/components/organizations/OrganizationProvidersAndModelsConfigurationCard';
 import { OrganizationChildOrganizationsCard } from '@/components/organizations/OrganizationChildOrganizationsCard';
 import { OrganizationEmailPreferencesCard } from '@/components/organizations/OrganizationEmailPreferencesCard';
+import { OrganizationGuardrailScanningCard } from '@/components/organizations/OrganizationGuardrailScanningCard';
 import { OrgActiveKiloclawsCard } from '@/components/organizations/OrgActiveKiloclawsCard';
 import { SupportCard } from '@/components/support/SupportCard';
 
@@ -176,6 +177,10 @@ export function OrganizationDashboard({
                     readonly={!(canManageOrganization(currentRole) || isKiloAdmin)}
                   />
                 )}
+                <OrganizationGuardrailScanningCard
+                  organizationId={organizationId}
+                  readonly={!(canManageOrganization(currentRole) || isKiloAdmin)}
+                />
               </>
             )}
           </div>

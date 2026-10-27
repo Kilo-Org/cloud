@@ -1,15 +1,18 @@
 import {
   getOrganizationById,
   mutateOrganizationSettings,
+  setOrganizationEnkryptShadowGuardrailsEnabled,
   setOrganizationRecommendationsDigestEnabled,
   updateOrganizationSettings,
 } from '@kilocode/web-shared/lib/organizations/organizations';
+import { isEnkryptShadowGuardrailsOrganization } from '@kilocode/web-shared/lib/organizations/enkrypt-shadow-guardrails';
 import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
   organizationBillingMutationProcedure,
   organizationAdminMutationProcedure,
+  organizationMemberProcedure,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { listAvailableModelsProcedure } from '@kilocode/web-shared/routers/organizations/organization-available-models-procedure';
 import { TRPCError } from '@trpc/server';
@@ -302,8 +305,17 @@ const UpdateRecommendationsDigestInputSchema = OrganizationIdInputSchema.extend(
   enabled: z.boolean(),
 });
 
+const UpdateEnkryptShadowGuardrailsInputSchema = OrganizationIdInputSchema.extend({
+  enabled: z.boolean(),
+});
+
 const SettingsResponseSchema = z.object({
   settings: z.custom<OrganizationSettings>(),
+});
+
+const EnkryptShadowGuardrailsResponseSchema = z.object({
+  available: z.boolean(),
+  enabled: z.boolean(),
 });
 
 export const organizationsSettingsRouter = createTRPCRouter({
@@ -873,5 +885,55 @@ export const organizationsSettingsRouter = createTRPCRouter({
       return {
         settings: updatedSettings,
       };
+    }),
+
+  getEnkryptShadowGuardrails: organizationMemberProcedure
+    .output(EnkryptShadowGuardrailsResponseSchema)
+    .query(async ({ input }) => {
+      if (!isEnkryptShadowGuardrailsOrganization(input.organizationId)) {
+        return { available: false, enabled: false };
+      }
+      const organization = await getOrganizationById(input.organizationId);
+      return {
+        available: true,
+        enabled: organization?.settings?.enkrypt_shadow_guardrails_enabled === true,
+      };
+    }),
+
+  updateEnkryptShadowGuardrails: organizationAdminMutationProcedure
+    .input(UpdateEnkryptShadowGuardrailsInputSchema)
+    .output(SettingsResponseSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, enabled } = input;
+      if (!isEnkryptShadowGuardrailsOrganization(organizationId)) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Guardrail scanning is not available for this organization.',
+        });
+      }
+
+      const existingOrg = await getOrganizationById(organizationId);
+      if (!existingOrg) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+
+      const wasEnabled = existingOrg.settings?.enkrypt_shadow_guardrails_enabled === true;
+      const updatedSettings = await setOrganizationEnkryptShadowGuardrailsEnabled(
+        organizationId,
+        enabled
+      );
+
+      if (enabled !== wasEnabled) {
+        await createAuditLog({
+          action: 'organization.settings.change',
+          actor_email: ctx.user.google_user_email,
+          actor_id: ctx.user.id,
+          actor_name: ctx.user.google_user_name,
+          message: `Enkrypt shadow guardrail scanning: ${enabled ? 'enabled' : 'disabled'}`,
+          organization_id: organizationId,
+        });
+      }
+
+      return { settings: updatedSettings };
     }),
 });

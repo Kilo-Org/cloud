@@ -37,3 +37,11 @@ export const TEAM_SEAT_PRICE_MONTHLY_USD = SEAT_PRICING.teams.annual;
 export const ENTERPRISE_SEAT_PRICE_MONTHLY_USD = SEAT_PRICING.enterprise.annual;
 
 export const KILO_ORGANIZATION_ID = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
+
+/**
+ * Organizations that may see and enable Enkrypt shadow-mode guardrail scanning.
+ * The settings router and the AI gateway both enforce this list.
+ */
+export const ENKRYPT_SHADOW_GUARDRAILS_ORGANIZATION_IDS: ReadonlySet<string> = new Set([
+  KILO_ORGANIZATION_ID,
+]);

@@ -24,6 +24,14 @@ import { eq } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 
+const mockEnkryptAllowlist = new Set<string>();
+jest.mock('@kilocode/web-shared/lib/organizations/constants', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/organizations/constants'),
+  get ENKRYPT_SHADOW_GUARDRAILS_ORGANIZATION_IDS() {
+    return mockEnkryptAllowlist;
+  },
+}));
+
 jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
   isReleaseToggleEnabled: jest.fn(async () => true),
 }));
@@ -1392,6 +1400,109 @@ describe('organizations settings trpc router', () => {
       expect(result.settings.minimum_balance).toBe(100);
       expect(result.settings.minimum_balance_alert_email).toEqual(['alert@example.com']);
       expect(result.settings.recommendations_digest_enabled).toBe(true);
+    });
+  });
+
+  describe('Enkrypt shadow guardrail procedures', () => {
+    let allowlistedOrganization: Organization;
+
+    beforeAll(async () => {
+      allowlistedOrganization = await createTestOrganization(
+        'Guardrails Allowlisted',
+        owner.id,
+        0,
+        {},
+        false
+      );
+      await addUserToOrganization(allowlistedOrganization.id, member.id, 'member');
+      mockEnkryptAllowlist.add(allowlistedOrganization.id);
+    });
+
+    afterAll(async () => {
+      mockEnkryptAllowlist.clear();
+      await db.delete(organizations).where(eq(organizations.id, allowlistedOrganization.id));
+    });
+
+    afterEach(async () => {
+      await updateOrganizationSettings(allowlistedOrganization.id, {});
+      await updateOrganizationSettings(testOrganization.id, {});
+    });
+
+    it('hides the setting from organizations outside the allowlist, even when the flag is set', async () => {
+      await updateOrganizationSettings(testOrganization.id, {
+        enkrypt_shadow_guardrails_enabled: true,
+      });
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.settings.getEnkryptShadowGuardrails({
+          organizationId: testOrganization.id,
+        })
+      ).resolves.toEqual({ available: false, enabled: false });
+    });
+
+    it('rejects enabling scanning outside the allowlist', async () => {
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.organizations.settings.updateEnkryptShadowGuardrails({
+          organizationId: testOrganization.id,
+          enabled: true,
+        })
+      ).rejects.toThrow('Guardrail scanning is not available for this organization.');
+      const organization = await getOrganizationById(testOrganization.id);
+      expect(organization?.settings.enkrypt_shadow_guardrails_enabled).toBeUndefined();
+    });
+
+    it('lets an owner of an allowlisted organization toggle scanning', async () => {
+      const caller = await createCallerForUser(owner.id);
+      await updateOrganizationSettings(allowlistedOrganization.id, { model_deny_list: ['gpt-4'] });
+
+      const result = await caller.organizations.settings.updateEnkryptShadowGuardrails({
+        organizationId: allowlistedOrganization.id,
+        enabled: true,
+      });
+
+      expect(result.settings).toMatchObject({
+        enkrypt_shadow_guardrails_enabled: true,
+        model_deny_list: ['gpt-4'],
+      });
+      await expect(
+        caller.organizations.settings.getEnkryptShadowGuardrails({
+          organizationId: allowlistedOrganization.id,
+        })
+      ).resolves.toEqual({ available: true, enabled: true });
+
+      const auditLogs = await db
+        .select({ message: organization_audit_logs.message })
+        .from(organization_audit_logs)
+        .where(eq(organization_audit_logs.organization_id, allowlistedOrganization.id));
+      expect(auditLogs.map(log => log.message)).toContain(
+        'Enkrypt shadow guardrail scanning: enabled'
+      );
+
+      await caller.organizations.settings.updateEnkryptShadowGuardrails({
+        organizationId: allowlistedOrganization.id,
+        enabled: false,
+      });
+      const organization = await getOrganizationById(allowlistedOrganization.id);
+      expect(organization?.settings.enkrypt_shadow_guardrails_enabled).toBe(false);
+    });
+
+    it('shows members the setting but rejects their changes', async () => {
+      const caller = await createCallerForUser(member.id);
+
+      await expect(
+        caller.organizations.settings.getEnkryptShadowGuardrails({
+          organizationId: allowlistedOrganization.id,
+        })
+      ).resolves.toEqual({ available: true, enabled: false });
+      await expect(
+        caller.organizations.settings.updateEnkryptShadowGuardrails({
+          organizationId: allowlistedOrganization.id,
+          enabled: true,
+        })
+      ).rejects.toThrow('You do not have the required organizational role to access this feature');
     });
   });
 });

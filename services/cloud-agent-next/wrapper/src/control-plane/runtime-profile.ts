@@ -57,8 +57,8 @@ async function stageRuntimeProfile(
     await writeRuntimeSkills(staging, profile.runtimeSkills, options);
     const stagedSkills = path.join(staging, '.kilocode', 'skills');
     await fs.mkdir(stagedSkills, { recursive: true });
-    // Write config before the skills swap so a failed write leaves the previous skills live.
-    await writeRuntimeProfileConfig(home, profile);
+    const hasConfig = await writeRuntimeProfileConfig(staging, profile);
+    const stagedConfig = profileConfigPath(staging);
     const skills = path.join(home, '.kilocode', 'skills');
     const backup = path.join(staging, 'previous-skills');
     await fs.mkdir(path.dirname(skills), { recursive: true });
@@ -72,17 +72,20 @@ async function stageRuntimeProfile(
     }
     try {
       await fs.rename(stagedSkills, skills);
+      options?.signal?.throwIfAborted();
+      await commitRuntimeProfileConfig(stagedConfig, hasConfig, home);
     } catch (error) {
-      if (hadSkills) {
-        try {
-          await fs.rename(backup, skills);
-        } catch (rollbackError) {
-          preserveBackup = true;
-          throw new AggregateError(
-            [error, rollbackError],
-            `Failed to replace runtime skills and restore previous skills; backup preserved at ${backup}`
-          );
-        }
+      try {
+        await fs.rm(skills, { recursive: true, force: true });
+        if (hadSkills) await fs.rename(backup, skills);
+      } catch (rollbackError) {
+        preserveBackup = true;
+        throw new AggregateError(
+          [error, rollbackError],
+          hadSkills
+            ? `Failed to replace runtime skills and restore previous skills; backup preserved at ${backup}`
+            : 'Failed to replace runtime skills and remove the incomplete replacement'
+        );
       }
       throw error;
     }
@@ -91,7 +94,21 @@ async function stageRuntimeProfile(
   }
 }
 
-async function writeRuntimeProfileConfig(home: string, profile: RuntimeProfile): Promise<void> {
+async function commitRuntimeProfileConfig(
+  stagedConfig: string,
+  hasConfig: boolean,
+  home: string
+): Promise<void> {
+  const file = profileConfigPath(home);
+  if (!hasConfig) {
+    await fs.rm(file, { force: true });
+    return;
+  }
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.rename(stagedConfig, file);
+}
+
+async function writeRuntimeProfileConfig(home: string, profile: RuntimeProfile): Promise<boolean> {
   const config = {
     ...(profile.runtimeAgents?.length
       ? {
@@ -107,8 +124,9 @@ async function writeRuntimeProfileConfig(home: string, profile: RuntimeProfile):
   const file = profileConfigPath(home);
   if (Object.keys(config).length === 0) {
     await fs.rm(file, { force: true });
-    return;
+    return false;
   }
   await fs.mkdir(path.dirname(file), { recursive: true });
   await fs.writeFile(file, JSON.stringify(config), { mode: 0o600 });
+  return true;
 }

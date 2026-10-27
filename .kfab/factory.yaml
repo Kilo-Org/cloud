@@ -11,5 +11,7 @@ verificationCommands:
 
 # Stop the per-worktree Docker Compose test database that `pnpm test:db` starts.
 # kfab runs this once in the checkout when a run's workspace is cleaned up.
+# Only a checkout that published dev/.env owns its Compose project; without it,
+# Compose would fall back to the shared default `dev` project, so skip.
 teardown:
-  - docker compose -f dev/docker-compose.yml down -v
+  - test ! -f dev/.env || docker compose -f dev/docker-compose.yml down -v

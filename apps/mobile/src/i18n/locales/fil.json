@@ -876,6 +876,18 @@
       "spendAlertsSubtitle": "mga paglampas sa hangganan at pagtaas bawat oras",
       "spendAlertsToggle": "Kategorya ng mga babala sa gastos"
     },
+    "history": {
+      "title": "Kasaysayan ng notipikasyon",
+      "subtitle": "Mga notipikasyong natanggap ng account na ito",
+      "bannerBody": "Naka-off ang mga push notification para sa device na ito, kaya wala nang bagong darating dito.",
+      "bannerAction": "Mga setting ng notipikasyon",
+      "emptyTitle": "Wala pang mga notipikasyon",
+      "emptyCategoryTitle": "Wala pang mga notipikasyon sa kategoryang ito",
+      "emptyBody": "Lumalabas dito ang mga notipikasyong natatanggap ng account na ito. Itinatago ang mga ito sa loob ng {{days}} araw.",
+      "capped": "Ipinapakita ang mga pinakabagong notipikasyon.",
+      "loadError": "Hindi ma-load ang kasaysayan ng notipikasyon.",
+      "openFailed": "Hindi na mabubuksan kahit saan ang notipikasyong ito."
+    },
     "action": {
       "openSession": "Buksan ang sesyon"
     },
@@ -4084,6 +4096,10 @@
     "generate": "Gumawa ng buod",
     "retrySummary": "Subukan muli ang bayad na buod",
     "sources": "Ebidensya at artifact",
+    "sessionsShown_one": "Ipinapakita ang {{shown}} sa {{total}} na session",
+    "sessionsShown_other": "Ipinapakita ang {{shown}} sa {{total}} na session",
+    "itemsShown_one": "Ipinapakita ang {{shown}} sa {{total}} na item",
+    "itemsShown_other": "Ipinapakita ang {{shown}} sa {{total}} na item",
     "timezone": "Time zone ng briefing",
     "deviceTimezone": "Gamitin ang time zone ng device",
     "timezoneHint": "IANA time zone, halimbawa Europe/Berlin. Sa mga susunod na briefing magagamit ang pagbabago sa iskedyul.",

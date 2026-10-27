@@ -876,6 +876,18 @@
       "spendAlertsSubtitle": "oorskryding van drempels en uurlikse pieke",
       "spendAlertsToggle": "Kategorie vir bestedingswaarskuwings"
     },
+    "history": {
+      "title": "Kennisgewingsgeskiedenis",
+      "subtitle": "Kennisgewings wat hierdie rekening ontvang het",
+      "bannerBody": "Push-kennisgewings is af vir hierdie toestel, so nuwe kennisgewings sal nie hier aankom nie.",
+      "bannerAction": "Kennisgewingsinstellings",
+      "emptyTitle": "Nog geen kennisgewings nie",
+      "emptyCategoryTitle": "Geen kennisgewings in hierdie kategorie nie",
+      "emptyBody": "Kennisgewings wat hierdie rekening ontvang, verskyn hier. Hulle word vir {{days}} dae bewaar.",
+      "capped": "Die mees onlangse kennisgewings word gewys.",
+      "loadError": "Kon nie kennisgewingsgeskiedenis laai nie.",
+      "openFailed": "Hierdie kennisgewing open nêrens meer nie."
+    },
     "action": {
       "openSession": "Maak sessie oop"
     },
@@ -4084,6 +4096,10 @@
     "generate": "Genereer opsomming",
     "retrySummary": "Probeer betaalde opsomming weer",
     "sources": "Bewyse en artefakte",
+    "sessionsShown_one": "Wys {{shown}} van {{total}} sessie",
+    "sessionsShown_other": "Wys {{shown}} van {{total}} sessies",
+    "itemsShown_one": "Wys {{shown}} van {{total}} item",
+    "itemsShown_other": "Wys {{shown}} van {{total}} items",
     "timezone": "Verslag-tydsone",
     "deviceTimezone": "Gebruik toestel-tydsone",
     "timezoneHint": "IANA-tydsone, byvoorbeeld Europe/Berlin. Skedulewysigings geld vir toekomstige verslae.",

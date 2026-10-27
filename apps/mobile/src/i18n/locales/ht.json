@@ -876,6 +876,18 @@
       "spendAlertsSubtitle": "depasman papòt ak ogmantasyon chak èdtan",
       "spendAlertsToggle": "Kategori alèt depans"
     },
+    "history": {
+      "title": "Istwa notifikasyon",
+      "subtitle": "Notifikasyon kont sa a te resevwa",
+      "bannerBody": "Notifikasyon push dezaktive pou aparèy sa a, donk nouvo yo p ap rive isit la.",
+      "bannerAction": "Paramèt notifikasyon",
+      "emptyTitle": "Poko gen notifikasyon",
+      "emptyCategoryTitle": "Poko gen notifikasyon nan kategori sa a",
+      "emptyBody": "Notifikasyon kont sa a resevwa yo parèt isit la. Yo kenbe yo pandan {{days}} jou.",
+      "capped": "Sa yo se notifikasyon ki pi resan yo.",
+      "loadError": "Nou pa t ka chaje istwa notifikasyon yo.",
+      "openFailed": "Notifikasyon sa a pa ouvri okenn kote ankò."
+    },
     "action": {
       "openSession": "Louvri sesyon an"
     },
@@ -4084,6 +4096,10 @@
     "generate": "Kreye rezime",
     "retrySummary": "Re-eseye rezime peye a",
     "sources": "Prèv ak atefak",
+    "sessionsShown_one": "N ap montre {{shown}} sou {{total}} sesyon",
+    "sessionsShown_other": "N ap montre {{shown}} sou {{total}} sesyon",
+    "itemsShown_one": "N ap montre {{shown}} sou {{total}} eleman",
+    "itemsShown_other": "N ap montre {{shown}} sou {{total}} eleman",
     "timezone": "Fizo orè rapò a",
     "deviceTimezone": "Sèvi ak fizo orè aparèy la",
     "timezoneHint": "Fizo orè IANA, pa egzanp Europe/Berlin. Chanjman orè yo aplike pou rapò k ap vini yo.",

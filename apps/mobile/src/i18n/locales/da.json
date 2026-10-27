@@ -876,6 +876,18 @@
       "spendAlertsSubtitle": "grænseoverskridelser og spikes pr. time",
       "spendAlertsToggle": "Kategorien forbrugsadvarsler"
     },
+    "history": {
+      "title": "Notifikationshistorik",
+      "subtitle": "Notifikationer, som denne konto har modtaget",
+      "bannerBody": "Pushnotifikationer er slået fra på denne enhed, så nye ankommer ikke her.",
+      "bannerAction": "Notifikationsindstillinger",
+      "emptyTitle": "Ingen notifikationer endnu",
+      "emptyCategoryTitle": "Ingen notifikationer i denne kategori",
+      "emptyBody": "Notifikationer, som denne konto modtager, vises her. De gemmes i {{days}} dage.",
+      "capped": "Viser de seneste notifikationer.",
+      "loadError": "Kunne ikke indlæse notifikationshistorikken.",
+      "openFailed": "Denne notifikation kan ikke længere åbnes nogen steder."
+    },
     "action": {
       "openSession": "Åbn session"
     },
@@ -4084,6 +4096,10 @@
     "generate": "Generér resumé",
     "retrySummary": "Prøv betalt resumé igen",
     "sources": "Dokumentation og artefakter",
+    "sessionsShown_one": "Viser {{shown}} af {{total}} session",
+    "sessionsShown_other": "Viser {{shown}} af {{total}} sessioner",
+    "itemsShown_one": "Viser {{shown}} af {{total}} element",
+    "itemsShown_other": "Viser {{shown}} af {{total}} elementer",
     "timezone": "Tidszone for briefing",
     "deviceTimezone": "Brug enhedens tidszone",
     "timezoneHint": "IANA-tidszone, for eksempel Europe/Berlin. Ændringer i tidsplanen gælder fremtidige briefinger.",

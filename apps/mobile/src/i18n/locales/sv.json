@@ -876,6 +876,18 @@
       "spendAlertsSubtitle": "gränsöverskridanden och toppar per timme",
       "spendAlertsToggle": "Kategorin utgiftsvarningar"
     },
+    "history": {
+      "title": "Aviseringshistorik",
+      "subtitle": "Aviseringar som det här kontot har tagit emot",
+      "bannerBody": "Push-aviseringar är avstängda för den här enheten, så nya aviseringar kommer inte fram hit.",
+      "bannerAction": "Aviseringsinställningar",
+      "emptyTitle": "Inga aviseringar än",
+      "emptyCategoryTitle": "Inga aviseringar i den här kategorin",
+      "emptyBody": "Aviseringar som det här kontot tar emot visas här. De sparas i {{days}} dagar.",
+      "capped": "Visar de senaste aviseringarna.",
+      "loadError": "Kunde inte läsa in aviseringshistoriken.",
+      "openFailed": "Den här aviseringen öppnas inte längre någonstans."
+    },
     "action": {
       "openSession": "Öppna session"
     },
@@ -4084,6 +4096,10 @@
     "generate": "Skapa sammanfattning",
     "retrySummary": "Försök igen med betald sammanfattning",
     "sources": "Underlag och artefakter",
+    "sessionsShown_one": "Visar {{shown}} av {{total}} session",
+    "sessionsShown_other": "Visar {{shown}} av {{total}} sessioner",
+    "itemsShown_one": "Visar {{shown}} av {{total}} post",
+    "itemsShown_other": "Visar {{shown}} av {{total}} poster",
     "timezone": "Tidszon för rapport",
     "deviceTimezone": "Använd enhetens tidszon",
     "timezoneHint": "IANA-tidszon, till exempel Europe/Berlin. Schemaändringar gäller kommande rapporter.",

@@ -876,6 +876,18 @@
       "spendAlertsSubtitle": "hədd aşmaları və saatlıq sıçrayışlar",
       "spendAlertsToggle": "Xərc bildirişləri kateqoriyası"
     },
+    "history": {
+      "title": "Bildiriş tarixçəsi",
+      "subtitle": "Bu hesabın aldığı bildirişlər",
+      "bannerBody": "Bu cihaz üçün push bildirişlər deaktivdir, ona görə də yeni bildirişlər bura gəlməyəcək.",
+      "bannerAction": "Bildiriş parametrləri",
+      "emptyTitle": "Hələ bildiriş yoxdur",
+      "emptyCategoryTitle": "Bu kateqoriyada bildiriş yoxdur",
+      "emptyBody": "Bu hesabın aldığı bildirişlər burada görünür. Onlar {{days}} gün saxlanılır.",
+      "capped": "Ən son bildirişlər göstərilir.",
+      "loadError": "Bildiriş tarixçəsini yükləmək mümkün olmadı.",
+      "openFailed": "Bu bildiriş artıq heç yerdə açılmır."
+    },
     "action": {
       "openSession": "Sessiyanı aç"
     },
@@ -4084,6 +4096,10 @@
     "generate": "Xülasə yarat",
     "retrySummary": "Ödənişli xülasəni təkrarla",
     "sources": "Sübutlar və artefaktlar",
+    "sessionsShown_one": "{{total}} sessiyadan {{shown}} göstərilir",
+    "sessionsShown_other": "{{total}} sessiyadan {{shown}} göstərilir",
+    "itemsShown_one": "{{total}} elementdən {{shown}} göstərilir",
+    "itemsShown_other": "{{total}} elementdən {{shown}} göstərilir",
     "timezone": "Hesabat saat qurşağı",
     "deviceTimezone": "Cihazın saat qurşağından istifadə et",
     "timezoneHint": "IANA saat qurşağı, məsələn Europe/Berlin. Cədvəl dəyişiklikləri gələcək hesabatlara tətbiq olunur.",

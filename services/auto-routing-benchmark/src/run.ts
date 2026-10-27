@@ -89,6 +89,8 @@ import {
   filterSummariesByProvenance,
 } from './routing-table-builder';
 import {
+  addPriorAttempt,
+  type AttemptUsage,
   DECIDER_CLI_TIMEOUT_MS,
   destroyDeciderCliContainer,
   isRetryableContainerAvailabilityError,
@@ -1318,6 +1320,15 @@ const ContainerCaseResultSchema = z.object({
     attemptStartedAt: z.number().int().nonnegative().optional(),
     retried: z.boolean().optional(),
     priorCostUsd: z.number().nonnegative().nullable().optional(),
+    priorUsage: z
+      .object({
+        inputTokens: z.number().nonnegative().nullable(),
+        cachedInputTokens: z.number().nonnegative().nullable(),
+        outputTokens: z.number().nonnegative().nullable(),
+        reasoningTokens: z.number().nonnegative().nullable(),
+      })
+      .nullable()
+      .optional(),
   }),
   outcome: z.discriminatedUnion('kind', [
     z.object({
@@ -1410,6 +1421,10 @@ async function recordDeciderOutput(
       score: grade.score,
       latency_ms: result.latencyMs,
       cost_usd: result.costUsd,
+      input_tokens: result.inputTokens,
+      cached_input_tokens: result.cachedInputTokens,
+      output_tokens: result.outputTokens,
+      reasoning_tokens: result.reasoningTokens,
       error: result.exitCode !== 0 ? result.stderrTail.slice(0, 500) : null,
       fallback_reason: null,
       route_hit: null,
@@ -1595,10 +1610,13 @@ export async function acceptContainerCaseResult(env: Env, body: unknown): Promis
   } else {
     const result = parseContainerRunResponse(outcome.response, Date.now(), execution.model);
     if (execution.retried) {
-      result.costUsd =
-        result.costUsd === null && execution.priorCostUsd == null
-          ? null
-          : (result.costUsd ?? 0) + (execution.priorCostUsd ?? 0);
+      addPriorAttempt(result, {
+        costUsd: execution.priorCostUsd ?? null,
+        inputTokens: execution.priorUsage?.inputTokens ?? null,
+        cachedInputTokens: execution.priorUsage?.cachedInputTokens ?? null,
+        outputTokens: execution.priorUsage?.outputTokens ?? null,
+        reasoningTokens: execution.priorUsage?.reasoningTokens ?? null,
+      });
     }
     stored = await savePendingDeciderOutput(
       env.BENCH_DB,
@@ -1861,6 +1879,10 @@ export async function processJob(env: Env, rawMessage: unknown): Promise<void> {
             score: gradeClassifierOutput(benchCase.expected, classification),
             latency_ms: Math.round(performance.now() - startedAt),
             cost_usd: cost,
+            input_tokens: null,
+            cached_input_tokens: null,
+            output_tokens: null,
+            reasoning_tokens: null,
             error: null,
             fallback_reason: null,
             route_hit:
@@ -2135,6 +2157,7 @@ async function processDeciderJob(
         attemptStartedAt = startedAt;
         let retried = false;
         let priorCostUsd: number | null = null;
+        let priorUsage: Omit<AttemptUsage, 'costUsd'> | null = null;
         console.log(
           JSON.stringify({
             event: 'benchmark_case_execution_started',
@@ -2160,7 +2183,13 @@ async function processDeciderJob(
             variant: cliVariant,
             resultCallback: {
               url: env.BENCH_RESULT_URL,
-              execution: { ...execution, attemptStartedAt: startedAt, retried, priorCostUsd },
+              execution: {
+                ...execution,
+                attemptStartedAt: startedAt,
+                retried,
+                priorCostUsd,
+                priorUsage,
+              },
             },
           }).catch(error => {
             if (isRetryableContainerAvailabilityError(error)) throw error;
@@ -2187,6 +2216,12 @@ async function processDeciderJob(
         attemptStartedAt = startedAt;
         retried = true;
         priorCostUsd = first.costUsd;
+        priorUsage = {
+          inputTokens: first.inputTokens,
+          cachedInputTokens: first.cachedInputTokens,
+          outputTokens: first.outputTokens,
+          reasoningTokens: first.reasoningTokens,
+        };
         await deletePendingDeciderOutput(env.BENCH_DB, pendingKey);
         console.log(
           JSON.stringify({
@@ -2203,10 +2238,7 @@ async function processDeciderJob(
           })
         );
         const retry = await invokeCli();
-        retry.costUsd =
-          retry.costUsd === null && first.costUsd === null
-            ? null
-            : (retry.costUsd ?? 0) + (first.costUsd ?? 0);
+        addPriorAttempt(retry, first);
         return { result: retry, retried: true, attemptStartedAt: startedAt };
       };
       try {
@@ -2305,6 +2337,10 @@ function failedRow(
     score: 0,
     latency_ms: Math.round(performance.now() - startedAt),
     cost_usd: error instanceof ClassifierRunError ? error.cost : null,
+    input_tokens: null,
+    cached_input_tokens: null,
+    output_tokens: null,
+    reasoning_tokens: null,
     error: JSON.stringify(formatError(error)).slice(0, 500),
     fallback_reason: null,
     // A failed classification missed its route; decider rows carry no route hit.
@@ -2586,6 +2622,20 @@ export function summarize(rows: CaseResultRow[], kind: BenchmarkKind): Benchmark
         ? (latencies[Math.min(latencies.length - 1, Math.ceil(0.95 * latencies.length) - 1)] ??
           null)
         : null;
+    const averageTokens = (
+      field: 'input_tokens' | 'cached_input_tokens' | 'output_tokens' | 'reasoning_tokens'
+    ): number | null => {
+      let total = 0;
+      let count = 0;
+      for (const row of group) {
+        const value = row[field];
+        if (value !== null) {
+          total += value;
+          count++;
+        }
+      }
+      return count > 0 ? total / count : null;
+    };
     return {
       model,
       variant: variantFromStorage(storedVariant),
@@ -2594,6 +2644,10 @@ export function summarize(rows: CaseResultRow[], kind: BenchmarkKind): Benchmark
       avgCostUsd: costs.length
         ? Number((costs.reduce((a, r) => a + (r.cost_usd ?? 0), 0) / costs.length).toFixed(8))
         : null,
+      avgInputTokens: averageTokens('input_tokens'),
+      avgCachedInputTokens: averageTokens('cached_input_tokens'),
+      avgOutputTokens: averageTokens('output_tokens'),
+      avgReasoningTokens: averageTokens('reasoning_tokens'),
       avgLatencyMs: Math.round(group.reduce((a, r) => a + r.latency_ms, 0) / group.length),
       p50LatencyMs: latencies[Math.floor(latencies.length / 2)] ?? null,
       p95LatencyMs,

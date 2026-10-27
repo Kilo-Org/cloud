@@ -282,6 +282,7 @@ export async function handleAudioTranscriptionsRequest(
     mode: null,
     auto_model: null,
     ttfb_ms: null,
+    requestStartedAt,
     bouncer: {
       requestId: bouncerRequestId,
       occurredAt: new Date(requestStartedAtMs),
@@ -389,7 +390,6 @@ export async function handleAudioTranscriptionsRequest(
   });
 
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
-  usageContext.ttfb_ms = ttfbMs;
   usageContext.status_code = response.status;
 
   emitApiMetricsForResponse(

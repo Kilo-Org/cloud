@@ -867,16 +867,30 @@ it.each([
     );
     expect(Buffer.byteLength(JSON.stringify(displayed), 'utf8')).toBeLessThanOrEqual(64_000);
     expect({
-      coverage: prepared.report.coverage.activity,
+      coverage: prepared.report.coverage,
+      scorecard: prepared.report.scorecard,
       storedDate: row.local_date,
       localDate: prepared.report.localDate,
       status: prepared.report.sessions[0]?.status,
     }).toEqual({
-      coverage: 'partial',
+      coverage: {
+        activity: 'complete',
+        spend: 'complete',
+        blockers: 'complete',
+        pullRequests: 'complete',
+      },
+      scorecard: {
+        sessions: 1,
+        pullRequests: 0,
+        blockers: rootStatus === 'question' ? 2 : 1,
+        spendMicrodollars: 5000 * 7,
+      },
       storedDate: null,
       localDate: '2026-09-01',
       status: expectedStatus,
     });
+    expect(prepared.report.omittedCollectedSources).toBeGreaterThan(0);
+    expect(prepared.report.sessions[0]?.omittedSources).toBeGreaterThan(0);
     const times = prepared.report.sources.map(source => Date.parse(source.occurredAt));
     expect(Math.min(...times)).toBeLessThan(Date.parse(input.startAt) + 86400_000);
     expect(Math.max(...times)).toBeGreaterThan(Date.parse(input.endAt) - 86400_000);

@@ -352,6 +352,18 @@
       "spendAlertsSubtitle": "melewati ambang batas dan lonjakan per jam",
       "spendAlertsToggle": "Kategori peringatan pengeluaran"
     },
+    "history": {
+      "title": "Riwayat notifikasi",
+      "subtitle": "Notifikasi yang diterima akun ini",
+      "bannerBody": "Notifikasi push nonaktif untuk perangkat ini, jadi notifikasi baru tidak akan masuk di sini.",
+      "bannerAction": "Pengaturan notifikasi",
+      "emptyTitle": "Belum ada notifikasi",
+      "emptyCategoryTitle": "Tidak ada notifikasi di kategori ini",
+      "emptyBody": "Notifikasi yang diterima akun ini akan muncul di sini. Notifikasi disimpan selama {{days}} hari.",
+      "capped": "Menampilkan notifikasi terbaru.",
+      "loadError": "Tidak dapat memuat riwayat notifikasi.",
+      "openFailed": "Notifikasi ini tidak lagi dapat dibuka di mana pun."
+    },
     "action": {
       "openSession": "Buka sesi"
     },
@@ -4084,6 +4096,10 @@
     "generate": "Buat ringkasan",
     "retrySummary": "Coba lagi ringkasan berbayar",
     "sources": "Bukti dan artefak",
+    "sessionsShown_one": "Menampilkan {{shown}} dari {{total}} sesi",
+    "sessionsShown_other": "Menampilkan {{shown}} dari {{total}} sesi",
+    "itemsShown_one": "Menampilkan {{shown}} dari {{total}} item",
+    "itemsShown_other": "Menampilkan {{shown}} dari {{total}} item",
     "timezone": "Zona waktu laporan",
     "deviceTimezone": "Gunakan zona waktu perangkat",
     "timezoneHint": "Zona waktu IANA, misalnya Europe/Berlin. Perubahan jadwal berlaku untuk laporan berikutnya.",

@@ -895,6 +895,18 @@
       "spendAlertsSubtitle": "ultrapassagens de limites e picos horários",
       "spendAlertsToggle": "Categoria de alertas de gastos"
     },
+    "history": {
+      "title": "Histórico de notificações",
+      "subtitle": "Notificações que esta conta recebeu",
+      "bannerBody": "As notificações push estão desativadas neste dispositivo, por isso as novas não chegarão aqui.",
+      "bannerAction": "Definições de notificações",
+      "emptyTitle": "Ainda não há notificações",
+      "emptyCategoryTitle": "Ainda não há notificações nesta categoria",
+      "emptyBody": "As notificações que esta conta recebe aparecem aqui. São guardadas durante {{days}} dias.",
+      "capped": "A mostrar as notificações mais recentes.",
+      "loadError": "Não foi possível carregar o histórico de notificações.",
+      "openFailed": "Esta notificação já não abre em lado nenhum."
+    },
     "action": {
       "openSession": "Abrir sessão"
     },
@@ -4139,6 +4151,12 @@
     "generate": "Gerar resumo",
     "retrySummary": "Repetir resumo pago",
     "sources": "Provas e artefactos",
+    "sessionsShown_one": "A mostrar {{shown}} de {{total}} sessão",
+    "sessionsShown_many": "A mostrar {{shown}} de {{total}} sessões",
+    "sessionsShown_other": "A mostrar {{shown}} de {{total}} sessões",
+    "itemsShown_one": "A mostrar {{shown}} de {{total}} item",
+    "itemsShown_many": "A mostrar {{shown}} de {{total}} itens",
+    "itemsShown_other": "A mostrar {{shown}} de {{total}} itens",
     "timezone": "Fuso horário do relatório",
     "deviceTimezone": "Usar fuso horário do dispositivo",
     "timezoneHint": "Fuso horário IANA, por exemplo Europe/Berlin. As alterações ao horário aplicam-se aos relatórios futuros.",

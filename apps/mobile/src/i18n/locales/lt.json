@@ -914,6 +914,18 @@
       "spendAlertsSubtitle": "slenksčių viršijimai ir valandiniai šuoliai",
       "spendAlertsToggle": "Išlaidų įspėjimų kategorija"
     },
+    "history": {
+      "title": "Pranešimų istorija",
+      "subtitle": "Pranešimai, kuriuos gavo ši paskyra",
+      "bannerBody": "Šiame įrenginyje stumiamieji pranešimai išjungti, todėl nauji pranešimai čia neatkeliaus.",
+      "bannerAction": "Pranešimų nustatymai",
+      "emptyTitle": "Kol kas pranešimų nėra",
+      "emptyCategoryTitle": "Šioje kategorijoje pranešimų nėra",
+      "emptyBody": "Pranešimai, kuriuos gauna ši paskyra, rodomi čia. Jie saugomi {{days}} dienų.",
+      "capped": "Rodomi naujausi pranešimai.",
+      "loadError": "Nepavyko įkelti pranešimų istorijos.",
+      "openFailed": "Šio pranešimo nebegalima atidaryti niekur."
+    },
     "action": {
       "openSession": "Atidaryti sesiją"
     },
@@ -4194,6 +4206,14 @@
     "generate": "Kurti santrauką",
     "retrySummary": "Pakartoti mokamą santrauką",
     "sources": "Įrodymai ir artefaktai",
+    "sessionsShown_one": "Rodoma {{shown}} iš {{total}} sesijos",
+    "sessionsShown_few": "Rodoma {{shown}} iš {{total}} sesijų",
+    "sessionsShown_many": "Rodoma {{shown}} iš {{total}} sesijos",
+    "sessionsShown_other": "Rodoma {{shown}} iš {{total}} sesijų",
+    "itemsShown_one": "Rodoma {{shown}} iš {{total}} įrašo",
+    "itemsShown_few": "Rodoma {{shown}} iš {{total}} įrašų",
+    "itemsShown_many": "Rodoma {{shown}} iš {{total}} įrašo",
+    "itemsShown_other": "Rodoma {{shown}} iš {{total}} įrašų",
     "timezone": "Suvestinės laiko juosta",
     "deviceTimezone": "Naudoti įrenginio laiko juostą",
     "timezoneHint": "IANA laiko juosta, pvz., Europe/Berlin. Grafiko pakeitimai taikomi būsimoms suvestinėms.",

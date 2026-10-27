@@ -914,6 +914,18 @@
       "spendAlertsSubtitle": "překročení prahů a hodinové špičky",
       "spendAlertsToggle": "Kategorie upozornění na útratu"
     },
+    "history": {
+      "title": "Historie oznámení",
+      "subtitle": "Oznámení, která tento účet obdržel",
+      "bannerBody": "Push oznámení jsou pro toto zařízení vypnutá, takže nová sem nebudou přicházet.",
+      "bannerAction": "Nastavení oznámení",
+      "emptyTitle": "Zatím žádná oznámení",
+      "emptyCategoryTitle": "V této kategorii nejsou žádná oznámení",
+      "emptyBody": "Oznámení, která tento účet obdrží, se zobrazují zde. Uchovávají se {{days}} dní.",
+      "capped": "Zobrazují se nejnovější oznámení.",
+      "loadError": "Historii oznámení se nepodařilo načíst.",
+      "openFailed": "Toto oznámení se už nikde neotevře."
+    },
     "action": {
       "openSession": "Otevřít relaci"
     },
@@ -4194,6 +4206,14 @@
     "generate": "Vytvořit shrnutí",
     "retrySummary": "Zopakovat placené shrnutí",
     "sources": "Důkazy a artefakty",
+    "sessionsShown_one": "Zobrazeno {{shown}} z {{total}} relace",
+    "sessionsShown_few": "Zobrazeno {{shown}} z {{total}} relací",
+    "sessionsShown_many": "Zobrazeno {{shown}} z {{total}} relace",
+    "sessionsShown_other": "Zobrazeno {{shown}} z {{total}} relací",
+    "itemsShown_one": "Zobrazeno {{shown}} z {{total}} položky",
+    "itemsShown_few": "Zobrazeno {{shown}} z {{total}} položek",
+    "itemsShown_many": "Zobrazeno {{shown}} z {{total}} položky",
+    "itemsShown_other": "Zobrazeno {{shown}} z {{total}} položek",
     "timezone": "Časové pásmo přehledu",
     "deviceTimezone": "Použít časové pásmo zařízení",
     "timezoneHint": "Časové pásmo IANA, například Europe/Berlin. Změny plánu platí pro další přehledy.",

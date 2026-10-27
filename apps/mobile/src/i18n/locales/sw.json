@@ -876,6 +876,18 @@
       "spendAlertsSubtitle": "kuvuka vizingiti na kuongezeka kwa saa",
       "spendAlertsToggle": "Aina ya tahadhari za matumizi"
     },
+    "history": {
+      "title": "Historia ya arifa",
+      "subtitle": "Arifa ambazo akaunti hii imepokea",
+      "bannerBody": "Arifa za push zimezimwa kwenye kifaa hiki, kwa hivyo mpya hazitafika hapa.",
+      "bannerAction": "Mipangilio ya arifa",
+      "emptyTitle": "Hakuna arifa bado",
+      "emptyCategoryTitle": "Hakuna arifa katika kundi hili",
+      "emptyBody": "Arifa ambazo akaunti hii inapokea zinaonekana hapa. Zinahifadhiwa kwa siku {{days}}.",
+      "capped": "Inaonyesha arifa za hivi karibuni.",
+      "loadError": "Imeshindikana kupakia historia ya arifa.",
+      "openFailed": "Arifa hii haifunguki tena popote."
+    },
     "action": {
       "openSession": "Fungua kikao"
     },
@@ -4084,6 +4096,10 @@
     "generate": "Tengeneza muhtasari",
     "retrySummary": "Jaribu tena muhtasari wa kulipia",
     "sources": "Ushahidi na vielelezo",
+    "sessionsShown_one": "Inaonyesha {{shown}} kati ya kipindi {{total}}",
+    "sessionsShown_other": "Inaonyesha {{shown}} kati ya vipindi {{total}}",
+    "itemsShown_one": "Inaonyesha {{shown}} kati ya kipengee {{total}}",
+    "itemsShown_other": "Inaonyesha {{shown}} kati ya vipengee {{total}}",
     "timezone": "Saa za eneo za ripoti",
     "deviceTimezone": "Tumia saa za eneo za kifaa",
     "timezoneHint": "Saa za eneo za IANA, kwa mfano Europe/Berlin. Mabadiliko ya ratiba yanatumika kwa ripoti zijazo.",

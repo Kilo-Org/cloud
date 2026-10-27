@@ -952,6 +952,18 @@
       "spendAlertsSubtitle": "croesi trothwyon a sbigau bob awr",
       "spendAlertsToggle": "Categori rhybuddion gwariant"
     },
+    "history": {
+      "title": "Hanes hysbysiadau",
+      "subtitle": "Hysbysiadau a dderbyniodd y cyfrif hwn",
+      "bannerBody": "Mae hysbysiadau gwthio wedi'u diffodd ar gyfer y ddyfais hon, felly ni fydd rhai newydd yn cyrraedd yma.",
+      "bannerAction": "Gosodiadau hysbysiadau",
+      "emptyTitle": "Dim hysbysiadau eto",
+      "emptyCategoryTitle": "Dim hysbysiadau yn y categori hwn",
+      "emptyBody": "Bydd hysbysiadau a ddaw i'r cyfrif hwn yn ymddangos yma. Cânt eu cadw am {{days}} diwrnod.",
+      "capped": "Yn dangos y hysbysiadau diweddaraf.",
+      "loadError": "Methu llwytho hanes hysbysiadau.",
+      "openFailed": "Nid yw'r hysbysiad hwn yn agor yn unman mwyach."
+    },
     "action": {
       "openSession": "Agor y sesiwn"
     },
@@ -4304,6 +4316,18 @@
     "generate": "Creu crynodeb",
     "retrySummary": "Rhoi cynnig eto ar grynodeb taledig",
     "sources": "Tystiolaeth ac arteffactau",
+    "sessionsShown_zero": "Yn dangos {{shown}} o {{total}} sesiwn",
+    "sessionsShown_one": "Yn dangos {{shown}} o {{total}} sesiwn",
+    "sessionsShown_two": "Yn dangos {{shown}} o {{total}} sesiwn",
+    "sessionsShown_few": "Yn dangos {{shown}} o {{total}} sesiwn",
+    "sessionsShown_many": "Yn dangos {{shown}} o {{total}} sesiwn",
+    "sessionsShown_other": "Yn dangos {{shown}} o {{total}} sesiwn",
+    "itemsShown_zero": "Yn dangos {{shown}} o {{total}} eitem",
+    "itemsShown_one": "Yn dangos {{shown}} o {{total}} eitem",
+    "itemsShown_two": "Yn dangos {{shown}} o {{total}} eitem",
+    "itemsShown_few": "Yn dangos {{shown}} o {{total}} eitem",
+    "itemsShown_many": "Yn dangos {{shown}} o {{total}} eitem",
+    "itemsShown_other": "Yn dangos {{shown}} o {{total}} eitem",
     "timezone": "Cylchfa amser y briff",
     "deviceTimezone": "Defnyddio cylchfa amser y ddyfais",
     "timezoneHint": "Cylchfa amser IANA, er enghraifft Europe/Berlin. Bydd newidiadau i'r amserlen yn berthnasol i friffiau'r dyfodol.",

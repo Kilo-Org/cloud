@@ -876,6 +876,18 @@
       "spendAlertsSubtitle": "melepasi ambang dan lonjakan setiap jam",
       "spendAlertsToggle": "Kategori amaran perbelanjaan"
     },
+    "history": {
+      "title": "Sejarah pemberitahuan",
+      "subtitle": "Pemberitahuan yang diterima oleh akaun ini",
+      "bannerBody": "Pemberitahuan push dimatikan untuk peranti ini, jadi yang baharu tidak akan tiba di sini.",
+      "bannerAction": "Tetapan pemberitahuan",
+      "emptyTitle": "Belum ada pemberitahuan",
+      "emptyCategoryTitle": "Tiada pemberitahuan dalam kategori ini",
+      "emptyBody": "Pemberitahuan yang diterima oleh akaun ini muncul di sini. Ia disimpan selama {{days}} hari.",
+      "capped": "Memaparkan pemberitahuan terkini.",
+      "loadError": "Tidak dapat memuatkan sejarah pemberitahuan.",
+      "openFailed": "Pemberitahuan ini tidak lagi boleh dibuka di mana-mana."
+    },
     "action": {
       "openSession": "Buka sesi"
     },
@@ -4084,6 +4096,10 @@
     "generate": "Jana ringkasan",
     "retrySummary": "Cuba lagi ringkasan berbayar",
     "sources": "Bukti dan artifak",
+    "sessionsShown_one": "Memaparkan {{shown}} daripada {{total}} sesi",
+    "sessionsShown_other": "Memaparkan {{shown}} daripada {{total}} sesi",
+    "itemsShown_one": "Memaparkan {{shown}} daripada {{total}} item",
+    "itemsShown_other": "Memaparkan {{shown}} daripada {{total}} item",
     "timezone": "Zon waktu laporan",
     "deviceTimezone": "Guna zon waktu peranti",
     "timezoneHint": "Zon waktu IANA, contohnya Europe/Berlin. Perubahan jadual berkuat kuasa untuk laporan akan datang.",

@@ -876,6 +876,18 @@
       "spendAlertsSubtitle": "raja-arvojen ylitykset ja tunneittaiset piikit",
       "spendAlertsToggle": "Kulutusvaroitusten luokka"
     },
+    "history": {
+      "title": "Ilmoitushistoria",
+      "subtitle": "Tämän tilin vastaanottamat ilmoitukset",
+      "bannerBody": "Push-ilmoitukset ovat pois päältä tällä laitteella, joten uudet ilmoitukset eivät saavu tänne.",
+      "bannerAction": "Ilmoitusasetukset",
+      "emptyTitle": "Ei vielä ilmoituksia",
+      "emptyCategoryTitle": "Ei ilmoituksia tässä kategoriassa",
+      "emptyBody": "Tämän tilin vastaanottamat ilmoitukset näkyvät täällä. Ne säilytetään {{days}} päivää.",
+      "capped": "Näytetään uusimmat ilmoitukset.",
+      "loadError": "Ilmoitushistoriaa ei voitu ladata.",
+      "openFailed": "Tämä ilmoitus ei enää avaudu missään."
+    },
     "action": {
       "openSession": "Avaa istunto"
     },
@@ -4084,6 +4096,10 @@
     "generate": "Luo yhteenveto",
     "retrySummary": "Yritä maksullista yhteenvetoa uudelleen",
     "sources": "Todisteet ja artefaktit",
+    "sessionsShown_one": "Näytetään {{shown}}/{{total}} istunto",
+    "sessionsShown_other": "Näytetään {{shown}}/{{total}} istuntoa",
+    "itemsShown_one": "Näytetään {{shown}}/{{total}} kohde",
+    "itemsShown_other": "Näytetään {{shown}}/{{total}} kohdetta",
     "timezone": "Katsauksen aikavyöhyke",
     "deviceTimezone": "Käytä laitteen aikavyöhykettä",
     "timezoneHint": "IANA-aikavyöhyke, esimerkiksi Europe/Berlin. Aikataulumuutokset koskevat tulevia katsauksia.",

@@ -876,6 +876,18 @@
       "spendAlertsSubtitle": "daarbii daangaa fi olka'iinsa sa'aatii",
       "spendAlertsToggle": "Ramaddii akeekkachiisa baasii"
     },
+    "history": {
+      "title": "Seenaa beeksisaa",
+      "subtitle": "Beeksisoota herregni kun argate",
+      "bannerBody": "Beeksisoonni push meeshaa kanaaf cufamaniiru, kanaaf haaraan asitti hin dhufan.",
+      "bannerAction": "Qindaa'ina beeksisaa",
+      "emptyTitle": "Ammatti beeksisoonni hin jiran",
+      "emptyCategoryTitle": "Beeksisoonni rammii kana keessatti hin jiran",
+      "emptyBody": "Beeksisoonni herregni kun fudhatu asitti mul'atu. Guyyaa {{days}}f ni eegamu.",
+      "capped": "Beeksisoonni haaraan agarsiifamaa jiran.",
+      "loadError": "Seenaa beeksisaa fiduu hin dandeenye.",
+      "openFailed": "Beeksisni kun amma bakka tokkollee hin banamu."
+    },
     "action": {
       "openSession": "Turtii bani"
     },
@@ -4084,6 +4096,10 @@
     "generate": "Cuunfaa uumi",
     "retrySummary": "Cuunfaa kaffaltii irra deebi'ii yaali",
     "sources": "Ragaalee fi meeshaalee",
+    "sessionsShown_one": "Seeshinii {{total}} keessaa {{shown}} agarsiifamaa jira",
+    "sessionsShown_other": "Seeshinii {{total}} keessaa {{shown}} agarsiifamaa jira",
+    "itemsShown_one": "Ragaa {{total}} keessaa {{shown}} agarsiifamaa jira",
+    "itemsShown_other": "Ragaa {{total}} keessaa {{shown}} agarsiifamaa jira",
     "timezone": "Zoonii yeroo gabaasaa",
     "deviceTimezone": "Zoonii yeroo meeshaa fayyadami",
     "timezoneHint": "Zoonii yeroo IANA, fakkeenyaaf Europe/Berlin. Jijjiiramni sagantaa gabaasota dhufaniif hojjeta.",

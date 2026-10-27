@@ -352,6 +352,18 @@
       "spendAlertsSubtitle": "חציית ספים וזינוקים שעתיים",
       "spendAlertsToggle": "קטגוריית התראות הוצאות"
     },
+    "history": {
+      "title": "היסטוריית התראות",
+      "subtitle": "התראות שהחשבון הזה קיבל",
+      "bannerBody": "התראות דחיפה מושבתות במכשיר הזה, כך שלא יגיעו לכאן התראות חדשות.",
+      "bannerAction": "הגדרות התראות",
+      "emptyTitle": "אין עדיין התראות",
+      "emptyCategoryTitle": "אין התראות בקטגוריה הזו",
+      "emptyBody": "התראות שהחשבון הזה מקבל מופיעות כאן. הן נשמרות {{days}} ימים.",
+      "capped": "מוצגות ההתראות העדכניות ביותר.",
+      "loadError": "לא ניתן היה לטעון את היסטוריית ההתראות.",
+      "openFailed": "התראה זו כבר לא נפתחת בשום מקום."
+    },
     "action": {
       "openSession": "פתיחת סשן"
     },
@@ -4139,6 +4151,12 @@
     "generate": "יצירת סיכום",
     "retrySummary": "ניסיון חוזר לסיכום בתשלום",
     "sources": "ראיות ותוצרים",
+    "sessionsShown_one": "מוצגים {{shown}} מתוך {{total}} סשן",
+    "sessionsShown_two": "מוצגים {{shown}} מתוך {{total}} סשנים",
+    "sessionsShown_other": "מוצגים {{shown}} מתוך {{total}} סשנים",
+    "itemsShown_one": "מוצגים {{shown}} מתוך {{total}} פריט",
+    "itemsShown_two": "מוצגים {{shown}} מתוך {{total}} פריטים",
+    "itemsShown_other": "מוצגים {{shown}} מתוך {{total}} פריטים",
     "timezone": "אזור זמן לדוח",
     "deviceTimezone": "שימוש באזור הזמן של המכשיר",
     "timezoneHint": "אזור זמן IANA, לדוגמה Europe/Berlin. שינויים בלוח הזמנים יחולו על דוחות עתידיים.",

@@ -876,6 +876,18 @@
       "spendAlertsSubtitle": "ukweqa imingcele nokukhuphuka ngehora",
       "spendAlertsToggle": "Isigaba sezexwayiso zokusebenzisa imali"
     },
+    "history": {
+      "title": "Umlando wezaziso",
+      "subtitle": "Izaziso ezitholwe yile akhawunti",
+      "bannerBody": "Izaziso zokupush zivaliwe kule divayisi, ngakho ezintsha ngeke zifike lapha.",
+      "bannerAction": "Izilungiselelo zezaziso",
+      "emptyTitle": "Akukho izaziso okwamanje",
+      "emptyCategoryTitle": "Akukho izaziso kulesi sigaba",
+      "emptyBody": "Izaziso ezitholwa yile akhawunti zibonakala lapha. Zigcinwa izinsuku ezingama-{{days}}.",
+      "capped": "Kuboniswa izaziso zakamuva.",
+      "loadError": "Asikwazanga ukulayisha umlando wezaziso.",
+      "openFailed": "Lesi saziso asisavuleki ndawo."
+    },
     "action": {
       "openSession": "Vula iseshini"
     },
@@ -4084,6 +4096,10 @@
     "generate": "Khiqiza isifinyezo",
     "retrySummary": "Zama futhi isifinyezo esikhokhelwayo",
     "sources": "Ubufakazi nemikhiqizo",
+    "sessionsShown_one": "Kuboniswa {{shown}} eseshinini engu-{{total}}",
+    "sessionsShown_other": "Kuboniswa {{shown}} emaseshinini angu-{{total}}",
+    "itemsShown_one": "Kuboniswa {{shown}} entweni engu-{{total}}",
+    "itemsShown_other": "Kuboniswa {{shown}} ezintweni ezingu-{{total}}",
     "timezone": "Izoni yesikhathi yombiko",
     "deviceTimezone": "Sebenzisa izoni yesikhathi yedivayisi",
     "timezoneHint": "Izoni yesikhathi ye-IANA, isibonelo Europe/Berlin. Izinguquko zohlelo zisebenza emibikweni ezayo.",

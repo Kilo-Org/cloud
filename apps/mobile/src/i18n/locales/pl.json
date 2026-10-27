@@ -352,6 +352,18 @@
       "spendAlertsSubtitle": "przekroczenia progów i skoki godzinowe",
       "spendAlertsToggle": "Kategoria alertów o wydatkach"
     },
+    "history": {
+      "title": "Historia powiadomień",
+      "subtitle": "Powiadomienia otrzymane przez to konto",
+      "bannerBody": "Powiadomienia push są wyłączone dla tego urządzenia, więc nowe nie będą tu przychodzić.",
+      "bannerAction": "Ustawienia powiadomień",
+      "emptyTitle": "Nie ma jeszcze powiadomień",
+      "emptyCategoryTitle": "Brak powiadomień w tej kategorii",
+      "emptyBody": "Powiadomienia otrzymywane przez to konto pojawiają się tutaj. Są przechowywane przez {{days}} dni.",
+      "capped": "Wyświetlane są najnowsze powiadomienia.",
+      "loadError": "Nie udało się wczytać historii powiadomień.",
+      "openFailed": "Tego powiadomienia nie można już nigdzie otworzyć."
+    },
     "action": {
       "openSession": "Otwórz sesję"
     },
@@ -4194,6 +4206,14 @@
     "generate": "Utwórz podsumowanie",
     "retrySummary": "Ponów płatne podsumowanie",
     "sources": "Dowody i artefakty",
+    "sessionsShown_one": "Pokazano {{shown}} z {{total}} sesji",
+    "sessionsShown_few": "Pokazano {{shown}} z {{total}} sesji",
+    "sessionsShown_many": "Pokazano {{shown}} z {{total}} sesji",
+    "sessionsShown_other": "Pokazano {{shown}} z {{total}} sesji",
+    "itemsShown_one": "Pokazano {{shown}} z {{total}} pozycji",
+    "itemsShown_few": "Pokazano {{shown}} z {{total}} pozycji",
+    "itemsShown_many": "Pokazano {{shown}} z {{total}} pozycji",
+    "itemsShown_other": "Pokazano {{shown}} z {{total}} pozycji",
     "timezone": "Strefa czasowa raportu",
     "deviceTimezone": "Użyj strefy czasowej urządzenia",
     "timezoneHint": "Strefa czasowa IANA, np. Europe/Berlin. Zmiany harmonogramu dotyczą kolejnych raportów.",

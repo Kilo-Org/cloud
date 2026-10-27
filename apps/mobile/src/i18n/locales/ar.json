@@ -352,6 +352,18 @@
       "spendAlertsSubtitle": "تجاوزات الحدود والارتفاعات الساعية",
       "spendAlertsToggle": "فئة تنبيهات الإنفاق"
     },
+    "history": {
+      "title": "سجل الإشعارات",
+      "subtitle": "الإشعارات التي تلقّاها هذا الحساب",
+      "bannerBody": "الإشعارات الفورية معطّلة على هذا الجهاز، لذلك لن تصل الإشعارات الجديدة هنا.",
+      "bannerAction": "إعدادات الإشعارات",
+      "emptyTitle": "لا توجد إشعارات بعد",
+      "emptyCategoryTitle": "لا توجد إشعارات في هذا التصنيف",
+      "emptyBody": "تظهر هنا الإشعارات التي يتلقّاها هذا الحساب. يتم الاحتفاظ بها لمدة {{days}} يوم.",
+      "capped": "يتم عرض أحدث الإشعارات.",
+      "loadError": "تعذّر تحميل سجل الإشعارات.",
+      "openFailed": "لم يعد هذا الإشعار يفتح في أي مكان."
+    },
     "action": {
       "openSession": "فتح الجلسة"
     },
@@ -4304,6 +4316,18 @@
     "generate": "إنشاء ملخص",
     "retrySummary": "إعادة محاولة الملخص المدفوع",
     "sources": "الأدلة والمخرجات",
+    "sessionsShown_zero": "عرض {{shown}} من أصل {{total}} جلسات",
+    "sessionsShown_one": "عرض {{shown}} من أصل {{total}} جلسة",
+    "sessionsShown_two": "عرض {{shown}} من أصل {{total}} جلستين",
+    "sessionsShown_few": "عرض {{shown}} من أصل {{total}} جلسات",
+    "sessionsShown_many": "عرض {{shown}} من أصل {{total}} جلسة",
+    "sessionsShown_other": "عرض {{shown}} من أصل {{total}} جلسة",
+    "itemsShown_zero": "عرض {{shown}} من أصل {{total}} عناصر",
+    "itemsShown_one": "عرض {{shown}} من أصل {{total}} عنصر",
+    "itemsShown_two": "عرض {{shown}} من أصل {{total}} عنصرين",
+    "itemsShown_few": "عرض {{shown}} من أصل {{total}} عناصر",
+    "itemsShown_many": "عرض {{shown}} من أصل {{total}} عنصرًا",
+    "itemsShown_other": "عرض {{shown}} من أصل {{total}} عنصر",
     "timezone": "المنطقة الزمنية للتقرير",
     "deviceTimezone": "استخدام المنطقة الزمنية للجهاز",
     "timezoneHint": "منطقة زمنية وفق IANA، مثل Europe/Berlin. تُطبّق تغييرات الجدول على التقارير القادمة.",

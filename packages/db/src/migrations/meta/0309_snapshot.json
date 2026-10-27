@@ -1,5 +1,5 @@
 {
-  "id": "44a18050-0460-4747-9531-e8489ead970a",
+  "id": "10ad46c7-3c9c-49c7-a3e6-e229f7eac976",
   "prevId": "22f9636f-dc52-4e48-b714-57ed907efdec",
   "version": "7",
   "dialect": "postgresql",
@@ -2219,6 +2219,12 @@
         },
         "preferred_provider_order": {
           "name": "preferred_provider_order",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "custom_pricing": {
+          "name": "custom_pricing",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
@@ -22417,13 +22423,6 @@
         },
         "attempts": {
           "name": "attempts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "legacy_attempts": {
-          "name": "legacy_attempts",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,

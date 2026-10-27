@@ -895,6 +895,18 @@
       "spendAlertsSubtitle": "prekoračenja pragova i skokovi po satu",
       "spendAlertsToggle": "Kategorija obaveštenja o potrošnji"
     },
+    "history": {
+      "title": "Istorija obaveštenja",
+      "subtitle": "Obaveštenja koja je ovaj nalog primio",
+      "bannerBody": "Push obaveštenja su isključena za ovaj uređaj, pa nova neće stizati ovde.",
+      "bannerAction": "Podešavanja obaveštenja",
+      "emptyTitle": "Još nema obaveštenja",
+      "emptyCategoryTitle": "Nema obaveštenja u ovoj kategoriji",
+      "emptyBody": "Obaveštenja koja ovaj nalog prima prikazuju se ovde. Čuvaju se {{days}} dana.",
+      "capped": "Prikazuju se najnovija obaveštenja.",
+      "loadError": "Učitavanje istorije obaveštenja nije uspelo.",
+      "openFailed": "Ovo obaveštenje se više ne otvara nigde."
+    },
     "action": {
       "openSession": "Otvori sesiju"
     },
@@ -4139,6 +4151,12 @@
     "generate": "Generiši rezime",
     "retrySummary": "Ponovi plaćeni rezime",
     "sources": "Dokazi i artefakti",
+    "sessionsShown_one": "Prikazano {{shown}} od {{total}} sesije",
+    "sessionsShown_few": "Prikazano {{shown}} od {{total}} sesije",
+    "sessionsShown_other": "Prikazano {{shown}} od {{total}} sesija",
+    "itemsShown_one": "Prikazano {{shown}} od {{total}} stavke",
+    "itemsShown_few": "Prikazano {{shown}} od {{total}} stavke",
+    "itemsShown_other": "Prikazano {{shown}} od {{total}} stavki",
     "timezone": "Vremenska zona izveštaja",
     "deviceTimezone": "Koristi vremensku zonu uređaja",
     "timezoneHint": "IANA vremenska zona, na primer Europe/Berlin. Izmene rasporeda važe za buduće izveštaje.",

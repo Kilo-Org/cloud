@@ -876,6 +876,18 @@
       "spendAlertsSubtitle": "superacións de limiares e picos por hora",
       "spendAlertsToggle": "Categoría de alertas de gasto"
     },
+    "history": {
+      "title": "Historial de notificacións",
+      "subtitle": "Notificacións recibidas por esta conta",
+      "bannerBody": "As notificacións push están desactivadas neste dispositivo, polo que non chegarán novas aquí.",
+      "bannerAction": "Configuración de notificacións",
+      "emptyTitle": "Aínda non hai notificacións",
+      "emptyCategoryTitle": "Non hai notificacións nesta categoría",
+      "emptyBody": "As notificacións que recibe esta conta aparecen aquí. Consérvanse durante {{days}} días.",
+      "capped": "Mostrando as notificacións máis recentes.",
+      "loadError": "Non se puido cargar o historial de notificacións.",
+      "openFailed": "Esta notificación xa non se abre desde ningún sitio."
+    },
     "action": {
       "openSession": "Abrir a sesión"
     },
@@ -4084,6 +4096,10 @@
     "generate": "Xerar resumo",
     "retrySummary": "Tentar de novo o resumo de pago",
     "sources": "Probas e artefactos",
+    "sessionsShown_one": "Amosando {{shown}} de {{total}} sesión",
+    "sessionsShown_other": "Amosando {{shown}} de {{total}} sesións",
+    "itemsShown_one": "Amosando {{shown}} de {{total}} elemento",
+    "itemsShown_other": "Amosando {{shown}} de {{total}} elementos",
     "timezone": "Fuso horario do informe",
     "deviceTimezone": "Usar o fuso horario do dispositivo",
     "timezoneHint": "Fuso horario IANA, por exemplo Europe/Berlin. Os cambios de horario aplícanse aos informes futuros.",

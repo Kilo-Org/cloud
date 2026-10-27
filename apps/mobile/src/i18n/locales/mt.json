@@ -933,6 +933,18 @@
       "spendAlertsSubtitle": "qbiż ta' limiti u żidiet fis-siegħa",
       "spendAlertsToggle": "Kategorija tat-twissijiet tal-infiq"
     },
+    "history": {
+      "title": "Kronoloġija tan-notifiki",
+      "subtitle": "In-notifiki li rċieva dan il-kont",
+      "bannerBody": "In-notifiki push huma mitfija għal dan l-apparat, għalhekk dawk ġodda mhux se jaslu hawn.",
+      "bannerAction": "Impostazzjonijiet tan-notifiki",
+      "emptyTitle": "Għad m'hemmx notifiki",
+      "emptyCategoryTitle": "Għad m'hemmx notifiki f'din il-kategorija",
+      "emptyBody": "In-notifiki li jirċievi dan il-kont jidhru hawn. Jinżammu għal {{days}} ġranet.",
+      "capped": "Qed jintwerew in-notifiki l-aktar reċenti.",
+      "loadError": "Ma setgħetx tiġi mgħobbija l-kronoloġija tan-notifiki.",
+      "openFailed": "Din in-notifika m'għadhiex tinfetaħ imkien."
+    },
     "action": {
       "openSession": "Iftaħ is-sessjoni"
     },
@@ -4249,6 +4261,16 @@
     "generate": "Iġġenera sommarju",
     "retrySummary": "Erġa' pprova s-sommarju bi ħlas",
     "sources": "Evidenza u artifacts",
+    "sessionsShown_one": "Qed jintwerew {{shown}} minn {{total}} sessjoni",
+    "sessionsShown_two": "Qed jintwerew {{shown}} minn {{total}} sessjonijiet",
+    "sessionsShown_few": "Qed jintwerew {{shown}} minn {{total}} sessjonijiet",
+    "sessionsShown_many": "Qed jintwerew {{shown}} minn {{total}} sessjoni",
+    "sessionsShown_other": "Qed jintwerew {{shown}} minn {{total}} sessjoni",
+    "itemsShown_one": "Qed jintwerew {{shown}} minn {{total}} oġġett",
+    "itemsShown_two": "Qed jintwerew {{shown}} minn {{total}} oġġetti",
+    "itemsShown_few": "Qed jintwerew {{shown}} minn {{total}} oġġetti",
+    "itemsShown_many": "Qed jintwerew {{shown}} minn {{total}} oġġett",
+    "itemsShown_other": "Qed jintwerew {{shown}} minn {{total}} oġġett",
     "timezone": "Żona tal-ħin tal-briefing",
     "deviceTimezone": "Uża ż-żona tal-ħin tal-apparat",
     "timezoneHint": "Żona tal-ħin IANA, pereżempju Europe/Berlin. Il-bidliet fl-iskeda japplikaw għall-briefings li ġejjin.",

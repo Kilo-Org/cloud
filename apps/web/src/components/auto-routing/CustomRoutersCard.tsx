@@ -233,9 +233,21 @@ function CustomRouterItem({
               key={entry.key}
               className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between"
             >
-              <div className="flex min-w-0 items-center gap-2">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <span className="truncate font-mono">{entryLabel(entry.entry)}</span>
                 {entry.entry.kind === 'client' ? <Badge variant="secondary">Client</Badge> : null}
+                {entry.entry.measuredAs ? (
+                  <Badge variant="outline" className="max-w-full whitespace-normal break-all">
+                    Linked to {entry.entry.measuredAs}
+                  </Badge>
+                ) : null}
+                {entry.entry.measuredAs &&
+                status.kind !== 'stale' &&
+                entry.variants.some(variant => variant.linked && variant.status === 'stale') ? (
+                  <span className="text-muted-foreground text-xs">
+                    Linked platform measurements are stale. Routing still uses them.
+                  </span>
+                ) : null}
               </div>
               <div className="flex flex-col sm:items-end">
                 <span

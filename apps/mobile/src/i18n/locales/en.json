@@ -33,6 +33,10 @@
     "generate": "Generate summary",
     "retrySummary": "Retry paid summary",
     "sources": "Evidence and artifacts",
+    "sessionsShown_one": "Showing {{shown}} of {{total}} session",
+    "sessionsShown_other": "Showing {{shown}} of {{total}} sessions",
+    "itemsShown_one": "Showing {{shown}} of {{total}} item",
+    "itemsShown_other": "Showing {{shown}} of {{total}} items",
     "timezone": "Brief time zone",
     "deviceTimezone": "Use device time zone",
     "timezoneHint": "IANA time zone, for example Europe/Berlin. Schedule changes apply to future briefs.",
@@ -975,6 +979,18 @@
       "securityFindingsUnavailable": "Enable Kilo Security Agent on a scope to get security findings.",
       "spendAlertsSubtitle": "threshold crossings and hourly spikes",
       "spendAlertsToggle": "Spend alerts category"
+    },
+    "history": {
+      "title": "Notification history",
+      "subtitle": "Notifications this account received",
+      "bannerBody": "Push notifications are off for this device, so new ones will not arrive here.",
+      "bannerAction": "Notification settings",
+      "emptyTitle": "No notifications yet",
+      "emptyCategoryTitle": "No notifications in this category",
+      "emptyBody": "Notifications this account receives appear here. They are kept for {{days}} days.",
+      "capped": "Showing the most recent notifications.",
+      "loadError": "Could not load notification history.",
+      "openFailed": "This notification no longer opens anywhere."
     },
     "action": {
       "openSession": "Open session"

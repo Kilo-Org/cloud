@@ -895,6 +895,18 @@
       "spendAlertsSubtitle": "sliekšņu pārsniegumi un stundas lēcieni",
       "spendAlertsToggle": "Izdevumu brīdinājumu kategorija"
     },
+    "history": {
+      "title": "Paziņojumu vēsture",
+      "subtitle": "Paziņojumi, ko šis konts ir saņēmis",
+      "bannerBody": "Push paziņojumi šajā ierīcē ir izslēgti, tāpēc jaunie šeit netiks saņemti.",
+      "bannerAction": "Paziņojumu iestatījumi",
+      "emptyTitle": "Vēl nav paziņojumu",
+      "emptyCategoryTitle": "Šajā kategorijā nav paziņojumu",
+      "emptyBody": "Paziņojumi, ko šis konts saņem, parādās šeit. Tie tiek glabāti {{days}} dienas.",
+      "capped": "Tiek rādīti jaunākie paziņojumi.",
+      "loadError": "Neizdevās ielādēt paziņojumu vēsturi.",
+      "openFailed": "Šis paziņojums vairs nekur neatveras."
+    },
     "action": {
       "openSession": "Atvērt sesiju"
     },
@@ -4139,6 +4151,12 @@
     "generate": "Ģenerēt kopsavilkumu",
     "retrySummary": "Atkārtot maksas kopsavilkumu",
     "sources": "Pierādījumi un artefakti",
+    "sessionsShown_zero": "Rāda {{shown}} no {{total}} sesijām",
+    "sessionsShown_one": "Rāda {{shown}} no {{total}} sesijas",
+    "sessionsShown_other": "Rāda {{shown}} no {{total}} sesijām",
+    "itemsShown_zero": "Rāda {{shown}} no {{total}} ierakstiem",
+    "itemsShown_one": "Rāda {{shown}} no {{total}} ieraksta",
+    "itemsShown_other": "Rāda {{shown}} no {{total}} ierakstiem",
     "timezone": "Atskaites laika josla",
     "deviceTimezone": "Izmantot ierīces laika joslu",
     "timezoneHint": "IANA laika josla, piemēram, Europe/Berlin. Grafika izmaiņas attiecas uz nākamajām atskaitēm.",

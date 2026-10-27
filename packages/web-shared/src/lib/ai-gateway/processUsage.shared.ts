@@ -1,5 +1,6 @@
 import { captureException, captureMessage } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
+import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gateway/processUsage.constants';
@@ -128,23 +129,6 @@ export function extractVercelUpstreamId(
 }
 
 /**
- * Derives `generation_time` in milliseconds from the `startTime`/`endTime` of
- * the provider attempt that served the request, so Vercel AI Gateway usage gets
- * it without a `/generation` lookup. Returns `null` when either timestamp is
- * missing or the interval is negative.
- */
-export function extractVercelGenerationTime(
-  vercelProviderMetadata: VercelProviderMetaData | undefined | null
-): number | null {
-  const attempt = findVercelServingProviderAttempt(vercelProviderMetadata?.gateway);
-  const startTime = attempt?.startTime;
-  const endTime = attempt?.endTime;
-  if (typeof startTime !== 'number' || typeof endTime !== 'number') return null;
-  const generationTime = endTime - startTime;
-  return Number.isFinite(generationTime) && generationTime >= 0 ? generationTime : null;
-}
-
-/**
  * Node's fetch (undici) fails a body read with `TypeError: terminated` when the
  * upstream connection breaks mid-body. The cause tells an idle body timeout
  * apart from a closed or reset socket.
@@ -235,18 +219,71 @@ export function reportUpstreamStreamError(params: {
   });
 }
 
+export type ResponseTiming = Pick<NotYetCostedUsageStats, 'latency' | 'generation_time'>;
+
 /**
- * Drains a ReadableStream of binary chunks, calling `onTextChunk` for each
- * decoded piece of text. Handles stream processing failures gracefully and
- * always releases the reader lock and ends `streamProcessingSpan`.
+ * Records when the first and final chunks of an upstream response arrive. The
+ * gateway measures this itself, rather than trusting upstream-reported timings,
+ * so `latency` and `generation_time` mean the same thing for every provider:
+ * - `latency`: from `requestStartedAt` (a `performance.now()` value) until the
+ *   first chunk, or null when the start is unknown.
+ * - `generation_time`: from the first chunk until the final chunk, so the two
+ *   add up to the total response time.
+ * Both are null when no chunk arrived.
+ */
+function createChunkTimer() {
+  let firstChunkAt: number | null = null;
+  let finalChunkAt: number | null = null;
+  return {
+    markChunk() {
+      const now = performance.now();
+      firstChunkAt ??= now;
+      finalChunkAt = now;
+    },
+    receivedChunk: () => firstChunkAt !== null,
+    timing(requestStartedAt: number | undefined): ResponseTiming {
+      if (firstChunkAt === null || finalChunkAt === null) {
+        return { latency: null, generation_time: null };
+      }
+      return {
+        latency:
+          requestStartedAt === undefined
+            ? null
+            : Math.max(0, Math.round(firstChunkAt - requestStartedAt)),
+        generation_time: Math.round(finalChunkAt - firstChunkAt),
+      };
+    },
+  };
+}
+
+const isWhitespace = (text: string) => text.trim() === '';
+
+/**
+ * Drains an SSE response body, calling `onEvent` for each parsed event. Handles
+ * stream processing failures gracefully and always releases the reader lock and
+ * ends `streamProcessingSpan`.
  *
- * Returns `true` if the stream was aborted before completion.
+ * Each SSE event is a chunk for the response timing, so keep-alive comments such
+ * as OpenRouter's `: OPENROUTER PROCESSING` do not count as the first chunk. A
+ * body without any event, such as a JSON error, is timed by its non-whitespace
+ * chunks instead.
+ *
+ * `wasAborted` is `true` if the stream was aborted before completion.
  */
 export async function drainSseStream(
   stream: ReadableStream<Uint8Array>,
-  onTextChunk: (text: string) => void,
-  streamProcessingSpan: Span
-): Promise<boolean> {
+  onEvent: (event: EventSourceMessage) => void,
+  streamProcessingSpan: Span,
+  requestStartedAt: number | undefined
+): Promise<{ wasAborted: boolean; timing: ResponseTiming }> {
+  const eventTimer = createChunkTimer();
+  const chunkTimer = createChunkTimer();
+  const sseStreamParser = createParser({
+    onEvent(event) {
+      eventTimer.markChunk();
+      onEvent(event);
+    },
+  });
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let wasAborted = false;
@@ -254,7 +291,9 @@ export async function drainSseStream(
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      onTextChunk(decoder.decode(value, { stream: true }));
+      const text = decoder.decode(value, { stream: true });
+      if (!isWhitespace(text)) chunkTimer.markChunk();
+      sseStreamParser.feed(text);
     }
   } catch (error) {
     errorExceptInTest('[processUsage] treating stream processing error as aborted', error);
@@ -263,5 +302,33 @@ export async function drainSseStream(
     reader.releaseLock();
     streamProcessingSpan.end();
   }
-  return wasAborted;
+  const timer = eventTimer.receivedChunk() ? eventTimer : chunkTimer;
+  return { wasAborted, timing: timer.timing(requestStartedAt) };
+}
+
+/**
+ * Reads a non-streamed response body as text, timing its non-whitespace chunks.
+ * Rejects with the body's own error when the read fails.
+ */
+export async function readResponseText(
+  stream: ReadableStream<Uint8Array>,
+  requestStartedAt: number | undefined
+): Promise<{ text: string; timing: ResponseTiming }> {
+  const chunkTimer = createChunkTimer();
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let text = '';
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      if (!isWhitespace(chunk)) chunkTimer.markChunk();
+      text += chunk;
+    }
+    text += decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
+  return { text, timing: chunkTimer.timing(requestStartedAt) };
 }

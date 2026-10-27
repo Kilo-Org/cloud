@@ -933,6 +933,18 @@
       "spendAlertsSubtitle": "sáruithe tairsí agus spuaiceanna uaire",
       "spendAlertsToggle": "Catagóir foláirimh chaiteachais"
     },
+    "history": {
+      "title": "Stair fógraí",
+      "subtitle": "Na fógraí a fuair an cuntas seo",
+      "bannerBody": "Tá fógraí push múchta don ghléas seo, mar sin ní thiocfaidh cinn nua anseo.",
+      "bannerAction": "Socruithe fógraí",
+      "emptyTitle": "Níl aon fhógraí fós",
+      "emptyCategoryTitle": "Níl aon fhógraí sa chatagóir seo",
+      "emptyBody": "Taispeántar na fógraí a fhaigheann an cuntas seo anseo. Coimeádtar iad ar feadh {{days}} lá.",
+      "capped": "Taispeántar na fógraí is déanaí.",
+      "loadError": "Níorbh fhéidir stair fógraí a lódáil.",
+      "openFailed": "Ní osclaíonn an fógra seo in áit ar bith a thuilleadh."
+    },
     "action": {
       "openSession": "Oscail an seisiún"
     },
@@ -4249,6 +4261,16 @@
     "generate": "Gin achoimre",
     "retrySummary": "Bain triail eile as an achoimre íoctha",
     "sources": "Fianaise agus déantáin",
+    "sessionsShown_one": "Ag taispeáint {{shown}} as {{total}} seisiún",
+    "sessionsShown_two": "Ag taispeáint {{shown}} as {{total}} sheisiún",
+    "sessionsShown_few": "Ag taispeáint {{shown}} as {{total}} sheisiún",
+    "sessionsShown_many": "Ag taispeáint {{shown}} as {{total}} seisiún",
+    "sessionsShown_other": "Ag taispeáint {{shown}} as {{total}} seisiún",
+    "itemsShown_one": "Ag taispeáint {{shown}} as {{total}} mír",
+    "itemsShown_two": "Ag taispeáint {{shown}} as {{total}} mhír",
+    "itemsShown_few": "Ag taispeáint {{shown}} as {{total}} mhír",
+    "itemsShown_many": "Ag taispeáint {{shown}} as {{total}} mír",
+    "itemsShown_other": "Ag taispeáint {{shown}} as {{total}} mír",
     "timezone": "Crios ama na tuarascála",
     "deviceTimezone": "Úsáid crios ama an ghléis",
     "timezoneHint": "Crios ama IANA, mar shampla Europe/Berlin. Bainfidh athruithe sceidil le tuarascálacha amach anseo.",

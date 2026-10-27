@@ -93,17 +93,20 @@ export async function planClientEval(
   const { resolved } = await resolveCustomRouterEntries(
     request.entries.filter(entry => clientEval.has(customRouterEntryKey(entry))),
     request.clientEvalEntryKeys,
-    source
+    source,
+    { db, router: request.baseRouter }
   );
   const profiles = groupClientProfilesByPair(
     await listOwnerClientProfiles(db, request, request.baseRouter)
   );
   const pairs = resolved.flatMap(item =>
     item.measuredBy === 'client'
-      ? item.variants.map(variant => {
-          const entry = customRouterEntryRef(item.entry);
-          return { entry, variant, rows: profiles.get(clientPairKey(entry, variant)) ?? [] };
-        })
+      ? item.variants
+          .filter(variant => !item.linkedVariants?.has(variant))
+          .map(variant => {
+            const entry = customRouterEntryRef(item.entry);
+            return { entry, variant, rows: profiles.get(clientPairKey(entry, variant)) ?? [] };
+          })
       : []
   );
   const currentProfileIds = new Map(
@@ -187,10 +190,17 @@ export async function gradeClientEvalResult(
   const entryKey = customRouterEntryKey(request.entry);
   const entry = request.entries.find(candidate => customRouterEntryKey(candidate) === entryKey);
   const { resolved } = entry
-    ? await resolveCustomRouterEntries([entry], request.clientEvalEntryKeys, deps.source)
+    ? await resolveCustomRouterEntries([entry], request.clientEvalEntryKeys, deps.source, {
+        db,
+        router: request.baseRouter,
+      })
     : { resolved: [] };
   const [item] = resolved;
-  if (item?.measuredBy !== 'client' || !item.variants.includes(request.variant)) {
+  if (
+    item?.measuredBy !== 'client' ||
+    !item.variants.includes(request.variant) ||
+    item.linkedVariants?.has(request.variant)
+  ) {
     throw new ClientEvalError('invalid_request', `Unknown variant for ${entryKey}`);
   }
 

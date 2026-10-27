@@ -914,6 +914,18 @@
       "spendAlertsSubtitle": "preseganja pragov in urni skoki",
       "spendAlertsToggle": "Kategorija opozoril o porabi"
     },
+    "history": {
+      "title": "Zgodovina obvestil",
+      "subtitle": "Obvestila, ki jih je prejel ta račun",
+      "bannerBody": "Potisna obvestila so za to napravo izklopljena, zato nova ne bodo prispela sem.",
+      "bannerAction": "Nastavitve obvestil",
+      "emptyTitle": "Ni še obvestil",
+      "emptyCategoryTitle": "Ni obvestil v tej kategoriji",
+      "emptyBody": "Obvestila, ki jih prejme ta račun, se prikažejo tukaj. Hranijo se {{days}} dni.",
+      "capped": "Prikazana so najnovejša obvestila.",
+      "loadError": "Zgodovine obvestil ni bilo mogoče naložiti.",
+      "openFailed": "To obvestilo se ne odpre več nikjer."
+    },
     "action": {
       "openSession": "Odpri sejo"
     },
@@ -4194,6 +4206,14 @@
     "generate": "Ustvari povzetek",
     "retrySummary": "Znova poskusi plačljiv povzetek",
     "sources": "Dokazi in artefakti",
+    "sessionsShown_one": "Prikazano {{shown}} od {{total}} seje",
+    "sessionsShown_two": "Prikazano {{shown}} od {{total}} sej",
+    "sessionsShown_few": "Prikazano {{shown}} od {{total}} sej",
+    "sessionsShown_other": "Prikazano {{shown}} od {{total}} sej",
+    "itemsShown_one": "Prikazano {{shown}} od {{total}} vnosa",
+    "itemsShown_two": "Prikazano {{shown}} od {{total}} vnosov",
+    "itemsShown_few": "Prikazano {{shown}} od {{total}} vnosov",
+    "itemsShown_other": "Prikazano {{shown}} od {{total}} vnosov",
     "timezone": "Časovni pas poročila",
     "deviceTimezone": "Uporabi časovni pas naprave",
     "timezoneHint": "Časovni pas IANA, na primer Europe/Berlin. Spremembe urnika veljajo za prihodnja poročila.",

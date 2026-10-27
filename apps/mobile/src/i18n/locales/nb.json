@@ -876,6 +876,18 @@
       "spendAlertsSubtitle": "grenseoverskridelser og topper per time",
       "spendAlertsToggle": "Kategorien forbruksvarsler"
     },
+    "history": {
+      "title": "Varslingshistorikk",
+      "subtitle": "Varsler denne kontoen har mottatt",
+      "bannerBody": "Pushvarsler er slått av for denne enheten, så nye varsler vil ikke komme hit.",
+      "bannerAction": "Varslingsinnstillinger",
+      "emptyTitle": "Ingen varsler ennå",
+      "emptyCategoryTitle": "Ingen varsler i denne kategorien",
+      "emptyBody": "Varsler denne kontoen mottar, vises her. De oppbevares i {{days}} dager.",
+      "capped": "Viser de nyeste varslene.",
+      "loadError": "Kunne ikke laste varslingshistorikk.",
+      "openFailed": "Dette varselet åpnes ikke lenger noe sted."
+    },
     "action": {
       "openSession": "Åpne økt"
     },
@@ -4084,6 +4096,10 @@
     "generate": "Lag sammendrag",
     "retrySummary": "Prøv betalt sammendrag igjen",
     "sources": "Bevis og artefakter",
+    "sessionsShown_one": "Viser {{shown}} av {{total}} økt",
+    "sessionsShown_other": "Viser {{shown}} av {{total}} økter",
+    "itemsShown_one": "Viser {{shown}} av {{total}} oppføring",
+    "itemsShown_other": "Viser {{shown}} av {{total}} oppføringer",
     "timezone": "Tidssone for brief",
     "deviceTimezone": "Bruk enhetens tidssone",
     "timezoneHint": "IANA-tidssone, for eksempel Europe/Berlin. Endringer i tidsplanen gjelder fremtidige briefer.",

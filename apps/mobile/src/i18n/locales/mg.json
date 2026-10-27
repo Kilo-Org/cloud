@@ -876,6 +876,18 @@
       "spendAlertsSubtitle": "fihoaram-bidy sy fitsambikinana isan'ora",
       "spendAlertsToggle": "Sokajin'ny fampitandremana momba ny fandaniana"
     },
+    "history": {
+      "title": "Tantaran'ny fampandrenesana",
+      "subtitle": "Fampandrenesana voarain'ity kaonty ity",
+      "bannerBody": "Tsy mandeha ny fampandrenesana push amin'ity fitaovana ity, ka tsy hisy vaovao tonga eto.",
+      "bannerAction": "Fandrindran'ny fampandrenesana",
+      "emptyTitle": "Mbola tsy misy fampandrenesana",
+      "emptyCategoryTitle": "Tsy misy fampandrenesana ao amin'ity sokajy ity",
+      "emptyBody": "Miseho eto ny fampandrenesana azon'ity kaonty ity. Tehirizina mandritra ny {{days}} andro izy ireo.",
+      "capped": "Aseho ny fampandrenesana farany indrindra.",
+      "loadError": "Tsy nahomby ny fampakarana ny tantaran'ny fampandrenesana.",
+      "openFailed": "Tsy misokatra na aiza na aiza intsony io fampandrenesana io."
+    },
     "action": {
       "openSession": "Sokafy ny fotoam-piasana"
     },
@@ -4084,6 +4096,10 @@
     "generate": "Mamorona famintinana",
     "retrySummary": "Andramo indray ny famintinana andoavana",
     "sources": "Porofo sy vokatra",
+    "sessionsShown_one": "Aseho ny {{shown}} amin'ny fotoam-piasana {{total}}",
+    "sessionsShown_other": "Aseho ny {{shown}} amin'ny fotoam-piasana {{total}}",
+    "itemsShown_one": "Aseho ny {{shown}} amin'ny singa {{total}}",
+    "itemsShown_other": "Aseho ny {{shown}} amin'ny singa {{total}}",
     "timezone": "Faritra ora amin'ny tatitra",
     "deviceTimezone": "Ampiasao ny faritra ora amin'ny fitaovana",
     "timezoneHint": "Faritra ora IANA, ohatra Europe/Berlin. Ho an'ny tatitra ho avy ny fanovana fandaharana.",

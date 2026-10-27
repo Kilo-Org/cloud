@@ -21,6 +21,14 @@ import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/pro
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import { EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
 import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
+import {
+  CUSTOM_PRICING_FALLBACK_CONFIG,
+  getCustomPricing,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+
+function customPricingFor(model: string) {
+  return getCustomPricing(CUSTOM_PRICING_FALLBACK_CONFIG, model);
+}
 
 const nonFlexExclusiveModel: KiloExclusiveModel = {
   public_id: 'test/non-flex-exclusive',
@@ -101,7 +109,12 @@ describe('removeUnsupportedRequestServiceTier', () => {
       request.body.service_tier = 'priority';
       const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-      removeUnsupportedRequestServiceTier(model, request, kiloExclusiveModel);
+      removeUnsupportedRequestServiceTier(
+        model,
+        request,
+        kiloExclusiveModel,
+        customPricingFor(model)
+      );
 
       expect(request.body.service_tier).toBeUndefined();
       expect(warn).toHaveBeenCalledWith(
@@ -125,7 +138,7 @@ describe('removeUnsupportedRequestServiceTier', () => {
       request.body.service_tier = tier;
       const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-      removeUnsupportedRequestServiceTier(model, request, null);
+      removeUnsupportedRequestServiceTier(model, request, null, customPricingFor(model));
 
       expect(request.body.service_tier).toBeUndefined();
       expect(warn).toHaveBeenCalledWith(
@@ -144,7 +157,7 @@ describe('removeUnsupportedRequestServiceTier', () => {
       request.body.service_tier = tier as unknown as typeof request.body.service_tier;
       const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-      removeUnsupportedRequestServiceTier(model, request, null);
+      removeUnsupportedRequestServiceTier(model, request, null, customPricingFor(model));
 
       expect(request.body.service_tier).toBeUndefined();
       expect(warn).toHaveBeenCalledWith(
@@ -168,7 +181,12 @@ describe('removeUnsupportedRequestServiceTier', () => {
     const request = makeRequest(model);
     request.body.service_tier = 'priority';
 
-    removeUnsupportedRequestServiceTier(model, request, kiloExclusiveModel);
+    removeUnsupportedRequestServiceTier(
+      model,
+      request,
+      kiloExclusiveModel,
+      customPricingFor(model)
+    );
 
     expect(request.body.service_tier).toBe('priority');
   });

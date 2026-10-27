@@ -876,6 +876,18 @@
       "spendAlertsSubtitle": "küszöbátlépések és óránkénti kiugrások",
       "spendAlertsToggle": "Költésfigyelmeztetések kategóriája"
     },
+    "history": {
+      "title": "Értesítési előzmények",
+      "subtitle": "Az ehhez a fiókhoz beérkezett értesítések",
+      "bannerBody": "A push értesítések ki vannak kapcsolva ezen az eszközön, ezért az új értesítések nem érkeznek meg ide.",
+      "bannerAction": "Értesítési beállítások",
+      "emptyTitle": "Még nincsenek értesítések",
+      "emptyCategoryTitle": "Ebben a kategóriában nincsenek értesítések",
+      "emptyBody": "Az ehhez a fiókhoz beérkező értesítések itt jelennek meg. {{days}} napig maradnak meg.",
+      "capped": "A legutóbbi értesítések láthatók.",
+      "loadError": "Nem sikerült betölteni az értesítési előzményeket.",
+      "openFailed": "Ez az értesítés már sehol nem nyitható meg."
+    },
     "action": {
       "openSession": "Munkamenet megnyitása"
     },
@@ -4084,6 +4096,10 @@
     "generate": "Összefoglaló készítése",
     "retrySummary": "Fizetős összefoglaló újrapróbálása",
     "sources": "Bizonyítékok és artefaktumok",
+    "sessionsShown_one": "{{total}} munkamenetből {{shown}} látható",
+    "sessionsShown_other": "{{total}} munkamenetből {{shown}} látható",
+    "itemsShown_one": "{{total}} elemből {{shown}} látható",
+    "itemsShown_other": "{{total}} elemből {{shown}} látható",
     "timezone": "Jelentés időzónája",
     "deviceTimezone": "Eszköz időzónájának használata",
     "timezoneHint": "IANA időzóna, például Europe/Berlin. Az ütemezés módosításai a következő jelentésekre érvényesek.",

@@ -278,7 +278,6 @@ export function planSessionCardSend(params: {
       // The quiet window for a working card, the aggregate window otherwise.
       staleAtSeconds: sessionCardStaleAtSeconds(
         content,
-        nowSeconds,
         nowSeconds + SESSION_CARD_AGGREGATE_STALE_MS / 1000
       ),
     },

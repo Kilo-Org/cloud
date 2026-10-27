@@ -1,3 +1,4 @@
+import type { CustomPricingConfig } from '@kilocode/db/schema-types';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { getReasoningEffortTimeoutSuggestion } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { UpstreamTimeoutError } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
@@ -39,7 +40,7 @@ export type RewriteResponseParams = {
 export type ResponseUsageContext = Pick<
   MicrodollarUsageContext,
   'requested_model' | 'provider' | 'is_free' | 'user_byok' | 'api_kind'
->;
+> & { custom_pricing_config: CustomPricingConfig };
 
 export type ResponseUsage = {
   cost?: number;
@@ -324,7 +325,7 @@ export function rewriteUsage(
     cacheWriteTokens,
     is_byok: usage.is_byok ?? null,
   };
-  applyUsagePricing(costs, context);
+  applyUsagePricing(costs, context, context.custom_pricing_config);
   usage.cost = costs.cost_mUsd / 1_000_000;
   usage.is_byok = context.user_byok || context.provider === 'openai-chatgpt';
   if (

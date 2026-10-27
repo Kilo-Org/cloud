@@ -352,6 +352,18 @@
       "spendAlertsSubtitle": "門檻突破與每小時激增",
       "spendAlertsToggle": "支出提醒類別"
     },
+    "history": {
+      "title": "通知歷史",
+      "subtitle": "此帳戶收到的通知",
+      "bannerBody": "此裝置的推播通知已關閉，因此新通知不會送達這裡。",
+      "bannerAction": "通知設定",
+      "emptyTitle": "尚無通知",
+      "emptyCategoryTitle": "此類別尚無通知",
+      "emptyBody": "此帳戶收到的通知會顯示在這裡。通知會保留 {{days}} 天。",
+      "capped": "顯示最近的通知。",
+      "loadError": "無法載入通知歷史。",
+      "openFailed": "此通知已無法開啟。"
+    },
     "action": {
       "openSession": "開啟工作階段"
     },
@@ -4084,6 +4096,10 @@
     "generate": "產生摘要",
     "retrySummary": "重試付費摘要",
     "sources": "證據與產出物",
+    "sessionsShown_one": "顯示 {{total}} 個工作階段中的 {{shown}} 個",
+    "sessionsShown_other": "顯示 {{total}} 個工作階段中的 {{shown}} 個",
+    "itemsShown_one": "顯示 {{total}} 筆項目中的 {{shown}} 筆",
+    "itemsShown_other": "顯示 {{total}} 筆項目中的 {{shown}} 筆",
     "timezone": "簡報時區",
     "deviceTimezone": "使用裝置時區",
     "timezoneHint": "IANA 時區，例如 Europe/Berlin。排程變更將套用於之後的簡報。",

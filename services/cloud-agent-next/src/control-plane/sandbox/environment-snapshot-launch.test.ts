@@ -191,18 +191,44 @@ describe('environment snapshot lookup', () => {
           admission: { status: 'skipped', reason: 'backoff', retryAt: 5 },
         },
       })
-    ).toBe('No usable snapshot available; the replacement build is waiting after earlier failures');
+    ).toBe(
+      'Starting fresh: no saved snapshot exists; the replacement build is waiting after earlier failures'
+    );
     expect(environmentStartDetail(REFERENCE, { kind: 'timeout' })).toBe(
-      'Starting without an environment snapshot (lookup unavailable)'
+      'Starting fresh: snapshot lookup timed out'
+    );
+    expect(environmentStartDetail(REFERENCE, { kind: 'unavailable' })).toBe(
+      'Starting fresh: snapshot lookup unavailable'
     );
   });
 
-  it('explains that no usable snapshot is available and a new build is queued', () => {
+  it.each([
+    ['missing', 'no saved snapshot exists'],
+    ['scope_mismatch', 'snapshot belongs to a different environment, owner or repository'],
+    ['incompatible', 'snapshot is incompatible with the current image or runtime'],
+    ['newer_than_session', 'snapshot uses newer settings than this session'],
+    ['expired', 'snapshot has expired'],
+    ['deleted', 'environment was deleted'],
+    ['unsupported', 'snapshots are not supported for this environment'],
+    ['eligible', 'no usable snapshot is available'],
+  ] satisfies [SnapshotResolution['reason'], string][])(
+    'explains why a snapshot is not used: %s',
+    (reason, detail) => {
+      expect(
+        environmentStartDetail(REFERENCE, {
+          kind: 'resolved',
+          resolution: { snapshot: null, reason, admission: { status: 'not_needed' } },
+        })
+      ).toBe(`Starting fresh: ${detail}`);
+    }
+  );
+
+  it('includes the missing snapshot reason and queued build status', () => {
     expect(
       environmentStartDetail(REFERENCE, {
         kind: 'resolved',
         resolution: { ...RESOLVED, snapshot: null, reason: 'missing' },
       })
-    ).toBe('No usable snapshot available; a new snapshot build is queued');
+    ).toBe('Starting fresh: no saved snapshot exists; a new snapshot build is queued');
   });
 });

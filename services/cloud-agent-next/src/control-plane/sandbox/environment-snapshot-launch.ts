@@ -157,12 +157,24 @@ export function environmentStartDetail(
   lookup: EnvironmentLookup
 ): string {
   if (lookup.kind !== 'resolved') {
-    return 'Starting without an environment snapshot (lookup unavailable)';
+    return lookup.kind === 'timeout'
+      ? 'Starting fresh: snapshot lookup timed out'
+      : 'Starting fresh: snapshot lookup unavailable';
   }
-  const { snapshot, admission } = lookup.resolution;
+  const { snapshot, admission, reason } = lookup.resolution;
   const build = admissionText(admission);
   if (snapshot === null) {
-    return `No usable snapshot available${build === null ? '' : `; ${build}`}`;
+    const reasons = {
+      missing: 'no saved snapshot exists',
+      scope_mismatch: 'snapshot belongs to a different environment, owner or repository',
+      incompatible: 'snapshot is incompatible with the current image or runtime',
+      newer_than_session: 'snapshot uses newer settings than this session',
+      expired: 'snapshot has expired',
+      deleted: 'environment was deleted',
+      unsupported: 'snapshots are not supported for this environment',
+      eligible: 'no usable snapshot is available',
+    } satisfies Record<SnapshotResolution['reason'], string>;
+    return `Starting fresh: ${reasons[reason]}${build === null ? '' : `; ${build}`}`;
   }
   const settings =
     snapshot.revision === reference.configurationRevision

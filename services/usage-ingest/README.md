@@ -233,7 +233,7 @@ already on main; staging-host middleware remains deferred. This refresh preserve
 the sole selected EU source/DLQ, its preparation and routing rollback behavior,
 both diagnostics and parallelism variables, and the writer target. Keep one
 consumer at cap 200 / batch 2 / parallelism 2 (at most 400 writer calls); do not reconnect a
-legacy consumer or split the cap. The queue-budget and relay runtime tests pin
+legacy consumer or split the cap. The queue-budget and direct runtime tests pin
 the actual EU queue names and policy. Verify the refreshed source and those
 checks before merge. Historical four-PR compatibility results do not validate
 this first-test source, which keeps middleware unchanged.
@@ -316,63 +316,28 @@ The queue is simulated locally and delivered to the shipped `queue()` handler in
 the same Worker. Runtime tests cover HTTP publishing, receipt consumption, and opt-in processing
 in both environments.
 
-## Staging direct writer and retained Frankfurt relay
+## Direct usage writer
 
-Normal `staging` has no `USAGE_WRITER_RELAY` binding. The existing writer client
-calls `https://staging-app.kilo.ai/api/internal/usage/record` directly, preserving
-authentication, optional Vercel protection bypass, usage identity, the 160-second
-budget, response validation and per-message ACK/retry behavior. The single EU
-queue/DLQ, batch 2, parallelism 2, cap 200, retries and diagnostics stay unchanged.
-Production remains direct; the writer, middleware and database stay unchanged.
-This removes one hop for a controlled comparison; no latency improvement is
-established without hosted measurement.
+Processing calls the configured Vercel writer directly. The shared writer client
+retains the internal key, optional Vercel protection bypass, stable usage identity,
+160-second timeout, redirect/response validation and recorded/duplicate ACK rule.
+Publisher/consumer timing diagnostics and the queue policy are unchanged.
 
-The private `usage-writer-relay-staging` code, config, tests and deployed resource
-are retained for revert. Its fetch handler forwards to the same writer with a
-placement hint of `aws:eu-central-1`.
+The retired Frankfurt relay source, service binding, diagnostics and deployment
+step have been removed. The existing private `usage-writer-relay-staging` Worker
+may remain deployed and unused. Deleting that live resource is optional later
+administrative cleanup, separate from this change.
 
-The retained relay is an outbound-request placement experiment. [Placement's shared limitations](https://developers.cloudflare.com/workers/configuration/placement/#review-limitations-1)
-apply to fetch handlers and do not pin the queue consumer. The hint selects a
-Cloudflare data center near Frankfurt, not an AWS-hosted Worker. A US consumer
-still crosses to Europe and waits for the return; the relay adds a hop and may
-be neutral or slower. The hypothesis is that a Frankfurt-origin request avoids
-an extra Vercel middleware/routing trip. Actual relay placement, Vercel ingress
-and latency need measurement. EU queue jurisdiction does not place the consumer.
+Both manual and changed-worker deployment paths keep the existing EU queue
+preparation before consumer upload. When the current workflow selects an older
+staging source that still requires `USAGE_WRITER_RELAY`, it fails before queue
+preparation or upload. To deploy such a source, use its historical workflow with
+relay support or choose a direct-writer revision; this workflow provides no relay
+fallback. Reverting this cleanup restores the optional relay implementation and
+workflow support, but does not itself rebind the relay in staging.
 
-The relay has no public routes, workers.dev or preview URL. It streams to a fixed
-configured staging target, forwards only the existing internal key and optional
-Vercel protection bypass, and leaves authentication to the existing writer. It
-needs no additional secrets. Redirects are not followed, the client retains its
-160-second budget and response/identity validation, and only recorded/duplicate
-responses ACK. The relay adds no retries or persistence.
-
-### Deployment and verification
-
-Normal staging CI uses `--env staging`. Both the single-worker and changed-worker
-paths in `deploy-workers.yml` deploy `wrangler.writer-relay.jsonc` **first**, then
-deploy the existing consumer when the selected source's staging binding requires
-the relay. The current direct-path configuration skips relay deployment while
-still preparing the EU queues and uploading the consumer. A required relay's
-missing config or failed deployment stops the consumer deploy.
-The relay's nonstandard config filename keeps it out of independent discovery;
-its deployment is owned by usage-ingest. Other Workers and production skip this
-relay step. There is no separate `staging-relay` environment or manual activation.
-
-For an authorized comparison, record the consumer revision, relay revision when
-used, and unchanged writer deployment SHA. Send one authenticated smoke event and
-verify its stable usage ID/ACK/persistence. Inspect the Vercel ingress/function
-trace and, when bound, the relay's actual placement. Compute region
-is `executionRegion`/`proxy.lambdaRegion`; `proxy.region` is the ingress hop.
-For a subsequent approved comparison, keep queue cap/workload and cold/warm
-conditions fixed and capture aligned event age, full consumer HTTP p95/p99, queue
-backlog/retries/DLQ and DB pool/lock limits. Accounting creation → persistence
-excludes return/ACK; the full consumer HTTP duration includes the return leg.
-Local runtime tests cover the normal direct route and the optional service-binding
-route with ACK/retry behavior; geographical placement and speedup remain unproved.
-
-To restore the relay, revert the staging bypass change and redeploy staging.
-This restores the service binding; CI deploys the retained relay before the
-consumer. Keep the EU queue pair, single consumer and all queue policy unchanged.
-Do not delete the unused private relay. Queue routing rollback is separate: retain
-the deployment helper and change only staging queue selection as described in the
-[EU setup](eu-queues.md); reverting the earlier EU change cannot detach EU automatically.
+Local workerd/Queue/loopback HTTP tests cover direct publishing and consumption,
+writer credentials and stable identity, ACK after writer completion, duplicate
+ACK, and retry on transport/response failures. No hosted latency or placement
+improvement is claimed. EU routing rollback remains a separate operation in the
+[EU setup](eu-queues.md).

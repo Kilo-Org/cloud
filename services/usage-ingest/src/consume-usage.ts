@@ -95,24 +95,12 @@ async function processMessage(
     outcome = { kind: 'unavailable', reason: 'invalid_event' };
   } else {
     const writerStartedAt = performance.now();
-    const relay = env.USAGE_WRITER_RELAY;
-    outcome = await recordUsage(
-      parsed.data,
-      {
-        url: env.USAGE_WRITER_URL,
-        secret: env.USAGE_WRITER_SECRET,
-        protectionBypass: env.USAGE_WRITER_PROTECTION_BYPASS,
-        source: 'queue',
-      },
-      relay
-        ? (input, init) => {
-            if (!diagnostic) return relay.fetch(input, init);
-            const headers = new Headers(init?.headers);
-            headers.set('x-usage-id', parsed.data.core.id);
-            return relay.fetch(input, { ...init, headers });
-          }
-        : undefined
-    );
+    outcome = await recordUsage(parsed.data, {
+      url: env.USAGE_WRITER_URL,
+      secret: env.USAGE_WRITER_SECRET,
+      protectionBypass: env.USAGE_WRITER_PROTECTION_BYPASS,
+      source: 'queue',
+    });
     if (outcome.kind !== 'unavailable' || outcome.reason !== 'missing_config') {
       writerDurationMs = Math.round(performance.now() - writerStartedAt);
     }

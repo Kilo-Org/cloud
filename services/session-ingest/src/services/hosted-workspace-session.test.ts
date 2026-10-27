@@ -33,9 +33,7 @@ function lockedSelectBuilder(value: unknown[], lock: () => void, ordered: boolea
   return {
     from: vi.fn(() => ({
       where: vi.fn(() =>
-        ordered
-          ? { orderBy: vi.fn(() => lockResult) }
-          : { limit: vi.fn(() => lockResult) }
+        ordered ? { orderBy: vi.fn(() => lockResult) } : { limit: vi.fn(() => lockResult) }
       ),
     })),
   };
@@ -78,9 +76,7 @@ function createDb(options: { deleteRows: boolean }) {
   let selectIndex = 0;
   const tx = {
     select: vi.fn(() => builders[selectIndex++]),
-    execute: vi.fn(() =>
-      Promise.resolve({ rows: [{ session_id: kiloSessionId, depth: 0 }] })
-    ),
+    execute: vi.fn(() => Promise.resolve({ rows: [{ session_id: kiloSessionId, depth: 0 }] })),
     delete: vi.fn(() => ({ where: vi.fn(() => Promise.resolve()) })),
   };
   const db = {

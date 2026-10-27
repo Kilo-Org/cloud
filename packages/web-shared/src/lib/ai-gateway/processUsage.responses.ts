@@ -111,9 +111,13 @@ function extractResponseContent(output: OpenAI.Responses.ResponseOutputItem[]): 
 }
 
 function toolCallArgumentsOf(item: OpenAI.Responses.ResponseOutputItem | undefined): string | null {
-  if (item?.type === 'function_call') return item.arguments;
-  if (item?.type === 'custom_tool_call') return item.input;
-  return null;
+  const argumentsText =
+    item?.type === 'function_call'
+      ? item.arguments
+      : item?.type === 'custom_tool_call'
+        ? item.input
+        : null;
+  return typeof argumentsText === 'string' ? argumentsText : null;
 }
 
 export async function parseResponsesMicrodollarUsageFromStream(

@@ -79,6 +79,35 @@ describe('tool-call argument assembly', () => {
     expect(result.toolCallArguments).toBe('{"x":1}\n*** Begin Patch');
   });
 
+  test('chat completions JSON accepts tool calls without a type, as Mistral sends them', () => {
+    const result = parseMicrodollarUsageFromString(
+      JSON.stringify({
+        id: 'chatcmpl-1',
+        model: 'mistralai/devstral',
+        choices: [
+          {
+            index: 0,
+            finish_reason: 'tool_calls',
+            message: {
+              role: 'assistant',
+              content: '',
+              tool_calls: [
+                { id: 'a', function: { name: 'read', arguments: '{"x":1}' } },
+                { id: 'b' },
+              ],
+            },
+          },
+        ],
+        usage: { prompt_tokens: 1, completion_tokens: 1, cost: 0, is_byok: false },
+      }),
+      'user-1',
+      200,
+      'openrouter'
+    );
+    expect(result.toolCallArguments).toBe('{"x":1}');
+    expect(result.inputTokens).toBe(1);
+  });
+
   test('responses stream reads completed function and custom tool call items', async () => {
     const result = await parseResponsesMicrodollarUsageFromStream(
       sseStream([

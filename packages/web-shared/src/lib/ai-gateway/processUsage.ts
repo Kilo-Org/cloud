@@ -1391,8 +1391,9 @@ export function parseMicrodollarUsageFromString(
     responseContent: choice?.message.content ?? '',
     toolCallArguments: (choice?.message.tool_calls ?? [])
       .map(toolCall =>
-        toolCall.type === 'function' ? toolCall.function.arguments : toolCall.custom.input
+        toolCall.type === 'custom' ? toolCall.custom?.input : toolCall.function?.arguments
       )
+      .filter(argumentsText => typeof argumentsText === 'string')
       .join('\n'),
     inference_provider:
       responseJson?.provider ?? vercelProviderMetadata?.gateway?.routing?.finalProvider ?? null,

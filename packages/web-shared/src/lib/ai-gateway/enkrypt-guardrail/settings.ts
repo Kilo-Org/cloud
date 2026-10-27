@@ -4,7 +4,7 @@ import {
   type EnkryptPiiEntity,
   type OrganizationSettings,
 } from '@kilocode/db/schema-types';
-import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /** The `detectors` object of Enkrypt's `POST /guardrails/detect` request. */
 export type EnkryptDetectors = {
@@ -27,8 +27,6 @@ export const DEFAULT_ENKRYPT_DETECTORS = {
   injection_attack: true,
   pii_entities: ['secrets'],
 } satisfies EnkryptInputGuardrailSettings['detectors'];
-
-const logInvalidSettings = sentryLogger('enkrypt-guardrail', 'warning');
 
 function enkryptDetectors(
   selection: NonNullable<EnkryptInputGuardrailSettings['detectors']>
@@ -58,7 +56,7 @@ export function resolveEnkryptInputGuardrail(
   if (raw === undefined) return null;
   const parsed = EnkryptInputGuardrailSettingsSchema.safeParse(raw);
   if (!parsed.success) {
-    logInvalidSettings('[enkrypt-guardrail] invalid organization settings; guardrail disabled', {
+    warnExceptInTest('[enkrypt-guardrail] invalid organization settings; guardrail disabled', {
       organization_id: organizationId,
       issues: parsed.error.issues.map(issue => issue.path.join('.')),
     });

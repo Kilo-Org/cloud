@@ -2,7 +2,7 @@ import * as z from 'zod';
 import type { EnkryptGuardrailApiKind, EnkryptGuardrailDecision } from '@kilocode/db/schema-types';
 import type { EnkryptGuardrailCharge } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/charges';
 import type { EnkryptInputGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
-import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import { sentryLogger, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export const ENKRYPT_DETECT_URL = 'https://api.enkryptai.com/guardrails/detect';
 
@@ -79,7 +79,6 @@ type DetectAttempt =
   | { kind: 'failed'; error: string; retryable: boolean; creditsCost: number | null };
 
 const logDecision = sentryLogger('enkrypt-guardrail', 'info');
-const logFailure = sentryLogger('enkrypt-guardrail', 'warning');
 
 function isDetectorName(name: string): name is DetectorName {
   return Object.hasOwn(DETECTOR_TYPES, name);
@@ -289,7 +288,7 @@ function failedVerdict(
 ): EnkryptGuardrailScanResult {
   const failClosed = scan.config.failMode === 'closed';
   const closedVerdict = failure.closedVerdict ?? { action: 'unavailable' };
-  logFailure('[enkrypt-guardrail] decision', {
+  warnExceptInTest('[enkrypt-guardrail] decision', {
     ...logFields,
     decision: failClosed ? 'error_fail_closed' : 'error_fail_open',
     error: failure.error,

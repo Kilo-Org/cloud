@@ -317,12 +317,16 @@ export async function applyProviderSpecificLogic(
   isNonTrialEnterprise: boolean
 ) {
   // A user's own gateway key bills their account, so Kilo's routing preferences
-  // do not override what the request and their account ask for.
+  // do not override what the request and their account ask for, and the
+  // gateway's paid server features bill that account rather than Kilo's.
   const usesUserGatewayKey =
     userByok?.some(byok => isGatewayUserByokProviderId(byok.providerId)) ?? false;
 
   removeModelsFallback(requestedModel, requestToMutate);
-  if (isFreeModelExcludingCustomLlms(requestedModel) || userByok !== null) {
+  if (
+    isFreeModelExcludingCustomLlms(requestedModel) ||
+    (userByok !== null && !usesUserGatewayKey)
+  ) {
     removePaidServerFeatures(provider, requestedModel, requestToMutate, userId);
   }
   applyTrackingIds(requestToMutate, provider, userId, taskId);

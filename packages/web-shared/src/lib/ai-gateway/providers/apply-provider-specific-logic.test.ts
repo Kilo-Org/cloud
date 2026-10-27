@@ -818,6 +818,38 @@ describe('applyProviderSpecificLogic with a user gateway key', () => {
 
     expect(request.body.provider).toEqual({ order: USER_GATEWAY_TEST_ORDER });
   });
+
+  it.each([
+    { providerId: 'openrouter', provider: makeProvider(null), tool: 'openrouter:web_search' },
+    {
+      providerId: 'vercel-ai-gateway',
+      provider: createUserVercelAiGatewayProvider('user-key'),
+      tool: 'vercel:perplexity_search',
+    },
+  ] as const)(
+    'keeps paid server features for a $providerId key, which bills the user account',
+    async ({ providerId, provider, tool }) => {
+      const request = makeRequest(requestedModel);
+      const serverFeatures = { plugins: [{ id: 'web' }], tools: [{ type: tool }] };
+      Object.assign(request.body, structuredClone(serverFeatures));
+
+      await applyProviderSpecificLogic(
+        provider,
+        requestedModel,
+        request,
+        {},
+        [{ providerId, decryptedAPIKey: 'user-key' }],
+        EmptyFraudDetectionHeaders,
+        'user-1',
+        null,
+        null,
+        null,
+        true
+      );
+
+      expect(request.body).toMatchObject(serverFeatures);
+    }
+  );
 });
 
 describe('applyProviderSpecificLogic paid server features', () => {

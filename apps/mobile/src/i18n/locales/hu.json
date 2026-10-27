@@ -2591,7 +2591,9 @@
       "retrying": "Újrapróbálás…",
       "retryDeny": "Megtagadás újrapróbálása",
       "retryAllowOnce": "Egyszeri engedélyezés újrapróbálása",
-      "retryAlwaysAllow": "Mindig engedélyezés újrapróbálása"
+      "retryAlwaysAllow": "Mindig engedélyezés újrapróbálása",
+      "unreadableTitle": "Nem sikerült beolvasni az engedélykérést",
+      "unreadableBody": "Az ügynök egy engedélyezési döntésre vár, amelyet ez az alkalmazás nem tud megjeleníteni. Frissítse az alkalmazást vagy a CLI-t, illetve válaszoljon a kérésre a CLI-ben a folytatáshoz."
     },
     "questionCard": {
       "title": "Az ügynök válaszra vagy jóváhagyásra vár",
@@ -2983,8 +2985,9 @@
     "unavailableDevice": "A hangbevitel nem érhető el ezen az eszközön.",
     "unavailableLanguage": "A hangbevitel nem érhető el az eszközön beállított nyelven. Telepítsd a nyelv offline beszédfájljait, vagy használj másik alkalmazásnyelvet.",
     "languageNotInstalledTitle": "A hangbevitel {{language}} nyelven még nem áll készen",
-    "languageNotInstalledMessage": "A(z) {{language}} nyelv offline beszédfájljai nincsenek telepítve ezen a telefonon. Töltsd le őket, majd próbáld újra a hangbevitelt.",
+    "languageNotInstalledMessage": "A {{language}} nyelvű offline beszédfájlok nincsenek telepítve, és az online beszédfeldolgozás ki van kapcsolva. Töltsd le a fájlokat, vagy kapcsold vissza az online beszédfeldolgozást, hogy használhasd a hangbevitelt.",
     "downloadOfflineModel": "Letöltés",
+    "useOnlineTranscription": "Online beszédfeldolgozás engedélyezése",
     "offlineModelDownloadScheduled": "Az offline beszédfájlok a háttérben töltődnek le. Próbáld újra a hangbevitelt később.",
     "listeningStopped": "A beszéd figyelése leállt.",
     "transcribing": "Átírás folyamatban…",

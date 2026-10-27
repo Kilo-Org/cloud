@@ -1604,7 +1604,17 @@ describe('server runtime credential proxy', () => {
       },
     });
     env.SANDBOX_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
-    const upstream = vi.fn().mockResolvedValue(new Response('Unauthorized', { status: 401 }));
+    const upstream = vi.fn().mockResolvedValue(
+      new Response('<html><head><title>403 Forbidden</title></head></html>', {
+        status: 403,
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          Server: 'Vercel',
+          'X-Vercel-Id': 'fra1::abc-123',
+          'X-Vercel-Mitigated': 'deny',
+        },
+      })
+    );
     vi.stubGlobal('fetch', upstream);
     try {
       const response = await fetchWorker(
@@ -1621,14 +1631,21 @@ describe('server runtime credential proxy', () => {
         ),
         env
       );
-      expect(response.status).toBe(401);
-      await expect(response.text()).resolves.toBe('Unauthorized');
+      expect(response.status).toBe(403);
+      await expect(response.text()).resolves.toBe(
+        '<html><head><title>403 Forbidden</title></head></html>'
+      );
       expect(upstream).toHaveBeenCalledOnce();
       expect(loggerWithFieldsMock).toHaveBeenCalledTimes(1);
       expect(loggerWithFieldsMock).toHaveBeenCalledWith({
         logTag: 'runtime_proxy_request_failed',
         upstreamAttempted: true,
-        upstreamStatus: 401,
+        upstreamStatus: 403,
+        upstreamServer: 'Vercel',
+        upstreamContentType: 'text/html; charset=utf-8',
+        upstreamVercelId: 'fra1::abc-123',
+        upstreamVercelMitigated: 'deny',
+        upstreamErrorExcerpt: '403 Forbidden',
         sessionId: 'workspace_proxy',
         kiloSessionId: 'kilo_proxy',
       });

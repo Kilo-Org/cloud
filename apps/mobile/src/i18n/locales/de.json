@@ -2067,7 +2067,9 @@
       "retrying": "Erneuter Versuch…",
       "retryDeny": "Erneut verweigern",
       "retryAllowOnce": "Erneut einmal erlauben",
-      "retryAlwaysAllow": "Erneut immer erlauben"
+      "retryAlwaysAllow": "Erneut immer erlauben",
+      "unreadableTitle": "Berechtigungsanfrage konnte nicht gelesen werden",
+      "unreadableBody": "Der Agent wartet auf eine Berechtigungsentscheidung, die diese App nicht anzeigen kann. Aktualisiere die App oder die CLI oder beantworte die Anfrage in der CLI, um fortzufahren."
     },
     "questionCard": {
       "title": "Der Agent braucht deine Antwort",
@@ -2459,8 +2461,9 @@
     "unavailableDevice": "Die Spracheingabe ist auf diesem Gerät nicht verfügbar.",
     "unavailableLanguage": "Die Spracheingabe ist für die eingestellte Gerätesprache nicht verfügbar.",
     "languageNotInstalledTitle": "Spracheingabe für {{language}} ist noch nicht bereit",
-    "languageNotInstalledMessage": "Die Offline-Sprachdateien für {{language}} sind auf diesem Telefon nicht installiert. Lade sie herunter und versuche die Spracheingabe erneut.",
+    "languageNotInstalledMessage": "Die Offline-Sprachdateien für {{language}} sind nicht installiert, und die Online-Transkription ist deaktiviert. Lade die Dateien herunter oder aktiviere die Online-Transkription wieder, um die Spracheingabe zu nutzen.",
     "downloadOfflineModel": "Herunterladen",
+    "useOnlineTranscription": "Online-Transkription erlauben",
     "offlineModelDownloadScheduled": "Die Offline-Sprachdateien werden im Hintergrund heruntergeladen. Versuche die Spracheingabe später erneut.",
     "listeningStopped": "Die Aufnahme wurde beendet.",
     "transcribing": "Transkription läuft …",

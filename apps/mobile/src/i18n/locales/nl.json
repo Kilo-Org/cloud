@@ -2067,7 +2067,9 @@
       "retrying": "Opnieuw proberen…",
       "retryDeny": "Opnieuw weigeren",
       "retryAllowOnce": "Opnieuw eenmalig toestaan",
-      "retryAlwaysAllow": "Opnieuw altijd toestaan"
+      "retryAlwaysAllow": "Opnieuw altijd toestaan",
+      "unreadableTitle": "Toestemmingsverzoek kon niet worden gelezen",
+      "unreadableBody": "De agent wacht op een toestemmingsbeslissing die deze app niet kan tonen. Werk de app of de CLI bij, of beantwoord het verzoek in de CLI om door te gaan."
     },
     "questionCard": {
       "title": "Invoer voor de agent nodig",
@@ -2459,8 +2461,9 @@
     "unavailableDevice": "Spraakinvoer is niet beschikbaar op dit apparaat.",
     "unavailableLanguage": "Spraakinvoer is niet beschikbaar voor de taal van dit apparaat.",
     "languageNotInstalledTitle": "Spraakinvoer voor {{language}} is nog niet gereed",
-    "languageNotInstalledMessage": "De offline spraakbestanden voor {{language}} zijn niet op deze telefoon geïnstalleerd. Download ze en probeer spraakinvoer opnieuw.",
+    "languageNotInstalledMessage": "De offline spraakbestanden voor {{language}} zijn niet geïnstalleerd en online transcriptie staat uit. Download de bestanden of zet online transcriptie weer aan om spraakinvoer te gebruiken.",
     "downloadOfflineModel": "Downloaden",
+    "useOnlineTranscription": "Online transcriptie toestaan",
     "offlineModelDownloadScheduled": "De offline spraakbestanden worden op de achtergrond gedownload. Probeer spraakinvoer later opnieuw.",
     "listeningStopped": "Het luisteren is gestopt.",
     "transcribing": "Transcriberen...",

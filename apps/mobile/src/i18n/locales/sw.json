@@ -2591,7 +2591,9 @@
       "retrying": "Inajaribu tena…",
       "retryDeny": "Jaribu tena kukataa",
       "retryAllowOnce": "Jaribu tena kuruhusu mara moja",
-      "retryAlwaysAllow": "Jaribu tena kuruhusu daima"
+      "retryAlwaysAllow": "Jaribu tena kuruhusu daima",
+      "unreadableTitle": "Ombi la ruhusa halikuweza kusomwa",
+      "unreadableBody": "Wakala anasubiri uamuzi wa ruhusa ambao programu hii haiwezi kuonyesha. Sasisha programu au CLI, au jibu ombi hilo kwenye CLI ili kuendelea."
     },
     "questionCard": {
       "title": "Wakala anahitaji jibu",
@@ -2983,8 +2985,9 @@
     "unavailableDevice": "Uingizaji kwa sauti haupatikani kwenye kifaa hiki.",
     "unavailableLanguage": "Uingizaji kwa sauti haupatikani kwa lugha ya kifaa hiki.",
     "languageNotInstalledTitle": "Uingizaji kwa sauti kwa {{language}} hauko tayari bado",
-    "languageNotInstalledMessage": "Mafaili ya sauti ya nje ya mtandao ya {{language}} hayajasakinishwa kwenye simu hii. Pakua mafaili hayo, kisha ujaribu tena uingizaji kwa sauti.",
+    "languageNotInstalledMessage": "Mafaili ya sauti ya nje ya mtandao ya {{language}} hayajawekwa, na uchakataji mtandaoni umezimwa. Kwa kupakua mafaili hayo au kuwasha uchakataji mtandaoni tena, utaweza kutumia uingizaji kwa sauti.",
     "downloadOfflineModel": "Pakua",
+    "useOnlineTranscription": "Ruhusu uchakataji mtandaoni",
     "offlineModelDownloadScheduled": "Mafaili ya sauti ya nje ya mtandao yatapakuliwa nyuma ya pazia. Jaribu tena uingizaji kwa sauti baadaye.",
     "listeningStopped": "Usikilizaji umesimama.",
     "transcribing": "Inanukuuza...",

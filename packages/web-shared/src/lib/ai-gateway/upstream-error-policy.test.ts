@@ -56,7 +56,10 @@ describe('applyUpstreamErrorPolicy', () => {
 
   it('passes a BYOK 402 through and reports it without Sentry', async () => {
     const response = upstream(402);
-    const replacement = await applyUpstreamErrorPolicy({ ...baseParams(response), isUserByok: true });
+    const replacement = await applyUpstreamErrorPolicy({
+      ...baseParams(response),
+      isUserByok: true,
+    });
 
     expect(replacement).toBeUndefined();
     expect(captureMock).toHaveBeenCalledTimes(1);

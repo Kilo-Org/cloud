@@ -312,7 +312,7 @@ export async function applyProviderSpecificLogic(
   isNonTrialEnterprise: boolean
 ) {
   removeModelsFallback(requestedModel, requestToMutate);
-  if (isFreeModelExcludingCustomLlms(requestedModel)) {
+  if (isFreeModelExcludingCustomLlms(requestedModel) || userByok !== null) {
     removePaidServerFeatures(provider, requestedModel, requestToMutate, userId);
   }
   applyTrackingIds(requestToMutate, provider, userId, taskId);

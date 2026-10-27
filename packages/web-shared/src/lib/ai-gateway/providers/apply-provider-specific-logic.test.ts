@@ -1,5 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import {
   applyPreferredProvider,
   applyProviderSpecificLogic,
@@ -737,7 +738,9 @@ describe('applyProviderSpecificLogic paid server features', () => {
     ],
   };
 
-  async function applyTo(model: string) {
+  const userByok: BYOKResult[] = [{ providerId: 'anthropic', decryptedAPIKey: 'key' }];
+
+  async function applyTo(model: string, byok: BYOKResult[] | null = null) {
     const request = makeRequest(model);
     Object.assign(request.body, structuredClone(fields));
     await applyProviderSpecificLogic(
@@ -745,7 +748,7 @@ describe('applyProviderSpecificLogic paid server features', () => {
       model,
       request,
       {},
-      null,
+      byok,
       EmptyFraudDetectionHeaders,
       'user-1',
       null,
@@ -766,13 +769,56 @@ describe('applyProviderSpecificLogic paid server features', () => {
     warn.mockRestore();
   });
 
-  it('keeps them for paid model requests', async () => {
+  it('keeps them for paid model requests without BYOK', async () => {
     const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     const body = await applyTo('vendor/model');
 
     expect(body).toMatchObject(fields);
     expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('removes them from paid model requests with user BYOK', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const body = await applyTo('vendor/model', userByok);
+
+    expect(body.plugins).toEqual([{ id: 'file-parser', pdf: { engine: 'cloudflare-ai' } }]);
+    expect(body.tools).toEqual([fields.tools[1]]);
+    warn.mockRestore();
+  });
+
+  it('removes Vercel server tools from user BYOK requests routed through Vercel', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const model = 'anthropic/claude-sonnet-4.5';
+    const request = makeRequest(model);
+    Object.assign(request.body, {
+      tools: [{ type: 'vercel:perplexity_search' }, structuredClone(fields.tools[1])],
+      tool_choice: { type: 'vercel:perplexity_search' },
+    });
+
+    await applyProviderSpecificLogic(
+      VERCEL_AI_GATEWAY,
+      model,
+      request,
+      {},
+      userByok,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false
+    );
+
+    expect(request.body.tools).toEqual([fields.tools[1]]);
+    expect(request.body).not.toHaveProperty('tool_choice');
+    expect(request.body).not.toHaveProperty('plugins');
+    expect(warn).toHaveBeenCalledWith(
+      '[applyProviderSpecificLogic] Removed paid server features from free or BYOK request',
+      expect.objectContaining({ model, removedToolTypes: ['vercel:perplexity_search'] })
+    );
     warn.mockRestore();
   });
 });

@@ -227,7 +227,6 @@
     "hideBalance": "Ocultar saldo",
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
-    "bonusCreditsExpiring": "Os créditos no valor de {{amount}} expiram em {{date}}.",
     "signOutTitle": "Terminar sessão?",
     "signOutMessage": "Terás de iniciar sessão novamente para aceder ao teu espaço de trabalho.",
     "deleteAccountTitle": "Eliminar conta?",
@@ -3203,7 +3202,7 @@
     "creditActivity": {
       "emptyDescription": "As compras, a utilização e os ajustes de créditos desta organização aparecem aqui à medida que ocorrem.",
       "emptyTitle": "Sem movimentos de créditos",
-      "expires": "Expira em {{date}}",
+      "expiresUtc": "Expira em {{date}} (UTC)",
       "title": "Movimentos de créditos",
       "transactionFallback": "Transação de créditos",
       "category": {
@@ -3891,6 +3890,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Os valores apresentados como •••• mantêm o segredo armazenado; substitua um valor para o renovar. Alterar a linha de comando exige novamente todos os valores",
+      "headersHint": "Os valores apresentados como •••• mantêm o segredo armazenado; substitua um valor para o renovar. Alterar o URL exige novamente todos os valores",
       "nameRequired": "Introduza um nome de servidor",
       "nameInvalid": "O nome pode usar apenas letras ASCII, números, sublinhados e hífenes, até 100 caracteres",
       "commandRequired": "Introduza um comando",
@@ -3989,6 +3990,10 @@
   "credits": {
     "title": "Comprar créditos",
     "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de programação com IA na aplicação Kilo. A loja cobra na sua conta e os créditos são adicionados depois de a loja confirmar o pagamento.",
+    "nextExpiry": "Os créditos no valor de {{amount}} expiram em {{date}} (UTC). Os créditos com a data de expiração mais próxima são utilizados primeiro.",
+    "appStoreExpiry": "Os créditos comprados através da App Store não expiram.",
+    "playOneYearExpiry": "Estes créditos expiram um ano civil após a compra.",
+    "playNonexpiring": "Estes créditos não expiram.",
     "packLabel": "Adicionar {{amount}} em créditos",
     "priceUnavailable": "Preço indisponível",
     "purchased": "Créditos adicionados ao seu saldo.",

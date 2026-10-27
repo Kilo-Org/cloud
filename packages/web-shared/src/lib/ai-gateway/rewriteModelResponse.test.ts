@@ -907,6 +907,43 @@ describe('rewriteModelResponse_ChatCompletions', () => {
       expect(json.choices[0].message.reasoning_details).toBeUndefined();
     });
 
+    test('adds the missing function type to message tool calls', async () => {
+      const upstream = jsonResponse({
+        model: 'mistral-medium-3',
+        choices: [
+          {
+            index: 0,
+            message: {
+              role: 'assistant',
+              tool_calls: [
+                { id: 'BlUZaHnVa', function: { name: 'read', arguments: '{}' }, index: 0 },
+              ],
+            },
+            finish_reason: 'tool_calls',
+          },
+        ],
+      });
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const json = await result.json();
+
+      expect(json.choices[0].message.tool_calls).toEqual([
+        {
+          id: 'BlUZaHnVa',
+          type: 'function',
+          function: { name: 'read', arguments: '{}' },
+          index: 0,
+        },
+      ]);
+    });
+
     test('drops null message tool_calls', async () => {
       const upstream = jsonResponse({
         model: 'upstream-model',
@@ -1231,6 +1268,36 @@ describe('rewriteModelResponse_ChatCompletions', () => {
             format: 'google-gemini-v1',
           },
         ],
+      });
+    });
+
+    test('adds the missing function type to starting tool call deltas only', async () => {
+      const upstream = sseResponse(
+        'data: {"model":"mistral-medium-3","choices":[{"index":0,"delta":{"tool_calls":[{"id":"1KVxQL4of","function":{"name":"read","arguments":"{\\"a\\""},"index":0}]}},{"index":0,"delta":{"tool_calls":[{"function":{"arguments":":1}"},"index":0}]}}]}\n\n' +
+          'data: [DONE]\n\n'
+      );
+
+      const result = await rewriteModelResponse_ChatCompletions({
+        response: upstream,
+        usageContext: freeUsageContext,
+        capture: null,
+        vercelRequestId: null,
+        reasoningEffort: null,
+        responseTransforms: null,
+      });
+      const [chunk] = dataObjects(await readOutputStream(result)) as Array<{
+        choices: Array<{ delta: { tool_calls: Array<Record<string, unknown>> } }>;
+      }>;
+
+      expect(chunk.choices[0].delta.tool_calls[0]).toEqual({
+        id: '1KVxQL4of',
+        type: 'function',
+        function: { name: 'read', arguments: '{"a"' },
+        index: 0,
+      });
+      expect(chunk.choices[1].delta.tool_calls[0]).toEqual({
+        function: { arguments: ':1}' },
+        index: 0,
       });
     });
 

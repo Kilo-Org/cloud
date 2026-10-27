@@ -1,4 +1,3 @@
-import { enrolledByocVercelOwner } from './byoc/vercel-owner.js';
 import {
   CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION,
   CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION,
@@ -227,7 +226,6 @@ export type SandboxSelection = {
 
 export type SandboxSelectionEnv = {
   PER_SESSION_SANDBOX_ORG_IDS?: string;
-  BYOC_VERCEL_IDS?: string;
 } & CloudflareContainersEnrollmentEnv &
   Pick<
     Env,
@@ -361,9 +359,6 @@ export function getDefaultSandboxDestination(
   env: SandboxSelectionEnv,
   owner: { userId: string; orgId?: string }
 ): SandboxDestination {
-  if (enrolledByocVercelOwner(env, owner) !== undefined) {
-    return { provider: { id: 'vercel', account: 'byoc' }, instanceType: 'small' };
-  }
   const provider = selectDefaultSandboxProvider({
     env,
     orgId: owner.orgId,

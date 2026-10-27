@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Sandbox } from '@cloudflare/sandbox';
+import { getSandboxAllocationRequest } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   deriveSharedSandboxId,
   generateSandboxId,
@@ -877,6 +878,23 @@ describe('selectSandboxForNewSession', () => {
 
     expect(destination.provider.id).toBe('cloudflare-containers');
     expect(destination.instanceType).toBe('standard-3');
+  });
+
+  it('keeps BYOC enrollment from overriding the Cloudflare default', async () => {
+    const env = {
+      ...completeVercelConfiguration,
+      BYOC_VERCEL_IDS: '*',
+      VERCEL_SANDBOX_ORG_IDS: '*',
+    };
+    const destination = getDefaultSandboxDestination(env, { userId: 'user-id' });
+    expect(destination).toEqual(getSandboxAllocationRequest('cloudflare-containers-standard-3'));
+
+    const selection = await selectSandboxForNewSession({
+      env,
+      userId: 'user-id',
+      sessionId: controlSessionId,
+    });
+    expect(selection.provider).toBe('cloudflare-containers');
   });
 });
 

@@ -12,7 +12,10 @@ import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
-import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import {
+  isFreeModel,
+  isFreeModelExcludingCustomLlms,
+} from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   captureProxyError,
@@ -275,8 +278,14 @@ export async function handleEmbeddingsRequest(
 
   // Skip balance/org checks for anonymous users — they can only use free models
   if (!isAnonymousContext(user)) {
+    const freeRequest = await isFreeModel(requestedModelLowerCased);
     const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
-      await getBalanceAndOrgSettings(organizationId, user, readDb);
+      await getBalanceAndOrgSettings(
+        organizationId,
+        user,
+        readDb,
+        freeRequest ? undefined : 'usage'
+      );
     accountBalance = balance;
     accountPlan = plan;
     accountPayer = payer;

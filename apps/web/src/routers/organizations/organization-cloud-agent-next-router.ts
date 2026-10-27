@@ -29,7 +29,9 @@ import {
   getGitLabInstanceUrlForOrganization,
   buildGitLabCloneUrl,
   fetchGitLabRepositoriesForOrganization,
+  validateGitLabRepoAccessForOrganization,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
+import { captureException } from '@sentry/nextjs';
 import { orderRepositoriesByUsage } from '@/lib/cloud-agent/order-repositories';
 import {
   listProviderRepositoryBranches,
@@ -351,6 +353,34 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       };
 
       if (gitlabProject) {
+        let projectAvailable: boolean;
+        try {
+          projectAvailable = await validateGitLabRepoAccessForOrganization(
+            organizationId,
+            ctx.user.id,
+            gitlabProject
+          );
+        } catch (error) {
+          captureException(error, {
+            tags: {
+              component: 'cloud-agent-next-router',
+              op: 'organization-gitlab-project-resolution',
+            },
+          });
+          throw new TRPCError({
+            code: 'SERVICE_UNAVAILABLE',
+            message:
+              "Could not verify access to that GitLab project. Check this organization's GitLab connection and try again.",
+          });
+        }
+        if (!projectAvailable) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message:
+              "That GitLab project is not available through this organization's GitLab integration.",
+          });
+        }
+
         const instanceUrl = await getGitLabInstanceUrlForOrganization(organizationId);
         const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
         gitParams = { gitUrl, platform: PLATFORM.GITLAB };

@@ -227,7 +227,6 @@
     "hideBalance": "Egyenleg elrejtése",
     "showBalance": "Egyenleg megjelenítése",
     "balanceHidden": "Egyenleg elrejtve",
-    "bonusCreditsExpiring": "{{amount}} értékű kredit lejárati ideje: {{date}}.",
     "signOutTitle": "Kijelentkezel?",
     "signOutMessage": "A munkaterületed eléréséhez újra be kell jelentkezned.",
     "deleteAccountTitle": "Törlöd a fiókodat?",
@@ -3159,7 +3158,7 @@
     "creditActivity": {
       "emptyDescription": "Itt jelennek meg a szervezet kreditvásárlásai, kreditfelhasználása és egyenlegmódosításai.",
       "emptyTitle": "Még nincsenek kreditműveletek",
-      "expires": "Lejárat: {{date}}",
+      "expiresUtc": "Lejárat: {{date}} (UTC)",
       "title": "Kreditműveletek",
       "transactionFallback": "Kredittranzakció",
       "category": {
@@ -3840,6 +3839,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "A ••••-ként megjelenő értékek megőrzik a tárolt titkot; egy érték cseréjével rotálhatja azt. A parancssor módosítása minden érték ismételt megadását igényli",
+      "headersHint": "A ••••-ként megjelenő értékek megőrzik a tárolt titkot; egy érték cseréjével rotálhatja azt. Az URL módosítása minden érték ismételt megadását igényli",
       "nameRequired": "Adja meg a szerver nevét",
       "nameInvalid": "A név csak ASCII betűket, számokat, aláhúzásjeleket és kötőjeleket tartalmazhat, legfeljebb 100 karakter lehet",
       "commandRequired": "Írjon be egy parancsot",
@@ -3938,6 +3939,10 @@
   "credits": {
     "title": "Kreditek vásárlása",
     "description": "A kreditek egyszeri vásárlás, amely a Kilo egyenlegedhez adódik AI kódolási munkamenetek futtatásához a Kilo alkalmazásban. Az áruház terheli a fiókodat, és a kreditek az áruház fizetésigazolása után kerülnek jóváírásra.",
+    "nextExpiry": "{{amount}} értékű kredit lejárati ideje: {{date}} (UTC). A legkorábban lejáró kreditek használódnak fel először.",
+    "appStoreExpiry": "Az App Store-on keresztül vásárolt kreditek nem járnak le.",
+    "playOneYearExpiry": "Ezek a kreditek a vásárlás után egy naptári évvel járnak le.",
+    "playNonexpiring": "Ezek a kreditek nem járnak le.",
     "packLabel": "{{amount}} értékű kredit hozzáadása",
     "priceUnavailable": "Az ár nem érhető el",
     "purchased": "A kreditek hozzáadva az egyenlegedhez.",

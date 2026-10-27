@@ -227,7 +227,6 @@
     "hideBalance": "Piilota saldo",
     "showBalance": "Näytä saldo",
     "balanceHidden": "Saldo piilotettu",
-    "bonusCreditsExpiring": "Krediittejä vanhenee {{date}}: {{amount}}.",
     "signOutTitle": "Kirjaudutaanko ulos?",
     "signOutMessage": "Pääset takaisin työtilaasi kirjautumalla uudelleen sisään.",
     "deleteAccountTitle": "Poistetaanko tili?",
@@ -3159,7 +3158,7 @@
     "creditActivity": {
       "emptyDescription": "Organisaation ostot, käyttö ja krediittien muutokset näkyvät tässä sitä mukaa kuin niitä kertyy.",
       "emptyTitle": "Ei krediittitapahtumia",
-      "expires": "Vanhenee {{date}}",
+      "expiresUtc": "Vanhenee {{date}} (UTC)",
       "title": "Krediittitapahtumat",
       "transactionFallback": "Krediittitapahtuma",
       "category": {
@@ -3840,6 +3839,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Arvot, jotka näkyvät muodossa ••••, säilyttävät tallennetun salaisuutensa; korvaa arvo vaihtaaksesi sen. Komentorivin muuttaminen edellyttää kaikkien arvojen antamista uudelleen",
+      "headersHint": "Arvot, jotka näkyvät muodossa ••••, säilyttävät tallennetun salaisuutensa; korvaa arvo vaihtaaksesi sen. URL-osoitteen muuttaminen edellyttää kaikkien arvojen antamista uudelleen",
       "nameRequired": "Anna palvelimen nimi",
       "nameInvalid": "Nimessä voi käyttää vain ASCII-kirjaimia, numeroita, alaviivoja ja väliviivoja, enintään 100 merkkiä",
       "commandRequired": "Anna komento",
@@ -3938,6 +3939,10 @@
   "credits": {
     "title": "Osta krediittejä",
     "description": "Krediitit ovat kertaostos, joka lisätään Kilo-saldoosi AI-koodausistuntojen ajamista varten Kilo-sovelluksessa. Kauppa veloittaa tiliäsi ja krediitit lisätään, kun kauppa vahvistaa maksun.",
+    "nextExpiry": "Krediittejä vanhenee {{date}} (UTC): {{amount}}. Aikaisimmin vanhenevat krediitit käytetään ensin.",
+    "appStoreExpiry": "App Storen kautta ostetut krediitit eivät vanhene.",
+    "playOneYearExpiry": "Nämä krediitit vanhenevat yhden kalenterivuoden kuluttua ostosta.",
+    "playNonexpiring": "Nämä krediitit eivät vanhene.",
     "packLabel": "Lisää {{amount}} krediittejä",
     "priceUnavailable": "Hinta ei saatavilla",
     "purchased": "Krediitit on lisätty saldoosi.",

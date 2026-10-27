@@ -227,7 +227,6 @@
     "hideBalance": "Skjul saldo",
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
-    "bonusCreditsExpiring": "{{amount}} i kreditter udløber {{date}}.",
     "signOutTitle": "Log ud?",
     "signOutMessage": "Du skal logge ind igen for at få adgang til dit arbejdsområde.",
     "deleteAccountTitle": "Slet konto?",
@@ -3159,7 +3158,7 @@
     "creditActivity": {
       "emptyDescription": "Her vises organisationens køb, forbrug og justeringer af kreditter løbende.",
       "emptyTitle": "Ingen bevægelser på kreditsaldoen",
-      "expires": "Udløber {{date}}",
+      "expiresUtc": "Udløber {{date}} (UTC)",
       "title": "Bevægelser på kreditsaldoen",
       "transactionFallback": "Kredittransaktion",
       "category": {
@@ -3840,6 +3839,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Værdier vist som •••• beholder deres gemte hemmelighed; erstat en værdi for at rotere den. Ændring af kommandolinjen kræver alle værdier igen",
+      "headersHint": "Værdier vist som •••• beholder deres gemte hemmelighed; erstat en værdi for at rotere den. Ændring af URL'en kræver alle værdier igen",
       "nameRequired": "Indtast et servernavn",
       "nameInvalid": "Navn kan kun bruge ASCII-bogstaver, tal, understregninger og bindestreger, højst 100 tegn",
       "commandRequired": "Indtast en kommando",
@@ -3938,6 +3939,10 @@
   "credits": {
     "title": "Køb kreditter",
     "description": "Kreditter er et engangskøb, der lægges til din Kilo-saldo til at køre AI-kodningssessioner i Kilo App. Butikken opkræver betaling på din konto, og kreditterne tilføjes, når butikken bekræfter betalingen.",
+    "nextExpiry": "{{amount}} i kreditter udløber {{date}} (UTC). Kreditter med den tidligste udløbsdato bruges først.",
+    "appStoreExpiry": "Kreditter købt via App Store udløber ikke.",
+    "playOneYearExpiry": "Disse kreditter udløber ét kalenderår efter købet.",
+    "playNonexpiring": "Disse kreditter udløber ikke.",
     "packLabel": "Tilføj {{amount}} i kreditter",
     "priceUnavailable": "Pris ikke tilgængelig",
     "purchased": "Kreditter er føjet til din saldo.",

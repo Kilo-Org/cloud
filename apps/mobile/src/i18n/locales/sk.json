@@ -227,7 +227,6 @@
     "hideBalance": "Skryť zostatok",
     "showBalance": "Zobraziť zostatok",
     "balanceHidden": "Zostatok je skrytý",
-    "bonusCreditsExpiring": "Platnosť kreditov v hodnote {{amount}} sa skončí {{date}}.",
     "signOutTitle": "Odhlásiť sa?",
     "signOutMessage": "Na prístup do svojho pracovného priestoru sa budeš musieť znova prihlásiť.",
     "deleteAccountTitle": "Odstrániť účet?",
@@ -3247,7 +3246,7 @@
     "creditActivity": {
       "emptyDescription": "Tu sa budú priebežne zobrazovať nákupy, spotreba a úpravy kreditov tejto organizácie.",
       "emptyTitle": "Žiadne pohyby kreditov",
-      "expires": "Platnosť končí {{date}}",
+      "expiresUtc": "Platnosť končí {{date}} (UTC)",
       "title": "Pohyby kreditov",
       "transactionFallback": "Kreditná transakcia",
       "category": {
@@ -3942,6 +3941,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Hodnoty zobrazené ako •••• si zachovávajú uloženú tajnú hodnotu; nahradením hodnoty ju obnovíte. Pri zmene príkazového riadka je potrebné znova zadať všetky hodnoty",
+      "headersHint": "Hodnoty zobrazené ako •••• si zachovávajú uloženú tajnú hodnotu; nahradením hodnoty ju obnovíte. Pri zmene URL je potrebné znova zadať všetky hodnoty",
       "nameRequired": "Zadajte názov servera",
       "nameInvalid": "Názov môže používať iba písmená ASCII, čísla, podčiarkovníky a pomlčky, maximálne 100 znakov",
       "commandRequired": "Zadajte príkaz",
@@ -4040,6 +4041,10 @@
   "credits": {
     "title": "Kúpiť kredity",
     "description": "Kredity sú jednorazový nákup pridaný do vášho zostatku Kilo na spúšťanie AI programovacích relácií v aplikácii Kilo. Obchod vám strhne platbu z účtu a kredity sa pripíšu po potvrdení platby obchodom.",
+    "nextExpiry": "Platnosť kreditov v hodnote {{amount}} sa skončí {{date}} (UTC). Najprv sa čerpajú kredity s najskorším koncom platnosti.",
+    "appStoreExpiry": "Kredity zakúpené cez App Store nestrácajú platnosť.",
+    "playOneYearExpiry": "Platnosť týchto kreditov sa skončí jeden kalendárny rok po nákupe.",
+    "playNonexpiring": "Tieto kredity nestrácajú platnosť.",
     "packLabel": "Pridať {{amount}} v kreditoch",
     "priceUnavailable": "Cena nie je k dispozícii",
     "purchased": "Kredity boli pridané do vášho zostatku.",

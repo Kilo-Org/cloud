@@ -227,7 +227,6 @@
     "hideBalance": "Kache balans",
     "showBalance": "Montre balans",
     "balanceHidden": "Balans kache",
-    "bonusCreditsExpiring": "{{amount}} nan kredi ap ekspire {{date}}.",
     "signOutTitle": "Dekonekte?",
     "signOutMessage": "W ap bezwen konekte ankò pou jwenn aksè nan espas travay ou.",
     "deleteAccountTitle": "Efase kont?",
@@ -3159,7 +3158,7 @@
     "creditActivity": {
       "emptyDescription": "Acha, itilizasyon ak ajisteman kredi òganizasyon sa a ap parèt isit la chak fwa yo fèt.",
       "emptyTitle": "Pa gen aktivite kredi",
-      "expires": "Ekspire {{date}}",
+      "expiresUtc": "Ekspire {{date}} (UTC)",
       "title": "Aktivite kredi",
       "transactionFallback": "Transaksyon kredi",
       "category": {
@@ -3840,6 +3839,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Valè ki parèt kòm •••• kenbe sekrè ki sere yo; ranplase yon valè pou w renouvle l. Chanje liy kòmand la mande tout valè yo ankò",
+      "headersHint": "Valè ki parèt kòm •••• kenbe sekrè ki sere yo; ranplase yon valè pou w renouvle l. Chanje URL la mande tout valè yo ankò",
       "nameRequired": "Antre yon non sèvè",
       "nameInvalid": "Non ka itilize sèlman lèt ASCII, nimewo, tirè ba ak tire, jiska 100 karaktè",
       "commandRequired": "Antre yon lòd",
@@ -3938,6 +3939,10 @@
   "credits": {
     "title": "Achte kredi",
     "description": "Kredi se yon acha yon sèl fwa ki ajoute nan balans Kilo ou pou kouri sesyon kodaj AI nan Kilo App. Magazen an chaje kont ou epi kredi yo ajoute apre magazen an konfime peman an.",
+    "nextExpiry": "{{amount}} nan kredi ap ekspire {{date}} (UTC). Kredi ki ekspire pi bonè yo itilize an premye.",
+    "appStoreExpiry": "Kredi ou achte nan App Store pa ekspire.",
+    "playOneYearExpiry": "Kredi sa yo ekspire yon ane kalandriye apre acha a.",
+    "playNonexpiring": "Kredi sa yo pa ekspire.",
     "packLabel": "Ajoute {{amount}} an kredi",
     "priceUnavailable": "Pri pa disponib",
     "purchased": "Kredi yo ajoute nan balans ou.",

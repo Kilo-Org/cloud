@@ -227,7 +227,6 @@
     "hideBalance": "Ezkutatu saldoa",
     "showBalance": "Erakutsi saldoa",
     "balanceHidden": "Saldoa ezkutatuta dago",
-    "bonusCreditsExpiring": "{{amount}} kreditu iraungiko dira data honetan: {{date}}.",
     "signOutTitle": "Itxi saioa?",
     "signOutMessage": "Zure lan-eremura sartzeko berriro hasi beharko duzu saioa.",
     "deleteAccountTitle": "Ezabatu kontua?",
@@ -3159,7 +3158,7 @@
     "creditActivity": {
       "emptyDescription": "Erakunde honen erosketak, erabilera eta kreditu-doikuntzak hemen agertuko dira gertatu ahala.",
       "emptyTitle": "Ez dago kreditu-jarduerarik",
-      "expires": "Iraungitze-data: {{date}}",
+      "expiresUtc": "Iraungitze-data: {{date}} (UTC)",
       "title": "Kreditu-jarduera",
       "transactionFallback": "Kreditu-transakzioa",
       "category": {
@@ -3840,6 +3839,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "•••• gisa erakutsitako balioek gordetako sekretua mantentzen dute; ordeztu balio bat biratzeko. Komando-lerroa aldatzeak balio guztiak berriro eskatzen ditu",
+      "headersHint": "•••• gisa erakutsitako balioek gordetako sekretua mantentzen dute; ordeztu balio bat biratzeko. URLa aldatzeak balio guztiak berriro eskatzen ditu",
       "nameRequired": "Sartu zerbitzariaren izena",
       "nameInvalid": "Izenak ASCII hizkiak, zenbakiak, azpimarra eta marra soilik erabil ditzake, gehienez 100 karaktere",
       "commandRequired": "Sartu komando bat",
@@ -3938,6 +3939,10 @@
   "credits": {
     "title": "Erosi kredituak",
     "description": "Kredituak Kilo App-en AI kodetze-saioak exekutatzeko zure Kilo saldoari gehitzen zaion behin betiko erosketa bat dira. Dendak zure kontuari kobratzen dio eta kredituak dendak ordainketa baieztatu ondoren gehitzen dira.",
+    "nextExpiry": "{{amount}} kreditu iraungiko dira data honetan: {{date}} (UTC). Lehenago iraungitzen diren kredituak erabiltzen dira lehenik.",
+    "appStoreExpiry": "App Store bidez erositako kredituak ez dira iraungitzen.",
+    "playOneYearExpiry": "Kreditu hauek erosi eta urte natural batera iraungitzen dira.",
+    "playNonexpiring": "Kreditu hauek ez dira iraungitzen.",
     "packLabel": "Gehitu {{amount}} kreditutan",
     "priceUnavailable": "Prezioa ez dago erabilgarri",
     "purchased": "Kredituak zure saldoari gehitu zaizkio.",

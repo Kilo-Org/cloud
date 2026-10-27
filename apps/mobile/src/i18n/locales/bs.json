@@ -227,7 +227,6 @@
     "hideBalance": "Sakrij saldo",
     "showBalance": "Prikaži saldo",
     "balanceHidden": "Saldo je sakriven",
-    "bonusCreditsExpiring": "Krediti u iznosu od {{amount}} istječu {{date}}.",
     "signOutTitle": "Odjaviti se?",
     "signOutMessage": "Za pristup svom radnom prostoru morat ćeš se ponovo prijaviti.",
     "deleteAccountTitle": "Obrisati nalog?",
@@ -3203,7 +3202,7 @@
     "creditActivity": {
       "emptyDescription": "Ovdje će se prikazivati kupovine, potrošnja i korekcije kredita ove organizacije.",
       "emptyTitle": "Nema prometa kredita",
-      "expires": "Istječe {{date}}",
+      "expiresUtc": "Istječe {{date}} (UTC)",
       "title": "Promet kredita",
       "transactionFallback": "Transakcija kredita",
       "category": {
@@ -3891,6 +3890,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Vrijednosti prikazane kao •••• čuvaju svoju pohranjenu tajnu; zamijenite vrijednost da biste je rotirali. Promjena komandne linije zahtijeva ponovni unos svih vrijednosti",
+      "headersHint": "Vrijednosti prikazane kao •••• čuvaju svoju pohranjenu tajnu; zamijenite vrijednost da biste je rotirali. Promjena URL-a zahtijeva ponovni unos svih vrijednosti",
       "nameRequired": "Unesite ime servera",
       "nameInvalid": "Ime može koristiti samo ASCII slova, brojeve, donje crte i crtice, najviše 100 znakova",
       "commandRequired": "Unesite komandu",
@@ -3989,6 +3990,10 @@
   "credits": {
     "title": "Kupi kredite",
     "description": "Krediti su jednokratna kupovina koja se dodaje na tvoj Kilo saldo za pokretanje AI sesija kodiranja u Kilo App. Trgovina naplaćuje tvoj račun, a krediti se dodaju nakon što trgovina potvrdi plaćanje.",
+    "nextExpiry": "Krediti u iznosu od {{amount}} istječu {{date}} (UTC). Prvo se koriste krediti s najranijim rokom isteka.",
+    "appStoreExpiry": "Krediti kupljeni putem App Storea ne istječu.",
+    "playOneYearExpiry": "Ovi krediti istječu jednu kalendarsku godinu nakon kupovine.",
+    "playNonexpiring": "Ovi krediti ne istječu.",
     "packLabel": "Dodaj {{amount}} kredita",
     "priceUnavailable": "Cijena nije dostupna",
     "purchased": "Krediti su dodani na tvoj saldo.",

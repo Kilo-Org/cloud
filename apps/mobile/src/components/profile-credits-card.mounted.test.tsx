@@ -405,8 +405,14 @@ describe('CreditsCard balance state', () => {
       const { texts, unmount } = await mountCard();
       try {
         await waitFor(() => texts().includes('$0.00') && !texts().includes('SKELETON'));
-        const notes = texts().filter(text => text.includes('in credits expiring'));
-        expect(notes).toEqual(future ? ['$2.00 in credits expiring 12/17/2026'] : []);
+        const notes = texts().filter(text => text.includes('in credits expires'));
+        expect(notes).toEqual(
+          future
+            ? [
+                '$2.00 in credits expires 12/17/2026 (UTC). Credits with the earliest expiry are used first.',
+              ]
+            : []
+        );
       } finally {
         unmount();
       }
@@ -440,8 +446,8 @@ describe('CreditsCard balance state', () => {
       const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
       try {
         await waitFor(() => texts().includes('$0.00') && !texts().includes('SKELETON'));
-        expect(texts().filter(text => text.includes('in credits expiring'))).toEqual([
-          '$2.00 in credits expiring 12/17/2026',
+        expect(texts().filter(text => text.includes('in credits expires'))).toEqual([
+          '$2.00 in credits expires 12/17/2026 (UTC). Credits with the earliest expiry are used first.',
         ]);
       } finally {
         unmount();
@@ -463,7 +469,7 @@ describe('CreditsCard balance state', () => {
     const { texts, unmount } = await mountCard(createTestQueryClient(), orgs);
     try {
       await waitFor(() => texts().includes('$0.00') && !texts().includes('SKELETON'));
-      expect(texts().filter(text => text.includes('in credits expiring'))).toEqual([]);
+      expect(texts().filter(text => text.includes('in credits expires'))).toEqual([]);
     } finally {
       unmount();
     }
@@ -688,6 +694,29 @@ describe('CreditsCard balance state', () => {
     expect(texts()).toContain('$10.00');
     expect(texts()).not.toContain('*****');
 
+    unmount();
+  });
+
+  it('shows the nearest paid or bonus deadline and hides it with the balance', async () => {
+    currentUser.userId = 'user-A';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 65 });
+    personalCreditBlocksQueryFn.mockResolvedValue({
+      creditBlocks: [
+        { balance_mUsd: 10_000_000, expiry_date: '2027-10-15T00:00:00Z' },
+        { balance_mUsd: 5_000_000, expiry_date: '2027-10-15T00:00:00Z' },
+        { balance_mUsd: 50_000_000, expiry_date: '2028-10-15T00:00:00Z' },
+      ],
+    });
+    const { renderer, texts, unmount } = await mountCard();
+    await waitFor(() => texts().some(text => text.includes('$15.00 in credits expires')));
+    expect(texts().some(text => text.includes('$65.00 in credits expires'))).toBe(false);
+    expect(texts().some(text => text.includes('bonus credits'))).toBe(false);
+
+    const hide = renderer.root.findByProps({ accessibilityLabel: 'Hide balance' });
+    await act(() => {
+      (hide.props.onPress as () => void)();
+    });
+    expect(texts().some(text => text.includes('in credits expires'))).toBe(false);
     unmount();
   });
 });

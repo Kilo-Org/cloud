@@ -398,6 +398,12 @@ describe.each(['slack', 'linear'] as const)('%s repository selection', platform 
         ...toolInput,
         ...(source === 'github' ? { githubRepo: otherRepository } : { gitlabProject }),
       };
+      mockGenerate.mockImplementationOnce(async () => {
+        const spawnTool = agentOptions().tools.spawnCloudAgentSession;
+        const args = spawnTool.inputSchema.parse(toolInput);
+        const result = await spawnTool.execute(args);
+        return { text: result.response };
+      });
 
       const result = await runBotAgent(params);
 

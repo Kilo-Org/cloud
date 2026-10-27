@@ -138,7 +138,6 @@ describe('spawnCloudAgentSession delegation', () => {
   // Dynamic imports keep the mocked modules' lazy `server-only` / config
   // side effects from running before jest.mock factories are registered.
   beforeAll(async () => {
-
     const githubRepositoryContext = await import('@/lib/slack-bot/github-repository-context');
     const gitlab = await import('@/lib/cloud-agent/gitlab-integration-helpers');
     const botUsers = await import('@/lib/bot-users/bot-user-service');

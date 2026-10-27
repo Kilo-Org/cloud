@@ -111,9 +111,8 @@ describe('sessionLiveText', () => {
       vi.resetModules();
       // A dynamic import re-evaluates the module, which is the only way to give
       // this case a process that has not built a segmenter yet.
-      const { sessionLiveText: cut } = await import(
-        '@kilocode/session-ingest-contracts/session-live-summary'
-      );
+      const { sessionLiveText: cut } =
+        await import('@kilocode/session-ingest-contracts/session-live-summary');
       // The first cut runs before the runtime has a segmenter, so it keeps code
       // units: the app installs that polyfill into the same process it draws in.
       expect(cut('ab🇷🇸cd', 5)).toBe('ab🇷…');

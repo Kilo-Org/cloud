@@ -10,6 +10,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { direct_byok_model_lists } from '@kilocode/db/schema';
 import { ReasoningOptionSchema, type ReasoningOption } from '@kilocode/db/schema-types';
 import { toLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
+import type { AwsBedrockEndpoint } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/aws-bedrock';
 import { recordSyncCompleted } from '@/lib/providers/openrouter/sync-providers-stale-alert';
 
 const DEFAULT_CONTENT_LENGTH = 200_000;
@@ -52,7 +53,10 @@ const ModelsDevModelSchema = z.object({
     })
     .optional(),
   tool_call: z.boolean().optional(),
-  provider: z.object({ npm: z.string().optional() }).optional().catch(undefined),
+  provider: z
+    .object({ npm: z.string().optional(), api: z.string().optional() })
+    .optional()
+    .catch(undefined),
   canonical_model_id: z.string().optional().catch(undefined),
 });
 
@@ -84,6 +88,7 @@ type RawModel = {
   input_modalities?: ReadonlyArray<z.infer<typeof ModalitySchema>>;
   flags?: ReadonlyArray<DirectByokModelFlag>;
   reasoning_options?: ReasoningOption[];
+  endpoint?: string;
 };
 
 type SyncContext = {
@@ -154,7 +159,7 @@ function isUsableModelsDevModel(model: ModelsDevModel) {
   );
 }
 
-function toRawModel(model: ModelsDevModel): RawModel {
+function toRawModel(model: ModelsDevModel, endpoint?: string): RawModel {
   return {
     id: model.id,
     name: shortenDisplayName(model.name),
@@ -163,6 +168,7 @@ function toRawModel(model: ModelsDevModel): RawModel {
     input_modalities: model.modalities?.input,
     flags: model.reasoning ? ['reasoning'] : undefined,
     reasoning_options: supportedReasoningOptions(model.reasoning_options),
+    endpoint,
   };
 }
 
@@ -180,6 +186,106 @@ export function parseModelsDevProviderModels(
         (!model.provider?.npm || !GEMINI_API_MODELS_DEV_SDKS.has(model.provider.npm))
     )
     .map(model => toRawModel(model));
+}
+
+const BEDROCK_INFERENCE_PROFILE_PREFIX = /^(global|us|us-gov|eu|apac|au|jp|in|ca)\./;
+const BEDROCK_MANTLE_SDK = '@ai-sdk/amazon-bedrock/mantle';
+// Verified on 2026-10-26: Nova and Pixtral have no OpenAI-compatible or
+// Anthropic endpoint (only Bedrock's native Converse API, which the gateway
+// cannot proxy), and Qwen3 235B times out on mantle when given tools.
+const BEDROCK_UNSUPPORTED_MODEL_PREFIXES = ['amazon.', 'mistral.pixtral-', 'qwen.qwen3-235b-'];
+// Verified on 2026-10-26: open-weight models that mantle does not serve.
+const BEDROCK_RUNTIME_ONLY_MODEL_PREFIXES = ['qwen.qwen3-next-', 'qwen.qwen3-vl-'];
+
+/** Mantle drops runtime's version suffix: `qwen.qwen3-32b-v1:0` is `qwen.qwen3-32b`. */
+function toBedrockMantleModelId(id: string) {
+  return id.replace(/-v\d+:\d+$/, '').replace(/-\d+:\d+$/, '');
+}
+
+function selectBedrockModel(
+  baseId: string,
+  model: ModelsDevModel,
+  globalModel: ModelsDevModel | null
+): { model: ModelsDevModel; id: string; endpoint: AwsBedrockEndpoint } {
+  // Claude on demand needs a cross-region inference profile.
+  if (baseId.startsWith('anthropic.claude')) {
+    const selected = globalModel ?? model;
+    return { model: selected, id: selected.id, endpoint: 'runtime-anthropic' };
+  }
+  // Grok returns its encrypted reasoning through the Responses API. Mantle
+  // serves Grok 4.3; newer Grok models only have a runtime inference profile.
+  if (baseId.startsWith('xai.')) {
+    return globalModel
+      ? { model: globalModel, id: globalModel.id, endpoint: 'runtime-responses' }
+      : { model, id: model.id, endpoint: 'mantle-openai' };
+  }
+  // OpenAI's GPT models and Gemma only work through mantle's Responses API.
+  if (model.provider?.npm === BEDROCK_MANTLE_SDK && model.provider.api?.endsWith('/openai/v1')) {
+    return { model, id: model.id, endpoint: 'mantle-openai' };
+  }
+  if (globalModel) {
+    return { model: globalModel, id: globalModel.id, endpoint: 'runtime-openai' };
+  }
+  if (BEDROCK_RUNTIME_ONLY_MODEL_PREFIXES.some(prefix => baseId.startsWith(prefix))) {
+    return { model, id: model.id, endpoint: 'runtime-openai' };
+  }
+  // Mantle returns open-weight models' reasoning as a separate `reasoning`
+  // string, where runtime inlines it into the content.
+  return { model, id: toBedrockMantleModelId(model.id), endpoint: 'mantle-chat' };
+}
+
+/**
+ * One entry per Bedrock model, on the endpoint that serves it best; see
+ * `selectBedrockModel`. Models that models.dev lists only as `global.`
+ * inference profiles are included through that profile.
+ */
+export function parseAwsBedrockModelsDevModels(entry: unknown): RawModel[] {
+  const { models } = ModelsDevProviderSchema.parse(entry);
+  const usable = Object.values(models).filter(isUsableModelsDevModel);
+  const usableIds = new Set(usable.map(model => model.id));
+  const baseIds = new Set(
+    usable.map(model => model.id.replace(BEDROCK_INFERENCE_PROFILE_PREFIX, ''))
+  );
+
+  const selected = new Map<string, RawModel>();
+  for (const baseId of baseIds) {
+    if (BEDROCK_UNSUPPORTED_MODEL_PREFIXES.some(prefix => baseId.startsWith(prefix))) continue;
+    const globalModel = usableIds.has(`global.${baseId}`) ? models[`global.${baseId}`] : null;
+    const baseModel = usableIds.has(baseId) ? models[baseId] : globalModel;
+    if (!baseModel) continue;
+    const { model, id, endpoint } = selectBedrockModel(baseId, baseModel, globalModel);
+    if (!selected.has(id)) {
+      selected.set(id, { ...toRawModel(model, endpoint), id });
+    }
+  }
+  return [...selected.values()];
+}
+
+const VERTEX_ANTHROPIC_SDK = '@ai-sdk/google-vertex/anthropic';
+const VERTEX_MISTRAL_SDK = '@ai-sdk/mistral';
+const VERTEX_OPENAI_COMPATIBLE_SDK = '@ai-sdk/openai-compatible';
+
+/**
+ * Gemini (no per-model SDK) and the managed open and partner models (the
+ * OpenAI-compatible SDK) use Vertex AI's Chat Completions endpoint, except
+ * Grok's reasoning models, which use its Responses API. Claude uses Anthropic's
+ * format and Mistral its own Chat Completions, both on `rawPredict` URLs.
+ */
+export function parseGcpVertexModelsDevModels(entry: unknown): RawModel[] {
+  const { models } = ModelsDevProviderSchema.parse(entry);
+  return Object.values(models)
+    .filter(isUsableModelsDevModel)
+    .flatMap(model => {
+      const npm = model.provider?.npm;
+      if (npm === VERTEX_ANTHROPIC_SDK) return [toRawModel(model, 'anthropic')];
+      if (npm === VERTEX_MISTRAL_SDK) return [toRawModel(model, 'mistral')];
+      // Grok's reasoning models return encrypted reasoning only through the Responses API.
+      if (model.id.startsWith('xai/') && model.reasoning) {
+        return [toRawModel(model, 'openapi-responses')];
+      }
+      if (!npm || npm === VERTEX_OPENAI_COMPATIBLE_SDK) return [toRawModel(model, 'openapi')];
+      return [];
+    });
 }
 
 function getModelsDevId(providerId: DirectUserByokInferenceProviderId): string | undefined {
@@ -245,6 +351,19 @@ function getModelsDevEntry(
     throw new Error(`models.dev catalog missing ${catalogKey} entry`);
   }
   return entry;
+}
+
+/** Parses a provider's models.dev entry with a provider-specific selection. */
+function customModelsDevFetcher(
+  providerId: DirectUserByokInferenceProviderId,
+  parse: (entry: unknown) => RawModel[]
+): ProviderFetcher {
+  return {
+    providerId,
+    async fetch(ctx) {
+      return parse(getModelsDevEntry(providerId, await ctx.getModelsDevCatalog()));
+    },
+  };
 }
 
 function modelsDevFetcher(
@@ -328,6 +447,8 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
   modelsDevFetcher('opencode-go', 'https://opencode.ai/zen/go/v1/models'),
   modelsDevFetcher('xiaomi-token-plan-ams'),
   modelsDevFetcher('xiaomi-token-plan-sgp'),
+  customModelsDevFetcher('aws-bedrock', parseAwsBedrockModelsDevModels),
+  customModelsDevFetcher('gcp-vertex', parseGcpVertexModelsDevModels),
 ];
 
 async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise<number> {
@@ -354,6 +475,7 @@ async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise
       max_completion_tokens,
       reasoning_options: raw.reasoning_options,
       catalog_model_id: catalogModelIds.get(raw.id),
+      ...(raw.endpoint && { endpoint: raw.endpoint }),
     });
   }
 

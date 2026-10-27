@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { GoogleServiceAccountSigningKeySchema } from '@kilocode/db/schema-types';
 
 export const OpenRouterInferenceProviderIdSchema = z.enum([
   'ai21',
@@ -109,10 +110,12 @@ export type VercelUserByokInferenceProviderId = z.infer<
 
 export const DirectUserByokInferenceProviderIdSchema = z.enum([
   'alibaba-token-plan',
+  'aws-bedrock',
   'byteplus-coding',
   'chutes-byok',
   'codestral',
   'edenai',
+  'gcp-vertex',
   'inceptron-byok',
   'kimi-coding',
   'martian',
@@ -159,10 +162,12 @@ export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.xiaomi]: 'xiaomi/mimo-v2-flash',
   [VercelUserByokInferenceProviderIdSchema.enum.zai]: 'zai/glm-4.7-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['alibaba-token-plan']]: 'deepseek-v3.2',
+  [DirectUserByokInferenceProviderIdSchema.enum['aws-bedrock']]: 'openai.gpt-oss-120b-1:0',
   [DirectUserByokInferenceProviderIdSchema.enum['byteplus-coding']]: 'bytedance-seed-code',
   [DirectUserByokInferenceProviderIdSchema.enum['chutes-byok']]: 'Qwen/Qwen3-30B-A3B',
   [DirectUserByokInferenceProviderIdSchema.enum.codestral]: 'mistral/codestral',
   [DirectUserByokInferenceProviderIdSchema.enum.edenai]: 'openai/gpt-5.6-luna',
+  [DirectUserByokInferenceProviderIdSchema.enum['gcp-vertex']]: 'google/gemini-3.5-flash-lite',
   [DirectUserByokInferenceProviderIdSchema.enum['kimi-coding']]: 'kimi-for-coding',
   [DirectUserByokInferenceProviderIdSchema.enum['inceptron-byok']]: 'moonshotai/Kimi-K2.6',
   [DirectUserByokInferenceProviderIdSchema.enum.martian]: 'google/gemini-3.5-flash',
@@ -315,3 +320,25 @@ export const VertexCredentialsSchema = z.object({
 });
 
 export type VertexCredentials = z.infer<typeof VertexCredentialsSchema>;
+
+/**
+ * A Google Cloud service account key file, as downloaded from the console, with
+ * an optional Vertex AI `location`. Only the fields needed to sign token
+ * requests and address the project are required.
+ */
+export const GoogleServiceAccountKeyFileSchema = GoogleServiceAccountSigningKeySchema.extend({
+  type: z.literal('service_account'),
+  project_id: z.string().min(1),
+  location: z.string().trim().min(1).optional(),
+});
+
+/**
+ * Direct Vertex AI BYOK accepts the Vercel-shaped credentials above, or a
+ * service account key file with an optional `location` (default `global`).
+ */
+export const DirectVertexCredentialsSchema = z.union([
+  VertexCredentialsSchema,
+  GoogleServiceAccountKeyFileSchema,
+]);
+
+export type DirectVertexCredentials = z.infer<typeof DirectVertexCredentialsSchema>;

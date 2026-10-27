@@ -8,9 +8,11 @@ import {
   normalizeSignupTlds,
 } from '@kilocode/web-shared/lib/blacklist-domains-config';
 import { BlacklistDomainsConfigSchema } from '@kilocode/worker-utils/account-access';
-import { BLACKLIST_DOMAINS_REDIS_KEY } from '@kilocode/web-shared/lib/redis-keys';
+import {
+  BLACKLIST_DOMAINS_REDIS_KEY,
+  BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY,
+} from '@kilocode/web-shared/lib/redis-keys';
 import type { BlacklistDomainsConfig } from '@kilocode/web-shared/lib/blacklist-domains-config';
-import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
@@ -85,20 +87,20 @@ export const adminBlacklistDomainsRouter = createTRPCRouter({
         ? (previous?.blocked_signup_tlds ?? (await getBlockedSignupTlds()))
         : normalizeSignupTlds(input.blocked_tlds);
 
+    const updatedAt = new Date().toISOString();
     const config: BlacklistDomainsConfig = {
       domains: normalizedDomains,
       blocked_signup_tlds: blockedSignupTlds,
-      updated_at: new Date().toISOString(),
+      updated_at: updatedAt,
       updated_by: ctx.user.id,
       updated_by_email: ctx.user.google_user_email,
     };
-    const written = await redisClient.set(BLACKLIST_DOMAINS_REDIS_KEY, JSON.stringify(config));
-    if (!written) {
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Redis is not configured — cannot save blacklisted domains',
-      });
-    }
+    // Readers download the list only when the updated_at key changes, so both
+    // keys must change together.
+    await redisClient.mset({
+      [BLACKLIST_DOMAINS_REDIS_KEY]: JSON.stringify(config),
+      [BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY]: updatedAt,
+    });
 
     // The list is already live for auth checks at this point, so a backfill
     // failure must not fail the save. Report it and point the admin at the

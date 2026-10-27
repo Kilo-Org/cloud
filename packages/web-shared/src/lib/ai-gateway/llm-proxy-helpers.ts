@@ -1109,6 +1109,7 @@ async function parseMistralFimUsageFromStream(
     streamProcessingSpan,
     requestStartedAt
   );
+  if (!firstTokenReceived) timeToFirstTokenSpan.end();
 
   if (!usage && !wasAborted) {
     captureMessage('SUSPICIOUS: No usage info in FIM stream', {
@@ -1161,10 +1162,18 @@ export function countAndStoreFimUsage(
           statusCode,
           requestStartedAt
         )
-      : readResponseText(clonedResponse.body, requestStartedAt).then(({ text, timing }) => ({
-          ...parseMistralFimUsageFromString(text, usageContext.provider, statusCode),
-          ...timing,
-        }));
+      : readResponseText(clonedResponse.body, requestStartedAt)
+          .then(({ text, timing }) => ({
+            ...parseMistralFimUsageFromString(text, usageContext.provider, statusCode),
+            ...timing,
+          }))
+          .catch(error => {
+            captureException(error, {
+              tags: { source: 'fim_usage_processing' },
+              extra: { statusCode },
+            });
+            return null;
+          });
 
   after(
     usageStatsPromise.then(usageStats => {

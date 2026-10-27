@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
-import { captureMessage } from '@sentry/nextjs';
+import { captureException, captureMessage } from '@sentry/nextjs';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
 import type { GatewayRequest } from './providers/openrouter/types';
 import { createMockUsageContext } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
@@ -31,6 +31,7 @@ jest.mock('./processUsage', () => ({
 jest.mock('@sentry/nextjs', () => ({
   ...(jest.requireActual('@sentry/nextjs') as Record<string, unknown>),
   captureMessage: jest.fn(),
+  captureException: jest.fn(),
 }));
 
 const mockedErrorExceptInTest = jest.fn();
@@ -621,6 +622,22 @@ describe('countAndStoreFimUsage', () => {
     expect(stats.cost_mUsd).toBe(0);
     expect(stats.cacheDiscount_mUsd).toBe(0);
     expect(stats.market_cost).toBe(325);
+  });
+
+  it('reports a JSON response it cannot parse instead of rejecting', async () => {
+    jest.mocked(captureException).mockClear();
+    const response = new Response(JSON.stringify({ error: { message: 'rate limited' } }), {
+      status: 429,
+    });
+
+    countAndStoreFimUsage(response, makeUsageContext({ status_code: 429 }), undefined);
+    await waitForUsageWrite();
+
+    expect(captureException).toHaveBeenCalledWith(expect.any(TypeError), {
+      tags: { source: 'fim_usage_processing' },
+      extra: { statusCode: 429 },
+    });
+    expect(mockedLogMicrodollarUsage).not.toHaveBeenCalled();
   });
 
   describe('response timing', () => {

@@ -68,7 +68,7 @@ jest.mock('./kilo-exclusive-models', () => ({
 jest.mock('./custom-pricing', () => ({ calculateCustomCost_mUsd: () => undefined }));
 jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
   normalizeJa4: () => null,
-  usageEventWireBody: (event: unknown) => event,
+  usageEventWireBody: jest.fn((event: unknown) => event),
   reportUsageEvent: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/bouncer/dispatch-usage-event-outbox', () => ({
@@ -1390,4 +1390,277 @@ test('unexpected post-commit Bouncer failure preserves recorded accounting and c
   });
   expect(JSON.stringify(error.mock.calls)).not.toContain('sensitive-secret-prompt');
   expect(lifecycle.errors).toEqual([]);
+});
+
+describe('prompt ordinary Bouncer reports for the selected queue transport', () => {
+  const client = jest.requireMock<{ reportUsageEvent: jest.Mock; usageEventWireBody: jest.Mock }>(
+    '@kilocode/web-shared/lib/bouncer/client'
+  );
+  const selected = [
+    { name: 'production SFO', env: {} },
+    {
+      name: 'staging FRA',
+      env: { VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: 'staging', VERCEL_REGION: 'fra1' },
+    },
+    {
+      name: 'staging SFO',
+      env: { VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: 'staging', VERCEL_REGION: 'sfo1' },
+    },
+  ];
+  beforeEach(() => {
+    client.reportUsageEvent.mockResolvedValue(undefined);
+    fetchGeneration.mockResolvedValue(null);
+  });
+
+  test.each(
+    selected.flatMap(selection =>
+      ['promise', 'function', 'late'].flatMap(mode =>
+        ['report_first', 'publication_first'].map(order => ({ ...selection, mode, order }))
+      )
+    )
+  )(
+    '$name / $mode / $order starts one ordinary report before acceptance and awaits both',
+    async ({ env, mode, order }) => {
+      configureQueueEnvironment(env);
+      const publicationStarted = Promise.withResolvers<void>();
+      const acceptance = Promise.withResolvers<Response>();
+      const reportDone = Promise.withResolvers<void>();
+      jest.mocked(fetch).mockImplementation(async (_url, init) => {
+        sent.push(JSON.parse(init?.body as string) as UsageRecordRequest);
+        publicationStarted.resolve();
+        return acceptance.promise;
+      });
+      client.reportUsageEvent.mockImplementation(() => reportDone.promise);
+      const lifecycle = requestLifetime();
+      if (mode === 'late') {
+        lifecycle.run(() => after(() => {}));
+        lifecycle.close();
+        await lifecycle.drain();
+      }
+      let result: Awaited<ReturnType<typeof logMicrodollarUsageAndReportToBouncer>> = null;
+      let completed = false;
+      const work = async () => {
+        result = await logMicrodollarUsageAndReportToBouncer({ ...stats }, { ...personalContext });
+        completed = true;
+      };
+      lifecycle.run(() => after(mode === 'function' ? work : work()));
+      if (mode !== 'late') lifecycle.close();
+      let drained = false;
+      const drain = lifecycle.drain().then(() => {
+        drained = true;
+      });
+      try {
+        await publicationStarted.promise;
+        expect(client.reportUsageEvent).toHaveBeenCalledTimes(1);
+        expect(client.reportUsageEvent).toHaveBeenCalledWith(
+          expect.objectContaining({
+            requestId: personalBouncer.requestId,
+            occurredAt: personalBouncer.occurredAt,
+            accountId: personalBouncer.accountId,
+            costMicrodollars: stats.cost_mUsd,
+            inputTokens: stats.inputTokens,
+            outputTokens: stats.outputTokens,
+          })
+        );
+        expect(completed).toBe(false);
+        expect(drained).toBe(false);
+        if (order === 'report_first') reportDone.resolve();
+        else acceptance.resolve(new Response(null, { status: 202 }));
+        await new Promise<void>(resolve => setImmediate(resolve));
+        expect(completed).toBe(false);
+        expect(drained).toBe(false);
+        expect(client.reportUsageEvent).toHaveBeenCalledTimes(1);
+      } finally {
+        reportDone.resolve();
+        acceptance.resolve(new Response(null, { status: 202 }));
+        await drain;
+      }
+      expect(completed).toBe(true);
+      expect(drained).toBe(true);
+      expect(result).toEqual({
+        status: 'queued',
+        usageId: sent[0].core.id,
+        createdAt: sent[0].core.created_at,
+      });
+      expect(sent[0].metadata.id).toBe(sent[0].core.id);
+      expect(sent[0].bouncer_usage_event).toBeNull();
+      expect(publisher.enqueueUsage).toHaveBeenCalledTimes(1);
+      expect(client.usageEventWireBody).not.toHaveBeenCalled();
+      expect(writer).not.toHaveBeenCalled();
+      expect(db.transaction).not.toHaveBeenCalled();
+      expect(outbox.enqueueBouncerUsageEvent).not.toHaveBeenCalled();
+      expect(lifecycle.errors).toEqual([]);
+    }
+  );
+
+  test.each([false, true])(
+    '503 retry retains one payload/report with spendWatch=%s',
+    async spendWatch => {
+      configureQueueEnvironment();
+      const retryStarted = Promise.withResolvers<void>();
+      const accepted = Promise.withResolvers<Response>();
+      jest.mocked(fetch).mockImplementation(async (_url, init) => {
+        sent.push(JSON.parse(init?.body as string) as UsageRecordRequest);
+        if (sent.length === 1) return new Response(null, { status: 503 });
+        retryStarted.resolve();
+        return accepted.promise;
+      });
+      const lifecycle = requestLifetime();
+      let result: Awaited<ReturnType<typeof logMicrodollarUsageAndReportToBouncer>> = null;
+      lifecycle.run(() =>
+        after(async () => {
+          result = await logMicrodollarUsageAndReportToBouncer(
+            { ...stats },
+            {
+              ...personalContext,
+              bouncer: { ...personalBouncer, spendWatch },
+            }
+          );
+        })
+      );
+      lifecycle.close();
+      const drain = lifecycle.drain();
+      try {
+        await retryStarted.promise;
+        expect(client.reportUsageEvent).toHaveBeenCalledTimes(spendWatch ? 0 : 1);
+        expect(result).toBeNull();
+        expect(sent).toHaveLength(2);
+        expect(sent[1]).toEqual(sent[0]);
+        if (spendWatch) {
+          const payload = jest.mocked(publisher.enqueueUsage).mock.calls[0][0];
+          expect(payload.bouncer_usage_event).toEqual({
+            request_id: personalBouncer.requestId,
+            payload: client.usageEventWireBody.mock.results[0].value,
+          });
+          expect(payload.bouncer_usage_event?.payload).toBe(
+            client.usageEventWireBody.mock.results[0].value
+          );
+          expect(client.usageEventWireBody).toHaveBeenCalledTimes(1);
+        } else expect(sent[0].bouncer_usage_event).toBeNull();
+      } finally {
+        accepted.resolve(new Response(null, { status: 202 }));
+        await drain;
+      }
+      expect(result).toEqual({
+        status: 'queued',
+        usageId: sent[0].core.id,
+        createdAt: sent[0].core.created_at,
+      });
+      expect(client.reportUsageEvent).toHaveBeenCalledTimes(spendWatch ? 0 : 1);
+      expect(writer).not.toHaveBeenCalled();
+      expect(db.transaction).not.toHaveBeenCalled();
+      expect(outbox.enqueueBouncerUsageEvent).not.toHaveBeenCalled();
+      expect(bouncer.deliverBouncerUsageEventNow).not.toHaveBeenCalled();
+      expect(lifecycle.errors).toEqual([]);
+    }
+  );
+
+  test.each([
+    { name: 'production FRA', env: { VERCEL_REGION: 'fra1' } },
+    { name: 'master off', env: { USAGE_QUEUE_ONLY_ENABLED: 'false' } },
+    { name: 'zero exposure', env: { USAGE_QUEUE_SFO_EXPOSURE: '0' } },
+    { name: 'unlisted SFO payer', env: { USAGE_QUEUE_SFO_USER_IDS: '["other"]' } },
+  ])('$name preserves direct accounting-before-report order', async ({ env }) => {
+    configureQueueEnvironment(env);
+    const started = Promise.withResolvers<void>();
+    const committed = Promise.withResolvers<void>();
+    const originalWriter = writer.getMockImplementation();
+    const originalTransaction = db.transaction.getMockImplementation();
+    writer.mockImplementation(async (...args: unknown[]) => {
+      started.resolve();
+      await committed.promise;
+      return originalWriter?.(...args);
+    });
+    db.transaction.mockImplementation(async (...args: unknown[]) => {
+      started.resolve();
+      await committed.promise;
+      return originalTransaction?.(...args);
+    });
+    const lifecycle = requestLifetime();
+    const work = lifecycle.run(() =>
+      logMicrodollarUsageAndReportToBouncer({ ...stats }, { ...personalContext })
+    );
+    try {
+      await started.promise;
+      expect(client.reportUsageEvent).not.toHaveBeenCalled();
+      expect(publisher.enqueueUsage).not.toHaveBeenCalled();
+    } finally {
+      committed.resolve();
+    }
+    expect(await work).toMatchObject({ status: 'recorded' });
+    lifecycle.close();
+    await lifecycle.drain();
+    expect(client.reportUsageEvent).toHaveBeenCalledTimes(1);
+    expect(writer).toHaveBeenCalledTimes(process.env.VERCEL_REGION === 'sfo1' ? 1 : 0);
+    expect(db.transaction).toHaveBeenCalledTimes(process.env.VERCEL_REGION === 'fra1' ? 1 : 0);
+    expect(lifecycle.errors).toEqual([]);
+  });
+
+  test.each(['disabled', 'ambiguous_200', 'http_503', 'unexpected_rejection', 'no_scope'])(
+    'ordinary report remains single when queued accounting returns null: %s',
+    async failure => {
+      configureQueueEnvironment();
+      if (failure === 'disabled') config.USAGE_INGEST_URL = '';
+      if (failure === 'ambiguous_200')
+        jest.mocked(fetch).mockResolvedValue(new Response(null, { status: 200 }));
+      if (failure === 'http_503')
+        jest.mocked(fetch).mockResolvedValue(new Response(null, { status: 503 }));
+      if (failure === 'unexpected_rejection')
+        jest
+          .mocked(publisher.enqueueUsage)
+          .mockRejectedValue(new Error('synthetic publisher rejection'));
+      const lifecycle = requestLifetime();
+      const work = () =>
+        logMicrodollarUsageAndReportToBouncer({ ...stats }, { ...personalContext });
+      expect(await (failure === 'no_scope' ? work() : lifecycle.run(work))).toBeNull();
+      lifecycle.close();
+      await lifecycle.drain();
+      expect(client.reportUsageEvent).toHaveBeenCalledTimes(1);
+      expect(client.usageEventWireBody).not.toHaveBeenCalled();
+      expect(writer).not.toHaveBeenCalled();
+      expect(db.transaction).not.toHaveBeenCalled();
+      expect(outbox.enqueueBouncerUsageEvent).not.toHaveBeenCalled();
+      expect(fetch).toHaveBeenCalledTimes(
+        failure === 'http_503'
+          ? publisher.USAGE_ENQUEUE_MAX_ATTEMPTS
+          : failure === 'ambiguous_200'
+            ? 1
+            : 0
+      );
+      expect(lifecycle.errors).toEqual([]);
+    }
+  );
+
+  test('missing event keeps queued accounting without any Bouncer report', async () => {
+    configureQueueEnvironment();
+    const lifecycle = requestLifetime();
+    expect(
+      await lifecycle.run(() => logMicrodollarUsageAndReportToBouncer({ ...stats }, { ...context }))
+    ).toMatchObject({ status: 'queued' });
+    lifecycle.close();
+    await lifecycle.drain();
+    expect(sent[0].bouncer_usage_event).toBeNull();
+    expect(client.reportUsageEvent).not.toHaveBeenCalled();
+    expect(publisher.enqueueUsage).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([{ is_free: true }, { user_byok: true }])(
+    'processTokenData reports finalized zero cost for %p',
+    async change => {
+      configureQueueEnvironment();
+      const lifecycle = requestLifetime();
+      expect(
+        await lifecycle.run(() => processTokenData({ ...stats }, { ...personalContext, ...change }))
+      ).toMatchObject({ status: 'queued' });
+      lifecycle.close();
+      await lifecycle.drain();
+      expect(client.reportUsageEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ requestId: personalBouncer.requestId, costMicrodollars: 0 })
+      );
+      expect(sent[0].core.cost).toBe(0);
+      expect(sent[0].bouncer_usage_event).toBeNull();
+      expect(writer).not.toHaveBeenCalled();
+      expect(db.transaction).not.toHaveBeenCalled();
+    }
+  );
 });

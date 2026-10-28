@@ -26,10 +26,34 @@ const mockGetContext = jest.fn(
 const mockPolicy = { policyRevision: 7 };
 const mockEvaluatePolicy = jest.fn((_context: OrganizationGroupPolicyContext) => mockPolicy);
 const ALLOWED_MODEL_ROUTES: ReadonlySet<string> = new Set(['groq']);
-const mockDecision = jest.fn(async (_policy: unknown, id: string) => ({
-  allowed: id !== 'provider/blocked',
-  ...(id === 'provider/allowed' && { eligibleProviderRoutes: ALLOWED_MODEL_ROUTES }),
-}));
+const DENIAL_SOURCES: Record<string, string> = {
+  'provider/blocked': 'group_model',
+  'provider/ceiling-inference': 'organization_provider',
+  'provider/ceiling-catalog': 'organization_provider',
+  'provider/ceiling-gateway': 'organization_provider',
+  'provider/deny-listed-inference': 'organization_model',
+  'provider/ungranted-inference': 'no_grant',
+};
+const mockDecision = jest.fn(async (_policy: unknown, id: string) =>
+  DENIAL_SOURCES[id]
+    ? { allowed: false, denialSource: DENIAL_SOURCES[id] }
+    : {
+        allowed: true,
+        ...(id === 'provider/allowed' && { eligibleProviderRoutes: ALLOWED_MODEL_ROUTES }),
+      }
+);
+const INFERENCE_PROVIDER_BYOK_MODELS = new Set([
+  'provider/ceiling-inference',
+  'provider/deny-listed-inference',
+  'provider/ungranted-inference',
+]);
+const mockInferenceProviderByok = jest.fn(
+  async (
+    modelId: string,
+    _providers: readonly string[],
+    directByokCatalogModelIds: ReadonlySet<string>
+  ) => INFERENCE_PROVIDER_BYOK_MODELS.has(modelId) || directByokCatalogModelIds.has(modelId)
+);
 const mockByok = jest.fn<Promise<OpenRouterModel[]>, [string]>();
 const mockCustom = jest.fn<
   Promise<OpenRouterModel[]>,
@@ -77,6 +101,9 @@ jest.mock(
   })
 );
 jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
+  allowsInferenceProviderByok: jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/organizations/effective-model-access.server'
+  ).allowsInferenceProviderByok,
   evaluateEffectiveModelAccessPolicy: mockEvaluatePolicy,
   getEffectiveModelDecision: mockDecision,
 }));
@@ -97,6 +124,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   addDirectByokCatalogAvailability: mockCatalogAvailability,
   addUserByokAvailability: mockAvailability,
   getOrganizationByokProviderIds: mockProviderIds,
+  hasInferenceProviderByokForModel: mockInferenceProviderByok,
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
   tagOpenAiChatGptByokModels: mockTagChatGpt,
@@ -511,5 +539,44 @@ describe('organization model producer publication', () => {
     expect(result.data.find(model => model.id === 'provider/allowed')?.hasUserByokAvailable).toBe(
       true
     );
+  });
+
+  it('lists models outside the provider allow-list only when an inference provider key serves them', async () => {
+    const catalogModelIds = new Set(['provider/allowed', 'provider/ceiling-catalog']);
+    mockDirectByokCatalogModelIds.mockResolvedValueOnce(catalogModelIds);
+    mockProviderIds.mockResolvedValueOnce(['moonshotai', 'openrouter']);
+    mockCatalog = {
+      ...mockCatalog,
+      data: [
+        catalogModel('provider/allowed'),
+        catalogModel('provider/ceiling-inference'),
+        catalogModel('provider/ceiling-catalog'),
+        catalogModel('provider/ceiling-gateway'),
+        catalogModel('provider/deny-listed-inference'),
+        catalogModel('provider/ungranted-inference'),
+      ],
+    };
+
+    const result = await resultFor();
+
+    expect(result.data.map(model => model.id)).toEqual([
+      'provider/allowed',
+      'provider/ceiling-inference',
+      'provider/ceiling-catalog',
+      'morph-byok/private',
+      'kilo-internal/private',
+    ]);
+    expect(mockInferenceProviderByok).toHaveBeenCalledWith(
+      'provider/ceiling-gateway',
+      ['moonshotai', 'openrouter'],
+      catalogModelIds
+    );
+    expect(mockInferenceProviderByok).not.toHaveBeenCalledWith(
+      'provider/deny-listed-inference',
+      expect.anything(),
+      expect.anything()
+    );
+    const getAllowedProviders = mockAvailability.mock.calls[0][2];
+    expect(getAllowedProviders?.('provider/ceiling-inference')).toBeUndefined();
   });
 });

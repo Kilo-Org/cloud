@@ -4,6 +4,7 @@ import {
   getEnhancedOpenRouterModels,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import {
+  allowsInferenceProviderByok,
   getEffectiveModelDecision,
   evaluateEffectiveModelAccessPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
@@ -18,6 +19,7 @@ import {
   addDirectByokCatalogAvailability,
   addUserByokAvailability,
   getOrganizationByokProviderIds,
+  hasInferenceProviderByokForModel,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import { tagOpenAiChatGptByokModels } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
@@ -70,14 +72,26 @@ export async function getAvailableModelsForOrganization(
   const organization = context.organization;
   const policy = evaluateEffectiveModelAccessPolicy(context);
 
-  const responseData = await getEnhancedOpenRouterModels({ countryCode });
+  const [responseData, byokProviderIds, directByokCatalogModelIds] = await Promise.all([
+    getEnhancedOpenRouterModels({ countryCode }),
+    getOrganizationByokProviderIds(readDb, organizationId),
+    getDirectByokCatalogModelIds({ type: 'organization', id: organizationId }),
+  ]);
   const restrictionCandidates = [...responseData.data];
 
   const filteredModels = [];
   const allowedProvidersByModel = new Map<string, ReadonlySet<string>>();
   for (const model of restrictionCandidates) {
     const decision = await getEffectiveModelDecision(policy, model.id);
-    if (decision.allowed) {
+    if (
+      decision.allowed ||
+      (allowsInferenceProviderByok(decision) &&
+        (await hasInferenceProviderByokForModel(
+          model.id,
+          byokProviderIds,
+          directByokCatalogModelIds
+        )))
+    ) {
       filteredModels.push(model);
       if (decision.eligibleProviderRoutes) {
         allowedProvidersByModel.set(model.id, decision.eligibleProviderRoutes);
@@ -85,10 +99,6 @@ export async function getAvailableModelsForOrganization(
     }
   }
 
-  const [byokProviderIds, directByokCatalogModelIds] = await Promise.all([
-    getOrganizationByokProviderIds(readDb, organizationId),
-    getDirectByokCatalogModelIds({ type: 'organization', id: organizationId }),
-  ]);
   let availableModels = addDirectByokCatalogAvailability(
     await addUserByokAvailability(filteredModels, byokProviderIds, modelId =>
       allowedProvidersByModel.get(modelId)

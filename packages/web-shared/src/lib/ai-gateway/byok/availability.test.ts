@@ -26,6 +26,8 @@ import {
   addDirectByokCatalogAvailability,
   addUserByokAvailability,
   getModelUserByokProviders,
+  hasInferenceProviderByokForModel,
+  isInferenceProviderByok,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 
 const EXCLUSIVE_MODEL_ID = kiloExclusiveModelFixture.public_id;
@@ -117,6 +119,71 @@ describe('addUserByokAvailability', () => {
       ['moonshotai/kimi-k2.6', true],
       ['openai/gpt-fixture', false],
     ]);
+  });
+});
+
+describe('hasInferenceProviderByokForModel', () => {
+  const noCatalogModels: ReadonlySet<string> = new Set();
+
+  test('counts an enabled provider key sent through Vercel', async () => {
+    mockedGetVercelModelsMetadata.mockResolvedValue(metadata);
+
+    await expect(
+      hasInferenceProviderByokForModel('anthropic/claude-fixture', ['bedrock'], noCatalogModels)
+    ).resolves.toBe(true);
+    await expect(
+      hasInferenceProviderByokForModel('openai/gpt-fixture', ['bedrock'], noCatalogModels)
+    ).resolves.toBe(false);
+  });
+
+  test('counts a catalog-mode direct BYOK key without reading the Vercel metadata', async () => {
+    await expect(
+      hasInferenceProviderByokForModel(
+        'moonshotai/kimi-k2.6',
+        [],
+        new Set(['moonshotai/kimi-k2.6'])
+      )
+    ).resolves.toBe(true);
+    expect(mockedGetVercelModelsMetadata).not.toHaveBeenCalled();
+  });
+
+  test('does not count gateway keys', async () => {
+    await expect(
+      hasInferenceProviderByokForModel(
+        'anthropic/claude-fixture',
+        ['openrouter', 'vercel-ai-gateway'],
+        noCatalogModels
+      )
+    ).resolves.toBe(false);
+    expect(mockedGetVercelModelsMetadata).not.toHaveBeenCalled();
+  });
+
+  test('keeps Kilo-exclusive models on Kilo accounts', async () => {
+    mockedGetVercelModelsMetadata.mockResolvedValue(metadata);
+
+    await expect(
+      hasInferenceProviderByokForModel(EXCLUSIVE_MODEL_ID, ['anthropic'], noCatalogModels)
+    ).resolves.toBe(false);
+  });
+});
+
+describe('isInferenceProviderByok', () => {
+  test.each([
+    [
+      'a provider key sent through Vercel',
+      [{ decryptedAPIKey: 'key', providerId: 'anthropic' }],
+      true,
+    ],
+    ['a direct BYOK key', [{ decryptedAPIKey: 'key', providerId: 'synthetic' }], true],
+    ['an OpenRouter key', [{ decryptedAPIKey: 'key', providerId: 'openrouter' }], false],
+    [
+      'a Vercel AI Gateway key',
+      [{ decryptedAPIKey: 'key', providerId: 'vercel-ai-gateway' }],
+      false,
+    ],
+    ['no key', null, false],
+  ] as const)('classifies %s', (_name, userByok, expected) => {
+    expect(isInferenceProviderByok(userByok)).toBe(expected);
   });
 });
 

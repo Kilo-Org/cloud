@@ -226,6 +226,34 @@ export async function addUserByokAvailability(
 }
 
 /**
+ * Whether an inference provider key among `enabledProviderIds` serves `modelId`, as `getProvider`
+ * routes it: a direct BYOK key in catalog mode (`directByokCatalogModelIds`), or a provider key
+ * sent through Vercel. Gateway keys leave the choice of provider to the gateway, so they do not
+ * count.
+ */
+export async function hasInferenceProviderByokForModel(
+  modelId: string,
+  enabledProviderIds: readonly UserByokProviderId[],
+  directByokCatalogModelIds: ReadonlySet<string>
+): Promise<boolean> {
+  if (directByokCatalogModelIds.has(modelId)) return true;
+  if (isKiloExclusiveModel(modelId) || enabledProviderIds.every(isGatewayUserByokProviderId)) {
+    return false;
+  }
+  const modelProviders = await getModelInferenceUserByokProviders(modelId);
+  return modelProviders.some(providerId => enabledProviderIds.includes(providerId));
+}
+
+/** Whether `userByok` are inference provider keys rather than a gateway key. */
+export function isInferenceProviderByok(userByok: readonly BYOKResult[] | null): boolean {
+  return (
+    userByok !== null &&
+    userByok.length > 0 &&
+    !userByok.some(byok => isGatewayUserByokProviderId(byok.providerId))
+  );
+}
+
+/**
  * Marks catalog models the caller's direct BYOK keys in catalog mode serve
  * (`getDirectByokCatalogModelIds`), alongside the gateway and Vercel BYOK availability.
  */

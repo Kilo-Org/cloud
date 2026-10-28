@@ -20074,6 +20074,347 @@
     ],
     "searchBlob": "organizations.groups.updateMetadata Update a group's name or description in an organization. Use to rename or describe a group. organizations groups updatemetadata organizationid groupid name description organizationId groupId name description"
   },
+  "organizations.guardrails.get": {
+    "path": "organizations.guardrails.get",
+    "kind": "query",
+    "summary": "Get an organization's Enkrypt AI input guardrail settings: whether it is enabled, whether tool results are scanned, and the configured detectors. Owners and admins only.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "guardrails",
+      "get",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.guardrails.get Get an organization's Enkrypt AI input guardrail settings: whether it is enabled, whether tool results are scanned, and the configured detectors. Owners and admins only. organizations guardrails get organizationid organizationId"
+  },
+  "organizations.guardrails.update": {
+    "path": "organizations.guardrails.update",
+    "kind": "mutation",
+    "summary": "Save an organization's Enkrypt AI input guardrail settings: enable or disable it, choose whether tool results are scanned, and configure detectors. Owners and admins only.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "scan_tool_results": {
+          "type": "boolean"
+        },
+        "detectors": {
+          "type": "object",
+          "properties": {
+            "injection_attack": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "enabled"
+              ],
+              "additionalProperties": false
+            },
+            "pii": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "log",
+                    "block"
+                  ]
+                },
+                "entities": {
+                  "maxItems": 4,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "pii",
+                      "secrets",
+                      "ip_address",
+                      "url"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "enabled",
+                "action",
+                "entities"
+              ],
+              "additionalProperties": false
+            },
+            "keyword_detector": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "log",
+                    "block"
+                  ]
+                },
+                "banned_keywords": {
+                  "maxItems": 200,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              },
+              "required": [
+                "enabled",
+                "action",
+                "banned_keywords"
+              ],
+              "additionalProperties": false
+            },
+            "topic_detector": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "topic": {
+                  "maxItems": 50,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              },
+              "required": [
+                "enabled",
+                "topic"
+              ],
+              "additionalProperties": false
+            },
+            "policy_violation": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "format": {
+                  "type": "string",
+                  "enum": [
+                    "policy_text",
+                    "rules"
+                  ]
+                },
+                "policy_text": {
+                  "type": "string",
+                  "maxLength": 10000
+                },
+                "rules": {
+                  "maxItems": 50,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64,
+                        "pattern": "^[A-Za-z0-9._-]+$"
+                      },
+                      "display_text": {
+                        "type": "string",
+                        "maxLength": 120
+                      },
+                      "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1000
+                      },
+                      "risk_category": {
+                        "type": "string",
+                        "enum": [
+                          "security_fraud",
+                          "safety_harm",
+                          "privacy_data_protection",
+                          "brand_reputation_trust",
+                          "bias_fairness_ethical",
+                          "legal_ip_liability",
+                          "product_misuse_abuse",
+                          "performance_reliability_quality"
+                        ]
+                      },
+                      "applicability": {
+                        "type": "string",
+                        "enum": [
+                          "user",
+                          "user_assistant"
+                        ]
+                      },
+                      "severity": {
+                        "type": "string",
+                        "enum": [
+                          "critical",
+                          "high",
+                          "medium",
+                          "low"
+                        ]
+                      },
+                      "frameworks": {
+                        "maxItems": 8,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "hipaa",
+                            "finra",
+                            "gdpr",
+                            "ccpa",
+                            "owasp_llm_2025",
+                            "nist_ai_rmf",
+                            "eu_ai_act",
+                            "iso_42001"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "display_text",
+                      "text",
+                      "risk_category",
+                      "applicability",
+                      "severity",
+                      "frameworks"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "enabled",
+                "format",
+                "policy_text",
+                "rules"
+              ],
+              "additionalProperties": false
+            },
+            "toxicity": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "enabled"
+              ],
+              "additionalProperties": false
+            },
+            "nsfw": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "enabled"
+              ],
+              "additionalProperties": false
+            },
+            "bias": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "action": {
+                  "type": "string",
+                  "enum": [
+                    "log",
+                    "block"
+                  ]
+                }
+              },
+              "required": [
+                "enabled",
+                "action"
+              ],
+              "additionalProperties": false
+            },
+            "sponge_attack": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "enabled"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "injection_attack",
+            "pii",
+            "keyword_detector",
+            "topic_detector",
+            "policy_violation",
+            "toxicity",
+            "nsfw",
+            "bias",
+            "sponge_attack"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "organizationId",
+        "enabled",
+        "scan_tool_results",
+        "detectors"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "guardrails",
+      "update",
+      "organizationid",
+      "enabled",
+      "scan_tool_results",
+      "detectors"
+    ],
+    "searchBlob": "organizations.guardrails.update Save an organization's Enkrypt AI input guardrail settings: enable or disable it, choose whether tool results are scanned, and configure detectors. Owners and admins only. organizations guardrails update organizationid enabled scan_tool_results detectors organizationId enabled scan_tool_results detectors"
+  },
   "organizations.invoices": {
     "path": "organizations.invoices",
     "kind": "query",

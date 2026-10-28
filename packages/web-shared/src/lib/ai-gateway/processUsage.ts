@@ -321,10 +321,32 @@ async function enqueueUsageWithinLifetime(
   return publication;
 }
 
+type UsageAccountingTransport = 'queue' | 'direct';
+
+function usageAccountingTransport(usageContext: MicrodollarUsageContext): UsageAccountingTransport {
+  return USAGE_QUEUE_ONLY_ENABLED || isSfoUsageQueueSelected(USAGE_QUEUE_SFO_CONFIG, usageContext)
+    ? 'queue'
+    : 'direct';
+}
+
 export async function logMicrodollarUsage(
   usageStats: MicrodollarUsageStats,
   usageContext: MicrodollarUsageContext,
   bouncerUsageEvent: BouncerUsageEventEnqueue | null = null
+): Promise<UsageAccountingResult | null> {
+  return logMicrodollarUsageWithTransport(
+    usageStats,
+    usageContext,
+    bouncerUsageEvent,
+    usageAccountingTransport(usageContext)
+  );
+}
+
+async function logMicrodollarUsageWithTransport(
+  usageStats: MicrodollarUsageStats,
+  usageContext: MicrodollarUsageContext,
+  bouncerUsageEvent: BouncerUsageEventEnqueue | null,
+  transport: UsageAccountingTransport
 ): Promise<UsageAccountingResult | null> {
   usageContext.status_code = usageStats.status_code;
   const contextInfo = extractUsageContextInfo(usageContext);
@@ -338,9 +360,7 @@ export async function logMicrodollarUsage(
     bouncer_usage_event: bouncerUsageEvent,
   };
 
-  const queueOnly =
-    USAGE_QUEUE_ONLY_ENABLED || isSfoUsageQueueSelected(USAGE_QUEUE_SFO_CONFIG, usageContext);
-  if (queueOnly) {
+  if (transport === 'queue') {
     const outcome = await enqueueUsageWithinLifetime(payload);
     if (outcome.kind === 'accepted') {
       console.info('usage accounting queued', { usageId: core.id });
@@ -1498,23 +1518,33 @@ export async function processTokenData(
  * When the request's decide verdict said `spendWatch`, the writer enqueues the usage event in its
  * transaction and attempts delivery right after commit; the cron drainer retries a failure.
  * Queued and recorded outcomes leave delivery with that writer/outbox. Failed accounting
- * keeps the best-effort send; bouncer dedupes on `requestId`. Every other request also keeps the
+ * retains the existing best-effort fallback. Every other request also keeps the
  * independent best-effort send, which never rejects.
+ * Ordinary queued reporting starts alongside publication and both are awaited by the caller's
+ * existing lifetime. Its queue payload has no Bouncer event, so the writer cannot send it again.
  */
 export async function logMicrodollarUsageAndReportToBouncer(
   usageStats: MicrodollarUsageStats,
   usageContext: MicrodollarUsageContext
 ): Promise<UsageAccountingResult | null> {
   const event = bouncerUsageEvent(usageStats, usageContext);
+  const transport = usageAccountingTransport(usageContext);
   if (!event || usageContext.bouncer?.spendWatch !== true) {
-    const record = await logMicrodollarUsage(usageStats, usageContext);
+    const accounting = logMicrodollarUsageWithTransport(usageStats, usageContext, null, transport);
+    if (event && transport === 'queue') {
+      const [record] = await Promise.all([accounting, reportUsageEvent(event)]);
+      return record;
+    }
+    const record = await accounting;
     if (event) await reportUsageEvent(event);
     return record;
   }
-  const record = await logMicrodollarUsage(usageStats, usageContext, {
-    request_id: event.requestId,
-    payload: usageEventWireBody(event),
-  });
+  const record = await logMicrodollarUsageWithTransport(
+    usageStats,
+    usageContext,
+    { request_id: event.requestId, payload: usageEventWireBody(event) },
+    transport
+  );
   if (!record) await reportUsageEvent(event);
   return record;
 }

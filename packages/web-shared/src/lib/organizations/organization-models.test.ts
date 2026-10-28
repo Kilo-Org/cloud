@@ -36,6 +36,11 @@ const mockCustom = jest.fn<
   [string, readonly string[], string | null]
 >();
 const mockProviderIds = jest.fn(async (_db: unknown, _organizationId: string) => ['openai']);
+const mockCatalogModelIds = new Set(['provider/allowed']);
+const mockDirectByokCatalogModelIds = jest.fn(async (_owner: unknown) => mockCatalogModelIds);
+const mockCatalogAvailability = jest.fn(
+  (models: OpenRouterModel[], _catalogModelIds: ReadonlySet<string>) => models
+);
 const mockAvailability = jest.fn(
   async (
     models: OpenRouterModel[],
@@ -80,6 +85,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlm
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForOrganization: mockByok,
+  getDirectByokCatalogModelIds: mockDirectByokCatalogModelIds,
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model', () => ({
   ORG_AUTO_MODEL: { id: 'kilo-auto/org' },
@@ -88,6 +94,7 @@ jest.mock('@kilocode/web-shared/lib/organizations/organization-auto-model', () =
   isOrganizationAutoEnabled: () => mockAutoEnabled,
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
+  addDirectByokCatalogAvailability: mockCatalogAvailability,
   addUserByokAvailability: mockAvailability,
   getOrganizationByokProviderIds: mockProviderIds,
 }));
@@ -357,11 +364,16 @@ describe('organization model producer publication', () => {
     expect(mockCustom).toHaveBeenCalledWith('fixture-org', ['fixture-group'], null);
     expect(mockByok).toHaveBeenCalledWith('fixture-org');
     expect(mockProviderIds).toHaveBeenCalledWith(expect.anything(), 'fixture-org');
+    expect(mockDirectByokCatalogModelIds).toHaveBeenCalledWith({
+      type: 'organization',
+      id: 'fixture-org',
+    });
     expect(mockAvailability).toHaveBeenCalledWith(
       [mockCatalog.data[0], mockCatalog.data[2]],
       ['openai'],
       expect.any(Function)
     );
+    expect(mockCatalogAvailability).toHaveBeenCalledWith(expect.any(Array), mockCatalogModelIds);
     const getAllowedProviders = mockAvailability.mock.calls[0][2];
     expect(getAllowedProviders?.('provider/allowed')).toEqual(ALLOWED_MODEL_ROUTES);
     expect(getAllowedProviders?.('provider/training')).toBeUndefined();

@@ -34,7 +34,16 @@ import {
   createUserVercelAiGatewayProvider,
   VERCEL_AI_GATEWAY,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
-import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  findDirectByokCatalogModels,
+  getDirectByokCatalogModelId,
+  getDirectByokModel,
+  supportsCatalogMode,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import type {
+  DirectByokModel,
+  DirectByokProvider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import { CustomLlmCredentialsSchema, type CustomLlmCredentials } from '@kilocode/db/schema-types';
 import {
@@ -67,8 +76,8 @@ export type GetProviderProviderResult = {
   userByok: BYOKResult[] | null;
   readonly isFree: boolean;
   /** Skip balance, paid-auth, and organization policy checks entirely. Used
-   *  by direct-byok and non-public custom_llm2 because both already require
-   *  explicit admin opt-in. */
+   *  by bespoke direct-byok ids and non-public custom_llm2 because both already
+   *  require explicit admin opt-in. */
   bypassAccessCheck: boolean;
   /** Skip only the zero-balance paid-model block. Set when a user credential
    *  outside Kilo credits pays for the request, such as the ChatGPT
@@ -76,34 +85,29 @@ export type GetProviderProviderResult = {
   skipBalanceCheck?: boolean;
 };
 
+/** A bespoke direct BYOK id whose key serves only catalog ids. */
+export type DirectByokCatalogOnlyResult = {
+  kind: 'direct-byok-catalog-only';
+  providerId: DirectByokProvider['id'];
+  /** The catalog id that serves the same model through the key, when one exists. */
+  catalogModelId: string | null;
+};
+
 export type GetProviderResult =
   | GetProviderProviderResult
   | { kind: 'chatgpt-reconnect'; message: string }
   /** The id is a custom LLM the caller may not use, or its stored credentials are unusable. */
-  | { kind: 'custom-llm-unavailable' };
+  | { kind: 'custom-llm-unavailable' }
+  | DirectByokCatalogOnlyResult;
 
-/**
- * Direct BYOK model IDs name their provider, such as `neuralwatt/...`, and the
- * request goes straight to that provider with the stored key, bypassing Kilo's
- * gateways.
- */
-async function resolveDirectByokProvider(
-  user: User | AnonymousUserContext,
+async function directByokProviderResult(
+  directByok: DirectByokProvider,
+  directByokModel: DirectByokModel,
+  credential: BYOKResult,
   requestedModel: string,
   request: GatewayRequest,
-  organizationId: string | undefined
-): Promise<GetProviderProviderResult | null> {
-  const { provider: directByok, model: directByokModel } = await getDirectByokModel(requestedModel);
-  if (!directByok || !directByokModel) {
-    return null;
-  }
-  const [credential] = await getByokCredentials(readDb, byokOwner(user.id, organizationId), [
-    directByok.id,
-  ]);
-  if (!credential) {
-    return null;
-  }
-
+  servesCatalogId: boolean
+): Promise<GetProviderProviderResult> {
   const upstream = await directByok.resolveUpstream({
     credential: credential.decryptedAPIKey,
     model: directByokModel,
@@ -123,8 +127,86 @@ async function resolveDirectByokProvider(
     } satisfies Provider,
     userByok: [{ decryptedAPIKey: credential.decryptedAPIKey, providerId: credential.providerId }],
     isFree: isFreeModelExcludingCustomLlms(requestedModel),
-    bypassAccessCheck: true,
+    // Organization model policies cover catalog ids. A bespoke id is only served by a key outside
+    // catalog mode, which stays exempt as before.
+    bypassAccessCheck: !servesCatalogId,
   };
+}
+
+/**
+ * The caller's catalog-mode keys serve the catalog id, but none over the request's API kind. The
+ * caller's other BYOK routes may still serve it; otherwise `result` fails the request with the
+ * unsupported-API error.
+ */
+type DirectByokUnsupportedApiKind = {
+  kind: 'direct-byok-unsupported-api-kind';
+  result: GetProviderProviderResult;
+};
+
+/**
+ * Direct BYOK model IDs name their provider, such as `neuralwatt/...`, and the
+ * request goes straight to that provider with the stored key, bypassing Kilo's
+ * gateways. A key in catalog mode instead serves the catalog ids its provider maps.
+ */
+async function resolveDirectByokProvider(
+  user: User | AnonymousUserContext,
+  requestedModel: string,
+  request: GatewayRequest,
+  organizationId: string | undefined
+): Promise<
+  GetProviderProviderResult | DirectByokCatalogOnlyResult | DirectByokUnsupportedApiKind | null
+> {
+  const owner = byokOwner(user.id, organizationId);
+  const { provider: directByok, model: directByokModel } = await getDirectByokModel(requestedModel);
+  if (directByok && directByokModel) {
+    const [credential] = await getByokCredentials(readDb, owner, [directByok.id]);
+    if (!credential) return null;
+    if (credential.serveCatalogModels && supportsCatalogMode(directByok.id)) {
+      return {
+        kind: 'direct-byok-catalog-only',
+        providerId: directByok.id,
+        catalogModelId: await getDirectByokCatalogModelId(directByokModel),
+      };
+    }
+    return directByokProviderResult(
+      directByok,
+      directByokModel,
+      credential,
+      requestedModel,
+      request,
+      false
+    );
+  }
+
+  if (isAnonymousContext(user)) return null;
+  const catalogModels = await findDirectByokCatalogModels(requestedModel);
+  if (catalogModels.length === 0) return null;
+  const credentials = await getByokCredentials(
+    readDb,
+    owner,
+    catalogModels.map(({ provider }) => provider.id),
+    { catalogModeOnly: true }
+  );
+  let unsupportedApiKind: GetProviderProviderResult | null = null;
+  for (const { provider, model } of catalogModels) {
+    const credential = credentials.find(
+      candidate => candidate.providerId === provider.id && candidate.serveCatalogModels
+    );
+    if (!credential) continue;
+    const result = await directByokProviderResult(
+      provider,
+      model,
+      credential,
+      requestedModel,
+      request,
+      true
+    );
+    if (result.provider.supportedChatApis.includes(request.kind)) return result;
+    unsupportedApiKind ??= result;
+  }
+  return (
+    unsupportedApiKind && { kind: 'direct-byok-unsupported-api-kind', result: unsupportedApiKind }
+  );
 }
 
 async function isEligibleForCustomLlm(
@@ -358,7 +440,10 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     request,
     organizationId
   );
-  if (directByokProvider) {
+  let directByokUnsupportedApiKind: DirectByokUnsupportedApiKind | null = null;
+  if (directByokProvider?.kind === 'direct-byok-unsupported-api-kind') {
+    directByokUnsupportedApiKind = directByokProvider;
+  } else if (directByokProvider) {
     return directByokProvider;
   }
 
@@ -407,6 +492,12 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
   );
   if (gatewayByok) {
     return gatewayByok;
+  }
+
+  // BYOK requests are never billed to Kilo, so a catalog id the caller's keys serve, but not over
+  // this API kind, fails with the unsupported-API error instead of taking a Kilo route.
+  if (directByokUnsupportedApiKind) {
+    return directByokUnsupportedApiKind.result;
   }
 
   if (

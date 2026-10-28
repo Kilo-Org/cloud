@@ -9,7 +9,9 @@ import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-util
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   formatDirectByokModelId,
+  getDirectByokCatalogModelId,
   getDirectByokModel,
+  supportsCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getByokCredentials } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { readDb, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
@@ -171,6 +173,18 @@ export async function validateOrganizationAutoTarget(
         kind: 'error',
         message: `Organization Auto route target '${targetModelId}' does not support the ${options.apiKind} API.`,
       };
+    }
+    // A catalog-mode key serves the model only under its catalog id, which organization model
+    // policies cover, so a stored bespoke target resolves to that id.
+    if (credential.serveCatalogModels && supportsCatalogMode(directByokTarget.provider.id)) {
+      const catalogModelId = await getDirectByokCatalogModelId(directByokTarget.model);
+      if (!catalogModelId) {
+        return {
+          kind: 'error',
+          message: `Organization Auto route target '${targetModelId}' is unavailable because this organization's ${directByokTarget.provider.id} key uses Kilo catalog model IDs and this model has no catalog ID.`,
+        };
+      }
+      return validateOrganizationAutoTarget(organization, catalogModelId, options);
     }
     return {
       kind: 'ok',

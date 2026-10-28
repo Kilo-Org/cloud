@@ -2,6 +2,7 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { GitPullRequest } from '@/components/ui/icons';
+import { useSinglePushRoute } from '@/components/code-reviewer/use-single-push-route';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, type ScrollViewInstance, TextInput, View } from 'react-native';
@@ -90,6 +91,7 @@ const FORM_EDGE_GAP = 16;
 
 export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const colors = useThemeColors();
   const githubStatus = useGitHubStatus(scope);
@@ -243,7 +245,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               <Button
                 className={cn('mt-3 w-full', STATE_ACTION_CLASS)}
                 onPress={() => {
-                  router.push(`/(app)/code-reviewer/${scope}/github` as Href);
+                  pushOnce(`/(app)/code-reviewer/${scope}/github` as Href);
                 }}
               >
                 <Text>{t('common.connectGithub')}</Text>

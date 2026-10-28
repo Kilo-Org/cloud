@@ -1,12 +1,17 @@
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
-import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
+import {
+  ORGANIZATION_BILLING_ROLES,
+  ORGANIZATION_MANAGE_ROLES,
+  canManageOrganization,
+  type OrganizationRole,
+} from '@kilocode/app-shared/organizations';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { byok_api_keys, MODELS_BY_PROVIDER_ADMIN_URL } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
@@ -15,6 +20,7 @@ import {
   UpdateBYOKKeyInputSchema,
   DeleteBYOKKeyInputSchema,
   SetBYOKKeyEnabledInputSchema,
+  SetBYOKKeyCatalogModeInputSchema,
   ListBYOKKeysInputSchema,
   TestBYOKKeyInputSchema,
   BYOKApiKeyResponseSchema,
@@ -43,6 +49,7 @@ import {
   decryptByokRow,
   getByokKmsContext,
   getModelGatewayUserByokProviders,
+  servesCatalogModels,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { encryptByokForStorage } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import { GatewayAuthenticationError, type GatewayProviderOptions } from '@ai-sdk/gateway';
@@ -52,6 +59,8 @@ import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers
 import {
   createAiSdkProvider,
   formatDirectByokModelId,
+  listDirectByokCatalogModels,
+  offersCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { parseAwsBedrockCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/bedrock-byok';
 import { parseGcpVertexCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/vertex-byok';
@@ -103,12 +112,38 @@ const BYOK_KEY_COLUMNS = {
   created_by: byok_api_keys.created_by,
   management_source: byok_api_keys.management_source,
   is_enabled: byok_api_keys.is_enabled,
+  settings: byok_api_keys.settings,
 };
 
-function toBYOKApiKeyResponse(key: Omit<BYOKApiKeyResponse, 'provider_name'>): BYOKApiKeyResponse {
+type BYOKKeyRow = Omit<
+  BYOKApiKeyResponse,
+  'provider_name' | 'serve_catalog_models' | 'supports_catalog_mode' | 'can_change_catalog_mode'
+> & { settings: unknown };
+
+/**
+ * Catalog mode decides whether organization model policies apply to the key, so on organization
+ * keys only the roles that edit those policies may change it.
+ */
+function canChangeCatalogMode(organizationRole: OrganizationRole | null) {
+  return organizationRole === null || canManageOrganization(organizationRole);
+}
+
+async function toBYOKApiKeyResponse(
+  { settings, ...key }: BYOKKeyRow,
+  organizationRole: OrganizationRole | null
+): Promise<BYOKApiKeyResponse> {
+  const supportsCatalog = await offersCatalogMode(key.provider_id);
+  const serveCatalogModels = servesCatalogModels(settings);
   return {
     ...key,
     provider_name: key.provider_id,
+    serve_catalog_models: serveCatalogModels,
+    supports_catalog_mode: supportsCatalog,
+    // An enabled key can always leave catalog mode, even after its provider loses its mappings.
+    can_change_catalog_mode:
+      (supportsCatalog || serveCatalogModels) &&
+      key.management_source === 'user' &&
+      canChangeCatalogMode(organizationRole),
   };
 }
 
@@ -131,6 +166,20 @@ function rejectManagedKeyMutation(managementSource: 'user' | 'coding_plan') {
       message: MANAGED_KEY_READ_ONLY_MESSAGE,
     });
   }
+}
+
+async function fetchCatalogModeSupportedModels(): Promise<Record<string, string[]>> {
+  const openRouterModelMetadata = await getOpenRouterModelsMetadataFromDatabase();
+  const result: Record<string, string[]> = {};
+  for (const provider of DIRECT_BYOK_PROVIDERS) {
+    const entries = await listDirectByokCatalogModels(provider.id);
+    if (entries.length === 0) continue;
+    result[provider.id] = entries.map(({ catalogModelId, model }) => {
+      const name = openRouterModelMetadata[catalogModelId]?.name ?? model.name;
+      return `${name} (${catalogModelId})`;
+    });
+  }
+  return result;
 }
 
 async function fetchSupportedModels(): Promise<Record<string, string[]>> {
@@ -200,6 +249,11 @@ export const byokRouter = createTRPCRouter({
     .output(z.record(z.string(), z.array(z.string())))
     .query(fetchSupportedModels),
 
+  /** The models a key of each direct BYOK provider serves in catalog mode, listed by catalog id. */
+  listCatalogModeSupportedModels: baseProcedure
+    .output(z.record(z.string(), z.array(z.string())))
+    .query(fetchCatalogModeSupportedModels),
+
   /** Whether keys for experimental BYOK providers, currently direct Amazon Bedrock and Google Vertex AI, can be added. */
   experimentalByokEnabled: baseProcedure
     .input(ListBYOKKeysInputSchema)
@@ -218,9 +272,9 @@ export const byokRouter = createTRPCRouter({
       const { organizationId } = input;
 
       // If organizationId provided, verify membership; otherwise use user's own keys
-      if (organizationId) {
-        await ensureOrganizationAccess(ctx, organizationId);
-      }
+      const organizationRole = organizationId
+        ? await ensureOrganizationAccess(ctx, organizationId)
+        : null;
 
       const keys = await db
         .select(BYOK_KEY_COLUMNS)
@@ -232,7 +286,7 @@ export const byokRouter = createTRPCRouter({
         );
 
       // Map provider_id to provider_name (will be enhanced in UI with actual provider names)
-      return keys.map(toBYOKApiKeyResponse);
+      return Promise.all(keys.map(key => toBYOKApiKeyResponse(key, organizationRole)));
     }),
 
   create: baseProcedure
@@ -242,9 +296,9 @@ export const byokRouter = createTRPCRouter({
       const { organizationId, provider_id, api_key } = input;
 
       // If organizationId provided, verify owner/billing access
-      if (organizationId) {
-        await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
-      }
+      const organizationRole = organizationId
+        ? await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES)
+        : null;
 
       rejectUnavailableExperimentalProvider(provider_id, organizationId);
       validateUserByokCredential(provider_id, api_key);
@@ -289,7 +343,7 @@ export const byokRouter = createTRPCRouter({
         });
       }
 
-      return toBYOKApiKeyResponse(newKey);
+      return toBYOKApiKeyResponse(newKey, organizationRole);
     }),
 
   update: baseProcedure
@@ -299,9 +353,9 @@ export const byokRouter = createTRPCRouter({
       const { organizationId, id, api_key } = input;
 
       // If organizationId provided, verify owner/billing access
-      if (organizationId) {
-        await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
-      }
+      const organizationRole = organizationId
+        ? await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES)
+        : null;
 
       // Verify key exists and belongs to the organization or user
       const [existingKey] = await db
@@ -371,7 +425,7 @@ export const byokRouter = createTRPCRouter({
         });
       }
 
-      return toBYOKApiKeyResponse(updatedKey);
+      return toBYOKApiKeyResponse(updatedKey, organizationRole);
     }),
 
   setEnabled: baseProcedure
@@ -380,9 +434,9 @@ export const byokRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }): Promise<BYOKApiKeyResponse> => {
       const { organizationId, id, is_enabled } = input;
 
-      if (organizationId) {
-        await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
-      }
+      const organizationRole = organizationId
+        ? await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES)
+        : null;
 
       const [existingKey] = await db
         .select({
@@ -438,7 +492,65 @@ export const byokRouter = createTRPCRouter({
         });
       }
 
-      return toBYOKApiKeyResponse(updatedKey);
+      return toBYOKApiKeyResponse(updatedKey, organizationRole);
+    }),
+
+  setCatalogMode: baseProcedure
+    .input(SetBYOKKeyCatalogModeInputSchema)
+    .output(BYOKApiKeyResponseSchema)
+    .mutation(async ({ input, ctx }): Promise<BYOKApiKeyResponse> => {
+      const { organizationId, id, serve_catalog_models } = input;
+
+      const organizationRole = organizationId
+        ? await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_MANAGE_ROLES)
+        : null;
+
+      const [existingKey] = await db
+        .select({
+          organization_id: byok_api_keys.organization_id,
+          kilo_user_id: byok_api_keys.kilo_user_id,
+          provider_id: byok_api_keys.provider_id,
+          management_source: byok_api_keys.management_source,
+        })
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, id));
+
+      const ownsKey = organizationId
+        ? existingKey?.organization_id === organizationId
+        : existingKey?.kilo_user_id === ctx.user.id;
+      if (!existingKey || !ownsKey) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'BYOK key not found' });
+      }
+
+      rejectManagedKeyMutation(existingKey.management_source);
+      // Turning catalog mode off stays possible after a provider loses its catalog mappings.
+      if (serve_catalog_models && !(await offersCatalogMode(existingKey.provider_id))) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Provider ${existingKey.provider_id} does not support Kilo catalog model IDs.`,
+        });
+      }
+
+      const [updatedKey] = await db
+        .update(byok_api_keys)
+        .set({
+          settings: sql`${byok_api_keys.settings} || ${JSON.stringify({ serve_catalog_models })}::jsonb`,
+        })
+        .where(eq(byok_api_keys.id, id))
+        .returning(BYOK_KEY_COLUMNS);
+
+      if (existingKey.organization_id) {
+        await createAuditLog({
+          action: 'organization.settings.change',
+          actor_email: ctx.user.google_user_email,
+          actor_id: ctx.user.id,
+          actor_name: ctx.user.google_user_name,
+          message: `${serve_catalog_models ? 'Enabled' : 'Disabled'} Kilo catalog model IDs for BYOK key for provider: ${existingKey.provider_id}`,
+          organization_id: existingKey.organization_id,
+        });
+      }
+
+      return toBYOKApiKeyResponse(updatedKey, organizationRole);
     }),
 
   testApiKey: baseProcedure

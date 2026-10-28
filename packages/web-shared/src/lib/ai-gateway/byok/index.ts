@@ -6,25 +6,31 @@ import type { EncryptedData } from '@kilocode/web-shared/lib/ai-gateway/byok/enc
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import {
+  GatewayUserByokProviderIdSchema,
   UserByokProviderIdSchema,
   getVercelUserByokProviderIdForEndpoint,
+  type GatewayUserByokProviderId,
   type UserByokProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { isCodestralModel } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
+  getVercelModelsFromDatabase,
   getVercelModelsMetadataFromDatabase,
+  isValidOpenRouterModelId,
   type StoredModelMap,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { hasEnabledUserByokForModel } from '@kilocode/web-shared/lib/ai-gateway/byok/availability';
 
 // A BYOK key belongs to exactly one owner, either a user or an organization.
 type ByokOwnerColumn = typeof byok_api_keys.kilo_user_id | typeof byok_api_keys.organization_id;
 type ByokSourceDb = typeof db | DrizzleTransaction;
 
-async function deriveModelUserByokProviders(
+async function deriveModelInferenceUserByokProviders(
   modelId: string,
   vercelModelMetadata: StoredModelMap
 ): Promise<UserByokProviderId[]> {
@@ -45,13 +51,46 @@ async function deriveModelUserByokProviders(
   return providers;
 }
 
-export async function getModelUserByokProviders(modelId: string): Promise<UserByokProviderId[]> {
-  const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
-  if (Object.keys(vercelModelMetadata).length === 0) {
-    console.error('[getModelUserByokProviders] no Vercel model metadata for model %s', modelId);
+/**
+ * Kilo-exclusive and free models stay on Kilo's own accounts: they are served
+ * through Kilo-specific routes or paid for by Kilo, so a gateway key must not
+ * take them over. Custom LLMs are never in the gateway catalogs, so the
+ * built-in free rules suffice.
+ */
+export async function getModelGatewayUserByokProviders(
+  modelId: string
+): Promise<GatewayUserByokProviderId[]> {
+  if (isKiloExclusiveModel(modelId) || isFreeModelExcludingCustomLlms(modelId)) {
     return [];
   }
-  return deriveModelUserByokProviders(modelId, vercelModelMetadata);
+  const [vercelModels, vercelModelId, isOpenRouterModel] = await Promise.all([
+    getVercelModelsFromDatabase(),
+    mapModelIdToVercel(modelId),
+    isValidOpenRouterModelId(modelId),
+  ]);
+  return GatewayUserByokProviderIdSchema.options.filter(providerId =>
+    providerId === 'vercel-ai-gateway' ? vercelModels.has(vercelModelId) : isOpenRouterModel
+  );
+}
+
+/**
+ * Returns every user BYOK provider whose key can serve `modelId`: first the
+ * inference providers routed through Vercel, then the gateway keys in order of
+ * preference.
+ */
+export async function getModelUserByokProviders(modelId: string): Promise<UserByokProviderId[]> {
+  const [vercelModelMetadata, gatewayProviders] = await Promise.all([
+    getVercelModelsMetadataFromDatabase(),
+    getModelGatewayUserByokProviders(modelId),
+  ]);
+  if (Object.keys(vercelModelMetadata).length === 0) {
+    console.error('[getModelUserByokProviders] no Vercel model metadata for model %s', modelId);
+    return gatewayProviders;
+  }
+  return [
+    ...(await deriveModelInferenceUserByokProviders(modelId, vercelModelMetadata)),
+    ...gatewayProviders,
+  ];
 }
 
 export type ByokOwner = { type: 'user'; id: string } | { type: 'organization'; id: string };
@@ -117,9 +156,14 @@ export async function getOrganizationByokProviderIds(
   return providers.map(provider => provider.providerId);
 }
 
+/**
+ * `getAllowedProviders` returns the organization's allowed providers for a
+ * model, or undefined when every provider is allowed.
+ */
 export async function addUserByokAvailability(
   models: OpenRouterModel[],
-  enabledProviderIds: UserByokProviderId[]
+  enabledProviderIds: UserByokProviderId[],
+  getAllowedProviders: (modelId: string) => ReadonlySet<string> | undefined = () => undefined
 ): Promise<OpenRouterModel[]> {
   const enabledProviders = new Set(enabledProviderIds);
   const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
@@ -129,12 +173,21 @@ export async function addUserByokAvailability(
   }
   return Promise.all(
     models.map(async model => {
-      const hasUserByokAvailable =
-        hasMetadata &&
-        !isKiloExclusiveModel(model.id) &&
-        (await deriveModelUserByokProviders(model.id, vercelModelMetadata)).some(provider =>
-          enabledProviders.has(provider)
-        );
+      if (isKiloExclusiveModel(model.id)) {
+        return { ...model, hasUserByokAvailable: false };
+      }
+      const modelProviders = [
+        ...(hasMetadata
+          ? await deriveModelInferenceUserByokProviders(model.id, vercelModelMetadata)
+          : []),
+        ...(await getModelGatewayUserByokProviders(model.id)),
+      ];
+      const hasUserByokAvailable = await hasEnabledUserByokForModel({
+        modelId: model.id,
+        modelProviders,
+        enabledProviderIds: enabledProviders,
+        allowedProviders: getAllowedProviders(model.id),
+      });
       return { ...model, hasUserByokAvailable };
     })
   );

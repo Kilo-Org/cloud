@@ -64,7 +64,7 @@ describe('getEmbeddingProvider', () => {
 
     expect(result.provider.id).toBe('vercel');
     expect(result.provider).toBe(VERCEL_AI_GATEWAY);
-    expect(result.userByok).toBe(mockByokResult);
+    expect(result.userByok).toEqual(mockByokResult);
     expect(mockedGetBYOKforUser).toHaveBeenCalledWith(readDb, user.id, ['openai']);
   });
 
@@ -78,7 +78,7 @@ describe('getEmbeddingProvider', () => {
     const result = await getEmbeddingProvider('mistralai/mistral-embed-2312', user, 'org-123');
 
     expect(result.provider.id).toBe('vercel');
-    expect(result.userByok).toBe(mockByokResult);
+    expect(result.userByok).toEqual(mockByokResult);
     expect(mockedGetBYOKforOrganization).toHaveBeenCalledWith(readDb, 'org-123', ['mistral']);
   });
 
@@ -89,6 +89,19 @@ describe('getEmbeddingProvider', () => {
     expect(result.provider.id).toBe('openrouter');
     expect(result.userByok).toBeNull();
     expect(mockedGetModelUserByokProviders).not.toHaveBeenCalled();
+  });
+
+  it('does not use gateway keys for embeddings', async () => {
+    const user = createTestUser();
+    mockedGetModelUserByokProviders.mockResolvedValue(['openai', 'openrouter']);
+    mockedGetBYOKforUser.mockResolvedValue([
+      { decryptedAPIKey: 'sk-openrouter', providerId: 'openrouter' },
+    ]);
+
+    const result = await getEmbeddingProvider('openai/text-embedding-3-small', user, undefined);
+
+    expect(result.provider).toBe(OPENROUTER);
+    expect(result.userByok).toBeNull();
   });
 
   it('should fall through to OpenRouter when no BYOK keys found', async () => {

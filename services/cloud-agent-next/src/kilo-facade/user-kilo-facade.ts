@@ -59,6 +59,7 @@ import {
 import {
   canRetainNativeEvent,
   createNativeAttachmentRegistry,
+  createNativeSnapshotReconciler,
   isDeliverableNativeEvent,
   NATIVE_FACADE_FENCE_EVENT,
   NATIVE_FACADE_RESNAPSHOT_EVENT,
@@ -66,6 +67,7 @@ import {
   type NativeEventBatch,
   type NativeEventContinuity,
   type NativeEventSubscription,
+  type NativeSnapshotAuthority,
   NATIVE_DELIVERY_LIMITS,
   type NativePublicEvent,
 } from './native-event-source.js';
@@ -137,6 +139,7 @@ export type KiloFacadeGlobalEvents = {
       attachmentId?: string;
       nextPage?: () => Promise<NativeAttachOutcome>;
       continuity?: NativeEventContinuity;
+      authority?: NativeSnapshotAuthority;
     }
   ): Response;
 };
@@ -207,6 +210,7 @@ export type NativeAttachOutcome =
       snapshot: NativeSnapshot;
       nextPage?: () => Promise<NativeAttachOutcome>;
       continuity?: NativeEventContinuity;
+      authority?: NativeSnapshotAuthority;
     }
   | { kind: 'stopped' }
   | { kind: 'resnapshot' }
@@ -261,6 +265,11 @@ async function defaultOpenNativeAttachment(params: {
       events,
       snapshot,
       continuity: subscription.continuity,
+      authority: {
+        sessionStatus: snapshot.sessionStatus,
+        questions: snapshot.questions,
+        permissions: snapshot.permissions,
+      },
       ...(snapshot.continuation === undefined
         ? {}
         : { nextPage: () => readPage(snapshot.continuation) }),
@@ -1215,6 +1224,9 @@ async function openHostedNativeAttachment(params: {
     attachmentId,
     nextPage: attach.kind === 'fenced' ? attach.nextPage : undefined,
     continuity: attach.kind === 'fenced' ? attach.continuity : undefined,
+    ...(attach.kind === 'fenced' && attach.authority !== undefined
+      ? { authority: attach.authority }
+      : {}),
   });
 }
 
@@ -1809,6 +1821,7 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
       attachmentId?: string;
       nextPage?: () => Promise<NativeAttachOutcome>;
       continuity?: NativeEventContinuity;
+      authority?: NativeSnapshotAuthority;
     }
   ): Response {
     return this.openPublicEventStream(
@@ -1878,6 +1891,7 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
       attachmentId?: string;
       nextPage?: () => Promise<NativeAttachOutcome>;
       continuity?: NativeEventContinuity;
+      authority?: NativeSnapshotAuthority;
     },
     globalUserId?: string
   ): Response {
@@ -1962,6 +1976,7 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
       attachmentId?: string;
       nextPage?: () => Promise<NativeAttachOutcome>;
       continuity?: NativeEventContinuity;
+      authority?: NativeSnapshotAuthority;
     }
   ): Promise<void> {
     const directory = publicCloudAgentDirectory(kiloSessionId);
@@ -2003,6 +2018,17 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
       let tail = Promise.resolve();
       let queued = 0;
       let queuedBytes = 0;
+      const reconciler = createNativeSnapshotReconciler(kiloSessionId);
+      let authority: NativeSnapshotAuthority = native.authority ?? {};
+      const mergeAuthority = (next: NativeSnapshotAuthority | undefined): void => {
+        if (next === undefined) return;
+        authority = {
+          ...authority,
+          ...(next.sessionStatus === undefined ? {} : { sessionStatus: next.sessionStatus }),
+          ...(next.questions === undefined ? {} : { questions: next.questions }),
+          ...(next.permissions === undefined ? {} : { permissions: next.permissions }),
+        };
+      };
       const unsubscribe = this.nativeAttachments.subscribe(attachmentId, event => {
         const bytes = encoder.encode(JSON.stringify(event)).byteLength;
         if (!canRetainNativeEvent(queued, queuedBytes, bytes)) {
@@ -2047,6 +2073,7 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
             this.clearNativeSubscriber(subscriberId);
             return;
           }
+          reconciler.observe(event);
           await send(event);
           if (!this.subscribers.has(subscriberId)) return;
         }
@@ -2060,8 +2087,20 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
           this.clearNativeSubscriber(subscriberId);
           return;
         }
+        mergeAuthority(page.authority);
         events = page.events;
         nextPage = page.nextPage;
+      }
+      for (const event of reconciler.corrections(authority)) {
+        if (
+          this.nativeAttachments.isLost(attachmentId) ||
+          this.nativeWriters.get(subscriberId) !== writer
+        ) {
+          this.clearNativeSubscriber(subscriberId);
+          return;
+        }
+        await send(event);
+        if (!this.subscribers.has(subscriberId)) return;
       }
       if (
         this.nativeAttachments.isLost(attachmentId) ||

@@ -52,6 +52,7 @@ type ActiveSession = {
   stub: DurableObjectStub<SandboxSessionV2>;
   wrapper: FakeWrapper;
   stopPump: () => void;
+  message: ControlPlanePromptPayload;
 };
 
 function metadata(input: { sessionId: string; kiloSessionId: string; sandboxId: string }) {
@@ -203,11 +204,19 @@ async function startReadySession(): Promise<ActiveSession> {
     expect(result.type === 'found' ? result.result.status : null).toBe('running');
   });
 
-  return { sandboxId, stub, wrapper, stopPump };
+  return { sandboxId, stub, wrapper, stopPump, message };
 }
 
 async function durableSnapshot(stub: DurableObjectStub<SandboxSessionV2>) {
   return runInDurableObject(stub, instance => instance.nativeSnapshot({}));
+}
+
+async function messageStatus(
+  stub: DurableObjectStub<SandboxSessionV2>,
+  messageId: string
+): Promise<string | null> {
+  const result = await stub.getMessageResult(messageId);
+  return result.type === 'found' ? result.result.status : null;
 }
 
 async function seedFacadeRoots(root: TestSessionIngestRoot): Promise<void> {
@@ -595,6 +604,244 @@ describe('hosted native history/live fence', { timeout: 30_000 }, () => {
         'permission.asked:per_native_reconnect',
         'question.asked:que_native_reconnect',
       ]);
+    } finally {
+      session.stopPump();
+      session.wrapper.close();
+    }
+  });
+
+  it('publishes Cloud terminal events live and replays them from stored rows without payload type metadata', async () => {
+    const session = await startReadySession();
+    try {
+      await seedFacadeRoots({
+        kiloSessionId: qualifiedKiloSessionId,
+        cloudAgentSessionId,
+        title: 'cloud terminal fixture',
+      });
+      const attached = await readAttach(await attach());
+      try {
+        session.wrapper.send({
+          type: 'session.outcome',
+          sessionId: cloudAgentSessionId,
+          status: 'completed',
+          lastMessageId: session.message.messageId,
+        });
+        const live = await readSseUntil(attached.reader, frame =>
+          isFrame(frame, 'cloud.message.completed')
+        );
+        const terminal = live.match as { properties: Record<string, unknown> };
+        expect(terminal.properties).toMatchObject({
+          sessionID: qualifiedKiloSessionId,
+          messageId: session.message.messageId,
+          status: 'completed',
+          delivery: 'sent',
+          accepted: true,
+        });
+        expect(
+          live.observed.filter(frame => isFrame(frame, 'cloud.message.completed'))
+        ).toHaveLength(1);
+
+        await waitFor(async () =>
+          expect(await messageStatus(session.stub, session.message.messageId)).toBe('completed')
+        );
+        const replay = await readAttach(await attach());
+        await replay.reader.cancel();
+        const replayed = replay.events.filter(frame => isFrame(frame, 'cloud.message.completed'));
+        expect(replayed).toHaveLength(1);
+        expect(replayed[0]).toMatchObject({
+          properties: {
+            sessionID: qualifiedKiloSessionId,
+            messageId: session.message.messageId,
+            status: 'completed',
+            delivery: 'sent',
+            accepted: true,
+          },
+        });
+      } finally {
+        await attached.reader.cancel();
+      }
+    } finally {
+      session.stopPump();
+      session.wrapper.close();
+    }
+  });
+
+  it('replays a stale busy status as authoritative idle before a newer live busy state', async () => {
+    const session = await startReadySession();
+    try {
+      await seedFacadeRoots({
+        kiloSessionId: qualifiedKiloSessionId,
+        cloudAgentSessionId,
+        title: 'stale status fixture',
+      });
+      await pushEvents(session, [
+        {
+          type: 'session.status',
+          properties: { sessionID: qualifiedKiloSessionId, status: { type: 'busy' } },
+        },
+      ]);
+      await waitFor(async () => {
+        const snapshot = await durableSnapshot(session.stub);
+        expect(
+          snapshot.events.some(
+            event =>
+              event.streamEventType === 'kilocode' &&
+              (event.data as { type?: string }).type === 'session.status'
+          )
+        ).toBe(true);
+      });
+
+      session.wrapper.send({
+        type: 'session.outcome',
+        sessionId: cloudAgentSessionId,
+        status: 'completed',
+        lastMessageId: session.message.messageId,
+      });
+      await waitFor(async () =>
+        expect((await durableSnapshot(session.stub)).sessionStatus).toEqual({ type: 'idle' })
+      );
+
+      const attached = await readAttach(await attach());
+      try {
+        const statuses = attached.events
+          .filter(frame => isFrame(frame, 'session.status'))
+          .map(frame => (frame.properties as { status?: { type?: string } }).status?.type);
+        expect(statuses[0]).toBe('busy');
+        expect(statuses.at(-1)).toBe('idle');
+
+        await pushEvents(session, [
+          {
+            type: 'session.status',
+            properties: { sessionID: qualifiedKiloSessionId, status: { type: 'busy' } },
+          },
+        ]);
+        const live = await readSseUntil(
+          attached.reader,
+          frame =>
+            isFrame(frame, 'session.status') &&
+            (frame.properties as { status?: { type?: string } }).status?.type === 'busy'
+        );
+        expect(live.match).toMatchObject({
+          properties: { sessionID: qualifiedKiloSessionId, status: { type: 'busy' } },
+        });
+      } finally {
+        await attached.reader.cancel();
+      }
+    } finally {
+      session.stopPump();
+      session.wrapper.close();
+    }
+  });
+
+  it('clears replayed interactions that the authoritative snapshot no longer reports', async () => {
+    const session = await startReadySession();
+    try {
+      await seedFacadeRoots({
+        kiloSessionId: qualifiedKiloSessionId,
+        cloudAgentSessionId,
+        title: 'interaction reconciliation fixture',
+      });
+      await pushEvents(session, [
+        questionAsked('que_reconcile_stale'),
+        permissionAsked('per_reconcile_stale'),
+      ]);
+      await waitFor(async () => {
+        const snapshot = await durableSnapshot(session.stub);
+        expect(snapshot.questions).toHaveLength(1);
+        expect(snapshot.permissions).toHaveLength(1);
+      });
+
+      await expect(
+        session.stub.answer({
+          sessionId: cloudAgentSessionId,
+          reply: { action: 'answer', questionId: 'que_reconcile_stale', answers: [['yes']] },
+        })
+      ).resolves.toBe('sent');
+      await expect(
+        session.stub.answer({
+          sessionId: cloudAgentSessionId,
+          reply: { action: 'permission', permissionId: 'per_reconcile_stale', response: 'once' },
+        })
+      ).resolves.toBe('sent');
+      await waitFor(async () => {
+        const snapshot = await durableSnapshot(session.stub);
+        expect(snapshot.questions).toHaveLength(0);
+        expect(snapshot.permissions).toHaveLength(0);
+      });
+
+      const attached = await readAttach(await attach());
+      await attached.reader.cancel();
+      const types = attached.events.map(frame => (frame as { type?: string }).type);
+      expect(types).toContain('question.asked');
+      expect(types).toContain('permission.asked');
+      expect(attached.events).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            type: 'question.rejected',
+            properties: expect.objectContaining({ requestID: 'que_reconcile_stale' }),
+          }),
+          expect.objectContaining({
+            type: 'permission.replied',
+            properties: expect.objectContaining({ requestID: 'per_reconcile_stale' }),
+          }),
+        ])
+      );
+      expect(types.at(-1)).toBe('permission.replied');
+    } finally {
+      session.stopPump();
+      session.wrapper.close();
+    }
+  });
+
+  it('replays a completed tool part whose materialized row predates later events', async () => {
+    const session = await startReadySession();
+    try {
+      await seedFacadeRoots({
+        kiloSessionId: qualifiedKiloSessionId,
+        cloudAgentSessionId,
+        title: 'materialized tool fixture',
+      });
+      const assistantMessageId = 'msg_tool_replay';
+      await pushEvents(session, [
+        messageUpdated('msg_user_tool_replay', 'user', 'run a command'),
+        messageUpdated(assistantMessageId, 'assistant', ''),
+        {
+          type: 'message.part.updated',
+          properties: {
+            sessionID: qualifiedKiloSessionId,
+            part: {
+              id: 'prt_tool_replay',
+              messageID: assistantMessageId,
+              sessionID: qualifiedKiloSessionId,
+              type: 'tool',
+              tool: 'bash',
+              state: { status: 'completed', input: { command: 'echo done' }, output: 'done' },
+            },
+          },
+        },
+      ]);
+      await waitFor(async () => {
+        const snapshot = await durableSnapshot(session.stub);
+        expect(
+          snapshot.events.some(
+            event =>
+              event.streamEventType === 'kilocode' &&
+              (event.data as { type?: string }).type === 'message.part.updated'
+          )
+        ).toBe(true);
+      });
+      await pushEvents(session, [
+        partUpdated(assistantMessageId, 'prt_later_replay', 'later event'),
+      ]);
+
+      const attached = await readAttach(await attach());
+      await attached.reader.cancel();
+      const tool = attached.events.find(
+        event =>
+          isFrame(event, 'message.part.updated') &&
+          (event.properties as { part?: { id?: string } }).part?.id === 'prt_tool_replay'
+      ) as { properties: { part: { state: { status: string } } } } | undefined;
+      expect(tool?.properties.part.state.status).toBe('completed');
     } finally {
       session.stopPump();
       session.wrapper.close();

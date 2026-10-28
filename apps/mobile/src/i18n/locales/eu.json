@@ -1706,6 +1706,7 @@
       "restartAnalysis": "Berrabiarazi azterketa",
       "retryAnalysis": "Aztertu berriro",
       "analyzeRepository": "Aztertu biltegia",
+      "rerunAnalysis": "Exekutatu azterketa berriro",
       "capacityFull": "Ezin da azterketa gehiago aldi berean egin. Itxaron martxan dagoen azterketa bat amaitu arte.",
       "couldNotCheckCapacity": "Ezin izan da egiaztatu azterketa gehiago egiteko tokirik dagoen.",
       "watchInCloudAgent": "Ikusi hodeiko agentean",

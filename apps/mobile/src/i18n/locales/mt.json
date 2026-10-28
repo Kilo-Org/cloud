@@ -1775,6 +1775,7 @@
       "restartAnalysis": "Erġa' ibda l-analiżi",
       "retryAnalysis": "Erġa' agħmel l-analiżi",
       "analyzeRepository": "Analizza r-repożitorju",
+      "rerunAnalysis": "Erġa' mexxi l-analiżi",
       "capacityFull": "Intlaħaq il-limitu ta' analiżijiet simultanji. Stenna sakemm tintemm analiżi attiva.",
       "couldNotCheckCapacity": "Ma setgħetx tiġi ċċekkjata l-kapaċità tal-analiżi.",
       "watchInCloudAgent": "Segwi fl-aġent fis-sħab",

@@ -1706,6 +1706,7 @@
       "restartAnalysis": "Reiniciar a análise",
       "retryAnalysis": "Tentar a análise de novo",
       "analyzeRepository": "Analizar o repositorio",
+      "rerunAnalysis": "Executar a análise de novo",
       "capacityFull": "Alcanzouse o límite de análises simultáneas. Agarda a que remate unha análise activa.",
       "couldNotCheckCapacity": "Non se puido comprobar a capacidade de análise.",
       "watchInCloudAgent": "Ver no axente na nube",

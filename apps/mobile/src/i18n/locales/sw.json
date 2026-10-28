@@ -1706,6 +1706,7 @@
       "restartAnalysis": "Anzisha upya uchambuzi",
       "retryAnalysis": "Chambua tena",
       "analyzeRepository": "Chambua hazina",
+      "rerunAnalysis": "Rudia uchambuzi",
       "capacityFull": "Kikomo cha uchambuzi unaoweza kufanyika kwa wakati mmoja kimefikiwa. Subiri uchambuzi unaoendelea ukamilike.",
       "couldNotCheckCapacity": "Imeshindikana kuangalia nafasi iliyopo ya uchambuzi.",
       "watchInCloudAgent": "Tazama kwenye wakala wa wingu",

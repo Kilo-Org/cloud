@@ -1706,6 +1706,7 @@
       "restartAnalysis": "Təhlili yenidən başlat",
       "retryAnalysis": "Təhlili təkrarla",
       "analyzeRepository": "Repozitoriyanı təhlil et",
+      "rerunAnalysis": "Təhlili yenidən işə sal",
       "capacityFull": "Eyni vaxtda aparılan təhlillərin say həddinə çatılıb. Aktiv təhlillərdən birinin bitməsini gözlə.",
       "couldNotCheckCapacity": "Yeni təhlilə başlamaq imkanını yoxlamaq mümkün olmadı.",
       "watchInCloudAgent": "Bulud agentində izlə",

@@ -1141,6 +1141,7 @@
     },
     "analysis": {
       "analyzeRepository": "Analisis repositori",
+      "rerunAnalysis": "Jalankan ulang analisis",
       "analyzed": "Sudah dianalisis",
       "capacityFull": "Kapasitas analisis penuh. Tunggu hingga salah satu analisis yang berjalan selesai.",
       "couldNotCheckCapacity": "Tidak dapat memeriksa kapasitas analisis.",

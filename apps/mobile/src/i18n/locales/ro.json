@@ -1729,6 +1729,7 @@
       "restartAnalysis": "Reia analiza",
       "retryAnalysis": "Reia analiza",
       "analyzeRepository": "Analizează depozitul",
+      "rerunAnalysis": "Rulează din nou analiza",
       "capacityFull": "S-a atins numărul maxim de analize simultane. Așteaptă finalizarea unei analize în curs.",
       "couldNotCheckCapacity": "Nu s-a putut verifica capacitatea de analiză.",
       "watchInCloudAgent": "Urmărește în agentul cloud",

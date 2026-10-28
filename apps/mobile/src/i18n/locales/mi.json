@@ -1706,6 +1706,7 @@
       "restartAnalysis": "Tīmatahia anō te tātari",
       "retryAnalysis": "Whakamātau anō ki te tātari",
       "analyzeRepository": "Tātaritia te pūranga",
+      "rerunAnalysis": "Whakahaeretia anō te tātari",
       "capacityFull": "Kua kī ngā tūranga tātari katoa. Tatari kia oti tētahi tātari e haere ana.",
       "couldNotCheckCapacity": "Kāore i taea te tirotiro mēnā he tūranga tātari e wātea ana.",
       "watchInCloudAgent": "Mātakihia i te Kaiāwhina kapua",

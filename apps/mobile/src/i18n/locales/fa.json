@@ -1706,6 +1706,7 @@
       "restartAnalysis": "اجرای دوباره تحلیل",
       "retryAnalysis": "تلاش دوباره برای تحلیل",
       "analyzeRepository": "تحلیل مخزن",
+      "rerunAnalysis": "اجرای مجدد تحلیل",
       "capacityFull": "ظرفیت تحلیل پر است. صبر کنید تا یکی از تحلیل‌های در حال اجرا تمام شود.",
       "couldNotCheckCapacity": "بررسی ظرفیت تحلیل ممکن نشد.",
       "watchInCloudAgent": "مشاهده در عامل ابری",

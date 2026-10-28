@@ -1141,6 +1141,7 @@
     },
     "analysis": {
       "analyzeRepository": "Phân tích kho lưu trữ",
+      "rerunAnalysis": "Tái chạy phân tích",
       "analyzed": "Đã phân tích",
       "capacityFull": "Đã đạt giới hạn số lượt phân tích đồng thời. Hãy chờ một lượt phân tích đang chạy hoàn tất.",
       "couldNotCheckCapacity": "Không thể kiểm tra số lượt phân tích còn có thể chạy đồng thời.",

@@ -1153,6 +1153,7 @@
     },
     "analysis": {
       "analyzeRepository": "تحليل المستودع",
+      "rerunAnalysis": "إجراء التحليل مجددًا",
       "analyzed": "تم التحليل",
       "capacityFull": "بلغ عدد التحليلات الجارية الحد الأقصى. انتظر حتى ينتهي أحدها.",
       "couldNotCheckCapacity": "تعذّر التحقق من توفر سعة للتحليل.",

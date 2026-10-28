@@ -1752,6 +1752,7 @@
       "restartAnalysis": "Spustiť analýzu znova",
       "retryAnalysis": "Zopakovať analýzu",
       "analyzeRepository": "Analyzovať repozitár",
+      "rerunAnalysis": "Znovu vykonať analýzu",
       "capacityFull": "Kapacita na analýzy je vyčerpaná. Počkajte, kým sa dokončí niektorá z prebiehajúcich analýz.",
       "couldNotCheckCapacity": "Dostupnú kapacitu na analýzy sa nepodarilo overiť.",
       "watchInCloudAgent": "Sledovať v cloudovom agentovi",

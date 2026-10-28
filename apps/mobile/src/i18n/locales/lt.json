@@ -1752,6 +1752,7 @@
       "restartAnalysis": "Pakartoti analizę",
       "retryAnalysis": "Kartoti analizę",
       "analyzeRepository": "Analizuoti saugyklą",
+      "rerunAnalysis": "Paleisti analizę iš naujo",
       "capacityFull": "Pasiektas vienu metu vykdomų analizių limitas. Palauk, kol baigsis viena iš vykdomų analizių.",
       "couldNotCheckCapacity": "Nepavyko patikrinti, ar galima pradėti dar vieną analizę.",
       "watchInCloudAgent": "Stebėti debesijos agente",

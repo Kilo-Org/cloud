@@ -1706,6 +1706,7 @@
       "restartAnalysis": "ትንታኔውን እንደገና ያስጀምሩ",
       "retryAnalysis": "ትንተናውን እንደገና ሞክር",
       "analyzeRepository": "ማከማቻውን ይተንትኑ",
+      "rerunAnalysis": "ትንታኔውን እንደገና ያካሂዱ",
       "capacityFull": "በአንድ ጊዜ ሊካሄዱ የሚችሉ ትንታኔዎች ገደብ ላይ ደርሰዋል። እየተካሄደ ያለ ትንታኔ እስኪጠናቀቅ ይጠብቁ።",
       "couldNotCheckCapacity": "የትንታኔ አቅምን መፈተሽ አልተቻለም።",
       "watchInCloudAgent": "በክላውድ ወኪል ውስጥ ይመልከቱ",

@@ -1144,6 +1144,7 @@
     },
     "analysis": {
       "analyzeRepository": "ניתוח המאגר",
+      "rerunAnalysis": "הרצת הניתוח בשנית",
       "analyzed": "נותח",
       "capacityFull": "מספר הניתוחים הפעילים הגיע למגבלה. המתן עד שאחד מהם יסתיים.",
       "couldNotCheckCapacity": "לא ניתן לבדוק אם אפשר להתחיל ניתוח נוסף.",

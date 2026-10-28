@@ -1706,6 +1706,7 @@
       "restartAnalysis": "Start analysen på nytt",
       "retryAnalysis": "Kjør analysen på nytt",
       "analyzeRepository": "Analyser kodelager",
+      "rerunAnalysis": "Analyser på nytt",
       "capacityFull": "All analysekapasitet er i bruk. Vent til en pågående analyse er ferdig.",
       "couldNotCheckCapacity": "Kunne ikke sjekke analysekapasiteten.",
       "watchInCloudAgent": "Følg med i skyagenten",

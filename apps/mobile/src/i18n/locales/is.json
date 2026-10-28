@@ -1706,6 +1706,7 @@
       "restartAnalysis": "Hefja greiningu aftur",
       "retryAnalysis": "Reyna aftur að greina",
       "analyzeRepository": "Greina geymslu",
+      "rerunAnalysis": "Keyra greiningu aftur",
       "capacityFull": "Hámarksfjölda samtímagreininga er náð. Bíddu þar til einni þeirra lýkur.",
       "couldNotCheckCapacity": "Ekki tókst að athuga hvort hægt sé að hefja fleiri greiningar.",
       "watchInCloudAgent": "Fylgjast með hjá skýjaaðstoðarmanni",

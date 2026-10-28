@@ -1706,6 +1706,7 @@
       "restartAnalysis": "Atombohy indray ny famakafakana",
       "retryAnalysis": "Andramo indray ny famakafakana",
       "analyzeRepository": "Fakafakao ny tahirin-kaody",
+      "rerunAnalysis": "Avereno ny famakafakana",
       "capacityFull": "Tratry ny fetra ny isan'ny famakafakana azo ampandehanana miaraka. Andraso ho vita ny iray amin'ireo famakafakana mandeha.",
       "couldNotCheckCapacity": "Tsy nety nohamarinina ny isan'ny famakafakana mbola azo ampandehanana.",
       "watchInCloudAgent": "Jereo ao amin'ny Cloud Agent",

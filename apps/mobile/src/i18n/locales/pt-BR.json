@@ -1112,6 +1112,7 @@
     },
     "analysis": {
       "analyzeRepository": "Analisar repositório",
+      "rerunAnalysis": "Executar análise novamente",
       "analyzed": "Analisado",
       "capacityFull": "O limite de análises simultâneas foi atingido. Aguarde uma análise em andamento terminar.",
       "couldNotCheckCapacity": "Não foi possível verificar a capacidade de análise.",

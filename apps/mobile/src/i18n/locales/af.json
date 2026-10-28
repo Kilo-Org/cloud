@@ -1706,6 +1706,7 @@
       "restartAnalysis": "Herbegin ontleding",
       "retryAnalysis": "Probeer weer ontleed",
       "analyzeRepository": "Ontleed bewaarplek",
+      "rerunAnalysis": "Voer ontleding weer uit",
       "capacityFull": "Alle ontledingskapasiteit is in gebruik. Wag totdat 'n aktiewe ontleding klaar is.",
       "couldNotCheckCapacity": "Die ontledingskapasiteit kon nie nagegaan word nie.",
       "watchInCloudAgent": "Volg in die Wolkagent",

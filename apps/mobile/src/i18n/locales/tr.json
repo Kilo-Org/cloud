@@ -1141,6 +1141,7 @@
     },
     "analysis": {
       "analyzeRepository": "Depoyu analiz et",
+      "rerunAnalysis": "Analizi yeniden çalıştır",
       "analyzed": "Analiz edildi",
       "capacityFull": "Analiz kapasitesi dolu. Devam eden bir analizin bitmesini bekle.",
       "couldNotCheckCapacity": "Analiz kapasitesi kontrol edilemedi.",

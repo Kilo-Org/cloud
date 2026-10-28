@@ -1706,6 +1706,7 @@
       "restartAnalysis": "Rinis analizën",
       "retryAnalysis": "Riprovo analizën",
       "analyzeRepository": "Analizo depon",
+      "rerunAnalysis": "Riekzekuto analizën",
       "capacityFull": "Kapaciteti për analiza është shteruar. Prit derisa të përfundojë një analizë aktive.",
       "couldNotCheckCapacity": "Nuk u kontrollua kapaciteti i analizës.",
       "watchInCloudAgent": "Ndiq te agjenti në re",

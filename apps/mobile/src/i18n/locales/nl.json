@@ -1141,6 +1141,7 @@
     },
     "analysis": {
       "analyzeRepository": "Repository analyseren",
+      "rerunAnalysis": "Analyse opnieuw uitvoeren",
       "analyzed": "Geanalyseerd",
       "capacityFull": "Alle analysecapaciteit is in gebruik. Wacht tot een lopende analyse is afgerond.",
       "couldNotCheckCapacity": "De beschikbare analysecapaciteit kon niet worden gecontroleerd.",

@@ -1729,6 +1729,7 @@
       "restartAnalysis": "Ponovo pokreni analizu",
       "retryAnalysis": "Ponovi analizu",
       "analyzeRepository": "Analiziraj repozitorijum",
+      "rerunAnalysis": "Ponovo izvrši analizu",
       "capacityFull": "Dostignut je najveći broj istovremenih analiza. Sačekaj da se neka od njih završi.",
       "couldNotCheckCapacity": "Nije moguće proveriti raspoloživi kapacitet za analize.",
       "watchInCloudAgent": "Prati u agentu u oblaku",

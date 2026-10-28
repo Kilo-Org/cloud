@@ -1706,6 +1706,7 @@
       "restartAnalysis": "เริ่มการวิเคราะห์ใหม่",
       "retryAnalysis": "ลองวิเคราะห์อีกครั้ง",
       "analyzeRepository": "วิเคราะห์คลังโค้ด",
+      "rerunAnalysis": "วิเคราะห์อีกครั้ง",
       "capacityFull": "จำนวนงานวิเคราะห์ถึงขีดจำกัดแล้ว รอให้งานที่กำลังวิเคราะห์อยู่เสร็จก่อน",
       "couldNotCheckCapacity": "ไม่สามารถตรวจสอบจำนวนงานวิเคราะห์ที่รองรับได้",
       "watchInCloudAgent": "ดูใน Cloud Agent",

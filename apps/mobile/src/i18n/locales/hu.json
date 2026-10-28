@@ -1706,6 +1706,7 @@
       "restartAnalysis": "Elemzés újraindítása",
       "retryAnalysis": "Elemzés megismétlése",
       "analyzeRepository": "Adattár elemzése",
+      "rerunAnalysis": "Elemzés újrafuttatása",
       "capacityFull": "Nincs szabad elemzési kapacitás. Várd meg, amíg egy folyamatban lévő elemzés befejeződik.",
       "couldNotCheckCapacity": "Nem sikerült ellenőrizni az elemzési kapacitást.",
       "watchInCloudAgent": "Figyelés a Cloud Agentben",

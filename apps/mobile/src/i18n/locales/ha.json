@@ -1706,6 +1706,7 @@
       "restartAnalysis": "Sake fara nazari",
       "retryAnalysis": "Sake gwada nazari",
       "analyzeRepository": "Yi nazarin ma'ajiya",
+      "rerunAnalysis": "Sake yin nazari",
       "capacityFull": "An kai iyakar nazarin da za a iya gudanarwa a lokaci guda. Jira wani nazarin da ke gudana ya ƙare.",
       "couldNotCheckCapacity": "An kasa duba ko akwai damar gudanar da nazari.",
       "watchInCloudAgent": "Bi diddigi a Wakilin gajimare",

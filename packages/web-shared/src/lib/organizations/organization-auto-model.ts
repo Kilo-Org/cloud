@@ -11,7 +11,7 @@ import {
   formatDirectByokModelId,
   getDirectByokModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import { getBYOKforOrganization } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { getByokCredentials } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { readDb, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   KILO_AUTO_BALANCED_MODEL,
@@ -148,10 +148,12 @@ export async function validateOrganizationAutoTarget(
 
   const directByokTarget = await getDirectByokModel(rawModelId);
   if (directByokTarget.provider && directByokTarget.model) {
-    const byok = await getBYOKforOrganization(options.dbClient ?? readDb, organization.id, [
-      directByokTarget.provider.id,
-    ]);
-    if (!byok || byok.length === 0) {
+    const [credential] = await getByokCredentials(
+      options.dbClient ?? readDb,
+      { type: 'organization', id: organization.id },
+      [directByokTarget.provider.id]
+    );
+    if (!credential) {
       return {
         kind: 'error',
         message: `Organization Auto route target '${targetModelId}' is unavailable because this organization does not have an enabled BYOK credential for ${directByokTarget.provider.id}.`,
@@ -159,7 +161,7 @@ export async function validateOrganizationAutoTarget(
     }
     const upstream = options.apiKind
       ? await directByokTarget.provider.resolveUpstream({
-          credential: byok[0].decryptedAPIKey,
+          credential: credential.decryptedAPIKey,
           model: directByokTarget.model,
           stream: false,
         })

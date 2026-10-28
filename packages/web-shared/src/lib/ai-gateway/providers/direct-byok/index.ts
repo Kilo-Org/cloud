@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { type UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   COMPATIBLE_USER_AGENT,
   type DirectByokModel,
@@ -9,8 +8,8 @@ import type { OpenRouterProvider } from '@kilocode/db/schema-types';
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import DIRECT_BYOK_PROVIDERS from './direct-byok-definitions';
 import {
-  getOrganizationByokProviderIds,
-  getUserByokProviderIds,
+  getEnabledByokProviders,
+  type EnabledByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
@@ -86,10 +85,10 @@ function convertModel(
   };
 }
 
-async function getDirectByokModels(byokProviders: UserByokProviderId[]) {
+async function getDirectByokModels(keys: EnabledByokProvider[]) {
   const firstPreferredId = (await getPreferredModels()).length;
   const enabledProviders = DIRECT_BYOK_PROVIDERS.filter(provider =>
-    byokProviders.includes(provider.id)
+    keys.some(key => key.providerId === provider.id)
   );
   const modelsByProvider = await Promise.all(
     enabledProviders.map(async provider => ({ provider, models: await provider.models() }))
@@ -122,13 +121,13 @@ export async function getDirectByokModel(requestedModel: string): Promise<{
 }
 
 export async function getDirectByokModelsForOrganization(organizationId: string) {
-  const byokProviderIds = await getOrganizationByokProviderIds(readDb, organizationId);
-  return byokProviderIds.length === 0 ? [] : await getDirectByokModels(byokProviderIds);
+  const keys = await getEnabledByokProviders(readDb, { type: 'organization', id: organizationId });
+  return keys.length === 0 ? [] : await getDirectByokModels(keys);
 }
 
 export async function getDirectByokModelsForUser(userId: string) {
-  const byokProviderIds = await getUserByokProviderIds(readDb, userId);
-  return byokProviderIds.length === 0 ? [] : await getDirectByokModels(byokProviderIds);
+  const keys = await getEnabledByokProviders(readDb, { type: 'user', id: userId });
+  return keys.length === 0 ? [] : await getDirectByokModels(keys);
 }
 
 /**

@@ -18,6 +18,7 @@ import { addAutoRoutingModels } from '@kilocode/web-shared/lib/ai-gateway/auto-r
 import type * as AutoRouting from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
 import {
   addUserByokAvailability,
+  getEnabledByokProviders,
   getUserByokProviderIds,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
@@ -179,6 +180,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => {
     ...actual,
     addUserByokAvailability: jest.fn(actual.addUserByokAvailability),
     getUserByokProviderIds: jest.fn(async () => []),
+    getEnabledByokProviders: jest.fn(async () => []),
   };
 });
 
@@ -257,6 +259,7 @@ beforeEach(() => {
     .mockReset()
     .mockImplementation(realDirectByok.getDirectByokModelsForUser);
   jest.mocked(getUserByokProviderIds).mockReset().mockResolvedValue([]);
+  jest.mocked(getEnabledByokProviders).mockReset().mockResolvedValue([]);
   jest.mocked(getAvailableModelsForOrganization).mockReset().mockResolvedValue(null);
   jest.mocked(getCustomLlmsById).mockReset().mockResolvedValue(new Map());
   invalidateModelStatsCache();

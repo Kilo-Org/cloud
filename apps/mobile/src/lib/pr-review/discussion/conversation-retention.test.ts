@@ -10,10 +10,19 @@ import {
 } from './conversation-retention';
 import { type ConversationComment } from './review-discussion-types';
 
-const GITHUB_REF: ProviderPrRef = { platform: 'github', owner: 'octocat', repo: 'hello', number: 1 };
+const GITHUB_REF: ProviderPrRef = {
+  platform: 'github',
+  owner: 'octocat',
+  repo: 'hello',
+  number: 1,
+};
 const COMMENT = { id: 'c1' } as unknown as ConversationComment;
 
-function key(userId: string, organizationId: string | null, ref: ProviderPrRef = GITHUB_REF): string {
+function key(
+  userId: string,
+  organizationId: string | null,
+  ref: ProviderPrRef = GITHUB_REF
+): string {
   return conversationRetentionKey({ userId, organizationId, ref });
 }
 
@@ -124,9 +133,9 @@ describe('retainConversationAcrossMounts (remount survival)', () => {
     expect(retainConversationAcrossMounts(null, [{ conversation: [COMMENT] }], true)).toEqual([
       COMMENT,
     ]);
-    expect(retainConversationAcrossMounts(key('user_a', null), [{ conversation: [] }], false)).toEqual(
-      []
-    );
+    expect(
+      retainConversationAcrossMounts(key('user_a', null), [{ conversation: [] }], false)
+    ).toEqual([]);
     // And it is never served an entry another mount stored.
     retainConversationAcrossMounts(key('user_a', null), [{ conversation: [COMMENT] }], true);
     expect(retainConversationAcrossMounts(null, [{ conversation: [] }], false)).toEqual([]);
@@ -138,9 +147,9 @@ describe('retainConversationAcrossMounts (remount survival)', () => {
 
     clearConversationRetention();
 
-    expect(retainConversationAcrossMounts(key('user_a', null), [{ conversation: [] }], false)).toEqual(
-      []
-    );
+    expect(
+      retainConversationAcrossMounts(key('user_a', null), [{ conversation: [] }], false)
+    ).toEqual([]);
     expect(
       retainConversationAcrossMounts(key('user_b', 'org_1'), [{ conversation: [] }], false)
     ).toEqual([]);

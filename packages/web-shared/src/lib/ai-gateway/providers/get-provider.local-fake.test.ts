@@ -779,13 +779,16 @@ describe('getProvider direct BYOK routing', () => {
     expect(result.bypassAccessCheck).toBe(true);
   });
 
-  function directByokProvider(id: 'synthetic' | 'zai-coding') {
+  function directByokProvider(
+    id: 'synthetic' | 'zai-coding',
+    supportedChatApis: GatewayRequest['kind'][] = ['chat_completions']
+  ) {
     return {
       id,
       models_dev_id: id,
       resolveUpstream: apiKeyUpstream({
         apiUrl: `https://${id}.example/v1`,
-        supportedChatApis: ['chat_completions'],
+        supportedChatApis,
         responseTransforms: null,
       }),
       transformRequest: jest.fn(),
@@ -893,6 +896,49 @@ describe('getProvider direct BYOK routing', () => {
     jest.mocked(getBYOKforUser).mockResolvedValue(null);
 
     const result = await getProvider(providerInput('moonshotai/kimi-k2.6'));
+
+    expect(result).toMatchObject({ kind: 'provider', provider: OPENROUTER, userByok: null });
+  });
+
+  test('skips catalog-mode keys whose upstream cannot serve the API kind', async () => {
+    jest.mocked(findDirectByokCatalogModels).mockResolvedValue([
+      { provider: directByokProvider('synthetic'), model: directByokModel('hf:openai/gpt-oss') },
+      {
+        provider: directByokProvider('zai-coding', ['chat_completions', 'responses']),
+        model: directByokModel('gpt-oss'),
+      },
+    ]);
+    jest.mocked(getByokCredentials).mockResolvedValue([
+      { decryptedAPIKey: 'synthetic-key', providerId: 'synthetic', serveCatalogModels: true },
+      { decryptedAPIKey: 'zai-key', providerId: 'zai-coding', serveCatalogModels: true },
+    ]);
+
+    const result = await getProvider(responsesInput('openai/gpt-oss'));
+
+    expect(result).toMatchObject({
+      kind: 'provider',
+      provider: { id: 'direct-byok', apiKey: 'zai-key' },
+      bypassAccessCheck: false,
+    });
+  });
+
+  test('keeps the regular route when no catalog-mode key serves the API kind', async () => {
+    jest
+      .mocked(findDirectByokCatalogModels)
+      .mockResolvedValue([
+        { provider: directByokProvider('synthetic'), model: directByokModel('hf:openai/gpt-oss') },
+      ]);
+    jest
+      .mocked(getByokCredentials)
+      .mockResolvedValue([
+        { decryptedAPIKey: 'synthetic-key', providerId: 'synthetic', serveCatalogModels: true },
+      ]);
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
+    jest.mocked(getModelInferenceUserByokProviders).mockResolvedValue([]);
+    jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue([]);
+    jest.mocked(getBYOKforUser).mockResolvedValue(null);
+
+    const result = await getProvider(responsesInput('openai/gpt-oss'));
 
     expect(result).toMatchObject({ kind: 'provider', provider: OPENROUTER, userByok: null });
   });

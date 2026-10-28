@@ -181,9 +181,18 @@ async function resolveDirectByokProvider(
     const credential = credentials.find(
       candidate => candidate.providerId === provider.id && candidate.serveCatalogModels
     );
-    if (credential) {
-      return directByokProviderResult(provider, model, credential, requestedModel, request, true);
-    }
+    if (!credential) continue;
+    const result = await directByokProviderResult(
+      provider,
+      model,
+      credential,
+      requestedModel,
+      request,
+      true
+    );
+    // A key whose upstream cannot serve this API kind is skipped, so the catalog id falls back to
+    // the next catalog-mode key or the regular route instead of failing the request.
+    if (result.provider.supportedChatApis.includes(request.kind)) return result;
   }
   return null;
 }

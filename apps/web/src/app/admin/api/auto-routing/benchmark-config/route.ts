@@ -9,7 +9,6 @@ import {
   getBenchmarkConfig,
   updateBenchmarkConfig,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-benchmark-admin-client';
-import { gatewayChatApisForModel, modelServesAllGatewayChatApis } from '@/lib/model-api-kinds';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 
 export async function GET(request?: NextRequest) {
@@ -38,22 +37,6 @@ export async function PUT(request: NextRequest) {
   const parsed = BenchmarkConfigSchema.safeParse(rawBody);
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid benchmark config' }, { status: 400 });
-  }
-
-  // Routing-table candidates carry no per-protocol metadata, so every decider
-  // model must be servable on ALL gateway chat API kinds by the provider the
-  // gateway would route it to.
-  const unsupported = parsed.data.deciderModels
-    .map(m => m.id)
-    .filter(id => !modelServesAllGatewayChatApis(id))
-    .map(id => `${id} (supports: ${gatewayChatApisForModel(id).join(', ') || 'none'})`);
-  if (unsupported.length > 0) {
-    return NextResponse.json(
-      {
-        error: `Decider models must support all gateway chat APIs (chat_completions, responses, messages): ${unsupported.join('; ')}`,
-      },
-      { status: 400 }
-    );
   }
 
   const email = user?.google_user_email ?? '';

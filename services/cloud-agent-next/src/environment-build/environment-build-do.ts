@@ -32,7 +32,11 @@ import type {
   EnvironmentBuildStatus,
 } from '../shared/environment-build-status.js';
 import { environmentActorAccess, resolveBuilderGitSource } from './access.js';
-import { builderSandboxId, createBuilderProvider } from './builder-provider.js';
+import {
+  builderRuntimeUnsupportedReason,
+  builderSandboxId,
+  createBuilderProvider,
+} from './builder-provider.js';
 import {
   EnvironmentBuildCoordinator,
   type CoordinatorDeps,
@@ -191,7 +195,7 @@ export class EnvironmentBuild extends DurableObject<Env> {
         ) {
           return 'Cloudflare containers are not enabled for this account';
         }
-        return null;
+        return builderRuntimeUnsupportedReason(env);
       },
       log: (message, fields) => logger.withFields(fields).info(message),
     };

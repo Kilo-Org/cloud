@@ -17,24 +17,18 @@ import {
   updateOrganizationUserLimit,
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { DEFAULT_MEMBER_DAILY_LIMIT_USD } from '@kilocode/web-shared/lib/organizations/constants';
-import { CLAUDE_OPUS_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
-import { CLAUDE_SONNET_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
-import { GPT_SOL_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
-import { GLM_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/zai';
-import { KIMI_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/moonshotai';
-import { MINIMAX_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
 import { demoOrganizationSettings, SALES_DEMO_REMAINING_MICRODOLLARS } from './sales-demo-settings';
 import type { FEATURE_VALUES } from '@kilocode/web-shared/lib/feature-detection';
 
 // Stable per-1K-token rates (microdollars) for the current paid models. Rates
 // are illustrative only; the seed step needs determinism, not exact billing.
 const MODELS = [
-  { id: CLAUDE_SONNET_CURRENT_MODEL_ID, inputPer1k: 3000, outputPer1k: 15000 },
-  { id: CLAUDE_OPUS_CURRENT_MODEL_ID, inputPer1k: 15000, outputPer1k: 75000 },
-  { id: GPT_SOL_CURRENT_MODEL_ID, inputPer1k: 2500, outputPer1k: 10000 },
-  { id: GLM_CURRENT_MODEL_ID, inputPer1k: 1000, outputPer1k: 4000 },
-  { id: KIMI_CURRENT_MODEL_ID, inputPer1k: 600, outputPer1k: 2400 },
-  { id: MINIMAX_CURRENT_MODEL_ID, inputPer1k: 300, outputPer1k: 1200 },
+  { id: 'anthropic/claude-sonnet-5.5', inputPer1k: 3000, outputPer1k: 15000 },
+  { id: 'anthropic/claude-opus-5.5', inputPer1k: 15000, outputPer1k: 75000 },
+  { id: 'openai/gpt-6.1-sol', inputPer1k: 2500, outputPer1k: 10000 },
+  { id: 'z-ai/glm-5.3', inputPer1k: 1000, outputPer1k: 4000 },
+  { id: 'moonshotai/kimi-k3', inputPer1k: 600, outputPer1k: 2400 },
+  { id: 'minimax/minimax-m3', inputPer1k: 300, outputPer1k: 1200 },
 ] as const;
 
 const FEATURES = [

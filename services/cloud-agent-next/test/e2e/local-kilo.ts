@@ -5,7 +5,7 @@ import path from 'node:path';
 
 export function isolatedKiloEnvironment(input: {
   home: string;
-  token: string;
+  token?: string;
   password: string;
   web: string;
   worker: string;
@@ -25,7 +25,9 @@ export function isolatedKiloEnvironment(input: {
     XDG_CACHE_HOME: path.join(input.home, 'cache'),
     XDG_STATE_HOME: path.join(input.home, 'state'),
     KILO_DB: path.join(input.home, 'kilo.db'),
-    KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key: input.token } }),
+    ...(input.token
+      ? { KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key: input.token } }) }
+      : {}),
     KILO_SERVER_USERNAME: 'kilo',
     KILO_SERVER_PASSWORD: input.password,
     KILO_CONFIG_CONTENT: '{}',
@@ -56,7 +58,7 @@ export async function startLocalKilo(input: {
   repo: string;
   bun: string;
   home: string;
-  token: string;
+  token?: string;
   web: string;
   worker: string;
   gateway: string;
@@ -89,8 +91,8 @@ export async function startLocalKilo(input: {
     }
   );
   const output = (chunk: Buffer) => {
-    log = (log + chunk.toString())
-      .replaceAll(input.token, '[redacted]')
+    const combined = log + chunk.toString();
+    log = (input.token ? combined.replaceAll(input.token, '[redacted]') : combined)
       .replaceAll(password, '[redacted]')
       .replaceAll(basic, '[redacted]')
       .slice(-64 * 1024);

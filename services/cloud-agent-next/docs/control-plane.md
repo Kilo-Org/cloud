@@ -58,7 +58,8 @@ unavailable signing secret returns 503, so ordinary bounded-backoff reconnect re
 - A **route** is one session on one sandbox: `sessionId`, worktree directory, `kiloSessionId`.
   New allocations with a compatible wrapper share one Kilo runtime per directory.
   Existing allocations retain their original `runtimeIsolation` and HOME keys until normal replacement.
-  MCP servers are workspace configuration in shared runtimes.
+  Profile MCP, environment values, secrets, skills, agents, commands and setup commands
+  initialize once per shared runtime. Sibling attachments reuse that configuration.
 - Compatible routes reference one Sandbox-owned credential scope. Scope membership includes every
   eligible root Kilo session. Shared runtimes use **one handle per worktree scope**.
   Existing allocations retain per-session handles. A modern grant never merges with a legacy grant.
@@ -189,6 +190,16 @@ public stream has no reconnecting status today, so `reconnecting` changes no cli
   sent as a new message.
 - Each terminal message produces one report. The batch callback fires when no `queued` or
   `accepted` message remains (current callback semantics).
+- The per-user facade serves native `/event` and `/global/event`. `/event` first opens the same
+  session `/stream?replay=false` log the client stream uses and buffers its live frames, then pages
+  the `nativeSnapshot`, writes the fence, and delivers the buffered and later frames above it. The
+  durable log is the only cursor: the tail advances a monotonic last-delivered persisted id but
+  does not resume after a gap, because a gap cannot be proven continuous. Each failure emits one
+  `kilo.native.resnapshot` and closes the response: `continuity_unproven` for an upstream transport
+  gap, an identity change or a retained-buffer overflow; `snapshot_too_large` for an oversized
+  snapshot; `snapshot_unavailable` when a snapshot page read fails. The client rebuilds and
+  re-attaches. A plain Session DO eviction does not emit a resnapshot. `/global/event` opens one
+  live-only tail per owned root without history.
 
 ## 6. Sandbox DO
 
@@ -539,8 +550,12 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   builder. Heartbeats from reports renew the build lease; a builder silent for 90 s is lost.
 - **Lifetime.** The platform keeps an unused snapshot for 30 days and has no list or delete API in
   this release, so a superseded snapshot is unreferenced rather than deleted.
-- **Runtime selection.** Builders and sessions use the deployment's explicit startup selection.
-  Downloaded mode uses the current runtime installer and its named builder or supervisor target,
+- **Runtime selection.** Environment builders always use the `runtime-free` image and downloaded
+  startup. Snapshot enrollment controls builder access independently of the interactive session cohort.
+  Builds are unsupported without a downloaded runtime-free deployment and a published runtime release.
+  Existing all-in-one snapshots are incompatible and trigger replacement builds. Sessions keep their
+  cohort-selected image; an `app` session starts from its image instead of a split-image snapshot.
+  Downloaded startup uses the current runtime installer and its named builder or supervisor target,
   including on snapshot restore. The installed control bundle includes the builder. A preinstalled
   launch rejects snapshots captured with downloaded aliases; a downloaded launch can install a
   newer compatible runtime over a snapshot. The artifact read grant travels in the installer
@@ -985,8 +1000,8 @@ Worker forwards an admitted report to the Sandbox DO as `startup-failed`.
 - CI publishes runtime payloads create-only by content hash, and the descriptor last. The deploy
   reads an immutable handoff for the exact commit, and verifies the base image digest and both
   payloads before it deploys a `downloaded` target.
-- Roll out on an isolated target first: `downloaded` on the all-in-one image, then `downloaded` on
-  the runtime-free image, then production. Roll back the first step by mode and the second by image.
+- Roll out through a production `interactiveOrgIds` cohort: one test organization on `downloaded`
+  runtime-free first, then a wider cohort after qualification. Roll back by image or by mode.
 - The runtime-free image change relies on B1 (#7914), which is already merged: a running container
   captures under the image that it started with, including after DO reconstruction.
 - `runtime-targets.json` owns mode and image. Deployment renders Worker vars and the native image
@@ -1107,10 +1122,21 @@ mode. The environment default is captured at registration when admission omitted
 callers cannot choose proxy mode independently. Runtime authorization does not require SCM
 containment: Cloudflare Sandbox and Cloudflare Containers support both modes, while Vercel still
 requires containment. Unsupported modes and invalid modern facade configuration are rejected
-before queuing work. Contained SCM resolution and Vercel policy remain enforced. MCP servers are
-workspace configuration: sessions in one worktree share one runtime, and a session whose MCP set
-differs from the warm runtime's fails with `Kilo worktree MCP configuration mismatch` rather than
-running with another session's servers.
+before queuing work. Contained SCM resolution and Vercel policy remain enforced.
+Every `session.attach` carries the route's workspace configuration. The wrapper's preparation
+manager owns the decision: while another route holds the runtime key, the attachment uses the
+retained configuration and the offered one is ignored. When no route holds the key, the offered
+configuration replaces the retained one. The last route's release drops it. The Sandbox DO keeps no
+per-socket record of sent configuration, so hibernation does not change the result.
+The runtime still rejects profile MCP drift on legacy preparation paths.
+
+The built-in `kilo-cloud-agent` MCP server uses workspace authority. The worktree UUID identifies
+its original root chat, which remains the authorization anchor for the existing child-session API.
+Every grant renewal checks that root's authorization and its owner, organization and worktree.
+Deleting or revoking the root disables new grants; another sibling never becomes the anchor.
+Children and parent callbacks belong to that root, not necessarily the chat invoking MCP.
+The MCP transport does not send the invoking chat's identity. Built-in credential rotation is
+not profile MCP drift.
 
 Sandbox DO ↔ wrapper (WebSocket frames): `hello`, `welcome`, `shutdown`, `heartbeat`, `heartbeat_ack`,
 `session.prepare`, `session.progress`, `session.ready`, `session.failed`, `workspace.capture` and

@@ -39,7 +39,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
     description: 'Test model',
     context_length: 8_192,
     max_completion_tokens: 4_096,
-    flags: [],
+    vision: false,
   };
   return {
     ...actual,
@@ -66,8 +66,10 @@ jest.mock('next/server', () => ({
 
 import { afterAll, beforeEach, describe, expect, it } from '@jest/globals';
 import type * as gatewayModels from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
+import {
+  kiloExclusiveModels,
+  type KiloExclusiveModel,
+} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { resolveOpenAiChatGptAccessToken } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/refresh';
 import { getOpenAiChatGptStoredConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import { isOpenAiModelServed } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/served-models';

@@ -1,6 +1,8 @@
 import { afterAll, beforeAll } from '@jest/globals';
-import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
+import {
+  kiloExclusiveModels,
+  type KiloExclusiveModel,
+} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 
 export const kiloExclusiveModelFixture: KiloExclusiveModel = {
   public_id: 'kilo-exclusive/fixture',
@@ -9,7 +11,7 @@ export const kiloExclusiveModelFixture: KiloExclusiveModel = {
   description: 'A Kilo-exclusive model used by tests.',
   context_length: 1_000_000,
   max_completion_tokens: 128_000,
-  flags: ['reasoning', 'vision'],
+  vision: true,
 };
 
 export function addKiloExclusiveModel(model: KiloExclusiveModel): () => void {

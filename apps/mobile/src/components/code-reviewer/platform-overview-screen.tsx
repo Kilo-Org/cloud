@@ -15,6 +15,7 @@ import {
   resolveRowOnPress,
 } from '@/components/code-reviewer/platform-overview-rows';
 import { ProviderConnectCard } from '@/components/code-reviewer/provider-connect-card';
+import { useSinglePushRoute } from '@/components/code-reviewer/use-single-push-route';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-overview-skeleton';
 import { ScreenHeader } from '@/components/screen-header';
@@ -45,6 +46,7 @@ export function PlatformOverviewScreen({
   platform,
 }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const colors = useThemeColors();
   const capabilities = PLATFORM_CAPABILITIES[platform];
@@ -156,7 +158,7 @@ export function PlatformOverviewScreen({
   }
 
   const pushField = (field: string) => {
-    router.push(`/(app)/code-reviewer/${scope}/${platform}/${field}` as Href);
+    pushOnce(`/(app)/code-reviewer/${scope}/${platform}/${field}` as Href);
   };
 
   // The classification owns the body state, so the rows are built from the
@@ -195,7 +197,7 @@ export function PlatformOverviewScreen({
           onOpenReviewMemory:
             platform === 'github'
               ? () => {
-                  router.push(`/(app)/code-reviewer/${scope}/review-memory` as Href);
+                  pushOnce(`/(app)/code-reviewer/${scope}/review-memory` as Href);
                 }
               : undefined,
         });

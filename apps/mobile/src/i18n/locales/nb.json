@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Kunne ikke nå instansen. Den kan ha mistet tilkoblingen.",
     "remoteSpawnNonRetryable": "Instansen kunne ikke starte økten. Sjekk maskinen eller oppdater CLI-en.",
-    "remoteSpawnInstanceDisconnected": "Den valgte instansen mistet tilkoblingen. Start en økt på Cloud Agent eller velg en annen instans.",
-    "liveCount_one": "{{count}} I SANNTID",
-    "liveCount_other": "{{count}} I SANNTID"
+    "remoteSpawnInstanceDisconnected": "Den valgte instansen mistet tilkoblingen. Start en økt på Cloud Agent eller velg en annen instans."
   },
   "agentChat": {
     "session": {
@@ -3955,6 +3953,8 @@
     "title": "Kjøp kreditter",
     "description": "Kreditter er et engangskjøp som legges til Kilo-saldoen din for å kjøre AI-kodeøkter i Kilo App. Butikken belaster kontoen din, og kredittene legges til etter at butikken bekrefter betalingen.",
     "nextExpiry": "{{amount}} i kreditter utløper {{date}} (UTC). Kreditter med tidligst utløpsdato brukes først.",
+    "noExpiringCredits": "Ingen kreditter med utløpsdato.",
+    "expiryUnavailable": "Informasjon om kredittenes utløp er ikke tilgjengelig.",
     "appStoreExpiry": "Kreditter kjøpt via App Store utløper ikke.",
     "playOneYearExpiry": "Disse kredittene utløper ett kalenderår etter kjøpet.",
     "playNonexpiring": "Disse kredittene utløper ikke.",

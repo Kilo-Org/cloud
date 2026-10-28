@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Hatukuweza kufikia kizio — huenda muunganisho wake umekatika.",
     "remoteSpawnNonRetryable": "Kizio kimeshindwa kuanzisha kikao — angalia mashine au sasisha CLI.",
-    "remoteSpawnInstanceDisconnected": "Muunganisho wa kizio ulichochagua umekatika. Anzisha kikao kwenye Cloud Agent au chagua kizio kingine.",
-    "liveCount_one": "{{count}} MOJA KWA MOJA",
-    "liveCount_other": "{{count}} MOJA KWA MOJA"
+    "remoteSpawnInstanceDisconnected": "Muunganisho wa kizio ulichochagua umekatika. Anzisha kikao kwenye Cloud Agent au chagua kizio kingine."
   },
   "agentChat": {
     "session": {
@@ -3955,6 +3953,8 @@
     "title": "Nunua salio",
     "description": "Salio ni ununuzi wa mara moja unaoongezwa kwenye usawa wako wa Kilo kwa kuendesha vikao vya kuandika msimbo kwa AI katika Kilo App. Duka hukutoza akaunti yako na salio huongezwa baada ya duka kuthibitisha malipo.",
     "nextExpiry": "Muda wa salio la {{amount}} unaisha {{date}} (UTC). Salio linaloisha muda mapema zaidi hutumika kwanza.",
+    "noExpiringCredits": "Hakuna salio linaloisha muda.",
+    "expiryUnavailable": "Taarifa za muda wa kuisha kwa salio hazipatikani.",
     "appStoreExpiry": "Salio lililonunuliwa kupitia App Store halina muda wa kuisha.",
     "playOneYearExpiry": "Muda wa salio hili unaisha mwaka mmoja wa kalenda baada ya ununuzi.",
     "playNonexpiring": "Salio hili halina muda wa kuisha.",

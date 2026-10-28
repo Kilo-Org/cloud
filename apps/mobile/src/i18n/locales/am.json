@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "ከኢንስታንሱ ጋር መገናኘት አልተቻለም — ግንኙነቱ ተቋርጦ ሊሆን ይችላል።",
     "remoteSpawnNonRetryable": "ኢንስታንሱ ክፍለ ጊዜውን ማስጀመር አልቻለም — ኮምፒውተሩን ፈትሽ ወይም CLIን አዘምን።",
-    "remoteSpawnInstanceDisconnected": "የተመረጠው ኢንስታንስ ግንኙነት ተቋርጧል። በCloud Agent ላይ ክፍለ ጊዜ ጀምር ወይም ሌላ ኢንስታንስ ምረጥ።",
-    "liveCount_one": "{{count}} ቀጥታ",
-    "liveCount_other": "{{count}} ቀጥታ"
+    "remoteSpawnInstanceDisconnected": "የተመረጠው ኢንስታንስ ግንኙነት ተቋርጧል። በCloud Agent ላይ ክፍለ ጊዜ ጀምር ወይም ሌላ ኢንስታንስ ምረጥ።"
   },
   "agentChat": {
     "session": {
@@ -3955,6 +3953,8 @@
     "title": "ክሬዲት ይግዙ",
     "description": "ክሬዲት በKilo App ውስጥ የAI ኮዲንግ ክፍለ-ጊዜዎችን ለማስኬድ ወደ Kilo ቀሪ ሂሳብዎ የሚጨመር የአንድ ጊዜ ግዢ ነው። መደብሩ ሂሳብዎን ይከፍላል፣ እና መደብሩ ክፍያውን ካረጋገጠ በኋላ ክሬዲት ይጨመራል።",
     "nextExpiry": "{{amount}} ክሬዲት በ{{date}} (UTC) ጊዜው ያበቃል። ቀድሞ ጊዜው የሚያበቃው ክሬዲት መጀመሪያ ጥቅም ላይ ይውላል።",
+    "noExpiringCredits": "ጊዜው የሚያበቃ ክሬዲት የለም.",
+    "expiryUnavailable": "የክሬዲት ጊዜ ማብቂያ መረጃ አይገኝም.",
     "appStoreExpiry": "በApp Store የተገዙ ክሬዲቶች ጊዜያቸው አያበቃም።",
     "playOneYearExpiry": "እነዚህ ክሬዲቶች ከተገዙ ከአንድ የቀን መቁጠሪያ ዓመት በኋላ ጊዜያቸው ያበቃል።",
     "playNonexpiring": "እነዚህ ክሬዲቶች ጊዜያቸው አያበቃም።",

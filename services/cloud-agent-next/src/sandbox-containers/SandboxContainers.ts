@@ -69,6 +69,7 @@ import {
   nativeEgressPolicySchema,
   type NativeEgressPolicy,
 } from './egress-policy.js';
+import type { RuntimeStartupConfig } from '../shared/runtime-startup-config.js';
 
 export type { ContainerInstanceSize, ContainersStartSource } from './native-start.js';
 export type { NativeCaptureResult } from './native-capture.js';
@@ -85,6 +86,7 @@ export type ContainersLaunchInput = {
   /** Environment snapshot selected for this allocation; absent starts from the image. */
   snapshot?: NativeStartSnapshot;
   deadlineAt?: number;
+  nativeImage?: RuntimeStartupConfig['image'];
 };
 
 /**
@@ -164,6 +166,7 @@ type DelayedSchedule<T> = {
 
 const RECORD_KEY = 'containers:record:v1';
 const CONTAINER_IMAGE = 'app';
+const RUNTIME_FREE_CONTAINER_IMAGE = 'runtime-free';
 
 const PROBE_TIMEOUT_MS = 5_000;
 const CONTAINER_CALL_TIMEOUT_MS = 5_000;
@@ -440,6 +443,7 @@ export class SandboxContainers extends DurableObject<Env> {
           env: {},
           instance: input.instance,
           command: input.command,
+          nativeImage: 'runtime-free',
         },
         'environment-builder',
         false
@@ -534,7 +538,13 @@ export class SandboxContainers extends DurableObject<Env> {
   private async resolveStart(
     input: Pick<
       ContainersLaunchInput,
-      'env' | 'instance' | 'containment' | 'egressAllowlist' | 'snapshot' | 'command'
+      | 'env'
+      | 'instance'
+      | 'containment'
+      | 'egressAllowlist'
+      | 'snapshot'
+      | 'command'
+      | 'nativeImage'
     >,
     mainProcess: NativeMainProcess,
     allowSnapshot: boolean
@@ -549,7 +559,7 @@ export class SandboxContainers extends DurableObject<Env> {
         MAX_SNAPSHOT_START_FAILURES;
     const plan = planNativeStart(
       {
-        image: this.containerImage(),
+        image: this.containerImage(input.nativeImage ?? 'all-in-one'),
         instance: input.instance,
         mainProcess,
         env: input.env,
@@ -1275,10 +1285,12 @@ export class SandboxContainers extends DurableObject<Env> {
     );
   }
 
-  private containerImage(): string {
-    const image = this.requiredContainer().images[CONTAINER_IMAGE];
+  private containerImage(nativeImage: RuntimeStartupConfig['image']): string {
+    const imageName =
+      nativeImage === 'runtime-free' ? RUNTIME_FREE_CONTAINER_IMAGE : CONTAINER_IMAGE;
+    const image = this.requiredContainer().images[imageName];
     if (image === undefined) {
-      throw new Error(`Container image "${CONTAINER_IMAGE}" is unavailable`);
+      throw new Error(`Container image "${imageName}" is unavailable`);
     }
     return image;
   }
@@ -1354,8 +1366,8 @@ export class SandboxContainers extends DurableObject<Env> {
 
   /** The stored outcome of one capture, or null when this DO never recorded it. */
   /** The image a launch uses now; environment snapshots must match it. */
-  async currentImage(): Promise<string> {
-    return this.containerImage();
+  async currentImage(nativeImage: RuntimeStartupConfig['image']): Promise<string> {
+    return this.containerImage(nativeImage);
   }
 
   async readCapture(captureId: string): Promise<NativeCaptureResult | null> {
@@ -1381,7 +1393,7 @@ export class SandboxContainers extends DurableObject<Env> {
         reason: 'not_running',
       });
     }
-    const baseImage = (await this.readRecord()).startImage ?? this.containerImage();
+    const baseImage = (await this.readRecord()).startImage ?? this.containerImage('all-in-one');
     // Issued evidence goes down before the platform call: after a restart an
     // issued record without a result is uncertain, never a reason to retry.
     await this.storeCapture(captureId, key, {

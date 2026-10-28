@@ -1665,9 +1665,7 @@
     },
     "remoteSpawnRetryable": "Tidak dapat menghubungi instans. Koneksinya mungkin terputus.",
     "remoteSpawnNonRetryable": "Instans gagal memulai sesi. Periksa mesin atau perbarui CLI.",
-    "remoteSpawnInstanceDisconnected": "Koneksi instans yang dipilih terputus. Mulai sesi di Cloud Agent atau pilih instans lain.",
-    "liveCount_one": "{{count}} LANGSUNG",
-    "liveCount_other": "{{count}} LANGSUNG"
+    "remoteSpawnInstanceDisconnected": "Koneksi instans yang dipilih terputus. Mulai sesi di Cloud Agent atau pilih instans lain."
   },
   "agentChat": {
     "session": {
@@ -3955,6 +3953,8 @@
     "title": "Beli kredit",
     "description": "Kredit adalah pembelian satu kali yang ditambahkan ke saldo Kilo Anda untuk menjalankan sesi coding AI di Kilo App. Toko menagih akun Anda dan kredit ditambahkan setelah toko mengonfirmasi pembayaran.",
     "nextExpiry": "Kredit senilai {{amount}} akan kedaluwarsa pada {{date}} (UTC). Kredit dengan masa berlaku paling awal digunakan lebih dulu.",
+    "noExpiringCredits": "Tidak ada kredit yang akan kedaluwarsa.",
+    "expiryUnavailable": "Informasi kedaluwarsa kredit tidak tersedia.",
     "appStoreExpiry": "Kredit yang dibeli melalui App Store tidak kedaluwarsa.",
     "playOneYearExpiry": "Kredit ini kedaluwarsa satu tahun kalender setelah pembelian.",
     "playNonexpiring": "Kredit ini tidak kedaluwarsa.",

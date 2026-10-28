@@ -8,10 +8,14 @@ import {
   evaluateEffectiveModelAccessPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { listAvailableCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
-import { getDirectByokModelsForOrganization } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  getDirectByokCatalogModelIds,
+  getDirectByokModelsForOrganization,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { isOrganizationAutoEnabled } from '@kilocode/web-shared/lib/organizations/organization-auto-model';
 import {
+  addDirectByokCatalogAvailability,
   addUserByokAvailability,
   getOrganizationByokProviderIds,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
@@ -70,15 +74,26 @@ export async function getAvailableModelsForOrganization(
   const restrictionCandidates = [...responseData.data];
 
   const filteredModels = [];
+  const allowedProvidersByModel = new Map<string, ReadonlySet<string>>();
   for (const model of restrictionCandidates) {
-    if ((await getEffectiveModelDecision(policy, model.id)).allowed) {
+    const decision = await getEffectiveModelDecision(policy, model.id);
+    if (decision.allowed) {
       filteredModels.push(model);
+      if (decision.eligibleProviderRoutes) {
+        allowedProvidersByModel.set(model.id, decision.eligibleProviderRoutes);
+      }
     }
   }
 
-  let availableModels = await addUserByokAvailability(
-    filteredModels,
-    await getOrganizationByokProviderIds(readDb, organizationId)
+  const [byokProviderIds, directByokCatalogModelIds] = await Promise.all([
+    getOrganizationByokProviderIds(readDb, organizationId),
+    getDirectByokCatalogModelIds({ type: 'organization', id: organizationId }),
+  ]);
+  let availableModels = addDirectByokCatalogAvailability(
+    await addUserByokAvailability(filteredModels, byokProviderIds, modelId =>
+      allowedProvidersByModel.get(modelId)
+    ),
+    directByokCatalogModelIds
   );
 
   if (organization.plan === 'teams' && organization.settings.data_collection === 'deny') {

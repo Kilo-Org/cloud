@@ -39,25 +39,33 @@ retries of the same SHA. Different SHAs publish concurrently, independently of d
 Concurrent base builds retain the first verified digest for their shared input identity.
 Each publisher verifies that retained digest before use. A Worker-only SHA still creates its own handoff.
 
-The trigger stays disabled until infrastructure owners approve and provision:
+Publication requires these approved and provisioned resources:
 
 - A private runtime R2 bucket, separate from session storage. Keep public access disabled.
 - Repository variables `CLOUD_AGENT_RUNTIME_ACCOUNT_ID` and `CLOUD_AGENT_RUNTIME_BUCKET`.
-- Environment `cloud-agent-runtime-publication`, with its required reviewers.
-- Secrets `CLOUD_AGENT_RUNTIME_R2_WRITE_ACCESS_KEY_ID` and `CLOUD_AGENT_RUNTIME_R2_WRITE_SECRET_ACCESS_KEY`,
-  with the minimum bucket-scoped object write/read permissions. The publisher performs no deletes.
-- Secret `CLOUD_AGENT_RUNTIME_REGISTRY_PUBLISH_TOKEN`, restricted to the selected account's registry.
-- Deployment read credentials `CLOUD_AGENT_RUNTIME_R2_READ_ACCESS_KEY_ID` and
-  `CLOUD_AGENT_RUNTIME_R2_READ_SECRET_ACCESS_KEY`, restricted to the same bucket.
-- Finally, repository variable `CLOUD_AGENT_RUNTIME_PUBLICATION_ENABLED=true`.
+- Environment `cloud-agent-runtime-publication`, with a deployment branch policy restricted to `main`.
+- Repository secrets `CLOUD_AGENT_RUNTIME_R2_ACCESS_KEY_ID` and
+  `CLOUD_AGENT_RUNTIME_R2_SECRET_ACCESS_KEY`, with bucket-scoped object read/write permission.
+  The publisher performs no deletes. Publication and deployment use the same pair.
+- Repository secret `CLOUDFLARE_API_TOKEN` with permission to push to the selected account's container
+  registry. The publisher reuses the existing deploy token.
 
-No resources or credentials were provisioned by this change. No deployed target selects downloaded startup.
+An automatic run publishes only when `runtime-targets.json` at the source SHA has a downloaded default
+or named target. The admission job reads that catalog through the GitHub API for the exact SHA.
+A preinstalled-only catalog skips the publish job, so ordinary main CI runs build nothing.
+
+A manual `workflow_dispatch` run accepts an exact main SHA and requires a successful trusted CI push
+run for that SHA. A manual run publishes whatever the catalog contains.
+The admission checkout and the publication environment are restricted to `main`.
+
+Publication does not change startup selection; the catalog does. Publication does not provision
+credentials or deploy the Worker.
 
 `runtime-targets.json` owns target mode/image selection. See [runtime-rollout.md](runtime-rollout.md)
 for rendering, isolated qualification and rollback.
 
-Downloaded deployment preparation uses the exact checked-out source SHA. It fails at once when the
-enablement variable is not `true`. Otherwise it waits at most 45 minutes for that SHA's handoff
+Downloaded deployment preparation uses the exact checked-out source SHA. The same downloaded catalog
+starts publication for that SHA after its CI succeeds. Preparation waits at most 45 minutes for that SHA's handoff
 without holding the publisher's concurrency lock. It checks source identity,
 base inputs, stored payload bytes, compatibility and target image configuration before Wrangler or
 its custom build can run. Runtime-free targets use the recorded registry digest. Registry credentials

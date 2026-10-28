@@ -1,12 +1,17 @@
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
-import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
+import {
+  ORGANIZATION_BILLING_ROLES,
+  ORGANIZATION_MANAGE_ROLES,
+  canManageOrganization,
+  type OrganizationRole,
+} from '@kilocode/app-shared/organizations';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { byok_api_keys, MODELS_BY_PROVIDER_ADMIN_URL } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
@@ -15,48 +20,82 @@ import {
   UpdateBYOKKeyInputSchema,
   DeleteBYOKKeyInputSchema,
   SetBYOKKeyEnabledInputSchema,
+  SetBYOKKeyCatalogModeInputSchema,
   ListBYOKKeysInputSchema,
   TestBYOKKeyInputSchema,
   BYOKApiKeyResponseSchema,
   type BYOKApiKeyResponse,
 } from '@/lib/byok/types';
 import {
+  GatewayUserByokProviderIdSchema,
   UserByokProviderIdSchema,
   UserByokTestModels,
   getVercelUserByokProviderIdForEndpoint,
   VercelUserByokInferenceProviderIdSchema,
+  isExperimentalByokProviderId,
+  type ExperimentalByokProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   getVercelModelsMetadataFromDatabase,
   getOpenRouterModelsMetadataFromDatabase,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { createGateway, generateText } from 'ai';
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { getVercelInferenceProviderConfigForUserByok } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
-import { decryptByokRow } from '@kilocode/web-shared/lib/ai-gateway/byok';
-import type { GatewayProviderOptions } from '@ai-sdk/gateway';
+import {
+  decryptByokRow,
+  getByokKmsContext,
+  getModelGatewayUserByokProviders,
+  servesCatalogModels,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { encryptByokForStorage } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
+import { GatewayAuthenticationError, type GatewayProviderOptions } from '@ai-sdk/gateway';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import {
   createAiSdkProvider,
   formatDirectByokModelId,
+  listDirectByokCatalogModels,
+  offersCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { parseAwsBedrockCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/bedrock-byok';
+import { parseGcpVertexCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/vertex-byok';
+import { isExperimentalByokEnabled } from '@/lib/byok/experimental-byok';
 
 const GENERIC_TEST_FAILURE_MESSAGE = 'API key test failed. Check the credential and try again.';
+const KEY_DECRYPTION_FAILURE_MESSAGE =
+  'API key test failed: the stored key could not be read. Try again later.';
+const VERCEL_AI_GATEWAY_KEY_REJECTED_MESSAGE =
+  'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.';
 const MANAGED_KEY_READ_ONLY_MESSAGE =
   'This key is managed by your coding plan and is read-only. Cancel the coding plan to remove it.';
 const logByokWarning = sentryLogger('byok-key-test', 'warning');
 
-function validateVercelUserByokCredential(providerId: string, credential: string) {
+const EXPERIMENTAL_BYOK_CREDENTIAL_PARSERS = {
+  'bedrock-byok': parseAwsBedrockCredentials,
+  'vertex-byok': parseGcpVertexCredentials,
+} satisfies Record<ExperimentalByokProviderId, (credential: string) => unknown>;
+
+function validateUserByokCredential(providerId: string, credential: string) {
   const parsedProviderId = VercelUserByokInferenceProviderIdSchema.safeParse(providerId);
-  if (!parsedProviderId.success) return;
+  const parseExperimentalCredential = isExperimentalByokProviderId(providerId)
+    ? EXPERIMENTAL_BYOK_CREDENTIAL_PARSERS[providerId]
+    : undefined;
+  if (!parsedProviderId.success && !parseExperimentalCredential) return;
 
   try {
-    getVercelInferenceProviderConfigForUserByok({
-      providerId: parsedProviderId.data,
-      decryptedAPIKey: credential,
-    });
+    if (parsedProviderId.success) {
+      getVercelInferenceProviderConfigForUserByok({
+        providerId: parsedProviderId.data,
+        decryptedAPIKey: credential,
+      });
+    } else {
+      parseExperimentalCredential?.(credential);
+    }
   } catch {
     throw new TRPCError({
       code: 'BAD_REQUEST',
@@ -73,13 +112,51 @@ const BYOK_KEY_COLUMNS = {
   created_by: byok_api_keys.created_by,
   management_source: byok_api_keys.management_source,
   is_enabled: byok_api_keys.is_enabled,
+  settings: byok_api_keys.settings,
 };
 
-function toBYOKApiKeyResponse(key: Omit<BYOKApiKeyResponse, 'provider_name'>): BYOKApiKeyResponse {
+type BYOKKeyRow = Omit<
+  BYOKApiKeyResponse,
+  'provider_name' | 'serve_catalog_models' | 'supports_catalog_mode' | 'can_change_catalog_mode'
+> & { settings: unknown };
+
+/**
+ * Catalog mode decides whether organization model policies apply to the key, so on organization
+ * keys only the roles that edit those policies may change it.
+ */
+function canChangeCatalogMode(organizationRole: OrganizationRole | null) {
+  return organizationRole === null || canManageOrganization(organizationRole);
+}
+
+async function toBYOKApiKeyResponse(
+  { settings, ...key }: BYOKKeyRow,
+  organizationRole: OrganizationRole | null
+): Promise<BYOKApiKeyResponse> {
+  const supportsCatalog = await offersCatalogMode(key.provider_id);
+  const serveCatalogModels = servesCatalogModels(settings);
   return {
     ...key,
     provider_name: key.provider_id,
+    serve_catalog_models: serveCatalogModels,
+    supports_catalog_mode: supportsCatalog,
+    // An enabled key can always leave catalog mode, even after its provider loses its mappings.
+    can_change_catalog_mode:
+      (supportsCatalog || serveCatalogModels) &&
+      key.management_source === 'user' &&
+      canChangeCatalogMode(organizationRole),
   };
+}
+
+function rejectUnavailableExperimentalProvider(
+  providerId: string,
+  organizationId: string | null | undefined
+) {
+  if (isExperimentalByokProviderId(providerId) && !isExperimentalByokEnabled(organizationId)) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: `Provider ${providerId} is not available yet.`,
+    });
+  }
 }
 
 function rejectManagedKeyMutation(managementSource: 'user' | 'coding_plan') {
@@ -89,6 +166,20 @@ function rejectManagedKeyMutation(managementSource: 'user' | 'coding_plan') {
       message: MANAGED_KEY_READ_ONLY_MESSAGE,
     });
   }
+}
+
+async function fetchCatalogModeSupportedModels(): Promise<Record<string, string[]>> {
+  const openRouterModelMetadata = await getOpenRouterModelsMetadataFromDatabase();
+  const result: Record<string, string[]> = {};
+  for (const provider of DIRECT_BYOK_PROVIDERS) {
+    const entries = await listDirectByokCatalogModels(provider.id);
+    if (entries.length === 0) continue;
+    result[provider.id] = entries.map(({ catalogModelId, model }) => {
+      const name = openRouterModelMetadata[catalogModelId]?.name ?? model.name;
+      return `${name} (${catalogModelId})`;
+    });
+  }
+  return result;
 }
 
 async function fetchSupportedModels(): Promise<Record<string, string[]>> {
@@ -122,6 +213,9 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
 
   for (const openRouterModel of Object.values(openRouterModelMetadata)) {
     if (isKiloExclusiveModel(openRouterModel.id)) continue;
+    for (const providerId of await getModelGatewayUserByokProviders(openRouterModel.id)) {
+      addSupportedModel(providerId, openRouterModel);
+    }
     const vercelModel = vercelModelMetadata[await mapModelIdToVercel(openRouterModel.id)];
     if (!vercelModel) continue;
     if (vercelModel.type !== 'language') continue;
@@ -155,6 +249,22 @@ export const byokRouter = createTRPCRouter({
     .output(z.record(z.string(), z.array(z.string())))
     .query(fetchSupportedModels),
 
+  /** The models a key of each direct BYOK provider serves in catalog mode, listed by catalog id. */
+  listCatalogModeSupportedModels: baseProcedure
+    .output(z.record(z.string(), z.array(z.string())))
+    .query(fetchCatalogModeSupportedModels),
+
+  /** Whether keys for experimental BYOK providers, currently direct Amazon Bedrock and Google Vertex AI, can be added. */
+  experimentalByokEnabled: baseProcedure
+    .input(ListBYOKKeysInputSchema)
+    .output(z.boolean())
+    .query(async ({ input, ctx }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      return isExperimentalByokEnabled(input.organizationId);
+    }),
+
   list: baseProcedure
     .input(ListBYOKKeysInputSchema)
     .output(z.array(BYOKApiKeyResponseSchema))
@@ -162,9 +272,9 @@ export const byokRouter = createTRPCRouter({
       const { organizationId } = input;
 
       // If organizationId provided, verify membership; otherwise use user's own keys
-      if (organizationId) {
-        await ensureOrganizationAccess(ctx, organizationId);
-      }
+      const organizationRole = organizationId
+        ? await ensureOrganizationAccess(ctx, organizationId)
+        : null;
 
       const keys = await db
         .select(BYOK_KEY_COLUMNS)
@@ -176,7 +286,7 @@ export const byokRouter = createTRPCRouter({
         );
 
       // Map provider_id to provider_name (will be enhanced in UI with actual provider names)
-      return keys.map(toBYOKApiKeyResponse);
+      return Promise.all(keys.map(key => toBYOKApiKeyResponse(key, organizationRole)));
     }),
 
   create: baseProcedure
@@ -186,23 +296,37 @@ export const byokRouter = createTRPCRouter({
       const { organizationId, provider_id, api_key } = input;
 
       // If organizationId provided, verify owner/billing access
-      if (organizationId) {
-        await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
-      }
+      const organizationRole = organizationId
+        ? await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES)
+        : null;
 
-      validateVercelUserByokCredential(provider_id, api_key);
+      rejectUnavailableExperimentalProvider(provider_id, organizationId);
+      validateUserByokCredential(provider_id, api_key);
 
       // Encrypt the API key
       const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);
+      const keyId = crypto.randomUUID();
+      const envelope = await encryptByokForStorage({
+        apiKey: api_key,
+        context: {
+          key_id: keyId,
+          owner_type: organizationId ? 'organization' : 'user',
+          owner_id: organizationId ?? ctx.user.id,
+          provider_id,
+        },
+        actorUserId: ctx.user.id,
+      });
 
       // Insert into database - either org-owned or user-owned
       const [newKey] = await db
         .insert(byok_api_keys)
         .values({
+          id: keyId,
           organization_id: organizationId ?? null,
           kilo_user_id: organizationId ? null : ctx.user.id,
           provider_id,
           encrypted_api_key: encrypted,
+          encrypted_api_key_envelope: envelope,
           created_by: ctx.user.id,
         })
         .returning(BYOK_KEY_COLUMNS);
@@ -219,7 +343,7 @@ export const byokRouter = createTRPCRouter({
         });
       }
 
-      return toBYOKApiKeyResponse(newKey);
+      return toBYOKApiKeyResponse(newKey, organizationRole);
     }),
 
   update: baseProcedure
@@ -229,13 +353,14 @@ export const byokRouter = createTRPCRouter({
       const { organizationId, id, api_key } = input;
 
       // If organizationId provided, verify owner/billing access
-      if (organizationId) {
-        await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
-      }
+      const organizationRole = organizationId
+        ? await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES)
+        : null;
 
       // Verify key exists and belongs to the organization or user
       const [existingKey] = await db
         .select({
+          id: byok_api_keys.id,
           organization_id: byok_api_keys.organization_id,
           kilo_user_id: byok_api_keys.kilo_user_id,
           provider_id: byok_api_keys.provider_id,
@@ -269,12 +394,18 @@ export const byokRouter = createTRPCRouter({
       }
 
       rejectManagedKeyMutation(existingKey.management_source);
-      validateVercelUserByokCredential(existingKey.provider_id, api_key);
+      rejectUnavailableExperimentalProvider(existingKey.provider_id, existingKey.organization_id);
+      validateUserByokCredential(existingKey.provider_id, api_key);
 
       const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);
+      const envelope = await encryptByokForStorage({
+        apiKey: api_key,
+        context: getByokKmsContext(existingKey),
+        actorUserId: ctx.user.id,
+      });
       const [updatedKey] = await db
         .update(byok_api_keys)
-        .set({ encrypted_api_key: encrypted })
+        .set({ encrypted_api_key: encrypted, encrypted_api_key_envelope: envelope })
         .where(eq(byok_api_keys.id, id))
         .returning(BYOK_KEY_COLUMNS);
 
@@ -294,7 +425,7 @@ export const byokRouter = createTRPCRouter({
         });
       }
 
-      return toBYOKApiKeyResponse(updatedKey);
+      return toBYOKApiKeyResponse(updatedKey, organizationRole);
     }),
 
   setEnabled: baseProcedure
@@ -303,9 +434,9 @@ export const byokRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }): Promise<BYOKApiKeyResponse> => {
       const { organizationId, id, is_enabled } = input;
 
-      if (organizationId) {
-        await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
-      }
+      const organizationRole = organizationId
+        ? await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES)
+        : null;
 
       const [existingKey] = await db
         .select({
@@ -361,7 +492,65 @@ export const byokRouter = createTRPCRouter({
         });
       }
 
-      return toBYOKApiKeyResponse(updatedKey);
+      return toBYOKApiKeyResponse(updatedKey, organizationRole);
+    }),
+
+  setCatalogMode: baseProcedure
+    .input(SetBYOKKeyCatalogModeInputSchema)
+    .output(BYOKApiKeyResponseSchema)
+    .mutation(async ({ input, ctx }): Promise<BYOKApiKeyResponse> => {
+      const { organizationId, id, serve_catalog_models } = input;
+
+      const organizationRole = organizationId
+        ? await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_MANAGE_ROLES)
+        : null;
+
+      const [existingKey] = await db
+        .select({
+          organization_id: byok_api_keys.organization_id,
+          kilo_user_id: byok_api_keys.kilo_user_id,
+          provider_id: byok_api_keys.provider_id,
+          management_source: byok_api_keys.management_source,
+        })
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, id));
+
+      const ownsKey = organizationId
+        ? existingKey?.organization_id === organizationId
+        : existingKey?.kilo_user_id === ctx.user.id;
+      if (!existingKey || !ownsKey) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'BYOK key not found' });
+      }
+
+      rejectManagedKeyMutation(existingKey.management_source);
+      // Turning catalog mode off stays possible after a provider loses its catalog mappings.
+      if (serve_catalog_models && !(await offersCatalogMode(existingKey.provider_id))) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Provider ${existingKey.provider_id} does not support Kilo catalog model IDs.`,
+        });
+      }
+
+      const [updatedKey] = await db
+        .update(byok_api_keys)
+        .set({
+          settings: sql`${byok_api_keys.settings} || ${JSON.stringify({ serve_catalog_models })}::jsonb`,
+        })
+        .where(eq(byok_api_keys.id, id))
+        .returning(BYOK_KEY_COLUMNS);
+
+      if (existingKey.organization_id) {
+        await createAuditLog({
+          action: 'organization.settings.change',
+          actor_email: ctx.user.google_user_email,
+          actor_id: ctx.user.id,
+          actor_name: ctx.user.google_user_name,
+          message: `${serve_catalog_models ? 'Enabled' : 'Disabled'} Kilo catalog model IDs for BYOK key for provider: ${existingKey.provider_id}`,
+          organization_id: existingKey.organization_id,
+        });
+      }
+
+      return toBYOKApiKeyResponse(updatedKey, organizationRole);
     }),
 
   testApiKey: baseProcedure
@@ -376,10 +565,12 @@ export const byokRouter = createTRPCRouter({
 
       const [existingKey] = await db
         .select({
+          id: byok_api_keys.id,
           organization_id: byok_api_keys.organization_id,
           kilo_user_id: byok_api_keys.kilo_user_id,
           provider_id: byok_api_keys.provider_id,
           encrypted_api_key: byok_api_keys.encrypted_api_key,
+          encrypted_api_key_envelope: byok_api_keys.encrypted_api_key_envelope,
           management_source: byok_api_keys.management_source,
         })
         .from(byok_api_keys)
@@ -407,7 +598,16 @@ export const byokRouter = createTRPCRouter({
         };
       }
 
-      const decryptedKey = decryptByokRow(existingKey);
+      let decryptedKey: Awaited<ReturnType<typeof decryptByokRow>>;
+      try {
+        decryptedKey = await decryptByokRow(existingKey);
+      } catch (e) {
+        logByokWarning('BYOK key test could not decrypt the stored key', {
+          providerId: existingKey.provider_id,
+          message: e instanceof Error ? e.message : undefined,
+        });
+        return { success: false, message: KEY_DECRYPTION_FAILURE_MESSAGE };
+      }
 
       // Codestral is deprecated and its key only authenticates against codestral.mistral.ai,
       // which the gateway test path below cannot reach (it routes codestral to api.mistral.ai).
@@ -433,6 +633,30 @@ export const byokRouter = createTRPCRouter({
           };
         }
 
+        if (provider === GatewayUserByokProviderIdSchema.enum['vercel-ai-gateway']) {
+          const userGateway = createGateway({ apiKey: decryptedKey.decryptedAPIKey });
+          return {
+            finalProvider: provider,
+            model: userGateway(model),
+            // generateText replaces a gateway authentication error with
+            // developer setup instructions; the credits lookup surfaces a
+            // rejected key as the gateway's own error instead.
+            verifyCredential: () => userGateway.getCredits(),
+          };
+        }
+
+        if (provider === GatewayUserByokProviderIdSchema.enum.openrouter) {
+          return {
+            finalProvider: provider,
+            model: createOpenAICompatible({
+              name: 'openrouter',
+              baseURL: OPENROUTER.apiUrl,
+              apiKey: decryptedKey.decryptedAPIKey,
+              headers: ATTRIBUTION_HEADERS,
+            })(model),
+          };
+        }
+
         const [finalProvider, byokList] = getVercelInferenceProviderConfigForUserByok(decryptedKey);
         return {
           finalProvider,
@@ -449,7 +673,8 @@ export const byokRouter = createTRPCRouter({
       }
 
       try {
-        const { finalProvider, model, providerOptions } = await setup();
+        const { finalProvider, model, providerOptions, verifyCredential } = await setup();
+        await verifyCredential?.();
         const output = await generateText({
           model,
           prompt: 'Say hi',
@@ -478,6 +703,12 @@ export const byokRouter = createTRPCRouter({
           providerId: decryptedKey.providerId,
           message,
         });
+        if (
+          decryptedKey.providerId === GatewayUserByokProviderIdSchema.enum['vercel-ai-gateway'] &&
+          GatewayAuthenticationError.isInstance(e)
+        ) {
+          return { success: false, message: VERCEL_AI_GATEWAY_KEY_REJECTED_MESSAGE };
+        }
         return {
           success: false,
           message: message ? `API key test failed: ${message}` : GENERIC_TEST_FAILURE_MESSAGE,

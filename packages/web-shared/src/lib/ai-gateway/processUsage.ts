@@ -43,8 +43,7 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import type { OrganizationUsageMutationResult } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
-import type { ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { shouldRedactModelNameInMicrodollarUsage } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import type { Provider, ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@kilocode/web-shared/lib/kilo-pass/threshold';
@@ -113,8 +112,6 @@ import {
 import { deliverBouncerUsageEventNow } from '@kilocode/web-shared/lib/bouncer/dispatch-usage-event-outbox';
 import { enqueueBouncerUsageEvent } from '@kilocode/db/bouncer-usage-event-outbox';
 import type { BouncerUsageEventEnqueue, UsageRecordRequest } from '@kilocode/usage-contracts';
-
-export { calculateKiloExclusiveCost_mUsd } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
 
 const posthogClient = PostHogClient();
 
@@ -298,6 +295,23 @@ export async function toInsertableDbUsageRecord(
   return { core, metadata };
 }
 
+const PUBLISHER_NOT_CONFIGURED_REPORT_INTERVAL_MS = 60_000;
+let lastPublisherNotConfiguredReportAt = Number.NEGATIVE_INFINITY;
+
+/** Every selected event fails the same way, so report once per interval per instance. */
+function reportPublisherNotConfigured(usageId: string): void {
+  const now = Date.now();
+  if (now - lastPublisherNotConfiguredReportAt < PUBLISHER_NOT_CONFIGURED_REPORT_INTERVAL_MS) {
+    return;
+  }
+  lastPublisherNotConfiguredReportAt = now;
+  captureMessage('usage accounting queue publisher is not configured', {
+    level: 'error',
+    tags: { source: 'logMicrodollarUsage' },
+    extra: { usageId },
+  });
+}
+
 async function enqueueUsageWithinLifetime(
   payload: UsageRecordRequest
 ): Promise<UsageEnqueueOutcome> {
@@ -366,13 +380,41 @@ async function logMicrodollarUsageWithTransport(
       console.info('usage accounting queued', { usageId: core.id });
       return { status: 'queued', usageId: core.id, createdAt: core.created_at };
     }
+    if (outcome.reason === 'publisher_not_configured') {
+      // Nothing was attempted, so a direct write cannot duplicate the event.
+      reportPublisherNotConfigured(core.id);
+      console.warn('usage accounting queue publisher not configured', {
+        usageId: core.id,
+        fallback: 'direct',
+      });
+      return recordUsageDirectly(core, metadata, usageContext, bouncerUsageEvent);
+    }
+    if (outcome.reason === 'registration_failed') {
+      // No request scope or `waitUntil`, so `after()` could not track the publication.
+      // Nothing was published, so the direct write cannot duplicate it.
+      console.warn('usage accounting queue unavailable without a request lifetime', {
+        usageId: core.id,
+        reason: outcome.reason,
+        fallback: 'direct',
+      });
+      return recordUsageDirectly(core, metadata, usageContext, bouncerUsageEvent);
+    }
     console.error('usage accounting publication failed', {
       usageId: core.id,
-      reason: outcome.kind === 'disabled' ? 'publisher_disabled' : outcome.reason,
+      reason: outcome.reason,
     });
     return null;
   }
 
+  return recordUsageDirectly(core, metadata, usageContext, bouncerUsageEvent);
+}
+
+async function recordUsageDirectly(
+  core: MicrodollarUsage,
+  metadata: UsageMetaData,
+  usageContext: MicrodollarUsageContext,
+  bouncerUsageEvent: BouncerUsageEventEnqueue | null
+): Promise<UsageAccountingResult | null> {
   const inserted = await saveUsageRelatedData(
     core,
     metadata,
@@ -1108,7 +1150,8 @@ async function insertUsageAndMetadataWithBalanceUpdate(
 export function countAndStoreUsage(
   clonedReponse: Response,
   usageContext: MicrodollarUsageContext,
-  openrouterRequestSpan: Span | undefined
+  openrouterRequestSpan: Span | undefined,
+  servingProvider?: Provider
 ) {
   let usageStatsPromise: Promise<MicrodollarUsageStats | null> = Promise.resolve(null);
   const { requestStartedAt } = usageContext;
@@ -1190,7 +1233,9 @@ export function countAndStoreUsage(
     }
   }
 
-  return usageStatsPromise.then(usageStats => processTokenData(usageStats, usageContext));
+  return usageStatsPromise.then(usageStats =>
+    processTokenData(usageStats, usageContext, servingProvider)
+  );
 }
 
 export function processOpenRouterUsage(
@@ -1406,9 +1451,15 @@ export function parseMicrodollarUsageFromString(
   return { ...coreProps, ...costs };
 }
 
+/**
+ * `servingProvider` is the provider that served the request. Its key looks up
+ * the generation, so a request made with a user's own gateway key is looked up
+ * in that user's account.
+ */
 export async function processTokenData(
   usageStats: MicrodollarUsageStats | null,
-  usageContext: MicrodollarUsageContext
+  usageContext: MicrodollarUsageContext,
+  servingProvider?: Provider
 ): Promise<UsageAccountingResult | null> {
   if (!usageStats) {
     captureMessage('SUSPICIOUS: No usage information', {
@@ -1420,7 +1471,7 @@ export async function processTokenData(
   }
 
   const timer = createTimer();
-  const generationProvider = getGenerationLookupProvider(usageStats, usageContext);
+  const generationProvider = getGenerationLookupProvider(usageStats, usageContext, servingProvider);
   const generation =
     generationProvider &&
     usageStats.messageId &&
@@ -1500,7 +1551,7 @@ export async function processTokenData(
 
   if (
     !usageStats.model || // fallback for failure cases
-    shouldRedactModelNameInMicrodollarUsage(usageContext.provider, usageContext.requested_model)
+    usageContext.provider === 'custom' // custom LLMs do not reveal their upstream model
   ) {
     usageStats.model = usageContext.requested_model;
   }
@@ -1595,14 +1646,19 @@ function bouncerUsageEvent(
 
 function getGenerationLookupProvider(
   usageStats: MicrodollarUsageStats | null,
-  usageContext: MicrodollarUsageContext
-): typeof OPENROUTER | typeof VERCEL_AI_GATEWAY | undefined {
-  const provider =
+  usageContext: MicrodollarUsageContext,
+  servingProvider: Provider | undefined
+): Provider | undefined {
+  const gatewayProvider =
     usageContext.provider === 'openrouter'
       ? OPENROUTER
       : usageContext.provider === 'vercel'
         ? VERCEL_AI_GATEWAY
         : undefined;
+  const provider =
+    gatewayProvider && servingProvider?.id === gatewayProvider.id
+      ? servingProvider
+      : gatewayProvider;
   const isSuccessStatusCode = (usageStats?.status_code ?? 200) < 400;
   if (!provider || !isSuccessStatusCode) {
     return undefined;

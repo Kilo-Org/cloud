@@ -19,7 +19,9 @@ describe('getStructuredCredentialKind', () => {
   it.each([
     ['azure', 'azure'],
     ['bedrock', 'bedrock'],
+    ['bedrock-byok', 'bedrock'],
     ['vertex', 'vertex'],
+    ['vertex-byok', 'vertex'],
   ] as const)('maps %s to %s JSON credentials', (providerId, kind) => {
     expect(getStructuredCredentialKind(providerId)).toBe(kind);
   });

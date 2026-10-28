@@ -1665,9 +1665,7 @@
     },
     "remoteSpawnRetryable": "无法连接到实例，实例可能已断开连接。",
     "remoteSpawnNonRetryable": "实例未能启动会话。请检查主机或更新 CLI。",
-    "remoteSpawnInstanceDisconnected": "所选实例已断开连接。请在 Cloud Agent 上启动会话，或选择其他实例。",
-    "liveCount_one": "{{count}} 个实时会话",
-    "liveCount_other": "{{count}} 个实时会话"
+    "remoteSpawnInstanceDisconnected": "所选实例已断开连接。请在 Cloud Agent 上启动会话，或选择其他实例。"
   },
   "agentChat": {
     "session": {
@@ -3955,6 +3953,8 @@
     "title": "购买额度",
     "description": "额度是一次性购买，会添加到你的 Kilo 余额中，用于在 Kilo App 中运行 AI 编程会话。商店会向你的账户收费，商店确认付款后额度才会到账。",
     "nextExpiry": "{{amount}} 的额度将于 {{date}}（UTC）到期。最早到期的额度会优先使用。",
+    "noExpiringCredits": "目前没有会到期的额度。",
+    "expiryUnavailable": "无法获取额度到期信息。",
     "appStoreExpiry": "通过 App Store 购买的额度不会过期。",
     "playOneYearExpiry": "这些额度将在购买一个日历年后过期。",
     "playNonexpiring": "这些额度不会过期。",

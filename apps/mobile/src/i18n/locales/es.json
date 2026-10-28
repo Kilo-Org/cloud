@@ -1677,10 +1677,7 @@
     },
     "remoteSpawnRetryable": "No se pudo conectar con la instancia: es posible que se haya desconectado.",
     "remoteSpawnNonRetryable": "La instancia no pudo iniciar la sesión: revisa la máquina o actualiza la CLI.",
-    "remoteSpawnInstanceDisconnected": "La instancia seleccionada se desconectó. Inicia una sesión en Cloud Agent o elige otra instancia.",
-    "liveCount_one": "{{count}} EN DIRECTO",
-    "liveCount_other": "{{count}} EN DIRECTO",
-    "liveCount_many": "{{count}} EN DIRECTO"
+    "remoteSpawnInstanceDisconnected": "La instancia seleccionada se desconectó. Inicia una sesión en Cloud Agent o elige otra instancia."
   },
   "agentChat": {
     "session": {
@@ -4006,6 +4003,8 @@
     "title": "Comprar créditos",
     "description": "Los créditos son una compra única que se añade a tu saldo de Kilo para ejecutar sesiones de codificación con IA en Kilo App. La tienda cobra en tu cuenta y los créditos se añaden cuando la tienda confirma el pago.",
     "nextExpiry": "{{amount}} en créditos caducan el {{date}} (UTC). Los créditos con la caducidad más próxima se usan primero.",
+    "noExpiringCredits": "No hay créditos pendientes de caducar.",
+    "expiryUnavailable": "Información de caducidad de los créditos no disponible.",
     "appStoreExpiry": "Los créditos comprados a través de la App Store no caducan.",
     "playOneYearExpiry": "Estos créditos caducan un año natural después de la compra.",
     "playNonexpiring": "Estos créditos no caducan.",

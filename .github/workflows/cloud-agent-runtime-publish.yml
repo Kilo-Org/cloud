@@ -5,6 +5,12 @@ on:
     workflows: [CI]
     types: [completed]
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact main commit SHA with a successful CI run
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -12,12 +18,15 @@ permissions:
 
 jobs:
   admit:
-    # Failed or cancelled CI never publishes; the script verifies the conclusion again.
-    if: github.event.workflow_run.conclusion == 'success'
+    # Failed or cancelled CI never publishes; the scripts verify the source again.
+    if: >-
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      github.event_name == 'workflow_dispatch'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
-      source_sha: ${{ steps.admit.outputs.source_sha }}
+      source_sha: ${{ steps.admit.outputs.source_sha || steps.manual.outputs.source_sha }}
+      needed: ${{ steps.catalog.outputs.needed }}
     steps:
       # Admission code comes from trusted main, never the triggering PR.
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b
@@ -26,14 +35,32 @@ jobs:
           persist-credentials: false
       - name: Verify trusted successful CI run
         id: admit
+        if: github.event_name == 'workflow_run'
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node services/cloud-agent-next/scripts/runtime-ci-admission.mjs
+      - name: Verify manual publication request
+        id: manual
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: node services/cloud-agent-next/scripts/runtime-manual-admission.mjs
+      # The catalog at the source SHA owns enablement: only downloaded targets need a release.
+      - name: Check catalog for downloaded startup
+        id: catalog
+        if: github.event_name == 'workflow_run'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ steps.admit.outputs.source_sha }}
+        run: node services/cloud-agent-next/scripts/runtime-publication-need.mjs
 
   publish:
     needs: admit
-    # Infrastructure owners enable this only after bucket/credential approval.
-    if: vars.CLOUD_AGENT_RUNTIME_PUBLICATION_ENABLED == 'true'
+    # Automatic runs need a downloaded catalog target; manual runs are explicit operator actions.
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' || needs.admit.outputs.needed == 'true')
     environment: cloud-agent-runtime-publication
     runs-on: ${{ vars.RUNNER_LARGE_LABEL || 'ubuntu-24.04-8core' }}
     timeout-minutes: 45
@@ -62,8 +89,8 @@ jobs:
           SOURCE_SHA: ${{ needs.admit.outputs.source_sha }}
           RUNTIME_R2_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
           RUNTIME_R2_BUCKET: ${{ vars.CLOUD_AGENT_RUNTIME_BUCKET }}
-          RUNTIME_R2_ACCESS_KEY_ID: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_WRITE_ACCESS_KEY_ID }}
-          RUNTIME_R2_SECRET_ACCESS_KEY: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_WRITE_SECRET_ACCESS_KEY }}
+          RUNTIME_R2_ACCESS_KEY_ID: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_ACCESS_KEY_ID }}
+          RUNTIME_R2_SECRET_ACCESS_KEY: ${{ secrets.CLOUD_AGENT_RUNTIME_R2_SECRET_ACCESS_KEY }}
           CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUD_AGENT_RUNTIME_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUD_AGENT_RUNTIME_REGISTRY_PUBLISH_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: pnpm runtime:publish --bucket "$RUNTIME_R2_BUCKET" --source-sha "$SOURCE_SHA"

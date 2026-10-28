@@ -21,12 +21,14 @@ import {
   providerPrivacySchema,
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
-import {
-  getIgnoredProviders,
-  withIgnoredProviders,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
+import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
-import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  createDirectByokReferenceResolver,
+  getDirectByokModel,
+  supportsCatalogMode,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { byokOwner } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
@@ -71,11 +73,12 @@ import {
   unavailableModelResponse,
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
-  checkExclusiveModelProviderAllowed,
   allowedInferenceProviders,
   inferenceProvidersNotAllowedResponse,
   modelDoesNotExistOnOpenRouterResponse,
   chatGptReconnectResponse,
+  directByokCatalogOnlyMessage,
+  directByokCatalogOnlyResponse,
   lastUserPromptText,
   requestedLogprobs,
   requestedSamples,
@@ -228,6 +231,26 @@ async function resolveFreeModelRateLimitSubject(
   return user && !authFailedResponse
     ? { kind: 'account', kiloUserId: user.id }
     : { kind: 'ip', ipAddress };
+}
+
+/**
+ * The catalog id that replaces an auto-routed bespoke direct BYOK id when the caller's key for it
+ * is in catalog mode. Null when the id needs no replacement or has no catalog id; an unmapped id
+ * then gets the catalog-only error from `getProvider`.
+ */
+async function catalogModeModelForRoutedModel(
+  model: string,
+  authPromise: ReturnType<typeof getUserFromAuth>
+): Promise<string | null> {
+  const { provider } = await getDirectByokModel(model.toLowerCase());
+  if (!provider || !supportsCatalogMode(provider.id)) return null;
+  const { user, authFailedResponse, organizationId } = await authPromise;
+  if (!user || authFailedResponse) return null;
+  const resolveReference = await createDirectByokReferenceResolver(
+    byokOwner(user.id, organizationId)
+  );
+  const resolved = await resolveReference(model);
+  return resolved === model ? null : resolved;
 }
 
 export async function handleLlmProxyRequest(
@@ -624,6 +647,16 @@ export async function handleLlmProxyRequest(
     routingTarget = autoResult.kind === 'ok' ? (autoResult.routingTarget ?? null) : null;
   }
 
+  if (autoModel) {
+    // A router entry stored with a bespoke id keeps working when its key switches to catalog mode;
+    // the catalog id then goes through the organization policy check below.
+    const catalogModelId = await catalogModeModelForRoutedModel(
+      requestBodyParsed.body.model,
+      authPromise
+    );
+    if (catalogModelId) requestBodyParsed.body.model = catalogModelId;
+  }
+
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
   const customLlm = await findCustomLlm(effectiveModelIdLowerCased);
   const isPrivateCustomLlm = customLlm !== null && !isPublicCustomLlm(customLlm.definition);
@@ -877,10 +910,8 @@ export async function handleLlmProxyRequest(
     boundedSpending: requestCostLimit !== null,
     countryCode,
     getRoutingProviderConfig: async () =>
-      withIgnoredProviders(
-        (await accessCheckResolver.getRoutingProviderConfig?.()) ?? requestBodyParsed.body.provider,
-        ignoredProviders
-      ),
+      (await accessCheckResolver.getRoutingProviderConfig?.()) ?? requestBodyParsed.body.provider,
+    kiloIgnoredProviders: ignoredProviders,
   });
   if (providerResult.kind === 'chatgpt-reconnect') {
     // The person's enabled ChatGPT connection is terminally dead. Fail readably
@@ -890,6 +921,19 @@ export async function handleLlmProxyRequest(
   if (providerResult.kind === 'custom-llm-unavailable') {
     // Same response as an unknown model id, so callers cannot probe for custom LLMs.
     return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
+  }
+  if (providerResult.kind === 'direct-byok-catalog-only') {
+    // Falling through to the managed gateway would fail later with a misleading unknown-model error.
+    const message = directByokCatalogOnlyMessage({
+      model: effectiveModelIdLowerCased,
+      providerId: providerResult.providerId,
+      catalogModelId: providerResult.catalogModelId,
+    });
+    return autoModel === ORG_AUTO_MODEL.id && routingTarget
+      ? organizationAutoConfigurationResponse(
+          `Organization Auto route target '${routingTarget}' is unavailable: ${message}`
+        )
+      : directByokCatalogOnlyResponse(message);
   }
   const effectiveProviderContext = providerResult;
 
@@ -911,7 +955,10 @@ export async function handleLlmProxyRequest(
   if (!effectiveProviderContext.provider.supportedChatApis.includes(requestBodyParsed.kind)) {
     return apiKindNotSupportedResponse(
       requestBodyParsed.kind,
-      effectiveProviderContext.provider.supportedChatApis
+      effectiveProviderContext.provider.supportedChatApis,
+      effectiveProviderContext.provider.id === 'direct-byok'
+        ? effectiveProviderContext.userByok?.[0]?.providerId
+        : undefined
     );
   }
 
@@ -1037,12 +1084,6 @@ export async function handleLlmProxyRequest(
         only: eligibleProviders,
       };
     }
-  } else {
-    const providerNotAllowedError = checkExclusiveModelProviderAllowed(
-      effectiveModelIdLowerCased,
-      requestBodyParsed.body.provider
-    );
-    if (providerNotAllowedError) return providerNotAllowedError;
   }
 
   sentryRootSpan()?.setAttribute(
@@ -1074,12 +1115,28 @@ export async function handleLlmProxyRequest(
   const bouncerVerdict = await bouncerVerdictPromise;
   const bouncerRejection = bouncer.apply(bouncerVerdict, usageContext.bouncer);
   if (bouncerRejection) return bouncerRejection;
+  const requestLogging = {
+    user: maybeUser,
+    organization_id: organizationId || null,
+    session_id: usageContext.session_id,
+    vercel_request_id: vercelRequestId,
+    request: requestBodyParsed,
+  };
   const guardrailVerdict = await enkryptGuardrail.awaitVerdict();
   const guardrailRejection = enkryptGuardrailRejectionResponse(
     requestBodyParsed.kind,
     guardrailVerdict
   );
-  if (guardrailRejection) return guardrailRejection;
+  if (guardrailRejection) {
+    await logUnrewrittenResponse({
+      response: guardrailRejection.clone(),
+      model: effectiveModelIdLowerCased,
+      providerId: effectiveProviderContext.provider.id,
+      logging: requestLogging,
+      error: { guardrail_rejection: guardrailVerdict.action },
+    });
+    return guardrailRejection;
+  }
   const requestCostBalance = requestCostLimit !== null ? await balanceAndSettingsPromise : null;
 
   const attempt = await sendUpstreamAttempt({
@@ -1150,7 +1207,12 @@ export async function handleLlmProxyRequest(
 
   const clonedReponse = response.clone(); // reading from body is side-effectful
 
-  const accounting = accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
+  const accounting = accountForMicrodollarUsage(
+    clonedReponse,
+    usageContext,
+    openrouterRequestSpan,
+    effectiveProviderContext.provider
+  );
   const settlementToken = request.headers.get(BRIEFING_SETTLEMENT_HEADER);
   if (
     settlementToken &&
@@ -1178,14 +1240,6 @@ export async function handleLlmProxyRequest(
     );
   }
 
-  const requestLogging = {
-    user: maybeUser,
-    organization_id: organizationId || null,
-    session_id: usageContext.session_id,
-    vercel_request_id: vercelRequestId,
-    request: requestBodyParsed,
-  };
-
   {
     const errorResponse = await makeErrorReadable({
       providerId: effectiveProviderContext.provider.id,
@@ -1200,6 +1254,7 @@ export async function handleLlmProxyRequest(
         model: effectiveModelIdLowerCased,
         providerId: effectiveProviderContext.provider.id,
         logging: requestLogging,
+        error: null,
       });
       return errorResponse;
     }

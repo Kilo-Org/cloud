@@ -3789,50 +3789,63 @@
         "provider_id": {
           "anyOf": [
             {
-              "type": "string",
-              "enum": [
-                "anthropic",
-                "azure",
-                "bedrock",
-                "deepseek",
-                "fireworks",
-                "gmicloud",
-                "google",
-                "inception",
-                "openai",
-                "minimax",
-                "mistral",
-                "moonshotai",
-                "nebius",
-                "novita",
-                "perplexity",
-                "vertex",
-                "xai",
-                "xiaomi",
-                "zai"
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "anthropic",
+                    "azure",
+                    "bedrock",
+                    "deepseek",
+                    "fireworks",
+                    "gmicloud",
+                    "google",
+                    "inception",
+                    "openai",
+                    "minimax",
+                    "mistral",
+                    "moonshotai",
+                    "nebius",
+                    "novita",
+                    "perplexity",
+                    "vertex",
+                    "xai",
+                    "xiaomi",
+                    "zai"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "alibaba-token-plan",
+                    "bedrock-byok",
+                    "byteplus-coding",
+                    "chutes-byok",
+                    "edenai",
+                    "kimi-coding",
+                    "inceptron-byok",
+                    "martian",
+                    "morph-byok",
+                    "neuralwatt",
+                    "nvidia-byok",
+                    "ollama-cloud",
+                    "opencode-go",
+                    "orcarouter",
+                    "synthetic",
+                    "vertex-byok",
+                    "xiaomi-token-plan-ams",
+                    "xiaomi-token-plan-sgp",
+                    "zai-coding",
+                    "codestral"
+                  ]
+                }
               ]
             },
             {
               "type": "string",
               "enum": [
-                "alibaba-token-plan",
-                "byteplus-coding",
-                "chutes-byok",
-                "codestral",
-                "edenai",
-                "inceptron-byok",
-                "kimi-coding",
-                "martian",
-                "morph-byok",
-                "neuralwatt",
-                "nvidia-byok",
-                "ollama-cloud",
-                "opencode-go",
-                "orcarouter",
-                "synthetic",
-                "xiaomi-token-plan-ams",
-                "xiaomi-token-plan-sgp",
-                "zai-coding"
+                "vercel-ai-gateway",
+                "openrouter"
               ]
             }
           ]
@@ -3887,6 +3900,28 @@
     ],
     "searchBlob": "byok.delete Remove a stored BYOK provider API key belonging to the current user or an organization. Deletes the saved credential so it can no longer be used for inference. byok delete organizationid id organizationId id"
   },
+  "byok.experimentalByokEnabled": {
+    "path": "byok.experimentalByokEnabled",
+    "kind": "query",
+    "summary": "Check whether experimental BYOK providers, such as direct Amazon Bedrock and Google Vertex AI, can be added for the current user or a specified organization. Use before offering those providers when adding a key.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "byok",
+      "experimentalbyokenabled",
+      "organizationid"
+    ],
+    "searchBlob": "byok.experimentalByokEnabled Check whether experimental BYOK providers, such as direct Amazon Bedrock and Google Vertex AI, can be added for the current user or a specified organization. Use before offering those providers when adding a key. byok experimentalbyokenabled organizationid organizationId"
+  },
   "byok.list": {
     "path": "byok.list",
     "kind": "query",
@@ -3909,6 +3944,17 @@
     ],
     "searchBlob": "byok.list List all saved bring-your-own-key (BYOK) API keys for the current user or a specified organization, including provider, enabled status, and management source. byok list organizationid organizationId"
   },
+  "byok.listCatalogModeSupportedModels": {
+    "path": "byok.listCatalogModeSupportedModels",
+    "kind": "query",
+    "summary": "List which AI models each direct BYOK provider supports when running in catalog mode, grouped by provider and returned as model names with catalog ids. Use to discover available catalog-mode models per provider.",
+    "inputSchema": {},
+    "tags": [
+      "byok",
+      "listcatalogmodesupportedmodels"
+    ],
+    "searchBlob": "byok.listCatalogModeSupportedModels List which AI models each direct BYOK provider supports when running in catalog mode, grouped by provider and returned as model names with catalog ids. Use to discover available catalog-mode models per provider. byok listcatalogmodesupportedmodels"
+  },
   "byok.listSupportedModels": {
     "path": "byok.listSupportedModels",
     "kind": "query",
@@ -3919,6 +3965,42 @@
       "listsupportedmodels"
     ],
     "searchBlob": "byok.listSupportedModels Get the list of supported models per provider for bring-your-own-key (BYOK) usage, showing which model IDs each provider offers. byok listsupportedmodels"
+  },
+  "byok.setCatalogMode": {
+    "path": "byok.setCatalogMode",
+    "kind": "mutation",
+    "summary": "Enable or disable Kilo catalog model ID routing for an existing BYOK API key, for a user or organization key, and return the updated key details.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "serve_catalog_models": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "serve_catalog_models"
+      ]
+    },
+    "tags": [
+      "byok",
+      "setcatalogmode",
+      "organizationid",
+      "id",
+      "serve_catalog_models"
+    ],
+    "searchBlob": "byok.setCatalogMode Enable or disable Kilo catalog model ID routing for an existing BYOK API key, for a user or organization key, and return the updated key details. byok setcatalogmode organizationid id serve_catalog_models organizationId id serve_catalog_models"
   },
   "byok.setEnabled": {
     "path": "byok.setEnabled",

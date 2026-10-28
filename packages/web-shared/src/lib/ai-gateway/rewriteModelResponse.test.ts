@@ -13,7 +13,6 @@ import {
   getDynamicRequestLoggingMode,
   type RequestLoggingMode,
 } from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
-import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
@@ -2053,24 +2052,17 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
           { name: 'user BYOK', model: 'openai/gpt-5', isFree: false, userByok: true, cost: 0 },
           {
             name: 'custom pricing',
-            model: GEMINI_FLASH_CURRENT_MODEL_ID,
+            model: 'google/gemini-3.8-flash',
             isFree: false,
             userByok: false,
             cost: 2.419167,
           },
           {
             name: 'custom pricing with user BYOK',
-            model: GEMINI_FLASH_CURRENT_MODEL_ID,
+            model: 'google/gemini-3.8-flash',
             isFree: false,
             userByok: true,
             cost: 0,
-          },
-          {
-            name: 'paid exclusive pricing',
-            model: 'stealth/claude-opus-4.7',
-            isFree: false,
-            userByok: false,
-            cost: 13.38,
           },
         ])('$name', async ({ model, isFree, userByok, cost }) => {
           const usesMetadataCost = provider === 'vercel' && shape.kind !== 'chat_completions';
@@ -2323,7 +2315,7 @@ test.each(['openrouter', 'vercel'] as const)(
           'event: message_stop\ndata: {"type":"message_stop"}\n\n'
       ),
       usageContext: {
-        requested_model: GEMINI_FLASH_CURRENT_MODEL_ID,
+        requested_model: 'google/gemini-3.8-flash',
         provider,
         is_free: false,
         user_byok: false,
@@ -2734,10 +2726,10 @@ describe('rewriteModelResponse', () => {
     jest.mocked(getCustomPricingConfig).mockResolvedValueOnce(TEST_CUSTOM_PRICING_CONFIG);
     const result = await rewriteModelResponse({
       response: jsonResponse({
-        model: GEMINI_FLASH_CURRENT_MODEL_ID,
+        model: 'google/gemini-3.8-flash',
         usage: { cost: 0.5, cost_details: { upstream_inference_cost: 0.4 }, is_byok: false },
       }),
-      model: GEMINI_FLASH_CURRENT_MODEL_ID,
+      model: 'google/gemini-3.8-flash',
       providerId: 'openrouter',
       kind: 'chat_completions',
       isFree: false,
@@ -2747,7 +2739,7 @@ describe('rewriteModelResponse', () => {
     });
 
     expect(await result.json()).toEqual({
-      model: GEMINI_FLASH_CURRENT_MODEL_ID,
+      model: 'google/gemini-3.8-flash',
       usage: { cost: 0, cost_details: { upstream_inference_cost: 0.4 }, is_byok: false },
     });
   });
@@ -2844,6 +2836,7 @@ describe('rewriteModelResponse', () => {
       model: 'kilo-internal/my-model',
       providerId: 'custom',
       logging: makeLogging(),
+      error: null,
     });
 
     expect(mockedAfter).not.toHaveBeenCalled();
@@ -2873,12 +2866,17 @@ describe('api_request_log storage', () => {
     return rows[0];
   }
 
-  async function logUpstreamResponse(response: Response, mode: RequestLoggingMode) {
+  async function logUpstreamResponse(
+    response: Response,
+    mode: RequestLoggingMode,
+    error: Record<string, string> | null
+  ) {
     mockedOptIn.mockResolvedValueOnce(mode);
     await logUnrewrittenResponse({
       response,
       model: 'kilo-internal/my-model',
       providerId: 'custom',
+      error,
       logging: makeLogging({
         vercel_request_id: vercelRequestId,
         request: {
@@ -2895,7 +2893,7 @@ describe('api_request_log storage', () => {
   }
 
   async function logUpstreamError() {
-    await logUpstreamResponse(jsonResponse({ error: 'upstream error' }, 400), 'all');
+    await logUpstreamResponse(jsonResponse({ error: 'upstream error' }, 400), 'all', null);
   }
 
   async function selectLoggedRows() {
@@ -2977,7 +2975,7 @@ describe('api_request_log storage', () => {
   });
 
   test('logs upstream error statuses for errors-only opt-ins', async () => {
-    await logUpstreamResponse(jsonResponse({ error: 'upstream error' }, 400), 'errors_only');
+    await logUpstreamResponse(jsonResponse({ error: 'upstream error' }, 400), 'errors_only', null);
 
     const row = await selectLoggedRow();
     expect(row).toMatchObject({ status_code: 400, error: null });
@@ -2987,7 +2985,11 @@ describe('api_request_log storage', () => {
   });
 
   test('skips successful responses for errors-only opt-ins', async () => {
-    await logUpstreamResponse(jsonResponse({ model: 'kilo-internal/my-model' }), 'errors_only');
+    await logUpstreamResponse(
+      jsonResponse({ model: 'kilo-internal/my-model' }),
+      'errors_only',
+      null
+    );
 
     expect(await selectLoggedRows()).toHaveLength(0);
     expect(fakeR2.objects.size).toBe(0);
@@ -2996,7 +2998,8 @@ describe('api_request_log storage', () => {
   test('logs successful statuses with a response read error for errors-only opt-ins', async () => {
     await logUpstreamResponse(
       failingResponse('application/json', 'upstream disconnected'),
-      'errors_only'
+      'errors_only',
+      null
     );
 
     const row = await selectLoggedRow();
@@ -3007,9 +3010,39 @@ describe('api_request_log storage', () => {
   });
 
   test('logs successful responses for opt-ins that log all requests', async () => {
-    await logUpstreamResponse(jsonResponse({ model: 'kilo-internal/my-model' }), 'all');
+    await logUpstreamResponse(jsonResponse({ model: 'kilo-internal/my-model' }), 'all', null);
 
     expect(await selectLoggedRow()).toMatchObject({ status_code: 200, error: null });
+  });
+
+  test.each<RequestLoggingMode>(['all', 'errors_only'])(
+    'stores the caller error marker for %s opt-ins',
+    async mode => {
+      await logUpstreamResponse(jsonResponse({ error: 'blocked' }, 400), mode, {
+        guardrail_rejection: 'block',
+      });
+
+      expect(await selectLoggedRow()).toMatchObject({
+        status_code: 400,
+        error: { guardrail_rejection: 'block' },
+      });
+    }
+  );
+
+  test('merges the caller error marker with the R2 upload failure', async () => {
+    jest.spyOn(fakeR2, 'send').mockRejectedValue(new Error('R2 unavailable'));
+
+    await logUpstreamResponse(jsonResponse({ error: 'unavailable' }, 503), 'all', {
+      guardrail_rejection: 'unavailable',
+    });
+
+    expect(await selectLoggedRow()).toMatchObject({
+      status_code: 503,
+      error: {
+        guardrail_rejection: 'unavailable',
+        r2_upload_error: 'request: Error: R2 unavailable; response: Error: R2 unavailable',
+      },
+    });
   });
 });
 

@@ -2220,10 +2220,7 @@
     },
     "remoteSpawnRetryable": "Neizdevās sazināties ar vidi — iespējams, savienojums ir pārtrūcis.",
     "remoteSpawnNonRetryable": "Vidē neizdevās sākt sesiju — pārbaudi datoru vai atjaunini CLI.",
-    "remoteSpawnInstanceDisconnected": "Savienojums ar izvēlēto vidi pārtrūka. Sāc sesiju Cloud Agent vai izvēlies citu vidi.",
-    "liveCount_one": "{{count}} REĀLLAIKĀ",
-    "liveCount_other": "{{count}} REĀLLAIKĀ",
-    "liveCount_zero": "{{count}} AKTĪVU"
+    "remoteSpawnInstanceDisconnected": "Savienojums ar izvēlēto vidi pārtrūka. Sāc sesiju Cloud Agent vai izvēlies citu vidi."
   },
   "agentChat": {
     "session": {
@@ -4006,6 +4003,8 @@
     "title": "Pirkt kredītus",
     "description": "Kredīti ir vienreizējs pirkums, kas tiek pievienots tavam Kilo bilancei AI kodēšanas sesiju vadīšanai Kilo App. Veikals iekasē maksu no tava konta, un kredīti tiek pievienoti pēc tam, kad veikals apstiprina maksājumu.",
     "nextExpiry": "Kredītu {{amount}} apmērā derīguma termiņš beidzas {{date}} (UTC). Vispirms tiek izmantoti kredīti ar agrāko derīguma termiņu.",
+    "noExpiringCredits": "Nav kredītu ar derīguma termiņu.",
+    "expiryUnavailable": "Informācija par kredītu derīguma termiņu nav pieejama.",
     "appStoreExpiry": "Ar App Store starpniecību iegādātajiem kredītiem nav derīguma termiņa.",
     "playOneYearExpiry": "Šo kredītu derīguma termiņš beidzas vienu kalendāro gadu pēc pirkuma.",
     "playNonexpiring": "Šiem kredītiem nav derīguma termiņa.",

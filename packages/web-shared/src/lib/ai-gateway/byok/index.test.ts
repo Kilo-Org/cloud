@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, test } from '@jest/globals';
+import { afterEach, describe, expect, jest, test } from '@jest/globals';
+import { randomBytes } from 'crypto';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import {
   byokOwner,
@@ -15,7 +16,7 @@ import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { byok_api_keys, kilocode_users, organizations } from '@kilocode/db/schema';
-import type { ByokApiKeySettings } from '@kilocode/db/schema-types';
+import type { ByokApiKeySettings, EncryptedData } from '@kilocode/db/schema-types';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { inArray } from 'drizzle-orm';
@@ -292,6 +293,41 @@ describe('getByokCredentials', () => {
     await expect(getByokCredentials(db, organizationOwner, ['openai'])).resolves.toEqual([]);
   });
 
+  test('with catalogModeOnly, never decrypts keys outside catalog mode', async () => {
+    const user = await createUser();
+    const owner = byokOwner(user.id, null);
+    const catalogSecret = await insertByokKey(
+      owner,
+      user.id,
+      'synthetic',
+      '2026-01-01T00:00:00.000Z',
+      {
+        settings: { serve_catalog_models: true },
+      }
+    );
+    await insertByokKey(owner, user.id, 'chutes-byok', '2026-01-02T00:00:00.000Z', {
+      settings: { serve_catalog_models: false },
+    });
+    // A key outside catalog mode that cannot be decrypted, as during a KMS outage.
+    await db.insert(byok_api_keys).values({
+      kilo_user_id: user.id,
+      provider_id: 'edenai',
+      encrypted_api_key: encryptApiKey('unreadable', randomBytes(32).toString('base64')),
+      created_by: user.id,
+    });
+    const providers: UserByokProviderId[] = ['synthetic', 'chutes-byok', 'edenai'];
+
+    await expect(getByokCredentials(db, owner, ['edenai'])).rejects.toThrow();
+    await expect(
+      getByokCredentials(db, owner, providers, { catalogModeOnly: true })
+    ).resolves.toEqual([
+      { decryptedAPIKey: catalogSecret, providerId: 'synthetic', serveCatalogModels: true },
+    ]);
+    await expect(
+      getByokCredentials(db, owner, ['edenai'], { catalogModeOnly: true })
+    ).resolves.toEqual([]);
+  });
+
   test('backs getBYOKforUser without exposing catalog mode', async () => {
     const user = await createUser();
     await insertByokKey(
@@ -307,5 +343,127 @@ describe('getByokCredentials', () => {
     await expect(getBYOKforUser(db, user.id, ['anthropic'])).resolves.toEqual([
       { decryptedAPIKey: expect.any(String), providerId: 'anthropic' },
     ]);
+  });
+});
+
+describe('envelope-encrypted BYOK rows', () => {
+  const originalFetch = global.fetch;
+  const originalUrl = process.env.BYOK_KMS_SERVICE_URL;
+  const originalToken = process.env.BYOK_KMS_SERVICE_TOKEN;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    if (originalUrl === undefined) delete process.env.BYOK_KMS_SERVICE_URL;
+    else process.env.BYOK_KMS_SERVICE_URL = originalUrl;
+    if (originalToken === undefined) delete process.env.BYOK_KMS_SERVICE_TOKEN;
+    else process.env.BYOK_KMS_SERVICE_TOKEN = originalToken;
+  });
+
+  async function insertEnvelopeRow(
+    ownerId: string,
+    secret: string,
+    dek: string,
+    legacy?: EncryptedData
+  ) {
+    const [row] = await db
+      .insert(byok_api_keys)
+      .values({
+        kilo_user_id: ownerId,
+        provider_id: 'anthropic',
+        encrypted_api_key:
+          legacy ??
+          encryptApiKey('legacy-value-must-not-be-read', randomBytes(32).toString('base64')),
+        encrypted_api_key_envelope: {
+          encrypted_data: encryptApiKey(secret, dek),
+          wrapped_dek: 'wrapped',
+          kms_key_id: 'alias/test',
+          kms_key_version: '1',
+          algorithm: 'aes-256-gcm',
+          envelope_version: 1,
+        },
+        created_by: ownerId,
+      })
+      .returning({ id: byok_api_keys.id });
+    return row.id;
+  }
+
+  test('decrypts through the KMS service with the row context and ignores the legacy column', async () => {
+    const user = await createUser();
+    const secret = `anthropic-${crypto.randomUUID()}`;
+    const dek = randomBytes(32).toString('base64');
+    const keyId = await insertEnvelopeRow(user.id, secret, dek);
+    process.env.BYOK_KMS_SERVICE_URL = 'http://kms.test';
+    process.env.BYOK_KMS_SERVICE_TOKEN = 'token';
+    const fetchMock = jest.fn(async () => Response.json({ data_key: dek }));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const byok = await getBYOKforUser(db, user.id, ['anthropic']);
+
+    expect(byok).toEqual([{ decryptedAPIKey: secret, providerId: 'anthropic' }]);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('http://kms.test/decrypt');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(String(init.body))).toEqual({
+      key_id: keyId,
+      owner_type: 'user',
+      owner_id: user.id,
+      provider_id: 'anthropic',
+      wrapped_dek: 'wrapped',
+      kms_key_id: 'alias/test',
+      kms_key_version: '1',
+    });
+  });
+
+  test('falls back to the legacy column without calling KMS when the service is unconfigured', async () => {
+    const user = await createUser();
+    const secret = `anthropic-${crypto.randomUUID()}`;
+    await insertEnvelopeRow(
+      user.id,
+      secret,
+      randomBytes(32).toString('base64'),
+      encryptApiKey(secret, BYOK_ENCRYPTION_KEY)
+    );
+    delete process.env.BYOK_KMS_SERVICE_URL;
+    delete process.env.BYOK_KMS_SERVICE_TOKEN;
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(getBYOKforUser(db, user.id, ['anthropic'])).resolves.toEqual([
+      { decryptedAPIKey: secret, providerId: 'anthropic' },
+    ]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test('fails key resolution when the KMS service rejects the request', async () => {
+    const user = await createUser();
+    await insertEnvelopeRow(user.id, 'secret', randomBytes(32).toString('base64'));
+    process.env.BYOK_KMS_SERVICE_URL = 'http://kms.test';
+    process.env.BYOK_KMS_SERVICE_TOKEN = 'token';
+    global.fetch = jest.fn(
+      async () => new Response('{}', { status: 403 })
+    ) as unknown as typeof fetch;
+
+    await expect(getBYOKforUser(db, user.id, ['anthropic'])).rejects.toThrow('403');
+  });
+
+  test('keeps the keys that decrypt when another key fails and fails closed when none do', async () => {
+    const user = await createUser();
+    await insertEnvelopeRow(user.id, 'secret', randomBytes(32).toString('base64'));
+    const openaiSecret = await insertByokKey(
+      { type: 'user', id: user.id },
+      user.id,
+      'openai',
+      '2026-01-01T00:00:00.000Z'
+    );
+    process.env.BYOK_KMS_SERVICE_URL = 'http://kms.test';
+    process.env.BYOK_KMS_SERVICE_TOKEN = 'token';
+    global.fetch = jest.fn(
+      async () => new Response('{}', { status: 502 })
+    ) as unknown as typeof fetch;
+
+    await expect(getBYOKforUser(db, user.id, ['anthropic', 'openai'])).resolves.toEqual([
+      { decryptedAPIKey: openaiSecret, providerId: 'openai' },
+    ]);
+    await expect(getBYOKforUser(db, user.id, ['anthropic'])).rejects.toThrow('502');
   });
 });

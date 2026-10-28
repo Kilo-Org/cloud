@@ -100,13 +100,8 @@
   ],
   "limits": {
     "nativeDelivery": {
-      "count": 512,
-      "bytes": 65536,
       "eventBytes": 262144,
-      "retainedBytes": 327680,
-      "batchBytes": 331776,
-      "ageMs": 2000,
-      "coalesceMs": 10
+      "batchBytes": 331776
     }
   },
   "fixtures": {

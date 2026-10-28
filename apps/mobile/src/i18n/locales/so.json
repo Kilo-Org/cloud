@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Nuqulka lama gaari karin — waxaa laga yaabaa in xiriirkiisu go'ay.",
     "remoteSpawnNonRetryable": "Nuqulku ma bilaabi karin kalfadhiga — hubi mashiinka ama cusboonaysii CLI-ga.",
-    "remoteSpawnInstanceDisconnected": "Xiriirka nuqulkii la doortay ayaa go'ay. Kalfadhi ka bilow Cloud Agent ama dooro nuqul kale.",
-    "liveCount_one": "{{count}} TOOS AH",
-    "liveCount_other": "{{count}} TOOS AH"
+    "remoteSpawnInstanceDisconnected": "Xiriirka nuqulkii la doortay ayaa go'ay. Kalfadhi ka bilow Cloud Agent ama dooro nuqul kale."
   },
   "agentChat": {
     "session": {
@@ -3955,6 +3953,8 @@
     "title": "Iibso lacag adeeg",
     "description": "Lacagta adeeg waa iib hal mar ah oo lagu daraa dheelitirkaaga Kilo si loogu shaqeeyo kalfadhiyada codeynta AI ee app-ka Kilo. Dukaanku wuxuu ka qaadaa akoonkaaga, lacagta adeegna waxaa lagu daraa ka dib marka dukaanku xaqiijiyo lacag bixinta.",
     "nextExpiry": "Lacag adeeg ah oo dhan {{amount}} ayaa dhacaysa {{date}} (UTC). Lacagta adeegga ee ugu horreysa ee dhacaysa ayaa marka hore la isticmaalaa.",
+    "noExpiringCredits": "Ma jirto lacag adeeg ah oo dhacaysa.",
+    "expiryUnavailable": "Xogta dhicitaanka lacagta adeegga lama heli karo.",
     "appStoreExpiry": "Lacagta adeegga ee laga iibsaday App Store ma dhacdo.",
     "playOneYearExpiry": "Lacagtan adeeggu waxay dhacaysaa hal sano oo kalandar ah kadib iibsashada.",
     "playNonexpiring": "Lacagtan adeeggu ma dhacdo.",

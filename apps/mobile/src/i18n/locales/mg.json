@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Tsy tratra ny milina — mety tapaka ny fifandraisana.",
     "remoteSpawnNonRetryable": "Tsy vitan'ny milina ny nanomboka ny fotoam-piasana — jereo ny milina na havaozy ny CLI.",
-    "remoteSpawnInstanceDisconnected": "Tapaka ny fifandraisana amin'ny milina voafidy. Manomboha fotoam-piasana ao amin'ny Cloud Agent na mifidiana milina hafa.",
-    "liveCount_one": "{{count}} MIVANTANA",
-    "liveCount_other": "{{count}} MIVANTANA"
+    "remoteSpawnInstanceDisconnected": "Tapaka ny fifandraisana amin'ny milina voafidy. Manomboha fotoam-piasana ao amin'ny Cloud Agent na mifidiana milina hafa."
   },
   "agentChat": {
     "session": {
@@ -3955,6 +3953,8 @@
     "title": "Hividy kireditra",
     "description": "Ny kireditra dia fividianana indray mandeha ampiana amin'ny balan Kilo anao hanaovana session coding AI ao amin'ny Kilo App. Ny fivarotana no maka vola amin'ny kaontinao ary ampiana ny kireditra rehefa manamarina ny fandoavam-bola ny fivarotana.",
     "nextExpiry": "Kireditra {{amount}} ho lany daty amin'ny {{date}} (UTC). Ny kireditra ho lany daty voalohany no ampiasaina aloha.",
+    "noExpiringCredits": "Tsy misy kireditra ho lany daty.",
+    "expiryUnavailable": "Tsy azo alaina ny antsipirian'ny fahataperan'ny datin'ny kireditra.",
     "appStoreExpiry": "Tsy lany daty ny kireditra novidiana tamin'ny App Store.",
     "playOneYearExpiry": "Lany daty herintaona ara-kalandrie aorian'ny fividianana ireo kireditra ireo.",
     "playNonexpiring": "Tsy lany daty ireo kireditra ireo.",

@@ -12,6 +12,34 @@ type RuntimeProfile = Pick<
   'runtimeSkills' | 'runtimeAgents' | 'kiloCommands'
 >;
 
+export type RuntimeProfileMaterializer = {
+  materialize(
+    home: string,
+    profile: RuntimeProfile,
+    options?: RuntimeSkillInstallOptions
+  ): Promise<void>;
+  release(home: string): void;
+};
+
+export class RuntimeProfileMismatchError extends Error {
+  constructor() {
+    super('Workspace is already configured with a different runtime profile');
+    this.name = 'RuntimeProfileMismatchError';
+  }
+}
+
+type ProfileWaiter = {
+  onProgress?: (detail: string) => void;
+};
+
+type MaterializedProfile = {
+  configKey: string;
+  controller: AbortController;
+  waiters: Set<ProfileWaiter>;
+  state: 'installing' | 'ready' | 'aborting' | 'idle';
+  promise: Promise<void>;
+};
+
 const profileWrites = new Map<string, Promise<void>>();
 
 export function profileConfigPath(home: string): string {
@@ -25,6 +53,121 @@ export function withRuntimeProfileEnvironment(
 ): Record<string, string> {
   if (!profile.runtimeAgents?.length && !profile.kiloCommands?.length) return env;
   return { ...env, KILO_CONFIG: profileConfigPath(env.HOME) };
+}
+
+function stableValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(stableValue);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map(key => [key, stableValue((value as Record<string, unknown>)[key])])
+    );
+  }
+  return value;
+}
+
+export function runtimeProfileConfigKey(profile: RuntimeProfile): string {
+  return JSON.stringify(
+    stableValue({
+      runtimeSkills: profile.runtimeSkills ?? [],
+      runtimeAgents: profile.runtimeAgents ?? [],
+      kiloCommands: profile.kiloCommands ?? [],
+    })
+  );
+}
+
+/**
+ * Single-flight materialization per workspace HOME. Active siblings reuse a
+ * successful profile and reject drift; after release a changed profile may
+ * replace it.
+ */
+export function createRuntimeProfileMaterializer(): RuntimeProfileMaterializer {
+  const profiles = new Map<string, MaterializedProfile>();
+
+  return {
+    async materialize(home, profile, options) {
+      options?.signal?.throwIfAborted();
+      const configKey = runtimeProfileConfigKey(profile);
+      let entry = profiles.get(home);
+      if (entry?.state === 'aborting') entry = undefined;
+      if (entry?.state === 'idle') {
+        if (entry.configKey === configKey) {
+          entry.state = 'ready';
+          return;
+        }
+        profiles.delete(home);
+        entry = undefined;
+      }
+      if (entry?.state === 'ready') {
+        if (entry.configKey !== configKey) throw new RuntimeProfileMismatchError();
+        return;
+      }
+      if (entry && entry.configKey !== configKey) throw new RuntimeProfileMismatchError();
+
+      if (!entry) {
+        const controller = new AbortController();
+        const created: MaterializedProfile = {
+          configKey,
+          controller,
+          waiters: new Set(),
+          state: 'installing',
+          promise: Promise.resolve(),
+        };
+        const sharedOptions: RuntimeSkillInstallOptions = {
+          ...options,
+          signal: controller.signal,
+          onProgress: detail => {
+            for (const waiter of created.waiters) waiter.onProgress?.(detail);
+          },
+        };
+        created.promise = materializeRuntimeProfile(home, profile, sharedOptions).then(
+          () => {
+            if (profiles.get(home) !== created) return;
+            if (created.state === 'installing') created.state = 'ready';
+            else profiles.delete(home);
+          },
+          error => {
+            if (profiles.get(home) === created) profiles.delete(home);
+            throw error;
+          }
+        );
+        void created.promise.catch(() => undefined);
+        profiles.set(home, created);
+        entry = created;
+      }
+
+      const target = entry;
+      return new Promise<void>((resolve, reject) => {
+        const waiter: ProfileWaiter = { onProgress: options?.onProgress };
+        let settled = false;
+        const settle = (error?: unknown): void => {
+          if (settled) return;
+          settled = true;
+          options?.signal?.removeEventListener('abort', onAbort);
+          target.waiters.delete(waiter);
+          if (target.waiters.size === 0 && target.state === 'installing') {
+            target.state = 'aborting';
+            target.controller.abort();
+          }
+          if (error === undefined) resolve();
+          else reject(error);
+        };
+        const onAbort = (): void =>
+          settle(options?.signal?.reason ?? new DOMException('Aborted', 'AbortError'));
+        target.waiters.add(waiter);
+        options?.signal?.addEventListener('abort', onAbort, { once: true });
+        target.promise.then(
+          () => settle(),
+          error => settle(error)
+        );
+      });
+    },
+    release(home) {
+      const entry = profiles.get(home);
+      if (entry?.state === 'ready') entry.state = 'idle';
+    },
+  };
 }
 
 export async function materializeRuntimeProfile(

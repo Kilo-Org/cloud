@@ -122,6 +122,33 @@ import {
   type ControlPlaneWorktreeCaptureInput,
 } from '../../shared/control-plane-protocol.js';
 import { resolveControlPlaneTimers } from '../../shared/control-plane-timers.js';
+import {
+  admitSessionSnapshotWork,
+  beginSessionSnapshot,
+  waitForSessionSnapshotIdle,
+  invalidateSessionSnapshot,
+  publishSessionSnapshot,
+  readSessionSnapshot,
+  sessionSnapshotCaptureResultSchema,
+  sessionSnapshotActivitySchema,
+  isSessionSnapshotExecutionEvent,
+  sessionSnapshotIdentity,
+  sessionSnapshotsEnabled,
+  sameSessionSnapshotIdentity,
+  readReadySessionSnapshot,
+  SESSION_SNAPSHOT_CAPTURE_MS,
+  SESSION_SNAPSHOT_READ_MS,
+  SESSION_SNAPSHOT_RECONCILE_MS,
+  SESSION_SNAPSHOT_RPC_MARGIN_MS,
+  SESSION_SNAPSHOT_KEY,
+  type SessionSnapshotCaptureInput,
+  type SessionSnapshotCaptureResult,
+  type SessionSnapshotActivity,
+  type SessionSnapshotDescriptor,
+  type SessionSnapshotIdentity,
+} from '../session-snapshot.js';
+import { ISOLATED_CONTAINER_WORKSPACE_PATH } from '../../workspace.js';
+import { resolveSandboxIdClass } from '../../sandbox-placement.js';
 import type { SandboxStatusSnapshot } from '../../shared/sandbox-status.js';
 import type {
   WorkspaceBillingProjection,
@@ -372,6 +399,9 @@ export type ControlPlaneSessionSnapshot =
  * `SANDBOX_CONTROL` binding; tests may inject a fake through `sandboxPeerFor`.
  */
 export type ControlPlaneSandboxPeer = SharedWorktreeChangesPeer & {
+  captureSessionSnapshot?(
+    input: SessionSnapshotCaptureInput
+  ): Promise<SessionSnapshotCaptureResult>;
   status(payload: ControlPlaneSessionRefPayload): Promise<ControlPlaneStatusResult>;
   prepare(input: ControlPlanePrepareInputWithSelection): Promise<ControlPlaneRouteView>;
   deliver(payload: ControlPlaneDeliverPayload): Promise<ControlPlaneDeliverResult>;
@@ -768,6 +798,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       this.wipeLocator = null;
     } else {
       this.wipeLocator = parsedLocator.locator;
+    }
+    const snapshot = readSessionSnapshot(this.ctx.storage.kv);
+    if (snapshot?.state === 'pending') {
+      this.ctx.waitUntil(this.finishSessionSnapshot({ ...snapshot.input, reconcile: true }));
     }
   }
 
@@ -1382,6 +1416,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       }
     }
     if (reduction.changed.length > 0) {
+      admitSessionSnapshotWork(this.ctx.storage.kv);
       this.messages = reduction.messages;
       await this.persistMessages(reduction.changed);
       for (const message of reduction.changed) this.emitQueued(message);
@@ -1405,6 +1440,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (this.registration === null) return { interrupted: false };
     return this.enqueue(async () => {
       const open = openMessages(this.messages).map(m => m.messageId);
+      invalidateSessionSnapshot(this.ctx.storage.kv);
       // A user cancel: mark the interruption so the next idle schedules a
       // capture that shows the cancelled worktree state.
       this.worktreeChanges.markInterrupted();
@@ -1709,6 +1745,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.enqueue(async () => {
       // A delete queued ahead of this notification wiped the session.
       if (this.registration === null) return;
+      if (
+        readSessionSnapshot(this.ctx.storage.kv) !== undefined &&
+        parsed.events.some(isSessionSnapshotExecutionEvent)
+      ) {
+        await this.deferSessionSnapshotForActivity();
+      }
       for (const event of parsed.events) {
         if (event.type === 'commands.available') {
           await handleCommandsAvailable(event.properties, {
@@ -1749,6 +1791,40 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
+  async onNativeActivity(input: SessionSnapshotActivity): Promise<void> {
+    await this.initialized;
+    const activity = sessionSnapshotActivitySchema.parse(input);
+    await this.enqueue(async () => {
+      const snapshot = readSessionSnapshot(this.ctx.storage.kv);
+      if (snapshot === undefined || this.registration === null) return;
+      const currentRoute =
+        this.route.state !== 'unknown' &&
+        this.route.attemptId === activity.attemptId &&
+        (this.route.container?.allocationId === undefined ||
+          this.route.container.allocationId === activity.allocationId);
+      const sourceDisk =
+        snapshot.state === 'ready' &&
+        snapshot.descriptor.sourceAllocationId === activity.allocationId;
+      if (!currentRoute && !sourceDisk) return;
+      if (activity.active) await this.deferSessionSnapshotForActivity();
+      else if (snapshot.state === 'waiting' && currentRoute) {
+        if (
+          snapshot.deadlineAt <= Date.now() ||
+          this.route.state !== 'ready' ||
+          snapshot.input.attemptId !== this.route.attemptId ||
+          this.sessionSnapshotIdentity() === null ||
+          openMessages(this.messages).length > 0
+        )
+          invalidateSessionSnapshot(this.ctx.storage.kv);
+        else {
+          beginSessionSnapshot(this.ctx.storage.kv, snapshot.input, snapshot.deadlineAt);
+          this.ctx.waitUntil(this.finishSessionSnapshot(snapshot.input));
+        }
+        await this.armAlarm();
+      }
+    });
+  }
+
   async onOutcome(outcome: ControlPlaneOutcome): Promise<void> {
     await this.initialized;
     if (this.registration === null) return;
@@ -1781,6 +1857,172 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       // An outcome is a terminal event: capture on it. Interruption is set only
       // by an explicit user cancel (`stop`).
       this.worktreeChanges.onOutcome({ ...parsed });
+      if (
+        parsed.status === 'completed' &&
+        reduction.changed.length > 0 &&
+        openMessages(this.messages).length === 0
+      )
+        await this.scheduleSessionSnapshot(parsed.lastMessageId);
+    });
+  }
+
+  private sessionSnapshotIdentity(): SessionSnapshotIdentity | null {
+    const registration = this.registration;
+    if (
+      registration === null ||
+      registration.spec.directory !== ISOLATED_CONTAINER_WORKSPACE_PATH ||
+      !sessionSnapshotsEnabled(this.env, registration.credentials) ||
+      registration.sandboxSelection?.provider !== 'cloudflare-containers'
+    )
+      return null;
+    try {
+      const kind = resolveSandboxIdClass({
+        sandboxId: registration.sandboxId,
+        sandboxKind: registration.sandboxSelection.sandboxKind,
+      });
+      if (kind !== 'isolated-small' && kind !== 'isolated-standard') return null;
+    } catch {
+      return null;
+    }
+    return sessionSnapshotIdentity(
+      registration.sandboxId,
+      this.sessionId,
+      registration.spec.kiloSessionId,
+      registration.credentials
+    );
+  }
+
+  private async scheduleSessionSnapshot(lastMessageId: string): Promise<void> {
+    const identity = this.sessionSnapshotIdentity();
+    if (identity === null || this.route.state !== 'ready') return;
+    const input: SessionSnapshotCaptureInput = {
+      ...identity,
+      lastMessageId,
+      attemptId: this.route.attemptId,
+      captureId: crypto.randomUUID(),
+    };
+    waitForSessionSnapshotIdle(this.ctx.storage.kv, input);
+    await this.armAlarm();
+  }
+
+  private async deferSessionSnapshotForActivity(): Promise<void> {
+    const snapshot = readSessionSnapshot(this.ctx.storage.kv);
+    if (snapshot === undefined) return;
+    if (
+      this.sessionSnapshotIdentity() === null ||
+      this.route.state !== 'ready' ||
+      openMessages(this.messages).length > 0
+    ) {
+      invalidateSessionSnapshot(this.ctx.storage.kv);
+      await this.armAlarm();
+    } else if (snapshot.state !== 'waiting') {
+      await this.scheduleSessionSnapshot(
+        snapshot.state === 'ready'
+          ? snapshot.descriptor.lastMessageId
+          : snapshot.input.lastMessageId
+      );
+    }
+  }
+
+  private async finishSessionSnapshot(input: SessionSnapshotCaptureInput): Promise<void> {
+    const scheduled = readSessionSnapshot(this.ctx.storage.kv);
+    if (scheduled?.state !== 'pending' || scheduled.input.captureId !== input.captureId) return;
+    if (scheduled.deadlineAt <= Date.now()) {
+      await this.enqueue(async () => {
+        const current = readSessionSnapshot(this.ctx.storage.kv);
+        if (current?.state === 'pending' && current.input.captureId === input.captureId) {
+          invalidateSessionSnapshot(this.ctx.storage.kv);
+          await this.armAlarm();
+        }
+      });
+      return;
+    }
+    const peer = this.sandboxPeerFor(input.sandboxId);
+    let result: SessionSnapshotCaptureResult = { status: 'pending' };
+    if (peer?.captureSessionSnapshot === undefined) result = { status: 'unavailable' };
+    else {
+      try {
+        const raw = await withTimeout(
+          peer.captureSessionSnapshot(input),
+          (input.reconcile
+            ? SESSION_SNAPSHOT_READ_MS
+            : SESSION_SNAPSHOT_CAPTURE_MS + SESSION_SNAPSHOT_READ_MS) +
+            SESSION_SNAPSHOT_RPC_MARGIN_MS,
+          'Session snapshot capture timed out'
+        );
+        result = sessionSnapshotCaptureResultSchema.parse(raw);
+      } catch {
+        /* Reconcile the same durable capture ID; never issue another capture. */
+      }
+    }
+    await this.enqueue(async () => {
+      const pending = readSessionSnapshot(this.ctx.storage.kv);
+      if (pending?.state !== 'pending' || pending.input.captureId !== input.captureId) return;
+      const identity = this.sessionSnapshotIdentity();
+      if (
+        identity === null ||
+        !sameSessionSnapshotIdentity(identity, input) ||
+        openMessages(this.messages).length > 0 ||
+        this.route.state !== 'ready' ||
+        this.route.attemptId !== input.attemptId ||
+        pending.deadlineAt <= Date.now() ||
+        result.status === 'unavailable'
+      ) {
+        invalidateSessionSnapshot(this.ctx.storage.kv);
+        await this.armAlarm();
+        return;
+      }
+      if (result.status === 'pending') {
+        this.ctx.storage.kv.put(SESSION_SNAPSHOT_KEY, {
+          ...pending,
+          reconcileAt: Math.min(pending.deadlineAt, Date.now() + SESSION_SNAPSHOT_RECONCILE_MS),
+        });
+        await this.armAlarm();
+        return;
+      }
+      if (result.status === 'deferred') {
+        if (pending.idleDeadlineAt <= Date.now()) invalidateSessionSnapshot(this.ctx.storage.kv);
+        else
+          waitForSessionSnapshotIdle(
+            this.ctx.storage.kv,
+            { ...input, captureId: crypto.randomUUID(), reconcile: undefined },
+            pending.idleDeadlineAt
+          );
+        await this.armAlarm();
+        return;
+      }
+      const published = publishSessionSnapshot(this.ctx.storage.kv, result.descriptor);
+      logControlDiagnostic('session_snapshot_publication', {
+        sessionId: this.sessionId,
+        captureId: input.captureId,
+        allocationId: result.descriptor.sourceAllocationId,
+        published,
+      });
+      await this.armAlarm();
+    });
+  }
+
+  async getSessionDiskSnapshot(sandboxId: string): Promise<SessionSnapshotDescriptor | null> {
+    await this.initialized;
+    return this.enqueue(async () => {
+      const identity = this.sessionSnapshotIdentity();
+      if (
+        identity === null ||
+        identity.sandboxId !== sandboxId ||
+        this.messages.some(message => message.state === 'accepted')
+      )
+        return null;
+      const descriptor = readReadySessionSnapshot(this.ctx.storage.kv, identity, Date.now());
+      if (descriptor === null) return null;
+      const covered = this.messages.findIndex(
+        message => message.messageId === descriptor.lastMessageId && message.state === 'completed'
+      );
+      if (
+        covered < 0 ||
+        this.messages.slice(covered + 1).some(message => message.state !== 'queued')
+      )
+        return null;
+      return descriptor;
     });
   }
 
@@ -1818,6 +2060,19 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       // Retry any report/callback obligation a previous attempt could not send.
       await this.repairOutboxes();
       const now = Date.now();
+      const snapshot = readSessionSnapshot(this.ctx.storage.kv);
+      if (snapshot?.state === 'waiting' && snapshot.deadlineAt <= now)
+        invalidateSessionSnapshot(this.ctx.storage.kv);
+      if (snapshot?.state === 'pending' && snapshot.reconcileAt <= now) {
+        if (snapshot.deadlineAt <= now) invalidateSessionSnapshot(this.ctx.storage.kv);
+        else {
+          this.ctx.storage.kv.put(SESSION_SNAPSHOT_KEY, {
+            ...snapshot,
+            reconcileAt: Math.min(snapshot.deadlineAt, now + SESSION_SNAPSHOT_RECONCILE_MS),
+          });
+          this.ctx.waitUntil(this.finishSessionSnapshot({ ...snapshot.input, reconcile: true }));
+        }
+      }
       const due = dueBackstopMessages(this.messages, now, this.sessionTimers());
       if (due.length > 0) {
         if (due.some(entry => entry.message.state === 'queued')) {
@@ -1850,7 +2105,13 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (!this.messages.some(message => message.state === 'queued')) {
       await this.clearTransportRecovery();
     }
+    const snapshot = readSessionSnapshot(this.ctx.storage.kv);
     const candidates = [
+      snapshot?.state === 'pending'
+        ? snapshot.reconcileAt
+        : snapshot?.state === 'waiting'
+          ? snapshot.deadlineAt
+          : null,
       this.transportRecoveryAt,
       nextBackstopAt(this.messages, this.sessionTimers()),
       this.reportOutbox.nextDueAt() ?? null,
@@ -2585,10 +2846,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         this.sandboxRpcConfig(pass)
       );
     } catch {
+      invalidateSessionSnapshot(this.ctx.storage.kv);
       await this.scheduleTransportRecovery(pass);
       return;
     }
     if (result === 'sent') {
+      invalidateSessionSnapshot(this.ctx.storage.kv);
       const now = Date.now();
       const reduction = acceptMessages(
         this.messages,

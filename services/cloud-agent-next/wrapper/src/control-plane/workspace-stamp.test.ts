@@ -35,7 +35,7 @@ describe('workspace stamp', () => {
 
   it('round-trips the current shape without lineage', async () => {
     await writeWorkspaceStamp(directory, true, { allocationId: 'builder', commit: 'c1' });
-    expect(await readWorkspaceStamp(directory, true)).toEqual({
+    expect(await readWorkspaceStamp(directory)).toEqual({
       allocationId: 'builder',
       commit: 'c1',
     });
@@ -45,7 +45,7 @@ describe('workspace stamp', () => {
     await writeWorkspaceStamp(directory, true, { ...LINEAGE, allocationId: 'a', commit: 'c1' });
     await writeWorkspaceStamp(directory, true, { ...LINEAGE, allocationId: 'b', commit: 'c2' });
 
-    expect(await readWorkspaceStamp(directory, true)).toEqual({
+    expect(await readWorkspaceStamp(directory)).toEqual({
       ...LINEAGE,
       allocationId: 'b',
       commit: 'c2',
@@ -53,21 +53,63 @@ describe('workspace stamp', () => {
     expect(await fs.readdir(path.join(directory, '.git'))).toEqual(['kilo-workspace.json']);
   });
 
+  it('round-trips session identity and validated snapshot lineage', async () => {
+    const stamp = {
+      allocationId: 'alloc-restored',
+      commit: 'c1',
+      session: {
+        sessionId: 'workspace-one',
+        kiloSessionId: 'kilo-one',
+        snapshotSourceAllocationId: 'alloc-source',
+      },
+    };
+    await writeWorkspaceStamp(directory, true, stamp);
+    expect(await readWorkspaceStamp(directory)).toEqual(stamp);
+  });
+
   it('reads a missing, corrupt or foreign-shaped stamp as none', async () => {
-    expect(await readWorkspaceStamp(directory, true)).toBeNull();
+    expect(await readWorkspaceStamp(directory)).toBeNull();
     const file = workspaceStampPath(directory, true);
     await fs.writeFile(file, 'not json');
-    expect(await readWorkspaceStamp(directory, true)).toBeNull();
+    expect(await readWorkspaceStamp(directory)).toBeNull();
     await fs.writeFile(
       file,
       JSON.stringify({ ...LINEAGE, allocationId: 'a', commit: 'c', extra: 1 })
     );
-    expect(await readWorkspaceStamp(directory, true)).toBeNull();
+    expect(await readWorkspaceStamp(directory)).toBeNull();
     await fs.writeFile(file, JSON.stringify({ allocationId: 'a' }));
-    expect(await readWorkspaceStamp(directory, true)).toBeNull();
+    expect(await readWorkspaceStamp(directory)).toBeNull();
     await fs.writeFile(file, 'ready\n');
-    expect(await readWorkspaceStamp(directory, true)).toBeNull();
+    expect(await readWorkspaceStamp(directory)).toBeNull();
   });
+
+  it('discovers a bare workspace stamp before and after a repository is initialized', async () => {
+    const stamp = {
+      allocationId: 'alloc-source',
+      commit: '',
+      workspacePrepared: false as const,
+      session: { sessionId: 'workspace-one', kiloSessionId: 'kilo-one' },
+    };
+    await fs.rm(path.join(directory, '.git'), { recursive: true });
+    await writeWorkspaceStamp(directory, false, stamp);
+    expect(await readWorkspaceStamp(directory)).toEqual(stamp);
+    await fs.mkdir(path.join(directory, '.git'));
+    expect(await readWorkspaceStamp(directory)).toEqual(stamp);
+    const current = { ...stamp, allocationId: 'alloc-current' };
+    await writeWorkspaceStamp(directory, true, current);
+    expect(await readWorkspaceStamp(directory)).toEqual(current);
+  });
+
+  it.each(['corrupt', 'invalid', 'unreadable'])(
+    'does not fall back to a sidecar when the primary stamp is %s',
+    async kind => {
+      await writeWorkspaceStamp(directory, false, { allocationId: 'alloc-source', commit: '' });
+      const primary = workspaceStampPath(directory, true);
+      if (kind === 'unreadable') await fs.mkdir(primary);
+      else await fs.writeFile(primary, kind === 'corrupt' ? 'invalid' : '{"allocationId":"other"}');
+      expect(await readWorkspaceStamp(directory)).toBeNull();
+    }
+  );
 
   it('classifies a workspace from the filesystem alone', () => {
     const mine = { ...LINEAGE, allocationId: 'now', commit: 'c' };
@@ -79,5 +121,11 @@ describe('workspace stamp', () => {
     expect(classifyWorkspace({ ...input, hasGit: false, stamp: mine })).toBe('same');
     expect(classifyWorkspace({ ...input, hasGit: true, stamp: other })).toBe('foreign');
     expect(classifyWorkspace({ ...input, hasGit: false, stamp: other })).toBe('empty');
+    expect(
+      classifyWorkspace({ ...input, hasGit: false, stamp: { ...mine, workspacePrepared: false } })
+    ).toBe('empty');
+    expect(
+      classifyWorkspace({ ...input, hasGit: true, stamp: { ...mine, workspacePrepared: false } })
+    ).toBe('unstamped');
   });
 });

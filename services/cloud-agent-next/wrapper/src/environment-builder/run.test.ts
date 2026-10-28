@@ -171,7 +171,7 @@ describe('environment build run', () => {
     expect(await fs.readFile(path.join(home, '.cache', 'tool', 'built'), 'utf8')).toBe(
       'plain-value\n'
     );
-    expect(await readWorkspaceStamp(directory, true)).toEqual({
+    expect(await readWorkspaceStamp(directory)).toEqual({
       allocationId: '33333333-3333-4333-8333-333333333333',
       commit: tip,
     });
@@ -236,7 +236,7 @@ describe('environment build run', () => {
       reason: 'cleanup_failed',
       detail: 'a credential remained in Git metadata',
     });
-    expect(await readWorkspaceStamp(directory, true)).toBeNull();
+    expect(await readWorkspaceStamp(directory)).toBeNull();
   });
   it('reports an unavailable cleanup', async () => {
     const home = directoryHome(directory, homeRoot);

@@ -11,6 +11,7 @@ import { AgentSandboxUnavailableError } from '../agent-sandbox/protocol.js';
 import type { RuntimeStartupConfig } from '../shared/runtime-startup-config.js';
 import type { CredentialContainmentRequirements } from './credential-containment.js';
 import type { BillingContext } from '@kilocode/container-usage';
+import type { NativeCaptureResult } from '../sandbox-containers/native-capture.js';
 
 export type ProviderCreationCause =
   | 'insufficient_credits'
@@ -165,6 +166,10 @@ export type ProviderAdapter = {
   logs(ref: string): Promise<string>;
   /** Present on a provider that can start a session from an environment snapshot. */
   readonly environmentSnapshots?: true;
+  readonly sessionSnapshots?: {
+    capture(ref: string, captureId: string): Promise<NativeCaptureResult>;
+    read(captureId: string): Promise<NativeCaptureResult | null>;
+  };
   /**
    * Replace the live sandbox's contained-credential network policy with one
    * built from the authoritative grants. Only a provider whose network policy

@@ -406,6 +406,7 @@ export function createControlPlaneConnection(
           allocationId: options.allocationId,
           protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
           heartbeatAck: true,
+          sessionSnapshots: true,
           redactsNamedSecrets: true,
           installsSkillsSh: true,
         })

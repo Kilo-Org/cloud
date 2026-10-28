@@ -132,6 +132,9 @@ export function installFakeRuntimeProxyPeer(
       onRoute: update => peer.onRoute(update),
       onEvents: notification => peer.onEvents(notification),
       onOutcome: outcome => peer.onOutcome(outcome),
+      onNativeActivity: activity => peer.onNativeActivity?.(activity) ?? Promise.resolve(),
+      getSessionDiskSnapshot: sandboxId =>
+        peer.getSessionDiskSnapshot?.(sandboxId) ?? Promise.resolve(null),
       onWorktreeChangesReady: notification => peer.onWorktreeChangesReady(notification),
       getRuntimeProxyDelegationExpiresAt: async () => Date.now() + 24 * 60 * 60_000,
       issueRuntimeCredentialProxyGrant: async fence => {

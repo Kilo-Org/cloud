@@ -54,6 +54,7 @@ import {
 } from './native-start.js';
 import {
   CAPTURE_INDEX_KEY,
+  SNAPSHOT_CAPTURE_TIMEOUT_MS,
   captureKey,
   captureResult,
   parseCaptureIndex,
@@ -173,7 +174,7 @@ const CONTAINER_CALL_TIMEOUT_MS = 5_000;
 /** Pause between readiness probes, so repeated pgrep stays sequential and bounded. */
 const WRAPPER_READINESS_POLL_MS = 1_000;
 /** Bounds one snapshot capture. The environment coordinator's wait is a backstop over this. */
-export const SNAPSHOT_CAPTURE_TIMEOUT_MS = 5 * 60_000;
+export { SNAPSHOT_CAPTURE_TIMEOUT_MS } from './native-capture.js';
 const DESTROY_TIMEOUT_MS = 30_000;
 
 /**

@@ -16,6 +16,7 @@ export const CAPTURE_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 
 /** Captures retained per container DO, newest first. Older records are deleted. */
 export const MAX_RETAINED_CAPTURES = 8;
+export const SNAPSHOT_CAPTURE_TIMEOUT_MS = 5 * 60_000;
 
 const CAPTURE_KEY_PREFIX = 'containers:capture:v1:';
 export const CAPTURE_INDEX_KEY = 'containers:captures:v1';

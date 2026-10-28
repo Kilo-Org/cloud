@@ -121,8 +121,9 @@ repository.
 4. Running and failed preparation MUST always be visible. Failed preparation,
    its triggering failed message, and its safe error MUST remain visible, with
    a way to open details.
-5. Setup commands MUST run on the first prepare and again on every rebuild. A
-   failing or timed-out setup command MUST fail preparation and the turn.
+5. Setup commands MUST run on the first prepare and again on every rebuild,
+   except when restoring a private session disk snapshot. A failing or timed-out
+   setup command MUST fail preparation and the turn.
 6. Follow-up turns MUST NOT show preparation unless the environment was
    rebuilt.
 7. Preparation output MUST NOT reveal tokens or secret values.
@@ -138,8 +139,9 @@ repository.
 
 ### Environment snapshots
 
-1. A session MUST NOT save its workspace as a snapshot. Only an environment
-   build MAY create an environment snapshot.
+1. Only an environment build MAY create a reusable environment snapshot.
+   Private session disk snapshots MUST follow the separate session snapshot
+   rules below and MUST NOT be published as environment snapshots.
 2. A session that uses a repository environment MAY start from that
    environment's published snapshot when the owner, repository, sandbox image
    and runtime match and the snapshot revision is not newer than the
@@ -166,7 +168,43 @@ repository.
    of one revision. A manual build MUST stay available during backoff.
 10. Environment, profile, and launch screens MUST show a non-blocking notice
     that sessions can reuse a snapshot and cached files may retain earlier
-    values. The notice MUST NOT block a save or a launch or show a value.
+     values. The notice MUST NOT block a save or a launch or show a value.
+
+### Session disk snapshots
+
+1. Session disk snapshots MUST be disabled by default and enabled only for
+   explicitly enrolled users or organizations. Capture and restore MUST both
+   check enrollment independently of environment snapshot enrollment.
+2. An enrolled session MAY capture its container disk after successful turn
+   finalization and durable message settlement, when no Cloud messages remain
+   open and the existing wrapper heartbeat reports idle on the current
+   connection. Capture MUST NOT delay turn completion or Stop. Failed or
+   interrupted turns MUST NOT create snapshots.
+3. A snapshot MUST belong to exactly one session, Kilo session, sandbox, and
+   owner. Only isolated, single-session native Cloudflare Containers at
+   `/workspace/app` MAY capture or restore. Allocations that hosted another
+   session MUST NOT produce a session snapshot.
+4. Capture publication and restore MUST reject stale allocation, connection,
+   preparation, runtime, or conversation identity. New delivery, Stop, and
+   autonomous native execution MUST invalidate older disk state. An uncertain
+   capture MUST be reconciled by its persisted capture ID, not issued again.
+5. A cold start MAY prefer its own compatible session snapshot, no older than
+   24 hours, over an environment snapshot or base image. Lookup MUST be bounded
+   at two seconds. Reading a snapshot MUST NOT consume it before work is
+   delivered, so failed launches remain recoverable.
+6. Restore MUST preserve local branches, unpushed commits, the Git index,
+   dirty, untracked and ignored files, and session home state. It MUST NOT run
+   environment-template adoption, checkout, setup replay, or older file recovery
+   over the restored disk. It MUST refresh current credentials and configuration,
+   reconcile authoritative session history, and validate workspace provenance
+   before reporting ready.
+7. Unsupported runtimes, failed restore, or failed restored preparation MUST
+   use the bounded fresh-start fallback without silently hanging the session.
+   Existing history and worktree recovery MUST remain available on that fallback.
+8. A private disk snapshot MAY contain session credentials, caches, and user
+   secrets. It MUST NOT be shared with another session or an environment build.
+   Descriptor expiry or session deletion MUST remove eligibility, but MUST NOT
+   claim physical deletion where the provider offers no delete API.
 
 ### Turn
 

@@ -315,6 +315,10 @@ export const controlPlaneRouteSpecSchema = z
     branch: z.string().min(1).max(256).optional(),
     branchMode: z.literal('working').optional(),
     worktreeRecovery: worktreeRecoverySchema.optional(),
+    sessionSnapshot: z
+      .object({ sourceAllocationId: z.string().min(1).max(256) })
+      .strict()
+      .optional(),
     git: controlPlaneRouteGitSchema.optional(),
     kilo: controlPlaneRouteKiloSchema.optional(),
     env: z.record(z.string().max(256), z.string().max(10000)).optional(),
@@ -385,6 +389,13 @@ export type AttachmentSpec = z.infer<typeof attachmentSpecSchema>;
  */
 export const controlPlaneRegistrationRouteSpecSchema = controlPlaneRouteSpecSchema.superRefine(
   (spec, context) => {
+    if (spec.sessionSnapshot !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['sessionSnapshot'],
+        message: 'session snapshot provenance is frame-only',
+      });
+    }
     if (spec.secretEnvKeys !== undefined) {
       context.addIssue({
         code: 'custom',
@@ -489,6 +500,13 @@ export const controlPlanePrepareInputSchema = z
   })
   .strict()
   .superRefine((value, context) => {
+    if (value.spec.sessionSnapshot !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['spec', 'sessionSnapshot'],
+        message: 'session snapshot provenance is frame-only',
+      });
+    }
     if (value.spec.git?.token !== undefined) {
       context.addIssue({
         code: 'custom',
@@ -798,6 +816,7 @@ const controlPlaneHelloFrameSchema = z
     allocationId: z.string().min(1).max(128),
     protocolVersion: z.literal(CONTROL_PLANE_PROTOCOL_VERSION),
     heartbeatAck: z.literal(true).optional(),
+    sessionSnapshots: z.literal(true).optional(),
     /**
      * Optional capability: the wrapper redacts a value by each named secret key
      * from `session.prepare`, not only names matching the `SECRET_NAME` heuristic.

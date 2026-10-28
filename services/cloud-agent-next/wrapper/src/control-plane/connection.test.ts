@@ -163,6 +163,7 @@ it('advertises worktree support without changing the strict legacy hello', () =>
       allocationId: 'alloc-1',
       protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
       heartbeatAck: true,
+      sessionSnapshots: true,
       redactsNamedSecrets: true,
       installsSkillsSh: true,
     });
@@ -886,6 +887,7 @@ describe('createControlPlaneConnection', () => {
         allocationId: 'alloc-1',
         protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
         heartbeatAck: true,
+        sessionSnapshots: true,
         redactsNamedSecrets: true,
         installsSkillsSh: true,
       });

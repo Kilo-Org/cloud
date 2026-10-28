@@ -112,18 +112,24 @@ export const sessionAuthOptions = {
  * session. With the JWT strategy the read only parses and re-serializes request
  * cookies, so a throw means the cookies are unusable, for example a malformed
  * cookie name that `cookie.serialize` rejects while NextAuth clears an invalid
- * session token.
+ * session token. Any other failure is rethrown so it stays visible.
  */
 async function readSession(): Promise<Session | null> {
   try {
     return await getServerSession(sessionAuthOptions);
   } catch (error) {
+    if (!isCookieValidationError(error)) throw error;
     warnExceptInTest(
-      'NextAuth session read failed; treating request as unauthenticated',
-      error instanceof Error ? error.name : typeof error
+      'NextAuth session read failed on malformed cookies; treating request as unauthenticated'
     );
     return null;
   }
+}
+
+const COOKIE_VALIDATION_ERROR_MESSAGE = /^(argument|option) \w+ (is invalid|must be a string)$/;
+
+function isCookieValidationError(error: unknown): boolean {
+  return error instanceof TypeError && COOKIE_VALIDATION_ERROR_MESSAGE.test(error.message);
 }
 
 /**

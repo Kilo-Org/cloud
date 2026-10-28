@@ -835,6 +835,15 @@ describe('getUserFromSession', () => {
 
     await expect(getUserFromSession()).resolves.toBeNull();
   });
+
+  test.each([
+    ['a non-cookie TypeError', new TypeError("Cannot read properties of undefined (reading 'id')")],
+    ['a generic error', new Error('session callback failed')],
+  ])('rethrows %s from the session read', async (_label, error) => {
+    mockGetServerSession.mockRejectedValue(error);
+
+    await expect(getUserFromSession()).rejects.toBe(error);
+  });
 });
 
 describe('credential issuance authentication guards', () => {

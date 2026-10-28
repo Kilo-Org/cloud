@@ -68,7 +68,6 @@ import {
   unavailableModelResponse,
   storeAndPreviousResponseIdIsNotSupported,
   apiKindNotSupportedResponse,
-  checkExclusiveModelProviderAllowed,
   allowedInferenceProviders,
   inferenceProvidersNotAllowedResponse,
   modelDoesNotExistOnOpenRouterResponse,
@@ -1032,12 +1031,6 @@ export async function handleLlmProxyRequest(
         only: eligibleProviders,
       };
     }
-  } else {
-    const providerNotAllowedError = checkExclusiveModelProviderAllowed(
-      effectiveModelIdLowerCased,
-      requestBodyParsed.body.provider
-    );
-    if (providerNotAllowedError) return providerNotAllowedError;
   }
 
   sentryRootSpan()?.setAttribute(

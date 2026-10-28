@@ -208,4 +208,45 @@ describe('custom model pricing', () => {
       calculateCustomCost_mUsd(tieredConfig, GEMINI_FLASH_CURRENT_MODEL_ID, makeUsage())
     ).toBeUndefined();
   });
+
+  const promptPricing = (prompt_per_million: number) => ({
+    prompt_per_million,
+    completion_per_million: 0,
+    input_cache_read_per_million: null,
+    input_cache_write_per_million: null,
+  });
+
+  test('requires the first tier to start at zero', () => {
+    const invalidConfig: CustomPricingConfig = {
+      models: [
+        {
+          model: 'vendor/model',
+          pricing: [{ start_context_length: 1, pricing: promptPricing(1) }],
+        },
+      ],
+    };
+
+    expect(() =>
+      calculateCustomCost_mUsd(invalidConfig, 'vendor/model', makeUsage({ inputTokens: 100 }))
+    ).toThrow('The first pricing tier must start at context length 0');
+  });
+
+  test('requires tiers to be ordered by ascending start context length', () => {
+    const invalidConfig: CustomPricingConfig = {
+      models: [
+        {
+          model: 'vendor/model',
+          pricing: [
+            { start_context_length: 0, pricing: promptPricing(1) },
+            { start_context_length: 200, pricing: promptPricing(2) },
+            { start_context_length: 100, pricing: promptPricing(3) },
+          ],
+        },
+      ],
+    };
+
+    expect(() =>
+      calculateCustomCost_mUsd(invalidConfig, 'vendor/model', makeUsage({ inputTokens: 100 }))
+    ).toThrow('Pricing tiers must be ordered by ascending start context length');
+  });
 });

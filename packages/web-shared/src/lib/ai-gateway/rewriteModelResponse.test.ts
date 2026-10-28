@@ -27,10 +27,6 @@ import { PutObjectCommand } from '@aws-sdk/client-s3';
 import type { RewriteResponseParams } from './rewriteModelResponse.shared';
 import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
-import {
-  paidStealthModelFixture,
-  useKiloExclusiveModel,
-} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
 jest.mock('@kilocode/web-shared/lib/r2/create-client', () =>
   jest
@@ -2048,8 +2044,6 @@ async function rewriteUsageFixture(
 }
 
 describe.each(usageShapes)('$kind billed usage normalization', shape => {
-  useKiloExclusiveModel();
-
   describe.each([false, true])('stream=%s', stream => {
     describe.each(['openrouter', 'vercel'] as const)('%s', provider => {
       describe.each([false, true])('upstream BYOK=%s', upstreamByok => {
@@ -2070,13 +2064,6 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
             isFree: false,
             userByok: true,
             cost: 0,
-          },
-          {
-            name: 'paid exclusive pricing',
-            model: paidStealthModelFixture.public_id,
-            isFree: false,
-            userByok: false,
-            cost: 13.38,
           },
         ])('$name', async ({ model, isFree, userByok, cost }) => {
           const usesMetadataCost = provider === 'vercel' && shape.kind !== 'chat_completions';

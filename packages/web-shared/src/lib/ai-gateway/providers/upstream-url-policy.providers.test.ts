@@ -1,6 +1,4 @@
-import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { OPENAI_CHATGPT_API_URL } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/upstream';
-import { MARTIAN } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/martian';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
@@ -22,14 +20,6 @@ function urlsOf(name: string, apiUrl: string, overrides: ProviderApiUrlOverrides
 const PROVIDER_URLS = [
   ...urlsOf(OPENROUTER.id, OPENROUTER.apiUrl, OPENROUTER.apiUrlOverrides),
   ...urlsOf(VERCEL_AI_GATEWAY.id, VERCEL_AI_GATEWAY.apiUrl, VERCEL_AI_GATEWAY.apiUrlOverrides),
-  ...urlsOf(MARTIAN.id, MARTIAN.apiUrl, MARTIAN.apiUrlOverrides),
-  ...kiloExclusiveModels.flatMap(model =>
-    urlsOf(
-      `kilo-exclusive ${model.public_id}`,
-      model.provider.apiUrl,
-      model.provider.apiUrlOverrides
-    )
-  ),
   ['openai-chatgpt', OPENAI_CHATGPT_API_URL],
 ];
 

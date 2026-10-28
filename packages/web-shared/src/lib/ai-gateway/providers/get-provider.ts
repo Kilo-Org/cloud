@@ -8,10 +8,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { isGatewayUserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { withIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
-import {
-  findKiloExclusiveModel,
-  isKiloExclusiveModel,
-} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   byokOwner,
   getBYOKforOrganization,
@@ -241,12 +238,7 @@ async function getGatewayRoutedByok(
 ): Promise<GatewayRoutedByok> {
   const none: GatewayRoutedByok = { inference: [], gateway: [] };
   if (isAnonymousContext(user)) return none;
-  // Kilo-exclusive models are not routable through Vercel BYOK. Reasoning in particular
-  // breaks: the Vercel AI Gateway normalizes reasoning to each provider's upstream-native
-  // shape, whereas our Kilo-exclusive models are served through generic OpenAI-compatible
-  // endpoints (Martian, direct Alibaba, etc.) where that normalization doesn't apply and the
-  // response ends up corrupted. Skip the BYOK lookup entirely and let the caller fall
-  // through to the model's declared gateway.
+  // Kilo-exclusive models stay on Kilo's own accounts, like in `getModelGatewayUserByokProviders`.
   if (isKiloExclusiveModel(requestedModel)) return none;
   const modelProviders = await getModelUserByokProviders(requestedModel);
   if (modelProviders.length === 0) return none;
@@ -397,13 +389,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     return gatewayByok;
   }
 
-  const kiloExclusiveModel = findKiloExclusiveModel(requestedModel);
-
-  const eligibleForVercelRouting =
-    !kiloExclusiveModel || kiloExclusiveModel.flags.includes('vercel-routing');
-
   if (
-    eligibleForVercelRouting &&
     !boundedSpending &&
     (await shouldRouteToVercel(requestedModel, request, async () =>
       withIgnoredProviders(await resolveRoutingProviderConfig(), kiloIgnoredProviders)
@@ -420,7 +406,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 
   return {
     kind: 'provider',
-    provider: kiloExclusiveModel?.provider ?? OPENROUTER,
+    provider: OPENROUTER,
     userByok: null,
     isFree: isFreeModelExcludingCustomLlms(requestedModel),
     bypassAccessCheck: false,

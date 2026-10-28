@@ -16,7 +16,7 @@ import {
   publicCustomLlmDefinition,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import {
-  paidStealthModelFixture,
+  kiloExclusiveModelFixture,
   useKiloExclusiveModel,
 } from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
@@ -47,7 +47,7 @@ describe('custom LLM catalog', () => {
   });
 
   test('ignores a custom LLM whose id is still a Kilo-exclusive model', async () => {
-    const exclusiveId = paidStealthModelFixture.public_id;
+    const exclusiveId = kiloExclusiveModelFixture.public_id;
     await insertCustomLlmForTest(exclusiveId, publicCustomLlmDefinition(['acme']));
     try {
       await expect(findCustomLlm(exclusiveId)).resolves.toBeNull();

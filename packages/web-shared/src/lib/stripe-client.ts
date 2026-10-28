@@ -12,7 +12,8 @@ const skipStripeApi =
 
 // Stripe rejects requests that hit a locked object ("another API request or
 // Stripe process is currently accessing it") and advises retrying; the SDK
-// retries those with backoff. Pinned explicitly so the bound is deliberate.
+// retries those with backoff. 2 equals the stripe@23 default, so this pins the
+// existing policy against SDK default changes rather than adding retries.
 const STRIPE_MAX_NETWORK_RETRIES = 2;
 
 export const client: Stripe = new Stripe(stripeSecretKey, {

@@ -8,6 +8,7 @@
 // same security ledger) runs inside `mutationFn`. Only
 // `useHoistedOperationKey` is mocked (it holds React ref state that needs a
 // mounted renderer).
+/* eslint-disable max-lines -- one harness for the hooks module: dismissal wiring/rotation, analysis toasts and the findings query options */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 

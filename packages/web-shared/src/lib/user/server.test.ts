@@ -28,6 +28,7 @@ import {
   getUserUUID,
   uuidSchema,
   getUserFromAuth,
+  getUserFromSession,
   sessionAuthOptions,
   getUserFromBearerForCredentialExchange,
   getUserFromSessionForCredentialIssuance,
@@ -485,6 +486,17 @@ describe('getUserFromAuth', () => {
     expect(result.credentialsRejected).toBe(false);
   });
 
+  test('returns 401 when the session read throws on malformed cookies', async () => {
+    mockHeaders.mockResolvedValue(new Headers());
+    mockGetServerSession.mockRejectedValue(new TypeError('argument name is invalid'));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.credentialsRejected).toBe(false);
+  });
+
   test('flags an operation-scoped token presented to another endpoint', async () => {
     const user = await insertTestUser({ api_token_pepper: 'audience-fallthrough-pepper' });
     const token = signPolicyClaims({
@@ -810,6 +822,21 @@ describe('getUserFromAuth', () => {
   });
 });
 
+describe('getUserFromSession', () => {
+  test('returns the session user id for a valid session', async () => {
+    mockGetServerSession.mockResolvedValue({ kiloUserId: 'session-user-id' });
+
+    await expect(getUserFromSession()).resolves.toEqual({ id: 'session-user-id' });
+    expect(mockGetServerSession).toHaveBeenCalledWith(sessionAuthOptions);
+  });
+
+  test('returns null when the session read throws on malformed cookies', async () => {
+    mockGetServerSession.mockRejectedValue(new TypeError('argument name is invalid'));
+
+    await expect(getUserFromSession()).resolves.toBeNull();
+  });
+});
+
 describe('credential issuance authentication guards', () => {
   test.each([
     ['Bearer token', { Authorization: 'Bearer token' }],
@@ -841,6 +868,16 @@ describe('credential issuance authentication guards', () => {
 
     expect(result.user?.id).toBe(user.id);
     expect(mockGetServerSession).toHaveBeenCalledWith(sessionAuthOptions);
+  });
+
+  test('returns 401 when the session read throws on malformed cookies', async () => {
+    mockHeaders.mockResolvedValue(new Headers());
+    mockGetServerSession.mockRejectedValue(new TypeError('argument name is invalid'));
+
+    const result = await getUserFromSessionForCredentialIssuance();
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(401);
   });
 
   test('rejects a revoked web session', async () => {

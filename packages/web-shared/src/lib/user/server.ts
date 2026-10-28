@@ -14,7 +14,7 @@ import { headers } from 'next/headers';
 
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
-import type { NextAuthOptions, JWT, LoggerInstance } from 'next-auth';
+import type { NextAuthOptions, JWT, LoggerInstance, Session } from 'next-auth';
 import { getServerSession } from 'next-auth';
 import { IS_DEVELOPMENT, ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { redirect } from 'next/navigation';
@@ -31,7 +31,11 @@ import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import jwt from 'jsonwebtoken';
-import { logExceptInTest, sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import {
+  logExceptInTest,
+  sentryLogger,
+  warnExceptInTest,
+} from '@kilocode/web-shared/lib/utils.server';
 import {
   authViaTokenFromHeaders,
   clientIpFromHeaders,
@@ -104,12 +108,31 @@ export const sessionAuthOptions = {
 } satisfies NextAuthOptions;
 
 /**
+ * Reads the NextAuth session, treating a session read that throws as no
+ * session. With the JWT strategy the read only parses and re-serializes request
+ * cookies, so a throw means the cookies are unusable, for example a malformed
+ * cookie name that `cookie.serialize` rejects while NextAuth clears an invalid
+ * session token.
+ */
+async function readSession(): Promise<Session | null> {
+  try {
+    return await getServerSession(sessionAuthOptions);
+  } catch (error) {
+    warnExceptInTest(
+      'NextAuth session read failed; treating request as unauthenticated',
+      error instanceof Error ? error.name : typeof error
+    );
+    return null;
+  }
+}
+
+/**
  * Returns the signed-in user id when the request carries a valid NextAuth
  * session, or null when it does not. This performs no authorization checks and
  * never redirects; it is used to decide where an OAuth callback error lands.
  */
 export async function getUserFromSession(): Promise<{ id: string } | null> {
-  const session = await getServerSession(sessionAuthOptions);
+  const session = await readSession();
   return session?.kiloUserId ? { id: session.kiloUserId } : null;
 }
 
@@ -372,7 +395,7 @@ async function resolveUserFromSession(
   opts: RequiredPermissions,
   fromDb: typeof db
 ): Promise<GetAuthResponse> {
-  const session = await getServerSession(sessionAuthOptions);
+  const session = await readSession();
   const maybeKiloUserId = session?.kiloUserId;
 
   if (!maybeKiloUserId) return authError(401, 'Unauthorized', '?');

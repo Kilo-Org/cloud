@@ -3953,6 +3953,8 @@
     "title": "Nunua salio",
     "description": "Salio ni ununuzi wa mara moja unaoongezwa kwenye usawa wako wa Kilo kwa kuendesha vikao vya kuandika msimbo kwa AI katika Kilo App. Duka hukutoza akaunti yako na salio huongezwa baada ya duka kuthibitisha malipo.",
     "nextExpiry": "Muda wa salio la {{amount}} unaisha {{date}} (UTC). Salio linaloisha muda mapema zaidi hutumika kwanza.",
+    "noExpiringCredits": "Hakuna salio linaloisha muda.",
+    "expiryUnavailable": "Taarifa za muda wa kuisha kwa salio hazipatikani.",
     "appStoreExpiry": "Salio lililonunuliwa kupitia App Store halina muda wa kuisha.",
     "playOneYearExpiry": "Muda wa salio hili unaisha mwaka mmoja wa kalenda baada ya ununuzi.",
     "playNonexpiring": "Salio hili halina muda wa kuisha.",

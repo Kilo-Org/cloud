@@ -3953,6 +3953,8 @@
     "title": "Kredit al",
     "description": "Kredit Kilo App-də AI kodlaşdırma sessiyalarını işə salmaq üçün Kilo balansına əlavə olunan birdəfəlik alışdır. Mağaza hesabından ödəniş alır və mağaza ödənişi təsdiqlədikdən sonra kredit əlavə olunur.",
     "nextExpiry": "{{amount}} məbləğində kreditin müddəti {{date}} (UTC) tarixində bitir. Müddəti ən tez bitən kreditlər ilk istifadə olunur.",
+    "noExpiringCredits": "Müddəti bitəcək kredit yoxdur.",
+    "expiryUnavailable": "Kreditin müddətinin bitməsi barədə məlumat mövcud deyil.",
     "appStoreExpiry": "App Store vasitəsilə alınan kreditlərin müddəti bitmir.",
     "playOneYearExpiry": "Bu kreditlərin müddəti alışdan bir təqvim ili sonra bitir.",
     "playNonexpiring": "Bu kreditlərin müddəti bitmir.",

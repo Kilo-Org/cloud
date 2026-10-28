@@ -70,10 +70,6 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   logExceptInTest: () => {},
 }));
 jest.mock('./providers/upstream-request', () => ({ fetchGeneration: jest.fn() }));
-jest.mock('./kilo-exclusive-models', () => ({
-  findKiloExclusiveModel: () => undefined,
-  shouldRedactModelNameInMicrodollarUsage: () => false,
-}));
 jest.mock('./custom-pricing', () => ({ calculateCustomCost_mUsd: () => undefined }));
 jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
   normalizeJa4: () => null,

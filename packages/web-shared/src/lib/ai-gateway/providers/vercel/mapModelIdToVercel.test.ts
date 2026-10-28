@@ -6,6 +6,10 @@ import {
   mapResolvedModelIdToVercelWithoutOverrides,
   readVercelModelIdOverrides,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import {
+  kiloExclusiveModelFixture,
+  useKiloExclusiveModel,
+} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
 const overrides = [
   { openrouter_model_id: 'meta/muse-wonder', vercel_model_id: 'meta/muse-wonder-1.0' },
@@ -112,20 +116,14 @@ describe('mapModelIdToVercel', () => {
   });
 
   describe('kilo-exclusive models', () => {
-    it('maps an exclusive flagged with vercel-routing to its internal id', async () => {
-      // google/gemma-4-26b-a4b-it:free is registered in kiloExclusiveModels
-      // with the 'vercel-routing' flag and internal_id 'google/gemma-4-26b-a4b-it'.
+    useKiloExclusiveModel();
+
+    it('maps an exclusive to its internal id', async () => {
       await expect(mapModelIdToVercel('google/gemma-4-26b-a4b-it:free')).resolves.toBe(
         'google/gemma-4-26b-a4b-it'
       );
-    });
-
-    it('does not use internal_id for exclusives that are not vercel-routed', async () => {
-      // claude_sonnet_4_6_stealth_model has gateway 'martian' and no
-      // 'vercel-routing' flag, so the mapping must pass the public id through
-      // the generic prefix rewrite instead of substituting internal_id.
-      await expect(mapModelIdToVercel('stealth/claude-sonnet-4.6')).resolves.toBe(
-        'stealth/claude-sonnet-4.6'
+      await expect(mapModelIdToVercel(kiloExclusiveModelFixture.public_id)).resolves.toBe(
+        kiloExclusiveModelFixture.internal_id
       );
     });
   });

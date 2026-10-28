@@ -3953,6 +3953,8 @@
     "title": "Guthaben kaufen",
     "description": "Guthaben ist ein einmaliger Kauf, der deinem Kilo-Guthaben für AI-Codierungssitzungen in der Kilo App hinzugefügt wird. Der Store belastet dein Konto, und das Guthaben wird gutgeschrieben, sobald der Store die Zahlung bestätigt.",
     "nextExpiry": "{{amount}} Guthaben verfällt am {{date}} (UTC). Guthaben mit dem frühesten Ablaufdatum wird zuerst verbraucht.",
+    "noExpiringCredits": "Kein Guthaben mit Ablaufdatum.",
+    "expiryUnavailable": "Ablaufinformationen zum Guthaben nicht verfügbar.",
     "appStoreExpiry": "Über den App Store gekauftes Guthaben verfällt nicht.",
     "playOneYearExpiry": "Dieses Guthaben verfällt ein Kalenderjahr nach dem Kauf.",
     "playNonexpiring": "Dieses Guthaben verfällt nicht.",

@@ -5,11 +5,11 @@ import {
 import { hashToSandboxId } from '../sandbox-id.js';
 import type { EnvironmentBuildRunner } from '../shared/environment-build-protocol.js';
 import type { SandboxBillingInput } from '../container-usage-context.js';
+import { ProviderCreationError } from '../sandbox-control/provider.js';
 import { createCloudflareContainersProviderAdapter } from '../sandbox-control/cloudflare-containers-provider.js';
 import { encodeCloudflareProviderRef } from '../sandbox-control/cloudflare-provider.js';
 import { leaseAtLeastMs } from '../sandbox-control/deadlines.js';
 import { downloadedStartup } from '../sandbox-control/downloaded-startup.js';
-import { selectStartup } from '../sandbox-control/startup-selection.js';
 import { SHA256_PATTERN } from '../sandbox-control/runtime-release.js';
 import type { Env } from '../types.js';
 import type {
@@ -47,7 +47,7 @@ export type BuilderProvider = {
   capture(allocation: BuilderAllocation, captureId: string): Promise<NativeCaptureResult>;
   stop(allocation: BuilderAllocation): Promise<'terminal' | 'retryable'>;
   renewLease(allocation: BuilderAllocation): Promise<void>;
-  /** SHA-256 of the selected runtime release descriptor, or null for the baked image. */
+  /** SHA-256 of the runtime release descriptor, or null when unavailable. */
   runtimeReleaseId(): Promise<string | null>;
   /** The image a container in `sandboxId` starts from now, or null when unreadable. */
   currentImage(sandboxId: string): Promise<string | null>;
@@ -76,17 +76,29 @@ async function sha256Hex(value: string): Promise<string> {
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
+type BuilderRuntimeEnv = Pick<
+  Env,
+  | 'RUNTIME_STARTUP_MODE'
+  | 'NATIVE_RUNTIME_IMAGE'
+  | 'RUNTIME_RELEASE_DESCRIPTOR'
+  | 'WORKER_URL'
+  | 'NEXTAUTH_SECRET'
+  | 'RUNTIME_RELEASE_BUCKET'
+>;
+
+/** Snapshot enrollment is separate from the interactive session runtime cohort. */
+export function builderRuntimeUnsupportedReason(env: BuilderRuntimeEnv): string | null {
+  return env.RUNTIME_STARTUP_MODE === 'downloaded' &&
+    env.NATIVE_RUNTIME_IMAGE === 'runtime-free' &&
+    env.RUNTIME_RELEASE_DESCRIPTOR &&
+    env.RUNTIME_RELEASE_BUCKET
+    ? null
+    : 'Environment snapshots require the downloaded runtime-free image and runtime release';
+}
+
 export function createBuilderProvider(deps: {
   containers: DurableObjectNamespace<SandboxContainers>;
-  env: Pick<
-    Env,
-    | 'RUNTIME_STARTUP_MODE'
-    | 'NATIVE_RUNTIME_IMAGE'
-    | 'RUNTIME_RELEASE_DESCRIPTOR'
-    | 'WORKER_URL'
-    | 'NEXTAUTH_SECRET'
-    | 'RUNTIME_RELEASE_BUCKET'
-  >;
+  env: BuilderRuntimeEnv;
 }): BuilderProvider {
   const adapterFor = (allocation: BuilderAllocation): ProviderAdapter =>
     createCloudflareContainersProviderAdapter({
@@ -102,18 +114,18 @@ export function createBuilderProvider(deps: {
       await adapterFor(allocation).ensureBillingAdmission(providerRef(allocation), billing);
     },
     async launch(allocation, launch) {
-      const selection = selectStartup(deps.env, 'cloudflare-containers');
-      const command =
-        selection.mode === 'downloaded'
-          ? await downloadedStartup({
-              env: deps.env,
-              descriptor: selection.descriptor,
-              sandboxId: allocation.sandboxId,
-              allocationId: allocation.allocationId,
-              deadlineAt: launch.deadlineAt,
-              mainProcess: 'environment-builder',
-            })
-          : { argv: ['/usr/local/bin/bun', '/usr/local/bin/kilocode-environment-builder.js'] };
+      const descriptor = deps.env.RUNTIME_RELEASE_DESCRIPTOR;
+      if (builderRuntimeUnsupportedReason(deps.env) !== null || !descriptor) {
+        throw new ProviderCreationError('invalid_configuration');
+      }
+      const command = await downloadedStartup({
+        env: deps.env,
+        descriptor,
+        sandboxId: allocation.sandboxId,
+        allocationId: allocation.allocationId,
+        deadlineAt: launch.deadlineAt,
+        mainProcess: 'environment-builder',
+      });
       const ref = providerRef(allocation);
       await stub(allocation).launchBuilder({
         allocationRef: ref,
@@ -134,9 +146,8 @@ export function createBuilderProvider(deps: {
       await adapterFor(allocation).ensureLeaseAtLeast(providerRef(allocation), leaseAtLeastMs());
     },
     async runtimeReleaseId() {
-      const selection = selectStartup(deps.env, 'cloudflare-containers');
-      const descriptor = selection.mode === 'downloaded' ? selection.descriptor : undefined;
-      return descriptor === undefined
+      const descriptor = deps.env.RUNTIME_RELEASE_DESCRIPTOR;
+      return !descriptor
         ? null
         : SHA256_PATTERN.test(descriptor)
           ? descriptor
@@ -144,7 +155,7 @@ export function createBuilderProvider(deps: {
     },
     async currentImage(sandboxId) {
       try {
-        return await deps.containers.getByName(sandboxId).currentImage();
+        return await deps.containers.getByName(sandboxId).currentImage('runtime-free');
       } catch {
         return null;
       }

@@ -68,12 +68,12 @@ async function setup(): Promise<Harness> {
       snapshotId: `snap-${captureId}`,
       size: 42,
       capturedAt: Date.now(),
-      baseImage: 'registry.example/app:1',
+      baseImage: 'registry.example/runtime-free:1',
       durationMs: 10,
     }),
     stopResult: 'terminal',
     launchError: null,
-    currentImage: 'registry.example/app:1',
+    currentImage: 'registry.example/runtime-free:1',
     alarms: [],
     snapshotOrgIds: OWNER.id,
   };
@@ -96,7 +96,7 @@ async function setup(): Promise<Harness> {
       return harness.stopResult;
     },
     renewLease: async () => undefined,
-    runtimeReleaseId: async () => null,
+    runtimeReleaseId: async () => 'release-1',
     currentImage: async () => harness.currentImage,
   };
   await runInDurableObject(stub, async (instance: EnvironmentBuild, state) => {
@@ -662,6 +662,29 @@ describe('environment snapshot resolution', () => {
     });
   });
 
+  it.each(['queued', 'preparing'] as const)(
+    'retires a legacy all-in-one build in %s state without capture',
+    async buildState => {
+      const harness = await setup();
+      const accepted = await manualBuild(harness);
+      if (accepted.status !== 'accepted') throw new Error('Expected an accepted build');
+      if (buildState === 'preparing') await tick(harness);
+      await runInDurableObject(harness.stub, async (instance: EnvironmentBuild) => {
+        const host = instance as unknown as { store: BuildStore };
+        host.store.update(accepted.buildId, { runtime_release: null });
+      });
+      await drive(harness);
+      expect(harness.captures).toHaveLength(0);
+      expect(harness.launches).toHaveLength(buildState === 'queued' ? 0 : 1);
+      expect(harness.stops).toHaveLength(buildState === 'queued' ? 0 : 1);
+      expect(await status(harness)).toMatchObject({
+        activeBuild: null,
+        published: null,
+        latestBuild: { state: 'obsolete', failureReason: 'runtime_changed' },
+      });
+    }
+  );
+
   it('does not launch a queued build after organization access is removed', async () => {
     const harness = await setup();
     await manualBuild(harness);
@@ -738,7 +761,7 @@ describe('environment snapshot resolution', () => {
     });
     expect(after).toMatchObject({
       reason: 'eligible',
-      snapshot: { revision: 1, stale: 'revision', baseImage: 'registry.example/app:1' },
+      snapshot: { revision: 1, stale: 'revision', baseImage: 'registry.example/runtime-free:1' },
       admission: { status: 'admitted' },
     });
     // An older admitted session never gets a newer snapshot.
@@ -756,7 +779,7 @@ describe('environment snapshot resolution', () => {
     });
     await drive(harness);
 
-    harness.currentImage = 'registry.example/app:2';
+    harness.currentImage = 'registry.example/runtime-free:2';
     await expect(
       harness.stub.resolveSnapshot({
         reference: sessionReference(harness, 1),

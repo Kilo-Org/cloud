@@ -1559,6 +1559,15 @@ export type EncryptedData = {
   authTag: string;
 };
 
+export type BYOKApiKeyEnvelope = {
+  encrypted_data: EncryptedData;
+  wrapped_dek: string;
+  kms_key_id: string;
+  kms_key_version: string;
+  algorithm: 'aes-256-gcm';
+  envelope_version: 1;
+};
+
 /**
  * RSA + AES envelope stored for secrets that are encrypted by the web app
  * and decrypted by a Worker. Kept structural here so the schema package does
@@ -2500,6 +2509,23 @@ export const DirectByokModelFlagSchema = z.enum(['recommended', 'vision', 'reaso
 
 export type DirectByokModelFlag = z.infer<typeof DirectByokModelFlagSchema>;
 
+/** The upstream endpoint of a direct BYOK model, for providers that serve models from several. */
+export const DirectByokModelEndpointSchema = z.enum([
+  // Amazon Bedrock
+  'mantle-chat',
+  'mantle-openai',
+  'runtime-anthropic',
+  'runtime-openai',
+  'runtime-responses',
+  // Google Vertex AI
+  'openapi',
+  'openapi-responses',
+  'anthropic',
+  'mistral',
+]);
+
+export type DirectByokModelEndpoint = z.infer<typeof DirectByokModelEndpointSchema>;
+
 export const DirectByokModelSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -2510,6 +2536,11 @@ export const DirectByokModelSchema = z.object({
   reasoning_options: z.array(ReasoningOptionSchema).optional(),
   /** The OpenRouter catalog model ID that models.dev identifies as the same model. */
   catalog_model_id: z.string().optional(),
+  /**
+   * Provider-specific upstream endpoint for providers whose models are served
+   * by different endpoints, such as Amazon Bedrock runtime versus mantle.
+   */
+  endpoint: DirectByokModelEndpointSchema.optional(),
 });
 
 export const DirectByokModelArraySchema = z.array(DirectByokModelSchema);
